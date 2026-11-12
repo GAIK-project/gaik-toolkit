@@ -2876,5 +2876,48 @@
       }
     ],
     "note": "Evidence for extracted values: asks the extractor for one verbatim quote per value, then finds each quote in the source and compares the value with it with plain code (no model call), giving a verdict per value (verified / check / reworded / unchecked) and, for PDFs, the position of the quote on the page. It works AROUND an extractor and changes none: it does not replace the extractor step and is never a subsumed component. Add it after the extraction step and before an LLMJudge step. For AudioToStructuredData and DocumentsToStructuredData pass your own schema= and requirements= to run() so that the evidence request reaches only the extraction. It is not a confidence score (VisionExtractor.include_verification is the model's own rating) and does not replace a human reviewer or LLMJudge: a verified value matches its quote, which is not proof that the quote is the right place to read it. A scanned PDF has no text layer and is unchecked; a quote is not mapped to a time in a recording."
+  },
+  "SpreadsheetParser": {
+    "import": "from gaik.software_components.parsers.spreadsheet_parser import SpreadsheetParser",
+    "construct": "parser = SpreadsheetParser()",
+    "call": "res = parser.parse_document(str(input_path))\n    parsed_text = res['text_content']",
+    "returns": "dict(.text_content, .file_name, .file_extension, .content_length, .word_count). The text is Markdown: one '## Sheet: <name>' table per sheet (a .csv gives one table, no heading) with a leading Row column holding the source row number, so a citation can name the sheet and row. parse_spreadsheet(path) returns just the Markdown string.",
+    "install_extra": "spreadsheet-parser",
+    "options": [],
+    "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser."
+  },
+  "VectorStore": {
+    "import": "from gaik.software_components.RAG.vector_store import VectorStore",
+    "construct": "store = VectorStore(persist=False)",
+    "call": "store.add(documents, embeddings)\n    hits = store.search(query_embedding, top_k=5)",
+    "returns": "list[tuple(Document, float)] -- the float is the similarity to the query. add() needs documents and embeddings of the same length; store.count() returns the number of stored documents.",
+    "install_extra": "vector-store",
+    "options": [
+      {
+        "name": "persist",
+        "type": "bool",
+        "default": false,
+        "effect": "False keeps the index in memory, so it is lost when the process ends. True stores it in a local Chroma folder, so it survives restarts (needs chromadb, installed with the vector-store extra).",
+        "selection_relevant": true,
+        "infer_from": "documents are indexed once per run (a PoC, a small collection) -> False; the index must survive restarts, or re-embedding every run is costly -> True. A shared or production index, or hybrid keyword search -> use PgVectorStore instead"
+      },
+      {
+        "name": "persist_path",
+        "type": "str",
+        "default": "chroma_store",
+        "effect": "Folder of the Chroma index when persist=True; ignored otherwise.",
+        "selection_relevant": false,
+        "infer_from": "only set when persist=True and the folder should not be the default"
+      },
+      {
+        "name": "collection_name",
+        "type": "str",
+        "default": "gaik_rag",
+        "effect": "Chroma collection name when persist=True; use one name per knowledge base so indexes do not mix.",
+        "selection_relevant": false,
+        "infer_from": "several knowledge bases in one persist_path -> one collection_name each"
+      }
+    ],
+    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed."
   }
 }

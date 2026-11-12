@@ -227,6 +227,7 @@
     ],
     "uses_components": [
       "Embedder",
+      "VectorStore",
       "Retriever",
       "AnswerGenerator"
     ],
@@ -3542,5 +3543,134 @@
     "example_script_path": "implementation_layer/examples/software_components/source_tracing/",
     "readme_path": "implementation_layer/src/gaik/software_components/source_tracing/README.md",
     "install_extra": "source-tracing"
+  },
+  {
+    "id": "spreadsheet_parser",
+    "name": "SpreadsheetParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "tabular",
+      "document"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Fast and lossless for cell values; carries no layout, charts or cell formatting",
+      "cost_sensitivity": "none -- fully local, no API calls",
+      "degrades_on": [
+        "very_large_sheets_for_downstream_llm_context",
+        "workbooks_whose_formulas_have_no_stored_results"
+      ]
+    },
+    "known_limitations": [
+      "Only .xlsx and .csv; other types, including legacy .xls, raise ValueError",
+      "Formula cells show the result stored in the file; a workbook whose formulas have no stored results (written by a library and never opened in Excel) raises ValueError -- open and save it in Excel or LibreOffice first",
+      "The first non-empty row is the header; empty rows are dropped and empty sheets omitted; a file with no non-empty rows raises ValueError",
+      "Reads a spreadsheet as text. To ask questions over its data use TabularAgent; for mixed source files use SourceNormalizer, which calls this parser"
+    ],
+    "best_for": [
+      "spreadsheet_to_markdown",
+      "row_level_citations",
+      "fast_local_processing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_spreadsheet",
+        "component": "SpreadsheetParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/spreadsheet_parser/",
+    "import_path": "gaik.software_components.parsers.spreadsheet_parser",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/demo_spreadsheet_parser.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/spreadsheet_parser/README.md",
+    "install_extra": "spreadsheet-parser"
+  },
+  {
+    "id": "vector_store",
+    "name": "VectorStore",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text_chunks",
+      "embeddings"
+    ],
+    "output_artifact_types": [
+      "vector_index",
+      "retrieved_chunks"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "persist",
+      "persist_path",
+      "collection_name"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Embedding similarity only: no keyword half, so exact terms (ids, names, codes) can be missed; PgVectorStore.search_hybrid() adds keyword search",
+      "cost_sensitivity": "none beyond the embedding calls that fill it -- runs locally, no database to set up",
+      "degrades_on": [
+        "very_large_collections",
+        "queries_that_depend_on_exact_terms"
+      ]
+    },
+    "known_limitations": [
+      "Default is an in-memory store: the index is lost when the process ends; persist=True keeps it in a local Chroma folder (needs chromadb, installed with gaik[vector-store])",
+      "In-memory search compares the query with every stored embedding, so it suits small and medium collections",
+      "Metadata filtering is basic",
+      "A single process: not a shared or production index -- use PgVectorStore for that"
+    ],
+    "best_for": [
+      "proof_of_concept_retrieval",
+      "small_to_medium_collections",
+      "no_database_setup"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "store_embeddings",
+        "component": "VectorStore",
+        "inputs": [
+          "text_chunks"
+        ],
+        "outputs": [
+          "vector_index"
+        ]
+      },
+      {
+        "id": "retrieve_chunks",
+        "component": "VectorStore",
+        "inputs": [
+          "user_query",
+          "vector_index"
+        ],
+        "outputs": [
+          "retrieved_chunks"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/vector_store/",
+    "import_path": "gaik.software_components.RAG.vector_store",
+    "example_script_path": "implementation_layer/examples/software_components/RAG/retriever_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/vector_store/README.md",
+    "install_extra": "vector-store"
   }
 ]
