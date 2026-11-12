@@ -1375,26 +1375,6 @@ _AMBIGUOUS_DATE_KEYWORDS = frozenset({"data", "dato", "jour"})
 _COMPOUND_DATE_KEYWORDS = frozenset(
     {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih"}
 )
-# A field name may run words together: FieldSpec lowercases "deliveryDate" to
-# "deliverydate", and "birthdate" is one word. So a name's word may end in "date",
-# unless it is one of the English words that do so without being a date.
-_NOT_A_DATE_WORDS = frozenset(
-    {
-        "accommodate",
-        "antedate",
-        "backdate",
-        "candidate",
-        "consolidate",
-        "invalidate",
-        "liquidate",
-        "mandate",
-        "postdate",
-        "predate",
-        "revalidate",
-        "update",
-        "validate",
-    }
-)
 _LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
 
 
@@ -1402,8 +1382,6 @@ def _has_date_keyword(text: str, *, in_name: bool) -> bool:
     """Whether ``text`` contains a date keyword as a word, not inside another word."""
     words = _LETTER_WORD_RE.findall(text.lower())
     for word in words:
-        if in_name and word.endswith("date") and word not in _NOT_A_DATE_WORDS:
-            return True
         for keyword in DATE_KEYWORDS:
             if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name:
                 continue
@@ -1418,7 +1396,8 @@ def _is_date_field(name: str, description: str) -> bool:
     """Check if a field is a date field based on name or description (multilingual).
 
     A keyword counts only as a whole word, so ``candidate_name``, ``update_notes``
-    and ``metadata`` are not dates.
+    and ``metadata`` are not dates. This is the fallback for a field the model
+    did not type as a date; :func:`_apply_type_overrides` checks the type first.
     """
     return _has_date_keyword(name, in_name=True) or _has_date_keyword(description, in_name=False)
 
@@ -1443,7 +1422,10 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
         if not _EXPLICIT_PATTERN_RE.search(field_context):
             field.pattern = None
 
-        if _is_date_field(field.field_name, field.description):
+        # The model's own type comes first: it read the task, and a date field need
+        # not have a date word in its name ("deadline", "valid_until"). The keyword
+        # check catches a date the model typed as text.
+        if field.field_type == "date" or _is_date_field(field.field_name, field.description):
             if _requests_text_representation(field_context):
                 field.field_type = "str"
                 field.format = None

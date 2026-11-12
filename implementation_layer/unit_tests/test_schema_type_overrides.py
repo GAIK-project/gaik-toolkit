@@ -329,8 +329,6 @@ def test_date_keyword_inside_another_word_does_not_make_a_field_a_date(name, des
     [
         ("order_date", "Order date"),
         ("date", "When it happened"),
-        ("deliveryDate", "Delivery"),
-        ("birthdate", "Born"),
         ("paivamaara", "Merkinnän päivä"),
         ("toimituspaivamaara", "Toimitus"),
         ("lieferdatum", "Lieferung"),
@@ -360,3 +358,40 @@ def test_field_that_only_looks_like_a_date_keeps_its_parsed_type():
     _apply_type_overrides(requirements, original_text="- Mandatory\n- Update count")
 
     assert [field.field_type for field in requirements.fields] == ["bool", "int"]
+
+
+@pytest.mark.parametrize(
+    ("name", "task_line", "expected_format"),
+    [
+        ("deadline", "- Deadline (DD/MM/YYYY)", "%d/%m/%Y"),
+        ("valid_until", "- Valid until: the last day of validity, as DD.MM.YYYY", "%d.%m.%Y"),
+        ("deliverydate", "- deliveryDate (DD/MM/YYYY)", "%d/%m/%Y"),
+        ("expiry", "- Expiry", None),
+    ],
+)
+def test_field_the_model_typed_as_a_date_gets_its_format_without_a_date_word_in_its_name(
+    name, task_line, expected_format
+):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="date", description="When it applies")
+    )
+
+    _apply_type_overrides(requirements, original_text=task_line)
+
+    field = requirements.fields[0]
+    assert field.field_type == "date"
+    assert field.format == expected_format
+
+
+def test_field_the_model_typed_as_a_date_follows_a_keep_as_text_instruction():
+    requirements = _requirements(
+        FieldSpec(field_name="deadline", field_type="date", description="When it is due")
+    )
+
+    _apply_type_overrides(requirements, original_text="- Deadline (preserve format in string)")
+
+    field = requirements.fields[0]
+    assert field.field_type == "str"
+    assert normalize_extracted_data({"deadline": "12 OCT 25"}, requirements) == {
+        "deadline": "12 OCT 25"
+    }
