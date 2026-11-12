@@ -1280,7 +1280,20 @@ _EXPLICIT_PATTERN_RE = re.compile(r"\b(?:regex|regular\s+expression|pattern)\b",
 _ITEM_START_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)]|#{1,6})\s+")
 # What may precede a field name that heads its own line: an optional list
 # marker or heading, then emphasis, backticks or quotes.
-_OWN_LINE_LEAD_RE = re.compile(r"\s*(?:(?:[-*+]|\d+[.)]|#{1,6})\s+)?[`*_\"'(]*")
+_OWN_LINE_LEAD_RE = re.compile(r"^\s*(?:(?:[-*+]|\d+[.)]|#{1,6})\s+)?[`*_\"'(]*$")
+# What must follow that name, after closing emphasis and spaces: a colon,
+# parenthesis, equals sign or dash, or the end of the line. A comma there means
+# the line lists several fields ("Order date, delivery date (DD/MM/YYYY)").
+_OWN_LINE_CLOSING = "`*_\"')"
+_OWN_LINE_SEPARATORS = ":(=\u2013\u2014-"
+
+
+def _heads_own_line(line: str, start: int, end: int) -> bool:
+    """Whether the field name at ``line[start:end]`` heads its own line."""
+    if not _OWN_LINE_LEAD_RE.match(line[:start]):
+        return False
+    rest = line[end:].lstrip(_OWN_LINE_CLOSING).lstrip()
+    return not rest or rest[0] in _OWN_LINE_SEPARATORS
 
 
 def _field_specific_context(field: FieldSpec, original_text: str) -> str:
@@ -1306,7 +1319,7 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
         if not match:
             continue
 
-        if _OWN_LINE_LEAD_RE.fullmatch(line[: match.start()]):
+        if _heads_own_line(line, match.start(), match.end()):
             # The field heads its own bullet, numbered item or heading
             # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
             # line is about this field, commas included.
@@ -1390,13 +1403,15 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
                 continue
 
             field.field_type = "date"
-            # The field's own clause in the task text comes first; the parsed
-            # description is the fallback, since the parser is told to keep a
-            # field's own format there and never to copy a neighbour's.
-            detected_format = _detect_date_format(field_context) or _detect_date_format(
-                field.description
+            # The field's own clause in the task text comes first, then a
+            # format the task states for all dates. The parsed description is
+            # the last fallback: the parser is told to keep a field's own
+            # format there, but what it writes must not override the task.
+            field.format = (
+                _detect_date_format(field_context)
+                or global_date_format
+                or _detect_date_format(field.description)
             )
-            field.format = detected_format or global_date_format
             continue
 
         field.format = None
