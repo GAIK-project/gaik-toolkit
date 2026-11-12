@@ -84,7 +84,7 @@ unknown model prices remain zero in the local pricing table.
 ```python
 result.raw_markdown     # Model output with <div data-bbox/data-label> wrappers
 result.clean_markdown   # Wrappers stripped, inner markdown/HTML preserved
-result.html             # Styled HTML document, or None if create_html=False
+result.html             # Styled HTML document (document tags only), or None if create_html=False
 result.usage            # UsageRecord with token counts, duration, and USD cost
 ```
 

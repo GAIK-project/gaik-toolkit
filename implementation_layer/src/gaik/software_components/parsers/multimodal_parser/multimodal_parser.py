@@ -22,6 +22,7 @@ from .config import (
     get_google_config,
     get_openai_config,
 )
+from .html_allowlist import keep_document_markup
 from .prompts import SYSTEM_PROMPTS, USER_PROMPTS
 from .usage import UsageRecord, build_usage_record
 
@@ -566,7 +567,11 @@ def _clean_markdown(text: str) -> str:
 
 
 def _markdown_to_html(markdown_text: str, title: str = "Parsed Document") -> str:
-    """Render markdown to a styled standalone HTML document."""
-    rendered = MARKDOWN_RENDERER.render(markdown_text)
+    """Render markdown to a styled standalone HTML document.
+
+    The markdown holds the model's HTML tables, so the rendered body keeps only
+    the document markup listed in :mod:`.html_allowlist`.
+    """
+    rendered = keep_document_markup(MARKDOWN_RENDERER.render(markdown_text))
     indented = "\n".join(f"    {line}" if line else "" for line in rendered.splitlines())
     return HTML_TEMPLATE.format(title=html.escape(title), body=indented)
