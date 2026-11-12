@@ -1020,6 +1020,37 @@ flowchart LR
 
 ---
 
+### Fields to Word
+
+Fields to Word writes extracted fields to a Word file that a person can read, correct and file: a title, an optional line of facts, a table of labels and values, an optional column with the evidence for each value, and an optional appendix with the source text or transcript. It is built with python-docx only: no model call, no template file, no Pandoc and no provider configuration.
+
+```python
+from gaik.software_components.fields_to_docx import FieldsToDocx
+
+result = FieldsToDocx().write(
+    [("Site", "Hall 3"), ("Work done", "Replaced the inlet valve"), ("Next visit", None)],
+    "service_report.docx",
+    title="Service report",
+    metadata={"Date": "2026-11-12"},
+    appendix="Service visit at Hall 3.\n\nThe technician replaced the inlet valve.",
+)
+print(result.path, result.rows, result.filled)  # service_report.docx 3 2
+```
+
+**Key features:**
+- `FieldsToDocx().write(fields, output_path=None, *, title="Report", metadata=None, labels=None, trace=None, evidence=None, appendix=None, appendix_title="Appendix: source text", footer=None)` returns a `DocxResult` with the file as bytes (`content`), the `path`, and the `rows` and `filled` counts; without `output_path` nothing is written to disk
+- Inputs: one record (field name to value, one item of what `DataExtractor.extract()` returns), `(label, value)` tuples, `FieldRow` objects, or rows with a `value` and a `label` or `name`, such as the result of `gaik.operations.extract_fields`. An unknown shape raises `ValueError`; it is never guessed
+- Evidence column: for a record, pass the Source Tracing report as `trace`, and each field's first quote and verdict go beside its value. Rows carry their own `evidence` and `verdict`. The column appears when a row has a quote; `evidence=True` or `False` decides it
+- Values: an empty value shows `empty_text` and is not counted as filled; booleans, numbers, dates, lists and dicts are written as readable text; control characters a Word file cannot hold are removed
+- The constructor sets the look of every file: column `headers`, `empty_text`, `true_text`, `false_text`, `font_name`, `font_size`, `label_width_cm`
+- Install: `pip install "gaik[fields-to-docx]"`
+- Limits: one record per file; no nested tables, images or page numbers; no template file; it shows the evidence it is given and checks nothing itself
+
+- **Implementation code**: [software_components/fields_to_docx](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/fields_to_docx)
+- **Usage examples**: [examples/fields_to_docx](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/fields_to_docx)
+
+---
+
 ### Report Synthesizer
 
 The Report Synthesizer writes a governed report section by section from curated knowledge. Each technical section is written from its own knowledge only. Derived sections, such as recommendations and a summary, are written afterwards from the reviewed texts of the sections they depend on. A Draft Reviewer with its own model setting checks every draft, and a review log records the edits. The knowledge is plain data: it usually comes from the Knowledge Curator, but it can also be written by hand. It is the third stage of the Report-Writer module.

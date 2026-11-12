@@ -31,6 +31,9 @@ The same idea for files. Ask CSV, Excel, Parquet or JSON files questions in natu
 ### [Web Scraper](./web_scraper)
 Crawl a few pages of gaik.ai into Markdown, save them, and extract the upcoming events with the schema generator and the extractor.
 
+### [Fields to Word](./fields_to_docx)
+Write extracted fields to a Word file: a title, a facts line, a field table with an optional evidence column, and the source text as an appendix. No model call.
+
 ## Getting Started
 
 1. Choose the component you want to explore

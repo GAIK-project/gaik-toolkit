@@ -6,6 +6,9 @@ This repo is public: never commit machine-local paths, usernames or secret-store
 
 - `implementation_layer/src/gaik/`: the gaik library, published to PyPI; tests in
   `implementation_layer/unit_tests/`.
+- `implementation_layer/src/gaik/operations/` and `mcp_server/`: functions over the
+  components and the MCP server built on them; outside the packages the gaik-sync audit
+  scans, by design.
 - `implementation_layer/solution_wizard/`: the Solution Wizard, which mirrors gaik's API
   (see gaik-sync below).
 - `implementation_layer/toolkit_demo_app/`: the demo, Next.js on bun with a FastAPI

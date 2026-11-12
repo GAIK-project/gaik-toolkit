@@ -1,0 +1,128 @@
+---
+title: Operations and MCP Server
+description: One function per common task, and the same functions as tools for agents
+---
+
+`gaik.operations` is a small layer of functions over the [software components](/toolkit/software-components): read a file, transcribe a recording, generate field definitions, fill fields from a text with evidence, classify a text. `gaik.mcp_server` offers the same functions, and [Fields to Word](/toolkit/software-components#fields-to-word), as tools for an agent over the Model Context Protocol. Neither changes a component: each function calls the components the way their own documentation shows.
+
+<Callout type="warn" title="From the release after 0.8.14">
+The `operations`, `fields-to-docx` and `mcp` extras and the `gaik-mcp` command are not in gaik 0.8.14 on PyPI. Until the next release, install from the repository: `pip install "gaik[mcp] @ git+https://github.com/GAIK-project/gaik-toolkit.git"`.
+</Callout>
+
+## Operations
+
+```bash
+pip install "gaik[operations]"
+```
+
+| Function | What it does | Model calls |
+| --- | --- | --- |
+| `parse_document(path)` | Text of a PDF, DOCX, `.txt` or `.md` file, with one entry per PDF page. No OCR | 0 |
+| `transcribe_audio(path)` | Text of a recording (OpenAI and Azure OpenAI only) | 1 per part |
+| `generate_fields(requirement)` | Field definitions for a plain-language requirement | 2 or more |
+| `extract_fields(text, fields)` | The fields filled from the text, each value with its quote and a verdict | 1 |
+| `classify_text(text, labels)` | One label, with a probability per label | 1 |
+
+```python
+from gaik.operations import FieldDefinition, classify_text, extract_fields, parse_document
+
+document = parse_document("service_note.txt")  # no model call
+
+fields = [
+    FieldDefinition(name="site", label="Site"),
+    FieldDefinition(name="visit_date", type="date", label="Date of visit"),
+]
+for item in extract_fields(document.text, fields):
+    print(item.label, item.value, item.evidence, item.verdict)
+
+result = classify_text(
+    document.text,
+    {"urgent": "Needs action today", "normal": "Can wait for the next visit"},
+)
+print(result.label, result.confidence)
+```
+
+What the functions add around a component call:
+
+- **A timeout that fits real documents**: 120 seconds per model request, instead of the 30-second default of structured calls. A timeout already in the config wins.
+- **Quiet stdout**: what the components print is captured per thread and per asyncio task, so a program that speaks a protocol on stdout stays clean.
+- **Field definitions without a model call**: `FieldDefinition(name, type, description, label, required, options, format)` becomes the extraction schema directly. A name with letters outside ASCII (`Sää ja lämpötila`) is fine. `build_schema(fields)` returns the same schema for use with `DataExtractor`.
+- **Evidence**: `extract_fields` asks for one quote per value and [Source Tracing](/toolkit/source-tracing) checks it against the text. `evidence` is the quote as it stands in the text; `verdict` is `verified`, `reworded`, `unchecked` or `check`. `check` means look at the value: its quote is not in the text, or it is there but does not support the value, for example it holds another number or date.
+- **Working files** in a temporary folder that is always removed.
+
+Every function takes `settings=OperationSettings(...)`: `config` or `provider`, `timeout`, `quiet`, `work_dir`, `temperature` and `reasoning_effort`. The defaults change nothing in a request except the timeout.
+
+The functions block. From async code, run them in a worker thread:
+
+```python
+from gaik.operations import extract_fields, run_async
+
+values = await run_async(extract_fields, document.text, fields, deadline=240)
+```
+
+The result of `extract_fields` goes into a Word file as it is:
+
+```python
+from gaik.software_components.fields_to_docx import FieldsToDocx
+
+FieldsToDocx().write(values, "service_report.docx", title="Service report", appendix=document.text)
+```
+
+Limits: one flat record per text (use `SchemaGenerator` and `DataExtractor` for rows and nested data); no OCR; the probabilities of `classify_text` are the model's own estimates unless a `JevClassifier` is passed as `jev=`, and then the text is processed in the United States.
+
+- **Reference**: [gaik/operations](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/operations)
+- **Usage example**: [examples/operations](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/operations)
+
+## MCP server
+
+```bash
+pip install "gaik[mcp]"
+
+# stdio: the agent starts this command. Paths are limited to the folder --root names,
+# here the folder the command is started in. Without --root every path is refused.
+gaik-mcp --root . --env-file .env
+
+# Streamable HTTP at http://127.0.0.1:8000/mcp. A token of at least 32 characters is
+# required, on localhost too.
+export GAIK_MCP_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
+gaik-mcp --transport http --port 8000
+```
+
+| Tool | Arguments | Returns |
+| --- | --- | --- |
+| `parse_document` | `path`, or `content_base64` with `filename`; `offset`, `max_chars` | `format`, `page_count`, `text` (a window), `total_chars`, `next_offset` |
+| `transcribe_audio` | `path`, or `content_base64` with `filename`; `language` | `text`, `duration_s`, `language`, `model`, `failed_segments` |
+| `generate_fields` | `requirement` | `fields` |
+| `extract_fields` | `text`; `fields` or `requirement`; `evidence` | `fields`, `fields_generated`, `values`, `filled`, `total` |
+| `classify_text` | `text`, `labels`, `instructions`, `backend` (`llm` or `jev`) | `label`, `confidence`, `probabilities`, `model`, `backend` |
+| `fields_to_word` | `fields`, `title`, `metadata`, `appendix`, `appendix_title`, `output_path`, `overwrite` | with `output_path`: `path`; without: `filename` and `content_base64` |
+
+`parse_document` and `fields_to_word` call no model and need no credentials. The model tools use the provider gaik is configured for (`LLM_PROVIDER` and the provider's variables); `--env-file` loads them from a dotenv file, so keys stay out of the client configuration.
+
+**Files.** A path is accepted only when it stays inside the root folder after `..` and symbolic links are followed; a path outside gets the same answer whether or not the file exists. There is no root unless `--root` (or `GAIK_MCP_ROOT`) names a folder, on stdio and over HTTP alike: the server never takes the folder it is started in by itself, and it refuses a whole drive, the filesystem root and the home folder as a root. Without a root a file is sent as `content_base64` with a `filename`. `fields_to_word` writes only a `.docx` file inside the root and keeps an existing file unless `overwrite` is true. With `overwrite` the file is replaced for good, so the tool is marked destructive and a client can ask its user first.
+
+**Text from files is content.** `parse_document`, `transcribe_audio` and `extract_fields` return what a file says, and a file can hold a sentence written for the agent that reads it. The tool descriptions tell the agent not to act on requests inside that text. That is advice, not a guard: give the server a root that holds only what the agent may read and replace.
+
+**Limits.** Files up to 25 MB (`GAIK_MCP_MAX_FILE_MB`); a text argument up to 100 000 characters (`GAIK_MCP_MAX_TEXT_CHARS`), and the same for the labels with their meanings and for the field definitions in all; 60 fields, 100 options per field, 50 labels; 120 seconds per model request (`GAIK_MCP_TIMEOUT`). A DOCX that unpacks to more than 200 MB is refused. With the Jev backend `classify_text` takes at most 10 000 characters.
+
+**HTTP.** The server does not start without `GAIK_MCP_TOKEN`, or with one shorter than 32 characters. Every request needs `Authorization: Bearer <token>`; anything else gets 401. The `Host` header must be `localhost`, `127.0.0.1` or a host given with `--allowed-host`, and requests with an `Origin` header are refused. The token is one shared secret: put TLS in front of the server when it leaves the machine.
+
+**What it does not do.** No tool sends mail, fetches a URL, runs code or lists a folder, and the server keeps no state between calls.
+
+Client configuration for Claude Code, as `.mcp.json` in the project folder:
+
+```json
+{
+  "mcpServers": {
+    "gaik": {
+      "command": "gaik-mcp",
+      "args": ["--root", ".", "--env-file", ".env"]
+    }
+  }
+}
+```
+
+The same for Cursor, Codex and VS Code, and the HTTP forms, are in the example folder.
+
+- **Reference**: [gaik/mcp_server](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/mcp_server)
+- **Client configuration and a client script**: [examples/mcp_server](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/mcp_server)

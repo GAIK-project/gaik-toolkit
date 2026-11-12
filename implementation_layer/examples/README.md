@@ -65,3 +65,16 @@ uv run python examples/software_components/classifier/classification_example.py
 python examples/software_components/classifier/classification_example.py
 ```
 
+### Operations and MCP Server
+
+```bash
+# One function per task: parse, build a schema, extract with evidence, classify (needs credentials)
+uv run python examples/operations/operations_example.py
+
+# The same functions as MCP tools; the client script needs no credentials
+uv run python examples/mcp_server/mcp_client_example.py
+```
+
+Client configuration for Claude Code, Cursor, Codex and VS Code is in
+[`mcp_server/README.md`](./mcp_server/README.md).
+
