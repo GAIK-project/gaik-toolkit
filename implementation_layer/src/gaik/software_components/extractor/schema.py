@@ -1281,6 +1281,10 @@ _ITEM_START_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)]|#{1,6})\s+")
 # What may precede a field name that heads its own line: an optional list
 # marker or heading, then emphasis, backticks or quotes.
 _OWN_LINE_LEAD_RE = re.compile(r"\s*(?:(?:[-*+]|\d+[.)]|#{1,6})\s+)?[`*_\"'(]*")
+# What must follow that name: closing emphasis, then a colon, parenthesis,
+# equals sign or dash, or the end of the line. A comma there means the line
+# lists several fields ("Order date, delivery date (DD/MM/YYYY)").
+_OWN_LINE_TAIL_RE = re.compile(r"[`*_\"')]*\s*(?:[:(=\u2013\u2014-]|$)")
 
 
 def _field_specific_context(field: FieldSpec, original_text: str) -> str:
@@ -1306,7 +1310,9 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
         if not match:
             continue
 
-        if _OWN_LINE_LEAD_RE.fullmatch(line[: match.start()]):
+        if _OWN_LINE_LEAD_RE.fullmatch(line[: match.start()]) and _OWN_LINE_TAIL_RE.match(
+            line[match.end() :]
+        ):
             # The field heads its own bullet, numbered item or heading
             # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
             # line is about this field, commas included.
