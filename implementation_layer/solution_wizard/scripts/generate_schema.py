@@ -325,6 +325,18 @@ def main() -> int:
     py_path.write_text(py_content, encoding="utf-8")
     print(f"\nSchema written to:       {py_path}")
 
+    # -- Write output_schema_model.json: what load_schema() rebuilds the model
+    # from (gaik >= the release that loads saved schemas as data). The .py file
+    # above is for reading; load_schema() never imports it.
+    try:
+        from gaik.software_components.extractor.saved_schema import write_model_file
+    except ImportError:  # older gaik: load_schema() still reads output_schema.py
+        write_model_file = None
+    if write_model_file is not None:
+        model_path = schemas_dir / "output_schema_model.json"
+        write_model_file(schema_class, model_path)
+        print(f"Model written to:        {model_path}")
+
     # -- Write output_schema_requirements.json (load_schema() contract) --
     req_payload = _requirements_to_json(schema_class, requirements)
     req_path_out = schemas_dir / "output_schema_requirements.json"

@@ -89,13 +89,13 @@ def test_a_saved_schema_loads_again_whatever_the_use_case_is_called(tmp_path, us
     pytest.importorskip("fitz")
     from gaik.software_components.vision_extractor.vision_extractor import (
         _load_saved_schema,
-        _save_schema_to_python,
+        _save_schema_model,
     )
 
     model = create_extraction_model(_requirements(use_case_name))
-    path = tmp_path / "schema.py"
+    path = tmp_path / "schema_model.json"
 
-    _save_schema_to_python(model, path)
+    _save_schema_model(model, path)
     loaded = _load_saved_schema(path, model.__name__)
 
     assert loaded.model_json_schema()["properties"].keys() == {"name", "qty"}

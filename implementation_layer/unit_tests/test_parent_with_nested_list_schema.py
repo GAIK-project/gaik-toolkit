@@ -30,6 +30,7 @@ from gaik.software_components.vision_extractor.vision_extractor import (
     _load_saved_schema,
     _make_schema_strict,
     _save_requirements,
+    _save_schema_model,
     _save_schema_to_python,
 )
 
@@ -298,10 +299,11 @@ def test_composite_requirements_and_schema_save_load_round_trip(
     schema_path = tmp_path / "schema.py"
     requirements_path = tmp_path / "requirements.json"
     _save_schema_to_python(model, schema_path)
+    _save_schema_model(model, tmp_path / "schema_model.json")
     _save_requirements(requirements, model.__name__, requirements_path)
 
     model_name, loaded_requirements = _load_saved_requirements(requirements_path)
-    loaded_model = _load_saved_schema(schema_path, model_name)
+    loaded_model = _load_saved_schema(tmp_path / "schema_model.json", model_name)
 
     assert isinstance(loaded_requirements, CompositeExtractionRequirements)
     assert len(loaded_requirements.children) == 1

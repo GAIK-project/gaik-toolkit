@@ -15,6 +15,7 @@ from gaik.software_components.extractor.schema import (  # noqa: E402
 )
 from gaik.software_components.vision_extractor.vision_extractor import (  # noqa: E402
     _load_saved_schema,
+    _save_schema_model,
     _save_schema_to_python,
 )
 from gaik.software_modules.audio_to_structured_data.pipeline import (  # noqa: E402
@@ -78,8 +79,9 @@ def test_class_description_round_trips_as_text(description, tmp_path):
     Order.__doc__ = description
     path = tmp_path / "schema.py"
     _save_schema_to_python(Order, path)
+    _save_schema_model(Order, tmp_path / "schema_model.json")
 
-    loaded = _load_saved_schema(path, "Order")
+    loaded = _load_saved_schema(tmp_path / "schema_model.json", "Order")
     assert loaded.__doc__ == description.strip()
     assert list(loaded.model_fields) == ["number"]
     # Nothing in the description became a statement of the saved module.

@@ -6,7 +6,6 @@ Takes any audio, transcribes, parses fields and dynamically builds schema, extra
 
 from __future__ import annotations
 
-import importlib.util
 import io
 import json
 from collections.abc import Sequence
@@ -21,6 +20,11 @@ from gaik.software_components.extractor import (
     DataExtractor,
     ExtractionRequirements,
     SchemaGenerator,
+)
+from gaik.software_components.extractor.saved_schema import (
+    SavedSchemaError,
+    load_saved_model,
+    write_model_file,
 )
 from gaik.software_components.extractor.schema import print_pydantic_schema
 from gaik.software_components.transcriber import Transcriber, TranscriptionResult
@@ -207,7 +211,13 @@ from pydantic import BaseModel, Field, ConfigDict
 
 {schema_code}
 '''
+        # The .py file is for people to read; load_schema reads the model file.
         schema_path.write_text(template, encoding="utf-8")
+        try:
+            write_model_file(schema, schema_dir / f"{stem}_model.json")
+        except SavedSchemaError as exc:
+            # load_schema then rebuilds the model from the requirements file.
+            print(f"Schema {schema.__name__!r} not saved as data: {exc}")
 
         payload = {
             "model_name": schema.__name__,
@@ -218,11 +228,19 @@ from pydantic import BaseModel, Field, ConfigDict
     def load_schema(
         self, schema_dir: Path, schema_name: str
     ) -> tuple[type, ExtractionRequirements | CompositeExtractionRequirements] | None:
-        """Load schema + requirements if both files exist; otherwise return None."""
+        """Load the saved model and requirements as data; None if they are missing.
+
+        The saved model is rebuilt from ``<stem>_model.json``; ``<stem>.py`` is never
+        imported. A folder with only the older files is rebuilt from the
+        requirements where possible, else None (generate the schema again).
+        """
         stem = _schema_file_stem(schema_name)
-        schema_path = schema_dir / f"{stem}.py"
+        model_path = schema_dir / f"{stem}_model.json"
         req_path = schema_dir / f"{stem}_requirements.json"
-        if not (schema_path.exists() and req_path.exists()):
+        # A folder from an older gaik has <stem>.py but no model file; it is
+        # rebuilt from the requirements where they determine the model.
+        has_model = model_path.exists() or (schema_dir / f"{stem}.py").exists()
+        if not (has_model and req_path.exists()):
             return None
 
         data = json.loads(req_path.read_text(encoding="utf-8"))
@@ -237,9 +255,7 @@ from pydantic import BaseModel, Field, ConfigDict
         )
         requirements = requirements_class.model_validate(requirements_data)
 
-        spec = importlib.util.spec_from_file_location(model_name, schema_path)
-        module = importlib.util.module_from_spec(spec)
-        assert spec.loader is not None
-        spec.loader.exec_module(module)  # type: ignore[attr-defined]
-        schema = getattr(module, model_name)
+        schema = load_saved_model(model_path, model_name, requirements)
+        if schema is None:
+            return None
         return schema, requirements

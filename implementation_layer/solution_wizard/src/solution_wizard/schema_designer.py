@@ -416,6 +416,7 @@ def write_schema_files(
     """Write all schema artefacts into output_dir/schemas/.
 
     File layout that load_schema(schema_dir, "output_schema") expects:
+        schemas/output_schema_model.json          <- the model as data (what is loaded)
         schemas/output_schema.py                  <- Pydantic model; class name = schema_name
         schemas/output_schema_requirements.json   <- {"model_name": ..., "requirements": ...}
 
@@ -429,6 +430,7 @@ def write_schema_files(
 
     class_name = schema_name or target_output_spec.get("schema_name") or "OutputSchema"
     results: dict[str, Path] = {}
+    model_cls = None
 
     # output_schema.py -- class must be named class_name so load_schema can find it
     py_content = build_pydantic_model(target_output_spec, class_name)
@@ -447,7 +449,20 @@ def write_schema_files(
             json_path.write_text(json.dumps(json_schema, indent=2), encoding="utf-8")
             results["output_schema.json"] = json_path
     except Exception:
-        pass
+        model_cls = None
+
+    # output_schema_model.json -- what load_schema() rebuilds the model from in
+    # gaik releases that load saved schemas as data (output_schema.py is then
+    # never imported). Older gaik has no saved_schema module and reads the .py.
+    if model_cls is not None:
+        try:
+            from gaik.software_components.extractor.saved_schema import write_model_file
+        except ImportError:
+            write_model_file = None
+        if write_model_file is not None:
+            model_path = schemas_dir / "output_schema_model.json"
+            write_model_file(model_cls, model_path)
+            results["output_schema_model.json"] = model_path
 
     # output_schema_requirements.json -- the file load_schema() reads:
     #   load_schema(schema_dir, "output_schema") => schema_dir / "output_schema_requirements.json"
