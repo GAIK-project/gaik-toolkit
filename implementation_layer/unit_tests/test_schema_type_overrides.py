@@ -294,3 +294,165 @@ def test_all_dates_format_in_the_task_wins_over_a_format_in_the_description():
     assert by_name["order_date"].format == "%Y-%m-%d"
     # The field's own line still wins over the all-dates format.
     assert by_name["delivery_date"].format == "%d.%m.%Y"
+
+
+@pytest.mark.parametrize(
+    ("name", "description"),
+    [
+        ("candidate_name", "Name of the candidate"),
+        ("update_notes", "Notes about the change"),
+        ("validated_by", "Who checked the entry"),
+        ("mandatory", "Whether the item is required"),
+        ("metadata", "Free-form key and value pairs"),
+        ("database_name", "Name of the system"),
+        ("journal", "Name of the publication"),
+        ("notes", "Any remarks; keep the candidate's wording"),
+        ("journey_id", "Identifier of the trip"),
+    ],
+)
+def test_date_keyword_inside_another_word_does_not_make_a_field_a_date(name, description):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="str", description=description)
+    )
+
+    _apply_type_overrides(requirements, original_text=f"- {name.replace('_', ' ')}")
+
+    assert requirements.fields[0].field_type == "str"
+    # A value that happens to parse as a date is left as written.
+    assert normalize_extracted_data({name: "10/08/2026"}, requirements) == {name: "10/08/2026"}
+
+
+@pytest.mark.parametrize(
+    ("name", "description"),
+    [
+        ("order_date", "Order date"),
+        ("date", "When it happened"),
+        ("paivamaara", "Merkinnän päivä"),
+        ("toimituspaivamaara", "Toimitus"),
+        ("lieferdatum", "Lieferung"),
+        ("fecha_de_entrega", "Entrega"),
+        ("data_di_consegna", "Consegna"),
+        ("teslim_tarihi", "Teslim"),
+        ("issued", "Date of issue"),
+        ("laadittu", "Asiakirjan päivämäärä"),
+    ],
+)
+def test_date_keyword_as_a_word_still_makes_a_field_a_date(name, description):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="str", description=description)
+    )
+
+    _apply_type_overrides(requirements, original_text="")
+
+    assert requirements.fields[0].field_type == "date"
+
+
+def test_field_that_only_looks_like_a_date_keeps_its_parsed_type():
+    requirements = _requirements(
+        FieldSpec(field_name="mandatory", field_type="bool", description="Whether it is required"),
+        FieldSpec(field_name="update_count", field_type="int", description="Number of changes"),
+    )
+
+    _apply_type_overrides(requirements, original_text="- Mandatory\n- Update count")
+
+    assert [field.field_type for field in requirements.fields] == ["bool", "int"]
+
+
+@pytest.mark.parametrize(
+    ("name", "task_line", "expected_format"),
+    [
+        ("deadline", "- Deadline (DD/MM/YYYY)", "%d/%m/%Y"),
+        ("valid_until", "- Valid until: the last day of validity, as DD.MM.YYYY", "%d.%m.%Y"),
+        ("expiry", "- Expiry (DD/MM/YYYY)", "%d/%m/%Y"),
+        ("dob", "Use DD.MM.YYYY for all dates.\n- DOB", "%d.%m.%Y"),
+    ],
+)
+def test_field_the_model_typed_as_a_date_gets_its_format_without_a_date_word_in_its_name(
+    name, task_line, expected_format
+):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="date", description="When it applies")
+    )
+
+    _apply_type_overrides(requirements, original_text=task_line)
+
+    field = requirements.fields[0]
+    assert field.field_type == "date"
+    assert field.format == expected_format
+
+
+def test_field_the_model_typed_as_a_date_follows_a_keep_as_text_instruction():
+    requirements = _requirements(
+        FieldSpec(field_name="deadline", field_type="date", description="When it is due")
+    )
+
+    _apply_type_overrides(requirements, original_text="- Deadline (preserve format in string)")
+
+    field = requirements.fields[0]
+    assert field.field_type == "str"
+    assert normalize_extracted_data({"deadline": "12 OCT 25"}, requirements) == {
+        "deadline": "12 OCT 25"
+    }
+
+
+@pytest.mark.parametrize(
+    ("name", "description"),
+    [
+        ("remarks", "Free text; the data is copied as written"),
+        ("key_dates", "Milestones mentioned in the text"),
+    ],
+)
+def test_data_inside_a_description_and_a_plural_do_not_make_a_field_a_date(name, description):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="str", description=description)
+    )
+
+    _apply_type_overrides(requirements, original_text="")
+
+    assert requirements.fields[0].field_type == "str"
+
+
+@pytest.mark.parametrize(
+    ("name", "task_line", "expected_format"),
+    [
+        # FieldSpec lowercases a camelCase name without splitting it.
+        ("dueDate", "- dueDate (DD.MM.YYYY)", "%d.%m.%Y"),
+        ("invoiceDate", "- invoiceDate", None),
+        ("dateOfBirth", "- dateOfBirth", None),
+        ("birthdate", "- Birthdate (DD/MM/YYYY)", "%d/%m/%Y"),
+        ("leveringsdato", "- Leveringsdato", None),
+        ("fechaEntrega", "- fechaEntrega", None),
+    ],
+)
+def test_run_together_date_name_the_model_typed_as_text_is_still_a_date(
+    name, task_line, expected_format
+):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="str", description="See the task")
+    )
+
+    _apply_type_overrides(requirements, original_text=task_line)
+
+    field = requirements.fields[0]
+    assert field.field_type == "date"
+    assert field.format == expected_format
+
+
+@pytest.mark.parametrize(
+    ("name", "description"),
+    [
+        ("consegna", "Data di consegna dell'ordine"),
+        ("entrega", "Data de entrega do pedido"),
+        ("urodzenie", "Data urodzenia"),
+        ("levering", "Dato for levering"),
+        ("livraison", "Jour de livraison"),
+    ],
+)
+def test_ambiguous_keyword_that_opens_a_description_makes_a_field_a_date(name, description):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="str", description=description)
+    )
+
+    _apply_type_overrides(requirements, original_text="")
+
+    assert requirements.fields[0].field_type == "date"

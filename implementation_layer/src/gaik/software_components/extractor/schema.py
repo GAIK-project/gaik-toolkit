@@ -1366,14 +1366,78 @@ def _requests_text_representation(text: str) -> bool:
     return bool(_TEXT_REPRESENTATION_RE.search(text))
 
 
-def _is_date_field(name: str, description: str) -> bool:
-    """Check if a field is a date field based on name or description (multilingual)."""
-    name_lower = name.lower()
-    desc_lower = description.lower()
-    for keyword in DATE_KEYWORDS:
-        if keyword in name_lower or keyword in desc_lower:
+# Keywords that are ordinary words in another language ("data" in English, "dato"
+# in Spanish, "jour" in "ordre du jour"). A field name is written in the task's
+# language, so they count there. A description is prose, where they count only as
+# its first word ("Data di consegna", "Dato for levering").
+_AMBIGUOUS_DATE_KEYWORDS = frozenset({"data", "dato", "jour"})
+# Keywords that form compounds in their language ("Lieferdatum",
+# "toimituspäivämäärä", "teslimtarihi", "fechaentrega"), so they may be part of a
+# longer word.
+_COMPOUND_DATE_KEYWORDS = frozenset(
+    {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih", "fecha"}
+)
+# In a field name a word may also end in a keyword or start with "date":
+# "birthdate", "leveringsdato", and "duedate" and "dateofbirth", which is what
+# FieldSpec makes of "dueDate" and "dateOfBirth". This is the fallback for a date
+# the model typed as text, so it has to catch those names. The words below start
+# or end the same way without being dates.
+_DATE_NAME_SUFFIXES = ("date", "dato")
+_NOT_A_DATE_WORDS = frozenset(
+    {
+        "accommodate",
+        "antedate",
+        "backdate",
+        "candidate",
+        "candidato",
+        "consolidate",
+        "consolidato",
+        "dated",
+        "dates",
+        "invalidate",
+        "liquidate",
+        "mandate",
+        "mandato",
+        "postdate",
+        "predate",
+        "revalidate",
+        "soldato",
+        "update",
+        "validate",
+        "validato",
+    }
+)
+_LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
+
+
+def _has_date_keyword(text: str, *, in_name: bool) -> bool:
+    """Whether ``text`` contains a date keyword as a word, not inside another word."""
+    words = _LETTER_WORD_RE.findall(text.lower())
+    for position, word in enumerate(words):
+        if (
+            in_name
+            and (word.startswith("date") or word.endswith(_DATE_NAME_SUFFIXES))
+            and word not in _NOT_A_DATE_WORDS
+        ):
             return True
+        for keyword in DATE_KEYWORDS:
+            if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name and position:
+                continue
+            if word == keyword:
+                return True
+            if keyword in _COMPOUND_DATE_KEYWORDS and keyword in word:
+                return True
     return False
+
+
+def _is_date_field(name: str, description: str) -> bool:
+    """Check if a field is a date field based on name or description (multilingual).
+
+    A keyword counts only as a whole word, so ``candidate_name``, ``update_notes``
+    and ``metadata`` are not dates. This is the fallback for a field the model
+    did not type as a date; :func:`_apply_type_overrides` checks the type first.
+    """
+    return _has_date_keyword(name, in_name=True) or _has_date_keyword(description, in_name=False)
 
 
 def _apply_type_overrides(requirements: ExtractionRequirements, original_text: str = "") -> None:
@@ -1396,7 +1460,10 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
         if not _EXPLICIT_PATTERN_RE.search(field_context):
             field.pattern = None
 
-        if _is_date_field(field.field_name, field.description):
+        # The model's own type comes first: it read the task, and a date field need
+        # not have a date word in its name ("deadline", "valid_until"). The keyword
+        # check catches a date the model typed as text.
+        if field.field_type == "date" or _is_date_field(field.field_name, field.description):
             if _requests_text_representation(field_context):
                 field.field_type = "str"
                 field.format = None
