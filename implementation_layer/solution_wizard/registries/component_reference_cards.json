@@ -101,11 +101,11 @@
       },
       {
         "name": "default_prompt",
-        "type": "str",
-        "default": "Detect the language and extract transcript in the same language.",
-        "effect": "Whisper transcription prompt prepended before custom_context. Override to bias the model toward domain terminology.",
+        "type": "str | None",
+        "default": null,
+        "effect": "Optional context for hosted transcription requests. The provider expects transcript context in the audio's language, not instructions; None omits the prompt. Use initial_prompt for whisper_local.",
         "selection_relevant": true,
-        "infer_from": "domain_vocabulary is provided OR source language is known in advance and not auto-detected correctly"
+        "infer_from": "Provide only domain vocabulary or transcript context in the audio's language; otherwise leave None. For whisper_local, use initial_prompt instead."
       },
       {
         "name": "initial_prompt",

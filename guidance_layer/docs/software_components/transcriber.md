@@ -100,7 +100,7 @@ transcriber = Transcriber(
     enhanced_transcript: bool = True,          # Enable GPT enhancement
     max_size_mb: int = 25,                     # Chunk size limit
     max_duration_seconds: int = 1200,          # Duration limit (API ceiling is 1400 s)
-    default_prompt: str = DEFAULT_PROMPT       # Custom Whisper prompt
+    default_prompt: str | None = None          # Optional context in the audio language
 )
 
 # Transcribe file
@@ -111,6 +111,10 @@ result = transcriber.transcribe(
     compress_audio: bool | None = None     # Override compression
 ) -> TranscriptionResult
 ```
+
+Remote transcription requests omit `prompt` by default. Set `default_prompt` or pass
+`custom_context` when transcript context is needed; for `whisper_local`, use
+`initial_prompt` instead.
 
 ### TranscriptionResult
 
