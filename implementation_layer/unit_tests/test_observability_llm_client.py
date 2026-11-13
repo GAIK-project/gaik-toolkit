@@ -796,3 +796,24 @@ def test_gemini_s_thinking_tokens_count_as_output(spans):
     (span,) = spans()
     assert span.attributes["gen_ai.usage.output_tokens"] == 80
     assert span.attributes["gaik.usage.thinking_tokens"] == 50
+
+
+@needs_otel
+def test_the_extra_is_looked_up_once_not_on_every_call(monkeypatch, spans):
+    import importlib.util
+
+    calls = []
+    real = importlib.util.find_spec
+
+    def counting(name, *args, **kwargs):
+        calls.append(name)
+        return real(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib.util, "find_spec", counting)
+    client = TracedProviderClient(_FakeProvider(result="ok", chunks=["a"]))
+    for _ in range(3):
+        client.chat(MESSAGES)
+        list(client.chat_stream(MESSAGES))
+
+    assert calls.count("opentelemetry.exporter.otlp.proto.http") == 1
+    assert len(spans()) == 6

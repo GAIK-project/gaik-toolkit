@@ -60,6 +60,7 @@ _lock = threading.Lock()
 _tracer: Any = None
 _provider: Any = None  # gaik's own provider, when it exports by itself
 _resolved = False
+_extra: bool | None = None  # whether the gaik[otel] extra is installed, once known
 
 #: The request settings a span records, by attribute name; any other key is left out.
 #: Providers name the token limit differently; all three are the same setting.
@@ -162,11 +163,19 @@ def tracing_enabled() -> bool:
 
 
 def _extra_installed() -> bool:
-    """Whether the OTLP exporter, which only the ``gaik[otel]`` extra brings, is present."""
-    try:
-        return importlib.util.find_spec("opentelemetry.exporter.otlp.proto.http") is not None
-    except (ImportError, ValueError):
-        return False
+    """Whether the OTLP exporter, which only the ``gaik[otel]`` extra brings, is present.
+
+    Looked up once per process: packages do not come and go while it runs, and
+    the lookup searches the installed packages, which costs on every model call.
+    """
+    global _extra
+    if _extra is None:
+        try:
+            spec = importlib.util.find_spec("opentelemetry.exporter.otlp.proto.http")
+            _extra = spec is not None
+        except (ImportError, ValueError):
+            _extra = False
+    return _extra
 
 
 def in_llm_span() -> bool:
@@ -533,9 +542,10 @@ def _end(span: Any) -> None:
 
 
 def _reset_for_tests() -> None:
-    """Forget the resolved tracer so the next call resolves it again."""
-    global _tracer, _provider, _resolved
+    """Forget the resolved tracer and extra so the next call resolves them again."""
+    global _tracer, _provider, _resolved, _extra
     with _lock:
         _tracer = None
         _provider = None
         _resolved = False
+        _extra = None

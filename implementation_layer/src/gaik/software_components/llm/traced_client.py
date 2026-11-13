@@ -10,7 +10,9 @@ The wrapper changes nothing a caller sees: arguments are passed on as given,
 and results, exceptions and retries are the client's own. Every other
 attribute is the client's, read and set through the wrapper, and
 ``isinstance`` answers as for the client. A fault in the instrumentation is
-logged and never reaches the caller.
+logged and never reaches the caller. One difference: a model method replaced
+on the client (``client.chat = Mock()``) is the one called, but reading
+``client.chat`` back gives the wrapper's method, so assert on the mock itself.
 
 A span holds lengths, never text: the characters of the messages' text parts
 and of the answer (the parsed record as JSON for ``chat_parsed``; the summed
