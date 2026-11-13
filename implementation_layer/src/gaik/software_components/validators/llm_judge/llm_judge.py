@@ -146,7 +146,7 @@ class LLMJudge:
         )
         duration_s = time.perf_counter() - t0
 
-        flags = parse_judge_flags(raw_text)
+        flags, judge_error = _judge_flags_and_error(raw_text)
         usage = JudgeUsage(
             provider=self.model_provider,
             model=self.model,
@@ -156,7 +156,9 @@ class LLMJudge:
             duration_s=duration_s,
             cost_usd=compute_judge_cost_usd(self.model, input_tokens, output_tokens),
         )
-        return ValidationResult(flags=flags, raw_judge_text=raw_text, usage=usage)
+        return ValidationResult(
+            flags=flags, raw_judge_text=raw_text, usage=usage, judge_error=judge_error
+        )
 
     def detect_hallucinations(
         self,
@@ -219,7 +221,7 @@ class LLMJudge:
         )
         duration_s = time.perf_counter() - t0
 
-        flags = parse_hallucination_flags(raw_text)
+        flags, judge_error = _hallucination_flags_and_error(raw_text)
         usage = JudgeUsage(
             provider=self.model_provider,
             model=self.model,
@@ -229,7 +231,9 @@ class LLMJudge:
             duration_s=duration_s,
             cost_usd=compute_judge_cost_usd(self.model, input_tokens, output_tokens),
         )
-        return HallucinationReport(flags=flags, raw_judge_text=raw_text, usage=usage)
+        return HallucinationReport(
+            flags=flags, raw_judge_text=raw_text, usage=usage, judge_error=judge_error
+        )
 
     def judge_text_pair(
         self,
@@ -624,33 +628,52 @@ def _strip_json_fences(raw_text: str) -> str:
     return text
 
 
-def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
-    """Parse ``{"flags": [...]}`` JSON into typed :class:`ValidationFlag`\\ s.
+def _flag_entries(raw_text: str, what: str) -> tuple[list | None, str | None]:
+    """The ``flags`` list of a judge response, or ``(None, reason)`` when there is none.
 
-    Tolerant of stray markdown fences. Returns an empty list when the response
-    is unparseable so the caller can decide whether to retry.
-
-    Reads both the ``score`` (Likert 1-5) and ``severity`` fields. ``score``
-    defaults to 0 when the judge omits it (severity-mode behaviour).
+    The reason gives the size only: the response can quote the judged content.
     """
     text = _strip_json_fences(raw_text)
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("Could not decode judge response as JSON (%d characters)", len(text))
-        return []
-
+        logger.warning("Could not decode %s response as JSON (%d characters)", what, len(text))
+        return None, f"response is not JSON ({len(text)} characters)"
     flags = data.get("flags") if isinstance(data, dict) else data
     if not isinstance(flags, list):
-        return []
+        logger.warning("The %s response has no flags list", what)
+        return None, "response has no flags list"
+    return flags, None
+
+
+def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
+    """Parse ``{"flags": [...]}`` JSON into typed :class:`ValidationFlag`\\ s.
+
+    Tolerant of stray markdown fences. Returns an empty list when the response
+    is unparseable; :meth:`LLMJudge.validate` reports that case in
+    ``ValidationResult.judge_error``, so an empty list here is not a pass.
+
+    Reads both the ``score`` (Likert 1-5) and ``severity`` fields. ``score``
+    defaults to 0 when the judge omits it (severity-mode behaviour).
+    """
+    return _judge_flags_and_error(raw_text)[0]
+
+
+def _judge_flags_and_error(raw_text: str) -> tuple[list[ValidationFlag], str | None]:
+    flags, error = _flag_entries(raw_text, "judge")
+    if flags is None:
+        return [], error
 
     parsed: list[ValidationFlag] = []
+    unreadable = 0
     for entry in flags:
         if not isinstance(entry, dict):
+            unreadable += 1
             continue
         try:
             severity_raw = str(entry.get("severity", "")).lower()
             if severity_raw not in ("ok", "suspect", "wrong"):
+                unreadable += 1
                 continue
             severity: Severity = severity_raw  # type: ignore[assignment]
             parsed.append(
@@ -668,36 +691,36 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
                 )
             )
         except (TypeError, ValueError):
+            unreadable += 1
             continue
-    return parsed
+    return parsed, _unreadable_entries_error(unreadable, len(flags), "judge")
 
 
 def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
     """Parse ``{"flags": [...]}`` JSON into typed :class:`HallucinationFlag`\\ s.
 
     Tolerant of stray markdown fences. Returns an empty list when the
-    response is unparseable so callers can decide whether to retry.
+    response is unparseable; :meth:`LLMJudge.detect_hallucinations` reports
+    that case in ``HallucinationReport.judge_error``.
     Severity-only entries (no ``score``) are accepted.
     """
-    text = _strip_json_fences(raw_text)
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        logger.warning(
-            "Could not decode hallucination judge response as JSON (%d characters)", len(text)
-        )
-        return []
+    return _hallucination_flags_and_error(raw_text)[0]
 
-    flags = data.get("flags") if isinstance(data, dict) else data
-    if not isinstance(flags, list):
-        return []
+
+def _hallucination_flags_and_error(raw_text: str) -> tuple[list[HallucinationFlag], str | None]:
+    flags, error = _flag_entries(raw_text, "hallucination judge")
+    if flags is None:
+        return [], error
 
     parsed: list[HallucinationFlag] = []
+    unreadable = 0
     for entry in flags:
         if not isinstance(entry, dict):
+            unreadable += 1
             continue
         severity_raw = str(entry.get("severity", "")).lower()
         if severity_raw not in ("ok", "suspect", "wrong"):
+            unreadable += 1
             continue
         # Drop entries the judge marked "ok" — by definition the report
         # only carries fields the caller may want to clear.
@@ -706,6 +729,7 @@ def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
         severity: Severity = severity_raw  # type: ignore[assignment]
         field = str(entry.get("field", "")).strip()
         if not field:
+            unreadable += 1
             continue
         parsed.append(
             HallucinationFlag(
@@ -715,7 +739,19 @@ def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
                 reason=str(entry.get("reason", "")).strip(),
             )
         )
-    return parsed
+    return parsed, _unreadable_entries_error(unreadable, len(flags), "hallucination judge")
+
+
+def _unreadable_entries_error(unreadable: int, total: int, what: str) -> str | None:
+    """An error when any flag entry could not be read, so the verdict is not a pass.
+
+    The readable flags are still returned; the error says how many were not,
+    without their content.
+    """
+    if not unreadable:
+        return None
+    logger.warning("%d of %d %s flags could not be read", unreadable, total, what)
+    return f"{unreadable} of {total} flags could not be read"
 
 
 def parse_text_judgement(raw_text: str) -> tuple[bool, Severity, int, str]:

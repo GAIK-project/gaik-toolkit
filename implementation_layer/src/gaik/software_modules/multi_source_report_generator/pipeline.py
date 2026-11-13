@@ -1122,7 +1122,7 @@ class MultiSourceReportGenerator:
         Pandoc system binary (https://pandoc.org/installing.html).
         """
         try:
-            import pypandoc
+            import pypandoc  # noqa: F401  (checked here for the install hint)
         except ImportError as exc:
             raise ImportError(
                 "DOCX export requires 'pypandoc' and the Pandoc system binary. "
@@ -1132,9 +1132,9 @@ class MultiSourceReportGenerator:
                 "(or: winget install JohnMacFarlane.Pandoc / brew install pandoc / "
                 "apt install pandoc)."
             ) from exc
-        docx_path = md_path.with_suffix(".docx")
-        pypandoc.convert_file(str(md_path), "docx", outputfile=str(docx_path))
-        return docx_path
+        from gaik.software_components._pandoc import markdown_file_to_docx
+
+        return markdown_file_to_docx(md_path, md_path.with_suffix(".docx"))
 
 
 # ---------------------------------------------------------------------------

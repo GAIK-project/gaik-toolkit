@@ -70,10 +70,9 @@ class Report(BaseModel):
         paths["markdown"] = out / "report.md"
         paths["markdown"].write_text(self.markdown, encoding="utf-8")
         if docx:
-            import pypandoc
+            from .._pandoc import markdown_file_to_docx
 
-            paths["docx"] = out / "report.docx"
-            pypandoc.convert_file(str(paths["markdown"]), "docx", outputfile=str(paths["docx"]))
+            paths["docx"] = markdown_file_to_docx(paths["markdown"], out / "report.docx")
         else:
             (out / "report.docx").unlink(missing_ok=True)
         return paths

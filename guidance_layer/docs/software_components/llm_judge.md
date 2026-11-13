@@ -75,7 +75,11 @@ for a complete script that renders a PDF to PNG bytes via PyMuPDF.
   and USD cost with longest-prefix model-id matching (so a rotated model
   id like `gemini-3-flash-Q3` still resolves to the closest known rate).
 - **JSON-Tolerant Parser** — `parse_judge_flags()` strips stray markdown
-  fences and silently drops malformed entries.
+  fences. A response that cannot be read at all, or a flag entry that cannot be
+  read (not an object, or a severity other than `ok`/`suspect`/`wrong`), sets
+  `judge_error` on the result, for example `"1 of 2 flags could not be read"`;
+  the readable flags are kept. Check `result.passed` rather than
+  `not result.flags`, since an unreadable verdict may have no flags.
 
 ---
 
@@ -114,6 +118,8 @@ result = judge.validate(
 )
 # result.flags          : list[ValidationFlag]
 # result.raw_judge_text : str (the model's untouched response)
+# result.judge_error : str | None (set when the response could not be read)
+# result.passed : bool (a readable verdict with every flag "ok")
 # result.usage          : JudgeUsage
 ```
 
@@ -301,6 +307,8 @@ class HallucinationReport:
     flags: list[HallucinationFlag]
     raw_judge_text: str
     usage: JudgeUsage
+    judge_error: str | None = None          # set when the response could not be read
+    # passed: True only for a readable verdict with no flags
 ```
 
 See the [demo example](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_detect_hallucinations.py)
