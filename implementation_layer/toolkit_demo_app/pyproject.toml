@@ -5,7 +5,6 @@ description = "GAIK Toolkit Demo Application"
 requires-python = ">=3.11"
 
 dependencies = [
-    "langfuse==4.15.6",            # Optional, opt-in Solution Wizard pilot
     "fastapi>=0.128.0",
     "uvicorn[standard]>=0.40.0",
     "python-multipart>=0.0.21",
@@ -15,10 +14,6 @@ dependencies = [
     "boto3>=1.35.0",              # S3 presigned URLs for the video-search demo
     "yt-dlp>=2026.8.19",          # video download in api/scripts/seed_dental_demo.py — YouTube changes break older releases
     "gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]>=0.8.0",
-    # Solution Configuration Wizard (drives the wizard skill via Claude Agent SDK).
-    # NOTE: claude-agent-sdk spawns the `claude` Code CLI binary, which must be
-    # present in the runtime (installed in local dev; add to the Docker image for prod).
-    "claude-agent-sdk>=0.1.48",
 ]
 
 [tool.uv.sources]

@@ -21,7 +21,7 @@ test("settings only apply to supported POST operations", () => {
   expect(supportsModelSettings("/api/extract/plain-language")).toBe(true);
   expect(supportsModelSettings("/api/extract-vision")).toBe(true);
   expect(supportsModelSettings("/api/llm-judge/panel/text-pair")).toBe(false);
-  expect(supportsModelSettings("/api/wizard/message/abc")).toBe(true);
+  expect(supportsModelSettings("/api/wizard/message/abc")).toBe(false);
   expect(supportsModelSettings("/api/wizard/start")).toBe(false);
   expect(supportsModelSettings("/api/extract", "GET")).toBe(false);
   expect(supportsModelSettings("/api/pipeline/text/stream")).toBe(true);
