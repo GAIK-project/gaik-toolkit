@@ -88,7 +88,7 @@ def run_case(label: str, file_paths: list[Path], task: str, schema_dir: Path) ->
         # --- Schema (optional — generated automatically if omitted) ---
         extraction_model=None,  # pre-built Pydantic model class, or None
         requirements=None,  # pre-built ExtractionRequirements, or None
-        schema_dir=schema_dir,  # directory to save/load schema.py + requirements.json
+        schema_dir=schema_dir,  # directory to save/load schema_model.json + requirements.json
     )
 
     total_s = round(time.perf_counter() - t_start, 3)

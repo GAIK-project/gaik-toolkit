@@ -175,7 +175,7 @@ result = extractor.extract(
     user_requirements="Extract ...",         # Required. Natural-language extraction task.
     extraction_model=None,                   # Optional Pydantic model class.
     requirements=None,                       # Optional ExtractionRequirements metadata.
-    schema_dir=None,                         # Optional directory for schema.py + requirements.json.
+    schema_dir=None,                         # Optional directory for saved schema files.
 )
 ```
 
@@ -187,12 +187,12 @@ result = extractor.extract(
 | `user_requirements` | `str` | Yes | Natural-language description of the structured information to extract. |
 | `extraction_model` | `type[BaseModel] | None` | No | Existing Pydantic model. If supplied with `requirements`, schema generation is skipped. |
 | `requirements` | `ExtractionRequirements | CompositeExtractionRequirements | None` | No | Field metadata used for post-processing and normalization. Must match `extraction_model` when provided manually. |
-| `schema_dir` | `str | Path | None` | No | Directory used to load/save generated schema files. If `schema.py` and `requirements.json` exist, they are reused. |
+| `schema_dir` | `str | Path | None` | No | Directory used to load/save generated schema files. If `schema_model.json` and `requirements.json` exist, they are reused. |
 
 Schema resolution order:
 
 1. If both `extraction_model` and `requirements` are provided, use them directly.
-2. If `schema_dir` contains `schema.py` and `requirements.json`, load the saved schema.
+2. If `schema_dir` contains `schema_model.json` and `requirements.json`, rebuild the saved schema from them.
 3. Otherwise, generate a schema from `user_requirements`, then save it to `schema_dir` if provided.
 
 Supported input files:
@@ -283,9 +283,18 @@ Example parent-with-list output:
 Schema persistence files:
 
 ```text
-schema.py           # Generated Pydantic model
+schema_model.json   # The model's classes and fields as data; this is what is loaded
 requirements.json   # Field metadata and structure type
+schema.py           # The same model as Python source, for reading only
 ```
+
+Loading never imports `schema.py`; the model is rebuilt from
+`schema_model.json` with `pydantic.create_model`. A folder saved by an older
+gaik has only `schema.py` and `requirements.json`: a flat or
+parent-with-children schema is rebuilt from `requirements.json` and
+`schema_model.json` is written next to it, while a nested-list schema (whose
+container field is recorded only in the model) is generated again. Edits made
+by hand to `schema.py` have no effect.
 
 Delete or change `schema_dir` when you want to force schema regeneration.
 
@@ -340,7 +349,7 @@ implementation_layer/examples/software_components/vision_extractor/vision_extrac
 ```
 
 The example demonstrates single-document and multi-document extraction, schema
-persistence with `schema.py` and `requirements.json`, provider selection,
+persistence with `schema_model.json` and `requirements.json`, provider selection,
 reasoning effort, table-merge instructions, verification, token usage, and cost
 reporting.
 

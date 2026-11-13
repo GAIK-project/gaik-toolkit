@@ -68,5 +68,5 @@ The configured parsing model must support image input. Text extraction can use a
 - `requirements`: Corresponding `ExtractionRequirements`.
 
 ## Schema Persistence (example pattern)
-- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure the schema and `<name>_requirements.json` exist under `schema/`.
+- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure `<name>_model.json` and `<name>_requirements.json` exist under `schema/`. `load_schema` rebuilds the model from `<name>_model.json` as data and never imports `<name>.py`, which is written only for reading. A folder from an older gaik without `<name>_model.json` is rebuilt from the requirements for a flat or parent-with-children schema; for a nested-list schema `load_schema` returns `None` and the schema is generated again.
 - To generate and save a schema, set `generate_schema=True`; the example uses `pipeline.save_schema(...)` to write both artifacts to `schema/`.

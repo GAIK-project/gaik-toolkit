@@ -13,8 +13,8 @@ from solution_wizard.schema_designer import (
     build_pydantic_model,
     build_requirements_json,
     build_requirements_text,
-    write_schema_files,
     write_extraction_requirements,
+    write_schema_files,
 )
 
 SPEC_FULL = {
@@ -216,6 +216,30 @@ def test_write_schema_files_output_schema_json(tmp_path):
     if json_path.exists():
         schema = json.loads(json_path.read_text())
         assert "properties" in schema or "title" in schema
+
+
+def test_designed_schema_loads_as_data_without_running_its_python_file(tmp_path):
+    pytest.importorskip("fitz")
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    from gaik.software_modules.documents_to_structured_data.pipeline import (
+        DocumentsToStructuredData,
+    )
+
+    write_schema_files(SPEC_FULL, "MaintenanceTicket", tmp_path, "test_uc")
+    schemas = tmp_path / "schemas"
+    assert (schemas / "output_schema_model.json").exists()
+    expected = json.loads((schemas / "output_schema.json").read_text())
+    marker = tmp_path / "marker.txt"
+    (schemas / "output_schema.py").write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran')\n"
+    )
+
+    pipeline = object.__new__(DocumentsToStructuredData)
+    model, _ = pipeline.load_schema(schemas, "output_schema")
+
+    assert not marker.exists()
+    assert model.__name__ == "MaintenanceTicket"
+    assert model.model_json_schema() == expected
 
 
 def test_write_extraction_requirements(tmp_path):

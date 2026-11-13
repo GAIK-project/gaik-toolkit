@@ -39,6 +39,7 @@ from gaik.software_components.extractor.schema import (
 )
 from gaik.software_components.vision_extractor.vision_extractor import (
     _load_saved_schema,
+    _save_schema_model,
     _save_schema_to_python,
     _wrap_model_for_verification,
 )
@@ -291,10 +292,10 @@ class TestSavedSchemaReload:
 
     def test_vision_extractor_persistence_round_trip(self, requirements, tmp_path):
         model = create_extraction_model(requirements)
-        schema_path = tmp_path / "schema.py"
-        _save_schema_to_python(model, schema_path)
+        model_path = tmp_path / "schema_model.json"
+        _save_schema_model(model, model_path)
 
-        loaded = _load_saved_schema(schema_path, model.__name__)
+        loaded = _load_saved_schema(model_path, model.__name__)
         schema = loaded.model_json_schema()
         assert "pattern" not in json.dumps(schema)
 

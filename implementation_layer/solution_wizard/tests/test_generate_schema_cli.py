@@ -143,8 +143,10 @@ def test_explicit_provider_overrides_legacy_flag_and_schema_reloads(
     # Exercise the same load_schema filename/JSON contract as generated PoCs,
     # without constructing an unrelated live pipeline client.
     pipeline = object.__new__(DocumentsToStructuredData)
+    assert (schema_dir / "output_schema_model.json").exists()
     loaded_schema, loaded_requirements = pipeline.load_schema(schema_dir, "output_schema")
     assert loaded_schema.__name__ == schema.__name__
+    assert loaded_schema.model_json_schema() == schema.model_json_schema()
     assert loaded_schema(title="Saved record").title == "Saved record"
     assert loaded_requirements == requirements
     assert (schema_dir / "output_schema.hash").read_text() == hashlib.sha256(
