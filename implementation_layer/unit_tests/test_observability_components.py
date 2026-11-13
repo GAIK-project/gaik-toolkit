@@ -339,7 +339,7 @@ def test_document_classifier_records_settings_tokens_and_lengths(spans):
     _assert_clean(span)
 
 
-def test_tabular_agent_retries_are_counted_in_one_span(spans, tmp_path):
+def test_tabular_agent_retries_are_counted_in_one_span(spans, tmp_path, monkeypatch):
     pytest.importorskip("duckdb")
     from gaik.software_components.tabular_agent.agent import TabularAgent
     from gaik.software_components.tabular_agent.models import GeneratedSQL
@@ -361,11 +361,8 @@ def test_tabular_agent_retries_are_counted_in_one_span(spans, tmp_path):
     )
     import gaik.software_components.tabular_agent.agent as module
 
-    module.time.sleep, sleep = (lambda s: None), module.time.sleep
-    try:
-        agent._parse_structured([{"role": "user", "content": SECRET}], GeneratedSQL)
-    finally:
-        module.time.sleep = sleep
+    monkeypatch.setattr(module.time, "sleep", lambda seconds: None)
+    agent._parse_structured([{"role": "user", "content": SECRET}], GeneratedSQL)
 
     assert len(attempts) == 2
     (span,) = spans()
