@@ -3,29 +3,142 @@
 from __future__ import annotations
 
 import csv
+import math
 from collections.abc import Iterable, Sequence
 from datetime import datetime, time
+from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
+
+# Characters a number format shows as they are, without quotes.
+_PLAIN_TEXT = frozenset("  -+()$€£¥")
+_COLOURS = frozenset({"black", "blue", "cyan", "green", "magenta", "red", "white", "yellow"})
 
 
-def _cell(value: Any, number_format: str = "General") -> str:
+class _NumberLayout(NamedTuple):
+    """How a number format shows a number."""
+
+    before: str
+    after: str
+    integer_digits: int
+    decimal_digits: int
+    percent: bool
+
+
+def _number_layout(number_format: str) -> _NumberLayout | None:
+    """Read the first section of an Excel number format, the one for positive numbers.
+
+    None for a format this parser does not render: scientific notation, fractions,
+    conditions, digits scaled by a trailing comma or split by text (``000-000``).
+    """
+    before: list[str] = []
+    after: list[str] = []
+    digits = ""
+    percent = False
+    index = 0
+    while index < len(number_format):
+        char = number_format[index]
+        index += 1
+        if char == ";":
+            break
+        if char in "_*":
+            # Room for the next character, or a fill with it: neither is text.
+            index += 1
+            continue
+        if char in "0#?.," or number_format.startswith("General", index - 1):
+            if after:
+                return None
+            if char == "G":
+                char, index = "#", index + len("General") - 1
+            digits += char
+            continue
+        if char == '"':
+            end = number_format.find('"', index)
+            if end < 0:
+                return None
+            text, index = number_format[index:end], end + 1
+        elif char == "\\":
+            text, index = number_format[index : index + 1], index + 1
+        elif char == "[":
+            end = number_format.find("]", index)
+            if end < 0:
+                return None
+            inside, index = number_format[index:end], end + 1
+            if inside.startswith("$"):
+                text = inside[1:].split("-", 1)[0]  # [$€-40B] is €, [$-409] only a locale
+            elif inside.lower() in _COLOURS or inside.lower().startswith("color"):
+                text = ""
+            else:
+                return None
+        elif char == "%":
+            text, percent = "%", True
+        elif char in _PLAIN_TEXT:
+            text = char
+        else:
+            return None
+        (after if digits else before).append(text)
+
+    integer, _, decimals = digits.partition(".")
+    grouped = integer.replace(",", "")
+    if (
+        not (grouped or decimals)
+        or "." in decimals
+        or "," in decimals
+        or integer.startswith(",")
+        or integer.endswith(",")
+    ):
+        return None
+    return _NumberLayout(
+        "".join(before), "".join(after), grouped.count("0"), decimals.count("0"), percent
+    )
+
+
+def _formatted_number(value: int | float, number_format: str) -> str | None:
+    """The number as its format shows it, or None when the format is not rendered.
+
+    Nothing of the stored value is lost: digits the format would round away are kept, and
+    no thousands separator is added, since its character depends on the reader's locale.
+    """
+    layout = _number_layout(number_format)
+    if layout is None or not math.isfinite(value):
+        return None
+    signs = set(layout.before + layout.after) & set("+-()")
+    if value < 0 and signs:
+        # The format's own sign is for a positive number.
+        return None
+    number = Decimal(repr(value)) * (100 if layout.percent else 1)
+    whole, _, fraction = format(abs(number), "f").partition(".")
+    fraction = fraction.rstrip("0").ljust(layout.decimal_digits, "0")
+    text = whole.zfill(layout.integer_digits) + (f".{fraction}" if fraction else "")
+    sign = "-" if number < 0 else ""
+    return " ".join(f"{sign}{layout.before}{text}{layout.after}".split())
+
+
+def _number(value: int | float, number_format: str | None) -> str:
+    plain = str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
+    if not number_format or number_format in ("General", "@"):
+        return plain
+    shown = _formatted_number(value, number_format)
+    if shown is None:
+        return f"{plain} (number format: {number_format})"
+    return shown
+
+
+def _cell(value: Any, number_format: str | None = None) -> str:
     if value is None:
         return ""
     if isinstance(value, datetime):
         text = value.date().isoformat() if value.time() == time() else value.isoformat(sep=" ")
-    elif isinstance(value, float) and value.is_integer():
-        text = str(int(value))
+    elif isinstance(value, (int, float)) and not isinstance(value, bool):
+        text = _number(value, number_format)
     else:
         text = str(value)
-    if number_format and number_format != "General":
-        text = f"{text} (number format: {number_format})"
     return " ".join(text.splitlines()).replace("|", "\\|")
 
 
 def _table(
     rows: Iterable[Iterable[Any]],
-    number_formats: Sequence[Sequence[str]] | None = None,
+    number_formats: Sequence[Sequence[str | None]] | None = None,
 ) -> str | None:
     """Render rows as a Markdown table with a leading ``Row`` column; None if all are empty."""
     kept = []
@@ -34,9 +147,7 @@ def _table(
     )
     for number, (row, formats) in enumerate(source_rows, start=1):
         cells = [
-            _cell(
-                value, formats[index] if formats is not None and index < len(formats) else "General"
-            )
+            _cell(value, formats[index] if formats is not None and index < len(formats) else None)
             for index, value in enumerate(row)
         ]
         while cells and not cells[-1].strip():
