@@ -88,6 +88,103 @@ def test_gpt_transcription_single_pass_when_within_size_and_duration(tmp_path: P
     single.assert_called_once_with(audio, "prompt", "gpt-4o-transcribe", None)
 
 
+@pytest.mark.parametrize(
+    ("overrides", "custom_context", "expected_prompt"),
+    [
+        ({}, "", None),
+        ({}, "Suomenkielinen aihe", "Suomenkielinen aihe"),
+        ({"default_prompt": "Explicit prompt"}, "", "Explicit prompt"),
+        (
+            {"default_prompt": "Explicit prompt"},
+            "Additional context",
+            "Explicit prompt\nAdditional context",
+        ),
+    ],
+)
+def test_transcribe_sends_only_explicit_prompt_context(
+    tmp_path: Path,
+    overrides: dict[str, object],
+    custom_context: str,
+    expected_prompt: str | None,
+):
+    audio = tmp_path / "short.mp3"
+    audio.write_bytes(b"tiny")
+    transcriber = _transcriber(output_dir=tmp_path / "output", **overrides)
+
+    with (
+        patch(
+            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            side_effect=OSError("duration unavailable in test"),
+        ),
+        patch(
+            "gaik.software_components.transcriber.transcriber._create_audio_client"
+        ) as create_client,
+        patch("gaik.software_components.transcriber.transcriber._close_owned_audio_client"),
+        patch.object(transcriber, "_needs_chunking", return_value=False),
+    ):
+        create_client.return_value.audio.transcriptions.create.return_value = SimpleNamespace(
+            text="Transcript", usage=None
+        )
+        transcriber.transcribe(audio, custom_context=custom_context)
+
+    request = create_client.return_value.audio.transcriptions.create.call_args.kwargs
+    if expected_prompt is None:
+        assert "prompt" not in request
+    else:
+        assert request["prompt"] == expected_prompt
+
+
+def test_custom_context_does_not_leak_into_later_transcriptions(tmp_path: Path):
+    audio = tmp_path / "short.mp3"
+    audio.write_bytes(b"tiny")
+    transcriber = _transcriber(output_dir=tmp_path / "output")
+
+    with (
+        patch(
+            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            side_effect=OSError("duration unavailable in test"),
+        ),
+        patch(
+            "gaik.software_components.transcriber.transcriber._create_audio_client"
+        ) as create_client,
+        patch("gaik.software_components.transcriber.transcriber._close_owned_audio_client"),
+        patch.object(transcriber, "_needs_chunking", return_value=False),
+    ):
+        create_client.return_value.audio.transcriptions.create.return_value = SimpleNamespace(
+            text="Transcript", usage=None
+        )
+        transcriber.transcribe(audio, custom_context="Explicit context")
+        transcriber.transcribe(audio)
+
+    requests = create_client.return_value.audio.transcriptions.create.call_args_list
+    assert requests[0].kwargs["prompt"] == "Explicit context"
+    assert "prompt" not in requests[1].kwargs
+
+
+def test_local_whisper_path_remains_independent_of_remote_prompt(tmp_path: Path):
+    audio = tmp_path / "short.mp3"
+    audio.write_bytes(b"tiny")
+    transcriber = _transcriber(
+        output_dir=tmp_path / "output",
+        transcription_model="whisper_local",
+        initial_prompt="Finnish names",
+    )
+
+    with (
+        patch(
+            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            side_effect=OSError("duration unavailable in test"),
+        ),
+        patch.object(
+            transcriber, "_transcribe_input_local", return_value=("Transcript", None)
+        ) as local,
+    ):
+        transcriber.transcribe(audio, custom_context="Remote-only context")
+
+    local.assert_called_once_with(audio)
+    assert transcriber.initial_prompt == "Finnish names"
+
+
 def test_transcription_usage_maps_tokens_and_duration():
     tokens = SimpleNamespace(type="tokens", input_tokens=7, output_tokens=3, total_tokens=10)
     duration = SimpleNamespace(type="duration", seconds=61.2)
@@ -160,6 +257,56 @@ class _SliceableFakeAudio(_FakeAudio):
         start = item.start or 0
         stop = self.duration_ms if item.stop is None else min(item.stop, self.duration_ms)
         return _FakeChunk(stop - start, self.exported_chunk_ms)
+
+
+@pytest.mark.parametrize(
+    ("base_prompt", "fail_first"),
+    [
+        (None, False),
+        ("Explicit Finnish-language context", False),
+        (None, True),
+        ("Explicit Finnish-language context", True),
+    ],
+)
+def test_chunked_transcription_omits_default_and_uses_prior_transcript_context(
+    tmp_path: Path, base_prompt: str | None, fail_first: bool
+):
+    audio_path = tmp_path / "long.mp3"
+    audio_path.write_bytes(b"tiny")
+    requests: list[dict[str, object]] = []
+
+    def create_request(**kwargs: object) -> SimpleNamespace:
+        requests.append({key: value for key, value in kwargs.items() if key != "file"})
+        if fail_first and len(requests) == 1:
+            raise RuntimeError("first chunk failed")
+        return SimpleNamespace(text=f"Transcript {len(requests)}", usage=None)
+
+    with (
+        patch("gaik.software_components.transcriber.transcriber.create_openai_client") as factory,
+        patch("gaik.software_components.transcriber.transcriber.time.sleep"),
+    ):
+        factory.return_value.audio.transcriptions.create.side_effect = create_request
+        split_and_transcribe_with_context(
+            str(audio_path),
+            {"use_azure": False, "api_key": "test-key"},
+            max_size_mb=100,
+            max_duration_seconds=60,
+            audio=_SliceableFakeAudio(duration_ms=120_000),
+            base_prompt=base_prompt,
+            transcription_model="gpt-4o-transcribe",
+        )
+
+    assert len(requests) == 3
+    if base_prompt is None:
+        assert "prompt" not in requests[0]
+    else:
+        assert requests[0]["prompt"] == base_prompt
+    if fail_first:
+        assert "prompt" not in requests[1]
+        assert requests[2]["prompt"] == "Transcript 2"
+    else:
+        assert requests[1]["prompt"] == "Transcript 1"
+        assert requests[2]["prompt"] == "Transcript 2"
 
 
 @pytest.mark.parametrize("max_duration_seconds", [DEFAULT_MAX_DURATION_SECONDS, 1500])

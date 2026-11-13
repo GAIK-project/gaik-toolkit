@@ -156,7 +156,7 @@ class Transcriber:
         enhanced_transcript: bool = False,
         max_size_mb: int = 25,
         max_duration_seconds: int = DEFAULT_MAX_DURATION_SECONDS,
-        default_prompt: str = DEFAULT_PROMPT,
+        default_prompt: str | None = None,
         transcription_model: str | None = None,
         enhanced_transcript_instructions: str | None = None,
         language: str = "auto",
@@ -211,8 +211,10 @@ class Transcriber:
         print("=" * 80)
 
         # IMPORTANT: do NOT mutate self.default_prompt across calls.
-        prompt = self.default_prompt + (("\n" + custom_context) if custom_context else "")
-        print(f"Transcription prompt: {len(prompt)} characters")
+        prompt = self.default_prompt
+        if custom_context:
+            prompt = f"{prompt}\n{custom_context}" if prompt is not None else custom_context
+        print(f"Transcription prompt: {len(prompt) if prompt is not None else 0} characters")
 
         effective_model = self._resolve_transcription_model()
         self._warn_ignored_local_options(effective_model)
@@ -370,7 +372,7 @@ class Transcriber:
     def _transcribe_input_remote(
         self,
         input_path: Path,
-        prompt: str,
+        prompt: str | None,
         transcription_model: str,
         usage: UsageCounter | None = None,
     ) -> str:
@@ -418,7 +420,7 @@ class Transcriber:
     def _single_pass_transcription(
         self,
         file_path: Path,
-        prompt: str,
+        prompt: str | None,
         transcription_model: str,
         usage: UsageCounter | None = None,
     ) -> str:
@@ -428,11 +430,17 @@ class Transcriber:
         audio_client = _create_audio_client(self.api_config)
         try:
             with file_path.open("rb") as f:
-                response = audio_client.audio.transcriptions.create(
-                    model=transcription_model,
-                    file=f,
-                    prompt=prompt,
-                )
+                if prompt is None:
+                    response = audio_client.audio.transcriptions.create(
+                        model=transcription_model,
+                        file=f,
+                    )
+                else:
+                    response = audio_client.audio.transcriptions.create(
+                        model=transcription_model,
+                        file=f,
+                        prompt=prompt,
+                    )
             if usage is not None:
                 usage.add(_transcription_usage(response))
             return response.text
@@ -449,7 +457,7 @@ def split_and_transcribe_with_context(
     max_size_mb=25,
     max_duration_seconds=DEFAULT_MAX_DURATION_SECONDS,
     audio=None,
-    base_prompt: str = DEFAULT_PROMPT,
+    base_prompt: str | None = None,
     transcription_model: str | None = None,
     usage: UsageCounter | None = None,
 ):
@@ -504,20 +512,21 @@ def split_and_transcribe_with_context(
                 prompt = base_prompt
             else:
                 trimmed_context = context_text[-170:] if len(context_text) > 170 else context_text
-                prompt = f"""The following is a continuation of a \
-conversation. Here is the previous part of the transcript:
-
-{trimmed_context}
-
-Continue the transcription, maintaining speaker consistency and dialogue structure."""
+                prompt = trimmed_context or None
 
             try:
                 with open(chunk_path, "rb") as chunk_file:
-                    transcript_response = audio_client.audio.transcriptions.create(
-                        model=transcription_model,
-                        file=chunk_file,
-                        prompt=prompt,
-                    )
+                    if prompt is None:
+                        transcript_response = audio_client.audio.transcriptions.create(
+                            model=transcription_model,
+                            file=chunk_file,
+                        )
+                    else:
+                        transcript_response = audio_client.audio.transcriptions.create(
+                            model=transcription_model,
+                            file=chunk_file,
+                            prompt=prompt,
+                        )
 
                     chunk_transcript = transcript_response.text
                     transcripts.append(chunk_header + chunk_transcript)
