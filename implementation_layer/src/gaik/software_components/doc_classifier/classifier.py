@@ -11,6 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
@@ -345,21 +346,30 @@ Provide your classification with:
         ]
 
         try:
-            if isinstance(self.client, ProviderClient):
-                parsed = self.client.chat_parsed(
-                    messages=messages,
-                    response_format=ClassificationModel,
-                    model=self.model,
-                )
-            else:
-                response = self.client.beta.chat.completions.parse(
-                    model=self.model,
-                    messages=messages,
-                    response_format=ClassificationModel,
-                    **normalize_chat_kwargs(self.model, {"temperature": 0}, config=self.config),
-                    timeout=30,
-                )
-                parsed = response.choices[0].message.parsed
+            with llm_span(
+                "DocumentClassifier", provider=provider_of(self.client), model=self.model
+            ) as call:
+                if isinstance(self.client, ProviderClient):
+                    parsed = self.client.chat_parsed(
+                        messages=messages,
+                        response_format=ClassificationModel,
+                        model=self.model,
+                    )
+                else:
+                    settings = normalize_chat_kwargs(
+                        self.model, {"temperature": 0}, config=self.config
+                    )
+                    record_request(settings)
+                    response = self.client.beta.chat.completions.parse(
+                        model=self.model,
+                        messages=messages,
+                        response_format=ClassificationModel,
+                        **settings,
+                        timeout=30,
+                    )
+                    record_response(response)
+                    parsed = response.choices[0].message.parsed
+                call.record_text(messages, parsed)
 
             return {
                 "class": parsed.document_class,

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import requests
 
+from gaik.observability.tracing import llm_span
+
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".m4v"}
 
 
@@ -100,14 +102,18 @@ def transcribe(
             }
             files = {"file": (upload_file.name, f)}
             print("Transcribing... (this may take a while)")
-            r = requests.post(
-                f"{api_base}/transcribe",
-                data=payload,
-                files=files,
-                headers={"key": key},
-                timeout=60 * 30,
-            )
-            r.raise_for_status()
+            with llm_span(
+                "Transcriber", provider="whisper_local", model="whisper", operation="transcription"
+            ) as call:
+                r = requests.post(
+                    f"{api_base}/transcribe",
+                    data=payload,
+                    files=files,
+                    headers={"key": key},
+                    timeout=60 * 30,
+                )
+                r.raise_for_status()
+                call.record_text(initial_prompt)
 
         result = r.json()
         elapsed_seconds = time.perf_counter() - start_time

@@ -256,7 +256,7 @@ class AnthropicProvider:
         text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
         usage = _usage(response)
         self.usage.add(usage)
-        record_response(usage, response_model=response.model)
+        record_response(response)
         return ChatResponse(
             text="".join(text_blocks),
             model=response.model,
@@ -318,7 +318,7 @@ class AnthropicProvider:
             response = self.raw.messages.create(**params)
         usage = _usage(response)
         self.usage.add(usage)
-        record_response(usage, response_model=getattr(response, "model", None))
+        record_response(response)
         if getattr(response, "stop_reason", None) == "max_tokens":
             raise ValueError(
                 f"Anthropic response for '{tool_name}' was cut off at "

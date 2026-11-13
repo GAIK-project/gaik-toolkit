@@ -22,14 +22,6 @@ def _usage(completion) -> dict[str, int]:
     return {k: v for k, v in completion.usage.model_dump().items() if isinstance(v, int)}
 
 
-def _embedding_usage(response) -> dict[str, int]:
-    """An embeddings response's token counts for a gaik span; empty when it has none."""
-    try:
-        return _usage(response)
-    except Exception:
-        return {}
-
-
 class OpenAIProvider:
     def __init__(self, config: dict):
         self.provider = resolve_provider(config=config)
@@ -61,7 +53,7 @@ class OpenAIProvider:
         choice = completion.choices[0].message
         usage = _usage(completion)
         self.usage.add(usage)
-        record_response(usage, response_model=completion.model)
+        record_response(completion)
         return ChatResponse(
             text=choice.content or "",
             model=completion.model,
@@ -87,7 +79,7 @@ class OpenAIProvider:
         )
         usage = _usage(completion)
         self.usage.add(usage)
-        record_response(usage, response_model=getattr(completion, "model", None))
+        record_response(completion)
         parsed = completion.choices[0].message.parsed
         if parsed is None:
             raise ValueError("OpenAI parse() returned None — check the model/schema.")
@@ -117,5 +109,5 @@ class OpenAIProvider:
                 "supported by the endpoint, or embed(..., model=...)."
             )
         response = self.raw.embeddings.create(model=model, input=texts, **kwargs)
-        record_response(_embedding_usage(response))
+        record_response(response)
         return [item.embedding for item in sorted(response.data, key=lambda item: item.index)]

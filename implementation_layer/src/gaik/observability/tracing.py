@@ -52,6 +52,7 @@ from contextvars import ContextVar
 from typing import Any
 
 from .pricing import lookup_price
+from .providers import sdk_usage
 from .usage import UsageRecord, build_usage_record
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,12 @@ _SETTINGS = {
     "max_completion_tokens": "gen_ai.request.max_tokens",
     "max_output_tokens": "gen_ai.request.max_tokens",
     "reasoning_effort": "gaik.request.reasoning_effort",
+}
+
+#: Cached input tokens a response reports, by the attribute that records them.
+_CACHE_ATTRIBUTES = {
+    "cache_read_input_tokens": "gen_ai.usage.cache_read.input_tokens",
+    "cache_creation_input_tokens": "gen_ai.usage.cache_creation.input_tokens",
 }
 
 #: The open ``llm_span`` of this thread or task, for ``record_request``.
@@ -204,6 +211,8 @@ class LLMCallSpan:
         self._identity = identity or {}
         self._ended = False
         self._usage: UsageRecord | None = None
+        self._cache: dict[str, int] = {}
+        self._priced = True
 
     @property
     def ended(self) -> bool:
@@ -269,21 +278,48 @@ class LLMCallSpan:
                     }
                 )
                 # A model missing from the price table would read as a free call.
-                if lookup_price(usage.provider, usage.model) != (0.0, 0.0):
+                if self._priced and lookup_price(usage.provider, usage.model) != (0.0, 0.0):
                     attributes["gaik.cost.usd"] = usage.cost_usd
                     attributes["gaik.cost.estimated"] = True
             self._span.set_attributes({k: v for k, v in attributes.items() if v is not None})
         except Exception:
             logger.debug("gaik tracing could not record a result", exc_info=True)
 
+    def record_text(self, prompt: Any, output: Any = None) -> None:
+        """Add the lengths of a call's prompt and answer, never the text. Never raises.
+
+        ``prompt`` is measured by ``text_length``. ``output`` is the answer: a
+        string, or a Pydantic model or parsed JSON value, measured as JSON;
+        ``None`` leaves its length out. Measured only when the span is kept.
+        """
+        if not self.recording:
+            return
+        try:
+            if output is None or isinstance(output, str):
+                answer = output
+            elif callable(getattr(output, "model_dump_json", None)):
+                answer = output.model_dump_json()
+            else:
+                answer = json.dumps(output, ensure_ascii=False, default=str)
+            self.record(
+                None,
+                input_length=text_length(prompt),
+                output_length=None if answer is None else len(answer),
+            )
+        except Exception:
+            logger.debug("gaik tracing could not measure a call", exc_info=True)
+
     def record_usage(
         self, usage: Mapping[str, Any] | None, *, response_model: str | None = None
     ) -> None:
-        """Add the tokens a response reports, in an adapter's usage dict, and its model.
+        """Add the tokens a response reports, as ``sdk_usage`` gives them, and its model.
 
-        Takes either key style (``input_tokens``/``output_tokens`` or
-        ``prompt_tokens``/``completion_tokens``); the cost is estimated for the
-        span's provider and model. Responses within one span add up: a
+        Also takes ``prompt_tokens``/``completion_tokens``. The cost is
+        estimated for the span's provider and model, with cached input at the
+        base input price: cache reads cost less than that and Anthropic's
+        cache writes more. Chat and embeddings calls only; audio is billed
+        otherwise, so a transcription span has tokens but no cost. Responses
+        within one span add up: a
         component that retries inside its span is billed for every attempt.
         Never raises.
         """
@@ -296,6 +332,7 @@ class LLMCallSpan:
                     self._identity.get("provider", ""), self._identity.get("model", ""), counts, 0.0
                 )
                 self._usage = record if self._usage is None else self._usage + record
+                self._record_cache(usage)
             self.record(
                 self._usage,
                 response_model=response_model,
@@ -303,6 +340,14 @@ class LLMCallSpan:
             )
         except Exception:
             logger.debug("gaik tracing could not record the usage", exc_info=True)
+
+    def _record_cache(self, usage: Mapping[str, Any]) -> None:
+        for key, attribute in _CACHE_ATTRIBUTES.items():
+            value = usage.get(key)
+            if isinstance(value, int) and not isinstance(value, bool):
+                self._cache[attribute] = self._cache.get(attribute, 0) + value
+        if self._cache:
+            self._span.set_attributes(self._cache)
 
     @contextmanager
     def active(self) -> Iterator[LLMCallSpan]:
@@ -395,18 +440,75 @@ def start_llm_span(
         "model": model,
         "prompt_version": prompt_version,
     }
-    return LLMCallSpan(_start(identity, operation), identity)
+    call = LLMCallSpan(_start(identity, operation), identity)
+    # The price table holds text-model rates; audio models would match them by prefix.
+    call._priced = operation in ("chat", "embeddings")
+    return call
 
 
-def record_response(usage: Mapping[str, Any] | None, *, response_model: str | None = None) -> None:
-    """Record the tokens a model response reports on the open ``llm_span``, if any.
+def record_response(response: Any, *, response_model: str | None = None) -> None:
+    """Record a model response's tokens and model on the open ``llm_span``, if any.
 
-    Call it where the response arrives, with the adapter's usage dict. Outside
-    an ``llm_span`` it does nothing, like ``record_request``.
+    Call it where the response arrives, with the provider SDK's response
+    object (or a Gemini REST payload); ``sdk_usage`` reads its token counts,
+    and the model is the response's own unless ``response_model`` is given.
+    Outside an ``llm_span`` it does nothing, like ``record_request``. Never
+    raises.
     """
     call = _current_call.get()
-    if call is not None:
-        call.record_usage(usage, response_model=response_model)
+    if call is None or not call.recording:
+        return
+    try:
+        usage = sdk_usage(response)
+        model = response_model if response_model is not None else getattr(response, "model", None)
+    except Exception:
+        logger.debug("gaik tracing could not read a response's usage", exc_info=True)
+        return
+    call.record_usage(usage, response_model=model)
+
+
+def provider_of(client: Any) -> str:
+    """gaik's provider name for a client: a ``ProviderClient``'s own, else its SDK type's.
+
+    For a span around a call that may go through either kind of client.
+    Never raises.
+    """
+    try:
+        name = getattr(client, "provider", None)
+        if isinstance(name, str) and name:
+            return name
+        kind = type(client).__name__
+        if "Anthropic" in kind:
+            return "anthropic"
+        return "azure" if "Azure" in kind else "openai"
+    except Exception:
+        return "unknown"
+
+
+def text_length(content: Any) -> int | None:
+    """Characters of text in a prompt, never the text itself; for a span's lengths.
+
+    Takes a string, a list of chat messages, or a list of content parts (text
+    parts are counted, images and files are not). ``None`` when it cannot tell.
+    """
+
+    def count(item: Any) -> int:
+        if item is None:
+            return 0
+        if isinstance(item, str):
+            return len(item)
+        if isinstance(item, dict):
+            if isinstance(item.get("text"), str):
+                return len(item["text"])
+            return count(item.get("content"))
+        if isinstance(item, (list, tuple)):
+            return sum(count(part) for part in item)
+        raise TypeError("not a prompt")
+
+    try:
+        return count(content) if content is not None else None
+    except Exception:
+        return None
 
 
 def record_request(settings: Mapping[str, Any]) -> None:
@@ -487,8 +589,10 @@ def _current(span: Any) -> Any:
 
 
 def _start(identity: dict[str, Any], operation: str = "chat") -> Any:
+    # The OpenTelemetry API alone, which other packages bring, is not enough:
+    # gaik traces only with its own extra installed, as the client wrapper does.
     tracer = _get_tracer()
-    if tracer is None:
+    if tracer is None or not _extra_installed():
         return None
     span = None
     try:

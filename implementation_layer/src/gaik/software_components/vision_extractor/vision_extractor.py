@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, create_model
 from pydantic_core import PydanticUndefined
 
 from gaik.observability import UsageRecord, build_usage_record
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
 from gaik.software_components import _http
 from gaik.software_components.extractor import (
     CompositeExtractionRequirements,
@@ -939,19 +940,20 @@ class VisionExtractor:
         if self.model_provider in _ANTHROPIC_PROVIDERS:
             options["timeout"] = self.config.get("timeout") or _ANTHROPIC_TIMEOUT_S
         try:
-            result = client.chat_parsed(
-                [
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": build_chat_document_content(
-                            file_paths, user_prompt, include_text_layer=True
-                        ),
-                    },
-                ],
-                response_format=extraction_model,
-                **options,
-            )
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": build_chat_document_content(
+                        file_paths, user_prompt, include_text_layer=True
+                    ),
+                },
+            ]
+            with llm_span(
+                "VisionExtractor", provider=provider_of(client), model=self.model
+            ) as call:
+                result = client.chat_parsed(messages, response_format=extraction_model, **options)
+                call.record_text(messages, result)
             # ProviderClient's parsed-output contract returns only the validated
             # model; don't fabricate usage counts when the adapter doesn't expose them.
             return result.model_dump(), None
@@ -982,21 +984,25 @@ class VisionExtractor:
         content.append({"type": "input_text", "text": user_prompt})
 
         t0 = time.perf_counter()
-        response = client.responses.create(
-            model=self.model,
-            instructions=system_prompt,
-            input=[{"role": "user", "content": content}],
-            reasoning={"effort": self.reasoning_effort},
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": extraction_model.__name__[:64],
-                    "schema": _make_schema_strict(extraction_model.model_json_schema()),
-                    "strict": True,
-                }
-            },
-            max_output_tokens=32768,
-        )
+        with llm_span("VisionExtractor", provider=provider_of(client), model=self.model) as call:
+            record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})
+            response = client.responses.create(
+                model=self.model,
+                instructions=system_prompt,
+                input=[{"role": "user", "content": content}],
+                reasoning={"effort": self.reasoning_effort},
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": extraction_model.__name__[:64],
+                        "schema": _make_schema_strict(extraction_model.model_json_schema()),
+                        "strict": True,
+                    }
+                },
+                max_output_tokens=32768,
+            )
+            record_response(response)
+            call.record_text([system_prompt, content], response.output_text)
         elapsed = time.perf_counter() - t0
 
         result_dict = json.loads(response.output_text)
@@ -1045,17 +1051,23 @@ class VisionExtractor:
         }
 
         t0 = time.perf_counter()
-        with client.messages.stream(
-            model=self.model,
-            max_tokens=32768,
-            system=system_prompt,
-            thinking={"type": "adaptive"},
-            output_config={"effort": self.reasoning_effort},
-            tools=[tool_schema],
-            tool_choice={"type": "auto"},
-            messages=[{"role": "user", "content": content}],
-        ) as stream:
+        with (
+            llm_span("VisionExtractor", provider=provider_of(client), model=self.model) as call,
+            client.messages.stream(
+                model=self.model,
+                max_tokens=32768,
+                system=system_prompt,
+                thinking={"type": "adaptive"},
+                output_config={"effort": self.reasoning_effort},
+                tools=[tool_schema],
+                tool_choice={"type": "auto"},
+                messages=[{"role": "user", "content": content}],
+            ) as stream,
+        ):
+            record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})
             response = stream.get_final_message()
+            record_response(response)
+            call.record_text([system_prompt, content])
         elapsed = time.perf_counter() - t0
 
         result_dict: dict = {}
@@ -1129,10 +1141,15 @@ class VisionExtractor:
             }
 
         t0 = time.perf_counter()
-        resp = _http.post(url, service="Gemini", headers=headers, json=body, timeout=(30, 300))
+        provider = "vertex" if is_vertex else "google"
+        with llm_span("VisionExtractor", provider=provider, model=self.model) as call:
+            record_request({"temperature": 0, "max_tokens": 32768})
+            resp = _http.post(url, service="Gemini", headers=headers, json=body, timeout=(30, 300))
+            payload = resp.json()
+            record_response(payload)
+            call.record_text([system_prompt, parts])
         elapsed = time.perf_counter() - t0
 
-        payload = resp.json()
         candidates = payload.get("candidates", [])
         if not candidates:
             raise ValueError(

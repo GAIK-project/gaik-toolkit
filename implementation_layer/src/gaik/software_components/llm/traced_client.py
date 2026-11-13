@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import copy
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 from gaik.observability.tracing import (
@@ -41,6 +41,7 @@ from gaik.observability.tracing import (
     in_llm_span,
     llm_span,
     start_llm_span,
+    text_length,
     tracing_enabled,
 )
 
@@ -175,7 +176,9 @@ class TracedProviderClient:
         except Exception:
             logger.debug("gaik tracing could not prepare a stream span", exc_info=True)
             return stream
-        return _traced_stream(stream, provider, model, messages)
+        return traced_stream(
+            stream, component=None, provider=provider, model=model, messages=messages
+        )
 
     def embed(self, *args: Any, **kwargs: Any) -> Any:
         client = self._gaik_client
@@ -216,10 +219,20 @@ def _identity(client: Any, kwargs: dict[str, Any], operation: str) -> tuple[str,
     return str(getattr(client, "provider", None) or "unknown"), str(model)
 
 
-def _traced_stream(
-    stream: Iterator[str], provider: str, model: str, messages: Any
+def traced_stream(
+    stream: Iterable[str],
+    *,
+    component: str | None,
+    provider: str,
+    model: str,
+    messages: Any,
 ) -> Iterator[str]:
     """``stream`` passed on chunk by chunk inside a span that ends with it.
+
+    For a component that streams an answer: give it a generator that makes
+    the request when first read, so the request's settings and any client
+    call made in it land on this span (a ``ProviderClient``'s ``chat_stream``
+    then makes no second span).
 
     The span starts at the first read and ends when the stream is used up,
     closed early or fails. It is current only while the client produces a
@@ -230,7 +243,7 @@ def _traced_stream(
         yield from stream
         return
     try:
-        call = start_llm_span(None, provider=provider, model=model)
+        call = start_llm_span(component, provider=provider, model=model)
         recording = call.recording
     except Exception:
         logger.debug("gaik tracing could not start a stream span", exc_info=True)
@@ -278,36 +291,18 @@ def _traced_stream(
         call.fail(exc)
         raise
     finally:
-        call.record(None, input_length=_input_length(messages), output_length=length)
+        call.record(None, input_length=text_length(messages), output_length=length)
         call.end()
 
 
 def _record_lengths(call: LLMCallSpan, messages: Any, output_length: Callable[[], int]) -> None:
     """Add the call's lengths to its span, measured only when the span is kept."""
     if call.recording:
-        call.record(None, input_length=_input_length(messages), output_length=_safe(output_length))
+        call.record(None, input_length=text_length(messages), output_length=_safe(output_length))
 
 
 def _messages(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
     return args[0] if args else kwargs.get("messages")
-
-
-def _input_length(messages: Any) -> int | None:
-    """Characters in the messages' text, never the text itself; images are not counted."""
-
-    def count() -> int:
-        total = 0
-        for message in messages:
-            content = message.get("content")
-            if isinstance(content, str):
-                total += len(content)
-            elif isinstance(content, list):
-                for part in content:
-                    if isinstance(part, dict) and isinstance(part.get("text"), str):
-                        total += len(part["text"])
-        return total
-
-    return _safe(count)
 
 
 def _safe(compute: Callable[[], int]) -> int | None:

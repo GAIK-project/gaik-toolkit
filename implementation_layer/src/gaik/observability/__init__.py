@@ -16,9 +16,17 @@ from .pricing import (
     compute_cost_usd,
     lookup_price,
 )
-from .providers import openai_usage_to_dict
+from .providers import openai_usage_to_dict, sdk_usage
 from .timing import measure_duration
-from .tracing import LLMCallSpan, config_version, llm_span, record_request
+from .tracing import (
+    LLMCallSpan,
+    config_version,
+    llm_span,
+    provider_of,
+    record_request,
+    record_response,
+    text_length,
+)
 from .usage import UsageRecord, build_usage_record
 
 __all__ = [
@@ -35,5 +43,9 @@ __all__ = [
     "lookup_price",
     "measure_duration",
     "openai_usage_to_dict",
+    "provider_of",
     "record_request",
+    "record_response",
+    "sdk_usage",
+    "text_length",
 ]

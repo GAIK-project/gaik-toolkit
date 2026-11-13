@@ -14,6 +14,7 @@ except ImportError as exc:
         "Embedder requires 'langchain-core'. Install extras with 'pip install gaik[embedder]'"
     ) from exc
 
+from gaik.observability.tracing import llm_span, provider_of, record_response
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
@@ -86,17 +87,28 @@ class Embedder:
         embeddings: list[list[float]] = []
 
         for batch in _chunked([doc.page_content for doc in docs], size):
-            if isinstance(self.client, ProviderClient):
-                vectors = _with_retries(
-                    lambda batch=batch: self.client.embed(batch, model=self.model)
-                )
-                embeddings.extend(vectors)
-            else:
-                resp = _with_retries(
-                    lambda: self.client.embeddings.create(model=self.model, input=batch)
-                )
-                data = sorted(resp.data, key=lambda item: item.index)
-                embeddings.extend([item.embedding for item in data])
+            with llm_span(
+                "Embedder",
+                provider=provider_of(self.client),
+                model=self.model,
+                operation="embeddings",
+            ) as call:
+                if isinstance(self.client, ProviderClient):
+                    vectors = _with_retries(
+                        lambda batch=batch: self.client.embed(batch, model=self.model)
+                    )
+                    embeddings.extend(vectors)
+                else:
+
+                    def create(batch=batch):
+                        response = self.client.embeddings.create(model=self.model, input=batch)
+                        record_response(response)
+                        return response
+
+                    resp = _with_retries(create)
+                    data = sorted(resp.data, key=lambda item: item.index)
+                    embeddings.extend([item.embedding for item in data])
+                call.record_text(batch)
 
         return embeddings, docs
 
