@@ -9,6 +9,7 @@ from __future__ import annotations
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.providers import Provider, resolve_provider
+from gaik.software_components.llm.traced_client import traced_client
 
 
 def create_llm_client(config: dict) -> ProviderClient:
@@ -17,7 +18,14 @@ def create_llm_client(config: dict) -> ProviderClient:
     Accepts either the new ``{"provider": ..., ...}`` shape or the legacy
     OpenAI/Azure dict (``{"use_azure": True, "api_key": ...}``). Raises
     ``ImportError`` with a useful hint if the provider's SDK extra is missing.
+
+    With gaik's tracing on (the ``gaik[otel]`` extra), each model call of the
+    client makes an OpenTelemetry span; the client behaves the same either way.
     """
+    return traced_client(_create_llm_client(config))
+
+
+def _create_llm_client(config: dict) -> ProviderClient:
     name = resolve_provider(config=config)
     config = {**config, "provider": name, "use_azure": name == Provider.AZURE.value}
     if name == Provider.LITELLM.value:

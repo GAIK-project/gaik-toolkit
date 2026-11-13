@@ -1,13 +1,19 @@
 """OpenTelemetry spans for gaik's LLM calls (optional ``gaik[otel]`` extra).
 
-Each instrumented model call becomes one ``chat <model>`` span with the
-OpenTelemetry GenAI names (``gen_ai.*``) and gaik's own (``gaik.*``): which
-component made the call, the provider, model and settings, tokens, an estimated
-cost and a configuration version. The settings are the ones the request carries:
-the code that sends it reports them with ``record_request``, after the
-provider's own adjustments (a temperature a reasoning model drops is left out).
-Only lengths of the input and output are recorded, never their text, and an
-error is recorded by its type, never its message.
+Each instrumented model call becomes one ``chat <model>`` span (``embeddings
+<model>`` for an embedding call) with the OpenTelemetry GenAI names
+(``gen_ai.*``) and gaik's own (``gaik.*``): which component made the call, the
+provider, model and settings, tokens, an estimated cost and a configuration
+version. The settings are the ones the request carries: the code that sends it
+reports them with ``record_request``, after the provider's own adjustments (a
+temperature a reasoning model drops is left out), and the tokens the response
+reports with ``record_response``. Only lengths of the input and output are
+recorded, never their text, and an error is recorded by its type, never its
+message.
+
+Clients from ``create_llm_client()`` make these spans for every call (see
+``gaik.software_components.llm.traced_client``); a component that opens its own
+``llm_span`` around a call gets that span alone.
 
 Enabled by the standard environment variables:
 
@@ -35,6 +41,7 @@ The ``gaik.*`` attribute names are a draft until the event schema v1.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import logging
 import os
@@ -45,7 +52,7 @@ from contextvars import ContextVar
 from typing import Any
 
 from .pricing import lookup_price
-from .usage import UsageRecord
+from .usage import UsageRecord, build_usage_record
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +60,7 @@ _lock = threading.Lock()
 _tracer: Any = None
 _provider: Any = None  # gaik's own provider, when it exports by itself
 _resolved = False
+_extra: bool | None = None  # whether the gaik[otel] extra is installed, once known
 
 #: The request settings a span records, by attribute name; any other key is left out.
 #: Providers name the token limit differently; all three are the same setting.
@@ -143,6 +151,39 @@ def _resolve_tracer() -> Any:
     return provider.get_tracer("gaik", _gaik_version())
 
 
+def tracing_enabled() -> bool:
+    """Whether the ``gaik[otel]`` extra is installed and gaik's tracing is not off.
+
+    The OpenTelemetry API alone, which other packages bring, is not enough.
+    True also when the spans are dropped because nothing collects them (no
+    endpoint and no application provider); ``LLMCallSpan.recording`` tells.
+    Never raises.
+    """
+    return _get_tracer() is not None and _extra_installed()
+
+
+def _extra_installed() -> bool:
+    """Whether the OTLP exporter, which only the ``gaik[otel]`` extra brings, is present.
+
+    Looked up once per process: packages do not come and go while it runs, and
+    the lookup searches the installed packages, which costs on every model call.
+    """
+    global _extra
+    if _extra is None:
+        try:
+            spec = importlib.util.find_spec("opentelemetry.exporter.otlp.proto.http")
+            _extra = spec is not None
+        except (ImportError, ValueError):
+            _extra = False
+    return _extra
+
+
+def in_llm_span() -> bool:
+    """Whether an ``llm_span`` is open, and not yet ended, in this thread or task."""
+    call = _current_call.get()
+    return call is not None and not call.ended
+
+
 def config_version(**fields: Any) -> str:
     """A stable id for a configuration: the same fields give the same id.
 
@@ -161,6 +202,13 @@ class LLMCallSpan:
     def __init__(self, span: Any, identity: dict[str, Any] | None = None) -> None:
         self._span = span
         self._identity = identity or {}
+        self._ended = False
+        self._usage: UsageRecord | None = None
+
+    @property
+    def ended(self) -> bool:
+        """Whether ``end`` has been called."""
+        return self._ended
 
     @property
     def recording(self) -> bool:
@@ -193,8 +241,13 @@ class LLMCallSpan:
         input_length: int | None = None,
         output_length: int | None = None,
         response_model: str | None = None,
+        thinking_reported: bool = True,
     ) -> None:
-        """Add tokens, estimated cost, lengths and the response's model. Never raises."""
+        """Add tokens, estimated cost, lengths and the response's model. Never raises.
+
+        ``thinking_reported=False`` leaves the thinking tokens out rather than
+        recording an unknown count as 0.
+        """
         if not self.recording:
             return
         try:
@@ -210,7 +263,9 @@ class LLMCallSpan:
                     {
                         "gen_ai.usage.input_tokens": usage.input_tokens,
                         "gen_ai.usage.output_tokens": usage.output_tokens,
-                        "gaik.usage.thinking_tokens": usage.thinking_tokens,
+                        "gaik.usage.thinking_tokens": usage.thinking_tokens
+                        if thinking_reported
+                        else None,
                     }
                 )
                 # A model missing from the price table would read as a free call.
@@ -221,20 +276,117 @@ class LLMCallSpan:
         except Exception:
             logger.debug("gaik tracing could not record a result", exc_info=True)
 
+    def record_usage(
+        self, usage: Mapping[str, Any] | None, *, response_model: str | None = None
+    ) -> None:
+        """Add the tokens a response reports, in an adapter's usage dict, and its model.
+
+        Takes either key style (``input_tokens``/``output_tokens`` or
+        ``prompt_tokens``/``completion_tokens``); the cost is estimated for the
+        span's provider and model. Responses within one span add up: a
+        component that retries inside its span is billed for every attempt.
+        Never raises.
+        """
+        if not self.recording:
+            return
+        try:
+            counts = _token_counts(usage)
+            if counts:
+                record = build_usage_record(
+                    self._identity.get("provider", ""), self._identity.get("model", ""), counts, 0.0
+                )
+                self._usage = record if self._usage is None else self._usage + record
+            self.record(
+                self._usage,
+                response_model=response_model,
+                thinking_reported=bool(usage) and _reports_thinking(usage),
+            )
+        except Exception:
+            logger.debug("gaik tracing could not record the usage", exc_info=True)
+
+    @contextmanager
+    def active(self) -> Iterator[LLMCallSpan]:
+        """Make this the current span and call inside the block.
+
+        For a call that runs in pieces, such as a stream read chunk by chunk:
+        spans made and settings recorded in the block land here. The block's
+        exception passes through unchanged and unrecorded; ``fail`` records it.
+        """
+        token = _current_call.set(self)
+        scope = _current(self._span)
+        try:
+            scope.__enter__()
+        except Exception:
+            logger.debug("gaik tracing could not make a span current", exc_info=True)
+            scope = None
+        try:
+            yield self
+        except BaseException as exc:
+            _leave(scope, exc)
+            raise
+        else:
+            _leave(scope, None)
+        finally:
+            _current_call.reset(token)
+
+    def fail(self, exc: BaseException) -> None:
+        """Mark the span failed with the exception's type, never its message. Never raises."""
+        _fail(self._span, exc)
+
+    def end(self) -> None:
+        """End the span; a second call does nothing. Never raises."""
+        if not self._ended:
+            self._ended = True
+            _end(self._span)
+
 
 @contextmanager
 def llm_span(
-    component: str,
+    component: str | None,
     *,
     provider: str,
     model: str,
     prompt_version: str | None = None,
+    operation: str = "chat",
 ) -> Iterator[LLMCallSpan]:
-    """Wrap one model call in a ``chat <model>`` span, the current span inside the block.
+    """Wrap one model call in a ``<operation> <model>`` span, the current span inside the block.
 
-    ``provider`` is gaik's provider name. The request's settings are added by
+    ``provider`` is gaik's provider name and ``operation`` the GenAI operation,
+    ``chat`` or ``embeddings``. The request's settings are added by
     ``record_request``, called where the request is sent. The call's own
     exception passes through unchanged; the span records only its type.
+    """
+    call = start_llm_span(
+        component,
+        provider=provider,
+        model=model,
+        prompt_version=prompt_version,
+        operation=operation,
+    )
+    try:
+        with call.active():
+            yield call
+    except BaseException as exc:
+        call.fail(exc)
+        raise
+    finally:
+        call.end()
+
+
+def start_llm_span(
+    component: str | None,
+    *,
+    provider: str,
+    model: str,
+    prompt_version: str | None = None,
+    operation: str = "chat",
+) -> LLMCallSpan:
+    """Start a span like ``llm_span`` does, for a call that outlives one block.
+
+    The span is not made current: wrap each piece of the call in
+    ``LLMCallSpan.active()``, then call ``fail`` on an error and always ``end``.
+    ``component`` may be ``None`` when the caller does not know it; the
+    attribute is then left out.
     """
     identity = {
         "component": component,
@@ -243,18 +395,18 @@ def llm_span(
         "model": model,
         "prompt_version": prompt_version,
     }
-    span = _start(identity)
-    handle = LLMCallSpan(span, identity)
-    token = _current_call.set(handle)
-    try:
-        with _current(span):
-            yield handle
-    except BaseException as exc:
-        _fail(span, exc)
-        raise
-    finally:
-        _current_call.reset(token)
-        _end(span)
+    return LLMCallSpan(_start(identity, operation), identity)
+
+
+def record_response(usage: Mapping[str, Any] | None, *, response_model: str | None = None) -> None:
+    """Record the tokens a model response reports on the open ``llm_span``, if any.
+
+    Call it where the response arrives, with the adapter's usage dict. Outside
+    an ``llm_span`` it does nothing, like ``record_request``.
+    """
+    call = _current_call.get()
+    if call is not None:
+        call.record_usage(usage, response_model=response_model)
 
 
 def record_request(settings: Mapping[str, Any]) -> None:
@@ -263,12 +415,51 @@ def record_request(settings: Mapping[str, Any]) -> None:
     Call it where the request is sent, with the options as sent, so the span
     shows what the provider received. Outside an ``llm_span`` it does nothing;
     so it does in a thread started inside one, or in a generator consumed after
-    the span has closed, which is why the adapters' streaming calls do not
-    record (no component streams inside a span).
+    the span has closed. The adapters' streaming calls do not record: a stream
+    read inside some other call's span would put its settings there.
     """
     call = _current_call.get()
     if call is not None:
         call.record_request(settings)
+
+
+def _leave(scope: Any, exc: BaseException | None) -> None:
+    """Leave a context entered by ``LLMCallSpan.active``; a fault here is only logged."""
+    if scope is None:
+        return
+    try:
+        if exc is None:
+            scope.__exit__(None, None, None)
+        else:
+            scope.__exit__(type(exc), exc, exc.__traceback__)
+    except BaseException as fault:
+        if fault is not exc:
+            logger.debug("gaik tracing could not leave a span's context", exc_info=True)
+
+
+def _reports_thinking(usage: Mapping[str, Any]) -> bool:
+    return any(isinstance(usage.get(k), int) for k in ("thinking_tokens", "reasoning_tokens"))
+
+
+def _token_counts(usage: Mapping[str, Any] | None) -> dict[str, int] | None:
+    """The counts ``build_usage_record`` takes, or ``None`` when the response has none."""
+    if not usage:
+        return None
+
+    def count(*keys: str) -> int:
+        for key in keys:
+            value = usage.get(key)
+            if isinstance(value, int) and not isinstance(value, bool):
+                return value
+        return 0
+
+    counts = {
+        "input_tokens": count("input_tokens", "prompt_tokens"),
+        "output_tokens": count("output_tokens", "completion_tokens"),
+        "thinking_tokens": count("thinking_tokens", "reasoning_tokens"),
+        "total_tokens": count("total_tokens"),
+    }
+    return counts if counts["input_tokens"] or counts["output_tokens"] else None
 
 
 def _known_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
@@ -295,7 +486,7 @@ def _current(span: Any) -> Any:
         return nullcontext()
 
 
-def _start(identity: dict[str, Any]) -> Any:
+def _start(identity: dict[str, Any], operation: str = "chat") -> Any:
     tracer = _get_tracer()
     if tracer is None:
         return None
@@ -303,13 +494,13 @@ def _start(identity: dict[str, Any]) -> Any:
     try:
         from opentelemetry.trace import SpanKind
 
-        span = tracer.start_span(f"chat {identity['model']}", kind=SpanKind.CLIENT)
+        span = tracer.start_span(f"{operation} {identity['model']}", kind=SpanKind.CLIENT)
         if not span.is_recording():
             return span
         provider = identity["provider"]
         attributes: dict[str, Any] = {
             "gaik.event.class": "llm_call",
-            "gen_ai.operation.name": "chat",
+            "gen_ai.operation.name": operation,
             "gen_ai.provider.name": _GEN_AI_PROVIDER.get(provider, provider),
             "gen_ai.request.model": identity["model"],
             "gaik.provider.name": provider,
@@ -351,9 +542,10 @@ def _end(span: Any) -> None:
 
 
 def _reset_for_tests() -> None:
-    """Forget the resolved tracer so the next call resolves it again."""
-    global _tracer, _provider, _resolved
+    """Forget the resolved tracer and extra so the next call resolves them again."""
+    global _tracer, _provider, _resolved, _extra
     with _lock:
         _tracer = None
         _provider = None
         _resolved = False
+        _extra = None

@@ -8,9 +8,18 @@ from typing import Any
 import litellm
 from pydantic import BaseModel
 
-from gaik.observability.tracing import record_request
+from gaik.observability.tracing import record_request, record_response
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+
+
+def _embedding_usage(response) -> dict[str, int]:
+    """An embeddings response's token counts for a gaik span; empty when it has none."""
+    try:
+        usage = response.usage
+        return {k: v for k, v in usage.model_dump().items() if isinstance(v, int)} if usage else {}
+    except Exception:
+        return {}
 
 
 class LiteLLMProvider:
@@ -63,6 +72,7 @@ class LiteLLMProvider:
             else {}
         )
         self.usage.add(usage)
+        record_response(usage, response_model=response.model)
         return ChatResponse(
             text=response.choices[0].message.content or "",
             model=response.model,
@@ -99,4 +109,5 @@ class LiteLLMProvider:
         if not model:
             raise ValueError("LiteLLM embeddings require an explicit embedding_model")
         response = litellm.embedding(model=model, input=texts, **self._options(kwargs, chat=False))
+        record_response(_embedding_usage(response))
         return [item["embedding"] for item in sorted(response.data, key=lambda item: item["index"])]
