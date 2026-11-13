@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
@@ -350,6 +351,14 @@ class TranscriptEnhancer:
         return self._chat_text(messages, fallback=transcript_text)
 
     def _chat_text(self, messages: list[dict], *, fallback: str) -> str:
+        with llm_span(
+            "TranscriptEnhancer", provider=provider_of(self.client), model=self.model
+        ) as call:
+            text = self._chat_text_traced(messages, fallback=fallback)
+            call.record_text(messages, text)
+        return text
+
+    def _chat_text_traced(self, messages: list[dict], *, fallback: str) -> str:
         # ``reasoning_effort`` is omitted unless explicitly configured so we
         # don't accidentally force the parameter onto providers/models that
         # don't support it. Routing both the ProviderClient and raw-OpenAI
@@ -367,13 +376,16 @@ class TranscriptEnhancer:
         # OpenAI's typed overloads can't match a ``**dict[str, Any]`` splat, so
         # ignore the spurious overload-mismatch warning. The runtime kwargs are
         # always valid (model name, messages, optional ``reasoning_effort``).
+        settings = normalize_chat_kwargs(
+            self.model, {"temperature": 0.0, **extra_kwargs}, config=self.api_config
+        )
+        record_request(settings)
         response = self.client.chat.completions.create(  # type: ignore[call-overload]
             model=self.model,
             messages=messages,
-            **normalize_chat_kwargs(
-                self.model, {"temperature": 0.0, **extra_kwargs}, config=self.api_config
-            ),
+            **settings,
         )
+        record_response(response)
         return self._extract_response_text(response, fallback)
 
     @staticmethod

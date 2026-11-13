@@ -9,6 +9,7 @@ import os
 import time
 from typing import Any, Literal
 
+from gaik.observability.tracing import llm_span, record_request, record_response
 from gaik.software_components.llm import create_llm_client, get_llm_config, resolve_provider
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
@@ -307,15 +308,19 @@ class LLMJudge:
         system_prompt: str,
     ) -> tuple[str, int, int]:
         """Route to the right ``_call_*`` for ``self.model_provider``."""
-        if self.config is not None:
-            return self._call_shared(user_prompt, system_prompt, source_pages)
-        provider_call = {
-            "openai": self._call_openai,
-            "azure": self._call_openai,
-            "anthropic": self._call_anthropic,
-            "google": self._call_google,
-        }[self.model_provider]
-        return provider_call(source_pages, user_prompt, system_prompt)
+        with llm_span("LLMJudge", provider=self._span_provider(), model=self.model) as call:
+            if self.config is not None:
+                result = self._call_shared(user_prompt, system_prompt, source_pages)
+            else:
+                provider_call = {
+                    "openai": self._call_openai,
+                    "azure": self._call_openai,
+                    "anthropic": self._call_anthropic,
+                    "google": self._call_google,
+                }[self.model_provider]
+                result = provider_call(source_pages, user_prompt, system_prompt)
+            call.record_text([system_prompt, user_prompt], _answer_of(result))
+        return result
 
     def _dispatch_text(
         self,
@@ -323,15 +328,27 @@ class LLMJudge:
         system_prompt: str,
     ) -> tuple[str, int, int]:
         """Route a text-only call (no source images) to the right provider."""
-        if self.config is not None:
-            return self._call_shared(user_prompt, system_prompt)
-        provider_call = {
-            "openai": self._call_openai_text,
-            "azure": self._call_openai_text,
-            "anthropic": self._call_anthropic_text,
-            "google": self._call_google_text,
-        }[self.model_provider]
-        return provider_call(user_prompt, system_prompt)
+        with llm_span("LLMJudge", provider=self._span_provider(), model=self.model) as call:
+            if self.config is not None:
+                result = self._call_shared(user_prompt, system_prompt)
+            else:
+                provider_call = {
+                    "openai": self._call_openai_text,
+                    "azure": self._call_openai_text,
+                    "anthropic": self._call_anthropic_text,
+                    "google": self._call_google_text,
+                }[self.model_provider]
+                result = provider_call(user_prompt, system_prompt)
+            call.record_text([system_prompt, user_prompt], _answer_of(result))
+        return result
+
+    def _span_provider(self) -> str:
+        """gaik's provider name for this judge's calls, for its trace spans."""
+        if self.config is None and self.model_provider == "openai" and self.use_azure:
+            return "azure"
+        if self.config is None and self.model_provider == "google" and self.use_vertexai:
+            return "vertex"
+        return str(self.model_provider)
 
     def _call_shared(
         self,
@@ -412,9 +429,10 @@ class LLMJudge:
         if self.reasoning_effort:
             kwargs["reasoning_effort"] = self.reasoning_effort
 
-        resp = client.chat.completions.create(
-            **normalize_chat_kwargs(self.model, kwargs, config=config)
-        )
+        request = normalize_chat_kwargs(self.model, kwargs, config=config)
+        record_request(request)
+        resp = client.chat.completions.create(**request)
+        record_response(resp)
         text = resp.choices[0].message.content or ""
         usage = resp.usage
         return (
@@ -462,6 +480,7 @@ class LLMJudge:
                 }
             ],
         )
+        record_response(resp)
         text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
         return text, resp.usage.input_tokens, resp.usage.output_tokens
 
@@ -503,6 +522,7 @@ class LLMJudge:
                 max_output_tokens=self.max_tokens,
             ),
         )
+        record_response(resp)
         text = resp.text or ""
         meta = getattr(resp, "usage_metadata", None)
         return (
@@ -539,9 +559,10 @@ class LLMJudge:
         if self.reasoning_effort:
             kwargs["reasoning_effort"] = self.reasoning_effort
 
-        resp = client.chat.completions.create(
-            **normalize_chat_kwargs(self.model, kwargs, config=config)
-        )
+        request = normalize_chat_kwargs(self.model, kwargs, config=config)
+        record_request(request)
+        resp = client.chat.completions.create(**request)
+        record_response(resp)
         text = resp.choices[0].message.content or ""
         usage = resp.usage
         return (
@@ -568,6 +589,7 @@ class LLMJudge:
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
+        record_response(resp)
         text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
         return text, resp.usage.input_tokens, resp.usage.output_tokens
 
@@ -604,6 +626,7 @@ class LLMJudge:
                 max_output_tokens=self.max_tokens,
             ),
         )
+        record_response(resp)
         text = resp.text or ""
         meta = getattr(resp, "usage_metadata", None)
         return (
@@ -611,6 +634,11 @@ class LLMJudge:
             getattr(meta, "prompt_token_count", 0) or 0,
             getattr(meta, "candidates_token_count", 0) or 0,
         )
+
+
+def _answer_of(result: Any) -> str | None:
+    """The answer text of a ``_call_*`` result, for its span's length."""
+    return result[0] if isinstance(result, tuple) and result else None
 
 
 def _strip_json_fences(raw_text: str) -> str:

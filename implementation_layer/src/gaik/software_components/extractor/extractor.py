@@ -195,13 +195,12 @@ class DataExtractor:
 
             parsed = resp.choices[0].message.parsed
             if call.recording:
-                # Tokens reach the span on the OpenAI/Azure path; the other
-                # adapters return no per-call usage here.
+                # Tokens reach the span from where each response arrives
+                # (record_response), retries included.
                 call.record(
-                    usage,
+                    None,
                     input_length=sum(len(m["content"]) for m in messages),
                     output_length=_output_length(parsed),
-                    response_model=getattr(resp, "model", None),
                 )
         result_dict = parsed.model_dump()
 

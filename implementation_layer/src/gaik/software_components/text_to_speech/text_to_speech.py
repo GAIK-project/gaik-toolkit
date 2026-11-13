@@ -8,6 +8,7 @@ from typing import Literal
 
 import requests
 
+from gaik.observability.tracing import llm_span
 from gaik.software_components.config import create_openai_client, get_openai_config
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
@@ -127,24 +128,32 @@ class TextToSpeech:
             language=resolved_language, instructions=instructions
         )
 
-        if self.api_config.get("use_azure", False):
-            audio_bytes = self._synthesize_with_azure_endpoint(
-                text=text,
-                voice=resolved_voice,
-                instructions=resolved_instructions,
-                response_format=resolved_format,
-                speed=resolved_speed,
-            )
-        else:
-            with self.client.audio.speech.with_streaming_response.create(
-                model=self.model,
-                voice=resolved_voice,
-                input=text,
-                instructions=resolved_instructions,
-                response_format=resolved_format,
-                speed=resolved_speed,
-            ) as response:
-                audio_bytes = b"".join(response.iter_bytes())
+        use_azure = self.api_config.get("use_azure", False)
+        with llm_span(
+            "TextToSpeech",
+            provider="azure" if use_azure else "openai",
+            model=self.model,
+            operation="text_to_speech",
+        ) as call:
+            if use_azure:
+                audio_bytes = self._synthesize_with_azure_endpoint(
+                    text=text,
+                    voice=resolved_voice,
+                    instructions=resolved_instructions,
+                    response_format=resolved_format,
+                    speed=resolved_speed,
+                )
+            else:
+                with self.client.audio.speech.with_streaming_response.create(
+                    model=self.model,
+                    voice=resolved_voice,
+                    input=text,
+                    instructions=resolved_instructions,
+                    response_format=resolved_format,
+                    speed=resolved_speed,
+                ) as response:
+                    audio_bytes = b"".join(response.iter_bytes())
+            call.record_text(text)
 
         return SpeechSynthesisResult(
             audio_bytes=audio_bytes,

@@ -30,6 +30,7 @@ except ImportError as exc:
         "TabularAgent requires 'duckdb'. Install extras with 'pip install gaik[tabular-agent]'"
     ) from exc
 
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
@@ -289,22 +290,32 @@ class TabularAgent:
     def _parse_structured(self, messages: list[dict], schema: type) -> Any:
         """Run one structured-output LLM call, whichever client type is in use."""
         client = self._get_llm_client()
-        if isinstance(client, ProviderClient):
-            return _with_retries(
-                lambda: client.chat_parsed(
-                    messages=messages, response_format=schema, model=self._model
+        with llm_span("TabularAgent", provider=provider_of(client), model=self._model) as call:
+            if isinstance(client, ProviderClient):
+                parsed = _with_retries(
+                    lambda: client.chat_parsed(
+                        messages=messages, response_format=schema, model=self._model
+                    )
                 )
-            )
-        response = _with_retries(
-            lambda: client.beta.chat.completions.parse(
-                model=self._model,
-                messages=messages,
-                response_format=schema,
-                **self._openai_kwargs(),
-                timeout=30,
-            )
-        )
-        return response.choices[0].message.parsed if response else None
+            else:
+
+                def parse() -> Any:
+                    settings = self._openai_kwargs()
+                    record_request(settings)
+                    response = client.beta.chat.completions.parse(
+                        model=self._model,
+                        messages=messages,
+                        response_format=schema,
+                        **settings,
+                        timeout=30,
+                    )
+                    record_response(response)
+                    return response
+
+                response = _with_retries(parse)
+                parsed = response.choices[0].message.parsed if response else None
+            call.record_text(messages, parsed)
+        return parsed
 
     # ------------------------------------------------------------------
     # Loading hooks
@@ -508,6 +519,12 @@ class TabularAgent:
             {"role": "user", "content": user_prompt},
         ]
 
+        with llm_span("TabularAgent", provider=provider_of(client), model=self._model) as call:
+            answer = self._answer_text(client, messages)
+            call.record_text(messages, answer)
+        return answer
+
+    def _answer_text(self, client: Any, messages: list[dict]) -> str:
         if isinstance(client, ProviderClient):
             response = _with_retries(
                 lambda: client.chat(
@@ -516,11 +533,16 @@ class TabularAgent:
             )
             return (response.text or "").strip() if response else ""
 
-        response = _with_retries(
-            lambda: client.chat.completions.create(
-                model=self._model, messages=messages, **self._openai_kwargs()
+        def create() -> Any:
+            settings = self._openai_kwargs()
+            record_request(settings)
+            response = client.chat.completions.create(
+                model=self._model, messages=messages, **settings
             )
-        )
+            record_response(response)
+            return response
+
+        response = _with_retries(create)
         if not response or not response.choices:
             return ""
         return (response.choices[0].message.content or "").strip()

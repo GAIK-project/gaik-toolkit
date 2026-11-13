@@ -14,6 +14,8 @@ from typing import Literal
 import requests
 from markdown_it import MarkdownIt
 
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
+
 from .config import (
     create_claude_client,
     create_openai_client,
@@ -310,16 +312,20 @@ class MultimodalParser:
         if self.model_provider in _ANTHROPIC_PROVIDERS:
             options["timeout"] = self.config.get("timeout") or _ANTHROPIC_TIMEOUT_S
         try:
-            response = client.chat(
-                [
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": build_chat_document_content([pdf_path], user_prompt),
-                    },
-                ],
-                **options,
-            )
+            with llm_span(
+                "MultimodalParser", provider=provider_of(client), model=self.config["model"]
+            ) as call:
+                response = client.chat(
+                    [
+                        {"role": "system", "content": system_prompt},
+                        {
+                            "role": "user",
+                            "content": build_chat_document_content([pdf_path], user_prompt),
+                        },
+                    ],
+                    **options,
+                )
+                call.record_text([system_prompt, user_prompt], response.text)
             return response.text, _extract_shared_usage(response.usage)
         finally:
             close = getattr(client.raw, "close", None)
@@ -331,18 +337,24 @@ class MultimodalParser:
         self, pdf_path: Path, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict[str, int]]:
         client = create_openai_client(self.config)
-        response = client.responses.create(
-            model=self.config["model"],
-            instructions=system_prompt,
-            input=[
-                {
-                    "role": "user",
-                    "content": _build_openai_content(pdf_path, user_prompt),
-                }
-            ],
-            reasoning={"effort": self.reasoning_effort},
-            max_output_tokens=32768,
-        )
+        with llm_span(
+            "MultimodalParser", provider=provider_of(client), model=self.config["model"]
+        ) as call:
+            record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})
+            response = client.responses.create(
+                model=self.config["model"],
+                instructions=system_prompt,
+                input=[
+                    {
+                        "role": "user",
+                        "content": _build_openai_content(pdf_path, user_prompt),
+                    }
+                ],
+                reasoning={"effort": self.reasoning_effort},
+                max_output_tokens=32768,
+            )
+            record_response(response)
+            call.record_text([system_prompt, user_prompt], response.output_text)
         text = response.output_text.strip()
         if not text:
             raise ValueError("The OpenAI response did not contain any text output.")
@@ -352,20 +364,28 @@ class MultimodalParser:
         self, pdf_path: Path, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict[str, int]]:
         client = create_claude_client(self.config)
-        with client.messages.stream(
-            model=self.config["model"],
-            max_tokens=32768,
-            system=system_prompt,
-            thinking={"type": "adaptive"},
-            output_config={"effort": self.reasoning_effort},
-            messages=[
-                {
-                    "role": "user",
-                    "content": _build_claude_content(pdf_path, user_prompt),
-                },
-            ],
-        ) as stream:
+        with (
+            llm_span(
+                "MultimodalParser", provider=provider_of(client), model=self.config["model"]
+            ) as call,
+            client.messages.stream(
+                model=self.config["model"],
+                max_tokens=32768,
+                system=system_prompt,
+                thinking={"type": "adaptive"},
+                output_config={"effort": self.reasoning_effort},
+                messages=[
+                    {
+                        "role": "user",
+                        "content": _build_claude_content(pdf_path, user_prompt),
+                    },
+                ],
+            ) as stream,
+        ):
+            record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})
             response = stream.get_final_message()
+            record_response(response)
+            call.record_text([system_prompt, user_prompt])
         text_blocks = [
             block.text for block in response.content if getattr(block, "type", None) == "text"
         ]
@@ -399,10 +419,14 @@ class MultimodalParser:
             )
             headers = {"Content-Type": "application/json; charset=utf-8"}
 
-        response = requests.post(url, headers=headers, json=body, timeout=(30, 300))
-        response.raise_for_status()
+        provider = "vertex" if self.config.get("vertex_ai", True) else "google"
+        with llm_span("MultimodalParser", provider=provider, model=self.config["model"]) as call:
+            response = requests.post(url, headers=headers, json=body, timeout=(30, 300))
+            response.raise_for_status()
+            payload = response.json()
+            record_response(payload)
+            call.record_text([system_prompt, user_prompt])
 
-        payload = response.json()
         candidates = payload.get("candidates", [])
         if not candidates:
             raise ValueError(f"The Gemini response contained no candidates: {payload}")

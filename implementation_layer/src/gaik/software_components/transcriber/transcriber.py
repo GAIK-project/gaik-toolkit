@@ -16,6 +16,7 @@ from openai import AzureOpenAI
 from pydub import AudioSegment
 
 from gaik.observability import measure_duration
+from gaik.observability.tracing import llm_span, provider_of, record_response
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
 from gaik.software_components.llm.base import UsageCounter
@@ -427,12 +428,22 @@ class Transcriber:
         """
         audio_client = _create_audio_client(self.api_config)
         try:
-            with file_path.open("rb") as f:
+            with (
+                llm_span(
+                    "Transcriber",
+                    provider=provider_of(audio_client),
+                    model=transcription_model,
+                    operation="transcription",
+                ) as call,
+                file_path.open("rb") as f,
+            ):
                 response = audio_client.audio.transcriptions.create(
                     model=transcription_model,
                     file=f,
                     prompt=prompt,
                 )
+                record_response(response)
+                call.record_text(prompt, getattr(response, "text", None))
             if usage is not None:
                 usage.add(_transcription_usage(response))
             return response.text
@@ -512,12 +523,22 @@ conversation. Here is the previous part of the transcript:
 Continue the transcription, maintaining speaker consistency and dialogue structure."""
 
             try:
-                with open(chunk_path, "rb") as chunk_file:
+                with (
+                    llm_span(
+                        "Transcriber",
+                        provider=provider_of(audio_client),
+                        model=transcription_model,
+                        operation="transcription",
+                    ) as call,
+                    open(chunk_path, "rb") as chunk_file,
+                ):
                     transcript_response = audio_client.audio.transcriptions.create(
                         model=transcription_model,
                         file=chunk_file,
                         prompt=prompt,
                     )
+                    record_response(transcript_response)
+                    call.record_text(prompt, getattr(transcript_response, "text", None))
 
                     chunk_transcript = transcript_response.text
                     transcripts.append(chunk_header + chunk_transcript)

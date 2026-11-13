@@ -51,6 +51,8 @@ ALLOWED = {
     "gen_ai.usage.input_tokens",
     "gen_ai.usage.output_tokens",
     "gaik.usage.thinking_tokens",
+    "gen_ai.usage.cache_read.input_tokens",
+    "gen_ai.usage.cache_creation.input_tokens",
     "gaik.cost.usd",
     "gaik.cost.estimated",
     "gaik.provider.name",
@@ -769,8 +771,9 @@ def test_responses_within_one_span_add_up(spans):
     from gaik.observability.tracing import record_response
 
     with llm_span("DataExtractor", provider="openai", model="gpt-4.1"):
-        record_response({"prompt_tokens": 100, "completion_tokens": 10})
-        record_response({"prompt_tokens": 100, "completion_tokens": 20})
+        for completion in (10, 20):
+            usage = SimpleNamespace(prompt_tokens=100, completion_tokens=completion)
+            record_response(SimpleNamespace(usage=usage))
 
     (span,) = spans()
     assert span.attributes["gen_ai.usage.input_tokens"] == 200
