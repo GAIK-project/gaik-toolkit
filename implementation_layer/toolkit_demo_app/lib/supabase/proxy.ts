@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Demo pages are open to look at. Running a demo needs a signed-in, approved
-// account (or a pending one, within the trial allowance in lib/trial.ts) or the
+// account, or a pending one within the trial allowance in lib/trial.ts or on the
 // user's own model key, and that is enforced on the API requests
 // in proxy.ts (see lib/api-access.ts), not by redirecting here. The demo layout
 // shows a "View only" notice to visitors who cannot run yet. The Solution Wizard

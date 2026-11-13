@@ -12,21 +12,12 @@ export function isStateChanging(method: string): boolean {
 }
 
 /**
- * `ownModelKey` is true when the request carries the user's own model key for a
- * route that supports it. That call runs on the user's credential, so it does not
- * need a signed-in, approved account.
+ * True for a request that needs a signed-in account (see `accessRefusal`).
+ * `pathname` is the decoded path from lib/request-path.ts.
  */
-export function needsApprovedUser(
-  method: string,
-  pathname: string,
-  ownModelKey = false,
-): boolean {
+export function needsApprovedUser(method: string, pathname: string): boolean {
   // The wizard API has its own gate, including the team-key path.
-  return (
-    isStateChanging(method) &&
-    !pathname.startsWith("/api/wizard") &&
-    !ownModelKey
-  );
+  return isStateChanging(method) && !pathname.startsWith("/api/wizard");
 }
 
 export interface GateState {
@@ -49,18 +40,22 @@ export const PENDING_DENIAL: Refusal = {
 
 /**
  * Why a request that needs an account is refused, or null when it may run.
- * An approved user runs freely; a pending one spends a trial run.
+ * An approved user runs freely; a pending one spends a trial run, unless the
+ * request runs on their own model key (`ownModelKey`), which needs the account
+ * but no trial run.
  */
 export async function accessRefusal(
   state: GateState,
   takeTrialRun: (
     userId: string,
   ) => Promise<{ ok: true } | ({ ok: false } & Refusal)>,
+  ownModelKey = false,
 ): Promise<Refusal | null> {
   if (!state.loggedIn)
     return { status: 401, error: "Sign in to use this feature." };
   if (state.approved) return null;
   if (!state.pending || !state.userId) return PENDING_DENIAL;
+  if (ownModelKey) return null;
   const trial = await takeTrialRun(state.userId);
   return trial.ok ? null : { status: trial.status, error: trial.error };
 }
