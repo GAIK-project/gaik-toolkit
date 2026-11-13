@@ -55,6 +55,35 @@ def test_a_flagged_field_does_not_pass():
     assert not result.passed
 
 
+def test_a_flag_with_an_unknown_severity_is_an_error_not_a_pass():
+    reply = '{"flags": [{"item_index": 0, "field": "total", "severity": "critical"}]}'
+    result = _judge(reply).validate(PAGE, EXTRACTED)
+    assert result.flags == []
+    assert result.judge_error == "1 of 1 flags could not be read"
+    assert not result.passed
+
+
+def test_a_flag_that_is_not_an_object_is_an_error_and_readable_flags_are_kept():
+    reply = '{"flags": ["total is wrong", {"item_index": 0, "field": "name", "severity": "ok"}]}'
+    result = _judge(reply).validate(PAGE, EXTRACTED)
+    assert [f.field for f in result.flags] == ["name"]
+    assert result.judge_error == "1 of 2 flags could not be read"
+    assert not result.passed
+
+
+def test_an_unreadable_hallucination_flag_is_an_error_but_an_ok_flag_is_not():
+    unknown = '{"flags": [{"field": "total", "value": "10", "severity": "critical"}]}'
+    no_field = '{"flags": [{"value": "10", "severity": "wrong"}]}'
+    for reply in (unknown, no_field):
+        report = _judge(reply).detect_hallucinations("source text", EXTRACTED)
+        assert report.judge_error == "1 of 1 flags could not be read"
+        assert not report.passed
+    ok = '{"flags": [{"field": "total", "value": "10", "severity": "ok"}]}'
+    report = _judge(ok).detect_hallucinations("source text", EXTRACTED)
+    assert report.flags == [] and report.judge_error is None
+    assert report.passed
+
+
 def test_an_unreadable_hallucination_verdict_is_an_error():
     report = _judge("no idea").detect_hallucinations("source text", EXTRACTED)
     assert report.flags == [] and report.judge_error

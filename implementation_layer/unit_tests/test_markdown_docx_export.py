@@ -6,12 +6,15 @@ import pytest
 from gaik.software_components import _pandoc
 
 
-def test_the_export_asks_pandoc_for_sandbox_mode_and_no_raw_blocks(tmp_path, monkeypatch):
+def test_the_export_asks_pandoc_for_the_image_filter_and_no_raw_blocks(tmp_path, monkeypatch):
     pypandoc = pytest.importorskip("pypandoc")
     calls = []
 
     def record(source, to, **kwargs):
-        calls.append((source, to, kwargs))
+        [arg] = kwargs["extra_args"]
+        filter_path = arg.removeprefix("--lua-filter=")
+        with open(filter_path, encoding="utf-8") as f:
+            calls.append((source, to, kwargs, f.read()))
 
     monkeypatch.setattr(pypandoc, "convert_file", record)
     md = tmp_path / "report.md"
@@ -20,9 +23,10 @@ def test_the_export_asks_pandoc_for_sandbox_mode_and_no_raw_blocks(tmp_path, mon
     out = _pandoc.markdown_file_to_docx(md, tmp_path / "report.docx")
 
     assert out == tmp_path / "report.docx"
-    [(source, to, kwargs)] = calls
+    [(source, to, kwargs, lua)] = calls
     assert (source, to) == (str(md), "docx")
-    assert "--sandbox" in kwargs["extra_args"]
+    assert "--sandbox" not in kwargs["extra_args"]
+    assert lua == _pandoc.IMAGES_AS_ALT_TEXT
     for extension in ("-raw_html", "-raw_tex", "-raw_attribute"):
         assert extension in kwargs["format"]
 
@@ -62,6 +66,23 @@ def test_a_picture_next_to_the_report_stays_out_of_the_docx(tmp_path):
         assert not [n for n in docx.namelist() if n.startswith("word/media/")]
     text = pypandoc.convert_file(str(out), "plain")
     assert "Before." in text and "After." in text
+    assert "a picture" in text
+
+
+def test_an_image_address_becomes_its_alt_text(tmp_path):
+    pypandoc = _pandoc_or_skip()
+    md = tmp_path / "report.md"
+    # Port 9 on the loopback address: nothing answers there.
+    md.write_text(
+        "# Report\n\nSee ![the chart](http://127.0.0.1:9/chart.png) here.\n",
+        encoding="utf-8",
+    )
+
+    out = _pandoc.markdown_file_to_docx(md, tmp_path / "report.docx")
+
+    with zipfile.ZipFile(out) as docx:
+        assert not [n for n in docx.namelist() if n.startswith("word/media/")]
+    assert "See the chart here." in " ".join(pypandoc.convert_file(str(out), "plain").split())
 
 
 def test_a_raw_block_in_the_markdown_is_kept_as_text(tmp_path):

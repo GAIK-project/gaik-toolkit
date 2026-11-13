@@ -665,12 +665,15 @@ def _judge_flags_and_error(raw_text: str) -> tuple[list[ValidationFlag], str | N
         return [], error
 
     parsed: list[ValidationFlag] = []
+    unreadable = 0
     for entry in flags:
         if not isinstance(entry, dict):
+            unreadable += 1
             continue
         try:
             severity_raw = str(entry.get("severity", "")).lower()
             if severity_raw not in ("ok", "suspect", "wrong"):
+                unreadable += 1
                 continue
             severity: Severity = severity_raw  # type: ignore[assignment]
             parsed.append(
@@ -688,8 +691,9 @@ def _judge_flags_and_error(raw_text: str) -> tuple[list[ValidationFlag], str | N
                 )
             )
         except (TypeError, ValueError):
+            unreadable += 1
             continue
-    return parsed, None
+    return parsed, _unreadable_entries_error(unreadable, len(flags), "judge")
 
 
 def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
@@ -709,11 +713,14 @@ def _hallucination_flags_and_error(raw_text: str) -> tuple[list[HallucinationFla
         return [], error
 
     parsed: list[HallucinationFlag] = []
+    unreadable = 0
     for entry in flags:
         if not isinstance(entry, dict):
+            unreadable += 1
             continue
         severity_raw = str(entry.get("severity", "")).lower()
         if severity_raw not in ("ok", "suspect", "wrong"):
+            unreadable += 1
             continue
         # Drop entries the judge marked "ok" — by definition the report
         # only carries fields the caller may want to clear.
@@ -722,6 +729,7 @@ def _hallucination_flags_and_error(raw_text: str) -> tuple[list[HallucinationFla
         severity: Severity = severity_raw  # type: ignore[assignment]
         field = str(entry.get("field", "")).strip()
         if not field:
+            unreadable += 1
             continue
         parsed.append(
             HallucinationFlag(
@@ -731,7 +739,19 @@ def _hallucination_flags_and_error(raw_text: str) -> tuple[list[HallucinationFla
                 reason=str(entry.get("reason", "")).strip(),
             )
         )
-    return parsed, None
+    return parsed, _unreadable_entries_error(unreadable, len(flags), "hallucination judge")
+
+
+def _unreadable_entries_error(unreadable: int, total: int, what: str) -> str | None:
+    """An error when any flag entry could not be read, so the verdict is not a pass.
+
+    The readable flags are still returned; the error says how many were not,
+    without their content.
+    """
+    if not unreadable:
+        return None
+    logger.warning("%d of %d %s flags could not be read", unreadable, total, what)
+    return f"{unreadable} of {total} flags could not be read"
 
 
 def parse_text_judgement(raw_text: str) -> tuple[bool, Severity, int, str]:

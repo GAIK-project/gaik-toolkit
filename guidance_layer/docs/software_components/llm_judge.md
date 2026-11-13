@@ -75,9 +75,11 @@ for a complete script that renders a PDF to PNG bytes via PyMuPDF.
   and USD cost with longest-prefix model-id matching (so a rotated model
   id like `gemini-3-flash-Q3` still resolves to the closest known rate).
 - **JSON-Tolerant Parser** — `parse_judge_flags()` strips stray markdown
-  fences and silently drops malformed entries. A response that cannot be read
-  at all sets `judge_error` on the result; check `result.passed` rather than
-  `not result.flags`, since an unreadable verdict also has no flags.
+  fences. A response that cannot be read at all, or a flag entry that cannot be
+  read (not an object, or a severity other than `ok`/`suspect`/`wrong`), sets
+  `judge_error` on the result, for example `"1 of 2 flags could not be read"`;
+  the readable flags are kept. Check `result.passed` rather than
+  `not result.flags`, since an unreadable verdict may have no flags.
 
 ---
 
