@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { apiFetch, RateLimitError, failureMessage } from "@/lib/api-client";
 import {
   reusableSchemaId,
   savedSchemaKey,
@@ -224,7 +224,10 @@ export default function DocumentStructuredPage() {
         body: formData,
         signal: abortControllerRef.current.signal,
       });
-      if (!response.ok) throw new Error("Failed to process the document");
+      if (!response.ok)
+        throw new Error(
+          await failureMessage(response, "Failed to process the document"),
+        );
 
       let streamError: Error | null = null;
       await processSSEStream<DocumentResult>(response, {

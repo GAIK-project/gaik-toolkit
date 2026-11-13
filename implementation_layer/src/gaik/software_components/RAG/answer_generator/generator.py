@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Iterable
 
@@ -35,6 +36,28 @@ DEFAULT_PROMPT_WITH_CITATIONS = (
 )
 
 
+_PLACEHOLDER = re.compile(r"\{query\}|\{context\}")
+_ESCAPED_TOKEN = re.compile(r"\{\{|\}\}|\{query\}|\{context\}")
+
+
+def _prompt_token(prompt: str) -> re.Pattern[str]:
+    """The pattern that reads a custom prompt.
+
+    A prompt written for ``str.format`` doubles every brace that is not a placeholder;
+    its ``{{`` and ``}}`` are then single braces. In any other prompt a doubled brace
+    is text, as in the JSON example ``{"answer": {"text": "..."}}``.
+    """
+    rest = _ESCAPED_TOKEN.sub("", prompt)
+    return _PLACEHOLDER if "{" in rest or "}" in rest else _ESCAPED_TOKEN
+
+
+def _validate_custom_prompt(prompt: str) -> None:
+    found = set(_prompt_token(prompt).findall(prompt))
+    missing = sorted({"{query}", "{context}"} - found)
+    if missing:
+        raise ValueError(f"Custom prompt is missing required placeholder(s): {', '.join(missing)}.")
+
+
 def _with_retries(call, *, tries: int = 4):
     for attempt in range(tries):
         try:
@@ -60,6 +83,8 @@ class AnswerGenerator:
         conversation_history: bool = False,
         last_n: int = 10,
     ) -> None:
+        if prompt:
+            _validate_custom_prompt(prompt)
         self.config = config or get_openai_config(use_azure=use_azure)
         self.model = model or self.config["model"]
         self.citations = citations
@@ -108,7 +133,16 @@ class AnswerGenerator:
 
     def _build_prompt(self, query: str, context_text: str) -> str:
         if self.prompt:
-            return self.prompt.format(query=query, context=context_text)
+            _validate_custom_prompt(self.prompt)
+            replacements = {
+                "{{": "{",
+                "}}": "}",
+                "{query}": query,
+                "{context}": context_text,
+            }
+            return _prompt_token(self.prompt).sub(
+                lambda match: replacements[match.group()], self.prompt
+            )
         template = DEFAULT_PROMPT_WITH_CITATIONS if self.citations else DEFAULT_PROMPT
         return template.format(query=query, context=context_text)
 

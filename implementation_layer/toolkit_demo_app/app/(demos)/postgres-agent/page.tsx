@@ -10,7 +10,6 @@ import {
   ResultText,
 } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -164,10 +163,6 @@ export default function PostgresAgentPage() {
         attempts: data.attempts,
         row_count: data.row_count,
       });
-
-      if (data.succeeded) {
-        toast.success("Query completed");
-      }
     } catch (error) {
       if (error instanceof RateLimitError) {
         return;
@@ -188,7 +183,7 @@ export default function PostgresAgentPage() {
       <DemoPageHeader
         icon={Database}
         title="PostgreSQL Agent"
-        description="Ask a database questions in plain language — the agent writes and runs read-only SQL"
+        description="Ask a database in plain language. The agent writes and runs read-only SQL."
       />
 
       <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
@@ -198,21 +193,11 @@ export default function PostgresAgentPage() {
             <CardHeader>
               <CardTitle>Ask the demo database</CardTitle>
               <CardDescription>
-                A fixed sample database of customers and orders. Your question is
-                turned into a safe, read-only SQL query — no writes, one schema.
+                A sample database of customers and orders. Nothing is written to
+                it.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {schema && (
-                <div className="flex flex-wrap gap-2">
-                  {schema.tables.map((t) => (
-                    <Badge key={t.name} variant="secondary">
-                      {t.name} · {t.columns.length} columns
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
               <div className="flex gap-2">
                 <Input
                   value={question}
@@ -235,22 +220,22 @@ export default function PostgresAgentPage() {
                 </Button>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-muted-foreground text-xs font-medium">
-                  Example questions
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {EXAMPLE_QUESTIONS.map((q) => (
-                    <Badge
-                      key={q}
-                      variant="outline"
-                      className="hover:bg-muted cursor-pointer transition-colors"
-                      onClick={() => !isLoading && handleExample(q)}
-                    >
-                      {q}
-                    </Badge>
-                  ))}
-                </div>
+              <div
+                role="group"
+                aria-label="Example questions"
+                className="flex flex-wrap gap-2"
+              >
+                {EXAMPLE_QUESTIONS.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => handleExample(q)}
+                    className="hover:border-primary/40 hover:bg-primary/5 focus-visible:ring-ring/50 rounded-full border px-3 py-1.5 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    {q}
+                  </button>
+                ))}
               </div>
 
               {status && !status.database_configured && (
@@ -259,12 +244,14 @@ export default function PostgresAgentPage() {
                   The demo database is not configured on this server.
                 </p>
               )}
-              {status && status.database_configured && !status.llm_configured && (
-                <p className="text-muted-foreground flex items-center gap-2 text-sm">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  No LLM API key configured — questions cannot be answered.
-                </p>
-              )}
+              {status &&
+                status.database_configured &&
+                !status.llm_configured && (
+                  <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    No LLM API key configured — questions cannot be answered.
+                  </p>
+                )}
               {loadError && (
                 <p className="text-muted-foreground text-sm">{loadError}</p>
               )}
@@ -273,35 +260,26 @@ export default function PostgresAgentPage() {
 
           {schema && (
             <ResultCard
-              title="Demo database schema"
-              description="The tables and columns the agent can query"
+              title="Tables the agent can query"
               copyContent={schema.schema_text}
             >
               <ResultText content={schema.schema_text} maxHeight="240px" />
             </ResultCard>
           )}
 
-          <HowItWorksCard description="The agent introspects the schema, generates validated read-only SQL, runs it, and explains the result.">
+          <HowItWorksCard description="The agent reads the schema, writes one read-only query, runs it and explains the rows.">
             <p>
-              <strong>1. Pick or type a question:</strong> Ask anything about the
-              customers and orders in the demo database.
+              <strong>Schema:</strong> tables, columns, primary and foreign keys
+              are read from the database.
             </p>
             <p>
-              <strong>2. Schema introspection:</strong> The agent reads the
-              database structure — tables, columns, primary and foreign keys.
+              <strong>SQL:</strong> a model writes a single <code>SELECT</code>.
+              Anything that writes or changes the schema is refused, and a
+              failed query is retried with its error.
             </p>
             <p>
-              <strong>3. SQL generation:</strong> An LLM turns your question into
-              a single read-only <code>SELECT</code> query.
-            </p>
-            <p>
-              <strong>4. Safe execution:</strong> The SQL is validated (read-only
-              only, no writes or DDL) and run. If it fails, the agent feeds the
-              error back and retries.
-            </p>
-            <p>
-              <strong>5. Plain-language answer:</strong> The result rows are
-              summarized into a natural-language answer you can read directly.
+              <strong>Answer:</strong> the rows are summarised in plain
+              language, with the SQL and the rows shown beside it.
             </p>
           </HowItWorksCard>
         </div>
@@ -369,7 +347,7 @@ export default function PostgresAgentPage() {
             <EmptyStateCard
               icon={Database}
               title="No query yet"
-              description="Ask a question to see the answer, the generated SQL, and the result rows."
+              description="The answer, the SQL and the rows show here."
               feedbackSlot={<FeedbackButton demoType="postgres-agent" />}
             />
           )}
