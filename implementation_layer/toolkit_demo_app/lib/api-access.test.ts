@@ -24,12 +24,32 @@ test("the wizard API keeps its own gate", () => {
   expect(needsApprovedUser("DELETE", "/api/wizard/end/abc")).toBe(false);
 });
 
-test("a request with the user's own model key needs no account", () => {
-  expect(needsApprovedUser("POST", "/api/extract", true)).toBe(false);
-  expect(needsApprovedUser("POST", "/api/extract", false)).toBe(true);
-  expect(needsApprovedUser("DELETE", "/api/video-search/clear", false)).toBe(
-    true,
-  );
+test("a request with the user's own model key still needs an account", async () => {
+  const take = async () => {
+    throw new Error("an own-key run must not spend a trial run");
+  };
+  const ownKey = true;
+  expect(
+    await accessRefusal(
+      { loggedIn: false, approved: false, pending: false, userId: null },
+      take,
+      ownKey,
+    ),
+  ).toEqual({ status: 401, error: "Sign in to use this feature." });
+  expect(
+    await accessRefusal(
+      { loggedIn: true, approved: false, pending: true, userId: "u1" },
+      take,
+      ownKey,
+    ),
+  ).toBeNull();
+  expect(
+    await accessRefusal(
+      { loggedIn: true, approved: false, pending: false, userId: "u1" },
+      take,
+      ownKey,
+    ),
+  ).toEqual(PENDING_DENIAL);
 });
 
 const signedIn = {
