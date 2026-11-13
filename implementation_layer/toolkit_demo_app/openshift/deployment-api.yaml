@@ -51,13 +51,16 @@ spec:
                   name: gaik-demo-api-keys
                   key: DOCLING_API_PASSWORD
                   optional: true
-            # Solution Wizard (Claude Agent SDK routed via Azure Foundry)
+            # No longer read: the old Solution Wizard's Claude Agent SDK settings.
             - name: CLAUDE_CODE_USE_FOUNDRY
               valueFrom:
                 secretKeyRef:
                   name: gaik-demo-api-keys
                   key: CLAUDE_CODE_USE_FOUNDRY
                   optional: true
+            # Claude server models and the Vision Extractor's Claude path (Azure
+            # Foundry): read by api/utils/model_settings.py and
+            # api/routers/vision_extractor.py.
             - name: ANTHROPIC_FOUNDRY_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -70,6 +73,7 @@ spec:
                   name: gaik-demo-api-keys
                   key: ANTHROPIC_FOUNDRY_RESOURCE
                   optional: true
+            # No longer read: the old Solution Wizard's model id.
             - name: ANTHROPIC_DEFAULT_SONNET_MODEL
               valueFrom:
                 secretKeyRef:

@@ -56,8 +56,9 @@ text layer. It roughly triples the output tokens of an extraction.
 ### Solution Wizard
 
 The Solution Configuration Wizard runs as its own service, Wizard V2. This demo no
-longer runs it: `/solution-wizard` says where it is and links to
-`NEXT_PUBLIC_WIZARD_V2_URL` when that is set at build time.
+longer runs it: `/solution-wizard` is open to every visitor, says where the wizard
+is and links to `WIZARD_V2_URL` when that is set. The server reads it at run time, so
+a deployment sets it with `oc set env` and needs no rebuild.
 
 ### No-code Assets
 

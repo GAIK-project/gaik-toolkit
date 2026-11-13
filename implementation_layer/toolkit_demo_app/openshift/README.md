@@ -121,7 +121,8 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
-| `WIZARD_ACCESS_SECRET`                 | Unlocks the gated Solution Wizard (`/solution-wizard?key=<secret>`) | Secret: `gaik-demo-admin` |
+| `WIZARD_ACCESS_SECRET`                 | Old wizard gate on `/api/wizard`; read until that gate is removed | Secret: `gaik-demo-admin` |
+| `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
 
 ### Backend (gaik-demo-api)
 
@@ -132,10 +133,10 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 | `AZURE_API_VERSION`         | Azure API version        | Secret: `gaik-demo-api-keys` |
 | `DOCLING_API_BASE`          | Docling parser API URL   | Secret: `gaik-demo-api-keys` |
 | `DOCLING_API_PASSWORD`      | Docling parser API key   | Secret: `gaik-demo-api-keys` |
-| `CLAUDE_CODE_USE_FOUNDRY`   | Solution Wizard: route Claude Agent SDK via Azure Foundry (`1`) | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_FOUNDRY_API_KEY` | Solution Wizard: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_FOUNDRY_RESOURCE`| Solution Wizard: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | Solution Wizard: model id (e.g. `claude-sonnet-5-5`) | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_FOUNDRY_API_KEY` | Claude server models and the Vision Extractor's Claude path: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_FOUNDRY_RESOURCE`| Claude server models and the Vision Extractor's Claude path: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
+| `CLAUDE_CODE_USE_FOUNDRY`   | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
 
 ## Route Annotations
 
