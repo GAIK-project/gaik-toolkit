@@ -61,6 +61,39 @@ def test_custom_prompt_unescapes_legacy_doubled_braces() -> None:
     assert prompt == '{"question": "What is the date?", "evidence": "Due date: July 1"}'
 
 
+@pytest.mark.parametrize(
+    ("template", "expected"),
+    [
+        # A nested JSON example ends in "}}"; it is text, not an escaped brace.
+        (
+            'Reply as JSON like {"answer": {"text": "..."}} using {context} for {query}',
+            'Reply as JSON like {"answer": {"text": "..."}} using Evidence for Question',
+        ),
+        (
+            '{"question": "{query}", "meta": {"evidence": "{context}"}}',
+            '{"question": "Question", "meta": {"evidence": "Evidence"}}',
+        ),
+        # Every other brace doubled: a str.format template, nested or not.
+        (
+            '{{"question": "{query}", "meta": {{"evidence": "{context}"}}}}',
+            '{"question": "Question", "meta": {"evidence": "Evidence"}}',
+        ),
+        ("{{{query}}} and {{{context}}}", "{Question} and {Evidence}"),
+    ],
+)
+def test_custom_prompt_keeps_nested_json_and_reads_format_templates(
+    template: str, expected: str
+) -> None:
+    assert _generator(prompt=template)._build_prompt("Question", "Evidence") == expected
+
+
+def test_escaped_placeholders_do_not_count_as_placeholders() -> None:
+    generator = _generator(prompt="Write {{query}} and {{context}} literally.")
+
+    with pytest.raises(ValueError, match=r"\{context\}, \{query\}"):
+        generator._build_prompt("Question", "Evidence")
+
+
 def test_custom_prompt_does_not_reformat_braces_in_query_or_context() -> None:
     generator = _generator(prompt="Question: {query}\nContext: {context}")
 
