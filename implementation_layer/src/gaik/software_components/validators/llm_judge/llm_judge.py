@@ -466,6 +466,7 @@ class LLMJudge:
             }
             for p in source_pages
         ]
+        record_request({"max_tokens": self.max_tokens})
         resp = client.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
@@ -513,6 +514,7 @@ class LLMJudge:
         for page in source_pages:
             parts.append(types.Part.from_bytes(data=page, mime_type="image/png"))
 
+        record_request({"max_tokens": self.max_tokens})
         resp = client.models.generate_content(
             model=self.model,
             contents=parts,
@@ -583,6 +585,7 @@ class LLMJudge:
 
         config = get_claude_config(use_azure=self.use_azure)
         client = create_claude_client(config)
+        record_request({"max_tokens": self.max_tokens})
         resp = client.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
@@ -617,6 +620,7 @@ class LLMJudge:
                 )
             client = genai.Client(api_key=api_key)
 
+        record_request({"max_tokens": self.max_tokens})
         resp = client.models.generate_content(
             model=self.model,
             contents=[user_prompt],

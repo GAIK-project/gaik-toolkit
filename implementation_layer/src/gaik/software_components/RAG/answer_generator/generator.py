@@ -154,7 +154,11 @@ class AnswerGenerator:
         return iterator()
 
     def _deltas(self, messages: list[dict]) -> Iterator[str]:
-        """The answer's text deltas; the request is made at the first read."""
+        """The answer's text deltas; the request is made at the first read.
+
+        A stream records no tokens: the API sends usage only when the request
+        asks for it (``stream_options``), and this request is left as it was.
+        """
         if isinstance(self.client, ProviderClient):
             stream = self.client.chat_stream(messages=messages, model=self.model, temperature=0.0)
             for delta in stream:

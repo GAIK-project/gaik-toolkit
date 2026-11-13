@@ -385,7 +385,7 @@ class MultimodalParser:
             record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})
             response = stream.get_final_message()
             record_response(response)
-            call.record_text([system_prompt, user_prompt])
+            call.record_text([system_prompt, user_prompt], _claude_text(response))
         text_blocks = [
             block.text for block in response.content if getattr(block, "type", None) == "text"
         ]
@@ -421,6 +421,7 @@ class MultimodalParser:
 
         provider = "vertex" if self.config.get("vertex_ai", True) else "google"
         with llm_span("MultimodalParser", provider=provider, model=self.config["model"]) as call:
+            record_request(_google_settings(body))
             response = requests.post(url, headers=headers, json=body, timeout=(30, 300))
             response.raise_for_status()
             payload = response.json()
@@ -437,6 +438,34 @@ class MultimodalParser:
             raise ValueError(f"The Gemini response contained no text parts: {payload}")
 
         return "".join(text_parts).strip() + "\n", _extract_google_usage(payload)
+
+
+# -- trace span helpers (module-level) ------------------------------------------
+
+
+def _google_settings(body: dict) -> dict:
+    """The sampling settings a Gemini REST body carries, by gaik's names, for its span."""
+    config = body.get("generationConfig") if isinstance(body, dict) else None
+    if not isinstance(config, dict):
+        return {}
+    thinking = config.get("thinkingConfig")
+    return {
+        "temperature": config.get("temperature"),
+        "max_tokens": config.get("maxOutputTokens"),
+        "reasoning_effort": thinking.get("thinkingLevel") if isinstance(thinking, dict) else None,
+    }
+
+
+def _claude_text(response) -> str | None:
+    """The text blocks of a Claude message, joined, for its span's output length."""
+    blocks = getattr(response, "content", None)
+    if not isinstance(blocks, list):
+        return None
+    return "".join(
+        block.text
+        for block in blocks
+        if getattr(block, "type", None) == "text" and isinstance(getattr(block, "text", None), str)
+    )
 
 
 # -- usage extraction (module-level helpers) ----------------------------------

@@ -428,14 +428,15 @@ class Transcriber:
         """
         audio_client = _create_audio_client(self.api_config)
         try:
+            # The file is opened first: a missing file is not a model call.
             with (
+                file_path.open("rb") as f,
                 llm_span(
                     "Transcriber",
                     provider=provider_of(audio_client),
                     model=transcription_model,
                     operation="transcription",
                 ) as call,
-                file_path.open("rb") as f,
             ):
                 response = audio_client.audio.transcriptions.create(
                     model=transcription_model,
@@ -523,22 +524,21 @@ conversation. Here is the previous part of the transcript:
 Continue the transcription, maintaining speaker consistency and dialogue structure."""
 
             try:
-                with (
-                    llm_span(
+                with open(chunk_path, "rb") as chunk_file:
+                    # The span covers the request only, not the pause between chunks.
+                    with llm_span(
                         "Transcriber",
                         provider=provider_of(audio_client),
                         model=transcription_model,
                         operation="transcription",
-                    ) as call,
-                    open(chunk_path, "rb") as chunk_file,
-                ):
-                    transcript_response = audio_client.audio.transcriptions.create(
-                        model=transcription_model,
-                        file=chunk_file,
-                        prompt=prompt,
-                    )
-                    record_response(transcript_response)
-                    call.record_text(prompt, getattr(transcript_response, "text", None))
+                    ) as call:
+                        transcript_response = audio_client.audio.transcriptions.create(
+                            model=transcription_model,
+                            file=chunk_file,
+                            prompt=prompt,
+                        )
+                        record_response(transcript_response)
+                        call.record_text(prompt, getattr(transcript_response, "text", None))
 
                     chunk_transcript = transcript_response.text
                     transcripts.append(chunk_header + chunk_transcript)
