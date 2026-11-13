@@ -8,6 +8,7 @@ from typing import Literal
 from openai import APIError, APITimeoutError, RateLimitError
 from pydantic import BaseModel, Field
 
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
@@ -142,17 +143,25 @@ class FormUnderstander:
                     response_format=LabelMapping,
                     temperature=0,
                 )
+            settings = normalize_chat_kwargs(
+                self.model, {"temperature": 0, "top_p": 1.0, "timeout": 30}, config=self.config
+            )
+            record_request(settings)
             response = self.client.beta.chat.completions.parse(
                 model=self.model,
                 messages=messages,
                 response_format=LabelMapping,
-                **normalize_chat_kwargs(
-                    self.model, {"temperature": 0, "top_p": 1.0, "timeout": 30}, config=self.config
-                ),
+                **settings,
             )
+            record_response(response)
             return response.choices[0].message.parsed
 
-        parsed: LabelMapping | None = _with_retries(_call)
+        # Retries happen inside the span, so it counts every attempt's tokens.
+        with llm_span(
+            "FormUnderstander", provider=provider_of(self.client), model=self.model
+        ) as call:
+            parsed: LabelMapping | None = _with_retries(_call)
+            call.record_text(messages, parsed)
         if parsed is None:
             raise ValueError("The model did not return a structured label mapping")
 

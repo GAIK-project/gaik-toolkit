@@ -23,6 +23,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from gaik.observability.tracing import llm_span, provider_of, record_response
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -379,12 +380,20 @@ class ParallelTranscriber:
                     kwargs["prompt"] = cfg.prompt
                 return str(client.audio.transcriptions.create(**kwargs))
 
-        return with_retry(
-            _do,
-            max_retries=cfg.max_retries,
-            base_delay=cfg.retry_base_delay_seconds,
-            max_429_retries=cfg.max_429_retries,
-        )
+        with llm_span(
+            "ParallelTranscriber",
+            provider=provider_of(client),
+            model=deployment,
+            operation="transcription",
+        ) as call:
+            srt = with_retry(
+                _do,
+                max_retries=cfg.max_retries,
+                base_delay=cfg.retry_base_delay_seconds,
+                max_429_retries=cfg.max_429_retries,
+            )
+            call.record_text(cfg.prompt, srt)
+        return srt
 
     def _transcribe_chunks_whisper(
         self,
@@ -426,12 +435,20 @@ class ParallelTranscriber:
                         kwargs["prompt"] = cfg.prompt
                     return str(client.audio.transcriptions.create(**kwargs))
 
-            result = with_retry(
-                _do,
-                max_retries=cfg.max_retries,
-                base_delay=cfg.retry_base_delay_seconds,
-                max_429_retries=cfg.max_429_retries,
-            )
+            # Each worker thread opens its own span: threads do not inherit context.
+            with llm_span(
+                "ParallelTranscriber",
+                provider=provider_of(client),
+                model=deployment,
+                operation="transcription",
+            ) as call:
+                result = with_retry(
+                    _do,
+                    max_retries=cfg.max_retries,
+                    base_delay=cfg.retry_base_delay_seconds,
+                    max_429_retries=cfg.max_429_retries,
+                )
+                call.record_text(cfg.prompt, result)
 
             if check_cancelled:
                 check_cancelled()
@@ -483,6 +500,16 @@ class ParallelTranscriber:
 
     def _call_gpt4o_api(self, audio_file_path: str) -> dict:
         """Send audio to GPT-4o Diarize API with retry logic."""
+        deployment = self._api_config.get("gpt4o_diarize_deployment", "gpt-4o-transcribe")
+        with llm_span(
+            "ParallelTranscriber", provider="azure", model=deployment, operation="transcription"
+        ) as call:
+            result = self._call_gpt4o_api_once(audio_file_path)
+            record_response(result)
+            call.record_text(None, result.get("text") if isinstance(result, dict) else None)
+        return result
+
+    def _call_gpt4o_api_once(self, audio_file_path: str) -> dict:
         import httpx
 
         cfg = self._config
@@ -682,15 +709,25 @@ class ParallelTranscriber:
             if cfg.prompt:
                 payload["initial_prompt"] = cfg.prompt
             files = {"file": (file_name, f)}
-            response = requests.post(
-                f"{api_base.rstrip('/')}/transcribe",
-                data=payload,
-                files=files,
-                headers={"key": key} if key else {},
-                timeout=cfg.whisper_local_request_timeout_seconds,
-            )
-            response.raise_for_status()
-        return response.json()
+            with llm_span(
+                "ParallelTranscriber",
+                provider="whisper_local",
+                model="whisper",
+                operation="transcription",
+            ) as call:
+                response = requests.post(
+                    f"{api_base.rstrip('/')}/transcribe",
+                    data=payload,
+                    files=files,
+                    headers={"key": key} if key else {},
+                    timeout=cfg.whisper_local_request_timeout_seconds,
+                )
+                response.raise_for_status()
+                result = response.json()
+                call.record_text(
+                    cfg.prompt, result.get("text") if isinstance(result, dict) else None
+                )
+        return result
 
     @staticmethod
     def _whisper_local_segments_to_srt(segments: list[dict]) -> str:

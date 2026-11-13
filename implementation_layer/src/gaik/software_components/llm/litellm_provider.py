@@ -13,15 +13,6 @@ from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCo
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 
-def _embedding_usage(response) -> dict[str, int]:
-    """An embeddings response's token counts for a gaik span; empty when it has none."""
-    try:
-        usage = response.usage
-        return {k: v for k, v in usage.model_dump().items() if isinstance(v, int)} if usage else {}
-    except Exception:
-        return {}
-
-
 class LiteLLMProvider:
     """Use explicit LiteLLM model IDs such as ``azure/gpt-6-luna``.
 
@@ -72,7 +63,7 @@ class LiteLLMProvider:
             else {}
         )
         self.usage.add(usage)
-        record_response(usage, response_model=response.model)
+        record_response(response)
         return ChatResponse(
             text=response.choices[0].message.content or "",
             model=response.model,
@@ -109,5 +100,5 @@ class LiteLLMProvider:
         if not model:
             raise ValueError("LiteLLM embeddings require an explicit embedding_model")
         response = litellm.embedding(model=model, input=texts, **self._options(kwargs, chat=False))
-        record_response(_embedding_usage(response))
+        record_response(response)
         return [item["embedding"] for item in sorted(response.data, key=lambda item: item["index"])]

@@ -46,7 +46,7 @@ from gaik.observability import (
     measure_duration,
     openai_usage_to_dict,
 )
-from gaik.observability.tracing import record_request
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
 
 # Import shared configuration
 from gaik.software_components.config import get_openai_config
@@ -198,15 +198,19 @@ def _parse_with(
     sampling = _sampling_kwargs(temperature, reasoning_effort)
     sampling = normalize_chat_kwargs(model, {"top_p": 1.0, **sampling}, config=config)
     record_request(sampling)
-    return _with_retries(
-        lambda: client.beta.chat.completions.parse(
+
+    def parse():
+        response = client.beta.chat.completions.parse(
             model=model,
             messages=messages,
             response_format=response_format,
             timeout=(config or {}).get("timeout", 30),
             **sampling,
         )
-    )
+        record_response(response)  # each attempt's tokens, on the caller's llm_span
+        return response
+
+    return _with_retries(parse)
 
 
 # -----------------------------------------------------------------------------
@@ -492,22 +496,25 @@ def detect_structure_type(
     elif model is None:
         raise ValueError("model must be provided when client is specified")
 
-    resp = _parse_with(
-        client=client,
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PARSER},
-            {
-                "role": "user",
-                "content": _build_structure_classification_prompt(user_description),
-            },
-        ],
-        response_format=StructureAnalysis,
-        temperature=temperature,
-        reasoning_effort=reasoning_effort,
-        config=config,
-    )
-    analysis = resp.choices[0].message.parsed
+    messages = [
+        {"role": "system", "content": SYSTEM_PARSER},
+        {
+            "role": "user",
+            "content": _build_structure_classification_prompt(user_description),
+        },
+    ]
+    with llm_span("SchemaGenerator", provider=provider_of(client), model=model) as call:
+        resp = _parse_with(
+            client=client,
+            model=model,
+            messages=messages,
+            response_format=StructureAnalysis,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+            config=config,
+        )
+        analysis = resp.choices[0].message.parsed
+        call.record_text(messages, analysis)
     if _usage_sink is not None:
         _usage_sink.append(openai_usage_to_dict(resp))
     if getattr(resp, "usage", None):
@@ -1082,19 +1089,22 @@ def parse_user_requirements(
     cleaned_description = _clean_requirements_text(user_description)
     prompt = _build_parse_requirements_prompt(cleaned_description, parse_mode=parse_mode)
 
-    resp = _parse_with(
-        client=client,
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PARSER},
-            {"role": "user", "content": prompt},
-        ],
-        response_format=ExtractionRequirements,
-        temperature=temperature,
-        reasoning_effort=reasoning_effort,
-        config=config,
-    )
-    req = resp.choices[0].message.parsed
+    messages = [
+        {"role": "system", "content": SYSTEM_PARSER},
+        {"role": "user", "content": prompt},
+    ]
+    with llm_span("SchemaGenerator", provider=provider_of(client), model=model) as call:
+        resp = _parse_with(
+            client=client,
+            model=model,
+            messages=messages,
+            response_format=ExtractionRequirements,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+            config=config,
+        )
+        req = resp.choices[0].message.parsed
+        call.record_text(messages, req)
     # Keep the original line/bullet structure for field-scoped policy
     # detection. The prompt itself still uses the compact cleaned form.
     _apply_type_overrides(req, original_text=user_description)
