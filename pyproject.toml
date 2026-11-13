@@ -315,6 +315,9 @@ all = [
     "gaik[report-synthesizer]",
     "gaik[report-writer]",
     "gaik[web-scraper]",
+    "gaik[fields-to-docx]",
+    "gaik[operations]",
+    "gaik[mcp]",
 ]
 
 # Software components
@@ -407,6 +410,30 @@ web-scraper-browser = [
     "playwright>=1.49",
 ]
 
+# Extracted fields to a Word file: title, facts line, field table, optional evidence
+# column and appendix. python-docx only; no model call and no Pandoc.
+fields-to-docx = [
+    "python-docx>=1.2.0",
+]
+
+# gaik.operations: one function per common task (parse, transcribe, generate fields,
+# extract with evidence, classify) with shared settings. classify_text(jev=...) also
+# needs gaik[jev-classifier].
+operations = [
+    "gaik[parser-cpu]",
+    "gaik[transcriber]",
+    "gaik[extract]",
+    "gaik[source-tracing]",
+]
+
+# gaik.mcp_server: the operations and FieldsToDocx as MCP tools for agents (console
+# script gaik-mcp; stdio, or Streamable HTTP with a bearer token). SDK 2.x: MCPServer.
+mcp = [
+    "gaik[operations]",
+    "gaik[fields-to-docx]",
+    "mcp>=2.3,<3",
+]
+
 # CPU-only variants (no GPU/torch/docling dependencies)
 parser-cpu = [
     "PyMuPDF>=1.26.0",
@@ -445,6 +472,8 @@ all-cpu = [
     "gaik[report-synthesizer]",
     "gaik[report-writer]",
     "gaik[web-scraper]",
+    "gaik[fields-to-docx]",
+    "gaik[operations]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")
@@ -466,6 +495,9 @@ Homepage = "https://gaik.ai/"
 Repository = "https://github.com/GAIK-project/gaik-toolkit"
 Documentation = "https://gaik-project.github.io/gaik-toolkit/"
 Issues = "https://github.com/GAIK-project/gaik-toolkit/issues"
+
+[project.scripts]
+gaik-mcp = "gaik.mcp_server.cli:main"
 
 # Build system configuration (not installed, used during `python -m build`)
 [build-system]
