@@ -78,8 +78,10 @@ Without `config`, the generator uses `get_openai_config(use_azure)`. Pass
 
 Custom prompts must include both `{query}` and `{context}`; a prompt missing either is
 rejected when `AnswerGenerator` is created. Only these placeholders are substituted; other
-braces remain literal, so JSON examples do not need escaping. Doubled braces (`{{` and `}}`)
-retain Python format-string escaping and become single braces.
+braces remain literal, so a JSON example needs no escaping, nested or not:
+`{"answer": {"text": "..."}}` stays as written. A prompt written for Python's
+`str.format`, where every other brace is doubled (`{{"answer": "..."}}`), still works:
+its `{{` and `}}` become single braces.
 
 ---
 

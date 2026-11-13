@@ -36,16 +36,26 @@ DEFAULT_PROMPT_WITH_CITATIONS = (
 )
 
 
-_PROMPT_TOKEN = re.compile(r"\{\{|\}\}|\{query\}|\{context\}")
+_PLACEHOLDER = re.compile(r"\{query\}|\{context\}")
+_ESCAPED_TOKEN = re.compile(r"\{\{|\}\}|\{query\}|\{context\}")
+
+
+def _prompt_token(prompt: str) -> re.Pattern[str]:
+    """The pattern that reads a custom prompt.
+
+    A prompt written for ``str.format`` doubles every brace that is not a placeholder;
+    its ``{{`` and ``}}`` are then single braces. In any other prompt a doubled brace
+    is text, as in the JSON example ``{"answer": {"text": "..."}}``.
+    """
+    rest = _ESCAPED_TOKEN.sub("", prompt)
+    return _PLACEHOLDER if "{" in rest or "}" in rest else _ESCAPED_TOKEN
 
 
 def _validate_custom_prompt(prompt: str) -> None:
-    tokens = _PROMPT_TOKEN.findall(prompt)
-    matches = {token[1:-1] for token in tokens if token not in {"{{", "}}"}}
-    missing = sorted({"query", "context"} - matches)
+    found = set(_prompt_token(prompt).findall(prompt))
+    missing = sorted({"{query}", "{context}"} - found)
     if missing:
-        placeholders = ", ".join(f"{{{name}}}" for name in missing)
-        raise ValueError(f"Custom prompt is missing required placeholder(s): {placeholders}.")
+        raise ValueError(f"Custom prompt is missing required placeholder(s): {', '.join(missing)}.")
 
 
 def _with_retries(call, *, tries: int = 4):
@@ -130,7 +140,9 @@ class AnswerGenerator:
                 "{query}": query,
                 "{context}": context_text,
             }
-            return _PROMPT_TOKEN.sub(lambda match: replacements[match.group()], self.prompt)
+            return _prompt_token(self.prompt).sub(
+                lambda match: replacements[match.group()], self.prompt
+            )
         template = DEFAULT_PROMPT_WITH_CITATIONS if self.citations else DEFAULT_PROMPT
         return template.format(query=query, context=context_text)
 
