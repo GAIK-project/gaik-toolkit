@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from gaik.observability.tracing import record_request
+from gaik.observability.tracing import record_request, record_response
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
@@ -20,6 +20,14 @@ def _usage(completion) -> dict[str, int]:
     if not completion.usage:
         return {}
     return {k: v for k, v in completion.usage.model_dump().items() if isinstance(v, int)}
+
+
+def _embedding_usage(response) -> dict[str, int]:
+    """An embeddings response's token counts for a gaik span; empty when it has none."""
+    try:
+        return _usage(response)
+    except Exception:
+        return {}
 
 
 class OpenAIProvider:
@@ -53,6 +61,7 @@ class OpenAIProvider:
         choice = completion.choices[0].message
         usage = _usage(completion)
         self.usage.add(usage)
+        record_response(usage, response_model=completion.model)
         return ChatResponse(
             text=choice.content or "",
             model=completion.model,
@@ -76,7 +85,9 @@ class OpenAIProvider:
             response_format=response_format,
             **kwargs,
         )
-        self.usage.add(_usage(completion))
+        usage = _usage(completion)
+        self.usage.add(usage)
+        record_response(usage, response_model=getattr(completion, "model", None))
         parsed = completion.choices[0].message.parsed
         if parsed is None:
             raise ValueError("OpenAI parse() returned None — check the model/schema.")
@@ -106,4 +117,5 @@ class OpenAIProvider:
                 "supported by the endpoint, or embed(..., model=...)."
             )
         response = self.raw.embeddings.create(model=model, input=texts, **kwargs)
+        record_response(_embedding_usage(response))
         return [item.embedding for item in sorted(response.data, key=lambda item: item.index)]

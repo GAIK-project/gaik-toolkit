@@ -11,7 +11,7 @@ from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel
 
-from gaik.observability.tracing import record_request
+from gaik.observability.tracing import record_request, record_response
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
@@ -24,6 +24,26 @@ def _usage(response) -> dict[str, int]:
         "prompt_tokens": response.usage_metadata.prompt_token_count or 0,
         "completion_tokens": response.usage_metadata.candidates_token_count or 0,
     }
+
+
+def _span_usage(response) -> dict[str, int]:
+    """Token counts for a gaik span, thinking included.
+
+    Gemini bills thinking tokens as output but counts them apart from
+    ``candidates_token_count``, so the span adds them to the output.
+    """
+    try:
+        meta = getattr(response, "usage_metadata", None)
+        if not meta:
+            return {}
+        thoughts = getattr(meta, "thoughts_token_count", None) or 0
+        return {
+            "prompt_tokens": meta.prompt_token_count or 0,
+            "completion_tokens": (meta.candidates_token_count or 0) + thoughts,
+            "reasoning_tokens": thoughts,
+        }
+    except Exception:
+        return {}
 
 
 class GoogleProvider:
@@ -171,6 +191,7 @@ class GoogleProvider:
         )
         usage = _usage(response)
         self.usage.add(usage)
+        record_response(_span_usage(response))
         return ChatResponse(
             text=response.text or "",
             model=model,
@@ -244,7 +265,9 @@ class GoogleProvider:
             contents=self._to_contents(rest),
             config=config,
         )
-        self.usage.add(_usage(response))
+        usage = _usage(response)
+        self.usage.add(usage)
+        record_response(_span_usage(response))
         if response.parsed is not None:
             if isinstance(response.parsed, response_format):
                 return response.parsed

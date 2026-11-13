@@ -14,7 +14,7 @@ from typing import Any
 import anthropic
 from pydantic import BaseModel
 
-from gaik.observability.tracing import record_request
+from gaik.observability.tracing import record_request, record_response
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
@@ -256,6 +256,7 @@ class AnthropicProvider:
         text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
         usage = _usage(response)
         self.usage.add(usage)
+        record_response(usage, response_model=response.model)
         return ChatResponse(
             text="".join(text_blocks),
             model=response.model,
@@ -315,7 +316,9 @@ class AnthropicProvider:
             tool.pop("strict")
             tool["input_schema"] = schema
             response = self.raw.messages.create(**params)
-        self.usage.add(_usage(response))
+        usage = _usage(response)
+        self.usage.add(usage)
+        record_response(usage, response_model=getattr(response, "model", None))
         if getattr(response, "stop_reason", None) == "max_tokens":
             raise ValueError(
                 f"Anthropic response for '{tool_name}' was cut off at "
