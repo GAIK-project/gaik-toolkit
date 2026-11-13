@@ -396,8 +396,10 @@ def llm_span(
 ) -> Iterator[LLMCallSpan]:
     """Wrap one model call in a ``<operation> <model>`` span, the current span inside the block.
 
-    ``provider`` is gaik's provider name and ``operation`` the GenAI operation,
-    ``chat`` or ``embeddings``. The request's settings are added by
+    ``provider`` is gaik's provider name and ``operation`` the GenAI operation:
+    ``chat`` or ``embeddings``, or gaik's own ``transcription`` and
+    ``text_to_speech`` for audio calls, which carry tokens but no cost (the
+    price table holds text-model rates). The request's settings are added by
     ``record_request``, called where the request is sent. The call's own
     exception passes through unchanged; the span records only its type.
     """

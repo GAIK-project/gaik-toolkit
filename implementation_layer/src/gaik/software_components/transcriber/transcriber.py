@@ -431,14 +431,15 @@ class Transcriber:
         """
         audio_client = _create_audio_client(self.api_config)
         try:
+            # The file is opened first: a missing file is not a model call.
             with (
+                file_path.open("rb") as f,
                 llm_span(
                     "Transcriber",
                     provider=provider_of(audio_client),
                     model=transcription_model,
                     operation="transcription",
                 ) as call,
-                file_path.open("rb") as f,
             ):
                 if prompt is None:
                     response = audio_client.audio.transcriptions.create(
@@ -541,28 +542,27 @@ def split_and_transcribe_with_context(
             prompt = base_prompt if i == 0 else _chunk_prompt(base_prompt, context_text)
 
             try:
-                with (
-                    llm_span(
+                with open(chunk_path, "rb") as chunk_file:
+                    # The span covers the request only, not the pause between chunks.
+                    with llm_span(
                         "Transcriber",
                         provider=provider_of(audio_client),
                         model=transcription_model,
                         operation="transcription",
-                    ) as call,
-                    open(chunk_path, "rb") as chunk_file,
-                ):
-                    if prompt is None:
-                        transcript_response = audio_client.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                        )
-                    else:
-                        transcript_response = audio_client.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                            prompt=prompt,
-                        )
-                    record_response(transcript_response)
-                    call.record_text(prompt, getattr(transcript_response, "text", None))
+                    ) as call:
+                        if prompt is None:
+                            transcript_response = audio_client.audio.transcriptions.create(
+                                model=transcription_model,
+                                file=chunk_file,
+                            )
+                        else:
+                            transcript_response = audio_client.audio.transcriptions.create(
+                                model=transcription_model,
+                                file=chunk_file,
+                                prompt=prompt,
+                            )
+                        record_response(transcript_response)
+                        call.record_text(prompt, getattr(transcript_response, "text", None))
 
                     chunk_transcript = transcript_response.text
                     transcripts.append(chunk_header + chunk_transcript)

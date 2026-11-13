@@ -1067,7 +1067,7 @@ class VisionExtractor:
             record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})
             response = stream.get_final_message()
             record_response(response)
-            call.record_text([system_prompt, content])
+            call.record_text([system_prompt, content], _tool_input(response, "extract_data"))
         elapsed = time.perf_counter() - t0
 
         result_dict: dict = {}
@@ -1143,7 +1143,9 @@ class VisionExtractor:
         t0 = time.perf_counter()
         provider = "vertex" if is_vertex else "google"
         with llm_span("VisionExtractor", provider=provider, model=self.model) as call:
-            record_request({"temperature": 0, "max_tokens": 32768})
+            record_request(
+                {"temperature": 0, "max_tokens": 32768, "reasoning_effort": thinking_level}
+            )
             resp = _http.post(url, service="Gemini", headers=headers, json=body, timeout=(30, 300))
             payload = resp.json()
             record_response(payload)
@@ -1272,3 +1274,11 @@ class VisionExtractor:
         if self.additional_instructions:
             prompt = prompt.rstrip() + "\n" + self.additional_instructions + "\n"
         return prompt
+
+
+def _tool_input(response, name: str):
+    """The input Claude gave tool ``name``, for its span's output length; ``None`` if none."""
+    for block in getattr(response, "content", None) or []:
+        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == name:
+            return block.input
+    return None
