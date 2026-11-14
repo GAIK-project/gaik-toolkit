@@ -1,0 +1,19 @@
+# Version updates for the GitHub Actions only. The workflows pin every action to a
+# commit SHA; this keeps those pins current in one grouped pull request a month.
+# Python and JavaScript dependencies get Dependabot security updates (a repository
+# setting), not version updates.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # Skip releases younger than a week, so a compromised release has time to be caught.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns:
+          - '*'
+    commit-message:
+      prefix: ci
