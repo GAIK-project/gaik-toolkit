@@ -44,6 +44,33 @@ on:
         required: false
         default: false
         type: boolean
+    # The caller passes these by name (publish.yml), so no other secret reaches this
+    # workflow. A missing one makes the release gate fail, not pass.
+    secrets:
+      AZURE_API_KEY:
+        required: false
+      AZURE_ENDPOINT:
+        required: false
+      AZURE_API_VERSION:
+        required: false
+      AZURE_DEPLOYMENT:
+        required: false
+      OPENAI_API_KEY:
+        required: false
+      GOOGLE_API_KEY:
+        required: false
+      GOOGLE_SERVICE_ACCOUNT_JSON:
+        required: false
+      AITTA_API_KEY:
+        required: false
+      ANTHROPIC_API_KEY:
+        required: false
+      ANTHROPIC_FOUNDRY_API_KEY:
+        required: false
+
+# No job writes to the repository.
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -71,17 +98,18 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         ref: ${{ inputs.ref || github.ref }}  # Use input ref if provided, otherwise default
+        persist-credentials: false
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Set up uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
     - name: Install package
       run: uv pip install --system ".[all,dev,llm-all]"
@@ -119,17 +147,50 @@ jobs:
         working-directory: implementation_layer/toolkit_demo_app
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         ref: ${{ inputs.ref || github.ref }}
+        persist-credentials: false
 
     - name: Set up uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
     # `python -m pytest` puts the demo folder on sys.path so `import api` works;
     # plain `pytest` would also pick up the repository root's pytest config.
     - name: Run demo API tests
       run: uv run --python 3.11 --with pytest --with pytest-asyncio python -m pytest api/tests -o addopts="" -q
+
+  # The demo front end's unit tests, type check and lint. Lint warnings do not
+  # fail the job; lint errors do. Not in the release gate or the nightly run.
+  demo-frontend-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' && !inputs.release_gate
+    defaults:
+      run:
+        working-directory: implementation_layer/toolkit_demo_app
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        ref: ${{ inputs.ref || github.ref }}
+        persist-credentials: false
+
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version: 1.4.4
+
+    - name: Install dependencies
+      run: bun install --frozen-lockfile
+
+    - name: Unit tests
+      run: bun test
+
+    - name: Type check
+      run: bunx tsc --noEmit
+
+    - name: Lint
+      run: bun run lint
 
   # Tests that make real LLM calls. Kept off the ordinary push path: they
   # are a signal about the model and the AZURE_DEPLOYMENT behind it, not a
@@ -140,17 +201,18 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         ref: ${{ inputs.ref || github.ref }}
+        persist-credentials: false
 
     - name: Set up Python 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
         python-version: '3.11'
 
     - name: Set up uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
     - name: Install package
       run: uv pip install --system ".[all,dev]"
@@ -187,18 +249,19 @@ jobs:
     timeout-minutes: 60
     steps:
     - name: Checkout release commit
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         ref: ${{ inputs.ref || github.ref }}
+        persist-credentials: false
         fetch-depth: 0
 
     - name: Set up Python 3.11
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
         python-version: '3.11'
 
     - name: Set up uv
-      uses: astral-sh/setup-uv@v4
+      uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
     - name: Require tag and run complete release certification
       env:
@@ -241,7 +304,7 @@ jobs:
 
     - name: Upload sanitized certification report
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: release-certification-${{ github.sha }}
         path: results/release-check.json
