@@ -13,6 +13,15 @@ from pathlib import Path
 from typing import Any
 
 
+def _slug(text: str, *, max_len: int = 40) -> str:
+    """A section title as a lowercase file-name stem, shared by both paths."""
+    keep = [c.lower() if c.isalnum() else "_" for c in text.strip()]
+    s = "".join(keep)
+    while "__" in s:
+        s = s.replace("__", "_")
+    return s.strip("_")[:max_len] or "section"
+
+
 @dataclass
 class ReportSectionSpec:
     """A user-defined report section.

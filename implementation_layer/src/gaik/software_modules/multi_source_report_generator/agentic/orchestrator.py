@@ -167,7 +167,6 @@ def build_orchestrator_graph(
 def run_agentic_report(
     *,
     specs: list[ReportSectionSpec],
-    evidence_items: list,
     evidence_pack: str,
     matched_samples: dict,
     sample_report_provided: bool,
