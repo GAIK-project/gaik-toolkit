@@ -18,6 +18,8 @@ Public API mirrors the other generators:
 
 from __future__ import annotations
 
+import html
+import re
 import string
 from pathlib import Path
 from typing import Any, Dict, List
@@ -40,6 +42,23 @@ DOC_NAMES = [
 # ---------------------------------------------------------------------------
 
 
+_MD_SPECIAL = re.compile(r"([\\`*\[\]|!])")
+
+
+def md_text(value: Any) -> str:
+    """Blueprint text as Markdown shows it: one line, no markup, no raw HTML.
+
+    The documents are generated from what users and the agent wrote; a viewer
+    must show that text, not read it as headings, links, images, tables or
+    HTML. Link, image, emphasis, code and table characters are escaped, and
+    ``< > &`` become entities.
+    """
+    text = " ".join(str(value).split())
+    text = _MD_SPECIAL.sub(r"\\\1", html.escape(text, quote=False))
+    # A heading only starts a line; an underscore inside a word is plain text.
+    return "\\" + text if text.startswith("#") else text
+
+
 def _as_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
@@ -50,21 +69,23 @@ def _fmt_value(value: Any) -> str:
     if isinstance(value, bool):
         return "yes" if value else "no"
     if isinstance(value, list):
-        return ", ".join(str(v) for v in value) if value else "_none_"
+        return ", ".join(md_text(v) for v in value) if value else "_none_"
     if isinstance(value, dict):
-        return ", ".join(f"{k}: {v}" for k, v in value.items()) if value else "_none_"
-    return str(value)
+        if not value:
+            return "_none_"
+        return ", ".join(f"{md_text(k)}: {md_text(v)}" for k, v in value.items())
+    return md_text(value)
 
 
 def _bullets(value: Any) -> str:
     if isinstance(value, list):
-        items = [str(v) for v in value if str(v).strip()]
+        items = [md_text(v) for v in value if str(v).strip()]
     elif isinstance(value, dict):
-        items = [f"**{k}**: {v}" for k, v in value.items()]
+        items = [f"**{md_text(k)}**: {md_text(v)}" for k, v in value.items()]
     elif value in (None, ""):
         items = []
     else:
-        items = [str(value)]
+        items = [md_text(value)]
     if not items:
         return "- _not specified_"
     return "\n".join(f"- {it}" for it in items)
@@ -83,13 +104,13 @@ def _components_block(blueprint: Blueprint) -> str:
     comps = blueprint.components
     lines: List[str] = []
     for m in comps.selected_modules:
-        mid = getattr(m, "name", None) or getattr(m, "id", "")
-        reason = getattr(m, "reason", "") or ""
+        mid = md_text(getattr(m, "name", None) or getattr(m, "id", ""))
+        reason = md_text(getattr(m, "reason", "") or "")
         lines.append(f"- **{mid}** (module){f' — {reason}' if reason else ''}")
     for b in comps.selected_building_blocks:
-        lines.append(f"- **{b}** (component)")
+        lines.append(f"- **{md_text(b)}** (component)")
     for c in comps.custom_components:
-        lines.append(f"- **{c}** (custom)")
+        lines.append(f"- **{md_text(c)}** (custom)")
     return "\n".join(lines) if lines else "- _none selected_"
 
 
@@ -102,12 +123,16 @@ def _workflow_table(blueprint: Blueprint) -> str:
         "|------|------|-----------|--------|---------|",
     ]
     for s in steps:
-        comp = s.component or "—"
+        comp = md_text(s.component) if s.component else "—"
         params = ""
         if s.parameters:
-            params = " <br/>opts: " + ", ".join(f"{k}={v}" for k, v in s.parameters.items())
+            params = " <br/>opts: " + ", ".join(
+                f"{md_text(k)}={md_text(v)}" for k, v in s.parameters.items()
+            )
+        inputs = ", ".join(md_text(i) for i in s.inputs) or "—"
+        outputs = ", ".join(md_text(o) for o in s.outputs) or "—"
         rows.append(
-            f"| {s.id} | {s.type} | {comp}{params} | {', '.join(s.inputs) or '—'} | {', '.join(s.outputs) or '—'} |"
+            f"| {md_text(s.id)} | {md_text(s.type)} | {comp}{params} | {inputs} | {outputs} |"
         )
     return "\n".join(rows)
 
@@ -123,7 +148,9 @@ def _artifacts_block(blueprint: Blueprint) -> str:
         if art.optional:
             flags.append("optional")
         suffix = f" ({', '.join(flags)})" if flags else ""
-        lines.append(f"- `{aid}` — {art.type}, source: {art.source.value}{suffix}")
+        lines.append(
+            f"- {md_text(aid)} — {md_text(art.type)}, source: {md_text(art.source.value)}{suffix}"
+        )
     return "\n".join(lines)
 
 
@@ -142,10 +169,10 @@ def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
 
     return {
         # identity
-        "use_case_name": uc.name,
-        "use_case_id": uc.id,
-        "domain": uc.domain or "_not specified_",
-        "description": uc.description or "_not specified_",
+        "use_case_name": md_text(uc.name),
+        "use_case_id": md_text(uc.id),
+        "domain": md_text(uc.domain) if uc.domain else "_not specified_",
+        "description": md_text(uc.description) if uc.description else "_not specified_",
         "knowledge_processes": _fmt_value(
             [k.value if hasattr(k, "value") else k for k in uc.knowledge_processes]
         ),
@@ -176,7 +203,8 @@ def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
         "human_review": _fmt_value(tspec.get("human_review", tspec.get("human_review_required"))),
         "evaluation_requirements": _fmt_value(tspec.get("evaluation_requirements")),
         "runtime_interface": _fmt_value(runtime),
-        "run_command": run_cmd,
+        # Inside a ```bash block: one line, and no backtick that could end the block.
+        "run_command": " ".join(str(run_cmd).split()).replace("`", "'"),
         # target output
         "schema_name": _field(tos, "schema_name"),
         "fields_list": _bullets(fields),
@@ -185,8 +213,8 @@ def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
         "missing_value_policy": _field(tos, "missing_value_policy"),
         "validation_rules": _bullets(tos.get("validation_rules")),
         # governance
-        "contains_personal_data": dh.contains_personal_data,
-        "output_sensitivity": dh.output_sensitivity,
+        "contains_personal_data": md_text(dh.contains_personal_data),
+        "output_sensitivity": md_text(dh.output_sensitivity),
         "audit_log_required": "yes" if dh.audit_log_required else "no",
         # composed blocks
         "components_block": _components_block(blueprint),

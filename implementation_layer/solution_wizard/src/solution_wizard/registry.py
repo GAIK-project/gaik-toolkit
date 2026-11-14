@@ -10,6 +10,7 @@ known_limitations) and reasons from them directly.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -39,6 +40,11 @@ _REQUIRED_ENTRY_KEYS = (
 _VALID_TYPES = ("software_module", "software_component")
 
 
+#: The registry's import paths and class names are copied into generated code as
+#: ``from <import_path> import <name>``: a dotted gaik module and a Python name.
+_IMPORT_PATH_RE = re.compile(r"^gaik(\.[A-Za-z_][A-Za-z0-9_]*)+$")
+
+
 def _validate_entries(entries: List[Dict[str, Any]]) -> None:
     if not isinstance(entries, list):
         raise ValueError("Component registry must be a JSON array of entries.")
@@ -53,6 +59,13 @@ def _validate_entries(entries: List[Dict[str, Any]]) -> None:
                 f"Registry entry '{label}' has invalid type '{entry['type']}' "
                 f"(must be one of {_VALID_TYPES})."
             )
+        path = entry.get("import_path")
+        if path and not (isinstance(path, str) and _IMPORT_PATH_RE.match(path)):
+            raise ValueError(
+                f"Registry entry '{label}' has an import path that is not a gaik module: {path!r}"
+            )
+        if path and not (isinstance(entry.get("name"), str) and entry["name"].isidentifier()):
+            raise ValueError(f"Registry entry '{label}' has a name that is not a Python name")
         if entry["id"] in seen_ids:
             raise ValueError(f"Duplicate registry id '{entry['id']}'.")
         seen_ids.add(entry["id"])
