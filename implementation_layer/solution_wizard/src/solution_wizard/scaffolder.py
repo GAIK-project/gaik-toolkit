@@ -71,6 +71,105 @@ _CONFIG_OPTIONS = {
 }
 
 
+# Blueprint values that are written into generated code as names, in comments or
+# in string literals. An id is one token: letters, digits and _ . -, no spaces,
+# quotes or line breaks, so it cannot end the comment or literal it is in.
+_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,99}$")
+_LANGUAGE_RE = re.compile(r"^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*$")
+_EVAL_FRAMEWORK_RE = re.compile(r"^[a-z0-9_]{1,64}$")
+#: Free-text variables that templates put inside Python string literals and
+#: comments, and into .env.example comments.
+_CODE_TEXT_KEYS = ("use_case_name", "use_case_description")
+
+
+def _code_values_problems(blueprint: Blueprint) -> list[str]:
+    """Blueprint values the generated code would carry outside the id pattern."""
+    problems: list[str] = []
+
+    def check(value: Any, where: str) -> None:
+        if not isinstance(value, str) or not _ID_RE.match(value):
+            problems.append(f"{where} {value!r} must be letters, digits, _ . or - (no spaces)")
+
+    check(blueprint.use_case.id, "use_case.id")
+    for step in blueprint.workflow.steps:
+        check(step.id, "workflow step id")
+        check(step.type, f"type of step {step.id!r}")
+        for name in [*step.inputs, *step.outputs]:
+            check(name, f"artifact of step {step.id!r}")
+    spec = blueprint.target_output_spec or {}
+    schema_name = spec.get("schema_name")
+    if schema_name and not (isinstance(schema_name, str) and schema_name.isidentifier()):
+        problems.append(f"target_output_spec.schema_name {schema_name!r} must be a Python name")
+    for field in spec.get("fields", []):
+        if isinstance(field, str) and not field.isidentifier():
+            problems.append(f"output field {field!r} must be a Python name")
+    return problems
+
+
+def _eval_framework(evaluation: Any) -> str:
+    """The evaluation framework's name for the generated eval script; unknown shapes fall back."""
+    if not isinstance(evaluation, dict):
+        return "extraction_eval"
+    name = evaluation.get("eval_framework", "extraction_eval")
+    return name if isinstance(name, str) and _EVAL_FRAMEWORK_RE.match(name) else "extraction_eval"
+
+
+def _code_text(value: Any) -> str:
+    """Free text made safe inside a Python string literal, a docstring or a comment.
+
+    One line, with backslashes and quotes escaped. The templates put it in plain
+    literals only, never in an f-string.
+    """
+    text = " ".join(str(value).split())
+    return text.replace("\\", "\\\\").replace('"', '\\"').replace("'", "\\'")
+
+
+def _for_code(variables: dict[str, Any]) -> dict[str, Any]:
+    """The variables as code templates take them: free text escaped, one line."""
+    return {**variables, **{k: _code_text(variables[k]) for k in _CODE_TEXT_KEYS if k in variables}}
+
+
+_ENDPOINT_KEYS = ("base_url", "azure_endpoint", "azure_audio_endpoint")
+_ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,99}$")
+#: An ``env:`` reference in a blueprint names a setting (a deployment, an
+#: endpoint), never a credential: the PoC would read it and use it as a value.
+_CREDENTIAL_NAME_RE = re.compile(
+    r"KEY|TOKEN|SECRET|PASSW|CREDENTIAL|DATABASE|DSN|PRIVATE|CERT", re.IGNORECASE
+)
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _setting_problems(settings: dict[str, Any], where: str) -> list[str]:
+    """Endpoints and ``env:`` references the generated configuration would follow."""
+    from urllib.parse import urlsplit
+
+    problems: list[str] = []
+    for key, value in settings.items():
+        if not isinstance(value, str):
+            continue
+        text = value.strip()
+        if text[:4].lower() == "env:":
+            name = text[4:].strip()
+            if not _ENV_NAME_RE.match(name):
+                problems.append(f"{where}.{key} {value!r} (env: needs an UPPER_CASE name)")
+            elif _CREDENTIAL_NAME_RE.search(name):
+                problems.append(f"{where}.{key} {value!r} (env: names a setting, not a credential)")
+            continue
+        if key in _ENDPOINT_KEYS:
+            try:
+                url = urlsplit(text)
+                host = (url.hostname or "").lower()
+            except ValueError:
+                problems.append(f"{where}.{key} {value!r} (not a URL)")
+                continue
+            local = url.scheme == "http" and host in _LOCAL_HOSTS
+            if not (url.scheme == "https" or local) or not host or url.username or url.password:
+                problems.append(
+                    f"{where}.{key} {value!r} (an https endpoint without credentials in it)"
+                )
+    return problems
+
+
 def _provider_name(value: str) -> str:
     provider = str(value).strip().lower()
     provider = "azure" if provider == "azure_openai" else provider
@@ -147,6 +246,9 @@ def _stage_settings(blueprint: Blueprint) -> dict[str, dict]:
                 settings[model_key] = _model_id(
                     settings[model_key], f"models ({stage}.{model_key})"
                 )
+        problems = _setting_problems(settings, f"models ({stage})")
+        if problems:
+            raise ValueError("Unsafe model settings: " + "; ".join(problems))
         stages[stage] = settings
     return stages
 
@@ -725,6 +827,9 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
 def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     """Build the substitution variables dict from the blueprint."""
     bc = blueprint
+    problems = _code_values_problems(bc)
+    if problems:
+        raise ValueError("blueprint values cannot go into the PoC code: " + "; ".join(problems))
     models = bc.models or {}
     provider = _provider_name(models.get("provider", "azure"))
     stages = _stage_settings(blueprint)
@@ -770,6 +875,10 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         if isinstance(bc.technical_spec, dict)
         else getattr(bc.technical_spec, "language", "en")
     )
+    if not isinstance(language, str) or not _LANGUAGE_RE.match(language):
+        # The generated code takes the language as a code (en, fi, sv-FI);
+        # anything else falls back rather than reaching a string literal.
+        language = "en"
 
     # LLMJudge section: inject real code if judge is in the selected pipeline,
     # otherwise inject a skip comment so run_poc.py stays syntactically valid.
@@ -863,9 +972,7 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         "llm_judge_section": llm_judge_section,
         "source_tracing_setup": _build_source_tracing_setup(has_source_tracing),
         "source_tracing_section": _build_source_tracing_section(has_source_tracing, pattern),
-        "eval_framework": bc.evaluation.get("eval_framework", "extraction_eval")
-        if isinstance(bc.evaluation, dict)
-        else "extraction_eval",
+        "eval_framework": _eval_framework(bc.evaluation),
         "eval_framework_body": _EVAL_BODIES.get(
             bc.evaluation.get("eval_framework", "") if isinstance(bc.evaluation, dict) else "",
             _DEFAULT_EVAL_BODY,
@@ -976,7 +1083,7 @@ def _write_pdf_report_helper(blueprint: Blueprint, poc_dir: Path) -> Path | None
 
 def _write_env_example(variables: dict[str, Any], poc_dir: Path) -> None:
     tmpl = _read_template("_common", "env.example.tmpl") or ""
-    (poc_dir / ".env.example").write_text(_fill(tmpl, variables), encoding="utf-8")
+    (poc_dir / ".env.example").write_text(_fill(tmpl, _for_code(variables)), encoding="utf-8")
 
 
 def _write_config_yaml(variables: dict[str, Any], poc_dir: Path) -> None:
@@ -1013,7 +1120,7 @@ def _write_run_poc(variables: dict[str, Any], pattern: str, poc_dir: Path) -> bo
     tmpl = _read_template(pattern, "run_poc.py.tmpl")
     if not tmpl:
         tmpl = _read_template("_generic", "run_poc.py.tmpl") or ""
-    (poc_dir / "run_poc.py").write_text(_fill(tmpl, variables), encoding="utf-8")
+    (poc_dir / "run_poc.py").write_text(_fill(tmpl, _for_code(variables)), encoding="utf-8")
     return pattern != "_generic"
 
 
@@ -1021,7 +1128,8 @@ def _write_eval_script(variables: dict[str, Any], poc_dir: Path) -> None:
     tmpl = _read_template("_common", "run_basic_eval.py.tmpl") or ""
     evals_dir = poc_dir / "evals"
     evals_dir.mkdir(parents=True, exist_ok=True)
-    (evals_dir / "run_basic_eval.py").write_text(_fill(tmpl, variables), encoding="utf-8")
+    script = _fill(tmpl, _for_code(variables))
+    (evals_dir / "run_basic_eval.py").write_text(script, encoding="utf-8")
     (evals_dir / "ground_truth" / ".gitkeep").parent.mkdir(parents=True, exist_ok=True)
     (evals_dir / "ground_truth" / ".gitkeep").touch()
 
