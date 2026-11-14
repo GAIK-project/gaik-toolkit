@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from .blueprint import Blueprint
+from .docs_generator import md_text
 from .registry import get_registry
 from .schema_designer import write_extraction_requirements, write_schema_files
 
@@ -1003,7 +1004,8 @@ def _input_instructions(bp: Blueprint) -> str:
             if isinstance(bp.technical_spec, dict)
             else getattr(bp.technical_spec, "language", "")
         )
-        lang_note = f" in {lang.upper()}" if lang else ""
+        known = isinstance(lang, str) and _LANGUAGE_RE.match(lang)
+        lang_note = f" in {lang.upper()}" if known else ""
         return (
             f"Place an audio recording{lang_note} (.wav or .mp3) in `sample_input/`.\n"
             "The pipeline will transcribe and enhance it before extraction."
@@ -1136,7 +1138,9 @@ def _write_eval_script(variables: dict[str, Any], poc_dir: Path) -> None:
 
 def _write_readme(variables: dict[str, Any], poc_dir: Path) -> None:
     tmpl = _read_template("_common", "README.md.tmpl") or ""
-    (poc_dir / "README.md").write_text(_fill(tmpl, variables), encoding="utf-8")
+    # Markdown: the use case's own words are shown as text, not read as markup.
+    shown = {**variables, **{k: md_text(variables[k]) for k in _CODE_TEXT_KEYS if k in variables}}
+    (poc_dir / "README.md").write_text(_fill(tmpl, shown), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
