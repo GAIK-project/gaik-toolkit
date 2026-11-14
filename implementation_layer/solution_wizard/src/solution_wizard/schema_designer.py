@@ -200,6 +200,19 @@ def build_requirements_text(target_output_spec: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _safe_enum_member(v: str) -> str:
+    """Convert an allowed value to a valid Python identifier for an Enum member."""
+    s = re.sub(r"[^a-zA-Z0-9_]", "_", str(v))
+    # Enum members must not start with a digit
+    if s and s[0].isdigit():
+        s = f"V_{s}"
+    return s.upper() or "UNKNOWN"
+
+
+def _enum_name(field: str) -> str:
+    return "".join(w.title() for w in field.split("_")) + "Enum"
+
+
 def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | None = None) -> str:
     """Generate output_schema.py content -- a typed Pydantic model.
 
@@ -214,14 +227,6 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
     field_descriptions: dict[str, str] = target_output_spec.get("field_descriptions", {})
     allowed_values: dict[str, Any] = target_output_spec.get("allowed_values", {})
     name = schema_name or target_output_spec.get("schema_name") or "OutputSchema"
-
-    def _safe_enum_member(v: str) -> str:
-        """Convert an allowed value to a valid Python identifier for an Enum member."""
-        s = re.sub(r"[^a-zA-Z0-9_]", "_", str(v))
-        # Enum members must not start with a digit
-        if s and s[0].isdigit():
-            s = f"V_{s}"
-        return s.upper() or "UNKNOWN"
 
     # Do NOT include `from __future__ import annotations` (PEP 563).
     # That import defers all annotation evaluation, turning Optional[str] into
@@ -241,7 +246,7 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
     for field in fields:
         vals = allowed_values.get(field, [])
         if vals and all(isinstance(v, str) for v in vals):
-            enum_name = "".join(w.title() for w in field.split("_")) + "Enum"
+            enum_name = _enum_name(field)
             members = "\n".join(f'    {_safe_enum_member(v)} = "{v}"' for v in vals)
             enum_blocks.append(f"class {enum_name}(str, Enum):\n{members}\n")
 
@@ -251,8 +256,7 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
         py_type = _py_type(field_types.get(field, "string"))
         vals = allowed_values.get(field, [])
         if vals and all(isinstance(v, str) for v in vals):
-            enum_name = "".join(w.title() for w in field.split("_")) + "Enum"
-            py_type = enum_name
+            py_type = _enum_name(field)
 
         desc = field_descriptions.get(field, "")
         # Use Field(description=...) so the description propagates into JSON Schema
@@ -302,9 +306,8 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
     ]
     # Pydantic v2 requires model_rebuild() when the model references
     # types (e.g. Enums, or the Decimal safety aliases) defined in the same
-    # module / exec block -- callers that exec() this source into a bare
-    # dict namespace (see write_schema_files()'s JSON Schema export below)
-    # otherwise raise "class is not fully defined" for DecimalField /
+    # module -- a caller that runs this source into a bare dict namespace
+    # otherwise gets "class is not fully defined" for DecimalField /
     # OptionalDecimalField.
     if enum_blocks or needs_decimal_helper:
         parts += [f"{name}.model_rebuild()", ""]
@@ -407,6 +410,72 @@ def build_requirements_json(
     }
 
 
+def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
+    """The model that build_pydantic_model()'s source defines, built from the spec as data.
+
+    write_schema_files() needs the model only for its JSON Schema. Building it
+    with pydantic.create_model keeps the spec's text as values: no source code
+    is assembled from it and nothing is executed. Field for field it follows
+    build_pydantic_model(), so the JSON Schema is the same.
+    """
+    from decimal import Decimal
+    from enum import Enum
+    from typing import Annotated
+
+    from pydantic import BeforeValidator, Field, WithJsonSchema, create_model
+
+    noise = re.compile(r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]")
+    single = re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
+
+    def clean(v: Any) -> Any:
+        if not isinstance(v, str):
+            return v
+        text = noise.sub("", v.strip()).strip()
+        if not text or not single.match(text):
+            return None
+        return text.replace(",", "")
+
+    decimal_field = Annotated[Decimal, WithJsonSchema({"type": "string"}), BeforeValidator(clean)]
+    optional_decimal_field = Annotated[
+        Decimal | None,
+        WithJsonSchema({"anyOf": [{"type": "string"}, {"type": "null"}]}),
+        BeforeValidator(clean),
+    ]
+    simple = {"str": str, "int": int, "float": float, "bool": bool, "list[str]": list[str]}
+
+    spec = _normalize_spec(target_output_spec)
+    fields: list[str] = spec.get("fields", [])
+    field_types: dict[str, str] = spec.get("field_types", {})
+    required_fields: list[str] = spec.get("required_fields", [])
+    descriptions: dict[str, str] = spec.get("field_descriptions", {})
+    allowed_values: dict[str, Any] = spec.get("allowed_values", {})
+
+    definitions: dict[str, Any] = {}
+    for field in fields:
+        desc = descriptions.get(field, "")
+        required = field in required_fields
+        described = {"description": desc} if desc else {}
+        py_type = _py_type(field_types.get(field, "string"))
+        vals = allowed_values.get(field, [])
+        if vals and all(isinstance(v, str) for v in vals):
+            kind: Any = Enum(_enum_name(field), {_safe_enum_member(v): v for v in vals}, type=str)
+        elif py_type == "Decimal":
+            kind = decimal_field if required else optional_decimal_field
+        else:
+            kind = simple.get(py_type, str)
+        if required:
+            definitions[field] = (kind, Field(**described) if desc else ...)
+        elif py_type == "Decimal" and kind is optional_decimal_field:
+            definitions[field] = (kind, Field(default=None, **described) if desc else None)
+        else:
+            definitions[field] = (
+                kind | None,
+                Field(default=None, **described) if desc else None,
+            )
+
+    return create_model(name, **definitions)
+
+
 def write_schema_files(
     target_output_spec: dict[str, Any],
     schema_name: str | None,
@@ -436,16 +505,13 @@ def write_schema_files(
     py_path.write_text(py_content, encoding="utf-8")
     results["output_schema.py"] = py_path
 
-    # output_schema.json (human-readable JSON Schema; best-effort)
+    # output_schema.json (human-readable JSON Schema; best-effort). The model
+    # is built from the spec as data, never by running output_schema.py.
     try:
-        ns: dict[str, Any] = {}
-        exec(compile(py_content, "<schema>", "exec"), ns)
-        model_cls = ns.get(class_name)
-        if model_cls and hasattr(model_cls, "model_json_schema"):
-            json_schema = model_cls.model_json_schema()
-            json_path = schemas_dir / "output_schema.json"
-            json_path.write_text(json.dumps(json_schema, indent=2), encoding="utf-8")
-            results["output_schema.json"] = json_path
+        json_schema = _model_from_spec(target_output_spec, class_name).model_json_schema()
+        json_path = schemas_dir / "output_schema.json"
+        json_path.write_text(json.dumps(json_schema, indent=2), encoding="utf-8")
+        results["output_schema.json"] = json_path
     except Exception:
         pass
 
