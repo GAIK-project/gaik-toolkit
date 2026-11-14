@@ -18,11 +18,13 @@ jobs:
     with:
       ref: ${{ github.ref }}  # Pass the tag ref to test workflow
       release_gate: true  # Offline checks AND authenticated component certification are mandatory
-    # Only the provider credentials the release gate uses, never the PyPI tokens.
+    # Only the provider credentials the release gate (and, on a manual run, the live
+    # LLM tests) use, never the PyPI tokens.
     secrets:
       AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
       AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
       AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
+      AZURE_DEPLOYMENT: ${{ secrets.AZURE_DEPLOYMENT }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
