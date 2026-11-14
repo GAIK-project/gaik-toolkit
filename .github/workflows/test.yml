@@ -200,6 +200,10 @@ jobs:
     - name: Set up uv
       uses: astral-sh/setup-uv@v4
 
+    # The chunked transcription check exports its chunks with pydub, which needs ffmpeg.
+    - name: Install ffmpeg
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+
     - name: Require tag and run complete release certification
       env:
         RELEASE_REF: ${{ github.ref }}
@@ -223,6 +227,8 @@ jobs:
         RELEASE_GOOGLE_EMBEDDING_MODEL: ${{ vars.RELEASE_GOOGLE_EMBEDDING_MODEL }}
         RELEASE_VERTEX_EMBEDDING_MODEL: ${{ vars.RELEASE_VERTEX_EMBEDDING_MODEL }}
         RELEASE_AITTA_EMBEDDING_MODEL: ${{ vars.RELEASE_AITTA_EMBEDDING_MODEL }}
+        RELEASE_AZURE_TRANSCRIPTION_MODEL: ${{ vars.RELEASE_AZURE_TRANSCRIPTION_MODEL || 'gpt-4o-transcribe' }}
+        RELEASE_OPENAI_TRANSCRIPTION_MODEL: ${{ vars.RELEASE_OPENAI_TRANSCRIPTION_MODEL }}
         AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
         AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
         AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
