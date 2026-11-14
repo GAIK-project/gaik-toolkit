@@ -95,15 +95,17 @@ def select_targets(providers: str, environ: dict, required: list[str] = ()) -> l
                 )
         elif transcription_model:
             raise ValueError(f"{name} has no audio API; unset {prefix}_TRANSCRIPTION_MODEL")
-        for backend in backends:
+        for index, backend in enumerate(backends):
             targets.append(
                 {
                     "provider": name,
                     "backend": backend,
                     "model": model.strip(),
                     "embedding_model": environ.get(prefix + "_EMBEDDING_MODEL", "").strip(),
-                    # Transcription never goes through LiteLLM; certify it once, natively.
-                    "transcription_model": transcription_model if backend == "native" else "",
+                    # The Transcriber never goes through LiteLLM (the worker gives it the
+                    # native config on any backend), so certify it once per provider, on
+                    # its first target, even when that target is LiteLLM.
+                    "transcription_model": transcription_model if index == 0 else "",
                 }
             )
     return targets

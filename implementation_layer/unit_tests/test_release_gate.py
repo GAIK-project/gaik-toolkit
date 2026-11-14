@@ -148,16 +148,34 @@ def test_an_audio_provider_needs_an_explicit_transcription_model():
     assert target["transcription_model"] == "transcribe"
 
 
-def test_transcription_is_certified_once_on_the_native_backend():
+@pytest.mark.parametrize(
+    ("providers", "environ", "expected"),
+    [
+        (
+            "azure",
+            {"RELEASE_AZURE_BACKENDS": "native,litellm"},
+            [("azure", "native", "transcribe-deployment"), ("azure", "litellm", "")],
+        ),
+        # A LiteLLM-only selection must not drop the check.
+        (
+            "azure",
+            {"RELEASE_AZURE_BACKENDS": "litellm"},
+            [("azure", "litellm", "transcribe-deployment")],
+        ),
+        (
+            "openai",
+            {"RELEASE_OPENAI_MODEL": "openai-model", "RELEASE_OPENAI_BACKENDS": "litellm"},
+            [("openai", "litellm", "openai-transcribe")],
+        ),
+    ],
+)
+def test_transcription_is_certified_once_per_provider(providers, environ, expected):
     targets = gate.select_targets(
-        "azure",
-        {"RELEASE_AZURE_MODEL": "deployment", "RELEASE_AZURE_BACKENDS": "native,litellm"}
-        | _TRANSCRIPTION_ENV,
+        providers, {"RELEASE_AZURE_MODEL": "deployment", **environ, **_TRANSCRIPTION_ENV}
     )
-    assert [(target["backend"], target["transcription_model"]) for target in targets] == [
-        ("native", "transcribe-deployment"),
-        ("litellm", ""),
-    ]
+    assert [
+        (target["provider"], target["backend"], target["transcription_model"]) for target in targets
+    ] == expected
 
 
 def test_a_provider_without_an_audio_api_cannot_select_a_transcription_model():
