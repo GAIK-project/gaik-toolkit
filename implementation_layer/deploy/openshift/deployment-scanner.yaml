@@ -33,10 +33,11 @@ spec:
           ports:
             - containerPort: 3310
           # clamd holds the signatures in memory (about 1 GiB) and, while it
-          # loads an update, the new set beside the old one.
+          # loads an update, the new set beside the old one. The project's
+          # LimitRange allows a CPU limit at most 8 times the request.
           resources:
             requests:
-              cpu: 100m
+              cpu: 200m
               memory: 1280Mi
             limits:
               cpu: "1"
