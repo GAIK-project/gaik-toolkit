@@ -259,27 +259,20 @@ class _SliceableFakeAudio(_FakeAudio):
         return _FakeChunk(stop - start, self.exported_chunk_ms)
 
 
-@pytest.mark.parametrize(
-    ("base_prompt", "fail_first"),
-    [
-        (None, False),
-        ("Explicit Finnish-language context", False),
-        (None, True),
-        ("Explicit Finnish-language context", True),
-    ],
-)
-def test_chunked_transcription_omits_default_and_uses_prior_transcript_context(
-    tmp_path: Path, base_prompt: str | None, fail_first: bool
-):
+def _chunk_requests(
+    tmp_path: Path, base_prompt: str | None, transcripts: list[str | Exception]
+) -> list[dict[str, object]]:
+    """Transcribe three chunks; each request returns (or raises) the next item."""
     audio_path = tmp_path / "long.mp3"
     audio_path.write_bytes(b"tiny")
     requests: list[dict[str, object]] = []
 
     def create_request(**kwargs: object) -> SimpleNamespace:
         requests.append({key: value for key, value in kwargs.items() if key != "file"})
-        if fail_first and len(requests) == 1:
-            raise RuntimeError("first chunk failed")
-        return SimpleNamespace(text=f"Transcript {len(requests)}", usage=None)
+        outcome = transcripts[len(requests) - 1]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return SimpleNamespace(text=outcome, usage=None)
 
     with (
         patch("gaik.software_components.transcriber.transcriber.create_openai_client") as factory,
@@ -295,18 +288,54 @@ def test_chunked_transcription_omits_default_and_uses_prior_transcript_context(
             base_prompt=base_prompt,
             transcription_model="gpt-4o-transcribe",
         )
-
     assert len(requests) == 3
-    if base_prompt is None:
-        assert "prompt" not in requests[0]
-    else:
-        assert requests[0]["prompt"] == base_prompt
-    if fail_first:
-        assert "prompt" not in requests[1]
-        assert requests[2]["prompt"] == "Transcript 2"
-    else:
-        assert requests[1]["prompt"] == "Transcript 1"
-        assert requests[2]["prompt"] == "Transcript 2"
+    return requests
+
+
+_CONTEXT = "Matti Virtanen, pumppu P-17"
+
+
+@pytest.mark.parametrize(
+    ("base_prompt", "first_chunk", "expected_prompts"),
+    [
+        # Without caller context the first request has no prompt; later ones
+        # continue from the previous transcript.
+        (None, "Transcript 1", [None, "Transcript 1", "Transcript 2"]),
+        # The caller's context reaches every chunk, before the previous transcript.
+        (
+            _CONTEXT,
+            "Transcript 1",
+            [_CONTEXT, f"{_CONTEXT}\nTranscript 1", f"{_CONTEXT}\nTranscript 2"],
+        ),
+        # After a failed first chunk there is no transcript to continue from.
+        (None, RuntimeError("first chunk failed"), [None, None, "Transcript 2"]),
+        (
+            _CONTEXT,
+            RuntimeError("first chunk failed"),
+            [_CONTEXT, _CONTEXT, f"{_CONTEXT}\nTranscript 2"],
+        ),
+    ],
+)
+def test_every_chunk_gets_the_caller_context_before_the_previous_transcript(
+    tmp_path: Path,
+    base_prompt: str | None,
+    first_chunk: str | Exception,
+    expected_prompts: list[str | None],
+):
+    requests = _chunk_requests(tmp_path, base_prompt, [first_chunk, "Transcript 2", "Transcript 3"])
+
+    # None means the request carries no prompt at all, not an empty one.
+    assert [request.get("prompt", None) for request in requests] == expected_prompts
+    assert ["prompt" in request for request in requests] == [
+        prompt is not None for prompt in expected_prompts
+    ]
+
+
+def test_a_later_chunk_carries_only_the_end_of_a_long_previous_transcript(tmp_path: Path):
+    previous = " ".join(f"sana{number}" for number in range(100))
+    requests = _chunk_requests(tmp_path, _CONTEXT, [previous, "Transcript 2", "Transcript 3"])
+
+    assert requests[1]["prompt"] == f"{_CONTEXT}\n{previous[-170:]}"
 
 
 @pytest.mark.parametrize("max_duration_seconds", [DEFAULT_MAX_DURATION_SECONDS, 1500])
