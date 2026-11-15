@@ -87,7 +87,7 @@ class TextToSpeech:
         )
         if self.api_config.get("use_azure", False) and self._azure_tts_endpoint():
             # Refuse a wrong address when the speaker is built, not at the first request.
-            self._azure_tts_target()
+            self._check_azure_tts_endpoint(self._azure_tts_endpoint())
         self.model = model or self._resolve_default_model()
         if language not in SUPPORTED_LANGUAGES:
             supported = ", ".join(SUPPORTED_LANGUAGES)
@@ -198,9 +198,17 @@ class TextToSpeech:
         return self.api_config.get("tts_endpoint") or os.getenv("TTS_ENDPOINT")
 
     def _azure_tts_target(self) -> tuple[str, str]:
-        """The Azure speech URL and key: the caller's config first, then the environment."""
+        """The Azure speech URL and its key, taken together from one source.
+
+        ``api_config["tts_endpoint"]`` goes with ``api_config["api_key"]``; ``TTS_ENDPOINT``
+        goes with ``AZURE_API_KEY``, as before, so a speech resource with its own key keeps
+        working. Either falls back to the other key when its own is missing.
+        """
         tts_endpoint = self._azure_tts_endpoint()
-        api_key = self.api_config.get("api_key") or os.getenv("AZURE_API_KEY")
+        if self.api_config.get("tts_endpoint"):
+            api_key = self.api_config.get("api_key") or os.getenv("AZURE_API_KEY")
+        else:
+            api_key = os.getenv("AZURE_API_KEY") or self.api_config.get("api_key")
         if not tts_endpoint:
             raise ValueError(
                 "No Azure text-to-speech endpoint: set api_config['tts_endpoint'] or TTS_ENDPOINT."
@@ -209,6 +217,10 @@ class TextToSpeech:
             raise ValueError(
                 "No Azure text-to-speech key: set api_config['api_key'] or AZURE_API_KEY."
             )
+        self._check_azure_tts_endpoint(tts_endpoint)
+        return tts_endpoint, api_key
+
+    def _check_azure_tts_endpoint(self, tts_endpoint: str) -> None:
         host = check_endpoint(
             tts_endpoint,
             provider="azure",
@@ -216,7 +228,6 @@ class TextToSpeech:
             what="tts_endpoint",
         )
         log_endpoint("azure", host)
-        return tts_endpoint, api_key
 
     def _build_instructions(self, *, language: str, instructions: str | None) -> str:
         language_instruction = {

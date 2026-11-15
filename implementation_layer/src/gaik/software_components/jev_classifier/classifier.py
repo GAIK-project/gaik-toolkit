@@ -8,6 +8,7 @@ fallback when the model is not confident.
 """
 
 import logging
+import os
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -83,7 +84,8 @@ class JevClassifier:
                 ``system_one`` method). When given, ``api_key`` and ``base_url`` are
                 not used to build a client. Meant for tests and custom transports.
             allowed_endpoint_hosts: Hosts this application allows for ``base_url``
-                besides TypeSafe, gaik-decide and ``GAIK_DECIDE_URL``; also read from
+                besides TypeSafe, gaik-decide, ``GAIK_DECIDE_URL`` and ``TYPESAFE_BASE_URL``;
+                also read from
                 ``GAIK_ALLOWED_ENDPOINT_HOSTS``. ``base_url`` must be https.
 
         Raises:
@@ -104,8 +106,9 @@ class JevClassifier:
             return
         if not api_key or not api_key.strip():
             raise ValueError("api_key is required (pass your gaik-decide or TypeSafe key)")
+        # Without a base_url the SDK itself reads TYPESAFE_BASE_URL.
         host = check_endpoint(
-            base_url or DEFAULT_BASE_URL,
+            base_url or os.getenv("TYPESAFE_BASE_URL") or DEFAULT_BASE_URL,
             provider="jev",
             allowed_hosts=allowed_endpoint_hosts,
             what="base_url",

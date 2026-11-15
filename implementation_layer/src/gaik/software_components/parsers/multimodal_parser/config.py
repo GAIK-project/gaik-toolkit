@@ -14,9 +14,13 @@ from dotenv import load_dotenv
 from google.oauth2 import service_account
 from openai import AzureOpenAI, OpenAI
 
-from gaik.software_components.config import _check_openai_endpoint
-from gaik.software_components.endpoints import foundry_host, host_of, log_endpoint
-from gaik.software_components.llm.anthropic_provider import ANTHROPIC_URL
+from gaik.software_components.endpoints import (
+    ANTHROPIC_URL,
+    check_openai_endpoint,
+    foundry_host,
+    host_of,
+    log_endpoint,
+)
 
 load_dotenv()
 
@@ -53,13 +57,13 @@ def get_openai_config(use_azure: bool = True) -> dict:
 def create_openai_client(config: dict):
     """Create an OpenAI or Azure OpenAI client based on configuration."""
     if config.get("use_azure", False):
-        _check_openai_endpoint(config, "azure")
+        check_openai_endpoint(config, "azure")
         return AzureOpenAI(
             api_key=config["api_key"],
             api_version=config["api_version"],
             azure_endpoint=config["azure_endpoint"],
         )
-    _check_openai_endpoint({}, "openai")
+    check_openai_endpoint({}, "openai")
     return OpenAI(api_key=config["api_key"])
 
 

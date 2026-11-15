@@ -171,7 +171,7 @@ class Transcriber:
         local_api_key: str | None = None,
     ) -> None:
         _audio_provider(api_config)
-        if local_api_base:
+        if transcription_model == "whisper_local" and local_api_base:
             check_endpoint(
                 local_api_base,
                 provider="whisper_local",

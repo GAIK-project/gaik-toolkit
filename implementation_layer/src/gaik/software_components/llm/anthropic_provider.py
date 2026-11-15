@@ -15,7 +15,7 @@ from typing import Any
 import anthropic
 from pydantic import BaseModel
 
-from gaik.software_components.endpoints import foundry_host, host_of, log_endpoint
+from gaik.software_components.endpoints import ANTHROPIC_URL, foundry_host, host_of, log_endpoint
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
@@ -135,9 +135,6 @@ def _usage(response) -> dict[str, int]:
         "prompt_tokens": getattr(response.usage, "input_tokens", 0),
         "completion_tokens": getattr(response.usage, "output_tokens", 0),
     }
-
-
-ANTHROPIC_URL = "https://api.anthropic.com"
 
 
 class AnthropicProvider:

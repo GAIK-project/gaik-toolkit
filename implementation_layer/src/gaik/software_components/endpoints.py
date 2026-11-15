@@ -10,13 +10,15 @@ must be one of:
   provider (for example ``AZURE_ENDPOINT`` or ``OPENAI_BASE_URL``);
 - a host listed in ``GAIK_ALLOWED_ENDPOINT_HOSTS`` (comma-separated), or in the
   ``allowed_endpoint_hosts`` setting the application passes in code;
-- the local machine (``localhost``, ``127.0.0.1``, ``::1``), for local models,
-  where plain ``http://`` is accepted too.
+- the local machine (``localhost``, ``127.0.0.1``, ``::1``), over ``http://`` too,
+  for services that commonly run there: OpenAI-compatible model servers, LiteLLM,
+  Docling and local Whisper. For a cloud provider the local machine must be listed
+  like any other host.
 
-An entry is a host name (``llm.example.org``), a suffix pattern
-(``*.example.org``) or, to accept plain ``http://`` for one host on a private
-network, that host with its scheme (``http://docling.internal``). Anything else
-raises :class:`EndpointNotAllowedError` before a request is made.
+An entry is a host name (``llm.example.org``, a port is ignored), a suffix pattern
+(``*.example.org``) or, to accept plain ``http://`` on a private network, the host
+or pattern with its scheme (``http://docling.internal``). Anything else raises
+:class:`EndpointNotAllowedError` before a request is made.
 
 An application that forwards user settings to gaik should not forward
 ``allowed_endpoint_hosts``: the list is the deployment's decision.
@@ -58,7 +60,8 @@ PROVIDER_HOSTS: dict[str, tuple[str, ...]] = {
 }
 
 # Environment variables through which a deployment sets a provider's address.
-# The host of an address set there is trusted for that provider.
+# The host of an address set there is trusted for that provider. DOCLING_API_BASE and
+# LOCAL_TRANSCRIBER_API_BASE are the names the demo app and generated PoCs read.
 PROVIDER_ENDPOINT_ENVS: dict[str, tuple[str, ...]] = {
     "openai": ("OPENAI_BASE_URL",),
     "openai_compatible": ("OPENAI_BASE_URL",),
@@ -66,8 +69,18 @@ PROVIDER_ENDPOINT_ENVS: dict[str, tuple[str, ...]] = {
     "aitta": ("AITTA_BASE_URL",),
     "vertex": ("GOOGLE_GENERATE_CONTENT_URL",),
     "litellm": ("LITELLM_BASE_URL",),
-    "jev": ("GAIK_DECIDE_URL",),
+    "jev": ("GAIK_DECIDE_URL", "TYPESAFE_BASE_URL"),
+    "docling": ("DOCLING_API_BASE",),
+    "whisper_local": ("LOCAL_TRANSCRIBER_API_BASE",),
 }
+
+# Services that commonly run on the same machine as the application. For the others
+# (OpenAI, Azure, Aitta, Jev, ...) a loopback address must be allowed like any host.
+LOCAL_SERVICE_PROVIDERS = frozenset({"openai_compatible", "litellm", "docling", "whisper_local"})
+
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+AITTA_BASE_URL = "https://aitta-api.csc.fi/openai/v1"
+ANTHROPIC_URL = "https://api.anthropic.com"
 
 _LOOPBACK_NAMES = {"localhost"}
 
@@ -92,7 +105,7 @@ def _split_entries(value: str | Iterable[str] | None) -> list[str]:
     if not value:
         return []
     items = value.split(",") if isinstance(value, str) else list(value)
-    return [item.strip().lower().rstrip(".") for item in items if item and item.strip()]
+    return [item.strip().lower() for item in items if item and item.strip()]
 
 
 def _host_matches(host: str, pattern: str) -> bool:
@@ -117,22 +130,26 @@ def _parse(url: str, what: str) -> tuple[str, str]:
     return scheme, host
 
 
-def _allowed_entries(allowed_hosts: str | Iterable[str] | None) -> tuple[list[str], set[str]]:
-    """Host patterns from the env var and the application, and the hosts allowed over http."""
+def _allowed_entries(allowed_hosts: str | Iterable[str] | None) -> tuple[list[str], list[str]]:
+    """Host patterns from the env var and the application, and those allowed over http.
+
+    An entry may carry a port (``llm.example.org:8443``); only its host is compared.
+    """
     names: list[str] = []
-    http_hosts: set[str] = set()
+    http_names: list[str] = []
     for entry in _split_entries(os.getenv(ALLOWED_HOSTS_ENV)) + _split_entries(allowed_hosts):
-        if "://" not in entry:
-            names.append(entry)
-            continue
         try:
-            scheme, host = _parse(entry, ALLOWED_HOSTS_ENV)
-        except EndpointNotAllowedError:
+            parts = urlsplit(entry if "://" in entry else f"//{entry}")
+            host = (parts.hostname or "").rstrip(".")
+        except ValueError:
+            host = ""
+        if not host:
+            logger.warning("Ignoring an entry in %s that names no host", ALLOWED_HOSTS_ENV)
             continue
         names.append(host)
-        if scheme == "http":
-            http_hosts.add(host)
-    return names, http_hosts
+        if parts.scheme == "http":
+            http_names.append(host)
+    return names, http_names
 
 
 def _env_hosts(provider: str) -> list[str]:
@@ -169,11 +186,19 @@ def check_endpoint(
             machine) or its host is not one this deployment allows.
     """
     scheme, host = _parse(url, what)
+    names, http_names = _allowed_entries(allowed_hosts)
+    deployment = [*_env_hosts(provider), *names]
     if _is_loopback(host):
-        return host
-    names, http_hosts = _allowed_entries(allowed_hosts)
+        if provider in LOCAL_SERVICE_PROVIDERS or any(
+            _host_matches(host, pattern) for pattern in deployment
+        ):
+            return host
+        raise EndpointNotAllowedError(
+            f"{what} points at this machine, which is not a {provider} host. List "
+            f"{host!r} in {ALLOWED_HOSTS_ENV} if a local server stands in for it."
+        )
     if scheme == "http":
-        if host in http_hosts:
+        if any(_host_matches(host, pattern) for pattern in http_names):
             return host
         raise EndpointNotAllowedError(
             f"{what} must use https:// (got http:// for host {host!r}). For a server on a "
@@ -185,17 +210,39 @@ def check_endpoint(
         if provider == "litellm"
         else PROVIDER_HOSTS.get(provider, ())
     )
-    patterns = [
-        *known,
-        *_env_hosts(provider),
-        *names,
-    ]
-    if any(_host_matches(host, pattern) for pattern in patterns):
+    if any(_host_matches(host, pattern) for pattern in [*known, *deployment]):
         return host
     raise EndpointNotAllowedError(
         f"{what} host {host!r} is not a known {provider} host. Add it to "
         f"{ALLOWED_HOSTS_ENV} (or allowed_endpoint_hosts) if this deployment uses it."
     )
+
+
+def check_openai_endpoint(config: dict, provider: str) -> str:
+    """Check the address an OpenAI-SDK client for ``config`` will use; log its host once.
+
+    Returns the host, or ``""`` for Azure without an endpoint (the SDK then reports
+    the missing endpoint itself, or reads ``AZURE_OPENAI_ENDPOINT``).
+    """
+    if provider == "azure":
+        url = config.get("base_url") or config.get("azure_endpoint")
+        what = "base_url" if config.get("base_url") else "azure_endpoint"
+        if not url:
+            return ""
+    else:
+        # Without a base_url the OpenAI SDK itself reads OPENAI_BASE_URL.
+        default = (
+            AITTA_BASE_URL
+            if provider == "aitta"
+            else os.getenv("OPENAI_BASE_URL") or OPENAI_BASE_URL
+        )
+        url = config.get("base_url") or default
+        what = "base_url"
+    host = check_endpoint(
+        url, provider=provider, allowed_hosts=config.get("allowed_endpoint_hosts"), what=what
+    )
+    log_endpoint(provider, host)
+    return host
 
 
 def host_of(url: str) -> str:

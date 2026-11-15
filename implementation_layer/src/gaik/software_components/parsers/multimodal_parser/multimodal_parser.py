@@ -382,7 +382,6 @@ class MultimodalParser:
         body = _build_google_body(pdf_path, system_prompt, user_prompt, self.reasoning_effort)
 
         if self.config.get("vertex_ai", True):
-            token = get_google_access_token(self.config)
             url = self.config["generate_content_url"]
             # Substitute ``{model}`` placeholder with the active model so one
             # env-configured URL can drive runtime model swaps. URLs without
@@ -395,6 +394,7 @@ class MultimodalParser:
                 allowed_hosts=self.config.get("allowed_endpoint_hosts"),
                 what="generate_content_url",
             )
+            token = get_google_access_token(self.config)
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",

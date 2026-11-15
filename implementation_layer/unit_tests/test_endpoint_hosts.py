@@ -305,3 +305,71 @@ def test_azure_speech_refuses_an_endpoint_outside_azure_when_built():
         TextToSpeech(
             {"use_azure": True, "api_key": "k", "tts_endpoint": "https://other.example.test/s"}
         )
+
+
+def test_this_machine_is_refused_for_a_cloud_provider_unless_allowed(monkeypatch):
+    with pytest.raises(EndpointNotAllowedError, match="this machine"):
+        check_endpoint("http://127.0.0.1:9000", provider="openai")
+    monkeypatch.setenv("GAIK_ALLOWED_ENDPOINT_HOSTS", "127.0.0.1")
+    assert check_endpoint("http://127.0.0.1:9000", provider="openai") == "127.0.0.1"
+
+
+def test_an_entry_with_a_port_allows_its_host():
+    assert check_endpoint(
+        "https://llm.example.test:8443/v1",
+        provider="openai_compatible",
+        allowed_hosts="llm.example.test:8443",
+    )
+
+
+def test_an_http_pattern_entry_accepts_plain_http_for_matching_hosts():
+    allowed = "http://*.internal.example.test"
+    assert check_endpoint(
+        "http://docling.internal.example.test", provider="docling", allowed_hosts=allowed
+    )
+    with pytest.raises(EndpointNotAllowedError):
+        check_endpoint("http://docling.example.test", provider="docling", allowed_hosts=allowed)
+
+
+def test_the_docling_address_set_in_the_environment_is_trusted(monkeypatch):
+    monkeypatch.setenv("DOCLING_API_BASE", "https://docling.example.test")
+    assert check_endpoint("https://docling.example.test", provider="docling")
+
+
+def test_azure_speech_from_the_environment_keeps_the_environment_key(monkeypatch):
+    from gaik.software_components.text_to_speech import text_to_speech
+
+    monkeypatch.setenv("TTS_ENDPOINT", "https://speech-res.openai.azure.com/speech")
+    monkeypatch.setenv("AZURE_API_KEY", "speech-key")
+    seen = {}
+
+    def post(url, headers=None, json=None, timeout=None):
+        seen["url"], seen["key"] = url, headers["api-key"]
+        return _Response()
+
+    monkeypatch.setattr(text_to_speech.requests, "post", post)
+    speaker = text_to_speech.TextToSpeech({"use_azure": True, "api_key": "chat-key"})
+    speaker.synthesize("Hei")
+    assert seen == {"url": "https://speech-res.openai.azure.com/speech", "key": "speech-key"}
+
+
+def test_cloud_transcriber_ignores_an_unused_local_api_base(tmp_path):
+    from gaik.software_components.transcriber import Transcriber
+
+    transcriber = Transcriber(
+        {"provider": "openai", "api_key": "k"},
+        output_dir=tmp_path,
+        local_api_base="http://whisper.example.test:8080",
+        local_api_key="k",
+    )
+    assert transcriber.local_api_base == "http://whisper.example.test:8080"
+
+
+def test_jev_classifier_checks_the_sdk_environment_address(monkeypatch, caplog):
+    pytest.importorskip("typesafe_sdk")
+    from gaik.software_components.jev_classifier import JevClassifier
+
+    monkeypatch.setenv("TYPESAFE_BASE_URL", "https://typesafe-proxy.example.test")
+    with caplog.at_level(logging.INFO, logger="gaik.software_components.endpoints"):
+        JevClassifier(api_key="k")
+    assert "endpoint host=typesafe-proxy.example.test" in caplog.text

@@ -1109,7 +1109,6 @@ class VisionExtractor:
         }
 
         if is_vertex:
-            token = get_google_access_token(self.config)
             url = self.config["generate_content_url"]
             if "{model}" in url:
                 url = url.replace("{model}", self.model)
@@ -1119,6 +1118,7 @@ class VisionExtractor:
                 allowed_hosts=self.config.get("allowed_endpoint_hosts"),
                 what="generate_content_url",
             )
+            token = get_google_access_token(self.config)
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",

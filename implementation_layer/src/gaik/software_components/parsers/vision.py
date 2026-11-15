@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from gaik.software_components.config import _check_openai_endpoint
+from gaik.software_components.endpoints import check_openai_endpoint
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
@@ -291,7 +291,7 @@ class VisionParser:
 
             if not config.api_version:
                 raise ValueError("Azure API version is required when use_azure=True.")
-            _check_openai_endpoint(
+            check_openai_endpoint(
                 {
                     "base_url": config.base_url,
                     "azure_endpoint": endpoint,
@@ -314,7 +314,7 @@ class VisionParser:
             )
 
         logger.debug("Initializing standard OpenAI client")
-        _check_openai_endpoint(
+        check_openai_endpoint(
             {"base_url": config.base_url, "allowed_endpoint_hosts": config.allowed_endpoint_hosts},
             self._provider
             if self._provider in {Provider.OPENAI_COMPATIBLE.value, Provider.AITTA.value}
