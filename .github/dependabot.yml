@@ -1,7 +1,9 @@
-# Version updates for the GitHub Actions only. The workflows pin every action to a
-# commit SHA; this keeps those pins current in one grouped pull request a month.
+# Version updates for the GitHub Actions and the demo's base images. The workflows
+# pin every action to a commit SHA, and the demo's Dockerfiles pin each base image
+# by digest; this keeps those pins current in one grouped pull request a month each.
 # Python and JavaScript dependencies get Dependabot security updates (a repository
-# setting), not version updates.
+# setting), not version updates; the demo API's hashed lock is refreshed with
+# implementation_layer/toolkit_demo_app/scripts/lock_api_requirements.sh.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -17,3 +19,17 @@ updates:
           - '*'
     commit-message:
       prefix: ci
+  - package-ecosystem: docker
+    directories:
+      - /implementation_layer/toolkit_demo_app
+      - /implementation_layer/toolkit_demo_app/api
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      demo-images:
+        patterns:
+          - '*'
+    commit-message:
+      prefix: chore

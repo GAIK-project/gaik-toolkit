@@ -27,6 +27,11 @@ try:
 except ImportError:
     from api.utils.file_content import content_mismatch
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -602,7 +607,7 @@ async def index_documents(
                     except HTTPException:
                         raise
                     except Exception as e:
-                        error_msg = str(e)
+                        error_msg = error_detail(e, "Indexing this file")
                         indexed_docs.append(
                             IndexedDocument(
                                 filename=file.filename,
@@ -633,10 +638,10 @@ async def index_documents(
         raise
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -690,10 +695,10 @@ async def query_rag(
 
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
 
 
 @router.post("/query/stream")
@@ -807,15 +812,16 @@ async def query_rag_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
         finally:
             in_use.close()
 
@@ -979,9 +985,9 @@ async def load_example_document(
             raise
         except ImportError as e:
             raise HTTPException(
-                status_code=500, detail=f"Required components not installed: {e}"
+                status_code=500, detail=error_detail(e, "Loading the components")
             ) from e
         except Exception as e:
             raise HTTPException(
-                status_code=500, detail=f"Failed to load example document: {e}"
+                status_code=500, detail=error_detail(e, "Loading the example document")
             ) from e

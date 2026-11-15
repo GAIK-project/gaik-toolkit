@@ -33,6 +33,11 @@ except ImportError:
     from api.utils.model_settings import unsupported_option_detail
     from api.utils.report_runs import require_report_run_grant
 
+try:
+    from utils.errors import component_error
+except ImportError:
+    from api.utils.errors import component_error
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -239,8 +244,10 @@ async def run_stage(
                 with (inputs / name).open("xb") as out:
                     out.write(await upload.read())
             except OSError as exc:
+                logger.warning("Cannot store an uploaded file name: %s", type(exc).__name__)
                 raise HTTPException(
-                    400, f"The server cannot store the file name {name!r}: {exc}"
+                    400,
+                    f"The server cannot store a file named {name!r}. Rename it and try again.",
                 ) from exc
         for path, text in workspace_files.items():
             (workspace / path).parent.mkdir(parents=True, exist_ok=True)
@@ -269,8 +276,9 @@ async def run_stage(
                 result = getattr(writer, stage)(report_spec, workspace, progress_callback=progress)
             outcome["result"] = _result(stage, workspace, result)
         except Exception as exc:
-            logger.exception("Report Writer v2 %s failed", stage)
-            outcome["error"] = unsupported_option_detail(exc) or f"{type(exc).__name__}: {exc}"
+            outcome["error"] = unsupported_option_detail(exc) or component_error(
+                exc, f"The {stage} stage"
+            )
         finally:
             try:
                 shutil.rmtree(tmp)

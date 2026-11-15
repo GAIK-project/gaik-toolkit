@@ -27,6 +27,7 @@ import {
   withSessionCookies,
 } from "@/lib/supabase/proxy";
 import { takeTrialRun } from "@/lib/trial";
+import { attachCsp, isPagePath, setCsp } from "@/lib/csp";
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -41,7 +42,16 @@ function hasBody(method: string): boolean {
   return method !== "GET" && method !== "HEAD";
 }
 
+// A page request gets a fresh nonce and its Content-Security-Policy, on the
+// request, so the renderer stamps Next's own scripts with the nonce, and on the
+// response (lib/csp.ts). Kept apart from the routing below.
 export default async function proxy(request: NextRequest) {
+  if (!isPagePath(request.nextUrl.pathname)) return route(request);
+  const csp = attachCsp(request);
+  return setCsp(await route(request), csp);
+}
+
+async function route(request: NextRequest): Promise<NextResponse> {
   // The rules below match the path the backend routes on (lib/request-path.ts);
   // the request is forwarded with the path as it was sent.
   const rawPath = request.nextUrl.pathname;
@@ -226,8 +236,17 @@ export default async function proxy(request: NextRequest) {
         }),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Proxy error";
-      return reply(NextResponse.json({ error: message }, { status: 502 }));
+      // The reason names the backend's address; it goes to the log, not the page.
+      const id = crypto.randomUUID().slice(0, 12);
+      console.error(`[proxy] error id ${id}: backend request failed:`, error);
+      return reply(
+        NextResponse.json(
+          {
+            error: `The demo API did not answer (error id ${id}). Try again in a moment.`,
+          },
+          { status: 502 },
+        ),
+      );
     }
   }
 

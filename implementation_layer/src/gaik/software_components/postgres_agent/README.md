@@ -191,6 +191,18 @@ as tools for an external agent framework.
 - `query()` -> `QueryResult` (`sql`, `rows`, `row_count`, `attempts`, `succeeded`, `error`)
 - `ask()` -> `AnswerResult` (`answer`, `query_result`)
 
+### Errors
+
+Error messages never carry the connection string. A failed connection raises the
+driver's exception type with a generic message, e.g. `Could not connect to the PostgreSQL
+database: authentication failed.`, naming the reason in fixed words and the SQLSTATE when
+there is one. A failed query reaches `QueryResult.error`, the answer of `ask()` and the
+model's retry prompt in the same short form, e.g. `PostgreSQL rejected the query:
+undefined column (SQLSTATE 42703).`; a lost connection reads `The database could not run
+the query: ...`. The database's own text, which can quote the connection settings or
+values from a table, goes to the debug log only, with passwords masked. The model sees
+the kind of error and its failed SQL, not the column or value PostgreSQL named.
+
 ## Configuration
 
 ### Environment variables

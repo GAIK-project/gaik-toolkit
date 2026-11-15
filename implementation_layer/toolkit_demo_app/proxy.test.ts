@@ -84,6 +84,8 @@ beforeAll(() => {
       return Response.json({ status: "approved", wizard_access: false });
     backendCalls += 1;
     backendHeaders = new Headers(init?.headers);
+    if (url.includes("/unreachable"))
+      throw new TypeError("fetch failed: connect ECONNREFUSED 10.1.2.3:8000");
     return Response.json({ ok: true });
   }) as typeof fetch;
 });
@@ -207,6 +209,19 @@ test("a path that only begins like the old wizard API meets the normal gate", as
   );
   expect(response.status).toBe(401);
   expect(backendCalls).toBe(0);
+});
+
+test("an unreachable backend is reported with an id, not the connection error", async () => {
+  const response = await proxy(
+    new NextRequest("https://demo.test/api/unreachable", {
+      headers: { cookie: sessionCookie("r1", fresh()) },
+    }),
+  );
+  expect(response.status).toBe(502);
+  const { error } = await response.json();
+  expect(error).toContain("error id");
+  expect(error).not.toContain("ECONNREFUSED");
+  expect(error).not.toContain("10.1.2.3");
 });
 
 test("the generic proxy does not pass on the report run header", async () => {
