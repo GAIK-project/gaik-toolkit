@@ -87,7 +87,7 @@ def build_section_user_prompt(
     if dependencies_context:
         parts.append(
             "ALREADY-WRITTEN REPORT SECTIONS (context for this section; one source_material "
-            "block each, labelled with the section title):\n"
+            "block each, labelled with the section id and title):\n"
             f"{render_sections(blocks, dependencies_context)}\n\n"
             "Use these completed sections as the basis for this section (e.g. to summarize "
             "or build on them). You may also use the evidence below. Do not contradict the "
@@ -128,8 +128,8 @@ def build_section_user_prompt(
     parts.append(f"Content to cover:\n{instructions}")
     parts.append(
         "Evidence — this is the ONLY source of facts and content for the section (one "
-        "source_material block per source, labelled with its file name):\n"
-        + render_evidence(blocks, evidence)
+        "source_material block per source, labelled with its file name; a curated brief "
+        "names the file of each fact):\n" + render_evidence(blocks, evidence)
     )
     if additional_instructions:
         parts.append(f"ADDITIONAL INSTRUCTIONS:\n{additional_instructions}")
@@ -291,7 +291,8 @@ def build_curation_prompt(
         f"The section must cover:\n{instructions}\n\n"
         "From the source material below, extract ONLY the facts relevant to this "
         "section. Organise them as a concise, structured list of facts (with brief "
-        "context). Do not write the section itself.\n\n"
+        "context), and give each fact the file name of its source block, so it can be "
+        "cited. Do not write the section itself.\n\n"
         "Source material (one source_material block per source, labelled with its file "
         f"name):\n{render_evidence(blocks, evidence)}"
     )

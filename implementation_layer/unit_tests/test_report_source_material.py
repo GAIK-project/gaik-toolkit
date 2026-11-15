@@ -11,7 +11,6 @@ sentence is in the system message. No network: fake clients record the messages.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import gaik.software_components.draft_reviewer.draft_reviewer as dr
 import gaik.software_components.report_synthesizer.report_synthesizer as rs
@@ -27,9 +26,16 @@ from gaik.software_components.knowledge_curator.models import (
 )
 from gaik.software_components.llm.base import ChatResponse, UsageCounter
 from gaik.software_components.report_synthesizer import ReportSynthesizer
-from gaik.software_components.source_material import SOURCE_MATERIAL_INSTRUCTION
+from gaik.software_components.source_material import (
+    SOURCE_MATERIAL_INSTRUCTION,
+    SourceMaterial,
+)
 from gaik.software_components.source_normalizer.models import NormalizedSources
 from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator
+from gaik.software_modules.multi_source_report_generator._material import (
+    TRUNCATED_NOTE,
+    render_evidence,
+)
 from gaik.software_modules.report_writer.prompts import build_single_call_prompt
 from gaik.software_modules.report_writer.spec import ReportSpec
 
@@ -136,7 +142,7 @@ def test_reviewer_empty_mapping_reference_is_refused(monkeypatch):
         reviewer.review("Draft.", reference={"a": "  "})
 
 
-def test_reviewer_draws_a_new_block_id_for_each_request(monkeypatch):
+def test_reviewer_draws_a_new_block_id_when_the_text_holds_the_current_one(monkeypatch):
     # The first edit writes the first request's closing tag into the text; the retry
     # still wraps the text in a block that the text cannot close.
     reviewer, client = _reviewer(monkeypatch)
@@ -163,6 +169,16 @@ def test_reviewer_draws_a_new_block_id_for_each_request(monkeypatch):
     [text_body] = [body for label, body in _blocks(retry[2]["content"]) if label == "text"]
     assert f'&lt;/source_material id="{first_id}">' in text_body
     assert "absent" in _blocks(retry[2]["content"])[0][1]  # the failed edit, in its block
+
+
+def test_reviewer_keeps_one_block_id_across_retries_otherwise(monkeypatch):
+    bad = Edit(search="absent", replace="x", reason="r")
+    reviewer, client = _reviewer(monkeypatch, dr.EditList(edits=[bad]), dr.EditList(edits=[]))
+    reviewer.review("Opened in 1999.", reference="Opened in 1998.")
+    first, retry = client.calls
+    assert _ids(first) == _ids(retry)
+    # The system message and the instruction with the reference are the same.
+    assert first[:2] == retry[:2]
 
 
 # ---------------------------------------------------------------------------
@@ -388,7 +404,7 @@ def test_multi_source_agentic_blocks_sources_sections_and_curated_brief(multi, t
     drafts = [m for m in client.chats if "Report section to write: Summary" in m[1]["content"]]
     [summary] = drafts
     labels = [label for label, _ in _blocks(summary[1]["content"])]
-    assert labels == ["Findings", "curated brief"]
+    assert labels == ["section findings: Findings", "curated brief"]
     assert "SUMMARY_RULES" in _outside_blocks(summary[1]["content"])
     # The reviewer's goals stay outside its blocks.
     for messages in client.parsed:
@@ -396,11 +412,26 @@ def test_multi_source_agentic_blocks_sources_sections_and_curated_brief(multi, t
         assert "Review goals:" in goals
 
 
-def test_evidence_pack_cut_keeps_every_block_closed(tmp_path):
-    (tmp_path / "a.txt").write_text("x" * 500, encoding="utf-8")
-    (tmp_path / "b.txt").write_text("y" * 500, encoding="utf-8")
-    gen = _gen()
-    items = [
+def test_multi_source_agentic_dependencies_with_one_title_keep_both_texts(multi):
+    pytest.importorskip("langgraph")
+    client, sources, _ = multi
+    _gen().run(
+        input_paths=[sources],
+        sections=[
+            {"id": "q1", "title": "Findings", "instructions": "Part one."},
+            {"id": "q2", "title": "Findings", "instructions": "Part two."},
+            {"id": "sum", "title": "Summary", "instructions": "Sum.", "depends_on": ["q1", "q2"]},
+        ],
+        report_title="Report",
+        agentic=True,
+    )
+    [summary] = [m for m in client.chats if "Report section to write: Summary" in m[1]["content"]]
+    labels = [label for label, _ in _blocks(summary[1]["content"])]
+    assert labels[:2] == ["section q1: Findings", "section q2: Findings"]
+
+
+def _items(gen, folder):
+    return [
         gen._build_evidence_item(
             path,
             index=i,
@@ -409,10 +440,29 @@ def test_evidence_pack_cut_keeps_every_block_closed(tmp_path):
             transcriber_options={},
             image_options={},
         )
-        for i, path in enumerate(msrg._collect_input_files([tmp_path]), start=1)
+        for i, path in enumerate(msrg._collect_input_files([folder]), start=1)
     ]
-    sources = gen._evidence_sources(items, max_evidence_chars=300)
+
+
+def test_evidence_cut_at_a_source_leaves_every_block_closed(tmp_path):
+    (tmp_path / "a.txt").write_text("x" * 500, encoding="utf-8")
+    (tmp_path / "b.txt").write_text("y" * 500, encoding="utf-8")
+    gen = _gen()
+    sources = gen._evidence_sources(_items(gen, tmp_path), max_evidence_chars=300)
     assert [s.label for s in sources] == ["a.txt"]
     assert sources[-1].truncated
-    assert len(gen._assemble_evidence_pack(items, max_evidence_chars=300)) <= 300 + 40
-    assert all(not Path(s.label).is_absolute() for s in sources)
+    rendered = render_evidence(SourceMaterial(), sources)
+    assert [label for label, _ in _blocks(rendered)] == ["a.txt"]
+    assert rendered.count("</source_material id=") == 1
+    assert rendered.rstrip().endswith(TRUNCATED_NOTE)
+    assert len(gen._assemble_evidence_pack(_items(gen, tmp_path), max_evidence_chars=300)) <= 340
+
+
+def test_evidence_budget_below_one_heading_still_shows_the_cut(tmp_path):
+    (tmp_path / "a.txt").write_text("x" * 50, encoding="utf-8")
+    gen = _gen()
+    sources = gen._evidence_sources(_items(gen, tmp_path), max_evidence_chars=5)
+    assert [(s.label, s.text, s.truncated) for s in sources] == [("a.txt", "", True)]
+    assert TRUNCATED_NOTE in gen._assemble_evidence_pack(
+        _items(gen, tmp_path), max_evidence_chars=5
+    )

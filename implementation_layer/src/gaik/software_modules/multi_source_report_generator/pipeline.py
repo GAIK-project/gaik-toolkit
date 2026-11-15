@@ -941,7 +941,7 @@ class MultiSourceReportGenerator:
     ) -> list[EvidenceSource]:
         """The sources as the writer receives them, cut to ``max_evidence_chars``.
 
-        The budget counts the headings and texts as ``_assemble_evidence_pack``
+        The budget counts the headings and texts as ``_render_evidence_pack``
         writes them; the source that crosses it is cut and the later ones are left out.
         Labels are file names, never paths.
         """
@@ -955,9 +955,11 @@ class MultiSourceReportGenerator:
             cost = (len(_SOURCE_SEPARATOR) if sources else 0) + len(f"## {heading}\n\n")
             if max_evidence_chars is not None and used + cost + len(text) > max_evidence_chars:
                 room = max_evidence_chars - used - cost
-                if room > 0:
-                    sources.append(EvidenceSource(name, heading, text[:room], truncated=True))
-                elif sources:
+                if room > 0 or not sources:
+                    # The first source stays, even with no text, so the cut is visible.
+                    text = text[: max(room, 0)]
+                    sources.append(EvidenceSource(name, heading, text, truncated=True))
+                else:
                     last = sources[-1]
                     sources[-1] = EvidenceSource(last.label, last.heading, last.text, True)
                 logger.warning(

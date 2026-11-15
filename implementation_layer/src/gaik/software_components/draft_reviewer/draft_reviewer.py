@@ -89,10 +89,14 @@ class DraftReviewer:
         text = draft
         applied: list[Edit] = []
         failed: list[tuple[Edit, str]] = []
+        material = SourceMaterial()
         for attempt in range(1, self.max_attempts + 1):
-            # A new block id for every request: an applied edit may have written the
-            # previous one into the text.
-            material = SourceMaterial()
+            # The same block id for every request of this review, so the instruction
+            # stays the same across retries; a new one only when an applied or failed
+            # edit has written the current id into what is sent.
+            sent = [text] + [f"{e.search}\n{e.replace}\n{e.reason}" for e, _ in failed]
+            if any(material.boundary in piece for piece in sent):
+                material = SourceMaterial()
             prompt = (
                 retry_prompt(text, failed, attempt - 1, material)
                 if failed

@@ -52,7 +52,7 @@ def render_evidence(blocks: SourceMaterial, evidence: Evidence, *, label: str = 
 
 
 def render_sections(blocks: SourceMaterial, sections: Mapping[str, str]) -> str:
-    """Finished sections, one block each, labelled with the section title."""
+    """Finished sections, one block each, labelled with the mapping's key."""
     return "\n\n".join(blocks.wrap(text, label=title) for title, text in sections.items())
 
 

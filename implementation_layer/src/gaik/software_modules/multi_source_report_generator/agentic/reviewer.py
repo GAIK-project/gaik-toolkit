@@ -183,8 +183,9 @@ def diff_editor_run(
 ) -> tuple[str, list[dict], list[str], int]:
     """Run the check -> apply -> retry loop.
 
-    Every request draws new blocks (an applied edit may have written the
-    previous id into the text), so a callable ``instruction`` is rebuilt with them.
+    The requests share one block id, so the instruction stays the same across
+    retries; a new id is drawn, and a callable ``instruction`` rebuilt with it, only
+    when an applied or failed edit has written the current id into what is sent.
 
     Returns ``(corrected_text, applied_edits, warnings, num_proposed)``.
     ``warnings`` lists edits that could not be applied after all retries.
@@ -209,7 +210,9 @@ def diff_editor_run(
             break
         if attempt >= MAX_ATTEMPTS:
             break
-        blocks = SourceMaterial()
+        sent = [current] + [f"{f['search']}\n{f['replace']}" for f in failed]
+        if any(blocks.boundary in piece for piece in sent):
+            blocks = SourceMaterial()
         pending = _request_corrections(
             client,
             _instruction_for(instruction, blocks),

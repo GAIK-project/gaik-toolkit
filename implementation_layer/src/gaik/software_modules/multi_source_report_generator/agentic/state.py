@@ -44,7 +44,7 @@ class SectionWriterState(TypedDict, total=False):
     title: str
     instructions: str
     evidence_pack: Any
-    # Finalized content of this section's dependencies, title -> text (each sent
+    # Finalized content of this section's dependencies, label -> text (each sent
     # in its own block), or {} when the section has no dependencies.
     dependencies_context: dict[str, str]
     # The evidence the writer/reviewer actually use: the curated brief when

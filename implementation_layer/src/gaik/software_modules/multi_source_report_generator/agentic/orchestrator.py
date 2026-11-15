@@ -69,12 +69,13 @@ def _make_section_runner(spec: ReportSectionSpec, section_graph, id_to_title: di
         # Resolve this section's dependency context from the finalized content
         # of completed layers (available because of the join barrier).
         section_content = state.get("section_content", {})
-        # Each dependency is sent in its own block, labelled with its title.
+        # Each dependency is sent in its own block, labelled with its id and title
+        # (ids are unique, titles need not be).
         dependencies_context: dict[str, str] = {}
         for dep in spec.depends_on:
             content = (section_content.get(dep) or "").strip()
             if content:
-                dependencies_context[id_to_title.get(dep, dep)] = content
+                dependencies_context[f"section {dep}: {id_to_title.get(dep, dep)}"] = content
 
         section_state = {
             "section_id": spec.id,

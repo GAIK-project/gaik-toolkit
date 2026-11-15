@@ -117,7 +117,13 @@ def create_section_writer_graph(
         reporter.emit(f"[{title}] curated evidence -> drafting")
         # The brief repeats source text, so it reaches the writer and the reviewer
         # in its own block, like a source.
-        curated = [EvidenceSource("curated brief", f"Curated facts for {title}", brief)]
+        curated = [
+            EvidenceSource(
+                "curated brief",
+                f"Curated facts for {title}, each with the file name of its source",
+                brief,
+            )
+        ]
         return {
             "curated_brief": brief,
             "active_evidence": curated if brief else state["evidence_pack"],
