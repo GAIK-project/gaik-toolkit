@@ -1,7 +1,8 @@
 """Reproducible local/CI release gate, including authenticated component tests.
 
 Run from the repository: uv run python scripts/release_check.py --live --version 0.8.0
-Configure RELEASE_PROVIDERS and explicit RELEASE_<PROVIDER>_MODEL values.
+Configure RELEASE_PROVIDERS and explicit RELEASE_<PROVIDER>_MODEL values, and for the
+providers with an audio API also RELEASE_<PROVIDER>_TRANSCRIPTION_MODEL.
 No missing credential, failed request, incomplete result, or empty matrix is a pass.
 """
 
@@ -52,6 +53,11 @@ MODEL_ENV_FALLBACKS = {
     "anthropic": "ANTHROPIC_MODEL",
     "anthropic_foundry": "ANTHROPIC_MODEL",
 }
+# Providers whose audio API the Transcriber uses, with the model variable gaik reads.
+TRANSCRIPTION_ENV_FALLBACKS = {
+    "azure": "AZURE_TRANSCRIPTION_MODEL",
+    "openai": "OPENAI_TRANSCRIPTION_MODEL",
+}
 # The library is currently well below this. A larger artifact needs a deliberate
 # packaging review before PyPI; accidentally bundling the monorepo must fail.
 MAX_DISTRIBUTION_BYTES = 10 * 1024 * 1024
@@ -77,20 +83,40 @@ def select_targets(providers: str, environ: dict, required: list[str] = ()) -> l
         )
         if any(backend not in {"native", "litellm"} for backend in backends):
             raise ValueError(f"{prefix}_BACKENDS supports native,litellm")
-        for backend in backends:
+        transcription_model = environ.get(prefix + "_TRANSCRIPTION_MODEL", "").strip()
+        if name in TRANSCRIPTION_ENV_FALLBACKS:
+            transcription_model = (
+                transcription_model or environ.get(TRANSCRIPTION_ENV_FALLBACKS[name], "").strip()
+            )
+            if not transcription_model:
+                raise ValueError(
+                    f"Set {prefix}_TRANSCRIPTION_MODEL to the exact certified transcription "
+                    "model/deployment ID"
+                )
+        elif transcription_model:
+            raise ValueError(f"{name} has no audio API; unset {prefix}_TRANSCRIPTION_MODEL")
+        for index, backend in enumerate(backends):
             targets.append(
                 {
                     "provider": name,
                     "backend": backend,
                     "model": model.strip(),
                     "embedding_model": environ.get(prefix + "_EMBEDDING_MODEL", "").strip(),
+                    # The Transcriber never goes through LiteLLM (the worker gives it the
+                    # native config on any backend), so certify it once per provider, on
+                    # its first target, even when that target is LiteLLM.
+                    "transcription_model": transcription_model if index == 0 else "",
                 }
             )
     return targets
 
 
 def validate_live_result(result: dict, target: dict, returncode: int) -> bool:
-    required = REQUIRED_CHECKS | ({"embedder"} if target.get("embedding_model") else set())
+    required = (
+        REQUIRED_CHECKS
+        | ({"embedder"} if target.get("embedding_model") else set())
+        | ({"transcription"} if target.get("transcription_model") else set())
+    )
     checks = result.get("checks", {})
     return (
         returncode == 0
@@ -102,6 +128,10 @@ def validate_live_result(result: dict, target: dict, returncode: int) -> bool:
         and (
             not target.get("embedding_model")
             or result.get("embedding_model") == target["embedding_model"]
+        )
+        and (
+            not target.get("transcription_model")
+            or result.get("transcription_model") == target["transcription_model"]
         )
         and all(
             isinstance(checks.get(name), dict) and checks[name].get("ok") is True
@@ -322,6 +352,8 @@ def run_gate(args) -> dict:
                 ]
                 if target["embedding_model"]:
                     command += ["--embedding-model", target["embedding_model"]]
+                if target["transcription_model"]:
+                    command += ["--transcription-model", target["transcription_model"]]
                 try:
                     completed = _run_command(command, timeout=args.provider_timeout)
                     result = json.loads(result_path.read_text(encoding="utf-8"))
