@@ -330,13 +330,13 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
     for field in fields:
         if field in nested:
             child = _child_model_name(field)
-            desc = field_descriptions.get(field, "")
-            arg = f'Field(description="{desc}")' if desc else "..."
+            desc = str(field_descriptions.get(field) or "")
+            arg = f"Field(description={desc!r})" if desc else "..."
             if field in required_fields:
                 field_lines.append(f"    {field}: List[{child}] = {arg}")
             else:
                 default = (
-                    f'Field(default_factory=list, description="{desc}")'
+                    f"Field(default_factory=list, description={desc!r})"
                     if desc
                     else "Field(default_factory=list)"
                 )
@@ -552,7 +552,7 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
     from enum import Enum
     from typing import Annotated
 
-    from pydantic import BeforeValidator, Field, WithJsonSchema, create_model
+    from pydantic import BeforeValidator, ConfigDict, Field, WithJsonSchema, create_model
 
     noise = re.compile(r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]")
     single = re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
@@ -579,12 +579,20 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
     required_fields: list[str] = spec.get("required_fields", [])
     descriptions: dict[str, str] = spec.get("field_descriptions", {})
     allowed_values: dict[str, Any] = spec.get("allowed_values", {})
+    nested = _nested_specs(spec)
 
     definitions: dict[str, Any] = {}
     for field in fields:
         desc = descriptions.get(field, "")
         required = field in required_fields
         described = {"description": desc} if desc else {}
+        if field in nested:
+            child = _model_from_spec(nested[field], _child_model_name(field))
+            if required:
+                definitions[field] = (list[child], Field(**described) if desc else ...)
+            else:
+                definitions[field] = (list[child], Field(default_factory=list, **described))
+            continue
         py_type = _py_type(field_types.get(field, "string"))
         vals = allowed_values.get(field, [])
         if vals and all(isinstance(v, str) for v in vals):
@@ -603,7 +611,7 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
                 Field(default=None, **described) if desc else None,
             )
 
-    return create_model(name, **definitions)
+    return create_model(name, __config__=ConfigDict(extra="forbid"), **definitions)
 
 
 def write_schema_files(
