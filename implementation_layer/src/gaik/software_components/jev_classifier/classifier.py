@@ -13,9 +13,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components.endpoints import check_endpoint, log_endpoint
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "jev-1.13.0"
+DEFAULT_BASE_URL = "https://api.typesafe.ai"
 DEFAULT_INSTRUCTIONS = "Which label best describes the text?"
 UNKNOWN = "unknown"
 _QUESTION_ID = "label"
@@ -61,6 +64,7 @@ class JevClassifier:
         timeout: float = 30.0,
         max_retries: int = 3,
         client: Any = None,
+        allowed_endpoint_hosts: str | Sequence[str] | None = None,
     ):
         """
         Initialize the classifier.
@@ -78,9 +82,13 @@ class JevClassifier:
             client: A ready-made ``TypeSafeClient`` (or a compatible object with a
                 ``system_one`` method). When given, ``api_key`` and ``base_url`` are
                 not used to build a client. Meant for tests and custom transports.
+            allowed_endpoint_hosts: Hosts this application allows for ``base_url``
+                besides TypeSafe, gaik-decide and ``GAIK_DECIDE_URL``; also read from
+                ``GAIK_ALLOWED_ENDPOINT_HOSTS``. ``base_url`` must be https.
 
         Raises:
             ValueError: If ``api_key`` is empty and no ``client`` is given.
+            EndpointNotAllowedError: If ``base_url`` is not https or not an allowed host.
             ImportError: If ``typesafe-sdk`` is not installed.
 
         Example:
@@ -96,6 +104,13 @@ class JevClassifier:
             return
         if not api_key or not api_key.strip():
             raise ValueError("api_key is required (pass your gaik-decide or TypeSafe key)")
+        host = check_endpoint(
+            base_url or DEFAULT_BASE_URL,
+            provider="jev",
+            allowed_hosts=allowed_endpoint_hosts,
+            what="base_url",
+        )
+        log_endpoint("jev", host)
         try:
             from typesafe_sdk import RetryPolicy, TypeSafeClient
         except ImportError as e:

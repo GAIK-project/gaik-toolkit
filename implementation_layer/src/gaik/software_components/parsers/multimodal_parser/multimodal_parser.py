@@ -14,6 +14,8 @@ from typing import Literal
 import requests
 from markdown_it import MarkdownIt
 
+from gaik.software_components.endpoints import check_endpoint
+
 from .config import (
     create_claude_client,
     create_openai_client,
@@ -387,6 +389,12 @@ class MultimodalParser:
             # the placeholder are used as-is (backwards compatible).
             if "{model}" in url:
                 url = url.replace("{model}", self.config["model"])
+            check_endpoint(
+                url,
+                provider="vertex",
+                allowed_hosts=self.config.get("allowed_endpoint_hosts"),
+                what="generate_content_url",
+            )
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",

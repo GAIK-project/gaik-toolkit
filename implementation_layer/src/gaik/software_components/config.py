@@ -10,8 +10,41 @@ import os
 from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
+from gaik.software_components.endpoints import check_endpoint, log_endpoint
+
 # Load environment variables
 load_dotenv()
+
+
+AITTA_BASE_URL = "https://aitta-api.csc.fi/openai/v1"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+
+
+def _check_openai_endpoint(config: dict, provider: str) -> str:
+    """Refuse an address that should not receive this config's key; log the host once."""
+    if provider == "azure":
+        url = config.get("base_url") or config.get("azure_endpoint")
+        what = "base_url" if config.get("base_url") else "azure_endpoint"
+    else:
+        # Without a base_url the OpenAI SDK itself reads OPENAI_BASE_URL.
+        default = (
+            AITTA_BASE_URL
+            if provider == "aitta"
+            else os.getenv("OPENAI_BASE_URL") or OPENAI_BASE_URL
+        )
+        url = config.get("base_url") or default
+        what = "base_url"
+    if not url and provider == "azure":
+        # The SDK reports the missing endpoint itself (or reads AZURE_OPENAI_ENDPOINT).
+        return ""
+    host = check_endpoint(
+        url,
+        provider=provider,
+        allowed_hosts=config.get("allowed_endpoint_hosts"),
+        what=what,
+    )
+    log_endpoint(provider, host)
+    return host
 
 
 def get_openai_config(use_azure: bool = True) -> dict:
@@ -77,6 +110,7 @@ def create_openai_client(config: dict):
         if config.get(key) is not None
     }
     if name == Provider.AZURE.value:
+        _check_openai_endpoint(config, name)
         options["api_version"] = config["api_version"]
         if config.get("base_url"):
             options["base_url"] = config["base_url"]
@@ -93,10 +127,11 @@ def create_openai_client(config: dict):
         for field in ("base_url", "model"):
             if not config.get(field):
                 raise ValueError(f"openai_compatible requires an explicit {field!r}")
+    _check_openai_endpoint(config, name)
     if config.get("base_url"):
         options["base_url"] = config["base_url"]
     elif name == Provider.AITTA.value:
-        options["base_url"] = "https://aitta-api.csc.fi/openai/v1"
+        options["base_url"] = AITTA_BASE_URL
     if name == Provider.AITTA.value:
         options.setdefault("timeout", 600.0)
     return OpenAI(api_key=config["api_key"], **options)

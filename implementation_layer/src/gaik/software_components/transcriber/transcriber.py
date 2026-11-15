@@ -17,6 +17,7 @@ from pydub import AudioSegment
 
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
+from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
 from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
@@ -170,6 +171,13 @@ class Transcriber:
         local_api_key: str | None = None,
     ) -> None:
         _audio_provider(api_config)
+        if local_api_base:
+            check_endpoint(
+                local_api_base,
+                provider="whisper_local",
+                allowed_hosts=api_config.get("allowed_endpoint_hosts"),
+                what="local_api_base",
+            )
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
@@ -353,6 +361,7 @@ class Transcriber:
             audio_path=input_path,
             api_base=self.local_api_base,
             key=self.local_api_key,
+            allowed_endpoint_hosts=self.api_config.get("allowed_endpoint_hosts"),
             language=self.language,
             diarization=self.diarization,
             speaker_count=self.speaker_count,

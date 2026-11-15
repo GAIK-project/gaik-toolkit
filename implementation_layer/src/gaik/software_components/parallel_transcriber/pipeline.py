@@ -24,6 +24,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -89,13 +90,28 @@ class ParallelTranscriber:
             if not api_config.get("api_base"):
                 raise ValueError(
                     "WHISPER_LOCAL requires api_config['api_base'] "
-                    "(e.g. 'http://whisper.example.com:8080')"
+                    "(e.g. 'https://whisper.example.com:8080')"
                 )
+            check_endpoint(
+                api_config["api_base"],
+                provider="whisper_local",
+                allowed_hosts=api_config.get("allowed_endpoint_hosts"),
+                what="api_base",
+            )
         else:
             # Resolve like create_openai_client: a bare legacy config (neither
             # ``provider`` nor ``use_azure``) means standard OpenAI, whatever LLM_PROVIDER says.
             provider = resolve_provider(config={"use_azure": False, **api_config})
             assert_openai_or_azure({"provider": provider}, component="ParallelTranscriber")
+            # The GPT-4o diarize path posts the audio and key to this endpoint directly.
+            endpoint = api_config.get("azure_audio_endpoint") or api_config.get("azure_endpoint")
+            if endpoint:
+                check_endpoint(
+                    endpoint,
+                    provider="azure",
+                    allowed_hosts=api_config.get("allowed_endpoint_hosts"),
+                    what="azure_audio_endpoint",
+                )
         self._api_config = dict(api_config)
         self._config = cfg
 

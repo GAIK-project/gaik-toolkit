@@ -82,8 +82,12 @@ cause of an auth error that looks like a wrong key.
 An explicit shared `api_config` supersedes these routing flags.
 
 **`DoclingApiClientParser`** — the remote Docling service's address and password, passed as
-the required keyword arguments `api_base=` and `password=`. It reads no environment
-variables itself, so load them in your own code.
+the required keyword arguments `api_base=` and `password=`. It does not read them from the
+environment, so load them in your own code. `api_base` receives the document and the
+password, so it must be `https://` on a host the deployment allows: list the host in
+`GAIK_ALLOWED_ENDPOINT_HOSTS` or pass `allowed_endpoint_hosts=`; a private-network server on
+plain http needs an `http://<host>` entry. Otherwise the constructor raises
+`EndpointNotAllowedError`.
 
 ## Choosing a provider for vision parsing
 

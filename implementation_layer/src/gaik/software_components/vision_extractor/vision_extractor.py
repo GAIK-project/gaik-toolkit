@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, create_model
 from pydantic_core import PydanticUndefined
 
 from gaik.observability import UsageRecord, build_usage_record
+from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.extractor import (
     CompositeExtractionRequirements,
     ExtractionRequirements,
@@ -1112,6 +1113,12 @@ class VisionExtractor:
             url = self.config["generate_content_url"]
             if "{model}" in url:
                 url = url.replace("{model}", self.model)
+            check_endpoint(
+                url,
+                provider="vertex",
+                allowed_hosts=self.config.get("allowed_endpoint_hosts"),
+                what="generate_content_url",
+            )
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",

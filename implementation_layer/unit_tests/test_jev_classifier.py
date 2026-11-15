@@ -117,7 +117,11 @@ def test_api_key_is_required_without_a_client():
 
 
 def test_builds_a_sdk_client_from_key_and_base_url():
-    classifier = JevClassifier(api_key="gd_test", base_url="https://gaik-decide.example.test")
+    classifier = JevClassifier(
+        api_key="gd_test",
+        base_url="https://gaik-decide.example.test",
+        allowed_endpoint_hosts="gaik-decide.example.test",
+    )
     assert type(classifier.client).__name__ == "TypeSafeClient"
     assert classifier.model == "jev-1.13.0"
 

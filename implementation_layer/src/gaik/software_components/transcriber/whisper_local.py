@@ -2,9 +2,12 @@ import shutil
 import subprocess
 import tempfile
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import requests
+
+from gaik.software_components.endpoints import check_endpoint
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".m4v"}
 
@@ -56,6 +59,7 @@ def transcribe(
     *,
     api_base: str,
     key: str,
+    allowed_endpoint_hosts: str | Sequence[str] | None = None,
     language: str = "auto",
     diarization: bool = False,
     speaker_count: int | None = None,
@@ -63,6 +67,10 @@ def transcribe(
     max_speakers: int | None = None,
     initial_prompt: str | None = None,
 ):
+    # The audio and the key go to api_base: https on an allowed host, or this machine.
+    check_endpoint(
+        api_base, provider="whisper_local", allowed_hosts=allowed_endpoint_hosts, what="api_base"
+    )
     start_time = time.perf_counter()
     input_file = Path(audio_path)
     if not input_file.exists():
