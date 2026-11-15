@@ -101,6 +101,14 @@ result = transcriber.transcribe(
 ) -> TranscriptionResult
 ```
 
+### Input limits
+
+`ParallelTranscriber(api_cfg, config, limits=InputLimits(...))` refuses a file over
+`max_media_bytes` (2 GiB) or `max_media_seconds` (6 hours) with `InputLimitError` before
+audio is extracted or any transcription call is made. The length is read with ffprobe;
+when that fails, it is checked again once the audio is measured, before chunking. Every
+ffprobe call has a 60-second timeout.
+
 ### TranscriptionConfig
 
 All parameters with sensible defaults. Key fields:

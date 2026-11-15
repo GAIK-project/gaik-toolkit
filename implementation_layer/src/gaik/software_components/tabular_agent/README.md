@@ -192,8 +192,15 @@ TabularAgent(
     extra_instructions: str | None = None,
     answer_language: str = "en",         # ISO 639-1 for the answer
     temperature: float | None = 0.0,
+    limits: InputLimits | None = None,   # file size and rows per sheet/file
 )
 ```
+
+`limits` (default `InputLimits()`) holds `max_file_bytes` (100 MiB, checked in the
+constructor; an .xlsx may unpack to 10 × that) and `max_table_rows` (1,000,000 per sheet
+or flat file, checked while loading). A file over a limit raises `InputLimitError`.
+`max_rows` is a different thing: it caps the rows a query returns. Excel rows are written
+through a private temporary directory (mode 0700) that is removed after loading.
 
 `config` is only resolved on the first LLM call, so `get_schema()` and
 `run_sql()` work without LLM credentials.

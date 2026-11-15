@@ -29,6 +29,7 @@ from gaik.software_components.extractor.schema import (
     decimal_field_repr,
     normalize_extracted_data,
 )
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.parsers.multimodal_parser.config import (
     create_claude_client,
     create_openai_client,
@@ -660,6 +661,13 @@ class VisionExtractor:
     All files are sent in one API call so the model sees the full context
     across related documents (e.g. a Purchase Order + multiple BOMs).
 
+    Before that call, every file is checked against ``limits``: its size, the
+    pixels of an image file (and, with a shared ``api_config``, of every PDF page
+    rendered as an image), and the pages of all files together, an image file
+    counting as one page. A file over a limit raises
+    :class:`~gaik.software_components.input_limits.InputLimitError` and no model
+    is called.
+
     Usage::
 
         extractor = VisionExtractor(model_provider="openai", use_azure=True)
@@ -682,7 +690,9 @@ class VisionExtractor:
         vertex_ai: bool = True,
         additional_instructions: str | None = None,
         include_verification: bool = False,
+        limits: InputLimits | None = None,
     ) -> None:
+        self.limits = limits or InputLimits()
         self.model_provider = model_provider
         self.reasoning_effort = reasoning_effort
         self.merge_table = merge_table
@@ -905,6 +915,7 @@ class VisionExtractor:
         extraction_model: type[BaseModel],
         user_requirements: str,
     ) -> tuple[dict, UsageRecord | None]:
+        self._check_input_limits(file_paths)
         system_prompt = self._get_system_prompt()
         user_prompt = self._get_user_prompt(user_requirements)
 
@@ -917,6 +928,17 @@ class VisionExtractor:
         elif self.model_provider == "google":
             return self._call_google(file_paths, system_prompt, user_prompt, extraction_model)
         raise ValueError(f"Unknown model_provider '{self.model_provider}'")
+
+    def _check_input_limits(self, file_paths: list[Path]) -> None:
+        """Refuse the call before any model request when a file is over ``limits``."""
+        pages = 0
+        for path in file_paths:
+            if _is_pdf(path):
+                pages += self.limits.check_pdf(path) or 1
+            elif path.suffix.lower() in SUPPORTED_MIME_TYPES:
+                self.limits.check_image_file(path)
+                pages += 1
+        self.limits.check_pages(pages, f"The {len(file_paths)} file(s) of this call")
 
     # -- internal: provider calls ---------------------------------------------
 
@@ -945,7 +967,10 @@ class VisionExtractor:
                     {
                         "role": "user",
                         "content": build_chat_document_content(
-                            file_paths, user_prompt, include_text_layer=True
+                            file_paths,
+                            user_prompt,
+                            include_text_layer=True,
+                            limits=self.limits,
                         ),
                     },
                 ],

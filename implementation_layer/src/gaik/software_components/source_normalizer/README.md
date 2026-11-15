@@ -95,6 +95,14 @@ the locator of a fact from a recording is null downstream.
 
 ---
 
+## Input limits
+
+`SourceNormalizer(limits=InputLimits(...))` checks every file before the first
+conversion: documents and images for size (100 MiB), PDF pages (500), image pixels, and
+recordings for size (2 GiB) and length (6 hours). The parsers and the Transcriber get the
+same limits, so a spreadsheet is also held to 1,000,000 rows per sheet. A file over a
+limit raises `InputLimitError` and nothing is converted.
+
 ## Save and Load
 
 ```python

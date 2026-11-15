@@ -6,6 +6,8 @@ import base64
 import mimetypes
 from pathlib import Path
 
+from gaik.software_components.input_limits import InputLimits
+
 # mimetypes maps .webp only from Python 3.13 on (or via the OS type table).
 _IMAGE_MIME_TYPES = {".webp": "image/webp"}
 
@@ -15,8 +17,15 @@ _TEXT_LAYER = (
 )
 
 
+_PAGE_DPI = 150
+
+
 def build_chat_document_content(
-    file_paths: list[Path], prompt: str, *, include_text_layer: bool = False
+    file_paths: list[Path],
+    prompt: str,
+    *,
+    include_text_layer: bool = False,
+    limits: InputLimits | None = None,
 ) -> list[dict]:
     """Render PDFs as page images and retain native image bytes for vision models.
 
@@ -27,7 +36,12 @@ def build_chat_document_content(
     page has one. A 150 DPI image alone loses digits of dense identifiers in a
     born-digital PDF (``V-518834`` read as ``V-51884``); the provider's native
     PDF input sends that text too, and an extractor needs the exact characters.
+
+    ``limits`` (default :class:`~gaik.software_components.input_limits.InputLimits`)
+    is checked for the pixels of every page image before any page is rendered,
+    and for the size and pixels of every image file before it is read.
     """
+    limits = limits or InputLimits()
     content: list[dict] = [{"type": "text", "text": prompt}]
     for path in file_paths:
         if path.suffix.lower() == ".pdf":
@@ -40,9 +54,13 @@ def build_chat_document_content(
                 ) from exc
             with fitz.open(path) as document:
                 for page_number, page in enumerate(document, start=1):
+                    limits.check_rendered_page(
+                        page, _PAGE_DPI / 72, f"{path.name}, page {page_number}"
+                    )
+                for page_number, page in enumerate(document, start=1):
                     label = f"{path.name}, page {page_number}"
                     content.append({"type": "text", "text": label})
-                    image = page.get_pixmap(dpi=150, alpha=False).tobytes("png")
+                    image = page.get_pixmap(dpi=_PAGE_DPI, alpha=False).tobytes("png")
                     content.append(_image_part(image, "image/png"))
                     text = page.get_text("text").strip() if include_text_layer else ""
                     if text:
@@ -51,6 +69,7 @@ def build_chat_document_content(
             mime = _IMAGE_MIME_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0]
             if not mime or not mime.startswith("image/"):
                 raise ValueError(f"Unsupported vision input type: {path.suffix}")
+            limits.check_image_file(path)
             content.append({"type": "text", "text": path.name})
             content.append(_image_part(path.read_bytes(), mime))
     return content

@@ -24,6 +24,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -63,6 +64,10 @@ class ParallelTranscriber:
             ``transcription_model``, etc.
         config: Optional :class:`TranscriptionConfig`.  Defaults are used
             when omitted.
+        limits: Size and duration limits (``max_media_bytes``,
+            ``max_media_seconds``; default 2 GiB and 6 hours). A file over one is
+            refused with :class:`~gaik.software_components.input_limits.InputLimitError`
+            before audio is extracted or any transcription call is made.
 
     Example::
 
@@ -81,6 +86,8 @@ class ParallelTranscriber:
         self,
         api_config: dict,
         config: TranscriptionConfig | None = None,
+        *,
+        limits: InputLimits | None = None,
     ) -> None:
         cfg = config or TranscriptionConfig()
         # Whisper Local has its own on-prem auth (api_base + key) — skip the
@@ -98,6 +105,7 @@ class ParallelTranscriber:
             assert_openai_or_azure({"provider": provider}, component="ParallelTranscriber")
         self._api_config = dict(api_config)
         self._config = cfg
+        self._limits = limits or InputLimits()
 
     # ------------------------------------------------------------------
     # Public helpers
@@ -131,10 +139,16 @@ class ParallelTranscriber:
 
         Returns:
             :class:`TranscriptionResult` with the transcribed content.
+
+        Raises:
+            InputLimitError: If the file is over ``max_media_bytes`` or
+                ``max_media_seconds``.
         """
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
+        # Size and length first: a long recording becomes many paid calls.
+        self._limits.check_media(file_path)
 
         cfg = self._config
         model = cfg.model
@@ -191,6 +205,9 @@ class ParallelTranscriber:
                 if duration_minutes > cfg.whisper_local_chunk_duration_minutes:
                     needs_chunking = True
 
+            if total_duration is not None:
+                self._limits.check_media_seconds(total_duration, file_path.name)
+
             if not needs_chunking:
                 # Single-pass transcription
                 logger.info("File %.1f MB within limits, single-pass transcription", file_size_mb)
@@ -202,6 +219,7 @@ class ParallelTranscriber:
             # ── Stage 3: measure duration ──────────────────────────────
             if total_duration is None:
                 total_duration = get_audio_duration(str(audio_path))
+                self._limits.check_media_seconds(total_duration, file_path.name)
             logger.info("Total duration: %.1f min", total_duration / 60)
 
             if check_cancelled:

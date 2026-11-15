@@ -150,6 +150,7 @@ extractor = VisionExtractor(
     vertex_ai=True,                  # Google only. True = Vertex AI, False = Gemini direct API.
     additional_instructions=None,    # Extra instructions appended to the user prompt.
     include_verification=False,      # Add confidence and a PDF text-layer check per extracted field.
+    limits=None,                     # InputLimits checked before the call; None = defaults.
 )
 ```
 
@@ -166,6 +167,7 @@ Constructor options:
 | `vertex_ai` | `bool` | `True` | For Google, use Vertex AI instead of direct Gemini API. |
 | `additional_instructions` | `str | None` | `None` | Extra extraction instructions appended to the provider user prompt. |
 | `include_verification` | `bool` | `False` | Wraps fields with `value`, `confidence_score`, `confidence_reason`, `found_in_text` and `page`. |
+| `limits` | `InputLimits | None` | `None` | Checked before the model call: each file's size (100 MiB), an image's pixels, and the pages of all files together (500, an image counting as one). With a shared `api_config` the pixels of each rendered PDF page are checked too. A file over a limit raises `InputLimitError`. |
 
 ### extract()
 

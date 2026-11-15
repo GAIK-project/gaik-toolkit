@@ -17,6 +17,31 @@ Use software components when you need fine-grained control over each processing 
 Most chat-based components (Extractor and SchemaGenerator, Classifier, TranscriptEnhancer, AnswerGenerator, Embedder, Postgres and Tabular Agents) accept the same configuration interface for OpenAI, Azure OpenAI, Anthropic, Google, CSC Aitta, other OpenAI-compatible servers, and the optional LiteLLM backend. Available operations depend on the provider and model; see [Multi-Provider LLM Client](/toolkit/multi-provider-llm) for the `gaik.software_components.llm` package and the capability matrix.
 </Callout>
 
+### Input limits
+
+Every PDF page, image and minute of a recording can become a model call, so the parsers, Vision Extractor, Document Classifier, Source Normalizer, RAG parsers, transcribers and Tabular Agent check a file before they parse it or call a model. A file over a limit raises `InputLimitError` (a `ValueError`) with a message naming the limit. Pass an `InputLimits` to the component's `limits` argument to change a limit; `None` switches one off.
+
+| `InputLimits` field | Default | Checked for |
+|---|---|---|
+| `max_file_bytes` | 100 MiB | documents, spreadsheets, images; a DOCX or XLSX may unpack to 10 × this |
+| `max_pages` | 500 | pages of a PDF (Vision Extractor: all files of one call, an image counting as one page) |
+| `max_table_rows` | 1,000,000 | rows of one sheet or CSV file |
+| `max_image_pixels` | 89,478,485 | an image file, an embedded image, or a PDF page rendered for a vision model |
+| `max_images` | 500 | embedded images described with a vision model for one document |
+| `max_media_bytes` | 2 GiB | audio and video files |
+| `max_media_seconds` | 6 hours | recording length, read with ffprobe (with a timeout) or from the decoded audio |
+
+```python
+from gaik.software_components.input_limits import InputLimitError, InputLimits
+from gaik.software_components.parsers import PyMuPDFParser
+
+parser = PyMuPDFParser(limits=InputLimits(max_pages=50, max_file_bytes=20 * 1024 * 1024))
+try:
+    text = parser.parse_pdf("report.pdf")
+except InputLimitError as error:
+    print(error)  # "report.pdf has 120 pages, more than the 50 allowed (InputLimits.max_pages)."
+```
+
 ---
 
 ### Transcriber

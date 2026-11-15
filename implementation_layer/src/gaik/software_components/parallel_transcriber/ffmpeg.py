@@ -25,6 +25,9 @@ from .models import ChunkSpec
 
 logger = logging.getLogger(__name__)
 
+# ffprobe reads only the container header; a minute is far more than it needs.
+FFPROBE_TIMEOUT_SECONDS = 60
+
 
 # ---------------------------------------------------------------------------
 # Availability check
@@ -44,12 +47,13 @@ def check_ffmpeg_available() -> bool:
 # ---------------------------------------------------------------------------
 
 
-def get_audio_duration(file_path: str | Path) -> float:
+def get_audio_duration(file_path: str | Path, *, timeout: float = FFPROBE_TIMEOUT_SECONDS) -> float:
     """Get duration in seconds using ``ffprobe``.
 
     Raises:
         FileNotFoundError: If *file_path* does not exist.
         subprocess.CalledProcessError: If ffprobe fails.
+        subprocess.TimeoutExpired: If ffprobe runs longer than *timeout* seconds.
     """
     file_path = str(file_path)
     if not os.path.exists(file_path):
@@ -69,6 +73,7 @@ def get_audio_duration(file_path: str | Path) -> float:
         capture_output=True,
         text=True,
         check=True,
+        timeout=timeout,
     )
     return float(result.stdout.strip())
 

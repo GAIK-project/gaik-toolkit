@@ -23,6 +23,8 @@ try:
 except Exception:
     pass
 
+from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
+
 if TYPE_CHECKING:
     from langchain_core.documents import Document
 
@@ -63,6 +65,7 @@ class VisionRagParser:
         verbose: bool = True,
         save_markdown: bool = False,
         vision_prompt: str | None = None,
+        limits: InputLimits | None = None,
     ) -> None:
         """
         Initialize the VisionRagParser.
@@ -77,7 +80,12 @@ class VisionRagParser:
             verbose: Print verbose output
             save_markdown: Persist markdown output when output_path is provided
             vision_prompt: Custom prompt for vision model (defaults to chart/diagram analysis)
+            limits: Input limits; a PDF over the size or page limit is refused before
+                Docling reads it, and one with more images (or larger ones) than
+                allowed before the first vision call. Defaults to
+                :class:`~gaik.software_components.input_limits.InputLimits`.
         """
+        self.limits = limits or InputLimits()
         self.verbose = verbose
         self.save_markdown = save_markdown
 
@@ -138,6 +146,7 @@ class VisionRagParser:
             use_context=False,  # We handle context via Docling structure
             max_tokens=2048,
             temperature=0.0,
+            limits=self.limits,
         )
 
     def convert_doc_to_chunks_with_vision(
@@ -271,7 +280,8 @@ class VisionRagParser:
         if self.verbose:
             print(f"Processing PDF with vision enhancement: {pdf_path}")
 
-        result = self.converter.convert(pdf_path)
+        self.limits.check_pdf(pdf_path)
+        result = self.converter.convert(pdf_path, **docling_limits(self.limits))
         doc = result.document
 
         if self.verbose:
@@ -282,6 +292,10 @@ class VisionRagParser:
         images_with_positions = self._collect_images(doc)
         if self.verbose:
             print(f"Found {len(images_with_positions)} images to analyze")
+        self.limits.check_images_to_describe(
+            [image_size(self._as_pil_image(entry["image"])) for entry in images_with_positions],
+            os.path.basename(pdf_path),
+        )
 
         image_descriptions, descriptions_by_page = self._describe_images(images_with_positions)
 

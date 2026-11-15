@@ -70,6 +70,15 @@ An explicit `transcription_model` always wins over the one in `api_config`.
   it above the ceiling has no effect.
 - `whisper_local` uses the local transcription server path and does not use PyDub chunking.
 
+## Input limits
+
+`max_size_mb` and `max_duration_seconds` decide only when a file is split. The total
+size and length are limited by `limits=InputLimits(...)`: `max_media_bytes` (2 GiB) and
+`max_media_seconds` (6 hours). The length is read with ffprobe (60 s timeout) or, when
+ffprobe cannot read it, from the decoded audio, and a file over a limit raises
+`InputLimitError` before the first transcription call. Video-to-audio extraction for
+`whisper_local` stops after 30 minutes.
+
 ## Transcript Error Fixing
 
 If `enhanced_transcript=True`, the transcriber runs the raw transcript through the standalone `enhance_transcript` software component.
