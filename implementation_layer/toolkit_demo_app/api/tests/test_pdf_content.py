@@ -7,7 +7,9 @@ way a viewer does, and returns for a plain PDF.
 
 from __future__ import annotations
 
+import base64
 import time
+import tracemalloc
 import zlib
 
 import pytest
@@ -17,14 +19,16 @@ from api.utils.pdf_content import ActiveContentError, TooComplexError, check
 JS_ACTION = b"<< /S /JavaScript /JS (app.alert(1)) >>"
 
 
-def _pdf(catalog_extra: bytes = b"", objects: bytes = b"") -> bytes:
+def _pdf(catalog_extra: bytes = b"", objects: bytes = b"", trailer_extra: bytes = b"") -> bytes:
     return (
         b"%PDF-1.7\n"
         b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R " + catalog_extra + b">>\nendobj\n"
         b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
         b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>\nendobj\n"
         + objects
-        + b"trailer\n<< /Root 1 0 R >>\n%%EOF\n"
+        + b"trailer\n<< /Root 1 0 R "
+        + trailer_extra
+        + b">>\n%%EOF\n"
     )
 
 
@@ -91,6 +95,17 @@ def _png_up(data: bytes, columns: int) -> bytes:
     return bytes(out)
 
 
+def _png_sub(data: bytes, rowlen: int, bpp: int) -> bytes:
+    """PNG 'Sub' prediction (row type 1), for the fixture only."""
+    out = bytearray()
+    for i in range(0, len(data), rowlen):
+        row = data[i : i + rowlen].ljust(rowlen, b"\0")
+        out += b"\x01" + bytes(
+            (row[j] - (row[j - bpp] if j >= bpp else 0)) & 0xFF for j in range(rowlen)
+        )
+    return bytes(out)
+
+
 def _timed(data: bytes) -> float:
     start = time.monotonic()
     try:
@@ -116,18 +131,68 @@ def _timed(data: bytes) -> float:
         b"(" * 100_000 + b"/S /JavaScript",
         b"<" * 100_000,
         b"%" * 100_000,
+        b"4 0 obj\n(" + b"/S%" * 100_000 + b"\nendobj\n",  # comment marks in an open string
+        b"4 0 obj\n(" + b"/JS%1" * 60_000 + b"\nendobj\n",
+        b"1" + b" " * 300_000 + b"obj\n",  # a long gap before an object keyword
     ],
 )
 def test_the_check_ends_quickly_on_any_file(body):
     assert _timed(_pdf(objects=body)) < 3.0
 
 
+def test_an_object_stream_full_of_comment_marks_ends_quickly():
+    text = b"(" + b"/S%" * 100_000
+    body = b"10 0 "
+    hidden = _stream(
+        9,
+        f"/Type /ObjStm /N 1 /First {len(body)} /Filter /FlateDecode".encode(),
+        zlib.compress(body + text),
+    )
+    assert _timed(_pdf(objects=hidden)) < 3.0
+
+
 def test_lzw_decoding_takes_time_in_step_with_the_stream():
     data = bytes(range(256)) * 600  # about 150 kB that compresses poorly
     encoded = _lzw_encode(data)
     start = time.monotonic()
-    assert pdf_content._lzw(encoded, pdf_content._Budget(10**9), {}) == data
+    assert pdf_content._lzw(encoded, 0, pdf_content._Budgets(), {}, None) == data
     assert time.monotonic() - start < 2.0
+
+
+def test_a_large_compressed_stream_with_line_ends_inside_its_length_ends_quickly():
+    # Over a megabyte decoded, and /Length counts the line end after the data.
+    content = zlib.compress(b"q 1 0 0 1 0 0 cm Q\n" * 200_000) + b"\r\n"
+    assert _timed(_pdf(objects=_stream(6, b"/Filter /FlateDecode", content))) < 3.0
+
+
+def test_many_compressed_streams_damaged_at_their_end_are_read_quickly():
+    body = bytes((i * 7919) % 251 for i in range(100_000))
+    damaged = zlib.compress(body, 1)[:-4] + b"\xff\xff\xff\xff"  # a wrong checksum
+    streams = b"".join(_stream(100 + i, b"/Filter /FlateDecode", damaged) for i in range(100))
+    assert _timed(_pdf(objects=streams)) < 3.0
+
+
+def test_many_tiny_compressed_streams_end_quickly():
+    tiny = b"1 0 obj << /Filter /Fl >> stream\nx\nendstream endobj\n" * 200_000
+    assert _timed(_pdf(objects=tiny)) < 3.0
+
+
+def test_slow_decoders_stop_at_their_budget(monkeypatch):
+    monkeypatch.setattr(pdf_content, "MAX_SLOW_DECODED_BYTES", 1024)
+    stream = _stream(6, b"/Filter /RunLengthDecode", b"\x00a" * 2048)
+    with pytest.raises(TooComplexError, match="too complex"):
+        check(_pdf(objects=stream))
+
+
+def test_many_small_strings_are_checked_in_memory_in_step_with_the_file():
+    data = _pdf(objects=b"4 0 obj\n[" + b"(a)" * 300_000 + b"]\nendobj\n")
+    tracemalloc.start()
+    try:
+        check(data)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert peak < 8 * len(data)
 
 
 # ---------------------------------------------------------------- filters
@@ -141,6 +206,26 @@ def test_lzw_decoding_takes_time_in_step_with_the_stream():
         (
             b"/Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 8 >>",
             lambda d: zlib.compress(_png_up(d, 8)),
+        ),
+        (
+            b"/Filter [/FlateDecode] /DecodeParms [<< /Predictor 12 /Columns 8 >>]",
+            lambda d: zlib.compress(_png_up(d, 8)),
+        ),
+        (
+            # three 4-bit colours: two bytes a pixel, as a viewer counts them
+            b"/Filter /FlateDecode /DecodeParms"
+            b" << /Predictor 11 /Colors 3 /BitsPerComponent 4 /Columns 4 >>",
+            lambda d: zlib.compress(_png_sub(d, 6, 2)),
+        ),
+        (
+            b"/Filter [/ASCII85Decode /FlateDecode]",
+            lambda d: base64.a85encode(zlib.compress(d)) + b"~>",
+        ),
+        (
+            # each filter has its own parameters; the predictor follows Flate
+            b"/Filter [/ASCIIHexDecode /FlateDecode]"
+            b" /DecodeParms [null << /Predictor 12 /Columns 8 >>]",
+            lambda d: zlib.compress(_png_up(d, 8)).hex().encode() + b">",
         ),
     ],
 )
@@ -159,13 +244,282 @@ def test_javascript_in_an_object_stream_is_found_through_its_decode_parameters(f
         b"/Filter [/FlateDecode null]",  # not a list of names
         b"/Filter /FlateDecode /DecodeParms 8 0 R",
         b"/Filter /FlateDecode /DecodeParms << /Predictor 2 /Columns 8 >>",
-        b"/Filter [/ASCIIHexDecode /FlateDecode] /DecodeParms [null << /Predictor 12 >>]",
+        b"/Filter [/ASCIIHexDecode /FlateDecode] /DecodeParms [<< /Predictor 12 >> null]",
+        b"/Filter [/FlateDecode /LZWDecode] /DecodeParms [<< /Predictor 12 /Columns 8 >>]",
+        b"/Filter [/FlateDecode /LZWDecode] /DecodeParms << /Predictor 12 /Columns 8 >>",
+        b"/Filter /FlateDecode /DecodeParms [8 0 R]",  # parameters in a list, by reference
+        b"/Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 8 0 R >>",
+        b"/Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 8.0 >>",
+        b"/Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 8 /Columns 4 >>",
+        b"/Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 8 >> /DecodeParms null",
+        b"/Filter /JPXDecode",  # objects read from what an image filter gives
     ],
 )
 def test_a_stream_whose_filters_cannot_be_read_is_refused_as_not_checkable(filters):
-    hidden = _object_stream(filters, OBJECTS)
+    # Encoded as the parameters say where they can be read, so only the way
+    # they are written leads to the refusal.
+    predicted = b"/Predictor 12 /Columns 8" in filters
+    encode = (lambda d: zlib.compress(_png_up(d, 8))) if predicted else zlib.compress
+    hidden = _object_stream(filters, OBJECTS, encode)
     with pytest.raises(TooComplexError, match="cannot be checked"):
         check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+def test_data_the_ascii85_filter_cannot_decode_is_refused_as_not_checkable():
+    hidden = _object_stream(b"/Filter /ASCII85Decode", OBJECTS, lambda d: b"vwxy{|}~>")
+    with pytest.raises(TooComplexError, match="cannot be checked"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+@pytest.mark.parametrize(
+    "dictionary",
+    [b"/Filter null", b"/Filter []", b"/Filter /FlateDecode /DecodeParms null"],
+)
+def test_a_null_or_empty_filter_or_null_parameters_mean_none(dictionary):
+    encode = zlib.compress if b"Flate" in dictionary else (lambda d: d)
+    content = b"BT /F1 12 Tf 20 100 Td (plain text) Tj ET"
+    check(_pdf(objects=_stream(6, dictionary, encode(content))))
+    hidden = _object_stream(dictionary, OBJECTS, encode)
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+def test_each_filter_gets_its_own_decode_parameters():
+    # The EarlyChange entry belongs to Flate; LZW keeps its default. The
+    # action comes after LZW's codes have grown past nine bits.
+    pad = b"<" + bytes(range(256)).hex().encode() * 4 + b"> "
+    table = f"11 0 10 {len(pad)} ".encode()
+    hidden = _stream(
+        9,
+        f"/Type /ObjStm /N 2 /First {len(table)}".encode()
+        + b" /Filter [/FlateDecode /LZWDecode] /DecodeParms [<< /EarlyChange 0 >> null]",
+        zlib.compress(_lzw_encode(table + pad + JS_ACTION)),
+    )
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+@pytest.mark.parametrize("dictionary", [b"/Filter null", b""])
+def test_an_unencoded_object_stream_is_read_through_its_offsets(dictionary):
+    first = b"(an open string "
+    body = f"11 0 10 {len(first)} ".encode()
+    hidden = _stream(
+        9,
+        f"/Type /ObjStm /N 2 /First {len(body)} ".encode() + dictionary,
+        body + first + JS_ACTION + b" )",
+    )
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+def _flate_with_stored_start(stored: bytes, rest: bytes) -> bytes:
+    """Flate data whose first block is stored as it is, for the fixture only."""
+    comp = zlib.compressobj(wbits=-15)
+    body = comp.compress(rest) + comp.flush()
+    header = (
+        b"\x00" + len(stored).to_bytes(2, "little") + (0xFFFF ^ len(stored)).to_bytes(2, "little")
+    )
+    adler = zlib.adler32(stored + rest).to_bytes(4, "big")
+    return b"\x78\x01" + header + stored + body + adler
+
+
+def test_a_compressed_stream_is_read_to_its_own_end_past_an_end_keyword_inside_it():
+    # Object 11 is a string whose text holds the stream's end keyword, stored
+    # as it is; object 10 follows, compressed. /Length is a reference.
+    note = b"(\nendstream\n) "
+    table = f"11 0 10 {len(note)} ".encode()
+    data = _flate_with_stored_start(table + note, JS_ACTION)
+    hidden = (
+        f"9 0 obj\n<< /Type /ObjStm /N 2 /First {len(table)} /Filter /FlateDecode".encode()
+        + b" /Length 8 0 R >>\nstream\n"
+        + data
+        + b"\nendstream\nendobj\n8 0 obj\n"
+        + str(len(data)).encode()
+        + b"\nendobj\n"
+    )
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+def test_an_unencoded_object_stream_with_a_referenced_length_is_refused():
+    first = b"(an open string "
+    body = f"11 0 10 {len(first)} ".encode()
+    hidden = (
+        f"9 0 obj\n<< /Type /ObjStm /N 2 /First {len(body)} /Length 8 0 R >>\nstream\n".encode()
+        + body
+        + first
+        + JS_ACTION
+        + b" )\nendstream\nendobj\n"
+    )
+    with pytest.raises(TooComplexError, match="cannot be checked"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+def test_a_compressed_stream_whose_referenced_length_is_elsewhere_passes():
+    # Object 8 may be in an object stream; the filter's own end is read.
+    content = zlib.compress(b"BT /F1 12 Tf 20 100 Td (text) Tj ET")
+    check(_pdf(objects=_stream(6, b"/Filter /FlateDecode /Length 8 0 R", content)))
+
+
+def test_ascii85_data_without_its_end_marker_is_refused_as_not_checkable():
+    data = base64.a85encode(zlib.compress(OBJECTS))
+    hidden = _object_stream(b"/Filter [/ASCII85Decode /FlateDecode]", OBJECTS, lambda d: data)
+    with pytest.raises(TooComplexError, match="cannot be checked"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+def test_a_compressed_stream_damaged_at_its_end_is_read_up_to_the_damage():
+    data = zlib.compress(OBJECTS)[:-4] + b"\xff\xff\xff\xff"  # a wrong checksum
+    hidden = _object_stream(b"/Filter /FlateDecode", OBJECTS, lambda d: data)
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+def test_an_encrypted_file_with_objects_in_a_stream_without_its_type_is_refused():
+    hidden = _stream(9, b"/N 1 /First 5 /Filter /FlateDecode", zlib.compress(OBJECTS))
+    with pytest.raises(ActiveContentError, match="encrypted"):
+        check(_pdf(objects=hidden, trailer_extra=b"/Encrypt 20 0 R"))
+
+
+def test_a_stream_is_read_past_a_length_that_stops_short():
+    data = zlib.compress(OBJECTS)
+    hidden = (
+        b"9 0 obj\n<< /Type /ObjStm /N 1 /First 5 /Filter /FlateDecode /Length 4 >>\n"
+        b"stream\n" + data + b"\nendstream\nendobj\n"
+    )
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+@pytest.mark.parametrize(
+    "filters",
+    [
+        b"/Filter /FlateDecode /DecodeParms [<< /Predictor 12 /Columns 8 >>]",
+        b"/Filter [/FlateDecode] /DecodeParms << /Predictor 12 /Columns 8 >>",
+    ],
+)
+@pytest.mark.parametrize("predicted", [True, False])
+def test_parameters_in_the_other_shape_for_one_filter_are_read_both_ways(filters, predicted):
+    # Whether a viewer applies the parameters or not, the action is not passed:
+    # found where both ways read, refused where one way cannot be read.
+    encode = (lambda d: zlib.compress(_png_up(d, 8))) if predicted else zlib.compress
+    expected = ActiveContentError if predicted else TooComplexError
+    with pytest.raises(expected):
+        check(_pdf(b"/OpenAction 10 0 R", _object_stream(filters, OBJECTS, encode)))
+
+
+def test_a_one_item_filter_list_with_a_predictor_dictionary_passes():
+    rows = bytes([1, 0, 15, 0]) * 6
+    xref = _stream(
+        12,
+        b"/Type /XRef /Size 6 /W [1 2 1] /Filter [/FlateDecode] "
+        b"/DecodeParms << /Predictor 12 /Columns 4 >>",
+        zlib.compress(_png_up(rows, 4)),
+    )
+    check(_pdf(objects=xref))
+
+
+def test_many_small_streams_pass():
+    content = b"BT /F1 12 Tf 20 100 Td (text) Tj ET"
+    flate = b"".join(
+        _stream(100 + i, b"/Filter /FlateDecode", zlib.compress(content)) for i in range(300)
+    )
+    lzw = b"".join(
+        _stream(400 + i, b"/Filter /LZWDecode", _lzw_encode(content)) for i in range(300)
+    )
+    check(_pdf(objects=flate + lzw))
+
+
+def test_ascii85_data_with_zero_groups_is_read_whole():
+    compressed = zlib.compress(OBJECTS)
+    compressed += b" " * (-len(compressed) % 4)  # whole groups, then four "z" groups
+    data = base64.a85encode(compressed + b"\0" * 16 + b"A") + b"~>"
+    assert data.count(b"z") == 4
+    hidden = _object_stream(b"/Filter [/ASCII85Decode /FlateDecode]", OBJECTS, lambda d: data)
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(b"/OpenAction 10 0 R", hidden))
+
+
+UNTERMINATED_A85 = _stream(6, b"/Filter /ASCII85Decode", base64.a85encode(JS_ACTION))
+
+
+@pytest.mark.parametrize("value", [b"null", b"/Standard"])
+def test_an_encrypt_entry_that_names_no_dictionary_does_not_make_the_file_encrypted(value):
+    # Read as plain, data the filter cannot decode is refused.
+    with pytest.raises(TooComplexError, match="cannot be checked"):
+        check(_pdf(objects=UNTERMINATED_A85, trailer_extra=b"/Encrypt " + value))
+
+
+def test_an_encrypt_entry_in_a_string_does_not_make_the_file_encrypted():
+    with pytest.raises(TooComplexError, match="cannot be checked"):
+        check(_pdf(objects=UNTERMINATED_A85, trailer_extra=b"/Info (/Encrypt 20 0 R)"))
+
+
+def test_streams_an_encrypted_file_keeps_readable_are_still_checked():
+    # Encryption that leaves streams as they are (an identity crypt filter).
+    attachment = _stream(6, b"/Type /EmbeddedFile /Filter /FlateDecode", zlib.compress(JS_ACTION))
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(objects=attachment, trailer_extra=b"/Encrypt 20 0 R"))
+
+
+@pytest.mark.parametrize("value", [b"0000000000000000001", b"1"])
+def test_numbers_with_leading_zeros_are_read_as_written(value):
+    stream = _object_stream(
+        b"/Filter /FlateDecode /DecodeParms << /Predictor " + value + b" /Columns 8 >>", OBJECTS
+    )
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(b"/OpenAction 10 0 R", stream))
+
+
+def test_a_very_long_number_after_startxref_passes():
+    data = _pdf() + b"startxref\n" + b"9" * 5_000 + b"\n%%EOF\n"
+    check(data)
+
+
+def test_a_file_of_many_small_compressed_streams_passes():
+    glyph = zlib.compress(b"0 0 m 10 10 l S")
+    streams = b"".join(_stream(100 + i, b"/Filter /FlateDecode", glyph) for i in range(5_000))
+    check(_pdf(objects=streams))
+
+
+def test_parameters_that_change_nothing_need_not_pair_with_the_filters():
+    data = base64.a85encode(zlib.compress(b"BT (text) Tj ET")) + b"~>"
+    stream = _stream(
+        6, b"/Filter [/ASCII85Decode /FlateDecode] /DecodeParms << /Predictor 1 >>", data
+    )
+    check(_pdf(objects=stream))
+
+
+def test_a_stream_of_an_encrypted_file_that_does_not_decode_is_taken_as_ciphertext():
+    stream = _stream(6, b"/Filter /ASCII85Decode", bytes(range(256)))  # ciphertext
+    check(_pdf(objects=stream, trailer_extra=b"/Encrypt 20 0 R"))
+
+
+def test_an_encrypted_file_is_still_held_to_the_checks_other_limits():
+    stream = _stream(
+        6,
+        b"/Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 9999999 >>",
+        zlib.compress(b"x" * 64),
+    )
+    with pytest.raises(TooComplexError, match="cannot be checked"):
+        check(_pdf(objects=stream, trailer_extra=b"/Encrypt 20 0 R"))
+
+
+def test_a_file_that_mentions_encryption_in_its_text_is_not_read_as_encrypted():
+    hidden = _object_stream(b"/Filter /FlateDecode", b"10 0 << /Type /Font >>")
+    info = b"4 0 obj\n<< /Title (About /Encrypt and /ObjStm) >>\nendobj\n"
+    check(_pdf(objects=info + hidden))
+
+
+def test_a_colour_profile_stream_with_n_but_no_first_passes():
+    profile = bytes(range(256)) * 8 + b"(open"
+    check(
+        _pdf(
+            objects=_stream(
+                6, b"/N 3 /Alternate /DeviceRGB /Filter /FlateDecode", zlib.compress(profile)
+            )
+        )
+    )
 
 
 def test_the_dictionary_is_read_from_the_real_header_when_a_string_holds_another():
@@ -219,6 +573,19 @@ def test_page_text_that_shows_action_names_passes(content):
     check(_pdf(objects=plain))
 
 
+def test_a_document_about_pdf_syntax_passes():
+    info = b"4 0 obj\n<< /Title (How /S /JavaScript and /S /Launch actions work) >>\nendobj\n"
+    content = b"BT /F1 12 Tf 20 100 Td (An action: << /S /JavaScript /JS (code) >>) Tj ET"
+    body = b"11 0 "
+    in_objects = _stream(
+        9,
+        f"/Type /ObjStm /N 1 /First {len(body)} /Filter /FlateDecode".encode(),
+        zlib.compress(body + b"<< /Title (see /S /ImportData and /Subtype /RichMedia) >>"),
+    )
+    check(_pdf(objects=info + _stream(6, b"/Filter /FlateDecode", zlib.compress(content))))
+    check(_pdf(objects=in_objects))
+
+
 def test_a_string_left_open_does_not_hide_the_next_object():
     objects = (
         b"4 0 obj\n(an open string\nendobj\n"
@@ -241,13 +608,20 @@ def test_a_string_left_open_in_an_object_stream_does_not_hide_the_next_object():
         check(_pdf(b"/OpenAction 10 0 R", hidden))
 
 
-def test_an_object_stream_whose_offsets_cannot_be_read_is_matched_with_its_strings():
+@pytest.mark.parametrize(
+    "dictionary, body",
+    [
+        (b"/First 8 0 R", b"10 0 " + JS_ACTION),  # /First by reference
+        (b"/First 5 /First 6", OBJECTS),  # given twice
+        (b"/First 400", OBJECTS),  # past the end of the stream
+        (b"/First 5", b"10 x " + JS_ACTION),  # offsets that are not numbers
+    ],
+)
+def test_an_object_stream_whose_offsets_cannot_be_read_is_refused(dictionary, body):
     hidden = _stream(
-        9,
-        b"/Type /ObjStm /N 1 /First 8 0 R /Filter /FlateDecode",
-        zlib.compress(b"(x) " + JS_ACTION),
+        9, b"/Type /ObjStm /N 1 " + dictionary + b" /Filter /FlateDecode", zlib.compress(body)
     )
-    with pytest.raises(ActiveContentError, match="JavaScript"):
+    with pytest.raises(TooComplexError, match="cannot be checked"):
         check(_pdf(b"/OpenAction 10 0 R", hidden))
 
 

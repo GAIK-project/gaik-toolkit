@@ -342,24 +342,62 @@ def test_a_scanner_that_stops_reading_is_given_up_on_time(monkeypatch):
     server.close()
 
 
-def test_the_report_writer_refuses_an_upload_the_check_refuses(monkeypatch):
+@pytest.mark.parametrize("as_sample", [False, True])
+def test_the_report_writer_refuses_an_unsafe_upload_without_writing_it(
+    monkeypatch, tmp_path, as_sample
+):
     from api.routers import report_writer
 
     monkeypatch.delenv("DEMO_MALWARE_SCANNER", raising=False)
     monkeypatch.delenv("DEMO_MALWARE_SCAN", raising=False)
     started: list[bool] = []
     monkeypatch.setattr(report_writer, "_run_options", lambda *a: started.append(True))
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    monkeypatch.setattr(report_writer.tempfile, "mkdtemp", lambda *a, **k: str(run_dir))
+    written: list[str] = []
+    real_write = report_writer.Path.write_bytes
+
+    def write_bytes(self, data):
+        written.append(self.name)
+        return real_write(self, data)
+
+    monkeypatch.setattr(report_writer.Path, "write_bytes", write_bytes)
     app = FastAPI()
     app.include_router(report_writer.router, prefix="/report-writer")
     pdf = _pdf(b"/OpenAction " + JS_ACTION)
-    response = TestClient(app).post(
-        "/report-writer/run",
-        data={"config": "{}"},
-        files=[
-            ("files", ("notes.md", b"# Notes", "text/markdown")),
-            ("files", ("survey.pdf", pdf, "application/pdf")),
-        ],
-    )
+    files = [("files", ("notes.md", b"# Notes", "text/markdown"))]
+    if as_sample:
+        files.append(("sample_report", ("survey.pdf", pdf, "application/pdf")))
+    else:
+        files.append(("files", ("survey.pdf", pdf, "application/pdf")))
+    response = TestClient(app).post("/report-writer/run", data={"config": "{}"}, files=files)
     assert response.status_code == 422
     assert response.json()["detail"].startswith("survey.pdf: PDF files that contain JavaScript")
+    assert "survey.pdf" not in written
+    assert not run_dir.exists()  # what was written before the refusal is removed
     assert not started
+
+
+def test_a_pdf_about_pdf_syntax_passes_the_upload_check(monkeypatch):
+    monkeypatch.delenv("DEMO_MALWARE_SCANNER", raising=False)
+    monkeypatch.delenv("DEMO_MALWARE_SCAN", raising=False)
+    text = b"BT /F1 12 Tf 20 100 Td (An action: << /S /JavaScript /JS (code) >>) Tj ET"
+    info = b"4 0 obj\n<< /Title (How /S /Launch actions work) >>\nendobj\n"
+    pdf = _pdf(objects=info + _stream(6, b"/Filter /FlateDecode", zlib.compress(text)))
+    assert asyncio.run(upload_problem(".pdf", pdf)) is None
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        b"1" + b" " * 2_000_000 + b"obj\n",  # a long gap inside what could be a header
+        b"4 0 obj\n(" + b"/S%" * 300_000 + b"\nendobj\n",  # comment marks in an open string
+    ],
+)
+def test_the_upload_check_returns_quickly_on_a_long_header_line(monkeypatch, line):
+    monkeypatch.delenv("DEMO_MALWARE_SCANNER", raising=False)
+    monkeypatch.delenv("DEMO_MALWARE_SCAN", raising=False)
+    start = time.monotonic()
+    asyncio.run(upload_problem(".pdf", _pdf(objects=line)))
+    assert time.monotonic() - start < 3.0
