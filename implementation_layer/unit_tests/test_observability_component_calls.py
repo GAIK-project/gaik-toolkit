@@ -213,6 +213,77 @@ def _embedder_shared(mp, tmp_path, error):
     }
 
 
+def _transcription_failed(result):
+    return "[Transcription failed for segment 1]" in result
+
+
+def _document_classifier(mp, tmp_path, error):
+    from gaik.software_components.doc_classifier.classifier import DocumentClassifier
+
+    calls = _Calls()
+    classifier = DocumentClassifier(
+        {"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"}
+    )
+
+    def parse(**kwargs):
+        calls.record(**kwargs)
+        if error is not None:
+            raise error
+        model = kwargs["response_format"]
+        return _completion(parsed=model(document_class="invoice", confidence=0.9, reasoning="r"))
+
+    classifier.client = _ns(beta=_ns(chat=_ns(completions=_ns(parse=parse))))
+    run = lambda: classifier._classify_with_llm(SECRET, ["invoice", "contract"])  # noqa: E731
+    return run, {
+        "component": "DocumentClassifier",
+        "input_tokens": 100,
+        "settings": {"gen_ai.request.temperature": 0, "gaik.config.version": ANY},
+        # A failed call is answered with the "unknown" class, not raised.
+        "swallows": True,
+        "failed": lambda result: result["class"] == "unknown",
+        "calls": calls,
+        "requests": [
+            {
+                "model": "gpt-4.1",
+                "messages": ANY,
+                "response_format": ANY,
+                "temperature": 0,
+                "timeout": 30,
+            }
+        ],
+    }
+
+
+def _tabular_agent_structured(mp, tmp_path, error):
+    pytest.importorskip("duckdb")
+    from gaik.software_components.tabular_agent.agent import TabularAgent
+    from gaik.software_components.tabular_agent.models import GeneratedSQL
+
+    calls = _Calls()
+    csv = _file(tmp_path, "sales.csv", b"region,total\nnorth,1\n")
+    agent = TabularAgent(csv, model="gpt-4.1")
+    parsed = GeneratedSQL(sql="SELECT 1", reasoning="r")
+    agent._llm_client = _raw_openai(calls, _completion(parsed=parsed), error)
+    messages = [{"role": "user", "content": SECRET}]
+    run = lambda: agent._parse_structured(messages, GeneratedSQL)  # noqa: E731
+    return run, {
+        "component": "TabularAgent",
+        "input_tokens": 100,
+        "settings": {"gen_ai.request.temperature": 0.0, "gaik.config.version": ANY},
+        "lengths": (len(SECRET), len(parsed.model_dump_json())),
+        "calls": calls,
+        "requests": [
+            {
+                "model": "gpt-4.1",
+                "messages": messages,
+                "response_format": GeneratedSQL,
+                "temperature": 0.0,
+                "timeout": 30,
+            }
+        ],
+    }
+
+
 def _transcript_enhancer(mp, tmp_path, error):
     from gaik.software_components.enhance_transcript import TranscriptEnhancer
 
@@ -1061,6 +1132,8 @@ CASES = {
         mp, tmp_path, error, answer=True
     ),
     "TabularAgent-answer": _tabular_agent_answer,
+    "TabularAgent-structured": _tabular_agent_structured,
+    "DocumentClassifier": _document_classifier,
     "TextToSpeech": _text_to_speech,
     "Transcriber": _transcriber,
     "Transcriber-chunked": _transcriber_chunked,
@@ -1155,7 +1228,7 @@ def test_a_failed_call_records_only_the_error_s_type(name, spans, monkeypatch, t
     result, expected = _run_failing(CASES[name], monkeypatch, tmp_path)
 
     if expected.get("swallows"):
-        assert "[Transcription failed for segment 1]" in result
+        assert expected.get("failed", _transcription_failed)(result)
     assert expected["calls"] == expected["requests"]
     recorded = spans()
     assert len(recorded) == expected.get("spans", 1)

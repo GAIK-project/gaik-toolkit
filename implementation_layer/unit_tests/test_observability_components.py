@@ -334,6 +334,8 @@ def test_document_classifier_records_settings_tokens_and_lengths(spans):
     assert result["class"] == "invoice"
     (span,) = spans()
     assert span.attributes["gaik.component.name"] == "DocumentClassifier"
+    assert span.attributes["gen_ai.request.temperature"] == 0
+    assert "gaik.config.version" in span.attributes
     assert span.attributes["gen_ai.usage.input_tokens"] == 100
     assert span.attributes["gaik.output.length"] > 0
     _assert_clean(span)
