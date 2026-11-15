@@ -17,6 +17,7 @@ import threading
 import time
 import zipfile
 import zlib
+from pathlib import Path
 
 import pytest
 from api.routers import classifier as route
@@ -63,6 +64,18 @@ def _docx(extra: dict[str, bytes] | None = None) -> bytes:
     return _zip({"[Content_Types].xml": b"<Types/>", "word/document.xml": b"<w/>", **(extra or {})})
 
 
+def _xlsm(extra: dict[str, bytes] | None = None, types: bytes = b"") -> bytes:
+    content_types = (
+        b'<Types><Override PartName="/xl/workbook.xml" '
+        b'ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/>'
+        + types
+        + b"</Types>"
+    )
+    return _zip(
+        {"[Content_Types].xml": content_types, "xl/workbook.xml": b"<workbook/>", **(extra or {})}
+    )
+
+
 # ---------------------------------------------------------------------------
 # What a document carries
 # ---------------------------------------------------------------------------
@@ -107,14 +120,13 @@ def test_image_data_is_not_read_for_actions():
     [
         (".docx", _docx({"word/vbaProject.bin": b"\xd0\xcf\x11\xe0"})),
         (".docx", _docx({"word/activeX/activeX1.bin": b"\xd0\xcf\x11\xe0"})),
+        (".xlsm", _xlsm({"xl/vbaProject.bin": b"\xd0\xcf\x11\xe0"})),
+        (".xlsm", _xlsm({"xl/macrosheets/sheet1.xml": b"<xm:macrosheet/>"})),
         (
             ".xlsm",
-            _zip(
-                {
-                    "[Content_Types].xml": b"<Types><Override ContentType="
-                    b'"application/vnd.ms-excel.sheet.macroEnabled.main+xml"/></Types>',
-                    "xl/workbook.xml": b"<workbook/>",
-                }
+            _xlsm(
+                types=b'<Override PartName="/xl/m.xml" '
+                b'ContentType="application/vnd.ms-excel.macrosheet+xml"/>'
             ),
         ),
     ],
@@ -126,6 +138,11 @@ def test_an_office_file_with_macros_is_refused(suffix, data):
 
 def test_an_office_file_without_macros_passes():
     assert content_problem(".docx", _docx()) is None
+
+
+def test_a_macro_enabled_workbook_without_macros_passes():
+    # Excel marks every .xlsm as macro-enabled, with or without code.
+    assert content_problem(".xlsm", _xlsm()) is None
 
 
 # ---------------------------------------------------------------------------
@@ -402,3 +419,26 @@ def test_the_upload_check_returns_quickly_on_a_long_header_line(monkeypatch, lin
     start = time.monotonic()
     asyncio.run(upload_problem(".pdf", _pdf(objects=line)))
     assert time.monotonic() - start < 3.0
+
+
+# ---------------------------------------------------------------------------
+# Every route that takes a file checks it
+# ---------------------------------------------------------------------------
+
+ROUTERS = Path(__file__).resolve().parents[1] / "routers"
+#: Routes that take an upload which is not a document, with the reason.
+NOT_DOCUMENTS = {
+    # A JSON object of path to text, validated against its schema; no parser
+    # or viewer reads it as a file.
+    "knowledge_curator.py",
+}
+
+
+@pytest.mark.parametrize(
+    "router",
+    sorted(p.name for p in ROUTERS.glob("*.py") if "UploadFile" in p.read_text(encoding="utf-8")),
+)
+def test_every_router_that_takes_a_file_checks_it(router):
+    if router in NOT_DOCUMENTS:
+        pytest.skip("its upload is not a document")
+    assert "upload_problem(" in (ROUTERS / router).read_text(encoding="utf-8")

@@ -106,13 +106,34 @@ def _png_sub(data: bytes, rowlen: int, bpp: int) -> bytes:
     return bytes(out)
 
 
-def _timed(data: bytes) -> float:
-    start = time.monotonic()
+def _steps(data: bytes) -> int:
+    """The steps ``check`` takes on ``data``, whether it passes or refuses it.
+
+    The bound these tests hold is the steps, not seconds, so they do not depend
+    on the machine; ``MAX_WORK`` is what keeps the time in step with them."""
+    budgets = pdf_content._Budgets()
+    real = pdf_content._Budgets
+    pdf_content._Budgets = lambda: budgets  # type: ignore[misc,assignment]
     try:
         check(data)
     except (ActiveContentError, TooComplexError):
         pass
-    return time.monotonic() - start
+    finally:
+        pdf_content._Budgets = real  # type: ignore[misc]
+    return pdf_content.MAX_WORK - budgets.work.left
+
+
+def _bounded(data: bytes) -> bool:
+    """True when the check stops within ``MAX_WORK`` steps and its deadline.
+
+    A refused file may count past ``MAX_WORK`` by the one take that refuses it
+    (at most a predictor row of 1 MiB), before that work is done."""
+    start = time.monotonic()
+    steps = _steps(data)
+    return (
+        steps <= pdf_content.MAX_WORK + (1 << 20)
+        and time.monotonic() - start < pdf_content.CHECK_SECONDS
+    )
 
 
 # ---------------------------------------------------------------- bounded time
@@ -137,7 +158,7 @@ def _timed(data: bytes) -> float:
     ],
 )
 def test_the_check_ends_quickly_on_any_file(body):
-    assert _timed(_pdf(objects=body)) < 3.0
+    assert _bounded(_pdf(objects=body))
 
 
 def test_an_object_stream_full_of_comment_marks_ends_quickly():
@@ -148,40 +169,82 @@ def test_an_object_stream_full_of_comment_marks_ends_quickly():
         f"/Type /ObjStm /N 1 /First {len(body)} /Filter /FlateDecode".encode(),
         zlib.compress(body + text),
     )
-    assert _timed(_pdf(objects=hidden)) < 3.0
+    assert _bounded(_pdf(objects=hidden))
 
 
 def test_lzw_decoding_takes_time_in_step_with_the_stream():
     data = bytes(range(256)) * 600  # about 150 kB that compresses poorly
     encoded = _lzw_encode(data)
-    start = time.monotonic()
-    assert pdf_content._lzw(encoded, 0, pdf_content._Budgets(), {}, None) == data
-    assert time.monotonic() - start < 2.0
+    budgets = pdf_content._Budgets()
+    assert pdf_content._lzw(encoded, 0, budgets, {}, None) == data
+    # One step for each byte read: the time is in step with the stream.
+    assert pdf_content.MAX_WORK - budgets.work.left == len(encoded)
 
 
 def test_a_large_compressed_stream_with_line_ends_inside_its_length_ends_quickly():
     # Over a megabyte decoded, and /Length counts the line end after the data.
     content = zlib.compress(b"q 1 0 0 1 0 0 cm Q\n" * 200_000) + b"\r\n"
-    assert _timed(_pdf(objects=_stream(6, b"/Filter /FlateDecode", content))) < 3.0
+    assert _bounded(_pdf(objects=_stream(6, b"/Filter /FlateDecode", content)))
 
 
 def test_many_compressed_streams_damaged_at_their_end_are_read_quickly():
     body = bytes((i * 7919) % 251 for i in range(100_000))
     damaged = zlib.compress(body, 1)[:-4] + b"\xff\xff\xff\xff"  # a wrong checksum
     streams = b"".join(_stream(100 + i, b"/Filter /FlateDecode", damaged) for i in range(100))
-    assert _timed(_pdf(objects=streams)) < 3.0
+    assert _bounded(_pdf(objects=streams))
 
 
-def test_many_tiny_compressed_streams_end_quickly():
+def test_many_tiny_compressed_streams_stop_at_the_step_budget():
     tiny = b"1 0 obj << /Filter /Fl >> stream\nx\nendstream endobj\n" * 200_000
-    assert _timed(_pdf(objects=tiny)) < 3.0
+    with pytest.raises(TooComplexError, match="too complex"):
+        check(_pdf(objects=tiny))
+    assert _bounded(_pdf(objects=tiny))
 
 
-def test_slow_decoders_stop_at_their_budget(monkeypatch):
-    monkeypatch.setattr(pdf_content, "MAX_SLOW_DECODED_BYTES", 1024)
+def test_slow_decoders_stop_at_the_step_budget(monkeypatch):
+    monkeypatch.setattr(pdf_content, "MAX_WORK", 1024)
     stream = _stream(6, b"/Filter /RunLengthDecode", b"\x00a" * 2048)
     with pytest.raises(TooComplexError, match="too complex"):
         check(_pdf(objects=stream))
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"<a" * 50_000_000,  # hex string marks that open no string
+        b"(a)" * 30_000_000,  # many short strings
+        b"(" + b"\\(" * 50_000_000,  # escapes inside one string
+        b"%\n" * 50_000_000,  # many comments
+        b"/A#41" * 20_000_000,  # many escaped names
+    ],
+)
+def test_a_small_file_that_decodes_to_much_work_stops_at_the_step_budget(body):
+    # About 100 kB compressed, 100 MB decoded: the work is counted, not the bytes.
+    data = _pdf(objects=_stream(6, b"/Filter /FlateDecode", zlib.compress(body, 9)))
+    assert len(data) < 200_000
+    with pytest.raises(TooComplexError, match="too complex"):
+        check(data)
+
+
+def test_predictor_rows_count_as_steps_and_as_decoded_bytes():
+    rowlen = 1000
+    rows = (b"\x04" + b"\x01" * rowlen) * 1_000  # Paeth rows, 1 MB
+    stream = _stream(
+        6,
+        f"/Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns {rowlen} >>".encode(),
+        zlib.compress(rows, 9),
+    )
+    data = _pdf(objects=stream)
+    assert _steps(data) >= 1_000 * rowlen
+    budgets = pdf_content._Budgets()
+    pdf_content._png_unpredict(rows, {b"Predictor": 12, b"Columns": rowlen}, budgets)
+    assert pdf_content.MAX_DECODED_BYTES - budgets.decoded.left == 1_000 * rowlen
+
+
+def test_the_check_stops_at_its_deadline(monkeypatch):
+    monkeypatch.setattr(pdf_content, "CHECK_SECONDS", 0.0)
+    with pytest.raises(TooComplexError, match="too complex"):
+        check(_pdf(objects=b"(a)" * 10_000))
 
 
 def test_many_small_strings_are_checked_in_memory_in_step_with_the_file():
@@ -643,4 +706,4 @@ def test_a_comment_line_before_a_plain_header_passes():
 def test_binary_data_with_many_percent_signs_and_few_line_ends_is_quick():
     binary = (b"7 %" + bytes(range(14, 256))) * 2_000  # no line ends
     image = _stream(6, b"/Subtype /Image /Width 1 /Height 1 /Filter /DCTDecode", binary)
-    assert _timed(_pdf(objects=image)) < 3.0
+    assert _bounded(_pdf(objects=image))

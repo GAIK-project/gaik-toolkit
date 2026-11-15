@@ -49,10 +49,13 @@ object streams (``/ObjStm``, or any stream with ``/First``), where the checked
 names could hide. A PDF with a user password is refused by the scanner.
 
 Comments are blanked before any pattern runs, so every pattern runs in time
-linear in its input. The bytes the check reads more than once, the bytes the
-slower decoders read and the streams it decodes are counted against budgets,
-and positions are kept in compact arrays, so the check ends quickly and in
-bounded memory on any file.
+linear in its input. The bytes the check reads more than once, the bytes it
+decodes and the streams it decodes are counted against budgets, and positions
+are kept in compact arrays, so the check holds bounded memory on any file.
+The steps of the check's own loops (each string and comment it blanks, each
+byte the LZW, RunLength and predictor code reads, each stream it decodes) are
+counted against one more budget, and the check also stops at a deadline, so it
+ends in bounded time on any file and any machine.
 """
 
 from __future__ import annotations
@@ -60,6 +63,7 @@ from __future__ import annotations
 import base64
 import bisect
 import re
+import time
 import zlib
 from array import array
 from collections.abc import Sequence
@@ -70,10 +74,16 @@ from collections.abc import Sequence
 #: check holds a few times its largest stream in memory at its peak, so this is
 #: half of the Solution Wizard's budget.
 MAX_DECODED_BYTES = 128 * 1024 * 1024
-#: Bytes the decoders written in Python read in all: LZW and RunLength input
-#: and PNG predictor rows (cross-reference streams; a few kilobytes in a
-#: normal file).
-MAX_SLOW_DECODED_BYTES = 16 * 1024 * 1024
+#: Steps of the check's own Python loops in one file: each string, comment or
+#: ``#xx`` escape it reads outside the patterns, each byte the LZW, RunLength
+#: and PNG predictor code reads, each object header it walks. A step takes
+#: about a microsecond, up to two on a slow machine.
+MAX_WORK = 4_000_000
+#: The steps a decoded stream costs besides its bytes.
+STREAM_STEPS = 100
+#: Seconds one check may take whatever its steps; a file that needs more is
+#: refused as too complex. The steps bound a normal machine well below this.
+CHECK_SECONDS = 15.0
 #: Bytes of the file read more than once (stream dictionaries and stream
 #: data), as a multiple of its size. A well-formed file reads each about twice.
 REREAD_FACTOR = 4
@@ -199,8 +209,11 @@ _IMAGE_CODECS = frozenset(
 )
 
 
-def _unescape(buf: bytes) -> bytes:
-    return _HEX_ESCAPE.sub(lambda m: bytes([int(m.group(1), 16)]), buf) if b"#" in buf else buf
+def _unescape(buf: bytes, work: _Budget) -> bytes:
+    if b"#" not in buf:
+        return buf
+    work.take(buf.count(b"#"))
+    return _HEX_ESCAPE.sub(lambda m: bytes([int(m.group(1), 16)]), buf)
 
 
 class _Budget:
@@ -213,10 +226,27 @@ class _Budget:
             raise TooComplexError("the PDF is too complex to be checked")
 
 
-class _Budgets:
+class _Work(_Budget):
+    """The steps the check takes, and its deadline."""
+
     def __init__(self) -> None:
+        super().__init__(MAX_WORK)
+        self.deadline = time.monotonic() + CHECK_SECONDS
+        self.clock = 0
+
+    def take(self, n: int) -> None:
+        super().take(n)
+        self.clock += n
+        if self.clock >= 1024:
+            self.clock = 0
+            if time.monotonic() > self.deadline:
+                raise TooComplexError("the PDF is too complex to be checked")
+
+
+class _Budgets:
+    def __init__(self, work: _Work | None = None) -> None:
         self.decoded = _Budget(MAX_DECODED_BYTES)
-        self.slow = _Budget(MAX_SLOW_DECODED_BYTES)
+        self.work = work if work is not None else _Work()
         self.streams = _Budget(MAX_DECODED_STREAMS)
 
 
@@ -236,10 +266,11 @@ _HEX_STRING = re.compile(rb"<[0-9A-Fa-f\x00\t\n\x0c\r ]*+>")
 _COMMENT = re.compile(rb"%[^\r\n]*+")
 
 
-def _string_end(buf: bytes, start: int, limit: int) -> int | None:
+def _string_end(buf: bytes, start: int, limit: int, work: _Budget) -> int | None:
     """End of the literal string opening at ``start``; None if it is open at ``limit``."""
     depth, i = 0, start
     while (m := _IN_STRING.search(buf, i, limit)) is not None:
+        work.take(1)
         c = buf[m.start()]
         if c == 0x5C:  # backslash: the next byte is taken as it is
             i = m.start() + 2
@@ -251,7 +282,12 @@ def _string_end(buf: bytes, start: int, limit: int) -> int | None:
     return None
 
 
-def _strip(buf: bytes, barriers: Sequence[int] = (), open_text: list[bytes] | None = None) -> bytes:
+def _strip(
+    buf: bytes,
+    work: _Budget,
+    barriers: Sequence[int] = (),
+    open_text: list[bytes] | None = None,
+) -> bytes:
     """``buf`` with literal and hex strings emptied and comments blanked.
 
     A string or comment ends at the next of ``barriers`` (where an object
@@ -267,6 +303,7 @@ def _strip(buf: bytes, barriers: Sequence[int] = (), open_text: list[bytes] | No
     last = i = 0
     n = len(buf)
     while (m := _SPECIAL.search(buf, i)) is not None:
+        work.take(1)
         p = m.start()
         b = bisect.bisect_right(barriers, p)
         limit = barriers[b] if b < len(barriers) else n
@@ -277,7 +314,7 @@ def _strip(buf: bytes, barriers: Sequence[int] = (), open_text: list[bytes] | No
             out += view[last:p]
             out += b" "
         elif c == 0x28:  # ( literal string
-            end = _string_end(buf, p, limit)
+            end = _string_end(buf, p, limit, work)
             if end is None:  # open at the barrier: its text is kept
                 out += view[last:p]
                 text = buf[p:limit]
@@ -307,20 +344,20 @@ def _strip(buf: bytes, barriers: Sequence[int] = (), open_text: list[bytes] | No
     return bytes(out)
 
 
-def _names(stripped: bytes, open_text: Sequence[bytes] = ()) -> str | None:
+def _names(stripped: bytes, work: _Budget, open_text: Sequence[bytes] = ()) -> str | None:
     """What ``stripped`` and ``open_text`` (from ``_strip``) name."""
     for text in (stripped, *open_text):
-        text = _unescape(text)
+        text = _unescape(text, work)
         for pattern, what in _FINDINGS:
             if pattern.search(text):
                 return what
     return None
 
 
-def _findings(buf: bytes, starts: Sequence[int]) -> str | None:
+def _findings(buf: bytes, starts: Sequence[int], work: _Budget) -> str | None:
     """What ``buf`` names outside strings; ``starts`` are where objects begin."""
     open_text: list[bytes] = []
-    return _names(_strip(buf, starts, open_text), open_text)
+    return _names(_strip(buf, work, starts, open_text), work, open_text)
 
 
 def _comment_could_precede(
@@ -345,16 +382,18 @@ def _comment_could_precede(
     return k < len(percents) and percents[k] < p
 
 
-def _headers(data: bytes) -> tuple[array[int], array[int]]:
+def _headers(data: bytes, work: _Budget) -> tuple[array[int], array[int]]:
     """Where every object header starts and ends; refuses a file where a header
     could have a comment between its tokens."""
     starts, ends = array("q"), array("q")
     for m in _OBJ.finditer(data):
+        work.take(1)
         starts.append(m.start())
         ends.append(m.end())
     line_starts: array[int] | None = None
     percents: array[int] | None = None
     for word in _OBJ_WORD.finditer(data):
+        work.take(1)
         e = bisect.bisect_left(ends, word.end())
         if e < len(ends) and ends[e] == word.end():
             continue
@@ -396,6 +435,7 @@ def _flate(
                 pos += len(chunk)
             else:
                 break
+            budgets.work.take(1)
             saved = decomp.copy()
             try:
                 piece = decomp.decompress(chunk, _OUT_CHUNK)
@@ -435,7 +475,9 @@ def _keep_until_damage(
     near the start."""
 
     def decodes(size: int) -> bool:
-        # A trial's output is not kept or counted, only bounded.
+        # A trial's output is not kept or counted, only bounded; its input
+        # counts as steps, a step for each 4 kB.
+        budgets.work.take(1 + size // 4096)
         trial = _Budget(min(budgets.decoded.left, _MAX_TRIAL_BYTES))
         try:
             _drain(decomp.copy(), chunk[:size], trial, None)
@@ -510,7 +552,7 @@ def _run_length(
     i = counted = start
     while i < len(data):
         if i - counted >= _IN_CHUNK:  # what was read, counted a chunk at a time
-            budgets.slow.take(i - counted)
+            budgets.work.take(i - counted)
             _take(raw, i - counted)
             counted = i
         n = data[i]
@@ -526,7 +568,7 @@ def _run_length(
         budgets.decoded.take(len(piece))
         out += piece
     i = min(i, len(data))
-    budgets.slow.take(i - counted)
+    budgets.work.take(i - counted)
     _take(raw, i - counted)
     return bytes(out)
 
@@ -554,7 +596,7 @@ def _lzw(
                     continue
                 if code == 257 or not (code <= len(table) and (prev or code < len(table))):
                     # the end of data, or a code no table holds: a viewer stops
-                    budgets.slow.take(k + 1)
+                    budgets.work.take(k + 1)
                     _take(raw, k + 1)
                     return bytes(out)
                 if code < len(table):
@@ -569,7 +611,7 @@ def _lzw(
                 prev = entry
                 if len(table) + early >= (1 << width) and width < 12:
                     width += 1
-        budgets.slow.take(len(chunk))  # a whole chunk read, counted after it
+        budgets.work.take(len(chunk))  # a whole chunk read, counted after it
         _take(raw, len(chunk))
     return bytes(out)
 
@@ -590,7 +632,7 @@ _DECODERS = {
 _PREDICTED = frozenset({b"FlateDecode", b"Fl", b"LZWDecode", b"LZW"})
 
 
-def _png_unpredict(data: bytes, parms: dict[bytes, int], budget: _Budget) -> bytes:
+def _png_unpredict(data: bytes, parms: dict[bytes, int], budgets: _Budgets) -> bytes:
     colors = parms.get(b"Colors", 1) or 1
     bpc = parms.get(b"BitsPerComponent", 8) or 8
     columns = parms.get(b"Columns", 1) or 1
@@ -598,11 +640,14 @@ def _png_unpredict(data: bytes, parms: dict[bytes, int], budget: _Budget) -> byt
     rowlen = (colors * bpc * columns + 7) // 8
     if rowlen > 1 << 20:
         raise TooComplexError(NOT_CHECKABLE)
-    budget.take(len(data))
     out = bytearray()
     prev = bytearray(rowlen)
     for start in range(0, len(data), rowlen + 1):
         kind = data[start]
+        # The rows are rebuilt a byte at a time in Python: each byte is a step,
+        # and the output counts as decoded.
+        budgets.work.take(rowlen if kind else 1)
+        budgets.decoded.take(rowlen)
         row = bytearray(data[start + 1 : start + 1 + rowlen].ljust(rowlen, b"\0"))
         if kind == 1:
             for i in range(bpp, rowlen):
@@ -728,11 +773,11 @@ def _decode(
         out = decoder(out, at, budgets, own, raw)
         at, raw = 0, None
         if own.get(b"Predictor", 1) >= 10:
-            out = _png_unpredict(out, own, budgets.slow)
+            out = _png_unpredict(out, own, budgets)
     return out
 
 
-def _object_offsets(decoded: bytes, stream_dict: bytes) -> list[int]:
+def _object_offsets(decoded: bytes, stream_dict: bytes, work: _Budget) -> list[int]:
     """Where an object stream's objects begin, as it lists them.
 
     Refuses a stream whose ``/First`` or offset list cannot be read: a viewer
@@ -746,6 +791,7 @@ def _object_offsets(decoded: bytes, stream_dict: bytes) -> list[int]:
     if start > len(decoded):
         raise TooComplexError(NOT_CHECKABLE)
     numbers = decoded[:start].split()
+    work.take(len(numbers))
     if len(numbers) % 2 or not all(n.isdigit() for n in numbers):
         raise TooComplexError(NOT_CHECKABLE)
     offsets = sorted({start + _num(n) for n in numbers[1::2]})
@@ -765,7 +811,9 @@ def _single_dict(stripped: bytes) -> bool:
     return False
 
 
-def _stream_dicts(data: bytes, kw: int, header_ends: Sequence[int], reread: _Budget) -> list[bytes]:
+def _stream_dicts(
+    data: bytes, kw: int, header_ends: Sequence[int], reread: _Budget, work: _Budget
+) -> list[bytes]:
     """Every dictionary a viewer could read for the stream keyword at ``kw``.
 
     From the nearest object header back: each header whose text up to ``kw``
@@ -778,9 +826,10 @@ def _stream_dicts(data: bytes, kw: int, header_ends: Sequence[int], reread: _Bud
     while h >= 0:
         lo = header_ends[h]
         reread.take(kw - lo)
-        stripped = _strip(data[lo:kw])
+        work.take(1)
+        stripped = _strip(data[lo:kw], work)
         if _single_dict(stripped):
-            found.append(_unescape(stripped))
+            found.append(_unescape(stripped, work))
         elif _BREAK.search(stripped):
             break
         h -= 1
@@ -820,7 +869,7 @@ def _check_stream(
             return None  # unencoded: already read with the file
         end = _unencoded_end(data, start, stream_dict, stream_ends)
         reread.take(end - start)
-        return _read_decoded(data[start:end], objects, stream_dict)
+        return _read_decoded(data[start:end], objects, stream_dict, budgets.work)
     if any(name in _IMAGE_CODECS for name in filters):
         if objects:  # a viewer would read objects from what the image filter gives
             raise TooComplexError(NOT_CHECKABLE)
@@ -829,9 +878,10 @@ def _check_stream(
     # refused, since a viewer may still read something from it.
     for parms in _parms(stream_dict, filters, listed):
         budgets.streams.take(1)
+        budgets.work.take(STREAM_STEPS)
         try:
             decoded = _decode(data, start, filters, parms, budgets, reread)
-            what = _read_decoded(decoded, objects, stream_dict)
+            what = _read_decoded(decoded, objects, stream_dict, budgets.work)
         except _UndecodableError:
             if encrypted:
                 continue  # ciphertext: data that does not decode is opaque
@@ -841,35 +891,37 @@ def _check_stream(
     return None
 
 
-def _read_decoded(decoded: bytes, objects: bool, stream_dict: bytes) -> str | None:
+def _read_decoded(decoded: bytes, objects: bool, stream_dict: bytes, work: _Budget) -> str | None:
     if not decoded:
         return None
     if not objects:
-        return _findings(decoded, ())
-    return _findings(decoded, _object_offsets(decoded, stream_dict))
+        return _findings(decoded, (), work)
+    return _findings(decoded, _object_offsets(decoded, stream_dict, work), work)
 
 
 def check(data: bytes) -> None:
     """Raise ``ActiveContentError`` or ``TooComplexError``; return for a plain PDF."""
-    header_starts, header_ends = _headers(data)
+    budgets = _Budgets()
+    work = budgets.work
+    header_starts, header_ends = _headers(data, work)
     open_text: list[bytes] = []
-    stripped = _strip(data, header_starts, open_text)
-    what = _names(stripped, open_text)
+    stripped = _strip(data, work, header_starts, open_text)
+    what = _names(stripped, work, open_text)
     if what:
         raise ActiveContentError(f"PDF files that contain {what} are not accepted")
-    plain = _unescape(stripped)  # names outside strings and comments
+    plain = _unescape(stripped, work)  # names outside strings and comments
     # Read as encrypted when an /Encrypt dictionary is named outside strings,
     # wherever it is: a stream that then does not decode is taken as ciphertext.
     encrypted = bool(_ENCRYPT.search(plain))
     if encrypted and _OBJSTM.search(plain):
         raise ActiveContentError(ENCRYPTED_OBJECTS)
     del stripped, plain, open_text
-    budgets = _Budgets()
     reread = _Budget(REREAD_FACTOR * len(data) + 1024 * 1024)
     stream_ends = array("q", (m.start() for m in _ENDSTREAM.finditer(data)))
     for match in _STREAM.finditer(data):
+        work.take(1)
         seen: set[bytes] = set()
-        for stream_dict in _stream_dicts(data, match.start(), header_ends, reread):
+        for stream_dict in _stream_dicts(data, match.start(), header_ends, reread, work):
             if stream_dict in seen:
                 continue
             seen.add(stream_dict)
