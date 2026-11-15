@@ -373,3 +373,37 @@ def test_jev_classifier_checks_the_sdk_environment_address(monkeypatch, caplog):
     with caplog.at_level(logging.INFO, logger="gaik.software_components.endpoints"):
         JevClassifier(api_key="k")
     assert "endpoint host=typesafe-proxy.example.test" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("provider", "url"),
+    [
+        ("azure", "https://other.example.test\\@res.openai.azure.com/"),
+        ("vertex", "https://other.example.test\\@aiplatform.googleapis.com/v1/x"),
+        ("docling", "https://other.example.test\\@localhost"),
+        ("azure", "https://user:pw@res.openai.azure.com"),
+        ("azure", "https://res.openai.azure.com /x"),
+        ("azure", "https://res.openai.azure.com\t/x"),
+        ("azure", "https://rés.openai.azure.com"),
+    ],
+)
+def test_urls_that_http_libraries_could_read_differently_are_refused(provider, url):
+    with pytest.raises(EndpointNotAllowedError):
+        check_endpoint(url, provider=provider)
+
+
+@pytest.mark.parametrize(
+    ("location", "host"),
+    [
+        ("global", "aiplatform.googleapis.com"),
+        ("europe-north1", "europe-north1-aiplatform.googleapis.com"),
+    ],
+)
+def test_vertex_location_names_a_google_host(location, host):
+    assert endpoints.vertex_host(location) == host
+
+
+@pytest.mark.parametrize("location", ["other.example.test?", "x/y", "", "europe north1"])
+def test_vertex_location_that_names_another_host_is_refused(location):
+    with pytest.raises(EndpointNotAllowedError):
+        endpoints.vertex_host(location)

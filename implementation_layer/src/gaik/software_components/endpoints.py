@@ -115,15 +115,27 @@ def _host_matches(host: str, pattern: str) -> bool:
     return host == pattern
 
 
+_UNSAFE_URL_CHARS = re.compile(r"[\\\s\x00-\x1f\x7f]|[^\x00-\x7f]")
+
+
 def _parse(url: str, what: str) -> tuple[str, str]:
     if not isinstance(url, str) or not url.strip():
         raise EndpointNotAllowedError(f"{what} is empty")
+    url = url.strip()
+    # HTTP libraries do not all split a URL the same way: a backslash, a space or a
+    # user-info part can make them connect to a host other than the one read here.
+    if _UNSAFE_URL_CHARS.search(url):
+        raise EndpointNotAllowedError(
+            f"{what} contains a backslash, whitespace, a control or a non-ASCII character"
+        )
     try:
-        parts = urlsplit(url.strip())
+        parts = urlsplit(url)
         host = (parts.hostname or "").lower().rstrip(".")
         parts.port  # noqa: B018 - raises ValueError on a malformed port
     except ValueError as exc:
         raise EndpointNotAllowedError(f"{what} is not a valid URL") from exc
+    if "@" in parts.netloc:
+        raise EndpointNotAllowedError(f"{what} must not carry a user name or password")
     scheme = parts.scheme.lower()
     if scheme not in {"https", "http"} or not host:
         raise EndpointNotAllowedError(f"{what} must be an https:// URL with a host name")
@@ -264,6 +276,21 @@ def log_endpoint(provider: str, host: str) -> None:
 
 
 _RESOURCE_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+
+
+_VERTEX_LOCATION = re.compile(r"global|[a-z]+(?:-[a-z0-9]+)*")
+
+
+def vertex_host(location: str) -> str:
+    """Return the Vertex AI host for ``location``: ``global`` or a region (``europe-north1``).
+
+    google-genai puts the location into ``https://{location}-aiplatform.googleapis.com``;
+    a value with URL characters would name another host.
+    """
+    name = location.strip().lower() if isinstance(location, str) else ""
+    if not _VERTEX_LOCATION.fullmatch(name):
+        raise EndpointNotAllowedError("location must be 'global' or a Google Cloud region name")
+    return "aiplatform.googleapis.com" if name == "global" else f"{name}-aiplatform.googleapis.com"
 
 
 def foundry_host(resource: str) -> str:

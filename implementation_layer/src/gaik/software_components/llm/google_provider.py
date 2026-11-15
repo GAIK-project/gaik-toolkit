@@ -11,7 +11,7 @@ from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel
 
-from gaik.software_components.endpoints import log_endpoint
+from gaik.software_components.endpoints import log_endpoint, vertex_host
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
@@ -62,7 +62,7 @@ class GoogleProvider:
                 credentials = service_account.Credentials.from_service_account_info(
                     info, scopes=scopes
                 )
-            log_endpoint("vertex", "aiplatform.googleapis.com")
+            log_endpoint("vertex", vertex_host(config.get("location", "global")))
             self.raw = genai.Client(
                 vertexai=True,
                 project=config["project_id"],
