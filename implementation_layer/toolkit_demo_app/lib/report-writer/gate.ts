@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { clientIp } from "@/lib/client-ip";
 import { ratelimit } from "@/lib/rate-limit";
 import {
   pickUsageFromEvents,
@@ -17,14 +18,7 @@ export interface AccessRow {
   report_limit_override: number | null;
 }
 
-/** First hop of x-forwarded-for, then x-real-ip, else "anonymous". */
-export function clientIp(headers: Headers): string {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    headers.get("x-real-ip") ??
-    "anonymous"
-  );
-}
+export { clientIp };
 
 /**
  * The 403 body for a user who is not approved or has used up their reports,
@@ -148,6 +142,19 @@ export async function recordReportUsage(
   if (error) throw new Error(`Recording usage failed: ${error.message}`);
 }
 
+/** Sent only by these route handlers; the generic proxy never forwards it. */
+export const REPORT_RUN_HEADER = "x-gaik-report-run";
+
+/**
+ * The header that tells the backend this run passed the gate above. The API's
+ * run routes refuse a run without it when REPORT_RUN_TOKEN is set on both
+ * deployments (api/utils/report_runs.py).
+ */
+export function reportRunHeaders(): Record<string, string> {
+  const token = process.env.REPORT_RUN_TOKEN;
+  return token ? { [REPORT_RUN_HEADER]: token } : {};
+}
+
 /**
  * POST the form to the backend and stream its SSE back. When the stream ends,
  * onEnd gets the folded result usage; if it throws, the client receives an
@@ -162,6 +169,7 @@ export async function forwardReportRun(
   try {
     backendRes = await fetch(`${BACKEND_URL}${backendPath}`, {
       method: "POST",
+      headers: reportRunHeaders(),
       body,
     });
   } catch (e) {

@@ -189,7 +189,14 @@ def extract_audio(
         creationflags=creationflags,
     )
     # communicate() drains both pipes — prevents 64 KB buffer deadlock
-    _stdout, stderr = process.communicate(timeout=cfg.ffmpeg_chunk_timeout_seconds)
+    try:
+        _stdout, stderr = process.communicate(timeout=cfg.ffmpeg_chunk_timeout_seconds)
+    except subprocess.TimeoutExpired:
+        # communicate() leaves the process running on a timeout: stop it and
+        # collect it before the error goes on.
+        process.kill()
+        process.communicate()
+        raise
 
     if process.returncode != 0:
         raise RuntimeError(f"FFmpeg failed (exit {process.returncode}): {stderr[:500]}")

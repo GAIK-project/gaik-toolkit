@@ -144,7 +144,9 @@ def _parse_pairwise(raw: str) -> tuple[Literal["a", "b", "tie"], int, int, str]:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("Could not decode pairwise judge response; first 200 chars: %s", text[:200])
+        logger.warning(
+            "Could not decode pairwise judge response as JSON (%d characters)", len(text)
+        )
         return ("tie", 0, 0, "")
     winner_raw = str(data.get("winner", "tie")).lower()
     if winner_raw not in ("a", "b", "tie"):

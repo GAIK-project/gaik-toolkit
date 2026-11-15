@@ -20,7 +20,7 @@ import logging
 import math
 import random
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -813,7 +813,13 @@ class RAGResponseEvaluator:
 
         _validate_referenced(df, question_col, reference_col, candidate_cols)
 
-        scored_df = _init_scored_df(df, candidate_cols, list(spec.score_fields), resume_from)
+        scored_df = _init_scored_df(
+            df,
+            candidate_cols,
+            list(spec.score_fields),
+            resume_from,
+            text_cols=[question_col, reference_col, *candidate_cols],
+        )
 
         sentinel_field = next(iter(spec.score_fields))
         pending: list[tuple[str, int]] = [
@@ -1025,11 +1031,13 @@ class RAGResponseEvaluator:
         v1_canon = _canonicalize_verdict(v1, spec, flipped=flip_first)
         if not swap_and_average:
             return _build_outcome(v1_canon, None, spec)
+        # The second pass shows the pair in the opposite order of the first.
+        second_a, second_b = (resp_a, resp_b) if flip_first else (resp_b, resp_a)
         v2 = self._judge_once(
-            _pairwise_messages(spec.system_prompt, question, resp_b, resp_a),
+            _pairwise_messages(spec.system_prompt, question, second_a, second_b),
             spec.schema,
         )
-        v2_canon = _canonicalize_verdict(v2, spec, flipped=True)
+        v2_canon = _canonicalize_verdict(v2, spec, flipped=not flip_first)
         return _build_outcome(v1_canon, v2_canon, spec)
 
     async def _judge_pair_async(
@@ -1052,12 +1060,14 @@ class RAGResponseEvaluator:
         v1_canon = _canonicalize_verdict(v1, spec, flipped=flip_first)
         if not swap_and_average:
             return _build_outcome(v1_canon, None, spec)
+        # The second pass shows the pair in the opposite order of the first.
+        second_a, second_b = (resp_a, resp_b) if flip_first else (resp_b, resp_a)
         v2 = await self._judge_once_async(
-            _pairwise_messages(spec.system_prompt, question, resp_b, resp_a),
+            _pairwise_messages(spec.system_prompt, question, second_a, second_b),
             spec.schema,
             semaphore,
         )
-        v2_canon = _canonicalize_verdict(v2, spec, flipped=True)
+        v2_canon = _canonicalize_verdict(v2, spec, flipped=not flip_first)
         return _build_outcome(v1_canon, v2_canon, spec)
 
     # ----------------------------------------------------------------- saving
@@ -1073,11 +1083,11 @@ class RAGResponseEvaluator:
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
         if isinstance(result, RAGResponseEvalResult):
-            result.scored_df.to_csv(out / "rag_eval_scored.csv", index=False)
-            _summary_referenced_csv(result).to_csv(out / "rag_eval_summary.csv", index=False)
+            _write_csv(result.scored_df, out / "rag_eval_scored.csv")
+            _write_csv(_summary_referenced_csv(result), out / "rag_eval_summary.csv")
         else:
-            result.comparisons_df.to_csv(out / "rag_eval_pairwise.csv", index=False)
-            _summary_pairwise_csv(result).to_csv(out / "rag_eval_pairwise_ranking.csv", index=False)
+            _write_csv(result.comparisons_df, out / "rag_eval_pairwise.csv")
+            _write_csv(_summary_pairwise_csv(result), out / "rag_eval_pairwise_ranking.csv")
         if write_plots:
             figs = self.plots(result)
             for name, fig in figs.items():
@@ -1257,12 +1267,17 @@ def _init_scored_df(
     candidate_cols: list[str],
     score_fields: list[str],
     resume_from: pd.DataFrame | None,
+    text_cols: Sequence[str] = (),
 ) -> pd.DataFrame:
-    scored = (
-        resume_from.copy()
-        if (resume_from is not None and len(resume_from) == len(df))
-        else df.copy()
-    )
+    if resume_from is not None and len(resume_from) == len(df):
+        scored = resume_from.copy()
+        # A table read back from a saved CSV carries _write_csv's leading
+        # apostrophe on text that starts like a formula; the input text is df's.
+        for column in text_cols:
+            if column in scored.columns:
+                scored[column] = df[column].to_numpy()
+    else:
+        scored = df.copy()
     for col in candidate_cols:
         for field_name in score_fields:
             colname = f"{col}_{field_name}"
@@ -1355,6 +1370,28 @@ def _count_constraint_violations(sub: pd.DataFrame, col: str, spec: ScoringSpec)
     return violations
 
 
+# A spreadsheet reads a cell that starts with one of these as a formula. The
+# scored and pairwise tables hold questions, answers and judge rationales, all
+# text from a model or a dataset, so such a cell is written with a leading
+# apostrophe and opens as the text it is.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_cell(value: Any) -> Any:
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
+
+def _write_csv(df: pd.DataFrame, path: Path) -> None:
+    """Write ``df`` as CSV with text cells that a spreadsheet opens as text."""
+    safe = df.copy()
+    for column in safe.columns:
+        if safe[column].dtype == object or pd.api.types.is_string_dtype(safe[column]):
+            safe[column] = safe[column].map(_csv_cell)
+    safe.to_csv(path, index=False)
+
+
 def _summary_referenced_csv(result: RAGResponseEvalResult) -> pd.DataFrame:
     rows = []
     for agg in result.per_system:
@@ -1423,8 +1460,17 @@ def _init_pairwise_df(
                 "_resp_b": row[b],
                 **{ac: pd.NA for ac in aspect_cols},
             }
-            if prior is not None and (q, a, b) in prior.index:
-                pr = prior.loc[(q, a, b)]
+            # A row read back from a saved CSV is in the form _write_csv gave it.
+            key = next(
+                (
+                    k
+                    for k in ((q, a, b), (_csv_cell(q), _csv_cell(a), _csv_cell(b)))
+                    if prior is not None and k in prior.index
+                ),
+                None,
+            )
+            if key is not None:
+                pr = prior.loc[key]
                 if pd.notna(pr.get("winner", pd.NA)):
                     entry.update(
                         {

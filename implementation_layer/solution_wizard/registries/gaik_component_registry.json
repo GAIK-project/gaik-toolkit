@@ -227,6 +227,7 @@
     ],
     "uses_components": [
       "Embedder",
+      "VectorStore",
       "Retriever",
       "AnswerGenerator"
     ],
@@ -3470,5 +3471,285 @@
     "example_script_path": "implementation_layer/examples/software_components/web_scraper/web_scraper_example.py",
     "readme_path": "implementation_layer/src/gaik/software_components/web_scraper/README.md",
     "install_extra": "web-scraper"
+  },
+  {
+    "id": "source_tracing",
+    "name": "SourceTracing",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json",
+      "text",
+      "transcript",
+      "enhanced_transcript",
+      "parsed_text",
+      "pdf"
+    ],
+    "output_artifact_types": [
+      "structured_json",
+      "validation_report"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "policy",
+      "source"
+    ],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "A plain-code check with no model call; the extraction call returns extra output tokens for one quote per value",
+      "cost_sensitivity": "low -- no extra model call, only the quote tokens added to the extraction output",
+      "degrades_on": [
+        "scanned_pdfs_without_a_text_layer",
+        "models_that_do_not_copy_quotes_verbatim"
+      ]
+    },
+    "known_limitations": [
+      "Works around an extractor and changes none: the caller passes the augmented model and prompt to the extractor, then checks the results. It does not call the extractor itself.",
+      "The model must follow the instruction. A model that skips the quotes lowers coverage; one that paraphrases a quote shows as not found (verdict check).",
+      "A verified value matches its quote; it does not prove the quote is the right place to read the value. Use LLMJudge or a person for that.",
+      "A scan has no text layer, so its values are unchecked; an image file is reported as no_text_layer.",
+      "Positions are in the transcript text or on the PDF page. A quote is not mapped to a time in an audio or video recording.",
+      "A value in another format, such as a converted unit, is flagged check: the code cannot tell a correct conversion from a wrong number. A text value that is not in its quote is reported as reworded.",
+      "For AudioToStructuredData and DocumentsToStructuredData the caller must supply schema and requirements, so that the evidence request reaches only the extraction; check against result.parsed_documents, or against the transcript the pipeline extracted from (enhanced when present, else raw).",
+      "Adds output tokens to the extraction call. It is provider-agnostic: no LLM call of its own."
+    ],
+    "best_for": [
+      "human_review_support",
+      "linking_values_to_source_quotes",
+      "audit_trail_for_extracted_values",
+      "page_highlighting_of_pdf_evidence"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "trace_sources",
+        "component": "SourceTracing",
+        "inputs": [
+          "source_text",
+          "structured_json"
+        ],
+        "outputs": [
+          "validation_report"
+        ],
+        "parameters": {
+          "source": "text"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/source_tracing/",
+    "import_path": "gaik.software_components.source_tracing",
+    "example_script_path": "implementation_layer/examples/software_components/source_tracing/",
+    "readme_path": "implementation_layer/src/gaik/software_components/source_tracing/README.md",
+    "install_extra": "source-tracing"
+  },
+  {
+    "id": "spreadsheet_parser",
+    "name": "SpreadsheetParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "tabular",
+      "document"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Fast and lossless for cell values; carries no layout, charts or cell formatting",
+      "cost_sensitivity": "none -- fully local, no API calls",
+      "degrades_on": [
+        "very_large_sheets_for_downstream_llm_context",
+        "workbooks_whose_formulas_have_no_stored_results"
+      ]
+    },
+    "known_limitations": [
+      "Only .xlsx and .csv; other types, including legacy .xls, raise ValueError",
+      "Formula cells show the result stored in the file; a workbook whose formulas have no stored results (written by a library and never opened in Excel) raises ValueError -- open and save it in Excel or LibreOffice first",
+      "The first non-empty row is the header; empty rows are dropped and empty sheets omitted; a file with no non-empty rows raises ValueError",
+      "Reads a spreadsheet as text. To ask questions over its data use TabularAgent; for mixed source files use SourceNormalizer, which calls this parser"
+    ],
+    "best_for": [
+      "spreadsheet_to_markdown",
+      "row_level_citations",
+      "fast_local_processing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_spreadsheet",
+        "component": "SpreadsheetParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/spreadsheet_parser/",
+    "import_path": "gaik.software_components.parsers.spreadsheet_parser",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/demo_spreadsheet_parser.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/spreadsheet_parser/README.md",
+    "install_extra": "spreadsheet-parser"
+  },
+  {
+    "id": "vector_store",
+    "name": "VectorStore",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text_chunks",
+      "embeddings"
+    ],
+    "output_artifact_types": [
+      "vector_index",
+      "retrieved_chunks"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "persist",
+      "persist_path",
+      "collection_name"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Embedding similarity only: no keyword half, so exact terms (ids, names, codes) can be missed; PgVectorStore.search_hybrid() adds keyword search",
+      "cost_sensitivity": "none beyond the embedding calls that fill it -- runs locally, no database to set up",
+      "degrades_on": [
+        "very_large_collections",
+        "queries_that_depend_on_exact_terms"
+      ]
+    },
+    "known_limitations": [
+      "Default is an in-memory store: the index is lost when the process ends; persist=True keeps it in a local Chroma folder (needs chromadb, installed with gaik[vector-store])",
+      "In-memory search compares the query with every stored embedding, so it suits small and medium collections",
+      "Metadata filtering is basic",
+      "A single process: not a shared or production index -- use PgVectorStore for that"
+    ],
+    "best_for": [
+      "proof_of_concept_retrieval",
+      "small_to_medium_collections",
+      "no_database_setup"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "store_embeddings",
+        "component": "VectorStore",
+        "inputs": [
+          "text_chunks"
+        ],
+        "outputs": [
+          "vector_index"
+        ]
+      },
+      {
+        "id": "retrieve_chunks",
+        "component": "VectorStore",
+        "inputs": [
+          "user_query",
+          "vector_index"
+        ],
+        "outputs": [
+          "retrieved_chunks"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/vector_store/",
+    "import_path": "gaik.software_components.RAG.vector_store",
+    "example_script_path": "implementation_layer/examples/software_components/RAG/retriever_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/vector_store/README.md",
+    "install_extra": "vector-store"
+  },
+  {
+    "id": "fields_to_docx",
+    "name": "FieldsToDocx",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json",
+      "validation_report",
+      "text",
+      "transcript",
+      "enhanced_transcript",
+      "parsed_text"
+    ],
+    "output_artifact_types": [
+      "word_document"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "output_path",
+      "title",
+      "metadata",
+      "labels",
+      "trace",
+      "evidence",
+      "appendix",
+      "appendix_title",
+      "footer",
+      "headers",
+      "empty_text",
+      "true_text",
+      "false_text",
+      "font_name",
+      "font_size",
+      "label_width_cm"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Deterministic and fast: writes exactly the values it is given; adds nothing and checks nothing",
+      "cost_sensitivity": "none -- fully local, python-docx only, no API calls",
+      "degrades_on": [
+        "several_records_in_one_file",
+        "deeply_nested_values"
+      ]
+    },
+    "known_limitations": [
+      "One record per file: call write() once per record; several records in one call raise ValueError",
+      "No nested tables: a list or a dict inside a value is written as lines of text in its cell",
+      "No template file: a fixed, neutral layout on an A4 page; restyle the result in Word",
+      "No images, charts or page numbers",
+      "Evidence comes from the first citation of a top-level field; citations of values inside a list (items[0].quantity) are not shown",
+      "The quote is shown as the model gave it; the verdict comes from SourceTracing, this component checks nothing itself"
+    ],
+    "best_for": [
+      "word_report_from_extracted_fields",
+      "human_readable_extraction_output",
+      "evidence_column_with_source_tracing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "write_word_report",
+        "component": "FieldsToDocx",
+        "inputs": [
+          "extracted_data"
+        ],
+        "outputs": [
+          "word_report"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/fields_to_docx/fields_to_docx.py",
+    "import_path": "gaik.software_components.fields_to_docx",
+    "example_script_path": "implementation_layer/examples/software_components/fields_to_docx/fields_to_docx_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/fields_to_docx/README.md",
+    "install_extra": "fields-to-docx"
   }
 ]

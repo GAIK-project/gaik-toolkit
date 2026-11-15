@@ -55,13 +55,10 @@ text layer. It roughly triples the output tokens of an extraction.
 
 ### Solution Wizard
 
-Session diagnostics are off: the self-hosted Langfuse pilot was removed from Rahti on
-2026-11-04. The tracing adapter (`api/utils/wizard_tracing.py`) stays and records
-nothing unless `WIZARD_LANGFUSE_ENABLED=true` and the `LANGFUSE_*` variables point at a
-Langfuse instance; [observability/langfuse](observability/langfuse/README.md) has the
-pilot's setup if it is needed again.
-
-- **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC. Access is gated separately from the regular demos: anonymous visitors are sent to `/sign-in`, approved users need a per-user `wizard_access` grant from `/admin`, and the optional team shortcut `/solution-wizard?key=<WIZARD_ACCESS_SECRET>` sets a temporary access cookie.
+The Solution Configuration Wizard runs as its own service, Wizard V2. This demo no
+longer runs it: `/solution-wizard` is open to every visitor, says where the wizard
+is and links to `WIZARD_V2_URL` when that is set. The server reads it at run time, so
+a deployment sets it with `oc set env` and needs no rebuild.
 
 ### No-code Assets
 
@@ -95,13 +92,11 @@ picked, the audio demos still transcribe on the server (local Whisper, else
 or CSC Aitta account. Enter the model/deployment and key; Azure also needs its public
 resource endpoint. **Test connection** makes one small chat request. **Use this key**
 activates it for this browser tab until refresh, navigation away or sign-out. **Clear
-own model** returns to the server models.
+own model** returns to the server models. A run on an own key needs a signed-in account,
+approved or pending; it spends no trial run.
 
 Own settings apply to Extractor, Schema Generator, Classifier, LLM-based Parser modes,
-Vision Extractor, PostgreSQL Agent questions, single LLM Judge tasks and Solution Wizard
-image attachments. Wizard text/document attachments keep their existing local parsing
-or server Docling fallback; audio attachments require clearing own model settings to
-use the server transcription deployment. The conversation uses the hosted Claude Agent SDK.
+Vision Extractor, PostgreSQL Agent questions and single LLM Judge tasks.
 The judge panel, RAG/Tabular sessions, audio workflows and Report Writer use server
 settings; their page notice makes this explicit. Select a vision-capable model for
 images, and use the server settings for mixed-provider workflows.
@@ -164,13 +159,48 @@ bun dev:api        # API: uv run uvicorn api.main:app --reload
 ```
 
 - Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/docs
+- API Docs: http://localhost:8000/docs (with `DEMO_API_DOCS=true` in `.env.local`, as in `.env.example`)
 
 ### Docker
 
 ```bash
 docker compose up --build
 ```
+
+### Pinned images and the API lock
+
+The images build from pinned base images and Python packages, so a rebuild of
+the same commit installs the same ones. The API image's system packages (ffmpeg,
+tesseract, pandoc) still come from the Debian mirror at build time, and
+`Dockerfile.pnpm` is not pinned.
+
+- `Dockerfile` and `api/Dockerfile` name each base image by tag and digest
+  (`oven/bun:1.4.4@sha256:…`). Dependabot proposes new ones once a month. To
+  move one by hand, look up the digest of the new tag and replace both:
+
+  ```bash
+  docker buildx imagetools inspect oven/bun:1.4.4 | grep -m1 Digest
+  ```
+
+  Take the digest of the multi-platform index (the first `Digest:` line), not
+  of one platform's image.
+- The API image installs every Python package from `api/requirements.lock`,
+  pinned with its hashes (`uv pip install --require-hashes`); a file whose hash
+  is not in the lock fails the build. `api/requirements.txt` stays the list to
+  edit, with the gaik pin. After changing it, write the lock again and commit
+  both:
+
+  ```bash
+  scripts/lock_api_requirements.sh            # keeps the other pins as they are
+  scripts/lock_api_requirements.sh --upgrade  # takes the newest allowed releases
+  ```
+
+  Nothing refreshes the lock on its own: run it with `--upgrade` now and then to
+  take security releases. The lock is for the image: Python 3.12 on linux
+  x86_64, with torch and torchvision as CPU builds from the PyTorch index. It
+  records the sha256 of the `requirements.txt` it was made from, and
+  `api/tests/test_api_image_pins.py` fails when that file has changed since, or
+  when a base image has no digest.
 
 ## Project Structure
 
@@ -213,9 +243,9 @@ toolkit_demo_app/
 | `/video-search` | Semantic dental video search |
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
 | `/report-writer` | Mixed-source report generation |
-| `/wizard` | Solution Configuration Wizard (optional; needs the Azure Foundry env vars) |
 
-API docs: <http://localhost:8000/docs> (Swagger UI)
+API docs: <http://localhost:8000/docs> (Swagger UI), served only with `DEMO_API_DOCS=true`;
+the deployed API leaves `/docs`, `/redoc` and `/openapi.json` off.
 
 ## Tech Stack
 

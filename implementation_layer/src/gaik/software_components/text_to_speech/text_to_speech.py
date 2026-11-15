@@ -98,7 +98,7 @@ class TextToSpeech:
         self,
         text: str,
         *,
-        language: Literal["fi", "en"] = DEFAULT_LANGUAGE,
+        language: Literal["fi", "en"] | None = None,
         voice: str | None = None,
         instructions: str | None = None,
         speed: float | None = None,

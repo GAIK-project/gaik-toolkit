@@ -103,6 +103,22 @@ def test_free_text_with_commas_is_not_converted_to_numbers(con, tmp_path):
     assert types["comment"].startswith("VARCHAR")
 
 
+def test_a_column_name_with_a_double_quote_is_loaded_and_profiled(con, tmp_path):
+    from gaik.software_components.tabular_agent.profiling import profile_tables
+
+    path = tmp_path / "pipes.csv"
+    path.write_text('id;5" pipe;price\n1;yes;1,5\n2;no;2,25\n', encoding="utf-8")
+
+    tables = _load(con, path)
+    schema = profile_tables(con, tables)
+
+    [table] = schema.tables
+    assert table.row_count == 2
+    assert [column.name for column in table.columns] == ["id", '5" pipe', "price"]
+    # The comma decimals are still repaired next to the oddly named column.
+    assert con.execute('SELECT sum(price) FROM "pipes"').fetchone()[0] == 3.75
+
+
 def test_rejects_unsupported_extension(tmp_path):
     path = tmp_path / "notes.pdf"
     path.write_bytes(b"%PDF-1.4")

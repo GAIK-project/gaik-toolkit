@@ -1,5 +1,9 @@
-import { expect, test } from "bun:test";
-import { accessDenial, clientIp } from "./gate";
+import { afterEach, expect, test } from "bun:test";
+import { accessDenial, clientIp, reportRunHeaders } from "./gate";
+
+afterEach(() => {
+  delete process.env.REPORT_RUN_TOKEN;
+});
 
 const row = (over: object = {}) => ({
   status: "approved",
@@ -8,10 +12,8 @@ const row = (over: object = {}) => ({
   ...over,
 });
 
-test("clientIp takes the first x-forwarded-for hop, then x-real-ip", () => {
-  expect(clientIp(new Headers({ "x-forwarded-for": " 1.2.3.4 , 5.6.7.8" }))).toBe("1.2.3.4");
-  expect(clientIp(new Headers({ "x-real-ip": "9.9.9.9" }))).toBe("9.9.9.9");
-  expect(clientIp(new Headers())).toBe("anonymous");
+test("the report gate keys on the router-added address", () => {
+  expect(clientIp(new Headers({ "x-forwarded-for": "1.2.3.4, 203.0.113.7" }))).toBe("203.0.113.7");
 });
 
 test("a missing or unapproved row is pending approval", () => {
@@ -53,4 +55,10 @@ test("the cap is the per-user override, else the default", () => {
     used: 0,
     limit: 0,
   });
+});
+
+test("a report run carries the run token to the backend only when one is set", () => {
+  expect(reportRunHeaders()).toEqual({});
+  process.env.REPORT_RUN_TOKEN = "sample-run-token";
+  expect(reportRunHeaders()).toEqual({ "x-gaik-report-run": "sample-run-token" });
 });

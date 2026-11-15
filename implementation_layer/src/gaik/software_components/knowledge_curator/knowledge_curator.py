@@ -26,8 +26,9 @@ from .models import (
     SectionKnowledge,
     SectionSpec,
     SourceRef,
+    _quote_in_squashed,
+    _squash,
     check_sections,
-    quote_in_text,
 )
 from .prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
 
@@ -86,7 +87,7 @@ def _failing_units(
     answer: CurationResponse, sources: NormalizedSources
 ) -> list[tuple[int, str, str]]:
     """``(position, reason, message)`` of every unit whose quote fails the check."""
-    texts = {s.file: s.text for s in sources.sources}
+    texts = {s.file: _squash(s.text) for s in sources.sources}
     failures = []
     for n, unit in enumerate(answer.units, start=1):
         if unit.source.file not in texts:
@@ -97,7 +98,7 @@ def _failing_units(
                     f'unit {n}: file "{unit.source.file}" is not a source; quote "{unit.quote}"',
                 )
             )
-        elif not quote_in_text(unit.quote, texts[unit.source.file]):
+        elif not _quote_in_squashed(unit.quote, texts[unit.source.file]):
             failures.append(
                 (
                     n,
@@ -106,6 +107,19 @@ def _failing_units(
                 )
             )
     return failures
+
+
+def _log_summary(failing: list[tuple[int, str, str]], bad_conflicts: list[str]) -> list[str]:
+    """What a log line says about failures: unit positions and reasons, no source text.
+
+    The full messages quote the sources and name the conflicts' topics; they
+    go back to the model in the retry prompt and into the raised error, not
+    into the log.
+    """
+    summary = [f"unit {n}: {reason}" for n, reason, _ in failing]
+    if bad_conflicts:
+        summary.append(f"{len(bad_conflicts)} conflict(s) refer to missing units")
+    return summary
 
 
 def _failing_conflicts(answer: CurationResponse) -> list[str]:
@@ -267,7 +281,9 @@ class KnowledgeCurator:
         if failing or bad_conflicts:
             failures = [message for _, _, message in failing]
             logger.warning(
-                "Section %r: retrying after failures %s", section.id, failures + bad_conflicts
+                "Section %r: retrying after failures %s",
+                section.id,
+                _log_summary(failing, bad_conflicts),
             )
             messages = [
                 *messages,
@@ -289,9 +305,9 @@ class KnowledgeCurator:
         if bad_conflicts:
             logger.warning(
                 "Section %r: removed conflict references to units that do not exist after "
-                "the retry: %s",
+                "the retry: %d conflict(s)",
                 section.id,
-                bad_conflicts,
+                len(bad_conflicts),
             )
             if progress_callback:
                 progress_callback(
@@ -315,7 +331,7 @@ class KnowledgeCurator:
                 "Section %r: dropped %d unit(s) whose quote failed the check after the retry: %s",
                 section.id,
                 len(dropped),
-                [message for _, _, message in failing],
+                _log_summary(failing, []),
             )
             if progress_callback:
                 progress_callback(

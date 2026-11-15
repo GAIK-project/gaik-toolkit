@@ -41,6 +41,7 @@ import {
   type TtsExample,
   formatDuration,
   joinBytes,
+  joinMp3,
   LANGUAGES,
   MAX_CHARACTERS,
   MAX_COMPARE_VOICES,
@@ -177,7 +178,8 @@ export default function TextToSpeechPage() {
       clips.push(bytesFromBase64(data.audio_base64));
     }
     if (!first) throw new Error("There is no text to read");
-    const bytes = joinBytes(clips);
+    const bytes =
+      first.response_format === "mp3" ? joinMp3(clips) : joinBytes(clips);
     const url = URL.createObjectURL(
       new Blob([new Uint8Array(bytes)], { type: first.content_type }),
     );

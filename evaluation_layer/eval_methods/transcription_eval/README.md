@@ -537,7 +537,7 @@ pip install -r requirements.txt
 **Dependencies:**
 - `jiwer==4.0.0` - Word error rate calculation
 - `rapidfuzz==3.14.3` - Levenshtein distance for spelling errors
-- `python-dotenv==1.2.1` - Environment variable management
+- `python-dotenv==1.2.4` - Environment variable management
 - `openai==1.109.1` - OpenAI/Azure OpenAI API client
 
 ### 2. Configure API Access

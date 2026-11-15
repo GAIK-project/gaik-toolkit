@@ -13,8 +13,17 @@ const tabs = [
   },
 ] as const;
 
-/** Shared top of /skills and /prompts: title and a two-way switch. */
-export function NoCodeHeader({ active }: { active: "/skills" | "/prompts" }) {
+/**
+ * Shared top of /skills and /prompts: title and a two-way switch. `lede`
+ * replaces the shared sentence with one about the page itself.
+ */
+export function NoCodeHeader({
+  active,
+  lede,
+}: {
+  active: "/skills" | "/prompts";
+  lede?: string;
+}) {
   return (
     <header className="space-y-5">
       <div className="space-y-2">
@@ -22,8 +31,8 @@ export function NoCodeHeader({ active }: { active: "/skills" | "/prompts" }) {
           No-code assets
         </h1>
         <p className="text-muted-foreground max-w-xl">
-          Ready-made skills and prompts. Download, copy or open them in the
-          assistant you already use.
+          {lede ??
+            "Ready-made skills and prompts. Download, copy or open them in the assistant you already use."}
         </p>
       </div>
       <nav

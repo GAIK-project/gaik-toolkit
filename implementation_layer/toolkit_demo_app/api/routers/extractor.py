@@ -56,6 +56,16 @@ except ImportError:
     from api.utils.model_settings import provider_error_detail
     from api.utils.schema_view import describe_fields, specs_by_name, structure_of
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -220,7 +230,7 @@ async def generate_schema(request: GenerateSchemaRequest):
         )
 
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "Loading the extractor")) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
@@ -286,7 +296,7 @@ async def extract_data_plain_language(request: PlainLanguageExtractRequest):
         )
 
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "Loading the extractor")) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
@@ -361,7 +371,7 @@ async def extract_data(request: ExtractRequest):
         )
 
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "Loading the extractor")) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
@@ -386,6 +396,8 @@ async def trace_sources(
         raise HTTPException(status_code=400, detail="sources and data must be JSON") from exc
 
     contents = [await validate_file_size(f) for f in file]
+    if any(content_mismatch(".pdf", content) for content in contents):
+        raise HTTPException(status_code=415, detail="The file's content is not a .pdf file.")
     with tempfile.TemporaryDirectory() as folder:
         documents = []
         for number, (upload, content) in enumerate(zip(file, contents, strict=True), start=1):

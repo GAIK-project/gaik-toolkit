@@ -65,6 +65,15 @@ def sanitize_identifier(name: str, *, fallback: str = "table") -> str:
     return cleaned[:60]
 
 
+def quote_identifier(name: str) -> str:
+    """``name`` as a quoted SQL identifier; a double quote inside it is doubled.
+
+    Column names come from the file's header row and can hold any character
+    (``5" pipe``).
+    """
+    return '"' + name.replace('"', '""') + '"'
+
+
 def _unique(name: str, taken: set[str]) -> str:
     """Append a numeric suffix until ``name`` is unused."""
     if name not in taken:
@@ -209,7 +218,7 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
         column, data_type = row[0], str(row[1]).upper()
         if not data_type.startswith("VARCHAR"):
             continue
-        quoted = f'"{column}"'
+        quoted = quote_identifier(column)
         try:
             total, matching = con.execute(
                 f"SELECT count({quoted}), "
@@ -420,7 +429,8 @@ def _looks_messy(grid: list[list[Any]], header_row: int | None) -> bool:
 
     shapes: dict[tuple[bool, ...], int] = {}
     for row in body:
-        shapes[_row_shape(row, width)] = shapes.get(_row_shape(row, width), 0) + 1
+        shape = _row_shape(row, width)
+        shapes[shape] = shapes.get(shape, 0) + 1
     dominant = max(shapes.values())
     return (len(body) - dominant) / len(body) > _SHAPE_DEVIATION_LIMIT
 
@@ -565,12 +575,13 @@ _DOMINANT_SHARE_MIN = 0.6
 def _numeric_columns(rows: list[list[Any]], dominant: tuple[bool, ...]) -> set[int]:
     """Indices of columns that hold numbers in the sheet's normal data rows."""
     width = len(dominant)
+    # The normal rows are the same for every column, so find them once.
+    normal = [r for r in rows if _row_shape(r, width) == dominant]
     numeric: set[int] = set()
     for i in range(width):
         if not dominant[i]:
             continue
-        values = [_at(r, i) for r in rows if _row_shape(r, width) == dominant]
-        values = [v for v in values if not _is_blank(v)]
+        values = [v for v in (_at(r, i) for r in normal) if not _is_blank(v)]
         if values and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
             numeric.add(i)
     return numeric
@@ -599,9 +610,9 @@ def _drop_shape_outliers(rows: list[list[Any]]) -> list[list[Any]]:
     if not rows:
         return rows
     width = max(len(r) for r in rows)
+    row_shapes = [_row_shape(row, width) for row in rows]
     shapes: dict[tuple[bool, ...], int] = {}
-    for row in rows:
-        shape = _row_shape(row, width)
+    for shape in row_shapes:
         shapes[shape] = shapes.get(shape, 0) + 1
     dominant, count = max(shapes.items(), key=lambda kv: kv[1])
     if count / len(rows) < _DOMINANT_SHARE_MIN:
@@ -613,8 +624,7 @@ def _drop_shape_outliers(rows: list[list[Any]]) -> list[list[Any]]:
     numeric = _numeric_columns(rows, dominant)
 
     kept: list[list[Any]] = []
-    for row in rows:
-        shape = _row_shape(row, width)
+    for row, shape in zip(rows, row_shapes, strict=True):
         if shape != dominant and all(d for s, d in zip(shape, dominant) if s):
             missing = {i for i in range(width) if dominant[i] and not shape[i]}
             is_sparse = sum(shape) <= _SPARSE_FILL_RATIO * dominant_filled
@@ -648,24 +658,22 @@ def _create_from_rows(con: Any, table_name: str, header: list[str], rows: list[l
     directly means both input paths get the same type inference, so a column of
     dates behaves identically whether it arrived as .csv or .xlsx.
     """
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False, newline="", encoding="utf-8"
-    )
+    # A directory of its own, readable by this user only and removed with its
+    # content whatever happens, keeps the rows out of the shared temp folder.
     try:
-        writer = csv.writer(tmp)
-        writer.writerow(header)
-        for row in rows:
-            writer.writerow(["" if _is_blank(c) else c for c in row])
-        tmp.close()
-        posix = Path(tmp.name).as_posix()
-        con.execute(
-            f'CREATE TABLE "{table_name}" AS SELECT * FROM '
-            f"read_csv('{_escape(posix)}', auto_detect=true, sample_size=-1)"
-        )
+        with tempfile.TemporaryDirectory(prefix="gaik_tabular_") as tmp_dir:
+            csv_path = Path(tmp_dir) / "rows.csv"
+            with open(csv_path, "w", newline="", encoding="utf-8") as tmp:
+                writer = csv.writer(tmp)
+                writer.writerow(header)
+                for row in rows:
+                    writer.writerow(["" if _is_blank(c) else c for c in row])
+            con.execute(
+                f'CREATE TABLE "{table_name}" AS SELECT * FROM '
+                f"read_csv('{_escape(csv_path.as_posix())}', auto_detect=true, sample_size=-1)"
+            )
     except Exception as exc:
         raise TableLoadError(f"Could not build table '{table_name}': {exc}") from exc
-    finally:
-        Path(tmp.name).unlink(missing_ok=True)
     repair_european_decimals(con, table_name)
 
 

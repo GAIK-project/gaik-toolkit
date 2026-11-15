@@ -211,7 +211,9 @@ class WebScraper:
             yield SkippedPage(url=start_url, reason=exc.reason)
             return
 
-        start_host = host_of(start)
+        # The start page's hosts: the one asked for and, once the page is in,
+        # the one it was served from (gaik.ai redirects to www.gaik.ai).
+        start_hosts = {host_of(start)}
         queue: deque[tuple[str, int, str | None]] = deque([(start, 0, None)])
         queued = {start}
         fetched: set[str] = set()
@@ -234,13 +236,15 @@ class WebScraper:
                 fetched.add(url)  # a redirect alias of a page already yielded
                 continue
             fetched.update((url, page.final_url))
+            if depth == 0:
+                start_hosts.add(host_of(page.final_url))
             pages += 1
             yield page
             if depth >= max_depth:
                 continue
             for link in page.links:
                 if link.url not in queued and self._follows(
-                    link, start_host, include, exclude, stay_on_host
+                    link, start_hosts, include, exclude, stay_on_host
                 ):
                     queued.add(link.url)
                     queue.append((link.url, depth + 1, page.final_url))
@@ -281,13 +285,13 @@ class WebScraper:
     def _follows(
         self,
         link: PageLink,
-        start_host: str,
+        start_hosts: set[str],
         include: list[str],
         exclude: list[str],
         stay_on_host: bool,
     ) -> bool:
         if stay_on_host:
-            if host_of(link.url) != start_host:
+            if host_of(link.url) not in start_hosts:
                 return False
         elif not self.policy.in_allowed_domains(link.url):
             return False

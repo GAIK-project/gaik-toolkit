@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security weakness
+    url: https://github.com/GAIK-project/gaik-toolkit/security/advisories/new
+    about: Report it privately, never in a public issue.

@@ -16,6 +16,9 @@ import {
   MODEL_TIER_HEADER,
   isModelStaff,
 } from "@/lib/model-tier";
+import { backendTarget, isApiPath } from "@/lib/backend-target";
+import { routedPath } from "@/lib/request-path";
+import { clientIp } from "@/lib/client-ip";
 import { ratelimit } from "@/lib/rate-limit";
 import {
   type AccessState,
@@ -24,6 +27,7 @@ import {
   withSessionCookies,
 } from "@/lib/supabase/proxy";
 import { takeTrialRun } from "@/lib/trial";
+import { attachCsp, isPagePath, setCsp } from "@/lib/csp";
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -38,8 +42,22 @@ function hasBody(method: string): boolean {
   return method !== "GET" && method !== "HEAD";
 }
 
+// A page request gets a fresh nonce and its Content-Security-Policy, on the
+// request, so the renderer stamps Next's own scripts with the nonce, and on the
+// response (lib/csp.ts). Kept apart from the routing below.
 export default async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  if (!isPagePath(request.nextUrl.pathname)) return route(request);
+  const csp = attachCsp(request);
+  return setCsp(await route(request), csp);
+}
+
+async function route(request: NextRequest): Promise<NextResponse> {
+  // The rules below match the path the backend routes on (lib/request-path.ts);
+  // the request is forwarded with the path as it was sent.
+  const rawPath = request.nextUrl.pathname;
+  const pathname = routedPath(rawPath);
+  if (pathname === null)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Read once per request and shared by the wizard and API gates. Reading it can
   // refresh the session, and every response below carries the new cookies.
@@ -48,63 +66,25 @@ export default async function proxy(request: NextRequest) {
   const reply = (response: NextResponse) =>
     withSessionCookies(response, access);
 
-  // Solution Wizard access gate. Two independent ways in:
-  //   1. Team shortcut: /solution-wizard?key=<WIZARD_ACCESS_SECRET> sets a
-  //      30-day `wizard_access` cookie (works without login). Unset the secret
-  //      in the environment to disable this path entirely.
+  // Old Solution Wizard API gate. The wizard runs as Wizard V2 and the demo API no
+  // longer serves /wizard, so nothing behind this path answers; the gate stays
+  // until it is removed with the wizard_access grant. The /solution-wizard page is
+  // only a notice that links to Wizard V2 and is open to everyone. Two ways in:
+  //   1. Team shortcut: the `wizard_access` cookie equal to WIZARD_ACCESS_SECRET.
   //   2. Registered beta testers: a logged-in user whose access_requests row
   //      has wizard_access = true (granted by an admin in /admin).
-  // Dev: BYPASS_AUTH opens the wizard. Default-deny otherwise.
-  if (
-    pathname.startsWith("/solution-wizard") ||
-    pathname.startsWith("/api/wizard")
-  ) {
-    const isApi = pathname.startsWith("/api/wizard");
+  // Dev: BYPASS_AUTH opens it. Default-deny otherwise.
+  if (pathname.startsWith("/api/wizard")) {
     const secret = process.env.WIZARD_ACCESS_SECRET;
-    const cookieKey = request.cookies.get("wizard_access")?.value;
-    const queryKey = request.nextUrl.searchParams.get("key");
     const teamAllowed =
-      !!secret && (cookieKey === secret || queryKey === secret);
-
-    if (teamAllowed) {
-      if (queryKey === secret && cookieKey !== secret) {
-        // First visit with ?key= — set the access cookie and drop the key
-        // from the URL.
-        const cleanUrl = request.nextUrl.clone();
-        cleanUrl.searchParams.delete("key");
-        const response = NextResponse.redirect(cleanUrl);
-        response.cookies.set("wizard_access", secret, {
-          httpOnly: true,
-          secure: true,
-          sameSite: "lax",
-          path: "/",
-          maxAge: 60 * 60 * 24 * 30, // 30 days
-        });
-        return response;
-      }
-      // Otherwise allowed via the team key/cookie — fall through.
-    } else {
-      // No team key: allow registered beta testers (logged-in + wizard_access).
-      const { loggedIn, wizardAccess } = await accessState();
-      if (!wizardAccess) {
-        if (isApi) {
-          return reply(
-            NextResponse.json(
-              { error: "Solution Wizard is not available yet." },
-              { status: 403 },
-            ),
-          );
-        }
-        // Page: send anonymous visitors to sign-in (to register / request
-        // access); send logged-in users without the flag home with a flag so
-        // the onboarding provider can explain how to request beta access.
-        return reply(
-          NextResponse.redirect(
-            new URL(loggedIn ? "/?wizard=denied" : "/sign-in", request.url),
-          ),
-        );
-      }
-      // Otherwise allowed via registered beta access — fall through.
+      !!secret && request.cookies.get("wizard_access")?.value === secret;
+    if (!teamAllowed && !(await accessState()).wizardAccess) {
+      return reply(
+        NextResponse.json(
+          { error: "Solution Wizard is not available yet." },
+          { status: 403 },
+        ),
+      );
     }
   }
 
@@ -118,14 +98,11 @@ export default async function proxy(request: NextRequest) {
     pathname === "/api/knowledge-curator/run" || // likewise
     pathname === "/api/knowledge-synthesis/run" || // likewise
     pathname === "/api/helpdesk-chat"; // runs its model in Next.js
-  if (pathname.startsWith("/api") && !isNextApiRoute) {
+  if (isApiPath(pathname) && !isNextApiRoute) {
     // Rate limit requests that change state (heavy processing, deletes)
     if (ratelimit && isStateChanging(request.method)) {
       try {
-        const ip =
-          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-          request.headers.get("x-real-ip") ??
-          "anonymous";
+        const ip = clientIp(request.headers);
 
         const { success, limit, remaining, reset } = await ratelimit.limit(ip);
 
@@ -152,15 +129,16 @@ export default async function proxy(request: NextRequest) {
 
     // Require login + approval for every backend request that changes state,
     // not just POST: DELETE /video-search/clear empties a table.
-    // A request that carries the user's own model key on a supported route runs
-    // on their credential, so it needs no account. A user still waiting for
-    // approval runs on the daily trial allowance (lib/trial.ts).
+    // A user still waiting for approval runs on the daily trial allowance
+    // (lib/trial.ts). A request that carries the user's own model key on a
+    // supported route runs on their credential: it still needs a signed-in
+    // account, approved or pending, but spends no trial run.
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
-    if (needsApprovedUser(request.method, pathname, ownModelKey)) {
+    if (needsApprovedUser(request.method, pathname)) {
       const state = await accessState();
-      const refusal = await accessRefusal(state, takeTrialRun);
+      const refusal = await accessRefusal(state, takeTrialRun, ownModelKey);
       if (refusal) {
         // Why a run was refused, without who: the page shows the same text.
         console.warn(
@@ -175,8 +153,16 @@ export default async function proxy(request: NextRequest) {
       }
     }
 
-    const backendPath = pathname.replace(/^\/api/, "");
-    const targetUrl = `${BACKEND_URL}${backendPath}${request.nextUrl.search}`;
+    const backendPath = pathname.slice("/api".length);
+    // Null when the URL would not be on the backend's own origin.
+    const targetUrl = backendTarget(
+      BACKEND_URL,
+      rawPath,
+      request.nextUrl.search,
+    );
+    if (!targetUrl) {
+      return reply(NextResponse.json({ error: "Not found" }, { status: 404 }));
+    }
 
     const headers = new Headers();
     const contentType = request.headers.get("content-type");
@@ -266,8 +252,17 @@ export default async function proxy(request: NextRequest) {
         }),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Proxy error";
-      return reply(NextResponse.json({ error: message }, { status: 502 }));
+      // The reason names the backend's address; it goes to the log, not the page.
+      const id = crypto.randomUUID().slice(0, 12);
+      console.error(`[proxy] error id ${id}: backend request failed:`, error);
+      return reply(
+        NextResponse.json(
+          {
+            error: `The demo API did not answer (error id ${id}). Try again in a moment.`,
+          },
+          { status: 502 },
+        ),
+      );
     }
   }
 
@@ -276,6 +271,6 @@ export default async function proxy(request: NextRequest) {
   for (const { name, value } of access?.cookies ?? [])
     request.cookies.set(name, value);
   const response = reply(await updateSession(request));
-  response.headers.set("x-current-path", pathname);
+  response.headers.set("x-current-path", rawPath);
   return response;
 }

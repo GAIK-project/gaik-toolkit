@@ -14,15 +14,8 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function CopyButton({
-  text,
-  label = "Copy prompt",
-  variant = "outline",
-}: {
-  text: string;
-  label?: string;
-  variant?: ComponentProps<typeof Button>["variant"];
-}) {
+/** Copies `text` and reports `copied` for two seconds; a failure shows a toast. */
+function useCopy(text: string) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -34,10 +27,52 @@ export function CopyButton({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  return { copied, copy };
+}
+
+export function CopyButton({
+  text,
+  label = "Copy prompt",
+  variant = "outline",
+}: {
+  text: string;
+  label?: string;
+  variant?: ComponentProps<typeof Button>["variant"];
+}) {
+  const { copied, copy } = useCopy(text);
+
   return (
     <Button variant={variant} size="sm" onClick={copy}>
       {copied ? <Check /> : <Copy />}
       {copied ? "Copied" : label}
+    </Button>
+  );
+}
+
+/** The icon-only copy control beside a command; `label` names what it copies. */
+export function CopyIconButton({
+  text,
+  label,
+}: {
+  text: string;
+  label: string;
+}) {
+  const { copied, copy } = useCopy(text);
+  const name = copied ? "Copied" : label;
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon-lg"
+      onClick={copy}
+      aria-label={name}
+      title={name}
+      className="text-muted-foreground hover:text-foreground size-12"
+    >
+      {copied ? <Check className="text-primary" /> : <Copy />}
+      <span className="sr-only" role="status">
+        {copied ? "Copied" : ""}
+      </span>
     </Button>
   );
 }

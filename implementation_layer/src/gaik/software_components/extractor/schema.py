@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 import re
 import time
+import types
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -1278,6 +1279,25 @@ _TEXT_REPRESENTATION_RE = re.compile(
 
 _EXPLICIT_PATTERN_RE = re.compile(r"\b(?:regex|regular\s+expression|pattern)\b", re.IGNORECASE)
 
+# A list marker or heading, which starts a field's own item in the task text.
+_ITEM_START_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)]|#{1,6})\s+")
+# What may precede a field name that heads its own line: an optional list
+# marker or heading, then emphasis, backticks or quotes.
+_OWN_LINE_LEAD_RE = re.compile(r"^\s*(?:(?:[-*+]|\d+[.)]|#{1,6})\s+)?[`*_\"'(]*$")
+# What must follow that name, after closing emphasis and spaces: a colon,
+# parenthesis, equals sign or dash, or the end of the line. A comma there means
+# the line lists several fields ("Order date, delivery date (DD/MM/YYYY)").
+_OWN_LINE_CLOSING = "`*_\"')"
+_OWN_LINE_SEPARATORS = ":(=\u2013\u2014-"
+
+
+def _heads_own_line(line: str, start: int, end: int) -> bool:
+    """Whether the field name at ``line[start:end]`` heads its own line."""
+    if not _OWN_LINE_LEAD_RE.match(line[:start]):
+        return False
+    rest = line[end:].lstrip(_OWN_LINE_CLOSING).lstrip()
+    return not rest or rest[0] in _OWN_LINE_SEPARATORS
+
 
 def _field_specific_context(field: FieldSpec, original_text: str) -> str:
     """Return task text scoped to ``field`` instead of the whole task.
@@ -1290,7 +1310,11 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
     """
     pieces: list[str] = []
     label = field.field_name.replace("_", " ")
-    label_re = re.compile(rf"\b{re.escape(label)}\b", re.IGNORECASE)
+    # The task may name the field as prose ("delivery date") or as the
+    # identifier itself ("delivery_date", often in backticks).
+    label_re = re.compile(
+        rf"\b(?:{re.escape(label)}|{re.escape(field.field_name)})\b", re.IGNORECASE
+    )
     lines = original_text.splitlines()
 
     for index, line in enumerate(lines):
@@ -1298,26 +1322,33 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
         if not match:
             continue
 
-        # A prose line often lists several fields. Keep only this field's
-        # comma/semicolon/period-delimited clause so one field's parenthesized
-        # format cannot leak into another field on the same line.
-        clause_chars: list[str] = []
-        depth = 0
-        for char in line[match.start() :]:
-            if char in "([":
-                depth += 1
-            elif char in ")]" and depth:
-                depth -= 1
-            if depth == 0 and char in ",;." and clause_chars:
-                break
-            clause_chars.append(char)
-        pieces.append("".join(clause_chars))
+        if _heads_own_line(line, match.start(), match.end()):
+            # The field heads its own bullet, numbered item or heading
+            # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
+            # line is about this field, commas included.
+            pieces.append(line[match.start() :])
+        else:
+            # A prose line often lists several fields. Keep only this field's
+            # comma/semicolon/period-delimited clause so one field's
+            # parenthesized format cannot leak into another field on the same
+            # line.
+            clause_chars: list[str] = []
+            depth = 0
+            for char in line[match.start() :]:
+                if char in "([":
+                    depth += 1
+                elif char in ")]" and depth:
+                    depth -= 1
+                if depth == 0 and char in ",;." and clause_chars:
+                    break
+                clause_chars.append(char)
+            pieces.append("".join(clause_chars))
 
-        # Support a bullet whose following indented lines carry the detailed
+        # Support a bullet or heading whose following lines carry the detailed
         # representation instruction.
-        if re.match(r"^\s*(?:[-*]|\d+[.)])\s+", line):
+        if _ITEM_START_RE.match(line):
             for following in lines[index + 1 :]:
-                if not following.strip() or re.match(r"^\s*(?:[-*]|\d+[.)])\s+", following):
+                if not following.strip() or _ITEM_START_RE.match(following):
                     break
                 pieces.append(following)
 
@@ -1338,14 +1369,78 @@ def _requests_text_representation(text: str) -> bool:
     return bool(_TEXT_REPRESENTATION_RE.search(text))
 
 
-def _is_date_field(name: str, description: str) -> bool:
-    """Check if a field is a date field based on name or description (multilingual)."""
-    name_lower = name.lower()
-    desc_lower = description.lower()
-    for keyword in DATE_KEYWORDS:
-        if keyword in name_lower or keyword in desc_lower:
+# Keywords that are ordinary words in another language ("data" in English, "dato"
+# in Spanish, "jour" in "ordre du jour"). A field name is written in the task's
+# language, so they count there. A description is prose, where they count only as
+# its first word ("Data di consegna", "Dato for levering").
+_AMBIGUOUS_DATE_KEYWORDS = frozenset({"data", "dato", "jour"})
+# Keywords that form compounds in their language ("Lieferdatum",
+# "toimituspäivämäärä", "teslimtarihi", "fechaentrega"), so they may be part of a
+# longer word.
+_COMPOUND_DATE_KEYWORDS = frozenset(
+    {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih", "fecha"}
+)
+# In a field name a word may also end in a keyword or start with "date":
+# "birthdate", "leveringsdato", and "duedate" and "dateofbirth", which is what
+# FieldSpec makes of "dueDate" and "dateOfBirth". This is the fallback for a date
+# the model typed as text, so it has to catch those names. The words below start
+# or end the same way without being dates.
+_DATE_NAME_SUFFIXES = ("date", "dato")
+_NOT_A_DATE_WORDS = frozenset(
+    {
+        "accommodate",
+        "antedate",
+        "backdate",
+        "candidate",
+        "candidato",
+        "consolidate",
+        "consolidato",
+        "dated",
+        "dates",
+        "invalidate",
+        "liquidate",
+        "mandate",
+        "mandato",
+        "postdate",
+        "predate",
+        "revalidate",
+        "soldato",
+        "update",
+        "validate",
+        "validato",
+    }
+)
+_LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
+
+
+def _has_date_keyword(text: str, *, in_name: bool) -> bool:
+    """Whether ``text`` contains a date keyword as a word, not inside another word."""
+    words = _LETTER_WORD_RE.findall(text.lower())
+    for position, word in enumerate(words):
+        if (
+            in_name
+            and (word.startswith("date") or word.endswith(_DATE_NAME_SUFFIXES))
+            and word not in _NOT_A_DATE_WORDS
+        ):
             return True
+        for keyword in DATE_KEYWORDS:
+            if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name and position:
+                continue
+            if word == keyword:
+                return True
+            if keyword in _COMPOUND_DATE_KEYWORDS and keyword in word:
+                return True
     return False
+
+
+def _is_date_field(name: str, description: str) -> bool:
+    """Check if a field is a date field based on name or description (multilingual).
+
+    A keyword counts only as a whole word, so ``candidate_name``, ``update_notes``
+    and ``metadata`` are not dates. This is the fallback for a field the model
+    did not type as a date; :func:`_apply_type_overrides` checks the type first.
+    """
+    return _has_date_keyword(name, in_name=True) or _has_date_keyword(description, in_name=False)
 
 
 def _apply_type_overrides(requirements: ExtractionRequirements, original_text: str = "") -> None:
@@ -1368,15 +1463,25 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
         if not _EXPLICIT_PATTERN_RE.search(field_context):
             field.pattern = None
 
-        if _is_date_field(field.field_name, field.description):
+        # The model's own type comes first: it read the task, and a date field need
+        # not have a date word in its name ("deadline", "valid_until"). The keyword
+        # check catches a date the model typed as text.
+        if field.field_type == "date" or _is_date_field(field.field_name, field.description):
             if _requests_text_representation(field_context):
                 field.field_type = "str"
                 field.format = None
                 continue
 
             field.field_type = "date"
-            detected_format = _detect_date_format(field_context)
-            field.format = detected_format or global_date_format
+            # The field's own clause in the task text comes first, then a
+            # format the task states for all dates. The parsed description is
+            # the last fallback: the parser is told to keep a field's own
+            # format there, but what it writes must not override the task.
+            field.format = (
+                _detect_date_format(field_context)
+                or global_date_format
+                or _detect_date_format(field.description)
+            )
             continue
 
         field.format = None
@@ -1404,8 +1509,10 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
 
 def sanitize_model_name(name: str, suffix: str = "") -> str:
     """
-    Sanitize model name following OpenAI requirements.
-    Only alphanumeric, underscores, and hyphens are allowed.
+    Sanitize a model name so that it is a valid OpenAI schema name and a valid
+    Python class name: letters, digits and underscores only, not starting with a
+    digit. A saved schema is written out as Python source, where a hyphen or a
+    leading digit in the class name is a syntax error.
     Ensures final name (with suffix) is <= 64 chars.
 
     Args:
@@ -1416,12 +1523,16 @@ def sanitize_model_name(name: str, suffix: str = "") -> str:
         Sanitized name that when combined with suffix is <= 64 chars
     """
     # Replace invalid characters with underscores
-    s = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
+    s = re.sub(r"[^a-zA-Z0-9_]", "_", name)
     # Remove consecutive underscores
     s = re.sub(r"_+", "_", s).strip("_")
 
     # Remove leading/trailing underscores
     s = s.strip("_")
+
+    # A class name cannot start with a digit
+    if s[:1].isdigit():
+        s = f"Schema_{s}"
 
     # Remove suffix from name if it already exists (avoid duplication)
     if suffix and s.endswith(suffix.lstrip("_")):
@@ -1526,17 +1637,8 @@ def decimal_field_repr(annotation) -> str | None:
         return "DecimalField"
 
     args: tuple = ()
-    origin = get_origin(annotation)
-    if origin is Union:
+    if get_origin(annotation) in (Union, types.UnionType):
         args = get_args(annotation)
-    else:
-        try:
-            import types as _types
-
-            if isinstance(annotation, _types.UnionType):
-                args = get_args(annotation)
-        except AttributeError:
-            pass
 
     if Decimal in args and type(None) in args:
         return "OptionalDecimalField"
@@ -1968,9 +2070,10 @@ def _print_single_model(model: type[BaseModel]) -> None:
     # Class definition
     print(f"class {model.__name__}(BaseModel):")
 
-    # Docstring
+    # Docstring. The pipelines save this output as a Python module, so texts
+    # are written with repr(): one string literal whatever they contain.
     if model.__doc__:
-        print(f'    """{model.__doc__}"""')
+        print(f"    {model.__doc__!r}")
 
     # Config
     if hasattr(model, "model_config"):
@@ -1999,7 +2102,7 @@ def _print_single_model(model: type[BaseModel]) -> None:
         default = field_info.default
         if is_required:
             if description:
-                print(f'    {field_name}: {type_str} = Field(description="{description}")')
+                print(f"    {field_name}: {type_str} = Field(description={description!r})")
             else:
                 print(f"    {field_name}: {type_str}")
         else:
@@ -2012,7 +2115,7 @@ def _print_single_model(model: type[BaseModel]) -> None:
             if description:
                 print(
                     f"    {field_name}: {type_str} = "
-                    f'Field(default={default_repr}, description="{description}")'
+                    f"Field(default={default_repr}, description={description!r})"
                 )
             else:
                 print(f"    {field_name}: {type_str} = {default_repr}")
@@ -2032,6 +2135,20 @@ def _resolve_fallback(field: FieldSpec):
     if field.field_type in ("list[str]", "list[dict]"):
         return []
     return None
+
+
+def _holds_items(key: str, value: object, requirements: ExtractionRequirements) -> bool:
+    """True when ``value`` is a nested-list schema's item list under ``key``.
+
+    The items are dicts. A list with no items is recognised by its key, which is
+    the container's name and not one of the item fields; reading the first item
+    alone took an empty collection for a flat record.
+    """
+    if not isinstance(value, list):
+        return False
+    if value:
+        return isinstance(value[0], dict)
+    return key not in {field.field_name for field in requirements.fields}
 
 
 def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> dict:

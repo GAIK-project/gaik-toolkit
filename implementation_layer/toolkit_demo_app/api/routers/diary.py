@@ -1,5 +1,6 @@
 """Diary router - Construction diary (Työmaapäiväkirja) workflow endpoints."""
 
+import asyncio
 import io
 import logging
 import tempfile
@@ -29,10 +30,24 @@ except ImportError:
         save_schema,
         sse_event,
     )
+try:
+    from routers.pipeline import _pdf_path
+except ImportError:
+    from api.routers.pipeline import _pdf_path
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 logger = logging.getLogger(__name__)
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 
 # Temporary storage for generated PDFs
@@ -121,6 +136,8 @@ async def diary_audio_pipeline_stream(
     content = await file.read()
     if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
         raise HTTPException(status_code=413, detail=AUDIO_TOO_LARGE_DETAIL)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
@@ -155,7 +172,9 @@ async def diary_audio_pipeline_stream(
                 enhanced_transcript=enhanced,
                 compress_audio=compress_audio,
             )
-            transcription = transcriber.transcribe(file_path=tmp_path)
+            # Every model call below is blocking, so each runs in a worker thread:
+            # the event loop stays free for the other requests of this one-pod API.
+            transcription = await asyncio.to_thread(transcriber.transcribe, file_path=tmp_path)
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = "Transcription complete"
@@ -166,7 +185,8 @@ async def diary_audio_pipeline_stream(
             steps[1]["message"] = "Analyzing requirements..."
             yield sse_event("step_update", steps[1])
 
-            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+            extraction_model, requirements, generated_new_schema = await asyncio.to_thread(
+                _get_or_create_schema,
                 config=config,
                 user_requirements=user_requirements,
                 schema_key="construction_diary",
@@ -189,7 +209,8 @@ async def diary_audio_pipeline_stream(
             extractor = DataExtractor(
                 config=config, model=config["model"], **get_model_options(config)
             )
-            extracted_data = extractor.extract(
+            extracted_data = await asyncio.to_thread(
+                extractor.extract,
                 extraction_model=extraction_model,
                 requirements=requirements,
                 user_requirements=user_requirements,
@@ -227,7 +248,9 @@ async def diary_audio_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title="Construction Diary", logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    # In the pipeline's PDF folder, so its sweep removes
+                    # this one too after an hour (main.py starts it).
+                    pdf_path = _pdf_path(job_id)
 
                     if extracted_data:
                         pdf_data = extracted_data
@@ -236,7 +259,7 @@ async def diary_audio_pipeline_stream(
                             transcription.enhanced_transcript or transcription.raw_transcript
                         )
                         pdf_data = [{"transcript": transcript}]
-                    pdf_generator.run(pdf_data, pdf_path)
+                    await asyncio.to_thread(pdf_generator.run, pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
                     PDF_TIMESTAMPS[job_id] = datetime.now()
@@ -246,7 +269,7 @@ async def diary_audio_pipeline_stream(
                     yield sse_event("step_update", steps[pdf_step_idx])
                 except Exception as e:
                     steps[pdf_step_idx]["status"] = "error"
-                    steps[pdf_step_idx]["message"] = f"PDF generation failed: {e}"
+                    steps[pdf_step_idx]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[pdf_step_idx])
 
             # Send final result
@@ -262,15 +285,16 @@ async def diary_audio_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
@@ -333,7 +357,8 @@ async def diary_text_pipeline_stream(
             steps[1]["status"] = "in_progress"
             yield sse_event("step_update", steps[1])
 
-            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+            extraction_model, requirements, generated_new_schema = await asyncio.to_thread(
+                _get_or_create_schema,
                 config=config,
                 user_requirements=user_requirements,
                 schema_key="construction_diary",
@@ -364,7 +389,8 @@ async def diary_text_pipeline_stream(
             extractor = DataExtractor(
                 config=config, model=config["model"], **get_model_options(config)
             )
-            extracted_data = extractor.extract(
+            extracted_data = await asyncio.to_thread(
+                extractor.extract,
                 extraction_model=extraction_model,
                 requirements=requirements,
                 user_requirements=user_requirements,
@@ -390,10 +416,12 @@ async def diary_text_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title="Construction Diary", logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    # In the pipeline's PDF folder, so its sweep removes
+                    # this one too after an hour (main.py starts it).
+                    pdf_path = _pdf_path(job_id)
 
                     pdf_data = extracted_data if extracted_data else [{"input_text": text}]
-                    pdf_generator.run(pdf_data, pdf_path)
+                    await asyncio.to_thread(pdf_generator.run, pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
                     PDF_TIMESTAMPS[job_id] = datetime.now()
@@ -403,7 +431,7 @@ async def diary_text_pipeline_stream(
                     yield sse_event("step_update", steps[pdf_step_idx])
                 except Exception as e:
                     steps[pdf_step_idx]["status"] = "error"
-                    steps[pdf_step_idx]["message"] = f"PDF generation failed: {e}"
+                    steps[pdf_step_idx]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[pdf_step_idx])
 
             # Send final result
@@ -418,15 +446,16 @@ async def diary_text_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
 
     return StreamingResponse(
         event_generator(),

@@ -78,7 +78,6 @@ import {
   Sparkles,
   Trash2,
   Upload,
-  Wrench,
   X,
 } from "lucide-react";
 import { FeedbackButton } from "@/components/feedback";
@@ -319,121 +318,6 @@ function SourcesList({ sources }: { sources: Source[] }) {
   );
 }
 
-interface DebugChunk {
-  index: number;
-  content: string;
-  metadata: Record<string, unknown>;
-}
-
-function DebugDialog({ collectionId }: { collectionId: string }) {
-  const [open, setOpen] = useState(false);
-  const [chunks, setChunks] = useState<DebugChunk[]>([]);
-  const [totalChunks, setTotalChunks] = useState(0);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const perPage = 20;
-
-  async function loadChunks(p: number) {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/rag/debug/${collectionId}?page=${p}&per_page=${perPage}`,
-      );
-      if (!res.ok) return;
-      const data = await res.json();
-      setChunks(data.chunks);
-      setTotalChunks(data.total_chunks);
-      setPage(p);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleOpen(isOpen: boolean) {
-    setOpen(isOpen);
-    if (isOpen) loadChunks(1);
-  }
-
-  const totalPages = Math.ceil(totalChunks / perPage);
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Wrench className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[80vh] max-w-3xl overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Wrench className="h-5 w-5" />
-            Debug: {totalChunks} chunks in {collectionId}
-          </DialogTitle>
-        </DialogHeader>
-        <div
-          className="space-y-3 overflow-y-auto pr-2"
-          style={{ maxHeight: "60vh" }}
-        >
-          {loading ? (
-            <p className="text-muted-foreground text-sm">Loading...</p>
-          ) : (
-            chunks.map((chunk) => (
-              <div
-                key={chunk.index}
-                className="space-y-1 rounded-lg border p-3 text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-semibold">
-                    Chunk #{chunk.index}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {(chunk.metadata.parser_used as string) ?? "unknown"} | page{" "}
-                    {(chunk.metadata.page_number as string) ?? "?"}
-                  </span>
-                </div>
-                <p className="text-muted-foreground leading-relaxed break-words whitespace-pre-wrap">
-                  {chunk.content}
-                </p>
-                <details className="text-muted-foreground/70">
-                  <summary className="cursor-pointer text-[10px]">
-                    metadata
-                  </summary>
-                  <pre className="mt-1 overflow-x-auto text-[10px]">
-                    {JSON.stringify(chunk.metadata, null, 2)}
-                  </pre>
-                </details>
-              </div>
-            ))
-          )}
-        </div>
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t pt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1 || loading}
-              onClick={() => loadChunks(page - 1)}
-            >
-              Previous
-            </Button>
-            <span className="text-muted-foreground text-xs">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages || loading}
-              onClick={() => loadChunks(page + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function RAGPage() {
   const router = useRouter();
   // Collection state
@@ -457,9 +341,6 @@ export default function RAGPage() {
 
   // Settings state
   const [topK, setTopK] = useState(5);
-  const [searchType, setSearchType] = useState<"semantic" | "hybrid">(
-    "semantic",
-  );
   const [parserChoice, setParserChoice] = useState<
     "vision_plus" | "docling_rag" | "pymupdf"
   >("docling_rag");
@@ -720,7 +601,6 @@ export default function RAGPage() {
       query_length: question.length,
       has_documents: hasDocuments,
       document_count: indexedCount,
-      search_type: searchType,
       top_k: topK,
     });
 
@@ -733,7 +613,6 @@ export default function RAGPage() {
       formData.append("question", question);
       formData.append("collection_id", collectionId);
       formData.append("top_k", String(topK));
-      formData.append("search_type", searchType);
 
       const response = await apiFetch("/api/rag/query/stream", {
         method: "POST",
@@ -925,10 +804,7 @@ export default function RAGPage() {
               </Dialog>
             )}
 
-            {/* Debug & Feedback - show when documents exist */}
-            {hasDocuments && collectionId && (
-              <DebugDialog collectionId={collectionId} />
-            )}
+            {/* Feedback - show when documents exist */}
             {hasDocuments && <FeedbackButton demoType="rag" />}
 
             {/* Settings */}
@@ -990,30 +866,6 @@ export default function RAGPage() {
                       Demo only parses 10 pages with Vision+ parser
                     </p>
                   ) : null}
-                  <div className="space-y-2">
-                    <Label htmlFor="searchType" className="text-xs">
-                      Search Type
-                    </Label>
-                    <Select
-                      value={searchType}
-                      onValueChange={(v) =>
-                        setSearchType(v as "semantic" | "hybrid")
-                      }
-                    >
-                      <SelectTrigger id="searchType" className="h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="semantic">Semantic</SelectItem>
-                        <SelectItem value="hybrid">Hybrid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <p className="text-muted-foreground text-xs">
-                    {searchType === "semantic"
-                      ? "Uses vector similarity"
-                      : "Combines vectors + keywords"}
-                  </p>
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>

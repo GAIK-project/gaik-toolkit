@@ -91,11 +91,22 @@ class JudgeUsage:
 
 @dataclass
 class ValidationResult:
-    """Aggregate result from one ``LLMJudge.validate(...)`` call."""
+    """Aggregate result from one ``LLMJudge.validate(...)`` call.
+
+    ``judge_error`` is set when the judge's response could not be read as a
+    list of flags; ``flags`` is then empty because there is no verdict, not
+    because nothing was wrong. ``passed`` is True only for a readable verdict
+    whose flags are all ``"ok"``.
+    """
 
     flags: list[ValidationFlag]
     raw_judge_text: str
     usage: JudgeUsage
+    judge_error: str | None = None
+
+    @property
+    def passed(self) -> bool:
+        return self.judge_error is None and all(f.severity == "ok" for f in self.flags)
 
 
 @dataclass
@@ -108,10 +119,14 @@ class JudgePanelResult:
             median Likert score across judges. See
             :func:`gaik.software_components.validators.llm_judge.panel._aggregate_flags`.
         agreement_score: Fraction of ``(item_index, field)`` keys where ALL
-            judges produced the same severity. ``1.0`` = full agreement,
-            ``0.0`` = total disagreement.
+            judges with a readable verdict produced the same severity; a judge
+            that did not flag a key counts as ``"ok"`` for it. ``1.0`` = full
+            agreement, ``0.0`` = total disagreement or fewer than two readable
+            verdicts.
         total_cost_usd: Sum of per-judge call costs.
         total_duration_s: Sum of per-judge wall times (sequential execution).
+        judge_errors: ``judge_error`` of each judge whose response could not be
+            read. Those judges are left out of the aggregation and agreement.
     """
 
     per_judge: list[ValidationResult]
@@ -119,6 +134,12 @@ class JudgePanelResult:
     agreement_score: float
     total_cost_usd: float
     total_duration_s: float
+    judge_errors: list[str] = field(default_factory=list)
+
+    @property
+    def passed(self) -> bool:
+        """True only when every judge gave a readable verdict and no key is flagged."""
+        return not self.judge_errors and all(f.severity == "ok" for f in self.aggregated_flags)
 
 
 @dataclass
@@ -217,11 +238,20 @@ class HallucinationReport:
         raw_judge_text: The judge's untouched response (useful for
             debugging or re-parsing with relaxed rules).
         usage: Token + cost record for the call.
+        judge_error: Set when the response could not be read as a list of
+            flags. ``flags`` is then empty because there is no verdict, so
+            check ``passed`` rather than ``not flags``.
     """
 
     flags: list[HallucinationFlag]
     raw_judge_text: str
     usage: JudgeUsage
+    judge_error: str | None = None
+
+    @property
+    def passed(self) -> bool:
+        """True only for a readable verdict that flags no field."""
+        return self.judge_error is None and not self.flags
 
 
 @dataclass

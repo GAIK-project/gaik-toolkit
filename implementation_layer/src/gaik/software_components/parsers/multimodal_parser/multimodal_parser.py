@@ -11,8 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-import requests
 from markdown_it import MarkdownIt
+
+from gaik.software_components import _http
 
 from .config import (
     create_claude_client,
@@ -22,6 +23,7 @@ from .config import (
     get_google_config,
     get_openai_config,
 )
+from .html_allowlist import keep_document_markup
 from .prompts import SYSTEM_PROMPTS, USER_PROMPTS
 from .usage import UsageRecord, build_usage_record
 
@@ -393,24 +395,30 @@ class MultimodalParser:
         else:
             api_key = self.config["api_key"]
             model = self.config["model"]
-            url = (
-                f"https://generativelanguage.googleapis.com/v1beta/"
-                f"models/{model}:generateContent?key={api_key}"
-            )
-            headers = {"Content-Type": "application/json; charset=utf-8"}
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            # The key travels in a header: a URL ends up in error messages and logs.
+            headers = {
+                "x-goog-api-key": api_key,
+                "Content-Type": "application/json; charset=utf-8",
+            }
 
-        response = requests.post(url, headers=headers, json=body, timeout=(30, 300))
-        response.raise_for_status()
+        response = _http.post(url, service="Gemini", headers=headers, json=body, timeout=(30, 300))
 
         payload = response.json()
         candidates = payload.get("candidates", [])
         if not candidates:
-            raise ValueError(f"The Gemini response contained no candidates: {payload}")
+            raise ValueError(
+                "The Gemini response contained no candidates "
+                f"({_http.describe_empty_gemini_response(payload)})"
+            )
 
         parts = candidates[0].get("content", {}).get("parts", [])
         text_parts = [p.get("text", "") for p in parts if p.get("text")]
         if not text_parts:
-            raise ValueError(f"The Gemini response contained no text parts: {payload}")
+            raise ValueError(
+                "The Gemini response contained no text parts "
+                f"({_http.describe_empty_gemini_response(payload)})"
+            )
 
         return "".join(text_parts).strip() + "\n", _extract_google_usage(payload)
 
@@ -565,7 +573,11 @@ def _clean_markdown(text: str) -> str:
 
 
 def _markdown_to_html(markdown_text: str, title: str = "Parsed Document") -> str:
-    """Render markdown to a styled standalone HTML document."""
-    rendered = MARKDOWN_RENDERER.render(markdown_text)
+    """Render markdown to a styled standalone HTML document.
+
+    The markdown holds the model's HTML tables, so the rendered body keeps only
+    the document markup listed in :mod:`.html_allowlist`.
+    """
+    rendered = keep_document_markup(MARKDOWN_RENDERER.render(markdown_text))
     indented = "\n".join(f"    {line}" if line else "" for line in rendered.splitlines())
     return HTML_TEMPLATE.format(title=html.escape(title), body=indented)

@@ -1,0 +1,28 @@
+name: Bug
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where
+      description: The component, page or command, and the gaik version or commit if you know it.
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: >-
+        What will be true when this is fixed, so anyone can check it. For example
+        "uploading a 30 MB PDF shows a size error instead of a blank page".
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: A security weakness goes through private reporting (see SECURITY.md), never a public issue.

@@ -53,6 +53,15 @@ pip install "gaik[llm-all]"       # all three
 # Finnish RAG text processing (lemmatization + compound splitting)
 pip install "gaik[finnish-rag]"
 
+# Extracted fields -> Word file (python-docx, no model call)
+pip install "gaik[fields-to-docx]"
+
+# One function per common task: parse, transcribe, generate fields, extract with evidence, classify
+pip install "gaik[operations]"
+
+# The operations as MCP tools for agents (console script: gaik-mcp)
+pip install "gaik[mcp]"
+
 # Software components (pipelines)
 pip install "gaik[audio-to-structured-data]"
 pip install "gaik[documents-to-structured-data]"

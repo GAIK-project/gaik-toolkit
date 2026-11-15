@@ -84,7 +84,7 @@ unknown model prices remain zero in the local pricing table.
 ```python
 result.raw_markdown     # Model output with <div data-bbox/data-label> wrappers
 result.clean_markdown   # Wrappers stripped, inner markdown/HTML preserved
-result.html             # Styled HTML document, or None if create_html=False
+result.html             # Styled HTML document (document tags only), or None if create_html=False
 result.usage            # UsageRecord with token counts, duration, and USD cost
 ```
 
@@ -208,6 +208,12 @@ result = parser.parse("document.pdf")
 | `GOOGLE_GENERATE_CONTENT_URL` | `vertex_ai=True` | — | Vertex generateContent endpoint. Include literal `{model}` to have the active model substituted at call time (e.g. `.../models/{model}:generateContent`), so one deployment can swap Gemini models at runtime. |
 | `GOOGLE_API_KEY` | `vertex_ai=False` | — | Direct Gemini API key |
 | `GOOGLE_MODEL` | Always | `gemini-3-flash-preview` | Model name (fallback when `model=None`) |
+
+A failed Gemini request raises the same `requests` exception type as before with a short
+message, e.g. `Gemini request failed: HTTP 429 Too Many Requests`. Its `response` keeps
+only the status code, the reason and a `Retry-After` header. The response body and the URL without its query string go to the debug log
+of `gaik.software_components._http` only. A response without text names only its
+block or finish reason.
 
 ## License
 

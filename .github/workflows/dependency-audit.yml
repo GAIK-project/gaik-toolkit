@@ -1,0 +1,71 @@
+name: Dependency audit
+
+# Lists known advisories for the library's dependencies (all extras) with pip-audit.
+# Report-only: findings appear as a warning and in the job summary, and the job
+# passes, so an advisory published overnight does not block unrelated work. A
+# scheduled run sends no mail when it passes; read the summary of the weekly run. The
+# repository commits no lockfile, so the versions are resolved from pyproject.toml
+# at run time, as a fresh `pip install "gaik[all]"` would get them.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "pyproject.toml"
+      - ".github/workflows/dependency-audit.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "pyproject.toml"
+      - ".github/workflows/dependency-audit.yml"
+  schedule:
+    - cron: "17 5 * * 1"  # Mondays 05:17 UTC
+  workflow_dispatch:
+
+# Nothing is granted by default; the job asks for what it needs.
+permissions: {}
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]  # The versions test.yml runs
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+    - name: Resolve the library's dependencies
+      env:
+        PYTHON_VERSION: ${{ matrix.python-version }}
+      run: uv pip compile pyproject.toml --all-extras --python-version "$PYTHON_VERSION" --quiet -o "$RUNNER_TEMP/requirements-audit.txt"
+
+    - name: Audit the resolved dependencies (report-only)
+      env:
+        PYTHON_VERSION: ${{ matrix.python-version }}
+      run: |
+        set +e
+        uvx pip-audit==2.10.1 --requirement "$RUNNER_TEMP/requirements-audit.txt" \
+          --no-deps --disable-pip --progress-spinner off --format markdown > "$RUNNER_TEMP/audit.md"
+        status=$?
+        set -e
+        {
+          echo "## pip-audit, Python $PYTHON_VERSION"
+          echo
+          cat "$RUNNER_TEMP/audit.md"
+        } >> "$GITHUB_STEP_SUMMARY"
+        if [ "$status" -ne 0 ] && [ -s "$RUNNER_TEMP/audit.md" ]; then
+          echo "::warning::pip-audit reported advisories for Python $PYTHON_VERSION; see the job summary."
+        elif [ "$status" -ne 0 ]; then
+          echo "::warning::pip-audit could not finish for Python $PYTHON_VERSION (exit $status); see the log."
+        fi
