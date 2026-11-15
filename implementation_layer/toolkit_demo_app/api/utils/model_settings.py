@@ -213,9 +213,8 @@ def request_model_settings() -> RequestModelSettings | None:
 
 
 def supports_model_settings(path: str, method: str) -> bool:
-    return method == "POST" and (
-        any(path == prefix or path.startswith(prefix + "/") for prefix in _PATHS)
-        or path.startswith("/wizard/message/")
+    return method == "POST" and any(
+        path == prefix or path.startswith(prefix + "/") for prefix in _PATHS
     )
 
 
