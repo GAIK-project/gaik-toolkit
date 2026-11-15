@@ -189,8 +189,8 @@ def test_native_provider_uses_shared_client_for_image_and_cleanup(monkeypatch, p
     assert parser._parse_image(b"image", page=1, previous_context=None) == "parsed"
     assert parser._clean_markdown(["first", "second"]) == "parsed"
     assert configs == [config]
-    assert client.calls[0][0][0]["content"][1]["type"] == "image_url"
-    assert "first" in client.calls[1][0][0]["content"]
+    assert client.calls[0][0][-1]["content"][1]["type"] == "image_url"
+    assert "first" in client.calls[1][0][-1]["content"]
     assert client.calls[0][1]["max_tokens"] == 16000
     assert parser.usage.snapshot() == {"prompt_tokens": 6}
 
@@ -209,7 +209,7 @@ def test_jpeg_image_uses_matching_media_type(monkeypatch, tmp_path):
     path = tmp_path / "picture.jpg"
     path.write_bytes(b"synthetic-jpeg")
     assert parser.convert_image(path) == "parsed markdown"
-    image = completions.kwargs["messages"][0]["content"][1]["image_url"]["url"]
+    image = completions.kwargs["messages"][-1]["content"][1]["image_url"]["url"]
     assert image.startswith("data:image/jpeg;base64,")
 
 
@@ -222,7 +222,7 @@ def test_webp_image_is_accepted_without_platform_mapping(monkeypatch, tmp_path):
     path = tmp_path / "picture.webp"
     path.write_bytes(b"synthetic-webp")
     assert parser.convert_image(path) == "parsed markdown"
-    image = completions.kwargs["messages"][0]["content"][1]["image_url"]["url"]
+    image = completions.kwargs["messages"][-1]["content"][1]["image_url"]["url"]
     assert image.startswith("data:image/webp;base64,")
 
 
@@ -231,7 +231,7 @@ def test_image_without_suffix_is_sent_as_png_and_non_images_fail(monkeypatch, tm
     upload = tmp_path / "upload"
     upload.write_bytes(b"synthetic-png")
     assert parser.convert_image(upload) == "parsed markdown"
-    image = completions.kwargs["messages"][0]["content"][1]["image_url"]["url"]
+    image = completions.kwargs["messages"][-1]["content"][1]["image_url"]["url"]
     assert image.startswith("data:image/png;base64,")
     with pytest.raises(ValueError, match="Unsupported image type"):
         parser.convert_image(tmp_path / "notes.txt")

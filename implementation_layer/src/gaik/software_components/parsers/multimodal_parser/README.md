@@ -175,6 +175,15 @@ result = parser.parse("document.pdf")
 
 ---
 
+## Source material as data
+
+The attached PDF is material, never instructions: every system prompt ends with
+the sentence in `SOURCE_MATERIAL_INSTRUCTION`
+([`gaik.software_components.source_material`](../../source_material.py)), and
+`additional_instructions` stay in the user message next to the file. With a
+shared provider config, file names next to the page images are cleaned to one
+line without quotes or angle brackets.
+
 ## Environment Variables
 
 ### OpenAI / Azure OpenAI
