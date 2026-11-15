@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import csv
 import math
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime, time
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from ...input_limits import InputLimits
+from ...input_limits import InputLimits, count_table_rows
 
 # Characters a number format shows as they are, without quotes.
 _PLAIN_TEXT = frozenset("  -+()$€£¥")
@@ -164,13 +164,6 @@ def _table(
     return "\n".join("| " + " | ".join(line) + " |" for line in lines)
 
 
-def _counted(rows: Iterable[Any], limits: InputLimits, name: str) -> Iterator[Any]:
-    """Yield ``rows``, refusing the table once it has more than ``max_table_rows``."""
-    for number, row in enumerate(rows, start=1):
-        limits.check_table_rows(number, name)
-        yield row
-
-
 def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
     """One ``## Sheet`` table per non-empty sheet, with the stored results of formulas."""
     from openpyxl import load_workbook
@@ -181,7 +174,7 @@ def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
         blocks, results = [], []
         for sheet, formula_sheet in zip(values.worksheets, formulas.worksheets):
             rows, number_formats = [], []
-            sheet_rows = _counted(sheet.iter_rows(), limits, f"{path.name} / {sheet.title}")
+            sheet_rows = count_table_rows(sheet.iter_rows(), limits, f"{path.name} / {sheet.title}")
             for row, formula_cells in zip(sheet_rows, formula_sheet.iter_rows()):
                 rows.append([cell.value for cell in row])
                 number_formats.append([cell.number_format for cell in row])
@@ -239,7 +232,7 @@ class SpreadsheetParser:
         elif suffix == ".csv":
             self.limits.check_file_size(path)
             with path.open(encoding="utf-8-sig", newline="") as handle:
-                rows = _counted(csv.reader(handle), self.limits, path.name)
+                rows = count_table_rows(csv.reader(handle), self.limits, path.name)
                 blocks = [table] if (table := _table(rows)) else []
         else:
             raise ValueError(f"{path.name}: unsupported spreadsheet type {suffix}")

@@ -20,13 +20,15 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS
+
 from .config import TranscriptionConfig
 from .models import ChunkSpec
 
 logger = logging.getLogger(__name__)
 
-# ffprobe reads only the container header; a minute is far more than it needs.
-FFPROBE_TIMEOUT_SECONDS = 60
+# The same ffprobe timeout as the input limit checks.
+FFPROBE_TIMEOUT_SECONDS = PROBE_TIMEOUT_SECONDS
 
 
 # ---------------------------------------------------------------------------

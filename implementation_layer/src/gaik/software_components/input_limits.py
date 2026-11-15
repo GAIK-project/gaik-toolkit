@@ -20,11 +20,12 @@ field set to ``None`` switches that limit off::
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import warnings
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -39,6 +40,7 @@ __all__ = [
     "DEFAULT_MAX_TABLE_ROWS",
     "InputLimitError",
     "InputLimits",
+    "count_table_rows",
     "docling_limits",
     "image_size",
     "pdf_page_count",
@@ -122,7 +124,8 @@ class InputLimits:
             XLSX may also unpack to at most ten times this size.
         max_pages: Pages in a PDF. The vision extractor counts every PDF page and
             image file of one call together.
-        max_table_rows: Rows in one sheet or CSV file.
+        max_table_rows: Data rows in one sheet or CSV file; the header row and
+            blank rows do not count.
         max_image_pixels: Pixels (width x height) of an image file, an embedded
             image or a PDF page rendered for a vision model.
         max_images: Embedded images of one document that are sent to a vision
@@ -181,7 +184,7 @@ class InputLimits:
             )
 
     def check_table_rows(self, rows: int, name: str) -> None:
-        """Refuse more than ``max_table_rows`` rows."""
+        """Refuse more than ``max_table_rows`` data rows (header and blank rows not counted)."""
         if self.max_table_rows is not None and rows > self.max_table_rows:
             raise InputLimitError(
                 f"{name} has more than the {self.max_table_rows} rows allowed "
@@ -276,17 +279,27 @@ class InputLimits:
                 maximum=maximum,
             )
 
-    def check_pdf(self, path: str | Path) -> int | None:
+    def check_pdf(self, path: str | Path, *, require_count: bool = False) -> int | None:
         """Refuse a PDF over ``max_file_bytes`` or ``max_pages``.
 
         Returns the page count, or ``None`` when no installed library can count
-        the pages (the size is still checked).
+        the pages (the size is still checked). With ``require_count`` such a PDF
+        is refused too while ``max_pages`` is set: use it where the whole file
+        goes to a model without being opened first.
         """
         path = Path(path)
         self.check_file_size(path)
         pages = pdf_page_count(path)
         if pages is not None:
             self.check_pages(pages, path.name)
+        elif require_count and self.max_pages is not None:
+            raise InputLimitError(
+                f"The pages of {path.name} cannot be counted, so it cannot be checked "
+                "against InputLimits.max_pages.",
+                limit="max_pages",
+                actual=float("inf"),
+                maximum=self.max_pages,
+            )
         return pages
 
     def check_image_file(self, path: str | Path) -> None:
@@ -343,15 +356,36 @@ class InputLimits:
         """Refuse a recording over ``max_media_bytes`` or ``max_media_seconds``.
 
         The duration is read with ffprobe. Returns it in seconds, or ``None``
-        when ffprobe is missing or cannot read the file; the caller then checks
-        the duration once it has decoded the audio, before any model call.
+        when ffprobe is missing or cannot read the file, or ``max_media_seconds``
+        is off; the caller then checks the duration once it has decoded the
+        audio, before any model call.
         """
         path = Path(path)
         self.check_media_size(path)
+        if self.max_media_seconds is None:
+            return None
         seconds = probe_media_seconds(path, timeout=timeout)
         if seconds is not None:
             self.check_media_seconds(seconds, path.name)
         return seconds
+
+
+def count_table_rows(rows: Iterable[Any], limits: InputLimits, name: str) -> Iterator[Any]:
+    """Yield ``rows``, refusing the table once it has more than ``max_table_rows`` data rows.
+
+    A row counts when any of its values (or cells' ``.value``) is not blank; the
+    first such row is the header and does not count.
+    """
+    filled = 0
+    for row in rows:
+        if any(_filled(getattr(value, "value", value)) for value in row):
+            filled += 1
+            limits.check_table_rows(filled - 1, name)
+        yield row
+
+
+def _filled(value: Any) -> bool:
+    return value is not None and not (isinstance(value, str) and not value.strip())
 
 
 def docling_limits(limits: InputLimits) -> dict[str, int]:
@@ -389,9 +423,10 @@ def pdf_page_count(path: str | Path) -> int | None:
     if pymupdf is not None:
         try:
             with pymupdf.open(path) as document:
-                return document.page_count if document.is_pdf else None
+                if document.is_pdf:
+                    return document.page_count
         except Exception:
-            return None  # an unreadable file is the parser's to report
+            pass  # try pypdfium2; an unreadable file is the parser's to report
     try:
         import pypdfium2
     except ImportError:
@@ -421,9 +456,11 @@ def _image_header_size(path: Path) -> tuple[int, int] | None:
             warnings.simplefilter("ignore", Image.DecompressionBombWarning)
             with Image.open(path) as image:
                 return image.size
-    except Image.DecompressionBombError:
-        # Pillow refuses to open an image over twice its own pixel limit.
-        return _TOO_LARGE_FOR_PILLOW
+    except Image.DecompressionBombError as error:
+        # Pillow refuses to open an image over twice its own pixel limit; its
+        # message names the image's pixel count, which is all the check needs.
+        match = re.search(r"\((\d+) pixels\)", str(error))
+        return (int(match.group(1)), 1) if match else _TOO_LARGE_FOR_PILLOW
     except Exception:
         return None  # not an image Pillow reads; the model or parser reports it
 

@@ -934,7 +934,7 @@ class VisionExtractor:
         pages = 0
         for path in file_paths:
             if _is_pdf(path):
-                pages += self.limits.check_pdf(path) or 1
+                pages += self.limits.check_pdf(path, require_count=True) or 1
             elif path.suffix.lower() in SUPPORTED_MIME_TYPES:
                 self.limits.check_image_file(path)
                 pages += 1

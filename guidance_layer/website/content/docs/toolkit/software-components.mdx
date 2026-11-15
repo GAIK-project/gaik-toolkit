@@ -19,13 +19,13 @@ Most chat-based components (Extractor and SchemaGenerator, Classifier, Transcrip
 
 ### Input limits
 
-Every PDF page, image and minute of a recording can become a model call, so the parsers, Vision Extractor, Document Classifier, Source Normalizer, RAG parsers, transcribers and Tabular Agent check a file before they parse it or call a model. A file over a limit raises `InputLimitError` (a `ValueError`) with a message naming the limit. Pass an `InputLimits` to the component's `limits` argument to change a limit; `None` switches one off.
+Every PDF page, image and minute of a recording can become a model call, so the parsers, Vision Extractor, Document Classifier, Source Normalizer, RAG parsers, transcribers and Tabular Agent check a file before they parse it or call a model. A file over a limit raises `InputLimitError` (a `ValueError`) with a message naming the limit. Pass an `InputLimits` to the component's `limits` argument (also `RAGWorkflow(limits=...)`) to change a limit; `None` switches one off. A PDF that goes to a model whole (Vision Extractor, Multimodal Parser) is refused when its pages cannot be counted.
 
 | `InputLimits` field | Default | Checked for |
 |---|---|---|
 | `max_file_bytes` | 100 MiB | documents, spreadsheets, images; a DOCX or XLSX may unpack to 10 × this |
 | `max_pages` | 500 | pages of a PDF (Vision Extractor: all files of one call, an image counting as one page) |
-| `max_table_rows` | 1,000,000 | rows of one sheet or CSV file |
+| `max_table_rows` | 1,000,000 | data rows of one sheet or CSV file (the header and blank rows do not count) |
 | `max_image_pixels` | 89,478,485 | an image file, an embedded image, or a PDF page rendered for a vision model |
 | `max_images` | 500 | embedded images described with a vision model for one document |
 | `max_media_bytes` | 2 GiB | audio and video files |

@@ -6,6 +6,7 @@ of documents and categorizing them using LLM-based classification.
 """
 
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal
 
@@ -64,9 +65,9 @@ class DocumentClassifier:
     This classifier extracts the first page from documents (PDF, DOCX, or images)
     and uses an LLM to categorize them into user-provided classes.
 
-    A file over ``limits`` (size, pages, image pixels) is refused with
-    :class:`~gaik.software_components.input_limits.InputLimitError` before it is
-    parsed. The vision parser reads only the first page of a PDF.
+    A file over ``limits`` (size, image pixels; pages for the vision parser) is
+    refused with :class:`~gaik.software_components.input_limits.InputLimitError`
+    before it is parsed. The vision parser reads only the first page of a PDF.
 
     Attributes:
         config: OpenAI configuration dictionary
@@ -276,7 +277,9 @@ class DocumentClassifier:
         """
         if parser_type == "pymupdf":
             try:
-                parser = PyMuPDFParser(limits=self.limits)
+                # Only the start of the text is used, so the page limit does not
+                # apply here; the size limit does.
+                parser = PyMuPDFParser(limits=replace(self.limits, max_pages=None))
                 result = parser.parse_document(file_path)
                 full_text = result["text_content"]
                 # Return first 1000 characters

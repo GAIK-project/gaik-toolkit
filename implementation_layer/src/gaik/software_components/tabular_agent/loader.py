@@ -34,7 +34,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from ..input_limits import InputLimits
+from ..input_limits import InputLimits, count_table_rows
 from .models import SheetLayout
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,6 @@ EXCEL_EXTENSIONS = {".xlsx", ".xlsm", ".xls"}
 PARQUET_EXTENSIONS = {".parquet"}
 JSON_EXTENSIONS = {".json", ".ndjson"}
 SUPPORTED_EXTENSIONS = CSV_EXTENSIONS | EXCEL_EXTENSIONS | PARQUET_EXTENSIONS | JSON_EXTENSIONS
-_ZIP_EXTENSIONS = {".xlsx", ".xlsm"}
 
 # How much of a sheet is shown to the LLM when inferring layout.
 PREVIEW_ROWS = 30
@@ -134,10 +133,7 @@ def normalize_sources(
                 f"Unsupported file type '{path.suffix}' for {path.name}. "
                 f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
             )
-        if path.suffix.lower() in _ZIP_EXTENSIONS:
-            limits.check_zip_container(path)
-        else:
-            limits.check_file_size(path)
+        limits.check_document(path)
     return pairs
 
 
@@ -202,8 +198,9 @@ def _load_flat_file(
 ) -> None:
     """Create a table from a CSV/TSV/Parquet/JSON file using DuckDB's readers.
 
-    At most one row more than ``max_table_rows`` is read, so a longer file is
-    refused without loading all of it.
+    At most one row more than ``max_table_rows`` goes into the table, so a longer
+    file is refused without holding all of it. DuckDB still scans the whole file
+    to infer the column types; ``max_file_bytes`` bounds that.
     """
     limits = limits or InputLimits()
     suffix = path.suffix.lower()
@@ -367,10 +364,8 @@ def _read_grid(
     Stops with ``InputLimitError`` once the sheet has more than ``max_table_rows``.
     """
     limits = limits or InputLimits()
-    grid = []
-    for number, row in enumerate(worksheet.iter_rows(values_only=True), start=1):
-        limits.check_table_rows(number, name)
-        grid.append(list(row))
+    rows = count_table_rows(worksheet.iter_rows(values_only=True), limits, name)
+    grid = [list(row) for row in rows]
     width = max((len(r) for r in grid), default=0)
     return [list(r) + [None] * (width - len(r)) for r in grid]
 

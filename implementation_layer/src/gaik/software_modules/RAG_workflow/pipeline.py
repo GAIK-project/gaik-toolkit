@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Literal
 
 from gaik.software_components.config import get_openai_config
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.RAG.answer_generator import AnswerGenerator
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.retriever import Retriever
@@ -71,6 +72,7 @@ class RAGWorkflow:
         stream: bool = True,
         conversation_history: bool = True,
         last_n: int = 3,
+        limits: InputLimits | None = None,
     ) -> None:
         """
         Initialize the workflow.
@@ -100,6 +102,10 @@ class RAGWorkflow:
             stream: Stream responses by default.
             conversation_history: Maintain last n Q/A pairs.
             last_n: Number of Q/A pairs to keep if conversation_history is True.
+            limits: Input limits for the parser (file size, PDF pages, images
+                described); a document over one raises ``InputLimitError`` before it
+                is parsed. Defaults to
+                :class:`~gaik.software_components.input_limits.InputLimits`.
         """
         if parser not in ("vision", "text"):
             raise ValueError(f"parser must be 'vision' or 'text', not {parser!r}")
@@ -119,14 +125,14 @@ class RAGWorkflow:
         if parser == "text":
             from .text_parser import TextRagParser
 
-            self.parser = TextRagParser()
+            self.parser = TextRagParser(limits=limits)
         else:
             if VisionRagParser is None:
                 raise ImportError(
                     "parser='vision' needs pip install 'gaik[rag-workflow]'; "
                     "parser='text' needs only 'gaik[rag-workflow-text]'"
                 ) from _vision_import_error
-            self.parser = VisionRagParser(vision_config=self.parser_config)
+            self.parser = VisionRagParser(vision_config=self.parser_config, limits=limits)
         self.embedder = Embedder(config=self.embedding_config, model=embedding_model)
         self.vector_store = VectorStore(
             persist=persist,

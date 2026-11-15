@@ -214,7 +214,7 @@ class Transcriber:
         input_path = Path(file_path)
         if not input_path.exists():
             raise FileNotFoundError(f"Input file not found: {input_path}")
-        probed_seconds = self.limits.check_media(input_path)
+        self.limits.check_media(input_path)
 
         job_id = self._generate_job_id(input_path)
 
@@ -241,7 +241,7 @@ class Transcriber:
             audio_duration_s = round(len(AudioSegment.from_file(str(input_path))) / 1000.0, 3)
         except Exception as exc:
             print(f"Could not read audio duration: {exc}")
-        if probed_seconds is None and audio_duration_s is not None:
+        if audio_duration_s is not None:
             self.limits.check_media_seconds(audio_duration_s, input_path.name)
 
         segments: list[dict] | None = None

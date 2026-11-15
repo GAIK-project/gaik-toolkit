@@ -108,9 +108,11 @@ config = get_llm_config("aitta")
 ## Input limits
 
 `DocumentClassifier(config, limits=InputLimits(...))` passes the limits to its parsers: a
-file over the size limit (100 MiB), a PDF over the page limit (500) or an image over the
-pixel limit raises `InputLimitError`, which is not wrapped in the generic classification
-error. With `parser="vision"` only the first page of a PDF is rendered and sent.
+file over the size limit (100 MiB) or an image over the pixel limit raises
+`InputLimitError`, which is not wrapped in the generic classification error. With
+`parser="vision"` only the first page of a PDF is rendered and sent, so the page limit
+applies to that page; the text parsers use only the start of the text and read a PDF of
+any page count.
 
 ## Environment Variables
 

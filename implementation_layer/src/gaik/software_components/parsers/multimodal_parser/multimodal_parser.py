@@ -236,7 +236,7 @@ class MultimodalParser:
         pdf_path = Path(pdf_path)
         if not pdf_path.exists():
             raise FileNotFoundError(f"PDF not found: {pdf_path}")
-        self.limits.check_pdf(pdf_path)
+        self.limits.check_pdf(pdf_path, require_count=True)
 
         system_prompt = self._get_system_prompt()
         user_prompt = self._get_user_prompt()

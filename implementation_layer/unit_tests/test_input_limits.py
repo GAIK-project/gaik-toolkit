@@ -107,8 +107,11 @@ def test_zip_container_that_unpacks_to_too_much_is_refused(tmp_path):
     assert caught.value.limit == "max_file_bytes"
 
 
-def test_image_header_over_the_pixel_limit_is_refused_without_decoding(tmp_path):
+def test_image_header_over_the_pixel_limit_is_refused_without_decoding(tmp_path, monkeypatch):
+    from PIL import ImageFile
+
     image = _png(tmp_path / "photo.png", 200, 100)
+    monkeypatch.setattr(ImageFile.ImageFile, "load", lambda self: pytest.fail("decoded"))
 
     with pytest.raises(InputLimitError) as caught:
         InputLimits(max_image_pixels=10_000).check_image_file(image)
@@ -121,7 +124,13 @@ def test_image_too_large_for_pillow_to_open_is_refused(tmp_path):
 
     with pytest.raises(InputLimitError) as caught:
         InputLimits().check_image_file(image)
-    assert caught.value.limit == "max_image_pixels"
+    assert (caught.value.limit, caught.value.actual) == ("max_image_pixels", 3_600_000_000)
+
+
+def test_a_raised_pixel_limit_is_honoured_above_pillows_own(tmp_path):
+    image = _png_header_only(tmp_path / "scan.png", 15_000, 15_000)
+
+    InputLimits(max_image_pixels=500_000_000).check_image_file(image)
 
 
 def test_media_probe_has_a_timeout_and_gives_up_when_it_passes(tmp_path, monkeypatch):
@@ -198,12 +207,13 @@ def test_spreadsheet_parser_refuses_a_csv_with_too_many_rows(tmp_path):
     from gaik.software_components.parsers.spreadsheet_parser import SpreadsheetParser
 
     path = tmp_path / "rows.csv"
-    path.write_text("name,value\n" + "".join(f"r{i},{i}\n" for i in range(5)))
+    path.write_text("name,value\n" + "".join(f"r{i},{i}\n" for i in range(5)) + ",\n" * 20)
 
     with pytest.raises(InputLimitError) as caught:
         SpreadsheetParser(limits=InputLimits(max_table_rows=4)).parse_spreadsheet(path)
     assert caught.value.limit == "max_table_rows"
-    assert "r4" in SpreadsheetParser(limits=InputLimits(max_table_rows=6)).parse_spreadsheet(path)
+    # Five data rows: the header and the blank rows do not count.
+    assert "r4" in SpreadsheetParser(limits=InputLimits(max_table_rows=5)).parse_spreadsheet(path)
 
 
 def test_spreadsheet_parser_refuses_a_sheet_with_too_many_rows(tmp_path):
@@ -217,7 +227,21 @@ def test_spreadsheet_parser_refuses_a_sheet_with_too_many_rows(tmp_path):
     workbook.save(path)
 
     with pytest.raises(InputLimitError, match="rows.xlsx / Sheet"):
-        SpreadsheetParser(limits=InputLimits(max_table_rows=9)).parse_spreadsheet(path)
+        SpreadsheetParser(limits=InputLimits(max_table_rows=8)).parse_spreadsheet(path)
+    SpreadsheetParser(limits=InputLimits(max_table_rows=9)).parse_spreadsheet(path)
+
+
+def test_rag_workflow_passes_its_limits_to_the_text_parser():
+    pytest.importorskip("langchain_core")
+    from gaik.software_modules.RAG_workflow.pipeline import RAGWorkflow
+
+    limits = InputLimits(max_pages=3)
+    config = {"provider": "openai", "model": "m", "api_key": "k"}
+    try:
+        workflow = RAGWorkflow(api_config=config, parser="text", persist=False, limits=limits)
+    except ImportError as exc:  # pragma: no cover - depends on the installed extras
+        pytest.skip(str(exc))
+    assert workflow.parser.limits is limits
 
 
 def test_text_rag_parser_refuses_a_pdf_with_too_many_pages(tmp_path):
@@ -328,6 +352,17 @@ def test_vision_extractor_counts_the_pages_of_all_files_before_the_call(tmp_path
     assert (caught.value.limit, caught.value.actual) == ("max_pages", 5)
 
 
+def test_vision_extractor_refuses_a_pdf_whose_pages_cannot_be_counted(tmp_path, monkeypatch):
+    from gaik.software_components.vision_extractor import VisionExtractor
+
+    extractor = VisionExtractor(api_config={"provider": "openai", "model": "m", "api_key": "k"})
+    monkeypatch.setattr(extractor, "_call_shared", lambda *a: pytest.fail("model was called"))
+    monkeypatch.setattr(input_limits, "pdf_page_count", lambda path: None)
+
+    with pytest.raises(InputLimitError, match="cannot be counted"):
+        extractor.suggest_requirements(file_paths=[_pdf(tmp_path / "a.pdf", pages=1)])
+
+
 def test_vision_extractor_refuses_an_image_over_the_pixel_limit(tmp_path, monkeypatch):
     from gaik.software_components.vision_extractor import VisionExtractor
 
@@ -417,12 +452,22 @@ def test_classifier_keeps_the_limit_error_instead_of_wrapping_it(tmp_path, monke
     from gaik.software_components.doc_classifier import classifier
 
     monkeypatch.setattr(classifier, "build_compat_client", lambda config: object())
-    instance = classifier.DocumentClassifier({"model": "m"}, limits=InputLimits(max_pages=1))
+    instance = classifier.DocumentClassifier({"model": "m"}, limits=InputLimits(max_file_bytes=100))
     monkeypatch.setattr(instance, "_classify_with_llm", lambda *a: pytest.fail("model called"))
     pdf = _pdf(tmp_path / "contract.pdf", pages=2)
 
-    with pytest.raises(InputLimitError, match="max_pages"):
+    with pytest.raises(InputLimitError, match="max_file_bytes"):
         instance._classify_single_file(str(pdf), ["contract", "unknown"], None)
+
+
+def test_classifier_text_path_reads_a_long_pdf_it_only_needs_the_start_of(tmp_path, monkeypatch):
+    from gaik.software_components.doc_classifier import classifier
+
+    monkeypatch.setattr(classifier, "build_compat_client", lambda config: object())
+    instance = classifier.DocumentClassifier({"model": "m"}, limits=InputLimits(max_pages=1))
+    pdf = _pdf(tmp_path / "manual.pdf", pages=3)
+
+    assert instance._extract_text(str(pdf), "pymupdf").startswith("Page 1 text")
 
 
 def test_classifier_vision_path_reads_only_the_first_page(tmp_path, monkeypatch):
@@ -511,6 +556,26 @@ def test_transcriber_uses_the_decoded_length_when_the_probe_cannot_read_it(tmp_p
     audio.write_bytes(b"\x00" * 64)
     transcriber = _transcriber(output_dir=tmp_path / "w", limits=InputLimits(max_media_seconds=60))
     monkeypatch.setattr(input_limits, "probe_media_seconds", lambda path, timeout: None)
+
+    with (
+        patch(
+            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            return_value=_FakeAudio(seconds=90),
+        ),
+        patch.object(transcriber, "_transcribe_input_remote") as remote,
+    ):
+        with pytest.raises(InputLimitError, match="max_media_seconds"):
+            transcriber.transcribe(audio)
+    remote.assert_not_called()
+
+
+def test_transcriber_checks_the_decoded_length_even_when_the_probe_reads_less(
+    tmp_path, monkeypatch
+):
+    audio = tmp_path / "meeting.mp3"
+    audio.write_bytes(b"\x00" * 64)
+    transcriber = _transcriber(output_dir=tmp_path / "w", limits=InputLimits(max_media_seconds=60))
+    monkeypatch.setattr(input_limits, "probe_media_seconds", lambda path, timeout: 30.0)
 
     with (
         patch(
@@ -632,9 +697,11 @@ def test_tabular_agent_refuses_a_sheet_with_too_many_rows(tmp_path):
         workbook.active.append([f"r{i}", i])
     workbook.save(path)
 
-    with TabularAgent(path, limits=InputLimits(max_table_rows=6)) as agent:
+    with TabularAgent(path, limits=InputLimits(max_table_rows=5)) as agent:
         with pytest.raises(InputLimitError, match="sales.xlsx / Sheet"):
             agent.table_names  # noqa: B018 - loading happens on first use
+    with TabularAgent(path, limits=InputLimits(max_table_rows=6)) as agent:
+        assert agent.table_names
 
 
 def test_tabular_agent_writes_sheet_rows_to_a_private_directory(tmp_path, monkeypatch):
