@@ -385,5 +385,45 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
                     )
                 )
 
+    # ------------------------------------------------------------------
+    # Rule 13: the governance flags decide which providers the PoC may use.
+    # A blueprint that allows no external model API, or requires local processing,
+    # must name a local endpoint for every stage; it never gets the default cloud
+    # provider. Without that restriction, a missing models.provider is reported,
+    # since the PoC then uses the default.
+    from .scaffolder import (
+        DEFAULT_PROVIDER,
+        defaulted_stages,
+        external_model_forbidden,
+        governance_problems,
+    )
+
+    if steps:
+        for problem in governance_problems(blueprint):
+            errors.append(Issue(13, problem))
+        try:
+            defaulted = [] if external_model_forbidden(blueprint) else defaulted_stages(blueprint)
+        except ValueError:
+            defaulted = []
+        if defaulted:
+            warnings.append(
+                Issue(
+                    13,
+                    f"No provider is set for the {', '.join(defaulted)} stage(s), so the PoC "
+                    f"uses the default {DEFAULT_PROVIDER!r}. Set models.provider to the "
+                    "provider the user chose.",
+                )
+            )
+    # Any answer but "no" or "unknown" counts as personal data, as in the BPMN annotations.
+    personal = str(blueprint.governance.data_handling.contains_personal_data).strip().lower()
+    if steps and personal not in {"no", "unknown", ""} and not external_model_forbidden(blueprint):
+        warnings.append(
+            Issue(
+                13,
+                "The blueprint marks the inputs as personal data and allows an external model "
+                "API: confirm that the chosen provider's data processing terms cover them.",
+            )
+        )
+
     ok = len(errors) == 0
     return ValidationResult(ok=ok, errors=errors, warnings=warnings)
