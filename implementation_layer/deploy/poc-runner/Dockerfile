@@ -57,7 +57,7 @@ ARG GAIK_VERSION=0.9.0
 # anthropic), and the vision-extract extra alone does not pull those in: the
 # first invoice PoC on s4 died on `No module named 'markdown_it'` before any
 # model call. The smoke test below imports vision_extractor for that reason.
-ARG GAIK_EXTRAS="extract,transcriber,enhance-transcript,audio-to-structured-data,llm-judge,vision-extract,multimodal-parser,documents-to-structured-data-cpu,evaluators,report-writer,vector-store,source-tracing"
+ARG GAIK_EXTRAS="extract,transcriber,enhance-transcript,audio-to-structured-data,llm-judge,vision-extract,multimodal-parser,documents-to-structured-data-cpu,evaluators,report-writer,vector-store,source-tracing,fields-to-docx"
 
 # pyyaml is the scaffolded run_poc.py's own import (`import yaml`) and is not a
 # gaik dependency; pydantic and python-dotenv arrive with gaik core. reportlab is
