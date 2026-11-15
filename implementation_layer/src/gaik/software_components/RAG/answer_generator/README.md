@@ -94,8 +94,9 @@ sentence in `SOURCE_MATERIAL_INSTRUCTION`
 ([`gaik.software_components.source_material`](../../source_material.py)). A
 sentence in an indexed document cannot close its block or change the task. With
 a custom prompt, your template is the user message and `{context}` becomes the
-blocks. Conversation history keeps the earlier questions and answers only, never
-the chunks retrieved for them. The call and its return value are unchanged.
+blocks. Conversation history keeps, as before, the earlier questions and answers
+only, not the chunks retrieved for them. The call and its return value are
+unchanged.
 
 ---
 

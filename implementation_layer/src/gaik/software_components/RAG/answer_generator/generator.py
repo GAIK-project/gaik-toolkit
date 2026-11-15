@@ -34,8 +34,8 @@ _CONTEXT_AND_QUESTION = "Context:\n{context}\n\nQuestion: {query}"
 # go in the user message (``_CONTEXT_AND_QUESTION``), each chunk in its own block.
 _DEFAULT_SYSTEM_PROMPT = _INSTRUCTIONS
 _DEFAULT_SYSTEM_PROMPT_WITH_CITATIONS = (
-    _INSTRUCTIONS + _CITATION_FORMAT + " Each context block starts with "
-    "[Document: name, Page: X]; take the document name and the page from there."
+    _INSTRUCTIONS + _CITATION_FORMAT + " When a context block starts with "
+    "[Document: name, Page: X], take the document name and the page from that line."
 )
 # The system message for a custom ``prompt=``: the caller's template goes in the
 # user message, with the chunk blocks where it has ``{context}``.
@@ -243,22 +243,25 @@ class AnswerGenerator:
         blocks = []
         for doc in context:
             meta = getattr(doc, "metadata", None) or {}
-            document_name = meta.get("document_name", "unknown")
-            page = meta.get("page_number", "unknown")
-            heading = meta.get("heading")
+            document_name, page = _name_and_page(meta)
             header = f"[Document: {document_name}, Page: {page}]"
+            heading = meta.get("heading")
             if heading:
                 header = f"{header} {heading}"
             blocks.append(material.wrap(f"{header}\n{doc.page_content}", label=_chunk_label(meta)))
         return "\n\n".join(blocks)
 
 
-def _chunk_label(meta: dict) -> str:
-    """``name, page X, chunk Y`` from a chunk's metadata, leaving out what is missing."""
-    parts = [str(meta.get("document_name") or "unknown")]
+def _name_and_page(meta: dict) -> tuple[str, str]:
+    """A chunk's document name and page, ``unknown`` for what is missing."""
     page = meta.get("page_number")
-    if page is not None:
-        parts.append(f"page {page}")
+    return str(meta.get("document_name") or "unknown"), "unknown" if page is None else str(page)
+
+
+def _chunk_label(meta: dict) -> str:
+    """``name, page X, chunk Y`` from a chunk's metadata, the same name and page as its header."""
+    document_name, page = _name_and_page(meta)
+    parts = [document_name, f"page {page}"]
     chunk = meta.get("chunk_id", meta.get("id"))
     if chunk is not None:
         parts.append(f"chunk {chunk}")

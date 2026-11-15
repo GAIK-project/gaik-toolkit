@@ -214,3 +214,16 @@ def test_a_label_never_carries_the_source_path(monkeypatch):
     [block] = _BLOCK.finditer(user)
     assert block["label"] == "unknown, page 1, chunk 42"
     assert "uploads/a1b2" not in user
+
+
+def test_header_and_label_agree_when_metadata_is_missing(monkeypatch):
+    generator, completions = _generator(monkeypatch, citations=True)
+    doc = Document(page_content="Text.", metadata={"document_name": None, "page_number": None})
+
+    generator.generate(QUESTION, [doc])
+
+    system, user = _system_and_user(completions.calls[0])
+    [block] = _BLOCK.finditer(user)
+    assert block["label"] == "unknown, page unknown"
+    assert block["body"].startswith("[Document: unknown, Page: unknown]\n")
+    assert "When a context block starts with [Document: name, Page: X]" in system
