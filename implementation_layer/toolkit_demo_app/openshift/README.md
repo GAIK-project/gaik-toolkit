@@ -74,6 +74,92 @@ oc apply -f services.yaml
 oc apply -f deployment-api.yaml
 oc apply -f deployment-frontend.yaml
 oc apply -f route.yaml
+oc apply -f networkpolicy-api.yaml
+```
+
+## Network policy and pod hardening
+
+`networkpolicy-api.yaml` lets only the frontend pods reach the API on port 8000
+(`gaik-demo` to `gaik-demo-api`, and `gaik-demo-staging` to `gaik-demo-api-staging`).
+`proxy.ts` is the only sign-in, approval and trial gate in front of the API, so no other
+pod in the project should reach the API directly. The kubelet's health probes are not
+affected, and the API has no route of its own.
+
+Apply the policy file on its own. Never `oc apply` the deployment manifests to a
+running environment: the live deployments carry env vars these files lack.
+
+```bash
+# 1. See what is already there. NetworkPolicies add up: any policy that also selects
+#    the API pods and admits more (an empty rule `ingress: [{}]`, a `from` with
+#    `podSelector: {}` or `namespaceSelector: {}`) still lets other pods in, and the
+#    new policy then changes nothing.
+oc get networkpolicy -n gaik -o yaml
+
+# 2. Check the labels the policy selects on.
+oc get pods -n gaik -L app
+```
+
+If such a policy exists, keep it for the other pods and take the API pods out of its
+`podSelector`, for example:
+
+```yaml
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: NotIn
+        values: [gaik-demo-api, gaik-demo-api-staging]
+```
+
+```bash
+# 3. Apply the policy.
+oc apply -f networkpolicy-api.yaml -n gaik
+
+# 4. Check: each frontend still reaches its API, another pod does not.
+oc exec -n gaik deployment/gaik-demo -- \
+  bun -e "fetch('http://gaik-demo-api:8000/health').then(r => console.log(r.status))"
+oc exec -n gaik deployment/gaik-demo-staging -- \
+  bun -e "fetch('http://gaik-demo-api-staging:8000/health').then(r => console.log(r.status))"
+oc run np-check -n gaik --rm -i --restart=Never --image=curlimages/curl:8.11.1 -- \
+  curl -s -m 5 -o /dev/null -w '%{http_code}\n' http://gaik-demo-api:8000/health
+# The last command times out once the policy is in force.
+```
+
+Roll back with `oc delete networkpolicy gaik-demo-api-from-frontend gaik-demo-api-staging-from-frontend -n gaik`.
+
+The deployment manifests state the pod hardening: no privilege escalation, all Linux
+capabilities dropped, a non-root user and the runtime's default seccomp profile.
+OpenShift's `restricted-v2` SCC may already enforce these; see which SCC the pods run
+under with `oc get pods -n gaik -o custom-columns=NAME:.metadata.name,SCC:.metadata.annotations.openshift\.io/scc`.
+The root filesystem stays writable in both: the API writes model caches, uploads and
+generated files, and Next.js writes its cache under `/app/.next/cache`. Add the same
+settings to a running deployment with `oc patch`, which merges containers by name and
+keeps the env vars. The loop reads each deployment's container name, which may differ
+from the deployment name on staging:
+
+```bash
+for d in gaik-demo-api gaik-demo gaik-demo-api-staging gaik-demo-staging; do
+  c=$(oc get deployment/$d -n gaik -o jsonpath='{.spec.template.spec.containers[0].name}')
+  oc patch deployment/$d -n gaik --type=strategic -p "{
+    \"spec\": {\"template\": {\"spec\": {
+      \"securityContext\": {\"runAsNonRoot\": true,
+        \"seccompProfile\": {\"type\": \"RuntimeDefault\"}},
+      \"containers\": [{\"name\": \"$c\", \"securityContext\": {
+        \"allowPrivilegeEscalation\": false,
+        \"capabilities\": {\"drop\": [\"ALL\"]}}}]}}}}"
+  oc rollout status deployment/$d -n gaik --timeout=240s
+done
+```
+
+To take the settings off again, remove them with a JSON patch rather than
+`oc rollout undo`, which on these image-triggered deployments can bring back an older
+image:
+
+```bash
+oc patch deployment/<name> -n gaik --type=json -p '[
+  {"op": "remove", "path": "/spec/template/spec/securityContext/runAsNonRoot"},
+  {"op": "remove", "path": "/spec/template/spec/securityContext/seccompProfile"},
+  {"op": "remove", "path": "/spec/template/spec/containers/0/securityContext"}]'
 ```
 
 ## Build & Push Images
@@ -180,6 +266,7 @@ cd implementation_layer/toolkit_demo_app/openshift
 | `deployment-api.yaml`      | Backend API deployment (FastAPI) |
 | `services.yaml`            | ClusterIP services for both      |
 | `route.yaml`               | Public HTTPS route for frontend  |
+| `networkpolicy-api.yaml`   | Only the frontend reaches the API (apply on its own) |
 | `secrets.yaml.example`     | Example secrets template         |
 
 ## Report Writer upload limits
