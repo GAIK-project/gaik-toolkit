@@ -283,6 +283,28 @@ def test_allowed_values_that_give_the_same_member_name_are_all_kept(tmp_path):
     assert [(m.name, m.value) for m in namespace["StatusEnum"]] == saved
 
 
+def test_fields_that_give_the_same_enum_name_keep_their_own_members(tmp_path):
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    from gaik.software_components.extractor.saved_schema import read_model_file
+
+    spec = {
+        "schema_name": "Test",
+        "fields": ["a_b", "a__b"],
+        "required_fields": ["a_b", "a__b"],
+        "allowed_values": {"a_b": ["x"], "a__b": ["y"]},
+    }
+    write_schema_files(spec, "Test", tmp_path, "test_uc")
+
+    schemas = tmp_path / "schemas"
+    model = read_model_file(schemas / "output_schema_model.json")
+    first = model.model_fields["a_b"].annotation
+    second = model.model_fields["a__b"].annotation
+    assert (first.__name__, [m.value for m in first]) == ("ABEnum", ["x"])
+    assert (second.__name__, [m.value for m in second]) == ("AB2Enum", ["y"])
+    src = (schemas / "output_schema.py").read_text()
+    assert "class ABEnum(str, Enum):" in src and "class AB2Enum(str, Enum):" in src
+
+
 def test_without_the_saved_format_an_earlier_model_file_is_removed(tmp_path, monkeypatch):
     pytest.importorskip("gaik.software_components.extractor.saved_schema")
     write_schema_files(SPEC_MINIMAL, "SimpleOutput", tmp_path, "test_uc")

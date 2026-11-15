@@ -244,7 +244,7 @@ def test_a_root_that_names_an_enum_instead_of_a_model_is_refused():
         build_model(description)
 
 
-def test_a_model_with_a_validator_is_not_saved_as_data():
+def _validated_title():
     from pydantic import field_validator
 
     class Ticket(BaseModel):
@@ -255,8 +255,55 @@ def test_a_model_with_a_validator_is_not_saved_as_data():
         def upper(cls, value: str) -> str:
             return value.upper()
 
-    with pytest.raises(SavedSchemaError, match="validators"):
-        describe_model(Ticket)
+    return Ticket
+
+
+def _checked_model():
+    from pydantic import model_validator
+
+    class Ticket(BaseModel):
+        title: str
+
+        @model_validator(mode="after")
+        def check(self):
+            return self
+
+    return Ticket
+
+
+def _serialized_title():
+    from pydantic import field_serializer
+
+    class Ticket(BaseModel):
+        title: str
+
+        @field_serializer("title")
+        def lower(self, value: str) -> str:
+            return value.lower()
+
+    return Ticket
+
+
+def _computed_field():
+    from pydantic import computed_field
+
+    class Ticket(BaseModel):
+        title: str
+
+        @computed_field
+        @property
+        def size(self) -> int:
+            return len(self.title)
+
+    return Ticket
+
+
+@pytest.mark.parametrize(
+    "make", [_validated_title, _checked_model, _serialized_title, _computed_field]
+)
+def test_a_model_with_validators_serializers_or_computed_fields_is_not_saved(make):
+    with pytest.raises(SavedSchemaError, match="validators or serializers"):
+        describe_model(make())
 
 
 def test_a_model_with_a_config_option_other_than_extra_is_not_saved_as_data():
@@ -270,23 +317,97 @@ def test_a_model_with_a_config_option_other_than_extra_is_not_saved_as_data():
         describe_model(Ticket)
 
 
-def test_a_model_with_model_post_init_is_not_saved_as_data():
+def test_a_model_with_a_private_attribute_is_not_saved_as_data():
+    from pydantic import PrivateAttr
+
+    class Ticket(BaseModel):
+        title: str
+        _seen: int = PrivateAttr(0)
+
+    with pytest.raises(SavedSchemaError, match="private attributes.*_seen"):
+        describe_model(Ticket)
+
+
+def _post_init():
     class Ticket(BaseModel):
         title: str
 
         def model_post_init(self, context) -> None:
             self.title = self.title.strip()
 
-    with pytest.raises(SavedSchemaError, match="model_post_init"):
-        describe_model(Ticket)
+    return Ticket
 
 
-def test_a_frozen_field_is_not_saved_as_data():
+def _own_init():
     class Ticket(BaseModel):
-        title: str = Field(frozen=True)
+        title: str
 
-    with pytest.raises(SavedSchemaError, match="options"):
-        describe_model(Ticket)
+        def __init__(self, **data):
+            data["title"] = str(data.get("title", "")).strip()
+            super().__init__(**data)
+
+    return Ticket
+
+
+def _own_dump():
+    class Base(BaseModel):
+        def model_dump(self, **kwargs):
+            return {}
+
+    class Ticket(Base):
+        title: str
+
+    return Ticket
+
+
+@pytest.mark.parametrize(
+    "make,method",
+    [(_post_init, "model_post_init"), (_own_init, "__init__"), (_own_dump, "model_dump")],
+)
+def test_a_model_that_defines_its_own_methods_is_not_saved_as_data(make, method):
+    with pytest.raises(SavedSchemaError, match=f"defines methods.*{method}"):
+        describe_model(make())
+
+
+@pytest.mark.parametrize(
+    "option,field",
+    [
+        ("frozen", Field(default="", frozen=True)),
+        ("exclude", Field(default="", exclude=True)),
+        ("exclude_if", Field(default="", exclude_if=lambda v: v == "")),
+        ("validate_default", Field(default="", validate_default=True)),
+        ("validation_alias", Field(default="", validation_alias="name")),
+        ("serialization_alias", Field(default="", serialization_alias="name")),
+    ],
+)
+def test_a_field_option_the_description_cannot_hold_is_not_saved(option, field):
+    from pydantic import create_model
+
+    ticket = create_model("Ticket", title=(str, field))
+
+    with pytest.raises(SavedSchemaError, match=f"Field 'title' has options.*'{option}'"):
+        describe_model(ticket)
+
+
+def test_a_rebuild_that_cannot_be_saved_does_not_say_it_was_saved(tmp_path, monkeypatch, capsys):
+    import gaik.software_components.extractor.saved_schema as saved_schema
+
+    requirements = ExtractionRequirements(
+        use_case_name="ticket",
+        fields=[FieldSpec(field_name="title", field_type="str", description="Title")],
+    )
+    model_name = create_extraction_model(requirements).__name__
+
+    def cannot_write(model, path):
+        raise OSError("read-only folder")
+
+    monkeypatch.setattr(saved_schema, "write_model_file", cannot_write)
+    model = load_saved_model(tmp_path / "m_model.json", model_name, requirements)
+
+    assert list(model.model_fields) == ["title"]
+    out = capsys.readouterr().out
+    assert "could not save it as m_model.json" in out
+    assert "and saved it" not in out
 
 
 _STATUS_ENUM = {

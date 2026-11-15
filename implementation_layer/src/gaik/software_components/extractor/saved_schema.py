@@ -63,6 +63,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Union, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, constr, create_model
+from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from .schema import (
@@ -85,6 +86,24 @@ _FIELD_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
 _ENUM_MEMBER_RE = re.compile(r"_?[A-Za-z0-9][A-Za-z0-9_]*|_")
 _MAX_TYPE_DEPTH = 8
 _EXTRA_VALUES = {"forbid", "ignore", "allow"}
+_FIELD_OPTIONS = {"annotation", "default", "default_factory", "description"}
+_PLAIN_FIELD = FieldInfo()  # a Field option set to its default value changes nothing
+# Dunder methods that change how a model is built, validated or dumped; any
+# other method a model class defines is refused as well.
+_MODEL_DUNDERS = {
+    "__init__",
+    "__new__",
+    "__setattr__",
+    "__getattr__",
+    "__getattribute__",
+    "__iter__",
+    "__eq__",
+    "__copy__",
+    "__deepcopy__",
+    "__get_pydantic_core_schema__",
+    "__get_pydantic_json_schema__",
+    "__pydantic_init_subclass__",
+}
 
 
 class SavedSchemaError(ValueError):
@@ -203,22 +222,35 @@ def _encode_default(value: Any) -> Any:
     raise SavedSchemaError(f"Default {value!r} cannot be saved as data")
 
 
+def _own_methods(model: type[BaseModel]) -> list[str]:
+    """Methods and properties the model or a base class between it and BaseModel defines."""
+    found: list[str] = []
+    for cls in model.__mro__:
+        if cls is BaseModel or not issubclass(cls, BaseModel):
+            continue
+        for name, value in vars(cls).items():
+            is_dunder = name.startswith("__") and name.endswith("__")
+            if is_dunder and name not in _MODEL_DUNDERS:
+                continue
+            if callable(value) or isinstance(value, (classmethod, staticmethod, property)):
+                found.append(name)
+    return sorted(set(found))
+
+
 def _describe_one(model: type[BaseModel], collect) -> dict:
     fields = []
     for name, info in model.model_fields.items():
-        if (
-            info.alias
-            or info.validation_alias
-            or info.serialization_alias
-            or info.title
-            or info.examples
-            or info.json_schema_extra
-            or info.discriminator
-            or info.frozen
-            or info.validate_default
-            or info.exclude
-        ):
-            raise SavedSchemaError(f"Field {name!r} has options that cannot be saved as data")
+        # Only what the description holds; any other Field option (alias,
+        # frozen, exclude, exclude_if, ...) would be lost in the rebuild.
+        options = {
+            key
+            for key, value in getattr(info, "_attributes_set", {}).items()
+            if key not in _FIELD_OPTIONS and value != getattr(_PLAIN_FIELD, key, None)
+        }
+        if options:
+            raise SavedSchemaError(
+                f"Field {name!r} has options that cannot be saved as data: {sorted(options)}"
+            )
         type_node = _describe_type(info.annotation, collect)
         is_decimal = decimal_field_repr(info.annotation) is not None
         pattern = _pattern_from_metadata(list(info.metadata), is_decimal)
@@ -258,9 +290,15 @@ def _describe_one(model: type[BaseModel], collect) -> dict:
         raise SavedSchemaError(
             f"Model {model.__name__!r} has validators or serializers that cannot be saved as data"
         )
-    if getattr(model, "__pydantic_post_init__", None):
+    if model.__private_attributes__:
         raise SavedSchemaError(
-            f"Model {model.__name__!r} has a model_post_init that cannot be saved as data"
+            f"Model {model.__name__!r} has private attributes that cannot be saved as data: "
+            f"{sorted(model.__private_attributes__)}"
+        )
+    methods = _own_methods(model)
+    if methods:
+        raise SavedSchemaError(
+            f"Model {model.__name__!r} defines methods that cannot be saved as data: {methods}"
         )
     other_config = {k: v for k, v in model.model_config.items() if k not in ("extra", "title")}
     if other_config or model.model_config.get("title") not in (None, model.__name__):
@@ -676,12 +714,12 @@ def load_saved_model(
         )
     try:
         write_model_file(model, model_path)
-    except (OSError, SavedSchemaError):
-        pass
+        saved = f"and saved it as {model_path.name}"
+    except (OSError, SavedSchemaError) as exc:
+        saved = f"but could not save it as {model_path.name} ({type(exc).__name__})"
     print(
         f"Rebuilt saved schema {model_name!r} in {model_path.parent} from its requirements "
-        f"and saved it as {model_path.name}; edits made only in the folder's .py file "
-        "are not in it."
+        f"{saved}; edits made only in the folder's .py file are not in it."
     )
     return model
 

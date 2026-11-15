@@ -234,6 +234,25 @@ def _enum_name(field: str) -> str:
     return "".join(w.title() for w in field.split("_")) + "Enum"
 
 
+def _enum_names(fields: list[str], allowed_values: dict[str, Any]) -> dict[str, str]:
+    """The Enum class name per field with allowed values, each name used once.
+
+    Two fields can give the same name ("a_b" and "a__b" both give ABEnum); the
+    later one gets a number, so neither Enum replaces the other.
+    """
+    names: dict[str, str] = {}
+    for field in fields:
+        vals = allowed_values.get(field, [])
+        if not (vals and all(isinstance(v, str) for v in vals)):
+            continue
+        base = _enum_name(field)
+        name, n = base, 2
+        while name in names.values():
+            name, n = f"{base[: -len('Enum')]}{n}Enum", n + 1
+        names[field] = name
+    return names
+
+
 def _source_name(value: Any, what: str) -> str:
     """A name the schema source can carry as written: an identifier, not a keyword."""
     if not (isinstance(value, str) and value.isidentifier() and not keyword.iskeyword(value)):
@@ -275,11 +294,12 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
     if has_enum:
         imports.append("from enum import Enum")
 
+    enum_names = _enum_names(fields, allowed_values)
     enum_blocks = []
     for field in fields:
         vals = allowed_values.get(field, [])
-        if vals and all(isinstance(v, str) for v in vals):
-            enum_name = _enum_name(field)
+        if field in enum_names:
+            enum_name = enum_names[field]
             members = "\n".join(f"    {m} = {v!r}" for m, v in _enum_members(vals))
             enum_blocks.append(f"class {enum_name}(str, Enum):\n{members}\n")
 
@@ -287,9 +307,8 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
     needs_decimal_helper = False
     for field in fields:
         py_type = _py_type(field_types.get(field, "string"))
-        vals = allowed_values.get(field, [])
-        if vals and all(isinstance(v, str) for v in vals):
-            py_type = _enum_name(field)
+        if field in enum_names:
+            py_type = enum_names[field]
 
         desc = str(field_descriptions.get(field) or "")
         # Use Field(description=...) so the description propagates into JSON Schema
@@ -484,6 +503,7 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
     descriptions: dict[str, str] = spec.get("field_descriptions", {})
     allowed_values: dict[str, Any] = spec.get("allowed_values", {})
 
+    enum_names = _enum_names(fields, allowed_values)
     definitions: dict[str, Any] = {}
     for field in fields:
         desc = descriptions.get(field, "")
@@ -491,8 +511,8 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
         described = {"description": desc} if desc else {}
         py_type = _py_type(field_types.get(field, "string"))
         vals = allowed_values.get(field, [])
-        if vals and all(isinstance(v, str) for v in vals):
-            kind: Any = Enum(_enum_name(field), _enum_members(vals), type=str)
+        if field in enum_names:
+            kind: Any = Enum(enum_names[field], _enum_members(vals), type=str)
         elif py_type == "Decimal":
             kind = decimal_field if required else optional_decimal_field
         else:
