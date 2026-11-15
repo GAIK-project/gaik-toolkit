@@ -10,3 +10,9 @@ test("every demo page gets the notice from the demos layout", () => {
   const layout = readFileSync("app/(demos)/layout.tsx", "utf8");
   expect(layout).toMatch(/<MainLayout[^>]*\baiNotice\b/);
 });
+
+test("the Solution Wizard page runs no model, so it has no AI notice", () => {
+  const layout = readFileSync("app/(wizard)/layout.tsx", "utf8");
+  expect(layout).toMatch(/<MainLayout\b/);
+  expect(layout).not.toMatch(/\baiNotice\b/);
+});

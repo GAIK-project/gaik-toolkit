@@ -19,16 +19,18 @@ import threading
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 try:
     from utils import get_api_config, sse_event
     from utils.model_allow_list import chat_models, check_model, transcription_models
+    from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
     from api.utils.model_allow_list import chat_models, check_model, transcription_models
+    from api.utils.report_runs import require_report_run_grant
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -79,7 +81,7 @@ def _not_a_file_name(name: str) -> bool:
     return name in (".", "..") or "/" in name or "\x00" in name or Path(name).name != name
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def run(manifest: str = Form(...), files: list[UploadFile] = File(...)):
     """Convert the uploaded files. Returns a Server-Sent Events stream.
 

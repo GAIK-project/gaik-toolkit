@@ -215,3 +215,19 @@ test("the API learns the model tier from the session, never from the browser", a
   expect(backendHeaders?.get("x-gaik-model-tier")).toBe("staff");
   expect(backendCalls).toBe(2);
 });
+
+test("the generic proxy does not pass on the report run header", async () => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const response = await proxy(
+    new NextRequest(RUN, {
+      method: "POST",
+      headers: {
+        cookie: sessionCookie("r1", future),
+        "x-gaik-report-run": "from-the-browser",
+      },
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(backendHeaders?.has("x-gaik-report-run")).toBe(false);
+});
