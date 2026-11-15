@@ -204,8 +204,20 @@ runs as before.
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
-| `WIZARD_ACCESS_SECRET`                 | Old wizard gate on `/api/wizard`; read until that gate is removed | Secret: `gaik-demo-admin` |
 | `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
+
+`WIZARD_ACCESS_SECRET` is no longer read: the frontend answers 404 on `/api/wizard`.
+Remove it from both frontend deployments first, then from the secret if it is there
+(the patch fails harmlessly when the key is absent):
+
+```bash
+for d in gaik-demo gaik-demo-staging; do
+  oc set env deployment/$d WIZARD_ACCESS_SECRET- -n gaik
+done
+oc get secret/gaik-demo-admin -n gaik -o jsonpath='{.data}' | grep -q WIZARD_ACCESS_SECRET &&
+  oc patch secret/gaik-demo-admin -n gaik --type=json \
+    -p '[{"op":"remove","path":"/data/WIZARD_ACCESS_SECRET"}]'
+```
 
 ### Backend (gaik-demo-api)
 

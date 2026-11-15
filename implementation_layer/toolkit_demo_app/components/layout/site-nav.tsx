@@ -88,7 +88,7 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   comingSoon?: boolean;
-  /** Built but gated behind beta access (e.g. the Solution Wizard `?key=`). */
+  /** Built but gated behind beta access (see `hasWizardAccess`). */
   beta?: boolean;
   external?: boolean;
   /** Knowledge process this item belongs to; a heading shows where it changes. */
@@ -334,9 +334,8 @@ function DesktopMenuItem({
 }) {
   const ItemIcon = item.icon;
 
-  // Beta items: built but gated behind beta access
-  // (the Solution Wizard `?key=`). Clickable for
-  // visitors who already hold the wizard_access cookie;
+  // Beta items: built but gated behind beta access.
+  // Clickable when `hasWizardAccess` is true;
   // a locked "Beta" tile for everyone else.
   if (item.beta) {
     if (hasWizardAccess) {
@@ -889,7 +888,7 @@ export interface SiteNavProps {
   pathname: string;
   githubPreview?: LinkPreview | null;
   isLoggedIn?: boolean;
-  /** True when the visitor already holds wizard_access (beta) — server-read. */
+  /** True when the visitor may open the beta items — server-read. */
   hasWizardAccess?: boolean;
 }
 

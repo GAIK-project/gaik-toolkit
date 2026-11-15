@@ -10,12 +10,8 @@ export async function SiteNavServer() {
   const headersList = await headers();
   const pathname = headersList.get("x-current-path") || "/";
 
-  // Solution Wizard nav state mirrors the proxy gate so the nav shows a real
-  // link to people who can actually open it and a locked "Beta" tile to
-  // everyone else. Unlocked for either:
-  //   - the team `?key=` cookie holders (httpOnly `wizard_access` cookie), or
-  //   - a registered user granted the per-user `wizard_access` flag.
-  // Default-deny otherwise.
+  // The /solution-wizard page is a notice open to everyone (getWizardAccess),
+  // so the nav shows it as a link rather than a locked "Beta" tile.
   let isLoggedIn = false;
   try {
     isLoggedIn = !!(await getUserAccessStatus()).user;
