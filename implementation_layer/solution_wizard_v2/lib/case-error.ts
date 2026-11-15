@@ -36,6 +36,21 @@ function acceptedFromMessage(message: string): AcceptedInput[] {
     .map((label) => ({ label, extensions: [] }));
 }
 
+function detailMessage(detail: unknown): string {
+  return detail && typeof detail === "object" ? String((detail as { message?: unknown }).message ?? "") : "";
+}
+
+/** The api gives input_unsafe for the malware check and for a document's own content. */
+function unsafeText(message: string, s: CaseStrings): string {
+  if (message.includes("macros")) return s.errors.macros;
+  if (message.includes("encrypted") || message.includes("password")) return s.errors.encrypted;
+  if (message.includes("too complex") || message.includes("too large") || message.includes("damaged")) {
+    return s.errors.uncheckable;
+  }
+  if (message.startsWith("PDF files that contain")) return s.errors.activeContent;
+  return s.errors.unsafe;
+}
+
 export function caseErrorText(
   status: number,
   body: unknown,
@@ -64,6 +79,8 @@ export function caseErrorText(
     return s.errors.tooLarge.replace("{mb}", String(Math.floor(MAX_INPUT_BYTES / (1024 * 1024))));
   }
   if (code === "input_exists") return s.errors.exists;
+  if (code === "input_unsafe") return unsafeText(detailMessage(detail), s);
+  if (code === "scanner_unavailable") return s.errors.scanUnavailable;
   if (typeof detail === "string") return detail;
   if (detail && typeof detail === "object" && "message" in detail) {
     return String((detail as { message: unknown }).message);

@@ -70,6 +70,10 @@ components = meter.create_counter(
     "wizard.components.selected",
     description="GAIK components in a solution when its Gate 2 is approved",
 )
+uploads_scanned = meter.create_counter(
+    "wizard.uploads.scanned",
+    description="Uploaded files by malware check result: clean, refused, unavailable",
+)
 turn_duration = meter.create_histogram(
     "wizard.turn.duration", unit="s", description="Length of a chat turn, start to end"
 )
@@ -144,8 +148,11 @@ _PRIMED = {
             "not_found",
             "internal_error",
             "unavailable",
+            "input_unsafe",
+            "scanner_unavailable",
         )
     ],
+    "uploads_scanned": [{"result": r} for r in ("clean", "refused", "unavailable")],
     "session_deletes": [
         {"reason": r, "outcome": o}
         for r in ("owner", "data-subject-request", "owner-left", "retention", "other")
@@ -239,15 +246,18 @@ def check_seconds() -> int:
 class _Cached:
     """A value computed at most once per ``check_seconds()``; the last good one stays."""
 
-    def __init__(self, compute: Callable[[], dict[str, float]]) -> None:
+    def __init__(
+        self, compute: Callable[[], dict[str, float]], seconds: Callable[[], int] = check_seconds
+    ) -> None:
         self._compute = compute
+        self._seconds = seconds
         self._value: dict[str, float] = {}
         self._at = 0.0
         self._lock = threading.Lock()
 
     def get(self) -> dict[str, float]:
         with self._lock:
-            if time.monotonic() - self._at >= check_seconds() or not self._at:
+            if time.monotonic() - self._at >= self._seconds() or not self._at:
                 try:
                     self._value = self._compute()
                 except Exception:  # noqa: BLE001 - a failed check keeps the last values
@@ -433,6 +443,37 @@ def _shared_runner_key() -> Iterable[tuple[float | None, dict]]:
     yield (1.0 if secret == SHARED_RUNNER_SECRET else 0.0), {}
 
 
+def _scanner_state() -> dict[str, float]:
+    from wizard_api.services import malware_scan
+
+    state = malware_scan.probe()
+    if state is None:
+        return {}
+    values = {"up": 1.0 if state.up else 0.0}
+    if state.signatures_time is not None:
+        values["signatures_time"] = state.signatures_time
+    return values
+
+
+# Asked once a minute: a scanner that stops answering refuses every upload.
+_scanner = _Cached(_scanner_state, seconds=lambda: 60)
+
+
+def _malware_scan() -> Iterable[tuple[float | None, dict]]:
+    from wizard_api.services import malware_scan
+
+    yield (1.0 if malware_scan.enabled() else 0.0), {}
+
+
+def _scanner_up() -> Iterable[tuple[float | None, dict]]:
+    yield _scanner.get().get("up"), {}
+
+
+def _signatures_age() -> Iterable[tuple[float | None, dict]]:
+    published = _scanner.get().get("signatures_time")
+    yield (None if published is None else max(0.0, time.time() - published)), {}
+
+
 def _up() -> Iterable[tuple[float | None, dict]]:
     yield 1.0, {}
 
@@ -465,6 +506,13 @@ _GAUGES = [
         "wizard.config.shared_runner_key",
         "1 while sandbox runs use the shared model key Secret",
         _shared_runner_key,
+    ),
+    ("wizard.config.malware_scan", "1 while uploads must pass the malware check", _malware_scan),
+    ("wizard.malware_scanner.up", "1 while the malware scanner answers", _scanner_up),
+    (
+        "wizard.malware_scanner.signatures_age",
+        "Age of the scanner's loaded signatures, seconds",
+        _signatures_age,
     ),
 ]
 

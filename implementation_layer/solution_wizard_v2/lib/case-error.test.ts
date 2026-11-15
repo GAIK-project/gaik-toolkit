@@ -94,6 +94,22 @@ describe("caseErrorText", () => {
   });
 });
 
+describe("refusals from the malware check and a document's own content", () => {
+  it.each([
+    ["the file was refused by the malware check", fi.errors.unsafe],
+    ["files with macros are not accepted; save the document without macros", fi.errors.macros],
+    ["PDF files that contain JavaScript are not accepted", fi.errors.activeContent],
+    ["password-protected or encrypted files are not accepted; upload an unprotected copy", fi.errors.encrypted],
+    ["the PDF is too complex to be checked", fi.errors.uncheckable],
+  ])("says %s in the page's language", (message, expected) => {
+    expect(caseErrorText(422, refusal("input_unsafe", message), fi, BUSY)).toBe(expected);
+  });
+
+  it("says the upload was not stored while files cannot be checked", () => {
+    expect(caseErrorText(503, refusal("scanner_unavailable"), en, BUSY)).toBe(en.errors.scanUnavailable);
+  });
+});
+
 describe("accepted types", () => {
   it("joins the labels as one phrase", () => {
     expect(acceptedPhrase(AUDIO, "tai")).toBe("WAV, MP3, M4A tai JSON");

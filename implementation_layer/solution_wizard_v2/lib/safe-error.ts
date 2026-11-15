@@ -38,6 +38,8 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   "input_type_not_accepted",
   "input_too_large",
   "input_exists",
+  "input_unsafe",
+  "scanner_unavailable",
   "input_clash",
   // cases and their process
   "case_state",

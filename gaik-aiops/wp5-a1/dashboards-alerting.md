@@ -61,6 +61,11 @@ the api) and its request spans.
 | WizardSessionCreateFailing | warning | Creating a session failed in the last 10 min |
 | WizardSessionLimitHits | info | Uploads refused at the session or case size limit |
 | WizardSessionDataMismatch | info | Session rows without a folder, or folders without a row, for an hour |
+| WizardMalwareScannerDown | critical | The upload malware scanner has not answered for 3 min; uploads are refused |
+| WizardUploadsScannerUnavailable | warning | Uploads refused in 10 min because the scanner gave no verdict |
+| WizardUnsafeUploadRefused | warning | An upload refused as unsafe (malware, macros, PDF actions) in 15 min |
+| WizardMalwareSignaturesStale | warning | Scanner signatures older than 2 days for an hour |
+| WizardUploadsNotScanned | warning | Uploads stored without a malware check (`WIZARD_MALWARE_SCANNER` not set) for 10 min |
 | WizardRunsUseSharedModelKey | info | Reminder while sandbox runs use the project's shared model key (no spending cap); clears when `WIZARD_POC_RUNNER_SECRET` names another Secret |
 
 ### Thresholds

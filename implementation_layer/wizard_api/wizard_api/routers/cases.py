@@ -23,7 +23,13 @@ from wizard_api import telemetry
 from wizard_api.db import get_db
 from wizard_api.errors import api_error, internal_error, public_run_message
 from wizard_api.ownership import requesting_user, session_belongs_to_requester
-from wizard_api.services import case_service, input_content, poc_service, session_service
+from wizard_api.services import (
+    case_service,
+    input_content,
+    malware_scan,
+    poc_service,
+    session_service,
+)
 from wizard_api.services.artifact_sync import (
     DRAFT_BLUEPRINT_FILE,
     WORKFLOW_BPMN_FILE,
@@ -309,6 +315,9 @@ async def upload_case_input(
             data,
             input_content.allowed_kinds(_draft(session.output_dir)),
         )
+        # Then the malware check; a file it reports, or one it could not
+        # check, is never written.
+        await malware_scan.check_upload(data)
         # Waits on the session's and the case's file locks and writes the file:
         # off the event loop, so one session's uploads do not stall the worker.
         name = await asyncio.to_thread(
@@ -326,6 +335,10 @@ async def upload_case_input(
         raise api_error(413, "input_too_large", str(exc)) from exc
     except input_content.UnsupportedInputError as exc:
         raise api_error(415, "input_type_not_accepted", str(exc)) from exc
+    except (malware_scan.UnsafeInputError, input_content.UnsafeContentError) as exc:
+        raise api_error(422, "input_unsafe", str(exc)) from exc
+    except malware_scan.ScannerUnavailableError as exc:
+        raise api_error(503, "scanner_unavailable", malware_scan.UNAVAILABLE_MESSAGE) from exc
     except poc_service.InputRejectedError as exc:
         raise api_error(422, "input_rejected", str(exc)) from exc
     except case_service.CaseStateError as exc:

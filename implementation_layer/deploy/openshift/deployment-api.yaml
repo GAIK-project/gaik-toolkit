@@ -58,6 +58,11 @@ spec:
               value: "100"
             - name: WIZARD_MAX_SESSION_INPUT_MB
               value: "1024"
+            # Every upload is checked by the scanner (deployment-scanner.yaml)
+            # before it is stored; while it does not answer, uploads are
+            # refused (wizard_api/services/malware_scan.py).
+            - name: WIZARD_MALWARE_SCANNER
+              value: NAME_PLACEHOLDER-scanner:3310
             # Service token (#135): every endpoint except /health requires the
             # X-Wizard-Service-Token header. Same value must be set on the web
             # deployment so its server-side proxy can present it.

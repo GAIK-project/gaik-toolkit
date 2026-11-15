@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
-from wizard_api.services import poc_service
+from wizard_api.services import pdf_content, poc_service
 
 # ---------------------------------------------------------------------------
 # The supported types
@@ -129,6 +129,10 @@ class UnsupportedInputError(poc_service.InputRejectedError):
 
 class InvalidInputError(poc_service.InputRejectedError):
     """The content is an accepted type but not a usable file of it (422)."""
+
+
+class UnsafeContentError(InvalidInputError):
+    """A document that carries macros or actions a viewer would run (422, input_unsafe)."""
 
 
 # ---------------------------------------------------------------------------
@@ -295,11 +299,36 @@ def _zip_kind(data: bytes) -> str:
             raise
         except (zipfile.BadZipFile, OSError, ValueError, NotImplementedError, EOFError) as exc:
             raise InvalidInputError("the file is not a readable archive") from exc
+        archive_types = b""
+        if "[Content_Types].xml" in names:
+            # Within the bound already measured above.
+            archive_types = archive.read("[Content_Types].xml")
+    if "[Content_Types].xml" in names and (
+        any(_is_macro_part(name) for name in names) or _declares_macros(archive_types)
+    ):
+        raise UnsafeContentError(
+            "files with macros are not accepted; save the document without macros"
+        )
     if "[Content_Types].xml" in names and "word/document.xml" in names:
         return "docx"
     if "[Content_Types].xml" in names and "xl/workbook.xml" in names:
         return "xlsx"
     return "zip"
+
+
+def _is_macro_part(name: str) -> bool:
+    """A VBA project, or an ActiveX control's binary, inside an office file."""
+    lowered = name.lower().replace("\\", "/")
+    base = lowered.rsplit("/", 1)[-1]
+    return base in {"vbaproject.bin", "vbadata.xml"} or (
+        "/activex/" in f"/{lowered}" and base.endswith(".bin")
+    )
+
+
+def _declares_macros(content_types: bytes) -> bool:
+    """``[Content_Types].xml`` names a macro-enabled document or a VBA part."""
+    lowered = content_types.lower()
+    return b"macroenabled" in lowered or b"vbaproject" in lowered
 
 
 def _check_text(data: bytes, kind: str) -> None:
@@ -349,4 +378,9 @@ def check(filename: str, data: bytes, allowed: frozenset[str] = ALL_KINDS) -> st
         raise UnsupportedInputError(
             f"the file's content does not match its {suffix} extension; {accepted}"
         )
+    if kind == "pdf":
+        try:
+            pdf_content.check(data)
+        except (pdf_content.ActiveContentError, pdf_content.TooComplexError) as exc:
+            raise UnsafeContentError(str(exc)) from exc
     return kind

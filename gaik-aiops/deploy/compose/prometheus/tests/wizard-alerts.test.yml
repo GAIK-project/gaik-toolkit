@@ -278,3 +278,82 @@ tests:
           - exp_labels: {service_name: wizard-v2-api, severity: warning}
             exp_annotations:
               summary: "wizard-v2-api: the wizard database is 4.657GiB"
+
+  - name: a scanner that stops answering is critical after 3 minutes
+    interval: 1m
+    input_series:
+      - series: 'wizard_malware_scanner_up{service_name="wizard-v2-api"}'
+        values: '1x3 0x6'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: WizardMalwareScannerDown
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: WizardMalwareScannerDown
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: critical}
+            exp_annotations:
+              summary: "wizard-v2-api: the malware scanner does not answer; uploads are refused"
+
+  - name: uploads refused because they could not be checked
+    interval: 1m
+    input_series:
+      - series: 'wizard_refusals_total{service_name="wizard-v2-api", code="scanner_unavailable"}'
+        values: '0x3 2x5'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: WizardUploadsScannerUnavailable
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: WizardUploadsScannerUnavailable
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 2 uploads refused in 10 minutes because they could not be checked"
+
+  - name: one unsafe upload fires at once, other refusals do not
+    interval: 1m
+    input_series:
+      - series: 'wizard_refusals_total{service_name="wizard-v2-api", code="input_unsafe"}'
+        values: '0 0 1 1'
+      - series: 'wizard_refusals_total{service_name="wizard-v2-api", code="input_rejected"}'
+        values: '0+3x3'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: WizardUnsafeUploadRefused
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: WizardUnsafeUploadRefused
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 1 uploads refused as unsafe in 15 minutes"
+
+  - name: signatures older than two days for an hour
+    interval: 1m
+    input_series:
+      - series: 'wizard_malware_scanner_signatures_age{service_name="wizard-v2-api"}'
+        values: '1000x10 175000+60x80'
+    alert_rule_test:
+      - eval_time: 50m
+        alertname: WizardMalwareSignaturesStale
+        exp_alerts: []
+      - eval_time: 75m
+        alertname: WizardMalwareSignaturesStale
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: the malware signatures are 2d 1h 40m 40s old; updates are not getting through"
+
+  - name: uploads stored without a check
+    interval: 1m
+    input_series:
+      - series: 'wizard_config_malware_scan{service_name="wizard-v2-api"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: WizardUploadsNotScanned
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: uploads are stored without a malware check; set WIZARD_MALWARE_SCANNER"

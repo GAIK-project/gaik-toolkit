@@ -2123,7 +2123,7 @@ async def upload_poc_input(
     Only that directory: the package root holds ``run_poc.py``, the file the Job
     executes, and an upload must never be able to become it.
     """
-    from wizard_api.services import input_content, poc_service
+    from wizard_api.services import input_content, malware_scan, poc_service
     from wizard_api.services.artifact_sync import read_draft_blueprint
 
     session = session_service.get_session(db, session_id)
@@ -2139,12 +2139,19 @@ async def upload_poc_input(
         # only the types the session's input contract asks for.
         allowed = input_content.allowed_kinds(read_draft_blueprint(session.output_dir))
         await asyncio.to_thread(input_content.check, file.filename or "", data, allowed)
+        # Then the malware check; a file it reports, or one it could not
+        # check, is never written.
+        await malware_scan.check_upload(data)
         name = poc_service.save_sample_input(poc, file.filename or "", data)
     # Both name the user's own file and the limit it broke.
     except poc_service.InputTooLargeError as exc:
         raise api_error(413, "input_too_large", str(exc)) from exc
     except input_content.UnsupportedInputError as exc:
         raise api_error(415, "input_type_not_accepted", str(exc)) from exc
+    except (malware_scan.UnsafeInputError, input_content.UnsafeContentError) as exc:
+        raise api_error(422, "input_unsafe", str(exc)) from exc
+    except malware_scan.ScannerUnavailableError as exc:
+        raise api_error(503, "scanner_unavailable", malware_scan.UNAVAILABLE_MESSAGE) from exc
     except poc_service.InputRejectedError as exc:
         raise api_error(422, "input_rejected", str(exc)) from exc
 

@@ -39,3 +39,7 @@ groups:
         expr: vector(10)
       - record: gaik:threshold:sessions_per_owner_10m
         expr: vector(10)
+
+      # Upload malware check
+      - record: gaik:threshold:scanner_signatures_age_seconds
+        expr: vector(172800)

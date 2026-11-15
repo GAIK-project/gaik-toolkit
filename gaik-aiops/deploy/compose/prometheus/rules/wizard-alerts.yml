@@ -213,6 +213,52 @@ groups:
         annotations:
           summary: "{{ $labels.service_name }}: {{ $value }} session {{ $labels.kind }}"
 
+  - name: gaik-wizard-uploads
+    rules:
+      # Uploads are refused while the scanner does not answer.
+      - alert: WizardMalwareScannerDown
+        expr: max by (service_name) (wizard_malware_scanner_up) == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service_name }}: the malware scanner does not answer; uploads are refused"
+
+      - alert: WizardUploadsScannerUnavailable
+        expr: |
+          sum by (service_name) (increase(wizard_refusals_total{code="scanner_unavailable"}[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service_name }}: {{ $value | printf `%.0f` }} uploads refused in 10 minutes because they could not be checked"
+
+      # A file with malware, macros or PDF actions was refused: someone tried
+      # to upload one. The signature name is in the api log.
+      - alert: WizardUnsafeUploadRefused
+        expr: sum by (service_name) (increase(wizard_refusals_total{code="input_unsafe"}[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service_name }}: {{ $value | printf `%.0f` }} uploads refused as unsafe in 15 minutes"
+
+      - alert: WizardMalwareSignaturesStale
+        expr: |
+          max by (service_name) (wizard_malware_scanner_signatures_age)
+            > on () group_left () gaik:threshold:scanner_signatures_age_seconds
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service_name }}: the malware signatures are {{ $value | humanizeDuration }} old; updates are not getting through"
+
+      - alert: WizardUploadsNotScanned
+        expr: max by (service_name) (wizard_config_malware_scan) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service_name }}: uploads are stored without a malware check; set WIZARD_MALWARE_SCANNER"
+
   - name: gaik-wizard-reminders
     rules:
       # A reminder, not a fault: sandbox runs still read the project's shared

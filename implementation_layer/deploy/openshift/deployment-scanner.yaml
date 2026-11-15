@@ -1,0 +1,92 @@
+# The malware scanner the api checks every uploaded file with: ClamAV (clamd)
+# on 3310, signatures kept current by freshclam in the same container. Image:
+# deploy/scanner/, built and pushed by `./deploy.sh scanner`. See SCANNER.md.
+#
+# One replica is enough for upload traffic; while it restarts (about a minute to
+# load the signatures) the api refuses uploads rather than storing them
+# unchecked.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: NAME_PLACEHOLDER-scanner
+  labels:
+    app: NAME_PLACEHOLDER-scanner
+    app.kubernetes.io/part-of: gaik-wizard-v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: NAME_PLACEHOLDER-scanner
+  template:
+    metadata:
+      labels:
+        app: NAME_PLACEHOLDER-scanner
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: clamd
+          image: image-registry.apps.2.rahti.csc.fi/PROJECT_PLACEHOLDER/NAME_PLACEHOLDER-scanner:latest
+          ports:
+            - containerPort: 3310
+          # clamd holds the signatures in memory (about 1 GiB) and, while it
+          # loads an update, the new set beside the old one.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1280Mi
+            limits:
+              cpu: "1"
+              memory: 3Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
+          # The only writable places: the signatures (copied from the image at
+          # start, then updated) and clamd's scratch space.
+          volumeMounts:
+            - name: signatures
+              mountPath: /var/lib/clamav
+            - name: tmp
+              mountPath: /tmp
+          # clamd opens its port only after the signatures are loaded.
+          startupProbe:
+            tcpSocket:
+              port: 3310
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: 3310
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket:
+              port: 3310
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: signatures
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: NAME_PLACEHOLDER-scanner
+  labels:
+    app: NAME_PLACEHOLDER-scanner
+spec:
+  selector:
+    app: NAME_PLACEHOLDER-scanner
+  ports:
+    - port: 3310
+      targetPort: 3310
+      protocol: TCP
