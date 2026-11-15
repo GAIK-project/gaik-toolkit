@@ -61,6 +61,7 @@ import {
   MAX_FILE_MB,
   type VisionExample,
 } from "./vision-data";
+import { UploadReminder } from "@/components/upload-reminder";
 
 const ACCEPT_ATTR = ACCEPTED_EXTENSIONS.join(",");
 
@@ -547,6 +548,7 @@ export default function VisionExtractorPage() {
                   className="sr-only"
                 />
               </label>
+              <UploadReminder />
 
               {isLoadingExample && (
                 <p className="text-muted-foreground flex items-center gap-2 text-sm">

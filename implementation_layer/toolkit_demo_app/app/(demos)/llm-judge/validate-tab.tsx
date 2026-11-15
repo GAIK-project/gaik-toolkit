@@ -43,6 +43,7 @@ import {
   useJudgeSubmit,
   type Usage,
 } from "./judge-shared";
+import { UploadReminder } from "@/components/upload-reminder";
 
 const DEMO_PROVIDER = "openai";
 
@@ -252,6 +253,7 @@ export function ValidatePdfTab() {
                 className="sr-only"
               />
             </label>
+            <UploadReminder />
 
             <div className="space-y-2">
               <Label htmlFor="validate-extracted">Extracted data (JSON)</Label>

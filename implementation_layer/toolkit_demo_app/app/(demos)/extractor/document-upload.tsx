@@ -11,6 +11,7 @@ import {
   MAX_DOCUMENTS,
   addDocuments,
 } from "./extractor-data";
+import { UploadReminder } from "@/components/upload-reminder";
 
 /** The documents to read: a list that grows as files are chosen or dropped. */
 export function DocumentUpload({
@@ -129,6 +130,7 @@ export function DocumentUpload({
           />
         </label>
       )}
+      <UploadReminder />
       {full && (
         <p className="text-muted-foreground text-xs">
           {MAX_DOCUMENTS} documents is the most for one extraction. Remove one

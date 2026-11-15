@@ -11,5 +11,7 @@ if (
     person_profiles: "identified_only",
     capture_pageview: true,
     capture_pageleave: true,
+    // The privacy notice offers Do Not Track as the opt-out.
+    respect_dnt: true,
   });
 }

@@ -122,7 +122,7 @@ export default function SignUpPage() {
               type="button"
               className="hover:text-foreground cursor-pointer underline"
             >
-              Privacy Policy
+              Privacy Notice
             </button>
           </PrivacyDialog>
           .

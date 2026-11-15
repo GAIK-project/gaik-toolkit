@@ -343,9 +343,8 @@ export function HelpdeskOwnData() {
 
       <p className="text-muted-foreground text-sm">
         Nothing is saved. The text of your documents is sent to the AI model
-        with each question, so leave out personal data and confidential
-        material. This is a basic test: the documents are read as they are, with
-        no tuning for your use case.
+        with each question. This is a basic test: the documents are read as they
+        are, with no tuning for your use case.
       </p>
 
       {example && <HelpdeskChat key={revision} example={example} />}

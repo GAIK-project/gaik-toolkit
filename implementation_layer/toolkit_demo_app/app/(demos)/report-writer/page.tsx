@@ -52,6 +52,7 @@ import {
   REPORT_UPLOAD_MAX_MB,
   totalFileBytes,
 } from "@/lib/report-writer/upload-limit";
+import { UploadReminder } from "@/components/upload-reminder";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -299,6 +300,7 @@ function MultiFileUpload({
           onChange={(e) => addFiles(Array.from(e.target.files || []))}
         />
       </div>
+      <UploadReminder />
       {files.length > 0 && (
         <ul className="space-y-1">
           {files.map((f, i) => (
