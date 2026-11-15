@@ -19,8 +19,12 @@ def create_llm_client(config: dict) -> ProviderClient:
     OpenAI/Azure dict (``{"use_azure": True, "api_key": ...}``). Raises
     ``ImportError`` with a useful hint if the provider's SDK extra is missing.
 
-    With gaik's tracing on (the ``gaik[otel]`` extra), each model call of the
-    client makes an OpenTelemetry span; the client behaves the same either way.
+    The client is wrapped for tracing whenever OpenTelemetry can be imported and
+    ``OTEL_SDK_DISABLED`` is not ``true``; otherwise it is returned as is. A
+    wrapped client's model calls each make an OpenTelemetry span while gaik's
+    tracing is on: with the ``gaik[otel]`` extra, or once the application sets
+    a tracer provider of its own, before or after the client is made (see
+    ``gaik.observability.tracing``). The client behaves the same either way.
     """
     return traced_client(_create_llm_client(config))
 

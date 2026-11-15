@@ -854,3 +854,81 @@ def test_the_extra_is_looked_up_once_not_on_every_call(monkeypatch, spans):
 
     assert calls.count("opentelemetry.exporter.otlp.proto.http") == 1
     assert len(spans()) == 6
+
+
+# -- streams stay lazy -------------------------------------------------------------
+
+
+class _LazyStream:
+    """A stream that counts the chunks produced, and fails if read ahead of its reader."""
+
+    def __init__(self, chunks):
+        self._chunks = list(chunks)
+        self.produced = 0
+        self.taken = 0  # chunks the test has taken so far
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.produced > self.taken:
+            raise AssertionError("the stream was read ahead of its reader")
+        if self.produced == len(self._chunks):
+            raise StopIteration
+        self.produced += 1
+        return self._chunks[self.produced - 1]
+
+
+class _LazyProvider(_FakeProvider):
+    def __init__(self, stream):
+        super().__init__()
+        self.stream = stream
+
+    def chat_stream(self, messages, **kwargs):
+        return self.stream
+
+
+def _read_lazily(stream, lazy):
+    """Read ``stream`` chunk by chunk, checking that ``lazy`` produced only what was read."""
+    assert lazy.produced == 0
+    chunks = []
+    for chunk in stream:
+        assert lazy.produced == len(chunks) + 1
+        chunks.append(chunk)
+        lazy.taken = len(chunks)
+    return chunks
+
+
+@pytest.mark.parametrize("where", ["off", "in-component-span", "traced"])
+def test_a_wrapped_stream_is_read_only_as_its_reader_reads(where, monkeypatch, spans):
+    if where == "off":
+        monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
+        tracing._reset_for_tests()
+    lazy = _LazyStream(["a", "b", "c"])
+    client = TracedProviderClient(_LazyProvider(lazy))
+
+    if where == "in-component-span":
+        with llm_span("AnswerGenerator", provider="openai", model="gpt-4.1"):
+            stream = client.chat_stream(MESSAGES)
+            assert stream is lazy  # handed back as is
+            assert _read_lazily(stream, lazy) == ["a", "b", "c"]
+    else:
+        stream = client.chat_stream(MESSAGES)
+        if where == "off":
+            assert stream is lazy
+        assert _read_lazily(stream, lazy) == ["a", "b", "c"]
+    assert len(spans()) == (0 if where == "off" else 1)
+
+
+@pytest.mark.parametrize("inside", [False, True], ids=["own-span", "in-component-span"])
+def test_traced_stream_reads_only_as_its_reader_reads(inside, spans):
+    lazy = _LazyStream(["a", "b"])
+    stream = traced.traced_stream(
+        lazy, component="AnswerGenerator", provider="openai", model="gpt-4.1", messages=MESSAGES
+    )
+    if inside:
+        with llm_span("AnswerGenerator", provider="openai", model="gpt-4.1"):
+            assert _read_lazily(stream, lazy) == ["a", "b"]
+    else:
+        assert _read_lazily(stream, lazy) == ["a", "b"]
+    assert len(spans()) == 1

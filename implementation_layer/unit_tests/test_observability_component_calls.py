@@ -158,6 +158,61 @@ def _answer_generator(stream):
     return case
 
 
+class _StreamingProvider(client_tests._FakeProvider):
+    """A ``ProviderClient`` whose ``chat_stream`` records its request, failing at first read."""
+
+    def chat_stream(self, messages, **kwargs):
+        self.calls.append(kwargs)
+        if self.error:
+            raise self.error
+        yield from self.chunks
+
+
+def _answer_generator_shared(stream):
+    """AnswerGenerator on a ProviderClient (a non-OpenAI config), plain and streamed."""
+
+    def case(mp, tmp_path, error):
+        pytest.importorskip("langchain_core")
+        from gaik.software_components.RAG.answer_generator import AnswerGenerator
+
+        fake = _StreamingProvider(
+            result=_chat_response(), error=error, chunks=["Laskun ", "", "summa on 12."]
+        )
+        generator = AnswerGenerator(
+            config={"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"},
+            stream=stream,
+        )
+        generator.client = TracedProviderClient(fake)
+        if stream:
+            run = lambda: "".join(generator.generate("q", SECRET))  # noqa: E731
+        else:
+            run = lambda: generator.generate("q", SECRET)  # noqa: E731
+        return run, {
+            "component": "AnswerGenerator",
+            "calls": fake.calls,
+            "requests": [{"model": "gpt-4.1", "temperature": 0.0}],
+        }
+
+    return case
+
+
+def _embedder_shared(mp, tmp_path, error):
+    pytest.importorskip("langchain_core")
+    from gaik.software_components.RAG.embedder import Embedder
+
+    fake = client_tests._FakeProvider(result=[[0.1, 0.2]], error=error)
+    embedder = Embedder({"provider": "openai", "api_key": "test-key"})
+    embedder.client = TracedProviderClient(fake)
+    embedder.model = "text-embedding-3-small"
+    run = lambda: embedder.embed([SECRET])[0]  # noqa: E731
+    return run, {
+        "component": "Embedder",
+        "operation": "embeddings",
+        "calls": fake.calls,
+        "requests": [{"model": "text-embedding-3-small"}],
+    }
+
+
 def _transcript_enhancer(mp, tmp_path, error):
     from gaik.software_components.enhance_transcript import TranscriptEnhancer
 
@@ -990,6 +1045,9 @@ def _classify_text(kind):
 CASES = {
     "AnswerGenerator": _answer_generator(stream=False),
     "AnswerGenerator-stream": _answer_generator(stream=True),
+    "AnswerGenerator-shared": _answer_generator_shared(stream=False),
+    "AnswerGenerator-shared-stream": _answer_generator_shared(stream=True),
+    "Embedder-shared": _embedder_shared,
     "TranscriptEnhancer": _transcript_enhancer,
     "SchemaGenerator": _schema_generator,
     "FormUnderstander": _form_understander,

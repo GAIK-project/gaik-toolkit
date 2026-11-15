@@ -162,9 +162,10 @@ def _resolve_tracer() -> Any:
         # later, as without an endpoint. Say why no spans arrive when there is none.
         if not _app_provider_set():
             logger.warning(
-                "An OTLP endpoint is set but the OTLP exporter is not installed, so gaik "
-                "sends no spans until the application sets a tracer provider. Install "
-                "gaik[otel]."
+                "An OTLP endpoint is set but gaik's OTLP exporter is not installed. gaik's "
+                "spans go to the application's tracer provider once it sets one, and are "
+                "dropped until then. Install gaik[otel] only to have gaik export them by "
+                "itself instead."
             )
         return trace.get_tracer("gaik", _gaik_version())
 

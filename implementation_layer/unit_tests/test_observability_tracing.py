@@ -6,6 +6,9 @@ test uses a fake client that answers like the OpenAI SDK.
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 import sys
 
 import pytest
@@ -128,7 +131,8 @@ def test_an_endpoint_without_the_exporter_or_an_app_provider_warns_and_sends_not
     only_the_api(monkeypatch)
     with caplog.at_level("WARNING", logger=tracing.__name__):
         assert tracing._resolve_tracer() is not None  # follows a provider set later
-    assert "Install gaik[otel]" in caplog.text
+    assert "exporter is not installed" in caplog.text
+    assert "application's tracer provider once it sets one" in caplog.text
     assert not tracing.tracing_enabled()
     with llm_span("DataExtractor", provider="openai", model="m") as call:
         assert call.recording is False
@@ -143,7 +147,7 @@ def test_an_endpoint_without_the_exporter_sends_to_the_app_provider(monkeypatch,
     monkeypatch.setattr(tracing, "_extra", False)
     with caplog.at_level("WARNING", logger=tracing.__name__):
         assert tracing.tracing_enabled()
-    assert "Install gaik[otel]" not in caplog.text
+    assert "exporter is not installed" not in caplog.text
     assert tracing._provider is None  # no exporter of gaik's own
 
     with llm_span("DataExtractor", provider="openai", model="m") as call:
@@ -163,7 +167,7 @@ def test_an_app_provider_set_after_the_warning_still_gets_the_spans(monkeypatch,
     monkeypatch.setattr(trace, "get_tracer_provider", lambda: current[0])
     with caplog.at_level("WARNING", logger=tracing.__name__):
         assert not tracing.tracing_enabled()  # resolved, and cached, now
-    assert "Install gaik[otel]" in caplog.text
+    assert "exporter is not installed" in caplog.text
 
     current[0] = real  # the application sets its provider later
     with llm_span("DataExtractor", provider="openai", model="m"):
@@ -678,3 +682,89 @@ def test_the_extractor_s_error_is_unchanged_and_marks_the_span(spans):
     assert span.status.status_code == trace.StatusCode.ERROR
     assert span.attributes["error.type"] == "builtins.ValueError"
     assert "document text" not in _values(span)
+
+
+_LATE_PROVIDER_SCRIPT = """
+import json
+import json
+import os
+import subprocess
+import sys
+
+if sys.argv[1] == "no-extra":
+    for name in (
+        "opentelemetry.exporter.otlp.proto.http",
+        "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+    ):
+        sys.modules[name] = None
+
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+from gaik.observability import llm_span
+from gaik.software_components.llm.traced_client import traced_client
+
+
+class Fake:
+    provider = "openai"
+    model = "gpt-4.1"
+
+    def chat(self, messages, **kwargs):
+        return "ok"
+
+
+# gaik makes a client and a span before the application sets its provider.
+client = traced_client(Fake())
+assert client.chat([]) == "ok"
+with llm_span("DataExtractor", provider="openai", model="before"):
+    pass
+
+exporter = InMemorySpanExporter()
+provider = TracerProvider()
+provider.add_span_processor(SimpleSpanProcessor(exporter))
+trace.set_tracer_provider(provider)
+assert not exporter.get_finished_spans()
+
+assert client.chat([]) == "ok"
+with llm_span("DataExtractor", provider="openai", model="after"):
+    pass
+print(json.dumps({
+    "wrapped": type(client).__name__,
+    "spans": sorted(span.name for span in exporter.get_finished_spans()),
+}))
+"""
+
+
+@needs_otel
+@pytest.mark.parametrize(
+    ("extra", "endpoint"),
+    [("no-extra", False), ("no-extra", True), ("extra", False)],
+    ids=["no-extra", "no-extra-with-endpoint", "extra"],
+)
+def test_a_provider_the_application_sets_later_gets_the_spans(extra, endpoint, tmp_path):
+    """The real transition, in a fresh process: no patched provider lookup.
+
+    With the extra and an endpoint gaik exports by itself, so that pair is not
+    a case here.
+    """
+    if extra == "extra" and not _HAS_EXPORTER:
+        pytest.skip("needs the gaik[otel] extra")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("OTEL_")}
+    if endpoint:
+        env["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://127.0.0.1:9"
+    script = tmp_path / "late_provider.py"
+    script.write_text(_LATE_PROVIDER_SCRIPT)
+
+    done = subprocess.run(
+        [sys.executable, str(script), extra],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert done.returncode == 0, done.stderr[-2000:]
+    result = json.loads(done.stdout.strip().splitlines()[-1])
+    assert result == {"wrapped": "TracedProviderClient", "spans": ["chat after", "chat gpt-4.1"]}
