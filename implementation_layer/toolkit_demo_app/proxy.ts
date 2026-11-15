@@ -20,6 +20,7 @@ import {
   MODEL_TIER_HEADER,
   isModelStaff,
 } from "@/lib/model-tier";
+import { isAnalyticsPath } from "@/lib/analytics-path";
 import { backendTarget, isApiPath } from "@/lib/backend-target";
 import { routedPath } from "@/lib/request-path";
 import { clientIp } from "@/lib/client-ip";
@@ -63,6 +64,15 @@ async function route(request: NextRequest): Promise<NextResponse> {
   const pathname = routedPath(rawPath);
   if (pathname === null)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Analytics requests go on to PostHog (lib/analytics-path.ts). Hand them on
+  // without this site's cookies, and before the session is read or refreshed:
+  // nothing here needs it, and a refresh would put new tokens in the request.
+  if (isAnalyticsPath(pathname)) {
+    const headers = new Headers(request.headers);
+    headers.delete("cookie");
+    return NextResponse.next({ request: { headers } });
+  }
 
   // Read at most once per request, by the API gates. Reading it can refresh the
   // session, and every response below carries the new cookies.
