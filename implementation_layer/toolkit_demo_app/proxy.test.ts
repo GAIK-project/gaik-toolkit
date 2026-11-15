@@ -56,6 +56,7 @@ function refreshTokenIn(response: NextResponse): string | null {
 
 let refreshes: string[] = [];
 let backendCalls = 0;
+let backendHeaders: Headers | null = null;
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = SUPABASE_URL;
@@ -82,6 +83,7 @@ beforeAll(() => {
     if (url.startsWith(`${SUPABASE_URL}/rest/v1/access_requests`))
       return Response.json({ status: "approved", wizard_access: false });
     backendCalls += 1;
+    backendHeaders = new Headers(init?.headers);
     return Response.json({ ok: true });
   }) as typeof fetch;
 });
@@ -96,6 +98,7 @@ afterAll(() => {
 beforeEach(() => {
   refreshes = [];
   backendCalls = 0;
+  backendHeaders = null;
 });
 
 const expired = () => Math.floor(Date.now() / 1000) - 60;
@@ -204,4 +207,20 @@ test("a path that only begins like the old wizard API meets the normal gate", as
   );
   expect(response.status).toBe(401);
   expect(backendCalls).toBe(0);
+});
+
+test("the generic proxy does not pass on the report run header", async () => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const response = await proxy(
+    new NextRequest(RUN, {
+      method: "POST",
+      headers: {
+        cookie: sessionCookie("r1", future),
+        "x-gaik-report-run": "from-the-browser",
+      },
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(backendHeaders?.has("x-gaik-report-run")).toBe(false);
 });
