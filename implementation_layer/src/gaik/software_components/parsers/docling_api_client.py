@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-import requests
+from gaik.software_components import _http
 
 
 class DoclingApiClientParser:
@@ -45,26 +45,25 @@ class DoclingApiClientParser:
         print(f"Sending document: {input_file.name} ...")
 
         # Health check
-        r = requests.get(f"{self.api_base}/health", timeout=self.healthcheck_timeout_seconds)
-        r.raise_for_status()
+        r = _http.get(
+            f"{self.api_base}/health",
+            service="Docling service",
+            timeout=self.healthcheck_timeout_seconds,
+        )
         print(f"Server OK - {r.json()}")
 
         with input_file.open("rb") as f:
             files = {"file": (input_file.name, f)}
             print("Parsing... (this may take a while)")
-            r = requests.post(
+            # A failed request raises with the HTTP status only; the service's
+            # response goes to the debug log.
+            r = _http.post(
                 f"{self.api_base}/parsedocument",
+                service="Docling service",
                 files=files,
                 headers={"key": self.password},
                 timeout=self.timeout_seconds,
             )
-            if r.status_code >= 400:
-                print(f"Server returned HTTP {r.status_code}")
-                try:
-                    print("Error response:", r.json())
-                except Exception:
-                    print("Error response:", r.text)
-                r.raise_for_status()
 
         payload = r.json()
         parsed_markdown = (payload.get("parsed_markdown") or "").strip()
