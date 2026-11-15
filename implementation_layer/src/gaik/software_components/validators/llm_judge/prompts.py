@@ -23,7 +23,6 @@ import json
 
 from gaik.software_components.source_material import (
     SourceMaterial,
-    clean_label,
     with_source_material_instruction,
 )
 
@@ -61,7 +60,7 @@ The severity must be consistent with the score:
 _ADDITIVE_SCALE = """
 Additive Likert score (integer 1-5):
   Award 1 point for each evaluation aspect (see "Focus your evaluation on
-  these aspects:" in the user prompt) that is fully satisfied for the field.
+  these aspects:" in the rubric) that is fully satisfied for the field.
   The total is the score, capped at 5. If no aspects are listed, fall back
   to the standard 1-5 Likert scale described above.
 """
@@ -292,15 +291,24 @@ def build_hallucination_system_prompt(field_descriptions: dict[str, str] | None 
     distinguish a documented soft default from a true hallucination. The
     rules are the caller's instructions, so they go in the system message.
     """
+    rules = _render_field_rules(field_descriptions)
+    return f"{HALLUCINATION_SYSTEM_PROMPT}\n\n{rules}" if rules else HALLUCINATION_SYSTEM_PROMPT
+
+
+def _one_line(text: str) -> str:
+    return " ".join(str(text).split())
+
+
+def _render_field_rules(field_descriptions: dict[str, str] | None) -> str:
     if not field_descriptions:
-        return HALLUCINATION_SYSTEM_PROMPT
+        return ""
     lines = ["Field rules (use these to decide what counts as 'unsupported'):"]
     for name, desc in field_descriptions.items():
         short = desc.replace("\n", " ").strip()
         if len(short) > 240:
             short = short[:237] + "..."
-        lines.append(f"  - {clean_label(name)}: {short}")
-    return HALLUCINATION_SYSTEM_PROMPT + "\n\n" + "\n".join(lines)
+        lines.append(f"  - {_one_line(name)}: {short}")
+    return "\n".join(lines)
 
 
 def build_hallucination_prompt(
@@ -314,23 +322,22 @@ def build_hallucination_prompt(
 
     The source text (truncated by the caller if needed) and the extracted
     JSON are shown verbatim, each in its own block, labelled ``"source"``
-    and ``"answer"``. ``field_descriptions`` no longer goes here: the field
-    rules are instructions, so :func:`build_hallucination_system_prompt`
-    puts them in the system message; the argument is accepted for
-    compatibility only. Pass the call's ``material`` so every block of the
-    call shares its id.
+    and ``"answer"``. ``field_descriptions``, when given, is rendered as
+    field rules before the blocks, outside them. :meth:`LLMJudge.detect_hallucinations`
+    does not pass it here: it puts the rules in the system message with
+    :func:`build_hallucination_system_prompt`. Pass the call's ``material``
+    so every block of the call shares its id.
     """
-    del field_descriptions  # rendered in the system message
     material = material or SourceMaterial()
     extracted_json = json.dumps(extracted, indent=2, ensure_ascii=False)
-    return "\n\n".join(
-        [
-            "Flag any field value in the block labelled answer that the block "
-            "labelled source does not support.",
-            material.wrap(source_text, label="source"),
-            material.wrap(extracted_json, label="answer"),
-        ]
-    )
+    parts = [
+        _render_field_rules(field_descriptions),
+        "Flag any field value in the block labelled answer that the block "
+        "labelled source does not support.",
+        material.wrap(source_text, label="source"),
+        material.wrap(extracted_json, label="answer"),
+    ]
+    return "\n\n".join(part for part in parts if part)
 
 
 def build_text_pair_prompt(
@@ -347,12 +354,12 @@ def build_text_pair_prompt(
     value labelled ``"answer"`` and the expected one ``"reference"``.
     ``context`` (e.g. the surrounding transcript) goes in a third block
     labelled ``"context"``. ``field_name`` is a hint from the caller's
-    schema; it stays outside the blocks, cleaned to one line. Pass the
+    schema; it stays outside the blocks, on one line. Pass the
     call's ``material`` so every block of the call shares its id.
     """
     material = material or SourceMaterial()
     parts: list[str] = []
-    name = clean_label(field_name) if field_name else ""
+    name = _one_line(field_name)[:200] if field_name else ""
     if name:
         parts.append(f"Field: {name}")
     parts.append(
@@ -402,15 +409,18 @@ def build_user_prompt(
     """Assemble the per-call user-side prompt: the task and the extractor output.
 
     The extracted JSON is shown verbatim inside one block labelled
-    ``"answer"``. The rubric is no longer rendered here: it goes in the
-    system message (:func:`build_system_prompt` with ``rubric=``), so the
-    ``rubric`` argument is accepted for compatibility only. Pass the
-    call's ``material`` so every block of the call shares its id.
+    ``"answer"``. ``rubric``, when given, is rendered as check lists and
+    few-shot examples before the block, outside it. :meth:`LLMJudge.validate`
+    does not pass it here: it puts the rubric in the system message with
+    :func:`build_system_prompt` (``rubric=``). Pass the call's ``material``
+    so every block of the call shares its id.
     """
-    del rubric  # rendered in the system message
     material = material or SourceMaterial()
     extracted_json = json.dumps(extracted, indent=2, ensure_ascii=False)
-    return (
+    parts = [
+        _render_rubric(rubric) if rubric is not None else "",
         "Compare the extractor output in the block labelled answer against the "
-        "page images and emit your flags.\n\n" + material.wrap(extracted_json, label="answer")
-    )
+        "page images and emit your flags.",
+        material.wrap(extracted_json, label="answer"),
+    ]
+    return "\n\n".join(part for part in parts if part)

@@ -125,10 +125,12 @@ steer its own verdict. Every judge call keeps the two apart with
 - Verdict parsing is unchanged: a reply that cannot be read is still reported in
   `judge_error`, never as a pass.
 
-`build_user_prompt` and `build_hallucination_prompt` keep their parameters, but
-the rubric and the field rules now go in the system message
-(`build_system_prompt(scoring_mode, rubric=...)`,
-`build_hallucination_system_prompt(field_descriptions)`). The instruction lowers
+To build the messages yourself, use `build_system_prompt(scoring_mode,
+rubric=...)` with `build_user_prompt(extracted)`, or
+`build_hallucination_system_prompt(field_descriptions)` with
+`build_hallucination_prompt(source_text, extracted)`. Passed a rubric or field
+rules, the user-prompt builders still render them, before the blocks. The
+instruction lowers
 the chance that judged content steers the verdict; it does not remove it, so
 check high-stakes verdicts by other means as well.
 

@@ -86,20 +86,26 @@ def test_build_hallucination_prompt_contains_source_and_extracted():
     assert '"foo"' in prompt and '"bar"' in prompt
 
 
-def test_field_descriptions_go_in_the_system_prompt_not_next_to_the_source():
-    system = build_hallucination_system_prompt({"a": "field a description"})
-    assert "Field rules" in system
-    assert "field a description" in system
+def test_build_hallucination_prompt_includes_field_descriptions_when_given():
     prompt = build_hallucination_prompt(
         source_text="x",
         extracted={"a": "b"},
         field_descriptions={"a": "field a description"},
     )
-    assert "field a description" not in prompt
+    assert "Field rules" in prompt
+    assert "field a description" in prompt
+    # The rules stay outside the blocks.
+    assert prompt.index("field a description") < prompt.index("<source_material")
 
 
-def test_no_field_rules_block_when_omitted():
-    assert "Field rules" not in build_hallucination_system_prompt(None)
+def test_build_hallucination_prompt_no_field_rules_block_when_omitted():
+    prompt = build_hallucination_prompt(source_text="x", extracted={"a": "b"})
+    assert "Field rules" not in prompt
+
+
+def test_the_system_prompt_carries_the_field_rules_when_given():
+    system = build_hallucination_system_prompt({"a": "field a description"})
+    assert "Field rules" in system and "field a description" in system
     assert build_hallucination_system_prompt(None) == HALLUCINATION_SYSTEM_PROMPT
 
 

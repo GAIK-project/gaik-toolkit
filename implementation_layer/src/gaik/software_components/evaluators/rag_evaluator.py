@@ -91,8 +91,8 @@ class RAGEvaluator:
 
     Args:
         judge: An :class:`LLMJudge` instance (any provider). The same judge
-            is reused for every metric; supply a panel-aware judge if you
-            want cross-model averaging.
+            is reused for every metric. An :class:`LLMJudgePanel` is not
+            accepted: each metric is one text-only call of one judge.
         skip_context_recall: When ``True`` (default), context_recall is
             skipped for items without a ``ground_truth``. Set to ``False``
             to error on missing ground truth.
@@ -104,6 +104,8 @@ class RAGEvaluator:
         *,
         skip_context_recall: bool = True,
     ) -> None:
+        if not callable(getattr(judge, "_dispatch_text", None)):
+            raise TypeError("RAGEvaluator needs an LLMJudge (one judge, not a panel)")
         self.judge = judge
         self.skip_context_recall = skip_context_recall
 
@@ -277,6 +279,11 @@ one flag for the metric:
 """
 
 
+def _text(value: object) -> str:
+    """A value as block text: ``None`` (no answer) is empty."""
+    return "" if value is None else str(value)
+
+
 def _grading_prompts(
     metric: str,
     *,
@@ -295,14 +302,15 @@ def _grading_prompts(
     material = SourceMaterial()
     blocks = [
         f"Grade the {metric} of the answer below and emit your JSON flag.",
-        material.wrap(query, label="query"),
-        material.wrap(answer, label="answer"),
+        material.wrap(_text(query), label="query"),
+        material.wrap(_text(answer), label="answer"),
     ]
     blocks.extend(
-        material.wrap(passage, label=f"context {i}") for i, passage in enumerate(context, start=1)
+        material.wrap(_text(passage), label=f"context {i}")
+        for i, passage in enumerate(context, start=1)
     )
     if ground_truth is not None:
-        blocks.append(material.wrap(ground_truth, label="reference"))
+        blocks.append(material.wrap(_text(ground_truth), label="reference"))
     return system_prompt, "\n\n".join(blocks)
 
 

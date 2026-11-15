@@ -133,6 +133,24 @@ def test_few_shot_examples_stay_in_the_system_message():
     assert "Reference examples" not in call["user"]
 
 
+def test_the_additive_scale_points_at_the_rubric_in_the_system_message():
+    from gaik.software_components.validators.llm_judge import build_system_prompt
+
+    rubric = ValidationRubric(scoring_mode="additive", evaluation_aspects=["dates match"])
+    system = build_system_prompt("additive", rubric=rubric)
+    assert "in the user prompt" not in system
+    assert "Focus your evaluation on these aspects:" in system and "dates match" in system
+
+
+def test_build_user_prompt_still_renders_a_rubric_passed_to_it_outside_the_block():
+    from gaik.software_components.validators.llm_judge import build_user_prompt
+
+    prompt = build_user_prompt({"total": "10"}, RUBRIC)
+    assert "Total is the sum" in prompt
+    assert prompt.index("Total is the sum") < prompt.index("<source_material")
+    assert "Total is the sum" not in _blocks(prompt)["answer"]
+
+
 def test_an_unreadable_verdict_stays_an_error():
     judge, _ = _judge("Everything looks fine.")
     result = judge.validate(PAGE, EXTRACTED, RUBRIC)
@@ -197,7 +215,7 @@ def test_answer_reference_and_context_each_have_a_block():
     assert list(blocks) == ["reference", "answer", "context"]
     assert STEERING_TEXT in blocks["answer"]
     assert _closing_tags(call["user"]) == 3
-    assert "Field: What happened b" in call["user"]
+    assert 'Field: What "happened" <b>' in call["user"]
     assert "forklift" not in call["system"]
     assert SOURCE_MATERIAL_INSTRUCTION in call["system"]
     assert (result.equivalent, result.severity, result.score) == (True, "ok", 5)
@@ -280,6 +298,19 @@ def test_rag_grading_puts_each_piece_in_its_own_block_and_sends_no_image():
     ]
     assert "Penalize hallucinations" in recorder.calls[0]["system"]
     assert item.faithfulness_score == 4
+
+
+def test_rag_grading_takes_a_missing_answer_as_empty():
+    judge, recorder = _judge('{"flags": [{"field": "x", "severity": "wrong", "score": 1}]}')
+    item = RAGEvaluator(judge).evaluate_item(query="q", answer=None, context=["c"])
+    assert _blocks(recorder.calls[0]["user"])["answer"] == ""
+    assert item.faithfulness_score == 1
+
+
+def test_rag_evaluator_refuses_a_panel_up_front():
+    panel = LLMJudgePanel([_judge("{}")[0], _judge("{}")[0]])
+    with pytest.raises(TypeError, match="panel"):
+        RAGEvaluator(panel)
 
 
 def test_rag_grading_scores_zero_when_the_reply_is_unreadable():
