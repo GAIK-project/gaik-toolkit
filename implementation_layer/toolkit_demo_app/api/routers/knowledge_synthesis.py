@@ -34,6 +34,10 @@ try:
     from utils import get_api_config, sse_event
 except ImportError:
     from api.utils import get_api_config, sse_event
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -154,6 +158,8 @@ async def _sample_markdown(upload: UploadFile, gaik) -> str:
     """The sample report as Markdown: text files as they are, DOCX and PDF converted locally."""
     suffix = Path(upload.filename or "").suffix.lower()
     data = await upload.read()
+    if (problem := await upload_problem(suffix, data, check_type=False)) is not None:
+        raise HTTPException(problem.status, f"The sample report: {problem.message}")
     if suffix in _SAMPLE_TEXT:
         try:
             return data.decode("utf-8-sig")

@@ -29,9 +29,9 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 router = APIRouter()
 
@@ -110,8 +110,8 @@ async def dental_transcription_stream(
     content = await file.read()
     if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
         return sse_error_response(AUDIO_TOO_LARGE_DETAIL)
-    if (mismatch := content_mismatch(suffix, content)) is not None:
-        return sse_error_response(mismatch)
+    if (problem := await upload_problem(suffix, content)) is not None:
+        return sse_error_response(problem.message)
 
     # Save uploaded file
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:

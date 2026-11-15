@@ -8,6 +8,10 @@ try:
     from utils import generate_presigned_url, sse_error_response, sse_event
 except ImportError:
     from api.utils import generate_presigned_url, sse_error_response, sse_event
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -277,7 +281,10 @@ async def ingest_srt_stream(
     if not file.filename:
         return sse_error_response("No filename provided")
 
-    srt_content = (await file.read()).decode("utf-8", errors="replace")
+    raw = await file.read()
+    if (problem := await upload_problem(".srt", raw, check_type=False)) is not None:
+        return sse_error_response(problem.message)
+    srt_content = raw.decode("utf-8", errors="replace")
 
     import uuid as uuid_mod
 

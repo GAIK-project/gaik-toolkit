@@ -39,9 +39,9 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 logger = logging.getLogger(__name__)
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 router = APIRouter()
 
@@ -131,8 +131,8 @@ async def diary_audio_pipeline_stream(
     content = await file.read()
     if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
         raise HTTPException(status_code=413, detail=AUDIO_TOO_LARGE_DETAIL)
-    if (mismatch := content_mismatch(suffix, content)) is not None:
-        raise HTTPException(status_code=415, detail=mismatch)
+    if (problem := await upload_problem(suffix, content)) is not None:
+        raise HTTPException(status_code=problem.status, detail=problem.message)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
