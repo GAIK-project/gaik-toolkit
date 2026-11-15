@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 import { NextRequest, type NextResponse } from "next/server";
+import { SHARED_DATA_DENIAL } from "./lib/api-access";
 
 // A demo run from a page left open past the access token's lifetime: the API
 // gate refreshes the session, and the browser must get the new cookies, or its
@@ -395,4 +396,38 @@ test("the generic proxy does not pass on the report run header", async () => {
   expect(response.status).toBe(200);
   expect(backendCalls).toBe(1);
   expect(backendHeaders?.has("x-gaik-report-run")).toBe(false);
+});
+
+// A user waiting for approval runs demos on the trial, which never covers a
+// write to the video-search index that every visitor searches. Without Redis the
+// trial is off here and this user's e-mail address is unconfirmed, so the
+// refusal is told apart by its reason; that it holds with trial runs left is in
+// lib/api-access.test.ts.
+
+test("a pending user's DELETE /api/video-search/clear is refused", async () => {
+  accessRow = { status: "pending", wizard_access: false };
+  const cookie = sessionCookie("r1", fresh());
+  const requests = [
+    ...[
+      "/api/video-search/clear",
+      "/api/video-search/%63lear",
+      "/api/video-search/clear/",
+    ].map(
+      (path) =>
+        new NextRequest(`https://demo.test${path}`, {
+          method: "DELETE",
+          headers: { cookie },
+        }),
+    ),
+    new NextRequest("https://demo.test/api/video-search/ingest/stream", {
+      method: "POST",
+      headers: { cookie },
+    }),
+  ];
+  for (const request of requests) {
+    const response = await proxy(request);
+    expect(response.status).toBe(SHARED_DATA_DENIAL.status);
+    expect(await response.json()).toEqual({ error: SHARED_DATA_DENIAL.error });
+  }
+  expect(backendCalls).toBe(0);
 });

@@ -5,6 +5,7 @@ import {
   isWizardApiPath,
   needsApprovedUser,
   wizardRefusal,
+  writesSharedData,
 } from "@/lib/api-access";
 import {
   MODEL_SETTINGS_HEADER,
@@ -129,11 +130,12 @@ async function route(request: NextRequest): Promise<NextResponse> {
     }
 
     // Require login + approval for every backend request that changes state,
-    // not just POST: DELETE /video-search/clear empties a table.
+    // not just POST: a DELETE clears data.
     // A user still waiting for approval runs on the daily trial allowance
     // (lib/trial.ts). A request that carries the user's own model key on a
     // supported route runs on their credential: it still needs a signed-in
-    // account, approved or pending, but spends no trial run.
+    // account, approved or pending, but spends no trial run. Neither covers a
+    // write to data that every visitor shares.
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
@@ -146,7 +148,10 @@ async function route(request: NextRequest): Promise<NextResponse> {
         pathname === "/api/model-settings/aitta/warm" ||
         (request.method === "DELETE" &&
           pathname.startsWith("/api/wizard/end/"));
-      const refusal = await accessRefusal(state, takeTrialRun, noTrialRun);
+      const refusal = await accessRefusal(state, takeTrialRun, {
+        noTrialRun,
+        sharedData: writesSharedData(request.method, pathname),
+      });
       if (refusal) {
         // Why a run was refused, without who: the page shows the same text.
         console.warn(
