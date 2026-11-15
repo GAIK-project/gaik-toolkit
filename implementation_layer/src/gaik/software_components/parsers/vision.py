@@ -27,6 +27,7 @@ from gaik.software_components.llm.factory import create_llm_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import Provider, resolve_provider
 from gaik.software_components.source_material import (
+    SOURCE_MATERIAL_INSTRUCTION,
     SourceMaterial,
     source_material_messages,
 )
@@ -411,9 +412,11 @@ class VisionParser:
             },
         ]
 
-        # The page image and the previous page's text are material: the system
-        # message says so, and neither reaches it.
-        content = self._chat_content(source_material_messages("", payload))
+        # The page image and the previous page's text are material. The rule goes
+        # in the user message: some served vision models refuse a system
+        # message next to an image.
+        payload[0]["text"] = f"{SOURCE_MATERIAL_INSTRUCTION}\n\n{payload[0]['text']}"
+        content = self._chat_content([{"role": "user", "content": payload}])
         if content is None:
             raise RuntimeError("Vision model returned empty content")
         return content
@@ -431,7 +434,7 @@ class VisionParser:
         if not content:
             raise RuntimeError("Cleanup LLM returned empty output")
 
-        trimmed = content.strip()
+        trimmed = material.strip_echo(content).strip()
         if trimmed.startswith("```"):
             trimmed = trimmed.strip("`").strip()
         return trimmed

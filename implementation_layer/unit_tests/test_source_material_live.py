@@ -1,8 +1,9 @@
 """A sentence in a document does not change what is extracted or the class.
 
-Needs Azure OpenAI: ``AZURE_API_KEY`` and ``AZURE_ENDPOINT``, with ``AZURE_DEPLOYMENT``
-naming the chat deployment. Skipped when the key or the endpoint is missing; kept
-out of the push gate (``-m "not llm"``) because it asserts on model output.
+Needs Azure OpenAI: ``AZURE_API_KEY`` and ``AZURE_ENDPOINT``; ``AZURE_DEPLOYMENT``
+names the chat deployment when the default one is not deployed. Skipped when the
+key or the endpoint is missing; kept out of the push gate (``-m "not llm"``)
+because it asserts on model output.
 """
 
 from __future__ import annotations

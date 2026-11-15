@@ -88,13 +88,16 @@ The same configuration shape works with `VisionPlusParser(vision_config=...)` an
 
 The parsers that send a document to a model (`VisionParser`, `VisionPlusParser`
 through it, and `MultimodalParser`) treat the document as material, never as
-instructions ([`gaik.software_components.source_material`](../source_material.py)). The system message holds the sentence in
-`SOURCE_MATERIAL_INSTRUCTION`; the page image, the end of the previous page
+instructions ([`gaik.software_components.source_material`](../source_material.py)).
+Each call states the rule in `SOURCE_MATERIAL_INSTRUCTION`: in the system message
+of `MultimodalParser` and of the `VisionParser` clean-up call, and at the start of
+the user message of a `VisionParser` page call, since some served vision models
+refuse a system message next to an image. The end of the previous page
 (`VisionParser` with `use_context=True`), the pages given to the clean-up call
-and a PDF's text layer travel in the user message, each text inside a
-`<source_material>` block with a random id for each call. The local parsers
-(`PyMuPDFParser`, `DocxParser`, `DoclingParser`, `SpreadsheetParser`) call no
-model.
+and a PDF's text layer travel in the user message, each inside a
+`<source_material>` block with a random id for each call; the clean-up answer
+loses those tags if the model repeats them. The local parsers (`PyMuPDFParser`,
+`DocxParser`, `DoclingParser`, `SpreadsheetParser`) call no model.
 
 ## Environment Variables
 

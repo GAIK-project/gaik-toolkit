@@ -53,7 +53,7 @@ def build_chat_document_content(
             with fitz.open(path) as document:
                 for page_number, page in enumerate(document, start=1):
                     # A file name comes from the document's owner: one clean line.
-                    label = clean_label(f"{path.name}, page {page_number}")
+                    label = f"{clean_label(path.name)}, page {page_number}"
                     content.append({"type": "text", "text": label})
                     image = page.get_pixmap(dpi=150, alpha=False).tobytes("png")
                     content.append(_image_part(image, "image/png"))
