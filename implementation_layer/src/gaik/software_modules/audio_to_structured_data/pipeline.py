@@ -229,7 +229,8 @@ from pydantic import BaseModel, Field, ConfigDict
 
         The saved model is rebuilt from ``<stem>_model.json``; ``<stem>.py`` is never
         imported. A folder with only the older files is rebuilt from the
-        requirements where possible, else None (generate the schema again).
+        requirements where they determine the model; otherwise SavedSchemaError
+        names the folder and how to convert it, and nothing is generated over it.
         """
         stem = _schema_file_stem(schema_name)
         model_path = schema_dir / f"{stem}_model.json"

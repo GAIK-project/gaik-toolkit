@@ -27,6 +27,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from gaik.software_components.extractor.saved_schema import load_saved_model, save_model_file
 from gaik.software_components.extractor.schema import (
     ChildRequirements,
     CompositeExtractionRequirements,
@@ -37,7 +38,6 @@ from gaik.software_components.extractor.schema import (
     apply_field_policies,
     create_extraction_model,
 )
-from gaik.software_components.extractor.saved_schema import load_saved_model, save_model_file
 from gaik.software_components.vision_extractor.vision_extractor import (
     _save_schema_to_python,
     _wrap_model_for_verification,

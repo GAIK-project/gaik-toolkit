@@ -515,7 +515,8 @@ def build_model(description: dict) -> type[BaseModel]:
             raise SavedSchemaError(f"Model {model.__name__!r} is described twice")
         built[model.__name__] = model
     root = description.get("root")
-    if root not in built:
+    # built also holds the rebuilt enums ("enum:<name>"); the root must be a model.
+    if not (isinstance(root, str) and _is_model(built.get(root))):
         raise SavedSchemaError(f"Root model {root!r} is not described")
     return built[root]
 

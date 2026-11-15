@@ -250,7 +250,7 @@ def test_an_allowed_value_that_becomes_an_underscore_name_is_saved_as_data(tmp_p
         "schema_name": "Test",
         "fields": ["status"],
         "required_fields": ["status"],
-        "allowed_values": {"status": ["-", "_x", "open"]},
+        "allowed_values": {"status": ["-", "_x", "-x-", "open"]},
     }
     write_schema_files(spec, "Test", tmp_path, "test_uc")
 
@@ -258,8 +258,26 @@ def test_an_allowed_value_that_becomes_an_underscore_name_is_saved_as_data(tmp_p
     ast.parse(src)
     model = read_model_file(tmp_path / "schemas" / "output_schema_model.json")
     enum_cls = model.model_fields["status"].annotation
-    assert [m.value for m in enum_cls] == ["-", "_x", "open"]
+    assert [m.value for m in enum_cls] == ["-", "_x", "-x-", "open"]
     assert not any(m.name.startswith("_") for m in enum_cls)
+
+
+def test_a_designed_schema_the_saved_format_refuses_leaves_the_folder_as_it_was(
+    tmp_path, monkeypatch
+):
+    saved_schema = pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    write_schema_files(SPEC_MINIMAL, "SimpleOutput", tmp_path, "test_uc")
+    schemas = tmp_path / "schemas"
+    before = {p.name: p.read_bytes() for p in schemas.iterdir()}
+
+    def refuse(model):
+        raise saved_schema.SavedSchemaError("refused for the test")
+
+    monkeypatch.setattr(saved_schema, "describe_model", refuse)
+    with pytest.raises(saved_schema.SavedSchemaError):
+        write_schema_files(SPEC_FULL, "MaintenanceTicket", tmp_path, "test_uc")
+
+    assert {p.name: p.read_bytes() for p in schemas.iterdir()} == before
 
 
 def test_write_extraction_requirements(tmp_path):

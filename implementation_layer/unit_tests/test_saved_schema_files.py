@@ -7,13 +7,16 @@ from pydantic import BaseModel, Field
 
 pytest.importorskip("fitz")
 
+from gaik.software_components.extractor.saved_schema import (  # noqa: E402
+    load_saved_model,
+    save_model_file,
+)
 from gaik.software_components.extractor.schema import (  # noqa: E402
     ExtractionRequirements,
     FieldSpec,
     create_extraction_model,
     print_pydantic_schema,
 )
-from gaik.software_components.extractor.saved_schema import load_saved_model, save_model_file  # noqa: E402
 from gaik.software_components.vision_extractor.vision_extractor import (  # noqa: E402
     _save_schema_to_python,
 )

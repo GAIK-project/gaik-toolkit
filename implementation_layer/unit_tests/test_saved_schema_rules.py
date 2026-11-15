@@ -220,3 +220,25 @@ def test_load_saved_model_reads_an_existing_file_without_the_requirements(tmp_pa
 
     write_model_file(Ticket, tmp_path / "m.json")
     assert list(load_saved_model(tmp_path / "m.json", "Ticket", None).model_fields) == ["title"]
+
+
+def test_a_root_that_names_an_enum_instead_of_a_model_is_refused():
+    description = _one_model(
+        [
+            {
+                "name": "status",
+                "type": {
+                    "type": "enum",
+                    "name": "Status",
+                    "doc": None,
+                    "mixin": "str",
+                    "members": [["OPEN", "open"]],
+                },
+                "description": None,
+            }
+        ]
+    )
+    description["root"] = "enum:Status"
+
+    with pytest.raises(SavedSchemaError, match="Root model"):
+        build_model(description)

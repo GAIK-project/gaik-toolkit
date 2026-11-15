@@ -12,6 +12,7 @@ from gaik.software_components.extractor import (
     FieldSpec,
     SchemaGenerator,
 )
+from gaik.software_components.extractor.saved_schema import load_saved_model, save_model_file
 from gaik.software_components.extractor.schema import (
     ChildContainerSpec,
     StructureAnalysis,
@@ -24,7 +25,6 @@ from gaik.software_components.extractor.schema import (
     _reroute_leaked_collections,
     _resolve_child_containers,
 )
-from gaik.software_components.extractor.saved_schema import load_saved_model, save_model_file
 from gaik.software_components.vision_extractor.vision_extractor import (
     VisionExtractor,
     _load_saved_requirements,

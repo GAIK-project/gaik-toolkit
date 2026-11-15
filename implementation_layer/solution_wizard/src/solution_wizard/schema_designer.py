@@ -204,8 +204,9 @@ def build_requirements_text(target_output_spec: dict[str, Any]) -> str:
 def _safe_enum_member(v: str) -> str:
     """Convert an allowed value to a valid Python identifier for an Enum member."""
     s = re.sub(r"[^a-zA-Z0-9_]", "_", str(v))
-    # Enum members must not start with a digit, nor with an underscore, which
-    # the saved-schema format refuses (output_schema_model.json)
+    # Enum members must not start with a digit. A leading underscore gets the
+    # prefix too: Python's Enum reserves _sunder_ names (a value "-x-" would give
+    # "_X_") and does not make a member of a __dunder__ name.
     if s and (s[0].isdigit() or s[0] == "_"):
         s = f"V_{s}"
     return s.upper() or "UNKNOWN"

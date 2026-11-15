@@ -91,3 +91,32 @@ def test_the_command_line_reports_a_refusal_with_exit_code_1(tmp_path, monkeypat
 
     assert _script().main() == 1
     assert "Model file not refreshed" in capsys.readouterr().err
+
+
+def test_a_type_correction_in_the_py_file_is_the_type_load_schema_gives(tmp_path):
+    pytest.importorskip("fitz")
+    from gaik.software_modules.documents_to_structured_data.pipeline import (
+        DocumentsToStructuredData,
+    )
+
+    schemas = _schemas(
+        tmp_path,
+        "from pydantic import BaseModel, Field\n\n"
+        "class Ticket(BaseModel):\n"
+        '    title: int = Field(description="Ticket title")\n',
+    )
+    requirements = {
+        "use_case_name": "ticket",
+        "fields": [{"field_name": "title", "field_type": "int", "description": "Ticket title"}],
+    }
+    (schemas / "output_schema_requirements.json").write_text(
+        json.dumps({"model_name": "Ticket", "requirements": requirements}), encoding="utf-8"
+    )
+    pipeline = object.__new__(DocumentsToStructuredData)
+    before, _ = pipeline.load_schema(schemas, "output_schema")
+    assert before.model_fields["title"].annotation is str
+
+    _script().refresh(schemas)
+
+    after, _ = pipeline.load_schema(schemas, "output_schema")
+    assert after.model_fields["title"].annotation is int

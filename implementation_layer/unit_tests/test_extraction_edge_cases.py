@@ -1,5 +1,6 @@
 """Extraction edge cases: an empty item list, class names, and Gemini's schema."""
 
+import pytest
 from gaik.software_components.extractor.extractor import DataExtractor
 from gaik.software_components.extractor.schema import (
     ExtractionRequirements,
@@ -8,8 +9,6 @@ from gaik.software_components.extractor.schema import (
     sanitize_model_name,
 )
 from pydantic import BaseModel
-
-import pytest
 
 
 def _requirements(use_case_name: str = "order lines") -> ExtractionRequirements:
