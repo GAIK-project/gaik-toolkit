@@ -55,7 +55,6 @@ jobs:
 
     - name: Install build dependencies
       run: |
-        python -m pip install --upgrade pip
         pip install build==1.6.1 twine==7.0.0
 
     - name: Build package
@@ -183,9 +182,13 @@ jobs:
         # Verify correct version was installed
         INSTALLED=$(python -c "from gaik import __version__; print(__version__)")
         echo "Installed version: $INSTALLED"
+        if [ "$INSTALLED" != "$VERSION" ]; then
+          echo "::error::Installed gaik reports $INSTALLED, expected $VERSION"
+          exit 1
+        fi
 
   github-release:
-    needs: publish-pypi
+    needs: [publish-pypi, verify-install]  # Only a release that installs from PyPI
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
