@@ -22,6 +22,7 @@ from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
+from .srt_utils import format_timestamp
 from .whisper_local import transcribe as whisper_local_transcribe
 
 DEFAULT_PROMPT = (
@@ -451,6 +452,22 @@ class Transcriber:
         return _create_audio_client(self.api_config)
 
 
+# How much of the previous chunk's transcript a chunk request carries.
+_PREVIOUS_TRANSCRIPT_CHARS = 170
+
+
+def _chunk_prompt(base_prompt: str | None, previous_transcript: str) -> str | None:
+    """The prompt of a chunk after the first: the caller's context, then the end of
+    the previous chunk's transcript.
+
+    The transcript comes last because the provider reads the prompt as the text just
+    before the audio (``whisper-1`` keeps only its final 224 tokens). ``None`` when
+    there is neither, so the request carries no prompt.
+    """
+    tail = previous_transcript[-_PREVIOUS_TRANSCRIPT_CHARS:]
+    return "\n".join(part for part in (base_prompt, tail) if part) or None
+
+
 def split_and_transcribe_with_context(
     audio_path,
     api_config,
@@ -508,11 +525,9 @@ def split_and_transcribe_with_context(
             end_time = format_timestamp(end_ms / 1000)
             chunk_header = f"\n[Timestamp: {start_time} - {end_time}]\n"
 
-            if i == 0:
-                prompt = base_prompt
-            else:
-                trimmed_context = context_text[-170:] if len(context_text) > 170 else context_text
-                prompt = trimmed_context or None
+            # The caller's context (names, terms) goes with every chunk, not just the
+            # first; a later chunk also continues from the previous transcript.
+            prompt = base_prompt if i == 0 else _chunk_prompt(base_prompt, context_text)
 
             try:
                 with open(chunk_path, "rb") as chunk_file:
@@ -567,9 +582,3 @@ def split_and_transcribe(
         max_duration_seconds=max_duration_seconds,
         audio=audio,
     )
-
-
-def format_timestamp(seconds):
-    minutes = int(seconds // 60)
-    seconds = int(seconds % 60)
-    return f"{minutes:02d}:{seconds:02d}"

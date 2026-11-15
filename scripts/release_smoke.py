@@ -1,6 +1,6 @@
 """Bounded, authenticated component smoke test used by release_check.py.
 
-All prompts and documents are synthetic. No response bodies, credentials, or
+All prompts, documents and audio are synthetic. No response bodies, credentials, or
 exception messages are written to the result. This is a real provider test,
 not a credential-presence check; every required component must return a
 semantically correct result for the selected model.
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import logging
 import math
@@ -40,6 +41,19 @@ LITELLM_PREFIXES = {
     "anthropic": "anthropic/",
 }
 
+# Synthetic Finnish speech, two sentences with a pause between them; see
+# release_fixtures/README.md. The anchors are stems of words in each sentence.
+TRANSCRIPTION_FIXTURE = Path(__file__).resolve().parent / "release_fixtures/transcription_fi.mp3"
+TRANSCRIPTION_FIXTURE_SHA256 = "b5d6cde7d4bc107344f41a2eb8af2eef9c87340acce07ec4347ea25b98b703c5"
+TRANSCRIPTION_FIRST_SENTENCE = ("huoltoteknik", "ilmoitta", "pumppu", "kattilahuone")
+TRANSCRIPTION_SECOND_SENTENCE = ("havaittiin", "maanantai", "yhdeksän", "korkea")
+# A transcript may mishear one word of a sentence, but not lose the sentence.
+TRANSCRIPTION_MIN_ANCHORS = 3
+# Caller context for the chunked run: a name in the audio's language.
+TRANSCRIPTION_CONTEXT = "Matti Virtanen"
+# Splits the 12.8-second fixture into two requests, in the pause between the sentences.
+TRANSCRIPTION_CHUNK_SECONDS = 8
+
 
 def backend_config(config: dict, provider: str, backend: str) -> dict:
     if backend == "native":
@@ -62,10 +76,14 @@ class CallBudget:
         self.output_tokens = output_tokens
         self.calls = 0
 
-    def options(self, provider, kwargs, *, embedding=False):
+    def count(self):
+        """Take one request from the allowance."""
         if self.calls >= self.max_calls:
             raise RuntimeError("Live release request budget exceeded")
         self.calls += 1
+
+    def options(self, provider, kwargs, *, embedding=False):
+        self.count()
         options = dict(kwargs)
         if not embedding:
             key = "max_completion_tokens" if provider in {"openai", "azure"} else "max_tokens"
@@ -156,6 +174,116 @@ def _budget_component(component, client, created_clients, provider):
     return component
 
 
+class BoundedAudioClient:
+    """Count transcription requests against the shared budget and keep what was sent.
+
+    The prompt and the transcript of each request stay in memory for the check's own
+    assertions; neither is written to the result. Each request still goes through the
+    raw SDK client the Transcriber constructed, with the arguments it chose.
+    """
+
+    def __init__(self, raw, budget):
+        self.raw = raw
+        self.requests = []
+
+        def create(**kwargs):
+            budget.count()
+            request = {"has_prompt": "prompt" in kwargs, "prompt": kwargs.get("prompt")}
+            self.requests.append(request)
+            response = raw.audio.transcriptions.create(**kwargs)
+            request["text"] = response.text
+            return response
+
+        self.audio = SimpleNamespace(transcriptions=SimpleNamespace(create=create))
+
+    def close(self):
+        _close(self.raw)
+
+
+def _anchor_hits(text, anchors):
+    lowered = (text or "").lower()
+    return sum(anchor in lowered for anchor in anchors)
+
+
+def transcription_check(config, transcription_model, budget, work_dir) -> dict:
+    """Transcribe the synthetic Finnish fixture with the default Transcriber, once in a
+    single request and once in two chunks with caller context, and check what each
+    request sent and returned. Returns a sanitized observation."""
+    import gaik.software_components.transcriber.transcriber as transcriber_module
+    from gaik.software_components.transcriber import Transcriber
+
+    digest = hashlib.sha256(TRANSCRIPTION_FIXTURE.read_bytes()).hexdigest()
+    if digest != TRANSCRIPTION_FIXTURE_SHA256:
+        raise AssertionError("The synthetic transcription fixture changed")
+    audio_config = {**config, "transcription_model": transcription_model}
+    original = transcriber_module._create_audio_client
+
+    def transcribe(name, call=None, **options):
+        clients = []
+
+        def bounded_audio_client(api_config):
+            clients.append(BoundedAudioClient(original(api_config), budget))
+            return clients[-1]
+
+        with mock.patch.object(transcriber_module, "_create_audio_client", bounded_audio_client):
+            result = Transcriber(
+                api_config=audio_config, output_dir=Path(work_dir) / name, **options
+            ).transcribe(TRANSCRIPTION_FIXTURE, **(call or {}))
+        requests = [request for client in clients for request in client.requests]
+        # The chunked path records a failed request in the transcript instead of raising.
+        if "[Transcription failed" in result.raw_transcript or any(
+            "text" not in request for request in requests
+        ):
+            raise AssertionError(f"A {name} transcription request failed")
+        return result, requests
+
+    def require_sentence(text, anchors, what):
+        if _anchor_hits(text, anchors) < TRANSCRIPTION_MIN_ANCHORS:
+            raise AssertionError(f"The {what} lost a sentence of the Finnish audio")
+
+    single, single_requests = transcribe("single")
+    if len(single_requests) != 1 or single_requests[0]["has_prompt"]:
+        raise AssertionError("A default Transcriber did not send one request without a prompt")
+    require_sentence(single_requests[0]["text"], TRANSCRIPTION_FIRST_SENTENCE, "transcript")
+    require_sentence(single_requests[0]["text"], TRANSCRIPTION_SECOND_SENTENCE, "transcript")
+
+    chunked, chunk_requests = transcribe(
+        "chunked",
+        call={"custom_context": TRANSCRIPTION_CONTEXT},
+        max_duration_seconds=TRANSCRIPTION_CHUNK_SECONDS,
+    )
+    if len(chunk_requests) != 2:
+        raise AssertionError("The fixture was not transcribed in two chunks")
+    first, second = chunk_requests
+    if first["prompt"] != TRANSCRIPTION_CONTEXT:
+        raise AssertionError("The first chunk did not carry the caller's context")
+    # The second request continues from the end of the first chunk's transcript.
+    if not second["has_prompt"] or not second["prompt"].endswith(first["text"][-50:]):
+        raise AssertionError("The second chunk did not continue from the first transcript")
+    require_sentence(first["text"], TRANSCRIPTION_FIRST_SENTENCE, "first chunk")
+    require_sentence(second["text"], TRANSCRIPTION_SECOND_SENTENCE, "second chunk")
+
+    return {
+        "fixture_sha256": digest,
+        "single_requests": len(single_requests),
+        "single_request_has_prompt": False,
+        "chunk_requests": len(chunk_requests),
+        "second_chunk_prompt_has_context": second["prompt"].startswith(TRANSCRIPTION_CONTEXT),
+        "anchor_hits": {
+            "single": [
+                _anchor_hits(single_requests[0]["text"], TRANSCRIPTION_FIRST_SENTENCE),
+                _anchor_hits(single_requests[0]["text"], TRANSCRIPTION_SECOND_SENTENCE),
+            ],
+            "chunks": [
+                _anchor_hits(first["text"], TRANSCRIPTION_FIRST_SENTENCE),
+                _anchor_hits(second["text"], TRANSCRIPTION_SECOND_SENTENCE),
+            ],
+            "of": len(TRANSCRIPTION_FIRST_SENTENCE),
+        },
+        "usage": {"single": single.usage, "chunked": chunked.usage},
+    }
+
+
 def run_smoke(args) -> dict:
     from gaik.software_components.llm import create_llm_client, get_llm_config
 
@@ -168,6 +296,8 @@ def run_smoke(args) -> dict:
     if args.provider == "aitta":
         if str(config["base_url"]).rstrip("/") != "https://aitta-api.csc.fi/openai/v1":
             raise ValueError("Aitta release checks require CSC's documented endpoint")
+    # The Transcriber calls the provider's audio API directly, never through LiteLLM.
+    native_config = config
     config = backend_config(config, args.provider, args.backend)
     client = BoundedClient(
         create_llm_client(config), max_calls=args.max_calls, output_tokens=args.output_tokens
@@ -390,6 +520,17 @@ def run_smoke(args) -> dict:
 
             check("embedder", embedder)
             result["embedding_model"] = args.embedding_model
+
+        if args.transcription_model:
+
+            def transcription():
+                with tempfile.TemporaryDirectory(prefix="gaik-release-transcription-") as temp:
+                    result["transcription_observation"] = transcription_check(
+                        native_config, args.transcription_model, client.budget, Path(temp)
+                    )
+
+            check("transcription", transcription)
+            result["transcription_model"] = args.transcription_model
         result["ok"] = all(result["checks"].get(name, {}).get("ok") for name in REQUIRED_CHECKS)
     except Exception:
         # The failed check already records a sanitized diagnostic. Never print
@@ -411,6 +552,10 @@ def main() -> int:
     parser.add_argument("--backend", choices=["native", "litellm"], default="native")
     parser.add_argument("--model", required=True)
     parser.add_argument("--embedding-model")
+    parser.add_argument(
+        "--transcription-model",
+        help="Transcription model or Azure deployment; adds the transcription check",
+    )
     parser.add_argument("--timeout", type=float, default=180)
     parser.add_argument("--max-calls", type=int, default=24)
     parser.add_argument("--output-tokens", type=int, default=2048)

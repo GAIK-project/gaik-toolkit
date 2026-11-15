@@ -154,7 +154,9 @@ expected.
   all-extras sync, offline tests, wizard tests/audit, package validation, and bounded
   live component checks. A passing sanitized `results/release-check.json` must name
   the exact commit and planned version. Rerun after any tracked release change.
-- Set `RELEASE_PROVIDERS` and explicit `RELEASE_<PROVIDER>_MODEL` model/deployment IDs.
+- Set `RELEASE_PROVIDERS` and explicit `RELEASE_<PROVIDER>_MODEL` model/deployment IDs,
+  and for Azure and OpenAI also `RELEASE_<PROVIDER>_TRANSCRIPTION_MODEL` (the live
+  transcription check needs ffmpeg on PATH).
   Check current official model documentation/catalogs before choosing IDs; do not
   assume a model name in an old example is current. Every changed provider/model
   family and every newly added provider needs a sanitized live smoke report before

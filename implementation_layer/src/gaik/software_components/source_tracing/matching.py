@@ -44,8 +44,9 @@ def find_run(haystack: list[str], needle: list[str]) -> int | None:
     """Index where ``needle`` starts as a contiguous run in ``haystack``."""
     if not needle:
         return None
-    for start in range(len(haystack) - len(needle) + 1):
-        if haystack[start : start + len(needle)] == needle:
+    first, size = needle[0], len(needle)
+    for start in range(len(haystack) - size + 1):
+        if haystack[start] == first and haystack[start : start + size] == needle:
             return start
     return None
 
@@ -186,11 +187,12 @@ def find_all(haystack: list[str], needle: list[str]) -> list[int]:
     starts: list[int] = []
     if not needle:
         return starts
+    first, size = needle[0], len(needle)
     index = 0
-    while index <= len(haystack) - len(needle):
-        if haystack[index : index + len(needle)] == needle:
+    while index <= len(haystack) - size:
+        if haystack[index] == first and haystack[index : index + size] == needle:
             starts.append(index)
-            index += len(needle)
+            index += size
         else:
             index += 1
     return starts
@@ -221,12 +223,27 @@ def locate_in_text(text: str, quote: str) -> tuple[int, int] | None:
     Words are compared as in :func:`tokens`, so a quote that the model copied with other
     line breaks, spacing or punctuation is still found.
     """
-    words = [(match.group().lower(), match.start(), match.end()) for match in _WORD.finditer(text)]
-    needle = tokens(quote)
-    at = find_run([word for word, _, _ in words], needle)
+    spans = _word_spans(text)
+    return _locate_in_words(spans, [word for word, _, _ in spans], tokens(quote))
+
+
+def _word_spans(text: str) -> list[tuple[str, int, int]]:
+    """Lowercased words of ``text`` with their character offsets."""
+    return [(match.group().lower(), match.start(), match.end()) for match in _WORD.finditer(text)]
+
+
+def _locate_in_words(
+    spans: list[tuple[str, int, int]], words: list[str], needle: list[str]
+) -> tuple[int, int] | None:
+    """:func:`locate_in_text` on a text already split by :func:`_word_spans`.
+
+    ``words`` is the word column of ``spans``; a caller that checks many quotes against
+    one text splits it once and passes both.
+    """
+    at = find_run(words, needle)
     if at is None:
         return None
-    return words[at][1], words[at + len(needle) - 1][2]
+    return spans[at][1], spans[at + len(needle) - 1][2]
 
 
 def value_around_quote(haystack: list[str], value: Any, quote: list[str]) -> tuple[int, int] | None:
