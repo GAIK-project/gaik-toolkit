@@ -14,6 +14,7 @@ import os
 import socket
 import struct
 import threading
+import time
 import zipfile
 import zlib
 
@@ -314,3 +315,51 @@ def test_a_route_refuses_uploads_while_the_scanner_is_down(classify, monkeypatch
     res = classify("scan.png", PNG)
     assert res.status_code == 503
     assert classify.calls == []  # type: ignore[attr-defined]
+
+
+def test_a_scanner_that_stops_reading_is_given_up_on_time(monkeypatch):
+    # Accepts the connection and never reads, as a stuck scanner would; it hangs
+    # up only after a while.
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+    held: list[socket.socket] = []
+
+    def hold() -> None:
+        conn, _ = server.accept()
+        held.append(conn)
+        time.sleep(5)
+        conn.close()
+
+    threading.Thread(target=hold, daemon=True).start()
+    monkeypatch.setenv("DEMO_MALWARE_SCANNER", f"127.0.0.1:{server.getsockname()[1]}")
+    monkeypatch.delenv("DEMO_MALWARE_SCAN", raising=False)
+    monkeypatch.setattr(malware_scan, "SCAN_TIMEOUT_SECONDS", 0.3)
+    start = time.monotonic()
+    with pytest.raises(malware_scan.ScannerUnavailableError):
+        asyncio.run(malware_scan.check_upload(b"x" * (8 * 1024 * 1024)))
+    assert time.monotonic() - start < 2.0
+    server.close()
+
+
+def test_the_report_writer_refuses_an_upload_the_check_refuses(monkeypatch):
+    from api.routers import report_writer
+
+    monkeypatch.delenv("DEMO_MALWARE_SCANNER", raising=False)
+    monkeypatch.delenv("DEMO_MALWARE_SCAN", raising=False)
+    started: list[bool] = []
+    monkeypatch.setattr(report_writer, "_run_options", lambda *a: started.append(True))
+    app = FastAPI()
+    app.include_router(report_writer.router, prefix="/report-writer")
+    pdf = _pdf(b"/OpenAction " + JS_ACTION)
+    response = TestClient(app).post(
+        "/report-writer/run",
+        data={"config": "{}"},
+        files=[
+            ("files", ("notes.md", b"# Notes", "text/markdown")),
+            ("files", ("survey.pdf", pdf, "application/pdf")),
+        ],
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"].startswith("survey.pdf: PDF files that contain JavaScript")
+    assert not started
