@@ -19,7 +19,7 @@ import {
 import { backendTarget, isApiPath } from "@/lib/backend-target";
 import { routedPath } from "@/lib/request-path";
 import { clientIp } from "@/lib/client-ip";
-import { ratelimit } from "@/lib/rate-limit";
+import { checkRateLimit, ratelimit } from "@/lib/rate-limit";
 import {
   type AccessState,
   getAccessState,
@@ -89,30 +89,19 @@ export default async function proxy(request: NextRequest) {
     pathname === "/api/knowledge-synthesis/run" || // likewise
     pathname === "/api/helpdesk-chat"; // runs its model in Next.js
   if (isApiPath(pathname) && !isNextApiRoute) {
-    // Rate limit requests that change state (heavy processing, deletes)
-    if (ratelimit && isStateChanging(request.method)) {
-      try {
-        const ip = clientIp(request.headers);
-
-        const { success, limit, remaining, reset } = await ratelimit.limit(ip);
-
-        if (!success) {
-          return NextResponse.json(
-            { error: "Liian monta pyyntöä. Yritä hetken päästä uudelleen." },
-            {
-              status: 429,
-              headers: {
-                "X-RateLimit-Limit": limit.toString(),
-                "X-RateLimit-Remaining": remaining.toString(),
-                "X-RateLimit-Reset": reset.toString(),
-              },
-            },
-          );
-        }
-      } catch (error) {
-        console.warn(
-          "[rate-limit] Redis unavailable, skipping rate limit:",
-          error instanceof Error ? error.message : error,
+    // Rate limit requests that change state (heavy processing, deletes). While
+    // the configured Redis does not answer, the limiter refuses them (503).
+    if (isStateChanging(request.method)) {
+      const limited = await checkRateLimit(
+        ratelimit,
+        clientIp(request.headers),
+        "Liian monta pyyntöä. Yritä hetken päästä uudelleen.",
+        "[rate-limit]",
+      );
+      if (limited) {
+        return NextResponse.json(
+          { error: limited.error },
+          { status: limited.status, headers: limited.headers },
         );
       }
     }

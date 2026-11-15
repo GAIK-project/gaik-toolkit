@@ -1,12 +1,16 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { isEmailConfirmed } from "@/lib/api-access";
 import { trialEnabled } from "@/lib/trial";
 import type { User } from "@supabase/supabase-js";
 
 export interface AccessStatus {
   user: User | null;
   isUnlocked: boolean;
-  /** Pending approval, but may run demos on the daily trial allowance (lib/trial.ts). */
+  /**
+   * Pending approval with a confirmed e-mail address: may run demos on the daily
+   * trial allowance (lib/trial.ts).
+   */
   isTrial: boolean;
   /** Per-user Solution Wizard beta access (the `wizard_access` flag). */
   wizardAccess: boolean;
@@ -50,7 +54,8 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
   return {
     user,
     isUnlocked: data?.status === "approved",
-    isTrial: data?.status === "pending" && trialEnabled(),
+    isTrial:
+      data?.status === "pending" && isEmailConfirmed(user) && trialEnabled(),
     wizardAccess: data?.wizard_access === true,
     bypassAuth: false,
   };

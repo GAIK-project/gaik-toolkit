@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isEmailConfirmed } from "@/lib/api-access";
 
 // Demo pages are open to look at. Running a demo needs a signed-in, approved
 // account, or a pending one within the trial allowance in lib/trial.ts or on the
@@ -37,6 +38,8 @@ export interface AccessState {
   approved: boolean;
   /** Signed up and waiting for approval: may run demos on a trial allowance (lib/trial.ts). */
   pending: boolean;
+  /** The sign-in e-mail address is confirmed; trial runs need it. */
+  emailConfirmed: boolean;
   userId: string | null;
   /** Lowercased sign-in email, for the model tier (lib/model-tier.ts). */
   email: string | null;
@@ -52,6 +55,7 @@ const NO_ACCESS: AccessState = {
   loggedIn: false,
   approved: false,
   pending: false,
+  emailConfirmed: false,
   userId: null,
   email: null,
   wizardAccess: false,
@@ -77,6 +81,7 @@ export async function getAccessState(
       loggedIn: true,
       approved: true,
       pending: false,
+      emailConfirmed: true,
       userId: null,
       email: null,
       wizardAccess: true,
@@ -114,6 +119,7 @@ export async function getAccessState(
     loggedIn: true,
     approved: data?.status === "approved",
     pending: data?.status === "pending",
+    emailConfirmed: isEmailConfirmed(user),
     userId: user.id,
     email: user.email?.toLowerCase() ?? null,
     wizardAccess: data?.wizard_access === true,
