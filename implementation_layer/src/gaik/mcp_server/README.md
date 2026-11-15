@@ -18,8 +18,7 @@ pip install "gaik[mcp]"
 For the Jev backend of `classify_text`, add `jev-classifier`: `pip install "gaik[mcp,jev-classifier]"`.
 
 **Note:** the `mcp`, `operations` and `fields-to-docx` extras and the `gaik-mcp` command exist
-from the release after 0.8.14. Until then install from the repository:
-`pip install "gaik[mcp] @ git+https://github.com/GAIK-project/gaik-toolkit.git"`.
+from gaik 0.9.0.
 
 The model tools use the provider gaik is configured for (`LLM_PROVIDER` and the provider's
 variables, for example `AZURE_API_KEY` and `AZURE_ENDPOINT`). `parse_document` and

@@ -56,6 +56,7 @@ function refreshTokenIn(response: NextResponse): string | null {
 
 let refreshes: string[] = [];
 let backendCalls = 0;
+let backendHeaders: Headers | null = null;
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = SUPABASE_URL;
@@ -82,6 +83,7 @@ beforeAll(() => {
     if (url.startsWith(`${SUPABASE_URL}/rest/v1/access_requests`))
       return Response.json({ status: "approved", wizard_access: false });
     backendCalls += 1;
+    backendHeaders = new Headers(init?.headers);
     if (url.includes("/unreachable"))
       throw new TypeError("fetch failed: connect ECONNREFUSED 10.1.2.3:8000");
     return Response.json({ ok: true });
@@ -98,6 +100,7 @@ afterAll(() => {
 beforeEach(() => {
   refreshes = [];
   backendCalls = 0;
+  backendHeaders = null;
 });
 
 const expired = () => Math.floor(Date.now() / 1000) - 60;
@@ -200,4 +203,20 @@ test("an unreachable backend is reported with an id, not the connection error", 
   expect(error).toContain("error id");
   expect(error).not.toContain("ECONNREFUSED");
   expect(error).not.toContain("10.1.2.3");
+});
+
+test("the generic proxy does not pass on the report run header", async () => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const response = await proxy(
+    new NextRequest(RUN, {
+      method: "POST",
+      headers: {
+        cookie: sessionCookie("r1", future),
+        "x-gaik-report-run": "from-the-browser",
+      },
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(backendHeaders?.has("x-gaik-report-run")).toBe(false);
 });

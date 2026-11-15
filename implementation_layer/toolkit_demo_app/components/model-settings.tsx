@@ -629,9 +629,6 @@ export function ModelSettingsNotice() {
           <>
             Own model: <strong>{LABELS[settings.provider]}</strong> ·{" "}
             {settings.model}
-            {pathname === "/solution-wizard"
-              ? " (image attachments only; conversation uses hosted Claude)"
-              : ""}
           </>
         ) : (
           "This demo uses server settings. Your own model is active on supported demos."
