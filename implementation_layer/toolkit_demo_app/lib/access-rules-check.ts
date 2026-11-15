@@ -17,7 +17,11 @@ export interface OwnSession {
   update(fields: Partial<AccessRow>): Promise<void>;
   /** Insert a second, approved row for the account itself. */
   insertOwn(): Promise<{ refused: boolean }>;
-  deleteOwn(): Promise<void>;
+  /**
+   * Delete with a condition no row meets: refused without the table's delete
+   * privilege, and deletes nothing with it, so the account's row is never lost.
+   */
+  deleteNone(): Promise<{ refused: boolean }>;
   restore(row: AccessRow): Promise<void>;
 }
 
@@ -86,10 +90,19 @@ export async function checkAccessRules(
       : "an approved row was added for the test account; remove it in the dashboard",
   });
 
-  await session.deleteOwn().catch(() => undefined);
-  const kept = await session.readOwn();
-  if (!kept) await session.restore(original).catch(() => undefined);
-  results.push({ name: "the account cannot delete its row", ok: !!kept });
+  // Deleting the row itself could not be undone with the account's session (an
+  // update does not bring back a deleted row), so the check asks only whether a
+  // delete is refused, with a condition that matches no row.
+  const deletion = await session
+    .deleteNone()
+    .catch(() => ({ refused: true }));
+  results.push({
+    name: "the account cannot delete rows",
+    ok: deletion.refused,
+    detail: deletion.refused
+      ? undefined
+      : "the table still grants delete to signed-in users",
+  });
 
   return results;
 }

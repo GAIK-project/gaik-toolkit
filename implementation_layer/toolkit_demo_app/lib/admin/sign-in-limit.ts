@@ -33,26 +33,39 @@ export function getSignInLimits(): SignInLimits {
 const ADDRESS_WINDOW_MS = 15 * 60 * 1000;
 const TOTAL_WINDOW_MS = 60 * 60 * 1000;
 
-/** Fixed-window counters in this process's memory. */
+/**
+ * Fixed-window counters in this process's memory, for at most `maxKeys` keys.
+ * When the map is full, windows that have ended are dropped; if it is still
+ * full, a new key is refused. A window still running is never dropped, so no
+ * count, the shared ceiling's included, starts over early.
+ */
 export class MemoryWindows {
-  private windows = new Map<string, { start: number; count: number }>();
+  private windows = new Map<
+    string,
+    { start: number; end: number; count: number }
+  >();
 
-  constructor(private now: () => number = Date.now) {}
+  constructor(
+    private now: () => number = Date.now,
+    private maxKeys = 10_000,
+  ) {}
 
   /** Count one attempt for `key`; false when the window already holds `limit`. */
   take(key: string, limit: number, windowMs: number): boolean {
     const now = this.now();
     const start = now - (now % windowMs);
-    const current = this.windows.get(key);
-    const entry =
-      current && current.start === start ? current : { start, count: 0 };
-    if (this.windows.size > 10_000) this.windows.clear();
-    if (entry.count >= limit) {
+    let entry = this.windows.get(key);
+    if (!entry || entry.start !== start) {
+      if (!entry && this.windows.size >= this.maxKeys) {
+        for (const [k, e] of this.windows)
+          if (e.end <= now) this.windows.delete(k);
+        if (this.windows.size >= this.maxKeys) return false;
+      }
+      entry = { start, end: start + windowMs, count: 0 };
       this.windows.set(key, entry);
-      return false;
     }
+    if (entry.count >= limit) return false;
     entry.count += 1;
-    this.windows.set(key, entry);
     return true;
   }
 }
@@ -68,11 +81,73 @@ function getRedis(): Redis | null {
   return redis;
 }
 
-function takeInMemory(address: string, limits: SignInLimits): boolean {
+function takeInMemory(
+  address: string,
+  limits: SignInLimits,
+  windows: MemoryWindows,
+): boolean {
   return (
-    memory.take(`address:${address}`, limits.perAddress, ADDRESS_WINDOW_MS) &&
-    memory.take("total", limits.total, TOTAL_WINDOW_MS)
+    windows.take(`address:${address}`, limits.perAddress, ADDRESS_WINDOW_MS) &&
+    windows.take("total", limits.total, TOTAL_WINDOW_MS)
   );
+}
+
+/** One shared counter: a Redis rate limit, or a stand-in in the tests. */
+export type SharedLimit = (
+  prefix: string,
+  limit: number,
+  window: "15 m" | "1 h",
+  key: string,
+) => Promise<{ success: boolean; reason?: string }>;
+
+function redisLimit(client: Redis): SharedLimit {
+  return (prefix, limit, window, key) =>
+    new Ratelimit({
+      redis: client,
+      limiter: Ratelimit.fixedWindow(limit, window),
+      prefix,
+      analytics: false,
+    }).limit(key);
+}
+
+/**
+ * Count one attempt from `address` in `shared` counters, or in `windows` when
+ * there are none or they do not answer. Upstash's rate limit lets a request
+ * through after its own timeout instead of failing (`reason: "timeout"`), so a
+ * timed-out answer is counted in memory too.
+ */
+export async function takeAttempt(
+  shared: SharedLimit | null,
+  address: string,
+  limits: SignInLimits,
+  windows: MemoryWindows = memory,
+): Promise<boolean> {
+  if (!shared) return takeInMemory(address, limits, windows);
+  try {
+    const byAddress = await shared(
+      "gaik-demo:admin-sign-in",
+      limits.perAddress,
+      "15 m",
+      address,
+    );
+    if (byAddress.reason === "timeout")
+      return takeInMemory(address, limits, windows);
+    if (!byAddress.success) return false;
+    const all = await shared(
+      "gaik-demo:admin-sign-in-total",
+      limits.total,
+      "1 h",
+      "all",
+    );
+    if (all.reason === "timeout") return takeInMemory(address, limits, windows);
+    return all.success;
+  } catch (error) {
+    console.warn(
+      "[admin] Redis unavailable, sign-in attempts counted in memory:",
+      error instanceof Error ? error.message : error,
+    );
+    return takeInMemory(address, limits, windows);
+  }
 }
 
 /**
@@ -82,29 +157,10 @@ function takeInMemory(address: string, limits: SignInLimits): boolean {
 export async function takeAdminSignInAttempt(
   address: string,
 ): Promise<boolean> {
-  const limits = getSignInLimits();
   const client = getRedis();
-  if (!client) return takeInMemory(address, limits);
-  try {
-    const perAddress = new Ratelimit({
-      redis: client,
-      limiter: Ratelimit.fixedWindow(limits.perAddress, "15 m"),
-      prefix: "gaik-demo:admin-sign-in",
-      analytics: false,
-    });
-    if (!(await perAddress.limit(address)).success) return false;
-    const total = new Ratelimit({
-      redis: client,
-      limiter: Ratelimit.fixedWindow(limits.total, "1 h"),
-      prefix: "gaik-demo:admin-sign-in-total",
-      analytics: false,
-    });
-    return (await total.limit("all")).success;
-  } catch (error) {
-    console.warn(
-      "[admin] Redis unavailable, sign-in attempts counted in memory:",
-      error instanceof Error ? error.message : error,
-    );
-    return takeInMemory(address, limits);
-  }
+  return takeAttempt(
+    client ? redisLimit(client) : null,
+    address,
+    getSignInLimits(),
+  );
 }

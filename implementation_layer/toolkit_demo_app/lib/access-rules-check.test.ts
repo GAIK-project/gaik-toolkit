@@ -26,9 +26,7 @@ function table(writable: boolean, visible = 1) {
       inserted = writable;
       return { refused: !writable };
     },
-    deleteOwn: async () => {
-      if (writable) row = null;
-    },
+    deleteNone: async () => ({ refused: !writable }),
     restore: async (original) => {
       if (writable) row = { ...original };
     },
@@ -56,7 +54,7 @@ describe("checkAccessRules", () => {
       "the account cannot change its reports_count",
       "the account cannot change its report_limit_override",
       "the account cannot add a row",
-      "the account cannot delete its row",
+      "the account cannot delete rows",
     ]);
     expect(t.current()).toEqual(ROW);
   });

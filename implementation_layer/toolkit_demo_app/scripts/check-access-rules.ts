@@ -72,8 +72,13 @@ const session: OwnSession = {
     });
     return { refused: !!error };
   },
-  deleteOwn: async () => {
-    await supabase.from("access_requests").delete().eq("user_id", userId);
+  deleteNone: async () => {
+    const { error } = await supabase
+      .from("access_requests")
+      .delete()
+      .eq("user_id", userId)
+      .eq("status", "access-check: no row has this status");
+    return { refused: !!error };
   },
   restore: async (row) => {
     await supabase.from("access_requests").update(row).eq("user_id", userId);

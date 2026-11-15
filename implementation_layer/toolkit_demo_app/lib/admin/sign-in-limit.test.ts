@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   MemoryWindows,
+  type SharedLimit,
   getSignInLimits,
   takeAdminSignInAttempt,
+  takeAttempt,
 } from "./sign-in-limit";
 
 afterEach(() => {
@@ -22,6 +24,54 @@ describe("MemoryWindows", () => {
     expect(windows.take("b", 2, 60_000)).toBe(true);
     now += 60_000;
     expect(windows.take("a", 2, 60_000)).toBe(true);
+  });
+
+  test("a full map refuses a new key and keeps every running count", () => {
+    let now = 1_000_000;
+    const windows = new MemoryWindows(() => now, 2);
+    expect(windows.take("total", 2, 3_600_000)).toBe(true);
+    expect(windows.take("a", 1, 60_000)).toBe(true);
+    expect(windows.take("b", 1, 60_000)).toBe(false); // full: refused, nothing cleared
+    expect(windows.take("total", 2, 3_600_000)).toBe(true);
+    expect(windows.take("total", 2, 3_600_000)).toBe(false);
+    now += 60_000; // "a" has ended and makes room; "total" is still running
+    expect(windows.take("b", 1, 60_000)).toBe(true);
+    expect(windows.take("total", 2, 3_600_000)).toBe(false);
+  });
+});
+
+describe("shared counters", () => {
+  const limits = { perAddress: 1, total: 100 };
+  const timingOut: SharedLimit = async () => ({
+    success: true,
+    reason: "timeout",
+  });
+
+  test("an answer that timed out is counted in memory, so the limit holds", async () => {
+    const windows = new MemoryWindows();
+    expect(await takeAttempt(timingOut, "203.0.113.5", limits, windows)).toBe(
+      true,
+    );
+    expect(await takeAttempt(timingOut, "203.0.113.5", limits, windows)).toBe(
+      false,
+    );
+  });
+
+  test("an error is counted in memory, and a refusal is final", async () => {
+    const windows = new MemoryWindows();
+    const failing: SharedLimit = async () => {
+      throw new Error("unreachable");
+    };
+    expect(await takeAttempt(failing, "203.0.113.6", limits, windows)).toBe(
+      true,
+    );
+    expect(await takeAttempt(failing, "203.0.113.6", limits, windows)).toBe(
+      false,
+    );
+    const refusing: SharedLimit = async () => ({ success: false });
+    expect(await takeAttempt(refusing, "203.0.113.7", limits, windows)).toBe(
+      false,
+    );
   });
 });
 
