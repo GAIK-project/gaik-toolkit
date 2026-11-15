@@ -68,11 +68,6 @@ def _gen() -> MultiSourceReportGenerator:
 # ---------------------------------------------------------------------------
 
 
-def test_pipeline_import_and_construct():
-    gen = MultiSourceReportGenerator(api_config={"use_azure": False, "api_key": "x", "model": "m"})
-    assert gen is not None
-
-
 def test_constructor_follows_gaik_convention():
     params = inspect.signature(MultiSourceReportGenerator.__init__).parameters
     assert set(params) - {"self"} == {"api_config", "use_azure"}
@@ -362,3 +357,30 @@ def test_visionparser_convert_image(tmp_path, monkeypatch):
     assert captured["mime_type"] == "image/png"
     # existing public API is unchanged
     assert hasattr(parser, "convert_pdf")
+
+
+def test_a_saved_config_loads_the_paths_it_was_given(tmp_path, monkeypatch):
+    # Paths relative to the working directory, saved into a config in another folder.
+    work = tmp_path / "work"
+    (work / "materials").mkdir(parents=True)
+    monkeypatch.chdir(work)
+    config_path = tmp_path / "configs" / "report.json"
+
+    msrg.save_report_config(
+        config_path,
+        input_paths=["materials", config_path.parent / "inside.txt"],
+        sections=[{"title": "Summary", "instructions": "Summarize."}],
+        output_dir="out",
+        sample_report_path="materials/sample.md",
+    )
+    loaded = msrg.load_report_config(config_path)
+
+    assert loaded["input_paths"] == [
+        (work / "materials").resolve(),
+        (config_path.parent / "inside.txt").resolve(),
+    ]
+    assert loaded["output_dir"] == (work / "out").resolve()
+    assert loaded["sample_report_path"] == (work / "materials" / "sample.md").resolve()
+    # A path inside the config's folder stays relative, so the folder can move.
+    assert "inside.txt" in config_path.read_text(encoding="utf-8")
+    assert str(config_path.parent) not in config_path.read_text(encoding="utf-8")

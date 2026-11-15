@@ -31,6 +31,23 @@ def test_openai_mode_still_builds_a_client():
     assert tts.client is not None
 
 
+def test_synthesize_speaks_the_language_the_instance_was_given(monkeypatch):
+    monkeypatch.setenv("TTS_ENDPOINT", "https://example.test/speech")
+    monkeypatch.setenv("AZURE_API_KEY", "k")
+    monkeypatch.setattr(
+        tts_module.requests,
+        "post",
+        lambda *_a, **_k: SimpleNamespace(raise_for_status=lambda: None, content=b"audio"),
+    )
+    config = {"use_azure": True, "api_key": "k"}
+
+    assert TextToSpeech(api_config=config, language="en").synthesize("Hello").language == "en"
+    assert TextToSpeech(api_config=config).synthesize("Hei").language == "fi"
+    # An explicit language still wins over the instance's.
+    english = TextToSpeech(api_config=config, language="en")
+    assert english.synthesize("Hei", language="fi").language == "fi"
+
+
 def test_azure_synthesize_posts_to_tts_endpoint(monkeypatch):
     monkeypatch.setenv("TTS_ENDPOINT", "https://example.test/speech")
     monkeypatch.setenv("AZURE_API_KEY", "k")

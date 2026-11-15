@@ -28,6 +28,16 @@ except ImportError:
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 
 # Temporary storage for generated subtitle files
@@ -105,6 +115,8 @@ async def dental_transcription_stream(
     content = await file.read()
     if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
         return sse_error_response(AUDIO_TOO_LARGE_DETAIL)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        return sse_error_response(mismatch)
 
     # Save uploaded file
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -194,13 +206,14 @@ async def dental_transcription_stream(
             )
 
         except Exception as e:
+            message = error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
@@ -250,7 +263,9 @@ async def dental_transcription_example():
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to load example video: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=error_detail(exc, "Loading the example video")
+        ) from exc
 
 
 @router.get("/srt/{job_id}")

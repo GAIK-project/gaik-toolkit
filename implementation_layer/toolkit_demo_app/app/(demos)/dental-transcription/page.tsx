@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { apiFetch, RateLimitError, failureMessage } from "@/lib/api-client";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import { cn } from "@/lib/utils";
 import {
@@ -262,7 +262,10 @@ export default function VideoTranscriptionPage() {
         body: formData,
         signal: abortControllerRef.current.signal,
       });
-      if (!response.ok) throw new Error("Failed to process the recording");
+      if (!response.ok)
+        throw new Error(
+          await failureMessage(response, "Failed to process the recording"),
+        );
 
       let streamError: Error | null = null;
       await processSSEStream<TranscriptionResult>(response, {

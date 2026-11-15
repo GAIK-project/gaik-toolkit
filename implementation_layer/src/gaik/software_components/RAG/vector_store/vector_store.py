@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
+import uuid
 
 try:
     from langchain_core.documents import Document
@@ -21,10 +21,6 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     if norm_a == 0.0 or norm_b == 0.0:
         return 0.0
     return dot / (norm_a * norm_b)
-
-
-def _iter_indices(n: int) -> Iterable[int]:
-    return range(n)
 
 
 class VectorStore:
@@ -66,12 +62,16 @@ class VectorStore:
             self._embeddings.extend(embeddings)
             return
 
-        ids = [f"{self.collection_name}_{i}" for i in _iter_indices(len(embeddings))]
+        if not documents:
+            return
+        # A new id for every document: ids counted from zero on each call collided
+        # with the ones already stored, and Chroma drops such a document silently.
+        ids = [f"{self.collection_name}_{uuid.uuid4().hex}" for _ in documents]
         self._collection.add(  # type: ignore[union-attr]
             ids=ids,
             embeddings=embeddings,
             documents=[doc.page_content for doc in documents],
-            metadatas=[doc.metadata for doc in documents],
+            metadatas=[_chroma_metadata(doc.metadata) for doc in documents],
         )
 
     def count(self) -> int:
@@ -108,7 +108,7 @@ class VectorStore:
             "include": ["documents", "metadatas", "distances"],
         }
         if filters:
-            query_kwargs["where"] = filters
+            query_kwargs["where"] = _chroma_where(filters)
 
         results = self._collection.query(  # type: ignore[union-attr]
             **query_kwargs
@@ -125,6 +125,23 @@ class VectorStore:
             scores.append(1.0 - float(dist))
 
         return list(zip(docs, scores))
+
+
+def _chroma_metadata(metadata: dict | None) -> dict | None:
+    """Metadata as Chroma stores it: no ``None`` values, and ``None`` when empty.
+
+    Chroma rejects a ``None`` value and an empty dict. A key left out reads back
+    the same as one set to ``None``.
+    """
+    kept = {key: value for key, value in (metadata or {}).items() if value is not None}
+    return kept or None
+
+
+def _chroma_where(filters: dict) -> dict:
+    """``filters`` as a Chroma ``where``: several keys must all match."""
+    if len(filters) > 1 and not any(str(key).startswith("$") for key in filters):
+        return {"$and": [{key: value} for key, value in filters.items()]}
+    return filters
 
 
 def _match_filters(metadata: dict, filters: dict) -> bool:

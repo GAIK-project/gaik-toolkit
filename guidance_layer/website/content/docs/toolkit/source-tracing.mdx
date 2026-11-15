@@ -1,0 +1,235 @@
+---
+title: Source Tracing
+description: Evidence quotes for extracted values, checked against the source
+---
+
+import { Mermaid } from '@/components/mdx/mermaid';
+
+Source Tracing gives every extracted value its evidence, so that a human reviewer can check it in seconds. The extractor is asked to return one short verbatim quote for each value. Plain code then finds each quote in the source, compares the value with it, and says whether the value can be trusted on that evidence. For PDFs it also gives the position of the quote on the page, taken from the PDF's own text layer, so an interface can highlight it.
+
+The check uses no language model. The component works around the extractor you call and changes none of them: it works with the [Extractor and the Vision Extractor](/toolkit/software-components) and with the [Documents and Audio to Structured Data modules](/toolkit/software-modules).
+
+<Callout type="info">
+Source Tracing is one of two review aids for human-in-the-loop pipelines. The other is the LLM judge, in which a second model scores each field. Tracing is cheap and shows the reviewer where to look; the judge can catch a value that is in the text but wrong for the question. They can be used together.
+</Callout>
+
+## How it works
+
+<Mermaid chart={`
+flowchart LR
+    T("📋 Schema + Task") --> A
+    subgraph ST["Source Tracing"]
+        direction TB
+        A["1. augment<br/>ask for a quote per value"]
+        C["3. check_text / check_pdf<br/>find quote · compare value · position"]
+    end
+    A --> E["2. Your extractor<br/>(unchanged)"]
+    E --> C
+    S("📄 Source text / PDF") --> C
+    C --> O1("✅ Results without evidence")
+    C --> O2("🔎 Report: a verdict per value")
+
+    style T fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style S fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style ST fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+1. **`augment`** returns a copy of your extraction schema with a citation field added, and your task text with the evidence instruction appended. Your own schema is not changed.
+2. **You call the extractor** as usual with the augmented schema and task.
+3. **`check_text` or `check_pdf`** removes the citations from the results, finds each quote in the source, compares the value with it and returns the clean results with a report.
+
+Each citation is the field's path (for example `lines[0].quantity`), the document and page, and a short quote copied exactly from the document. The model is never asked for coordinates: page positions come from the PDF itself.
+
+## Installation
+
+```bash
+pip install "gaik[source-tracing]"
+```
+
+This adds PyMuPDF, which only the PDF check uses. Checking text and transcripts works without it.
+
+## Quick start
+
+```python
+from gaik.software_components.source_tracing import SourceTracing
+
+tracing = SourceTracing()
+
+# 1. Ask for evidence. Use source="files" when the extractor reads the files
+#    themselves (VisionExtractor), source="text" when it reads text.
+task = tracing.augment(Invoice, "Extract the invoice number and the total", source="text")
+
+# 2. Call the extractor as usual, with the augmented model and prompt.
+results = extractor.extract(
+    extraction_model=task.model,
+    requirements=requirements,
+    user_requirements=task.prompt,
+    documents=[text],
+)
+
+# 3. Check each value against its quote.
+clean, report = tracing.check_text(results, [text])
+
+print(clean)             # your results, without the evidence
+print(report.summary())  # {"verified": 2, "check": 0, "reworded": 0, "unchecked": 0, "total": 2, "coverage": 1.0}
+```
+
+For a PDF read by the Vision Extractor:
+
+```python
+task = tracing.augment(Invoice, "Extract the invoice number and the total", source="files")
+result = vision_extractor.extract(
+    file_paths=["invoice.pdf"],
+    user_requirements=task.prompt,
+    extraction_model=task.model,
+    requirements=requirements,
+)
+clean, report = tracing.check_pdf(result.data, ["invoice.pdf"])
+```
+
+## Using it with each component
+
+| Component | Ask for evidence | Check against |
+|---|---|---|
+| Extractor (`DataExtractor.extract`) | `extraction_model=task.model`, `user_requirements=task.prompt` | `check_text(results, texts)` with the `documents` you passed |
+| Vision Extractor | the same two arguments, plus `requirements`, and `source="files"` | `check_pdf(result.data, file_paths)` with the same files |
+| `DocumentsToStructuredData.run` | `schema=task.model`, `requirements=...`, `user_requirements=task.prompt` | `check_text(result.extracted_fields, result.parsed_documents)` |
+| `AudioToStructuredData.run` | the same three keyword arguments | `check_text(result.extracted_fields, transcript_used(result))` |
+
+Pass your own `schema=` and `requirements=` to the two modules. A module that generates its own schema would receive the evidence request as part of the text it generates the schema from. `transcript_used(result)` returns the transcript the pipeline extracted from: the enhanced transcript when there is one, otherwise the raw one.
+
+With `VisionExtractor(include_verification=True)` the values keep their confidence envelopes, and Source Tracing compares the bare values.
+
+## What you get back
+
+`check_text` and `check_pdf` return `(clean, report)`:
+
+- **`clean`** is your extraction results with the citation field removed, in the same shape you passed in. The input is not modified.
+- **`report`** is a `TraceReport`: `report.items` (one `TracedValue` per citation), `report.summary()` (counts per verdict and the coverage), `report.coverage` (the share of values that came with a citation), `report.documents` and `report.to_dict()` (plain JSON for an interface).
+
+Each `TracedValue` has:
+
+| Field | Meaning |
+|---|---|
+| `field`, `value`, `quote` | the path of the value, the extracted value and the quote the model gave |
+| `document`, `page`, `cited_page` | where the quote was found (1-based), and the page the model named |
+| `status` | `found`, `moved` (found on another page or file), `not_found`, or `no_text_layer` (a scan or an image) |
+| `value_status` | `match`, `mismatch` or `unchecked`: whether the value is in the quote |
+| `verdict` | `verified`, `check`, `reworded` or `unchecked` |
+| `rects`, `value_rects` | PDF only: boxes of the quote's words and of the value inside the quote |
+| `span` | text only: character offsets of the quote in the text |
+| `occurrences` | how many times the quote occurs in the text or on its page |
+| `record` | the row the value belongs to, when the results hold lists of records |
+
+A box is `{"x", "y", "w", "h"}` as fractions of the page from 0 to 1, measured from the top left corner. Real output for one value on a sample purchase order:
+
+```json
+{
+  "summary": {"verified": 1, "check": 0, "reworded": 0, "unchecked": 0, "total": 1, "coverage": 1.0},
+  "documents": ["PO2.pdf"],
+  "sources": [
+    {
+      "field": "purchase_no", "value": "7200445321", "quote": "PURCHASE NO: 7200445321",
+      "document": 1, "page": 1, "cited_page": 1,
+      "status": "found", "value_status": "match", "verdict": "verified",
+      "rects": [
+        {"x": 0.498, "y": 0.114, "w": 0.073, "h": 0.014},
+        {"x": 0.575, "y": 0.114, "w": 0.024, "h": 0.014},
+        {"x": 0.649, "y": 0.114, "w": 0.073, "h": 0.014}
+      ],
+      "value_rects": [{"x": 0.649, "y": 0.114, "w": 0.073, "h": 0.014}],
+      "span": null, "occurrences": 1, "record": 0
+    }
+  ]
+}
+```
+
+## Reading the verdicts
+
+| Verdict | Meaning | What a reviewer does |
+|---|---|---|
+| `verified` | the quote is in the source and holds the value | nothing, or a glance |
+| `check` | the quote is not in the source, or holds another number or date than the value | looks at it: the value may be wrong, or a legitimate conversion |
+| `reworded` | the quote is in the source, but a text value is not in it | usually the model's own wording, such as a translation or a summary; reads it |
+| `unchecked` | cannot be compared: a list, a number written in words, a scan | checks by hand |
+
+A verified value matches its quote. That is not proof that the quote is the right place to read it. Examples from a sample purchase order:
+
+| Value | Quote | Verdict | Why |
+|---|---|---|---|
+| `7200445321` | `PURCHASE NO: 7200445321` | verified | the value is in the quote |
+| `2026-02-15` | `DATE: 02/15/2026` | verified | the same date in another order |
+| `7200-4453-21` | `PURCHASE NO: 7200445321` | verified | the same characters with other separators |
+| `2721.55` (kg) | `... 6,000 LB LB` | check | the only number in the quote is 6000 |
+| a Finnish description | the English line it came from | reworded | the value is the model's own wording |
+
+## Viewing the results
+
+**In the terminal.** Loop over `report.items` and print the verdict, field, value, page and quote, or print `report.summary()`.
+
+**Route by verdict.** For a review step, show only what needs a person:
+
+```python
+needs_review = [item for item in report.items if item.verdict != "verified"]
+uncited = report.coverage is not None and report.coverage < 1  # some values came with no quote
+```
+
+**On a PDF page, in your own interface.** Each item with `rects` says which page of which document, and where. Show that page at any size and place a box for every rect in percentages of the page, so that it scales with the image:
+
+```js
+// container: position: relative, same aspect ratio as the page image
+for (const r of item.rects) {
+  const box = document.createElement("div");
+  Object.assign(box.style, {
+    position: "absolute", border: "2px solid #16a34a",   // colour by item.verdict
+    left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%`,
+  });
+  container.appendChild(box);
+}
+// the value inside the quote: draw item.value_rects the same way, with a fill
+```
+
+The fractions are relative to the page as PyMuPDF sees it. If you render with another library, check one document first: rotated or cropped pages are not covered by the tests.
+
+**A complete example.** `source_tracing_viewer_example.py` in the [examples folder](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/source_tracing) runs the Vision Extractor with source tracing and writes one self-contained HTML page: the quotes outlined on the PDF pages, a verdict and an explanation for every value, filters, and the function that draws the boxes. The page needs no server, so you can open it in a browser or send it to a reviewer. Three extra fields in its task are chosen so that all four verdicts appear.
+
+**In text or a transcript.** `span` gives character offsets into the exact text you passed to `check_text`, so highlight `text[start:end]`. **With rows of records**, `record` ties a value to its row, so a table view can show each row's evidence next to its cells. **To send to a front end**, `report.to_dict()` is JSON-ready.
+
+## How the check decides
+
+1. **Quote in the source?** Quote and source are reduced to lowercase words with punctuation and spacing removed, and the quote's words must appear as an unbroken run. The cited page is tried first, then the other pages of the file, then the other files.
+2. **Value in the quote?** Numbers are compared as numbers in both European and American formats (`3.000 kg` holds `3000`, `1.234,50` holds `1234.5`). Dates are compared by year, month and day in any order, including month names. Text is compared by its words, or as the same characters with other separators.
+3. **Verdict** from the two answers, as in the table above.
+4. **Position (PDF):** the matched words' boxes from the PDF's text layer, and the box of the value inside the quote when it can be located.
+
+`SourceTracing(policy=TracePolicy(...))` sets the judgment calls: the number tolerance, matching of reformatted identifiers, treating `reworded` as a problem for tasks that must copy values verbatim, the shortest acceptable quote, and treating a quote that occurs more than once as a problem.
+
+## In the Solution Wizard
+
+The [Solution Configuration Wizard](/guidance-layer/solution-configuration-wizard) knows Source Tracing as a review aid for extraction pipelines:
+
+- When a use case needs human review, the wizard asks once which checks should help the reviewer: source tracing and the LLM judge (recommended), source tracing only, the judge only, or neither.
+- When no one is available to answer, it adds the judge as before, and adds source tracing too when the requirements ask for evidence, for example "cite the source" or an audit trail.
+- The workflow order is extraction, then source tracing, then the judge, then the human review step. Report-writing and RAG pipelines do not get these steps.
+- For audio and document extraction the generated proof of concept includes the evidence request and the check, and writes the report next to the results. The schema must exist for that: when the pipeline has to generate it, tracing starts on the next run.
+
+## Limits
+
+- The model must follow the instruction. A model that skips citations lowers the coverage; one that paraphrases a quote shows as not found.
+- A quote that occurs more than once, such as a unit or a header, is boxed at its first occurrence. `occurrences` says how many there are.
+- A scan has no text layer, so its values are unchecked; an image file is reported as having no text layer.
+- Positions are in the transcript text or on the PDF page. A quote is not mapped to a time in an audio or video recording.
+- A value in another format, such as a converted unit, is flagged `check`: the code can not tell a correct conversion from a wrong number.
+- A number with one dot or comma and three digits after it, such as `4.200`, can be read as 4.2 or 4200. The check accepts either, so a value of 4.2 matches a quote of `4.200` even when the document means 4200 and the value is a conversion (kilograms to tonnes, for example).
+- Citations add output tokens to the extraction call.
+
+**Potential applications:**
+- A review screen for extracted purchase orders or invoices, with the quote highlighted on the page
+- Incident reports from recordings, with each field linked to the sentence in the transcript
+- A cheap first check before an LLM judge, on the values a person has to approve
+- An audit trail: where each value in the database came from
+
+- **Implementation code**: [software_components/source_tracing](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/source_tracing)
+- **Usage examples**: [examples/source_tracing](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/source_tracing), with one script per component on the sample purchase orders

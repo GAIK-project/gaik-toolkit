@@ -113,6 +113,38 @@ def test_rejects_table_outside_allowlist():
         validate_read_only("SELECT * FROM secrets", allowed_tables=TABLES)
 
 
+@pytest.mark.parametrize(
+    "bad_sql",
+    [
+        # Inside its own body a non-recursive CTE name is the real table.
+        "WITH secrets AS (SELECT * FROM secrets) SELECT * FROM secrets",
+        # An earlier CTE cannot see a later one.
+        "WITH a AS (SELECT * FROM secrets), secrets AS (SELECT 1) SELECT * FROM a",
+        # A CTE of a subquery is not visible in the outer query.
+        "SELECT * FROM secrets WHERE EXISTS (WITH secrets AS (SELECT 1) SELECT 1 FROM secrets)",
+        # Nor in the other branch of a set operation.
+        "(WITH secrets AS (SELECT 1) SELECT * FROM secrets) UNION SELECT * FROM secrets",
+    ],
+)
+def test_cte_name_out_of_scope_is_checked_as_a_table(bad_sql):
+    with pytest.raises(UnsafeSQLError, match="not in the allowed table list"):
+        validate_read_only(bad_sql, allowed_tables=TABLES)
+
+
+@pytest.mark.parametrize(
+    "good_sql",
+    [
+        "WITH a AS (SELECT * FROM sales), b AS (SELECT * FROM a) SELECT * FROM b JOIN a USING (id)",
+        "WITH a AS (SELECT region FROM sales) SELECT * FROM a UNION SELECT * FROM a",
+        "WITH RECURSIVE r AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM r WHERE n < 3) "
+        "SELECT * FROM r",
+        "SELECT * FROM sales WHERE EXISTS (WITH t AS (SELECT 1) SELECT * FROM t)",
+    ],
+)
+def test_cte_name_in_scope_is_allowed(good_sql):
+    validate_read_only(good_sql, allowed_tables=TABLES)
+
+
 def test_rejects_cross_database_reference():
     with pytest.raises(UnsafeSQLError, match="Cross-database"):
         validate_read_only("SELECT * FROM other.main.sales", allowed_tables=TABLES)

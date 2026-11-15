@@ -9,9 +9,16 @@ from fastapi import APIRouter, Form, HTTPException
 from pydantic import BaseModel
 
 try:
+    from utils.ai_marking import mark_audio
     from utils.config import get_api_config
 except ImportError:
+    from api.utils.ai_marking import mark_audio
     from api.utils.config import get_api_config
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
 
 router = APIRouter()
 
@@ -36,6 +43,8 @@ class TextToSpeechResponse(BaseModel):
     content_type: str
     character_count: int
     audio_base64: str
+    # Synthetic speech: the audio carries the same mark (ID3 on MP3, INFO on WAV).
+    ai_generated: bool = True
 
 
 def _retry_after(exc: Exception) -> float | None:
@@ -97,10 +106,10 @@ async def synthesize_text(
         result = await _synthesize_with_retry(tts, normalized_text)
     except ImportError as exc:
         raise HTTPException(
-            status_code=500, detail=f"Text-to-speech component not installed: {exc}"
+            status_code=500, detail=error_detail(exc, "Loading the text-to-speech component")
         ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=error_detail(exc)) from exc
 
     return TextToSpeechResponse(
         filename=result.filename,
@@ -111,5 +120,7 @@ async def synthesize_text(
         response_format=result.response_format,
         content_type=result.content_type,
         character_count=len(normalized_text),
-        audio_base64=base64.b64encode(result.audio_bytes).decode("ascii"),
+        audio_base64=base64.b64encode(
+            mark_audio(result.audio_bytes, result.response_format)
+        ).decode("ascii"),
     )

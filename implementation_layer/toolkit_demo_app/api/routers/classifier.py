@@ -16,6 +16,16 @@ try:
 except ImportError:
     from api.utils.model_settings import provider_error_detail
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 
 
@@ -45,6 +55,8 @@ async def classify_document(
 
     # Validate file size and save temporarily
     content = await validate_file_size(file)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -89,7 +101,9 @@ async def classify_document(
         }
 
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Classifier not installed: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=error_detail(e, "Loading the classifier")
+        ) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
     finally:

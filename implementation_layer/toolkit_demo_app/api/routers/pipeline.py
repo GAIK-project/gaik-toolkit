@@ -89,14 +89,39 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
+try:
+    from utils.errors import error_detail
+    from utils.model_settings import provider_error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+    from api.utils.model_settings import provider_error_detail
+
 logger = logging.getLogger(__name__)
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 
 PDF_CLEANUP_AFTER_HOURS = 1
+# A sweep every ten minutes keeps a PDF at most 70 minutes; an hourly one let
+# a PDF made just after a pass live almost two hours.
+PDF_SWEEP_SECONDS = 600
+
+# Generated PDFs live in their own folder, so a file left by an earlier process
+# (the maps below start empty after a restart) is still found and removed.
+PDF_DIR = Path(tempfile.gettempdir()) / "gaik-demo-pipeline-pdfs"
 
 # Temporary storage for generated PDFs (path and creation time)
 PDF_STORAGE: dict[str, Path] = {}
 PDF_TIMESTAMPS: dict[str, datetime] = {}
+
+
+def _pdf_path(job_id: str) -> Path:
+    """Where the PDF of one job is written."""
+    PDF_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return PDF_DIR / f"{job_id}.pdf"
 
 
 def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config: dict):
@@ -189,22 +214,45 @@ def _get_or_create_schema(
     return wrap_schema_with_numeric_normalizers(schema), requirements, True
 
 
+def remove_expired_pdfs(now: datetime | None = None) -> int:
+    """Remove PDFs older than PDF_CLEANUP_AFTER_HOURS; returns how many files went."""
+    cutoff = (now or datetime.now()) - timedelta(hours=PDF_CLEANUP_AFTER_HOURS)
+    removed = 0
+    for job_id, timestamp in list(PDF_TIMESTAMPS.items()):
+        if timestamp < cutoff:
+            path = PDF_STORAGE.pop(job_id, None)
+            PDF_TIMESTAMPS.pop(job_id, None)
+            # One file that cannot go (held open, say) must not end the pass;
+            # the folder sweep below tries it again next time.
+            try:
+                if path is not None and path.exists():
+                    path.unlink(missing_ok=True)
+                    removed += 1
+            except OSError:
+                logger.warning("Could not remove an expired pipeline PDF")
+    if PDF_DIR.is_dir():
+        for path in PDF_DIR.glob("*.pdf"):
+            try:
+                if datetime.fromtimestamp(path.stat().st_mtime) < cutoff:
+                    path.unlink(missing_ok=True)
+                    removed += 1
+                    PDF_STORAGE.pop(path.stem, None)
+                    PDF_TIMESTAMPS.pop(path.stem, None)
+            except OSError:
+                logger.warning("Could not remove an expired pipeline PDF")
+    return removed
+
+
 async def cleanup_old_pdfs():
-    """Background task to clean up old PDFs."""
+    """Background task (started in main.py): remove expired PDFs at start and every ten minutes."""
     while True:
-        await asyncio.sleep(3600)  # Check every hour
-        cutoff = datetime.now() - timedelta(hours=PDF_CLEANUP_AFTER_HOURS)
-        jobs_to_delete = []
-        for job_id, timestamp in list(PDF_TIMESTAMPS.items()):
-            if timestamp < cutoff:
-                jobs_to_delete.append(job_id)
-        for job_id in jobs_to_delete:
-            if job_id in PDF_STORAGE:
-                path = PDF_STORAGE[job_id]
-                path.unlink(missing_ok=True)
-                del PDF_STORAGE[job_id]
-            if job_id in PDF_TIMESTAMPS:
-                del PDF_TIMESTAMPS[job_id]
+        try:
+            removed = remove_expired_pdfs()
+            if removed:
+                logger.info("Removed %d expired pipeline PDFs", removed)
+        except Exception:  # noqa: BLE001 - the loop must outlive one failed pass
+            logger.exception("Pipeline PDF cleanup failed")
+        await asyncio.sleep(PDF_SWEEP_SECONDS)
 
 
 # Logo path for PDF generation (letter-only logo works better for PDF headers)
@@ -299,10 +347,43 @@ async def audio_pipeline(
 
     # Validate file size and save temporarily
     content = await validate_audio_file_size(file)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
 
+    return await asyncio.to_thread(
+        _run_audio_pipeline,
+        job_id,
+        steps,
+        tmp_path,
+        user_requirements,
+        generate_pdf,
+        pdf_title,
+        enhanced,
+        compress_audio,
+        schema_key,
+        regenerate_schema,
+    )
+
+
+def _run_audio_pipeline(
+    job_id: str,
+    steps: list[PipelineStep],
+    tmp_path: str,
+    user_requirements: str,
+    generate_pdf: bool,
+    pdf_title: str,
+    enhanced: bool,
+    compress_audio: bool,
+    schema_key: str | None,
+    regenerate_schema: bool,
+) -> AudioPipelineResponse:
+    """Transcribe, extract and write the PDF, then remove the upload.
+
+    Blocking: the handler runs it in a worker thread.
+    """
     try:
         config = get_api_config()
 
@@ -357,7 +438,7 @@ async def audio_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                pdf_path = _pdf_path(job_id)
 
                 # Use extracted_fields if available, otherwise create from transcript
                 if result.extracted_fields:
@@ -377,26 +458,27 @@ async def audio_pipeline(
                 steps[3].message = "PDF generated"
             except Exception as e:
                 steps[3].status = "error"
-                steps[3].message = f"PDF generation failed: {e}"
+                steps[3].message = error_detail(e, "PDF generation")
 
         return response
 
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
+        message = provider_error_detail(e)
         # Mark current step as error
         for step in steps:
             if step.status == "in_progress":
                 step.status = "error"
-                step.message = str(e)
+                step.message = message
                 break
 
         return AudioPipelineResponse(
             job_id=job_id,
             steps=steps,
-            error=str(e),
+            error=message,
         )
     finally:
         Path(tmp_path).unlink(missing_ok=True)
@@ -461,10 +543,43 @@ async def document_pipeline(
 
     # Validate file size and save temporarily
     content = await validate_file_size(file)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
 
+    return await asyncio.to_thread(
+        _run_document_pipeline,
+        job_id,
+        steps,
+        tmp_path,
+        suffix,
+        parser_type,
+        user_requirements,
+        generate_pdf,
+        pdf_title,
+        schema_key,
+        regenerate_schema,
+    )
+
+
+def _run_document_pipeline(
+    job_id: str,
+    steps: list[PipelineStep],
+    tmp_path: str,
+    suffix: str,
+    parser_type: str,
+    user_requirements: str,
+    generate_pdf: bool,
+    pdf_title: str,
+    schema_key: str | None,
+    regenerate_schema: bool,
+) -> DocumentPipelineResponse:
+    """Parse, extract and write the PDF, then remove the upload.
+
+    Blocking: the handler runs it in a worker thread.
+    """
     try:
         config = get_api_config()
 
@@ -516,7 +631,7 @@ async def document_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                pdf_path = _pdf_path(job_id)
 
                 # Use extracted_data if available, otherwise create from parsed content
                 pdf_data = (
@@ -533,26 +648,27 @@ async def document_pipeline(
                 steps[3].message = "PDF generated"
             except Exception as e:
                 steps[3].status = "error"
-                steps[3].message = f"PDF generation failed: {e}"
+                steps[3].message = error_detail(e, "PDF generation")
 
         return response
 
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
+        message = provider_error_detail(e)
         # Mark current step as error
         for step in steps:
             if step.status == "in_progress":
                 step.status = "error"
-                step.message = str(e)
+                step.message = message
                 break
 
         return DocumentPipelineResponse(
             job_id=job_id,
             steps=steps,
-            error=str(e),
+            error=message,
         )
     finally:
         Path(tmp_path).unlink(missing_ok=True)
@@ -588,6 +704,33 @@ async def text_pipeline(
     if not text or not text.strip():
         raise HTTPException(status_code=400, detail="No text provided")
 
+    return await asyncio.to_thread(
+        _run_text_pipeline,
+        job_id,
+        steps,
+        text,
+        user_requirements,
+        generate_pdf,
+        pdf_title,
+        schema_key,
+        regenerate_schema,
+    )
+
+
+def _run_text_pipeline(
+    job_id: str,
+    steps: list[PipelineStep],
+    text: str,
+    user_requirements: str,
+    generate_pdf: bool,
+    pdf_title: str,
+    schema_key: str | None,
+    regenerate_schema: bool,
+) -> TextPipelineResponse:
+    """Extract and write the PDF.
+
+    Blocking: the handler runs it in a worker thread.
+    """
     try:
         config = get_api_config()
 
@@ -637,7 +780,7 @@ async def text_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                pdf_path = _pdf_path(job_id)
 
                 # Use extracted_data if available, otherwise create from input text
                 pdf_data = extracted_data if extracted_data else [{"input_text": text}]
@@ -650,26 +793,27 @@ async def text_pipeline(
                 steps[pdf_step_idx].message = "PDF generated"
             except Exception as e:
                 steps[pdf_step_idx].status = "error"
-                steps[pdf_step_idx].message = f"PDF generation failed: {e}"
+                steps[pdf_step_idx].message = error_detail(e, "PDF generation")
 
         return response
 
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
+        message = provider_error_detail(e)
         # Mark current step as error
         for step in steps:
             if step.status == "in_progress":
                 step.status = "error"
-                step.message = str(e)
+                step.message = message
                 break
 
         return TextPipelineResponse(
             job_id=job_id,
             steps=steps,
-            error=str(e),
+            error=message,
         )
 
 
@@ -726,6 +870,13 @@ async def audio_pipeline_stream(
 
         async def error_gen() -> AsyncGenerator[str, None]:
             yield sse_event("error", {"message": AUDIO_TOO_LARGE_DETAIL})
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": mismatch})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
@@ -912,7 +1063,7 @@ async def audio_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    pdf_path = _pdf_path(job_id)
 
                     if extracted_data:
                         pdf_data = extracted_data
@@ -931,7 +1082,7 @@ async def audio_pipeline_stream(
                     yield sse_event("step_update", steps[3])
                 except Exception as e:
                     steps[3]["status"] = "error"
-                    steps[3]["message"] = f"PDF generation failed: {e}"
+                    steps[3]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[3])
 
             # Send final result
@@ -973,15 +1124,16 @@ async def audio_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = provider_error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
@@ -1091,7 +1243,7 @@ async def text_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    pdf_path = _pdf_path(job_id)
 
                     # Use extracted_data if available, otherwise create from input text
                     pdf_data = extracted_data if extracted_data else [{"input_text": text}]
@@ -1105,7 +1257,7 @@ async def text_pipeline_stream(
                     yield sse_event("step_update", steps[pdf_step_idx])
                 except Exception as e:
                     steps[pdf_step_idx]["status"] = "error"
-                    steps[pdf_step_idx]["message"] = f"PDF generation failed: {e}"
+                    steps[pdf_step_idx]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[pdf_step_idx])
 
             # Send final result
@@ -1123,16 +1275,17 @@ async def text_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = provider_error_detail(e)
             # Mark current step as error
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
 
     return StreamingResponse(
         event_generator(),
@@ -1202,6 +1355,13 @@ async def document_pipeline_stream(
             yield sse_event(
                 "error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"}
             )
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": mismatch})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
@@ -1334,7 +1494,7 @@ async def document_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    pdf_path = _pdf_path(job_id)
 
                     pdf_data = (
                         extracted_data
@@ -1351,7 +1511,7 @@ async def document_pipeline_stream(
                     yield sse_event("step_update", steps[3])
                 except Exception as e:
                     steps[3]["status"] = "error"
-                    steps[3]["message"] = f"PDF generation failed: {e}"
+                    steps[3]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[3])
 
             # Send final result
@@ -1383,10 +1543,10 @@ async def document_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
             # A parser reports its problems as HTTP errors: show the reason, not the status.
-            message = str(e.detail) if isinstance(e, HTTPException) else str(e)
+            message = provider_error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
@@ -1426,7 +1586,7 @@ async def generate_session_schema(user_requirements: str = Form(...)):
     try:
         from gaik.software_components.extractor.schema import SchemaGenerator
     except ImportError as e:
-        raise HTTPException(503, f"Required components not installed: {e}") from e
+        raise HTTPException(503, error_detail(e, "Loading the components")) from e
 
     try:
         from routers.luvata_order import describe_schema

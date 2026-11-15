@@ -7,6 +7,8 @@ monkeypatching ``pipeline.create_llm_client``. The fake exposes both ``chat``
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 pytest.importorskip("langgraph")
@@ -499,6 +501,40 @@ def test_reviewer_of_dependent_section_gets_dependency_grounding(tmp_path, patch
     assert any("Draft body for Technical Analysis" in p for p in dep_reviews)
 
 
+def test_curated_brief_stays_in_its_folder_whatever_the_section_id(tmp_path, patch_llm):
+    patch_llm(_FakeClient(review_mode="none"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+    out = tmp_path / "deep" / "out"
+
+    _gen().run(
+        input_paths=[tmp_path / "src.txt"],
+        sections=[
+            {"id": "../../../escaped", "title": "Risks", "instructions": "Technical risks."},
+            {"id": "a/b", "title": "Costs", "instructions": "Costs."},
+            # Ids that differ only in a character keep their own files.
+            {"id": "costs 2026", "title": "Costs 2026", "instructions": "Costs."},
+            {"id": "costs_2026", "title": "Costs, 2026", "instructions": "Costs."},
+            {"id": "a%2Fb", "title": "Other costs", "instructions": "Costs."},
+            # An id of spaces only falls back to the title.
+            {"id": "   ", "title": "Blank id", "instructions": "Costs."},
+        ],
+        output_dir=out,
+        agentic=True,
+        curate_evidence=True,
+    )
+
+    curated = out / "evidence" / "curated_sections"
+    assert sorted(path.name for path in curated.iterdir()) == [
+        "..%2F..%2F..%2Fescaped.md",
+        "a%252Fb.md",
+        "a%2Fb.md",
+        "blank_id.md",
+        "costs 2026.md",
+        "costs_2026.md",
+    ]
+    assert not list(tmp_path.rglob("escaped.md"))
+
+
 def test_curated_brief_filename_uses_id(tmp_path, patch_llm):
     patch_llm(_FakeClient(review_mode="none"))
     (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
@@ -520,13 +556,25 @@ def test_curated_brief_filename_uses_id(tmp_path, patch_llm):
     assert (curated / "risk_biz.md").exists()
 
 
-def test_langgraph_missing_raises_or_skip():
-    try:
-        import langgraph  # noqa: F401
-    except ImportError:  # pragma: no cover
-        with pytest.raises(ImportError):
-            from gaik.software_modules.multi_source_report_generator.agentic import (  # noqa: F401
-                run_agentic_report,
-            )
-    else:
-        pytest.skip("langgraph is installed; import-error path not exercised")
+def test_without_langgraph_the_agentic_run_says_how_to_install_it(tmp_path, patch_llm, monkeypatch):
+    patch_llm(_FakeClient(review_mode="none"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+    # Hide langgraph: importing it now fails as it does when the extra is missing.
+    monkeypatch.setitem(sys.modules, "langgraph", None)
+    monkeypatch.setitem(sys.modules, "langgraph.graph", None)
+    # Import the agentic package again without it, so a module-level langgraph import fails
+    # here too; monkeypatch puts the original modules back afterwards.
+    import gaik.software_modules.multi_source_report_generator as package
+
+    monkeypatch.setattr(package, "agentic", package.agentic)
+    prefix = f"{package.__name__}.agentic"
+    for name in [n for n in sys.modules if n == prefix or n.startswith(prefix + ".")]:
+        monkeypatch.delitem(sys.modules, name)
+
+    with pytest.raises(ImportError, match="multi-source-report-generator-agentic"):
+        _gen().run(
+            input_paths=[tmp_path / "src.txt"],
+            sections=[{"id": "summary", "title": "Summary", "instructions": "Summarize."}],
+            output_dir=tmp_path / "out",
+            agentic=True,
+        )

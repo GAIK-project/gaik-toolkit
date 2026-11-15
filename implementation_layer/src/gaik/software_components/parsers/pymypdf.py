@@ -63,7 +63,8 @@ class PyMuPDFParser:
 
         Raises:
             FileNotFoundError: If file does not exist
-            ValueError: If page_markers is used with structured text
+            ValueError: If page_markers is used with structured text, or the
+                file's content is not a PDF
             Exception: If PDF parsing fails
         """  # noqa: E501
         if not os.path.exists(file_path):
@@ -73,6 +74,11 @@ class PyMuPDFParser:
 
         try:
             doc = fitz.open(file_path)
+            # PyMuPDF opens other formats too and picks the handler from the
+            # content, so ask it what it opened instead of trusting the name.
+            if not doc.is_pdf:
+                doc.close()
+                raise ValueError(f"The content of '{file_path}' is not a PDF document.")
 
             if use_markdown:
                 # Simple text extraction

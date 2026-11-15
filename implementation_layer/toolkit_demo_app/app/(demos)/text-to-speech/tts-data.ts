@@ -141,6 +141,33 @@ export function joinBytes(parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
+/**
+ * The MP3 bytes without a leading ID3v2 tag. Each part arrives with the
+ * API's AI-generated tag; the joined file keeps the first part's tag at its
+ * start, and the later parts' tags are dropped so none sits mid-stream.
+ */
+export function withoutId3(part: Uint8Array): Uint8Array {
+  if (
+    part.length < 10 ||
+    part[0] !== 0x49 || // "I"
+    part[1] !== 0x44 || // "D"
+    part[2] !== 0x33 // "3"
+  )
+    return part;
+  const size =
+    ((part[6] & 0x7f) << 21) |
+    ((part[7] & 0x7f) << 14) |
+    ((part[8] & 0x7f) << 7) |
+    (part[9] & 0x7f);
+  const footer = part[5] & 0x10 ? 10 : 0;
+  return part.subarray(Math.min(part.length, 10 + size + footer));
+}
+
+/** The MP3 parts as one file: the first part whole, the rest without their tags. */
+export function joinMp3(parts: Uint8Array[]): Uint8Array {
+  return joinBytes(parts.map((part, n) => (n === 0 ? part : withoutId3(part))));
+}
+
 export function bytesFromBase64(base64: string): Uint8Array {
   const binary = atob(base64);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));

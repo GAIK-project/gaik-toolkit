@@ -17,6 +17,12 @@ Modules:
         Document classification into predefined categories
     - gaik.software_components.jev_classifier:
         Text and document classification with the Jev model (TypeSafe)
+    - gaik.software_components.fields_to_docx:
+        Extracted fields to a Word file (python-docx, no model call)
+    - gaik.operations:
+        One function per common task around the components, with shared settings
+    - gaik.mcp_server:
+        The operations as MCP tools for agents (console script gaik-mcp)
 
 Example - Schema-based Extraction:
     >>> from gaik.software_components.extractor import (

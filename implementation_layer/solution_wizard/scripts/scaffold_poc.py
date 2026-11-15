@@ -2,7 +2,7 @@
 """Scaffold a minimal runnable PoC from a validated blueprint.
 
 Validates the blueprint first, then generates the poc/ folder in the
-blueprint's output directory (or a directory you specify).
+blueprint's output directory under its own folder (or a directory you specify).
 
 Usage:
     python scaffold_poc.py --blueprint ~/my-use-case/use_case.blueprint.json
@@ -93,7 +93,20 @@ def main() -> int:
     if args.output_dir:
         output_dir = Path(args.output_dir).expanduser().resolve()
     elif blueprint.package.output_dir:
+        # The blueprint may name a folder, but only one under its own folder: where
+        # the PoC is written is the caller's choice (--output-dir), not the file's.
+        # The path is read as before (~ expanded, a relative path from the current
+        # folder): run_wizard.py saves the folder it was given, such as "case" for
+        # --blueprint case/use_case.blueprint.json.
+        base = blueprint_path.parent.resolve()
         output_dir = Path(blueprint.package.output_dir).expanduser().resolve()
+        if output_dir != base and base not in output_dir.parents:
+            print(
+                f"ERROR: the blueprint's package.output_dir {blueprint.package.output_dir!r} "
+                f"is outside the blueprint's folder ({base}). Pass --output-dir to choose it.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
     else:
         output_dir = blueprint_path.parent.resolve()
 

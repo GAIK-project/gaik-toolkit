@@ -14,7 +14,8 @@ Findings categories:
     removed    — card whose gaik import no longer resolves (class gone/renamed)
     api_drift  — constructor kwarg or call method that no longer exists on gaik
     options    — card option name that is not a real constructor parameter
-    new        — public gaik class in a tracked module not known to the wizard
+    new        — gaik package (a subpackage, or one nested inside a known family such
+                 as RAG) that no reference card covers
     version    — installed gaik version vs the wizard's last-validated pin
 
 Each finding is {category, component, detail, file_hint}. The skill maps each to
@@ -88,6 +89,20 @@ INTERNAL_ONLY_SUBPACKAGES: dict[str, str] = {
     # extractor, parallel_transcriber, postgres_agent, RAG, text_to_speech,
     # transcriber. No README, no example script, no public component identity.
     "gaik.software_components.llm": "internal multi-provider LLM client abstraction",
+    # RAG chunking parsers (DoclingRagParser, VisionRagParser) behind RAGWorkflow and
+    # VisionPlusParser; the wizard picks parsers through the parsers family and
+    # RAGWorkflow, never directly.
+    "gaik.software_components.RAG.rag_parser_docling": (
+        "internal RAG chunking parser behind RAGWorkflow and VisionPlusParser"
+    ),
+    "gaik.software_components.RAG.rag_parser_vision": (
+        "internal RAG chunking parser behind RAGWorkflow and VisionPlusParser"
+    ),
+    # Implementation of the opt-in `agentic` option of MultiSourceReportGenerator,
+    # which its card already covers.
+    "gaik.software_modules.multi_source_report_generator.agentic": (
+        "implementation of the agentic option of MultiSourceReportGenerator"
+    ),
 }
 
 # Public namespace aliases for components that already have one canonical
@@ -481,6 +496,88 @@ def check_new(reg, cards) -> list[dict]:
     return out
 
 
+def _gaik_nested_subpackages() -> dict[str, str]:
+    """Map each package one level below a tracked subpackage -> that subpackage.
+
+    ``_gaik_subpackages`` stops at ``gaik.software_components.RAG``, and one card
+    that imports from RAG marks the whole family as known. A class living in a
+    nested package of that family, such as ``RAG.vector_store``, then has no card
+    and nothing says so. This lists those nested packages so ``check_new_nested``
+    can ask about each of them.
+    """
+    nested: dict[str, str] = {}
+    for sub_path in _gaik_subpackages():
+        try:
+            with _quiet():
+                sub = importlib.import_module(sub_path)
+        except Exception:
+            continue
+        if not hasattr(sub, "__path__"):
+            continue
+        for info in pkgutil.iter_modules(sub.__path__, sub_path + "."):
+            if info.ispkg:
+                nested[info.name] = sub_path
+    return nested
+
+
+def _card_class_modules(cards) -> set[str]:
+    """The modules the classes named in the cards' import lines are defined in.
+
+    A card may import a class from a family package that re-exports it
+    (``from gaik.software_components.RAG import Embedder``), so the import path
+    alone does not say which nested package the card covers; the class's own
+    ``__module__`` does.
+    """
+    modules: set[str] = set()
+    for name in cards.names():
+        m = re.search(r"from\s+(gaik[\w\.]*)\s+import\s+([\w,\s]+)", cards.get(name)["import"])
+        if not m:
+            continue
+        try:
+            with _quiet():
+                mod = importlib.import_module(m.group(1))
+        except Exception:
+            continue
+        for cls_name in (n.strip() for n in m.group(2).split(",")):
+            obj = getattr(mod, cls_name, None)
+            if isinstance(obj, type):
+                modules.add(obj.__module__)
+    return modules
+
+
+def check_new_nested(cards) -> list[dict]:
+    """Nested packages of a known family that no reference card covers.
+
+    ``check_new`` treats a family as known as soon as one card imports from it,
+    which hid every class in a nested package without a card of its own. A nested
+    package counts as covered when a card imports from it, or imports a class that
+    is defined in it. Anything else is a decision, as in ``check_new``: add a
+    registry entry and card, or list it in ``INTERNAL_ONLY_SUBPACKAGES`` /
+    ``ALIAS_SUBPACKAGES`` with the reason.
+    """
+    referenced = _card_module_paths(cards)
+    defined_in = _card_class_modules(cards)
+    out = []
+    for sub_path, family in sorted(_gaik_nested_subpackages().items()):
+        if sub_path in INTERNAL_ONLY_SUBPACKAGES or sub_path in ALIAS_SUBPACKAGES:
+            continue
+        if any(ref == sub_path or ref.startswith(sub_path + ".") for ref in referenced):
+            continue
+        if any(mod == sub_path or mod.startswith(sub_path + ".") for mod in defined_in):
+            continue
+        out.append(
+            _finding(
+                "new",
+                sub_path.rsplit(".", 1)[-1],
+                f"gaik package '{sub_path}' (inside '{family}') is not covered by any "
+                f"reference card: no card imports from it or imports a class defined in it "
+                f"(a component with no card, or an internal helper to ignore)",
+                REGISTRY_FILE,
+            )
+        )
+    return out
+
+
 def check_version() -> list[dict]:
     installed = _installed_version()
     pinned = _pinned_version()
@@ -529,6 +626,7 @@ def run_audit() -> dict:
         findings += check_api_drift(cards)
         findings += check_options(cards)
         findings += check_new(reg, cards)
+        findings += check_new_nested(cards)
 
     return {
         "gaik_installed": _installed_version(),

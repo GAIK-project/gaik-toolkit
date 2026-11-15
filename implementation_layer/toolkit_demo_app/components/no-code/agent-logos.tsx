@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { ReactNode } from "react";
 import {
   ClaudeIcon,
   CodexIcon,
@@ -26,13 +27,18 @@ const agents = {
   cursor: { name: "Cursor", icon: <CursorIcon className="size-4" /> },
 };
 
-/** A muted line of agent marks; each keeps its name as text. */
+/**
+ * A muted line of agent marks; each keeps its name as text. `children` follow
+ * the marks on the same line.
+ */
 export function AgentLogos({
   lead,
   which,
+  children,
 }: {
   lead: string;
   which: (keyof typeof agents)[];
+  children?: ReactNode;
 }) {
   return (
     <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -43,6 +49,7 @@ export function AgentLogos({
           {agents[key].name}
         </span>
       ))}
+      {children}
     </p>
   );
 }

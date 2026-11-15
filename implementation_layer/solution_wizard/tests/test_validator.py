@@ -404,3 +404,70 @@ def test_no_redundancy_warning_for_single_transcriber():
     bp = Blueprint.model_validate(_audio_enhance_data(separate_enhancer=False))
     result = validate(bp)
     assert not [w for w in result.warnings if w.rule == 12]
+
+
+def _rag_workflow_data(separate_store: bool) -> dict:
+    steps = [
+        {
+            "id": "answer",
+            "name": "Answer",
+            "type": "automated_task",
+            "component": "RAGWorkflow",
+            "inputs": ["docs"],
+            "outputs": ["reply"],
+        },
+    ]
+    artifacts = {
+        "docs": {"type": "document_collection", "source": "user_upload", "optional": False},
+        "reply": {
+            "type": "answer",
+            "source": "generated",
+            "optional": False,
+            "produced_by": "answer",
+            "final_output": True,
+        },
+    }
+    blocks = []
+    if separate_store:
+        steps.append(
+            {
+                "id": "index",
+                "name": "Index",
+                "type": "automated_task",
+                "component": "VectorStore",
+                "inputs": ["docs"],
+                "outputs": ["idx"],
+            }
+        )
+        artifacts["idx"] = {
+            "type": "vector_index",
+            "source": "generated",
+            "optional": False,
+            "produced_by": "index",
+        }
+        blocks.append("VectorStore")
+    return {
+        "blueprint_version": "1.0",
+        "use_case": {"id": "rag_uc", "name": "RAG", "description": "x", "domain": "test"},
+        "components": {
+            "selected_modules": [{"id": "rag_workflow", "name": "RAGWorkflow"}],
+            "selected_building_blocks": blocks,
+            "custom_components": [],
+        },
+        "artifacts": artifacts,
+        "workflow": {"steps": steps},
+    }
+
+
+def test_separate_vector_store_next_to_rag_workflow_warns():
+    # RAGWorkflow builds its own VectorStore, so a separate step is redundant.
+    bp = Blueprint.model_validate(_rag_workflow_data(separate_store=True))
+    result = validate(bp)
+    rule12 = [w for w in result.warnings if w.rule == 12]
+    assert any("VectorStore" in w.message and "RAGWorkflow" in w.message for w in rule12)
+
+
+def test_rag_workflow_alone_has_no_redundancy_warning():
+    bp = Blueprint.model_validate(_rag_workflow_data(separate_store=False))
+    result = validate(bp)
+    assert not [w for w in result.warnings if w.rule == 12]

@@ -113,3 +113,26 @@ def test_report_writer_family_import(module):
     import importlib
 
     assert importlib.import_module(module) is not None
+
+
+def test_fields_to_docx_import():
+    """The Word component imports with python-docx installed."""
+    pytest.importorskip("docx")
+    from gaik.software_components.fields_to_docx import FieldsToDocx
+
+    assert FieldsToDocx is not None
+
+
+def test_operations_import():
+    """gaik.operations imports with core dependencies only."""
+    import gaik.operations as operations
+
+    assert operations.extract_fields is not None
+
+
+def test_mcp_server_import():
+    """The MCP server builds with the mcp extra installed."""
+    pytest.importorskip("mcp")
+    from gaik.mcp_server import build_server
+
+    assert build_server is not None

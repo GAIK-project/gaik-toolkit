@@ -93,8 +93,20 @@ pip install "gaik[knowledge-curator]"
 pip install "gaik[draft-reviewer]"
 pip install "gaik[report-synthesizer]"
 
+# Evidence quotes for extracted values, checked against the source
+pip install "gaik[source-tracing]"
+
 # Web pages and sites -> Markdown (allowlisted, robots.txt-aware crawler)
 pip install "gaik[web-scraper]"
+
+# Extracted fields -> Word file (python-docx, no model call)
+pip install "gaik[fields-to-docx]"
+
+# One function per common task: parse, transcribe, generate fields, extract with evidence, classify
+pip install "gaik[operations]"
+
+# The operations as MCP tools for agents (console script: gaik-mcp)
+pip install "gaik[mcp]"
 
 # Software modules (pipelines)
 pip install "gaik[audio-to-structured-data]"

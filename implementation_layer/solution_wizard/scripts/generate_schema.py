@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import keyword
 import sys
 from pathlib import Path
 from typing import Literal, Union, get_args, get_origin
@@ -128,6 +129,13 @@ def _collect_models(model: type) -> list[type]:
     return ordered
 
 
+def _python_name(name: str, what: str) -> str:
+    """A name the generated source can carry as written: an identifier, not a keyword."""
+    if not isinstance(name, str) or not name.isidentifier() or keyword.iskeyword(name):
+        raise ValueError(f"the generated schema's {what} {name!r} is not a valid Python name")
+    return name
+
+
 def _schema_to_py(schema_class: type, schema_name: str) -> str:
     """Render the generated Pydantic model (and any nested child models) to a
     .py file string.
@@ -145,16 +153,20 @@ def _schema_to_py(schema_class: type, schema_name: str) -> str:
     needs_decimal_helper = False
 
     for current_model in _collect_models(schema_class):
-        lines = [f"class {current_model.__name__}(BaseModel):"]
+        class_name = _python_name(current_model.__name__, "class name")
+        lines = [f"class {class_name}(BaseModel):"]
 
+        # The description is written as a string literal (repr), so no text in
+        # it can end the docstring early.
         docstring = (current_model.__doc__ or "").strip()
         if docstring:
-            lines.append(f'    """{docstring}"""')
+            lines.append(f"    {docstring!r}")
 
         lines.append("    model_config = ConfigDict(extra='forbid')")
         lines.append("")
 
         for field_name, field in current_model.model_fields.items():
+            _python_name(field_name, "field name")
             field_args: list[str] = []
 
             if field.description:

@@ -17,6 +17,8 @@ try:
 except ImportError:
     FPDF = None  # type: ignore
 
+from .ai_marking import mark_pdf
+
 
 class GAIKPdf(FPDF):
     """Custom FPDF class with header and footer for GAIK branding."""
@@ -135,6 +137,7 @@ class StructuredDataToPDF:
             PDFResult with output path and page count.
         """
         pdf = GAIKPdf(title=self.title, logo_path=self.logo_path)
+        mark_pdf(pdf)
         pdf.alias_nb_pages()
         pdf.set_auto_page_break(auto=True, margin=25)
 

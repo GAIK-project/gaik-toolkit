@@ -39,7 +39,7 @@ def client(monkeypatch) -> TestClient:
 def test_parser_choice_reaches_the_classifier(client, parser, expected) -> None:
     response = client.post(
         "/classify",
-        files={"file": ("scan.png", b"not really a png", "image/png")},
+        files={"file": ("scan.png", b"\x89PNG\r\n\x1a\n", "image/png")},
         data={"classes": "invoice,receipt", "parser": parser},
     )
 

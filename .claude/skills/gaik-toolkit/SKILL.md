@@ -171,6 +171,7 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 | ExtractionEvaluator | `from gaik.software_components.evaluators import ExtractionEvaluator` | `evaluate_dataset(dataset, extracted_outputs)` → ExtractionEvaluationResult (field-level P/R/F1 + hallucination rate; optional semantic mode via LLMJudge) |
 | RAGEvaluator | `from gaik.software_components.evaluators import RAGEvaluator` | `evaluate_dataset(items)` → RAGEvaluationResult (RAGAS-style faithfulness / answer_relevance / context_precision / context_recall via LLMJudge) |
 | BatchEvaluationRunner | `from gaik.software_components.evaluators import BatchEvaluationRunner` | `run(dataset)` → RunnerResult (applies a pipeline callable over a dataset; on_error="skip" tolerates failures) |
+| FieldsToDocx | `from gaik.software_components.fields_to_docx import FieldsToDocx` | `write(fields, output_path=None, title=...)` → DocxResult (extracted fields as a Word file: title, facts line, field table, optional evidence column and appendix; a record, `(label, value)` tuples or rows; python-docx only, no model call; install `gaik[fields-to-docx]`) |
 
 ### Parser notes
 
@@ -237,6 +238,22 @@ Composed pipelines in `gaik.software_modules.*`. For full API, see [Software Com
 - `MultiSourceReportGenerator.run(input_paths=..., sections=...)` takes source files plus a report structure (section titles + per-section instructions) and returns the assembled Markdown report with a per-section breakdown.
 
 Each stage can use its own provider; an omitted stage config falls back to the shared `api_config` (or the legacy `use_azure` default). Constructor arguments: `DocumentsToStructuredData(parser_config=, extraction_config=)`, `AudioToStructuredData(transcription_config=, extraction_config=)` (transcription stays OpenAI/Azure), `RAGWorkflow(parser_config=, embedding_config=, answer_config=)`. `MultiSourceReportGenerator` takes them per run as `api_config` inside `parser_options`, `image_options`, `writer_options`, `review_options`, and `transcriber_options={"ctor": {"api_config": ...}}`.
+
+## Operations and MCP server
+
+`gaik.operations` has one blocking function per common task, each calling the components
+unchanged: `parse_document(path)`, `transcribe_audio(path)`, `generate_fields(requirement)`,
+`extract_fields(text, fields)` (each value with its quote and a verdict) and
+`classify_text(text, labels)`. They share `OperationSettings` (provider or config, a 120 s
+request timeout, quiet stdout, working folder); `build_schema(fields)` turns `FieldDefinition`s
+into an extraction schema without a model call, and `await run_async(fn, ..., deadline=)` runs
+any blocking call in a worker thread. Install `gaik[operations]`.
+
+`gaik.mcp_server` offers the same functions and `FieldsToDocx` as MCP tools: `gaik-mcp --root .`
+(stdio) or `gaik-mcp --transport http` with `GAIK_MCP_TOKEN` (32 characters or more). Path
+arguments stay inside the `--root` folder and are refused without one. Install `gaik[mcp]`. Both live outside `software_components` and `software_modules`, so
+the gaik-sync audit does not scan them. READMEs: `implementation_layer/src/gaik/operations/` and
+`implementation_layer/src/gaik/mcp_server/`; docs page `toolkit/operations-and-mcp.mdx`.
 
 ## Architecture Overview
 

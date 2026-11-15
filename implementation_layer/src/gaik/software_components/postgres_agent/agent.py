@@ -78,10 +78,72 @@ _LANGUAGE_NAMES: dict[str, str] = {
 }
 
 
-def _redact(connection_string: str) -> str:
-    """Mask the password in a connection string for safe logging."""
-    redacted = re.sub(r"(://[^:/?#@]+:)[^@/?#]+@", r"\1***@", connection_string)
-    return re.sub(r"(password=)[^\s]+", r"\1***", redacted)
+def _redact(text: str) -> str:
+    """Mask credentials in text that may quote a connection string, for debug logs.
+
+    Covers the user and password of a URI (also percent-encoded), ``password=`` and
+    ``PGPASSWORD=`` in keyword form or as a URI query parameter, quoted or not.
+    Error messages never carry the connection string; this is for debug logging only.
+    """
+    redacted = re.sub(r"(://)[^/?#\s]*@", r"\1***@", text)
+    return re.sub(
+        r"""((?:pg)?password\s*=\s*)('(?:[^'\\]|\\.)*'|"[^"]*"|\S+)""",
+        r"\1***",
+        redacted,
+        flags=re.IGNORECASE,
+    )
+
+
+def _db_error(exc: BaseException) -> str:
+    """A short, generic description of a database error: its kind and SQLSTATE.
+
+    The driver's own text is left out: it can quote the connection settings, the
+    query's literals or values from the table.
+    """
+    name = type(exc).__name__
+    if name == "OperationalError":
+        kind = "connection or server error"
+    elif name in {"Error", "DatabaseError", "InterfaceError"}:
+        kind = "database error"
+    else:
+        kind = re.sub(r"(?<!^)(?=[A-Z])", " ", name).lower()
+    sqlstate = getattr(exc, "sqlstate", None)
+    return f"{kind} (SQLSTATE {sqlstate})" if sqlstate else kind
+
+
+# What a failed connection says, matched in the driver's text and reported in these
+# words only, so a message never quotes the connection string. First match wins.
+_CONNECT_REASONS = (
+    ("invalid connection option", "invalid connection string"),
+    ('missing "="', "invalid connection string"),
+    ("invalid uri", "invalid connection string"),
+    ("invalid integer value", "invalid connection string"),
+    ("invalid dsn", "invalid connection string"),
+    ("invalid connection string", "invalid connection string"),
+    ("invalid sslmode", "invalid connection string"),
+    ("password authentication failed", "authentication failed"),
+    ("authentication failed", "authentication failed"),
+    ("no password supplied", "no password given"),
+    ("could not translate host name", "unknown host"),
+    ("name or service not known", "unknown host"),
+    ("nodename nor servname", "unknown host"),
+    ("connection refused", "connection refused"),
+    ("timeout expired", "connection timed out"),
+    ("timed out", "connection timed out"),
+    ("no pg_hba.conf entry", "this host or user may not connect"),
+    ("does not exist", "the database or role does not exist"),
+    ("ssl", "SSL negotiation failed"),
+)
+
+
+def _connect_reason(exc: BaseException) -> str:
+    """Why a connection failed, in fixed words, with the SQLSTATE when there is one."""
+    text = str(exc).lower()
+    for marker, reason in _CONNECT_REASONS:
+        if marker in text:
+            sqlstate = getattr(exc, "sqlstate", None)
+            return f"{reason} (SQLSTATE {sqlstate})" if sqlstate else reason
+    return _db_error(exc)
 
 
 def _with_retries(call: Any, *, tries: int = 4) -> Any:
@@ -219,10 +281,24 @@ class PostgresAgent:
                     autocommit=True,
                     options=options,
                 )
-            except psycopg.OperationalError as exc:
-                raise psycopg.OperationalError(
-                    f"Could not connect to {_redact(self.connection_string)}: {exc}"
-                ) from None
+            except psycopg.Error as exc:
+                # The driver's text can quote parts of the connection string: it goes
+                # to the debug log only, with credentials and quoted parts masked.
+                logger.debug(
+                    "PostgreSQL connection failed: %s",
+                    re.sub(r'"[^"]*"', '"***"', _redact(str(exc))),
+                )
+                error = type(exc)(
+                    "Could not connect to the PostgreSQL database: "
+                    f"{_connect_reason(exc)}. Check the connection string and that the "
+                    "server is reachable."
+                )
+                error.sqlstate = exc.sqlstate
+                error._gaik_safe_message = True  # query() may pass this text on as is
+                raise error from None
+            # Transactions opened on this connection start as BEGIN READ ONLY,
+            # whatever the session default is by then.
+            self._conn.read_only = True
         return self._conn
 
     def close(self) -> None:
@@ -350,8 +426,10 @@ class PostgresAgent:
     def run_sql(self, sql: str) -> list[dict]:
         """Validate ``sql`` as read-only and execute it.
 
-        The query is wrapped so at most ``max_rows`` rows are returned. The
-        connection is read-only, so any write is rejected by PostgreSQL.
+        The query is wrapped so at most ``max_rows`` rows are returned. It runs
+        in its own transaction, started ``READ ONLY`` and always rolled back,
+        so PostgreSQL rejects any write and no session setting changed by a
+        query outlives it.
 
         Args:
             sql: A single read-only SQL query.
@@ -368,7 +446,8 @@ class PostgresAgent:
         )
         wrapped = f"SELECT * FROM (\n{validated}\n) AS gaik_query LIMIT {self.max_rows}"
         conn = self._get_conn()
-        rows = conn.execute(wrapped).fetchall()
+        with conn.transaction(force_rollback=True):
+            rows = conn.execute(wrapped).fetchall()
         return [dict(row) for row in rows]
 
     def query(self, question: str) -> QueryResult:
@@ -401,8 +480,14 @@ class PostgresAgent:
                 # the same scale will time out again, so give the LLM exactly
                 # one targeted shot at rewriting for performance, then bail.
                 # This keeps wall time bounded for the caller.
-                msg = str(exc).strip()
-                result.error = msg
+                logger.debug("PostgreSQL canceled the query: %s", _redact(str(exc)))
+                if "statement timeout" in str(exc).lower():
+                    result.error = (
+                        "The query ran past the statement timeout of "
+                        f"{self.statement_timeout_ms} ms and was canceled."
+                    )
+                else:
+                    result.error = "The query was canceled (SQLSTATE 57014)."
                 if attempt == 1:
                     error_context = (
                         f"PostgreSQL canceled the query after "
@@ -421,10 +506,16 @@ class PostgresAgent:
                 )
                 return result
             except psycopg.Error as exc:
-                result.error = str(exc).strip()
-                error_context = (
-                    f"PostgreSQL rejected the query: {str(exc).strip()}\nFailed SQL:\n{result.sql}"
-                )
+                # Only the kind of error and its SQLSTATE reach the result and the
+                # model: the driver's text can carry values from the database.
+                logger.debug("PostgreSQL failed the query: %s", _redact(str(exc)))
+                if getattr(exc, "_gaik_safe_message", False):
+                    result.error = str(exc)
+                elif isinstance(exc, psycopg.OperationalError):
+                    result.error = f"The database could not run the query: {_db_error(exc)}."
+                else:
+                    result.error = f"PostgreSQL rejected the query: {_db_error(exc)}."
+                error_context = f"{result.error}\nFailed SQL:\n{result.sql}"
                 continue
             result.rows = rows
             result.row_count = len(rows)

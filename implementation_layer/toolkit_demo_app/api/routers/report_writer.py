@@ -12,13 +12,20 @@ import tempfile
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 try:
     from utils import get_api_config, sse_event
+    from utils.report_runs import report_writer_limits, require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.report_runs import report_writer_limits, require_report_run_grant
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -85,6 +92,112 @@ _SUPPORTED_EXTS = {
 
 
 # ---------------------------------------------------------------------------
+# Upload names and run options
+# ---------------------------------------------------------------------------
+
+# The option keys the report writer page sets. Anything else in the posted
+# config (folders, endpoints, other constructor arguments) is not passed on.
+_OPTION_KEYS: dict[str, frozenset[str]] = {
+    "image_options": frozenset({"mode", "user_requirements"}),
+    "writer_options": frozenset({"model", "temperature", "reasoning_effort"}),
+    "review_options": frozenset({"model"}),
+}
+_TRANSCRIBER_CTOR_KEYS = frozenset(
+    {
+        "transcription_model",
+        "language",
+        "enhanced_transcript",
+        "diarization",
+        "speaker_count",
+        "initial_prompt",
+    }
+)
+
+
+# Control characters, and the bidi controls that can make "x.exe.md" read as
+# "x.dm.exe", have no place in a name the report quotes.
+_NAME_DROP = (
+    {chr(c) for c in range(32)}
+    | {"\x7f"}
+    | {chr(c) for c in (*range(0x202A, 0x202F), *range(0x2066, 0x206A))}
+)
+_NAME_MAX = 150
+
+
+def _upload_name(filename: str, used: set[str]) -> str:
+    """The client's file name reduced to a plain name inside the run folder.
+
+    The name is kept (the report cites its sources by it), but only its last
+    part: no folders, no drive, nothing that leaves the folder. A colon becomes
+    "_" rather than costing the name its suffix ("Meeting: notes.pdf" is still
+    a PDF), control characters go, and a long name is cut before its suffix. A
+    repeated name gets a number so one upload does not replace another.
+    """
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1]
+    name = "".join(ch for ch in name if ch not in _NAME_DROP).replace(":", "_")
+    name = name.strip().lstrip(".")
+    if not name:
+        name = "upload"
+    stem, dot, suffix = name.rpartition(".")
+    if not dot:
+        stem, suffix = name, ""
+    if len(name) > _NAME_MAX:
+        stem = stem[: _NAME_MAX - len(suffix) - 1].rstrip() or "upload"
+        name = f"{stem}.{suffix}" if suffix else stem
+    candidate, number = name, 1
+    while candidate.lower() in used:
+        number += 1
+        candidate = f"{stem}-{number}.{suffix}" if suffix else f"{stem}-{number}"
+    used.add(candidate.lower())
+    return candidate
+
+
+def _apply_limits(run_config: dict, uploads: list[UploadFile]) -> None:
+    """Hold the page's limits here too (utils/report_runs.py): the number of
+    sections and the total upload size are refused over the limit, and the
+    evidence ceiling is capped at it."""
+    limits = report_writer_limits()
+    sections = run_config.get("sections", [])
+    if isinstance(sections, list) and len(sections) > limits["max_sections"]:
+        raise HTTPException(
+            status_code=400, detail=f"Too many sections (max {limits['max_sections']})"
+        )
+    if sum(uf.size or 0 for uf in uploads) > limits["max_upload_bytes"]:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Uploads exceed the {limits['max_upload_bytes'] // (1024 * 1024)} MB limit",
+        )
+    requested = run_config.get("max_evidence_chars")
+    run_config["max_evidence_chars"] = (
+        min(requested, limits["max_evidence_chars"])
+        if isinstance(requested, int) and not isinstance(requested, bool) and requested > 0
+        else limits["max_evidence_chars"]
+    )
+
+
+def _run_options(run_config: dict, work_dir: Path) -> dict:
+    """The component options for one run: only the keys the page sets."""
+    options: dict = {"parser_options": {}}
+    for key, allowed in _OPTION_KEYS.items():
+        given = run_config.get(key)
+        options[key] = (
+            {k: v for k, v in given.items() if k in allowed} if isinstance(given, dict) else {}
+        )
+    if not options["review_options"]:
+        options["review_options"] = None
+    given = run_config.get("transcriber_options")
+    ctor = given.get("ctor") if isinstance(given, dict) else None
+    ctor = (
+        {k: v for k, v in ctor.items() if k in _TRANSCRIBER_CTOR_KEYS}
+        if isinstance(ctor, dict)
+        else {}
+    )
+    ctor["output_dir"] = str(work_dir / "transcripts")
+    options["transcriber_options"] = {"ctor": ctor}
+    return options
+
+
+# ---------------------------------------------------------------------------
 # Example endpoints
 # ---------------------------------------------------------------------------
 
@@ -121,7 +234,7 @@ async def list_example_files():
 async def get_example_file(filename: str):
     """Serve one example input file."""
     path = _EXAMPLE_INPUTS / filename
-    if not path.exists() or not path.is_file():
+    if path.resolve().parent != _EXAMPLE_INPUTS.resolve() or not path.is_file():
         raise HTTPException(status_code=404, detail=f"Example file not found: {filename}")
     return FileResponse(str(path), filename=filename)
 
@@ -139,7 +252,7 @@ async def get_example_sample_report():
 # ---------------------------------------------------------------------------
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def generate_report(
     files: list[UploadFile] = File(...),
     sample_report: UploadFile | None = File(None),
@@ -156,27 +269,36 @@ async def generate_report(
         run_config: dict = json.loads(config)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid config JSON: {exc}") from exc
+    if not isinstance(run_config, dict):
+        raise HTTPException(status_code=400, detail="Config must be a JSON object")
+
+    _apply_limits(run_config, [*files, *([sample_report] if sample_report else [])])
 
     # Save uploaded files to a temp directory
     tmp_dir = Path(tempfile.mkdtemp())
     input_paths: list[str] = []
     sample_path: str | None = None
 
+    used_names: set[str] = {"output", "transcripts"}
     try:
         for uf in files:
             if not uf.filename:
                 continue
-            dest = tmp_dir / uf.filename
+            dest = tmp_dir / _upload_name(uf.filename, used_names)
             dest.write_bytes(await uf.read())
             input_paths.append(str(dest))
 
         if sample_report and sample_report.filename:
-            dest = tmp_dir / sample_report.filename
+            dest = tmp_dir / _upload_name(sample_report.filename, used_names)
             dest.write_bytes(await sample_report.read())
             sample_path = str(dest)
     except Exception as exc:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        logger.warning("Cannot store the uploads: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=400,
+            detail="The server cannot store the uploaded files. Rename them and try again.",
+        ) from exc
 
     if not input_paths:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -185,11 +307,17 @@ async def generate_report(
     msg_queue: queue.Queue[str] = queue.Queue()
     result_holder: dict = {}
     done_event = threading.Event()
+    cancelled = threading.Event()
 
     def progress_cb(msg: str) -> None:
+        if cancelled.is_set():
+            raise RuntimeError("Cancelled by the client")
         msg_queue.put(msg)
 
     def run_report() -> None:
+        # The worker owns the run folder: it reads the inputs and writes the output
+        # there until it ends, so only it removes the folder. A disconnect sets
+        # ``cancelled`` and the run stops at its next progress message.
         try:
             from gaik.software_modules.multi_source_report_generator import (
                 MultiSourceReportGenerator,
@@ -200,6 +328,7 @@ async def generate_report(
 
             output_dir = tmp_dir / "output"
             output_dir.mkdir(exist_ok=True)
+            options = _run_options(run_config, tmp_dir)
 
             result = gen.run(
                 input_paths=input_paths,
@@ -214,12 +343,8 @@ async def generate_report(
                 include_source_references=run_config.get("include_source_references", True),
                 max_evidence_chars=run_config.get("max_evidence_chars"),
                 parser_choice=run_config.get("parser_choice", "auto"),
-                parser_options=run_config.get("parser_options") or {},
-                transcriber_options=run_config.get("transcriber_options") or {},
-                image_options=run_config.get("image_options") or {},
-                writer_options=run_config.get("writer_options") or {},
+                **options,
                 agentic=run_config.get("agentic", False),
-                review_options=run_config.get("review_options"),
                 polish=run_config.get("polish", False),
                 # strict_review would raise before result; surface as warnings instead
                 strict_review=False,
@@ -227,66 +352,62 @@ async def generate_report(
                 verbose=False,
                 progress_callback=progress_cb,
             )
-            result_holder["result"] = result
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Report generation failed")
-            result_holder["error"] = str(exc)
-        finally:
-            done_event.set()
-
-    thread = threading.Thread(target=run_report, daemon=True)
-    thread.start()
-
-    async def event_stream():
-        last_heartbeat = asyncio.get_event_loop().time()
-        try:
-            while not done_event.is_set() or not msg_queue.empty():
-                drained = False
-                while not msg_queue.empty():
-                    try:
-                        msg = msg_queue.get_nowait()
-                        yield sse_event("progress", {"message": msg})
-                        drained = True
-                    except queue.Empty:
-                        break
-                if not drained:
-                    await asyncio.sleep(0.1)
-                    now = asyncio.get_event_loop().time()
-                    if now - last_heartbeat > 15:
-                        # SSE comment — keeps proxy connections alive
-                        yield ": heartbeat\n\n"
-                        last_heartbeat = now
-
-            thread.join(timeout=10)
-
-            if "error" in result_holder:
-                yield sse_event("error", {"message": result_holder["error"]})
-            elif "result" in result_holder:
-                result = result_holder["result"]
-                docx_b64: str | None = None
-                if result.docx_path and Path(result.docx_path).exists():
-                    docx_b64 = base64.b64encode(Path(result.docx_path).read_bytes()).decode()
-                sections_data = [
+            # Read the Word file here, while the folder still exists.
+            docx_b64: str | None = None
+            if result.docx_path and Path(result.docx_path).exists():
+                docx_b64 = base64.b64encode(Path(result.docx_path).read_bytes()).decode()
+            result_holder["result"] = {
+                "markdown": result.markdown,
+                "sections": [
                     {
                         "title": s.title,
                         "content_markdown": s.content_markdown,
                         "revision_warnings": s.revision_warnings,
                     }
                     for s in result.sections
-                ]
-                yield sse_event(
-                    "result",
-                    {
-                        "markdown": result.markdown,
-                        "sections": sections_data,
-                        "usage": result.usage or {},
-                        "docx_b64": docx_b64,
-                    },
-                )
+                ],
+                "usage": result.usage or {},
+                "docx_b64": docx_b64,
+            }
+        except Exception as exc:  # noqa: BLE001
+            if cancelled.is_set():
+                logger.info("Report generation stopped: the client left")
+                result_holder["error"] = "Report generation stopped: the client left."
+            else:
+                result_holder["error"] = error_detail(exc, "Report generation")
+        finally:
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            finally:
+                done_event.set()
+
+    threading.Thread(target=run_report, daemon=True).start()
+
+    async def event_stream():
+        loop = asyncio.get_running_loop()
+        last_heartbeat = loop.time()
+        try:
+            while not done_event.is_set() or not msg_queue.empty():
+                try:
+                    msg = msg_queue.get_nowait()
+                except queue.Empty:
+                    await asyncio.sleep(0.1)
+                    if loop.time() - last_heartbeat > 15:
+                        # SSE comment — keeps proxy connections alive
+                        yield ": heartbeat\n\n"
+                        last_heartbeat = loop.time()
+                    continue
+                yield sse_event("progress", {"message": msg})
+
+            if "error" in result_holder:
+                yield sse_event("error", {"message": result_holder["error"]})
+            elif "result" in result_holder:
+                yield sse_event("result", result_holder["result"])
             else:
                 yield sse_event("error", {"message": "No result produced"})
         finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+            # A closed or cancelled stream means the client left: stop at the next message.
+            cancelled.set()
 
     return StreamingResponse(
         event_stream(),

@@ -80,7 +80,17 @@ from gaik.software_components.extractor import (
 from gaik.software_components.parsers import PyMuPDFParser
 from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 logger = logging.getLogger(__name__)
+try:
+    from utils.ai_marking import mark_pdf
+except ImportError:
+    from api.utils.ai_marking import mark_pdf
+
 router = APIRouter(prefix="/luvata-order", tags=["luvata-order"])
 # Schema directory
 SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
@@ -646,6 +656,7 @@ def generate_pdf(
         return box_height
 
     pdf = FPDF()
+    mark_pdf(pdf)
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
     page_left = 12
@@ -891,8 +902,7 @@ async def process_order(
         except HTTPException as e:
             yield sse_event("error", {"message": str(e.detail)})
         except Exception as e:
-            logger.exception("Error processing order")
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": error_detail(e, "Processing the order")})
 
     return StreamingResponse(
         generate(),
@@ -1045,7 +1055,6 @@ async def generate_custom_schema(request: CustomSchemaRequest) -> dict:
             "fields": describe_schema(schema),
         }
     except Exception as exc:
-        logger.exception("Custom schema generation failed")
         raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc
 
 
@@ -1105,7 +1114,6 @@ async def extract_custom(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Custom extraction failed")
         raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc
 
 
@@ -1163,7 +1171,6 @@ async def single_example_schema() -> dict:
             "fields": describe_schema(schema),
         }
     except Exception as exc:
-        logger.exception("Single-file example schema failed")
         raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc
 
 
@@ -1190,5 +1197,4 @@ async def single_example_extract(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Single-file example extraction failed")
         raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc
