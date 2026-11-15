@@ -15,6 +15,7 @@ import os
 import socket
 import struct
 import threading
+import time
 import zlib
 
 import pytest
@@ -367,6 +368,31 @@ def test_a_scanner_that_hangs_up_refuses_the_upload(monkeypatch):
     try:
         with pytest.raises(malware_scan.ScannerUnavailableError):
             asyncio.run(malware_scan.check_upload(b"hello"))
+    finally:
+        server.close()
+
+
+def test_a_scanner_that_stops_reading_is_given_up_on_time(monkeypatch):
+    # Accepts the connection and never reads, as a stuck scanner would; it hangs
+    # up only after a while.
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+
+    def hold() -> None:
+        conn, _ = server.accept()
+        time.sleep(5)
+        conn.close()
+
+    threading.Thread(target=hold, daemon=True).start()
+    monkeypatch.setenv("WIZARD_MALWARE_SCANNER", f"127.0.0.1:{server.getsockname()[1]}")
+    monkeypatch.delenv("WIZARD_MALWARE_SCAN", raising=False)
+    monkeypatch.setattr(malware_scan, "SCAN_TIMEOUT_SECONDS", 0.3)
+    start = time.monotonic()
+    try:
+        with pytest.raises(malware_scan.ScannerUnavailableError):
+            asyncio.run(malware_scan.check_upload(b"x" * (8 * 1024 * 1024)))
+        assert time.monotonic() - start < 2.0
     finally:
         server.close()
 
