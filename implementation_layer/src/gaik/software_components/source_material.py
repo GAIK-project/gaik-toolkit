@@ -17,7 +17,8 @@ components one edge to share (each call site has to use it):
 
 The material itself always goes in the user message, never in the system one.
 Attached files and images are covered by the same sentence; wrap any text that
-travels next to them (a PDF's text layer, a file name) with the same object.
+travels next to them (a PDF's text layer) with the same object, and pass a file
+name through :func:`clean_label`.
 
 Usage::
 
@@ -61,8 +62,10 @@ SOURCE_MATERIAL_INSTRUCTION = (
 # case, also after a look-alike angle bracket a model may read as "<". An
 # opening tag cannot end a block, so it passes unchanged.
 _ANGLE = "<\uff1c\ufe64\u2329\u27e8\u3008\u2039"
+_GAP = r"[\s\u200b-\u200f\u2060\ufeff]*"  # spacing, also zero-width characters
+_SLASH = "/\uff0f\u2215\u2044"
 _CLOSING_IN_MATERIAL = re.compile(
-    rf"[{_ANGLE}](\s*/\s*)({SOURCE_MATERIAL_TAG})",
+    rf"[{_ANGLE}]({_GAP}[{_SLASH}]{_GAP})(source{_GAP}[-_ ]?{_GAP}material)",
     re.IGNORECASE,
 )
 _LABEL_UNSAFE = re.compile(rf"[\"{_ANGLE}>\uff1e\ufe65\u232a\u27e9\u3009\u203a]")
