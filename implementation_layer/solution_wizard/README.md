@@ -79,6 +79,15 @@ current shell environment. See `.env.example` for the required variables
 `ANTHROPIC_DEFAULT_SONNET_MODEL`). Run `python run_wizard_interactive.py --preflight` to
 confirm routing before a full session.
 
+The agent gets only the Read, Grep, Glob, Write, Edit and Bash tools. Writes and reads
+inside the output folder, reads in the wizard folder and the wizard's own scripts
+(`python scripts/<name>.py ...` on files in the output folder) run without asking. Any other
+command, the first write or read in a new folder and any change to the wizard's own files
+are shown to you first and run only if you answer `y`; `.env` files are never read. The
+agent's process receives only the environment variables listed in `AGENT_ENV_VARS` in the
+script (system basics, the Claude Code provider settings and the gaik provider settings);
+pass another one with `--pass-env NAME`.
+
 ### Option 3 — Wizard as a web chat (demo website)
 
 The wizard is also integrated as a streaming chat page in the demo website at
