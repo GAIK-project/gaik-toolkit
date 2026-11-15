@@ -17,8 +17,10 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -222,6 +224,27 @@ async def get_example_sample_report():
 # ---------------------------------------------------------------------------
 
 
+def _check_run_models(run_config: dict) -> None:
+    """The writer, review and transcription models must be ones the demo offers."""
+
+    def named(key: str, field: str):
+        given = run_config.get(key)
+        value = given.get(field) if isinstance(given, dict) else None
+        return value if isinstance(value, str) else None
+
+    offered = chat_models()
+    check_model(named("writer_options", "model"), offered, "writer model")
+    check_model(named("review_options", "model"), offered, "review model")
+    transcriber = run_config.get("transcriber_options")
+    ctor = transcriber.get("ctor") if isinstance(transcriber, dict) else None
+    model = ctor.get("transcription_model") if isinstance(ctor, dict) else None
+    check_model(
+        model if isinstance(model, str) else None,
+        transcription_models(),
+        "transcription model",
+    )
+
+
 @router.post("/run")
 async def generate_report(
     files: list[UploadFile] = File(...),
@@ -239,6 +262,9 @@ async def generate_report(
         run_config: dict = json.loads(config)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid config JSON: {exc}") from exc
+    if not isinstance(run_config, dict):
+        raise HTTPException(status_code=400, detail="Invalid config JSON: not an object")
+    _check_run_models(run_config)
 
     # Save uploaded files to a temp directory
     tmp_dir = Path(tempfile.mkdtemp())

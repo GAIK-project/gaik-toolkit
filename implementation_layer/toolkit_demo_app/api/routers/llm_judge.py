@@ -30,6 +30,14 @@ try:
 except ImportError:
     from api.utils.file_content import content_mismatch
 
+try:
+    from utils.model_allow_list import check_model
+
+    from routers.vision_extractor import _offered_models
+except ImportError:
+    from api.routers.vision_extractor import _offered_models
+    from api.utils.model_allow_list import check_model
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -80,8 +88,22 @@ def _resolve_provider(requested: JudgeProvider) -> JudgeProvider:
     return requested  # nothing configured — let LLMJudge raise a clear error
 
 
+# A judge runs on the models the Vision Extractor offers for its provider: the
+# panel's judges are the first of them (useVisionModels on the page).
+_CATALOGUE_PROVIDER: dict[str, str] = {
+    "openai": "openai",
+    "azure": "azure",
+    "anthropic": "claude",
+    "google": "google",
+}
+
+
 def _make_judge(provider: JudgeProvider, model: str | None):
-    """Construct an LLMJudge with friendly errors for missing deps / creds."""
+    """Construct an LLMJudge with friendly errors for missing deps / creds.
+
+    A named model must be one the demo offers for that provider, and a team-only
+    one needs the team tier (utils/model_allow_list.py).
+    """
     try:
         from gaik.software_components.validators import LLMJudge
     except ImportError as e:
@@ -90,6 +112,7 @@ def _make_judge(provider: JudgeProvider, model: str | None):
     request_config = get_request_api_config()
     if request_config is not None:
         return LLMJudge(config=request_config, model=request_config["model"])
+    check_model(model, _offered_models(_CATALOGUE_PROVIDER[provider]))
     provider = _resolve_provider(provider)
     # LLMJudge defaults use_azure=True, which would force the Azure OpenAI config
     # even for the plain "openai" provider. Drive it from the environment so an

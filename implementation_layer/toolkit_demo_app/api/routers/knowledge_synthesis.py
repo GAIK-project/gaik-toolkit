@@ -32,8 +32,10 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -218,6 +220,9 @@ async def run(
     ids = [s.id for s in parsed.sections]
     if len(set(ids)) != len(ids):
         raise HTTPException(400, f"Section ids must be distinct: {ids}")
+    offered = chat_models()
+    check_model(parsed.options.writer_model, offered, "writer model")
+    check_model(parsed.options.reviewer_model, offered, "reviewer model")
     try:
         files = _FILES.validate_json(await artifacts.read())
     except ValidationError as exc:

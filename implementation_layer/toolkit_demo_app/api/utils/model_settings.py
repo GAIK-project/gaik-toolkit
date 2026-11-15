@@ -81,6 +81,9 @@ class ServerModel:
 
 
 _server_model: ContextVar[ServerModel | None] = ContextVar("demo_server_model", default=None)
+# Whether the request carries the team tier, set by ModelSettingsMiddleware for the
+# routes that check a named model (utils/model_allow_list.py).
+_staff: ContextVar[bool] = ContextVar("demo_model_staff", default=False)
 
 _LABELS = {
     "gpt-6-luna": "GPT-6 Luna",
@@ -202,6 +205,11 @@ def server_models() -> list[ServerModel]:
 def is_staff(scope_or_headers) -> bool:
     headers = scope_or_headers.get("headers", []) if isinstance(scope_or_headers, dict) else []
     return any(k.lower() == TIER_HEADER and v == b"staff" for k, v in headers)
+
+
+def request_is_staff() -> bool:
+    """Whether the current request may run the team-only models."""
+    return _staff.get()
 
 
 def request_server_model() -> ServerModel | None:
@@ -396,6 +404,13 @@ class ModelSettingsMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
+        staff_token = _staff.set(is_staff(scope))
+        try:
+            return await self._call(scope, receive, send)
+        finally:
+            _staff.reset(staff_token)
+
+    async def _call(self, scope, receive, send):
         raw_headers = [v for k, v in scope.get("headers", []) if k.lower() == HEADER]
         if not raw_headers:
             return await self._server_model_call(scope, receive, send)

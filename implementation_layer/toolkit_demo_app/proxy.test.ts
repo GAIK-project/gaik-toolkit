@@ -26,7 +26,11 @@ function jwt(sub: string, exp: number): string {
   return `${part({ alg: "HS256", typ: "JWT" })}.${part({ sub, exp, role: "authenticated" })}.sig`;
 }
 
-const user = { id: "u1", aud: "authenticated", role: "authenticated" };
+const user: Record<string, string> = {
+  id: "u1",
+  aud: "authenticated",
+  role: "authenticated",
+};
 
 function session(refreshToken: string, expiresAt: number) {
   return {
@@ -56,6 +60,7 @@ function refreshTokenIn(response: NextResponse): string | null {
 
 let refreshes: string[] = [];
 let backendCalls = 0;
+let backendHeaders: Headers | null = null;
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = SUPABASE_URL;
@@ -82,6 +87,7 @@ beforeAll(() => {
     if (url.startsWith(`${SUPABASE_URL}/rest/v1/access_requests`))
       return Response.json({ status: "approved", wizard_access: false });
     backendCalls += 1;
+    backendHeaders = new Headers(init?.headers);
     return Response.json({ ok: true });
   }) as typeof fetch;
 });
@@ -96,6 +102,8 @@ afterAll(() => {
 beforeEach(() => {
   refreshes = [];
   backendCalls = 0;
+  backendHeaders = null;
+  delete user.email;
 });
 
 const expired = () => Math.floor(Date.now() / 1000) - 60;
@@ -185,4 +193,25 @@ test("a visitor with their own model key is asked to sign in", async () => {
     });
   }
   expect(backendCalls).toBe(0);
+});
+
+test("the API learns the model tier from the session, never from the browser", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const send = () =>
+    proxy(
+      new NextRequest("https://demo.test/api/extract", {
+        method: "POST",
+        headers: { cookie, "x-gaik-model-tier": "staff" },
+      }),
+    );
+
+  // Signed in and approved, but not on the team: the browser's header is dropped.
+  expect((await send()).status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-model-tier")).toBeNull();
+
+  // On the team by address: the proxy says so.
+  user.email = "someone@haaga-helia.fi";
+  expect((await send()).status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-model-tier")).toBe("staff");
+  expect(backendCalls).toBe(2);
 });

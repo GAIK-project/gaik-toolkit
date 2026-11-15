@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { clientIp } from "@/lib/client-ip";
+import { ADMIN_COOKIE_NAME, MODEL_TIER_HEADER, isModelStaff } from "@/lib/model-tier";
 import { ratelimit } from "@/lib/rate-limit";
 import {
   pickUsageFromEvents,
@@ -54,13 +55,19 @@ export function accessDenial(
 /**
  * Auth + approval (or trial) + quota, then the per-IP burst limit (parity with the proxy;
  * these routes are not proxied). Returns the refusal response, or the user id
- * (null under BYPASS_AUTH).
+ * (null under BYPASS_AUTH) and whether the user may run the team-only models
+ * (lib/model-tier.ts), read from the session like the proxy does.
  */
 export async function gateReportWriter(
   request: NextRequest,
   maxReports: number,
-): Promise<NextResponse | { userId: string | null }> {
-  if (BYPASS_AUTH) return { userId: null };
+): Promise<NextResponse | { userId: string | null; staff: boolean }> {
+  if (BYPASS_AUTH)
+    return {
+      userId: null,
+      // As in the proxy: without a session only the admin cookie counts.
+      staff: isModelStaff(null, request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+    };
 
   const supabase = await createClient();
   const {
@@ -114,7 +121,11 @@ export async function gateReportWriter(
     }
   }
 
-  return { userId: user.id };
+  const staff = isModelStaff(
+    user.email?.toLowerCase() ?? null,
+    request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+  );
+  return { userId: user.id, staff };
 }
 
 /** Add a run's report count and tokens to the user's access_requests row. */
@@ -145,11 +156,13 @@ export async function recordReportUsage(
 /**
  * POST the form to the backend and stream its SSE back. When the stream ends,
  * onEnd gets the folded result usage; if it throws, the client receives an
- * `error` event with its message instead of a silent miss.
+ * `error` event with its message instead of a silent miss. `staff` (from
+ * gateReportWriter) tells the API the user may run the team-only models.
  */
 export async function forwardReportRun(
   backendPath: string,
   body: FormData,
+  staff: boolean,
   onEnd: (usage: ReportUsageInfo) => Promise<void>,
 ): Promise<Response> {
   let backendRes: Response;
@@ -157,6 +170,7 @@ export async function forwardReportRun(
     backendRes = await fetch(`${BACKEND_URL}${backendPath}`, {
       method: "POST",
       body,
+      ...(staff ? { headers: { [MODEL_TIER_HEADER]: "staff" } } : {}),
     });
   } catch (e) {
     return NextResponse.json(

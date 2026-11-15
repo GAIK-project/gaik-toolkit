@@ -26,9 +26,11 @@ from pydantic import TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
     from utils.model_settings import unsupported_option_detail
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.model_settings import unsupported_option_detail
 
 logger = logging.getLogger(__name__)
@@ -171,6 +173,20 @@ async def get_example_file(example_id: str, name: str):
 # ---------------------------------------------------------------------------
 
 
+def _check_spec_models(models) -> None:
+    """Each step's model must be one the demo offers (utils/model_allow_list.py)."""
+    if models is None:
+        return
+    chat = chat_models()
+    for step in ("vision", "curator", "writer", "reviewer"):
+        check_model(getattr(models, step, None), chat, f"{step} model")
+    check_model(
+        getattr(models, "transcription", None),
+        transcription_models(),
+        "transcription model",
+    )
+
+
 @router.post("/run")
 async def run_stage(
     stage: str = Form(...),
@@ -193,6 +209,7 @@ async def run_stage(
         parsed = spec_class.model_validate_json(spec)
     except ValidationError as exc:
         raise HTTPException(400, f"Invalid spec: {_errors(exc)}") from exc
+    _check_spec_models(getattr(parsed, "models", None))
     names = [str(p) for p in _paths(parsed)]
     if bad := [n for n in names if _not_a_file_name(n)]:
         raise HTTPException(400, f"Spec files must be file names, not paths: {bad}")
