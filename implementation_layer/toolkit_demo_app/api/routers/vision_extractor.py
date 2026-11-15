@@ -67,6 +67,11 @@ try:
 except ImportError:
     from api.utils.file_content import content_mismatch
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -479,7 +484,9 @@ async def generate_schema(request: GenerateSchemaRequest):
     except HTTPException:
         raise
     except ImportError as exc:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=error_detail(exc, "Loading the extractor")
+        ) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc
 
@@ -534,12 +541,12 @@ async def extract_vision(
         try:
             from gaik.software_components.vision_extractor import VisionExtractor
         except ImportError as exc:
+            logger.warning("VisionExtractor is not available: %s", exc)
             raise HTTPException(
                 status_code=500,
                 detail=(
                     "VisionExtractor not available. "
-                    "Update to gaik>=0.5.10 or install the toolkit from source. "
-                    f"({exc})"
+                    "Update to gaik>=0.5.10 or install the toolkit from source."
                 ),
             ) from exc
 

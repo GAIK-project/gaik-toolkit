@@ -18,6 +18,11 @@ try:
 except ImportError:
     from api.utils.file_content import content_mismatch
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 
 
@@ -207,9 +212,11 @@ async def transcribe_audio(
             usage=result.usage or None,
         )
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Transcriber not installed: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=error_detail(e, "Loading the transcriber")
+        ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 

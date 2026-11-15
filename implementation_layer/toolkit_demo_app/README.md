@@ -159,7 +159,7 @@ bun dev:api        # API: uv run uvicorn api.main:app --reload
 ```
 
 - Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/docs
+- API Docs: http://localhost:8000/docs (with `DEMO_API_DOCS=true` in `.env.local`, as in `.env.example`)
 
 ### Docker
 
@@ -244,7 +244,8 @@ toolkit_demo_app/
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
 | `/report-writer` | Mixed-source report generation |
 
-API docs: <http://localhost:8000/docs> (Swagger UI)
+API docs: <http://localhost:8000/docs> (Swagger UI), served only with `DEMO_API_DOCS=true`;
+the deployed API leaves `/docs`, `/redoc` and `/openapi.json` off.
 
 ## Tech Stack
 

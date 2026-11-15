@@ -252,8 +252,17 @@ async function route(request: NextRequest): Promise<NextResponse> {
         }),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Proxy error";
-      return reply(NextResponse.json({ error: message }, { status: 502 }));
+      // The reason names the backend's address; it goes to the log, not the page.
+      const id = crypto.randomUUID().slice(0, 12);
+      console.error(`[proxy] error id ${id}: backend request failed:`, error);
+      return reply(
+        NextResponse.json(
+          {
+            error: `The demo API did not answer (error id ${id}). Try again in a moment.`,
+          },
+          { status: 502 },
+        ),
+      );
     }
   }
 

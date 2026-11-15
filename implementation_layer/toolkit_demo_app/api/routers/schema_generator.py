@@ -44,6 +44,11 @@ try:
 except ImportError:  # Compatibility with gaik releases predating the alias package.
     from gaik.software_components.extractor import SchemaGenerator
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -186,8 +191,7 @@ async def generate_schema(request: GenerateSchemaRequest) -> GenerateSchemaRespo
         raise
     except ImportError as exc:
         raise HTTPException(
-            status_code=500, detail=f"Schema Generator not installed: {exc}"
+            status_code=500, detail=error_detail(exc, "Loading the schema generator")
         ) from exc
     except Exception as exc:
-        logger.exception("Schema generation failed")
         raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc

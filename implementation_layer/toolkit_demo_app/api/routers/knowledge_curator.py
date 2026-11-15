@@ -31,6 +31,11 @@ except ImportError:
     from api.utils import get_api_config, sse_event
     from api.utils.report_runs import require_report_run_grant
 
+try:
+    from utils.errors import component_error
+except ImportError:
+    from api.utils.errors import component_error
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -188,8 +193,7 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
                 "dropped": [d.model_dump() for d in getattr(knowledge, "dropped", [])],
             }
         except Exception as exc:
-            logger.exception("Knowledge Curator failed")
-            outcome["error"] = f"{type(exc).__name__}: {exc}"
+            outcome["error"] = component_error(exc, "Curating the knowledge")
         finally:
             done.set()
 

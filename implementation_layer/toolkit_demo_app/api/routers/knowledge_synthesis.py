@@ -37,6 +37,11 @@ except ImportError:
     from api.utils import get_api_config, sse_event
     from api.utils.report_runs import require_report_run_grant
 
+try:
+    from utils.errors import component_error, error_detail
+except ImportError:
+    from api.utils.errors import component_error, error_detail
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -148,8 +153,7 @@ def _docx_or_error(report, wanted: bool) -> tuple[str | None, str | None]:
     try:
         return base64.b64encode(_docx(report)).decode(), None
     except Exception as exc:  # a missing Pandoc must not lose the report
-        logger.warning("DOCX export failed: %s", exc)
-        return None, f"{type(exc).__name__}: {exc}"
+        return None, error_detail(exc, "The Word export")
 
 
 async def _sample_markdown(upload: UploadFile, gaik) -> str:
@@ -169,7 +173,12 @@ async def _sample_markdown(upload: UploadFile, gaik) -> str:
             try:
                 return gaik.SourceNormalizer().to_markdown(path)
             except Exception as exc:
-                raise HTTPException(400, f"Cannot read the sample report: {exc}") from exc
+                logger.warning("Cannot read the sample report: %s", type(exc).__name__)
+                raise HTTPException(
+                    400,
+                    "Cannot read the sample report. Check that it opens, or save it again "
+                    "as .md, .txt, .docx or .pdf.",
+                ) from exc
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
     allowed = ", ".join(sorted(_SAMPLE_TEXT | _SAMPLE_CONVERTED))
@@ -288,8 +297,7 @@ async def run(
                 "docx_error": docx_error,
             }
         except Exception as exc:
-            logger.exception("Knowledge Synthesis failed")
-            outcome["error"] = f"{type(exc).__name__}: {exc}"
+            outcome["error"] = component_error(exc, "Writing the report")
         finally:
             done.set()
 
