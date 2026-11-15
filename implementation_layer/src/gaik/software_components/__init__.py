@@ -29,4 +29,5 @@ __all__ = [
     "report_synthesizer",
     "web_scraper",
     "source_tracing",
+    "fields_to_docx",
 ]

@@ -33,6 +33,7 @@ from .models import (
     GeneratedSection,
     ReportGenerationResult,
     ReportSectionSpec,
+    _slug,
 )
 
 # LLM path (monkeypatchable in tests). Imported defensively so the module can be
@@ -127,14 +128,6 @@ when they communicate the same meaning.
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _slug(text: str, *, max_len: int = 40) -> str:
-    keep = [c.lower() if c.isalnum() else "_" for c in text.strip()]
-    s = "".join(keep)
-    while "__" in s:
-        s = s.replace("__", "_")
-    return s.strip("_")[:max_len] or "section"
 
 
 def _normalize_sections(
@@ -529,7 +522,6 @@ class MultiSourceReportGenerator:
         if agentic:
             markdown, generated, usage_total = self._run_agentic(
                 specs=specs,
-                evidence_items=evidence_items,
                 evidence_pack=evidence_pack,
                 sample_markdown=sample_markdown,
                 output_dir=output_dir,
@@ -675,7 +667,6 @@ class MultiSourceReportGenerator:
         self,
         *,
         specs: list[ReportSectionSpec],
-        evidence_items: list[EvidenceItem],
         evidence_pack: str,
         sample_markdown: str | None,
         output_dir: str | Path | None,
@@ -726,7 +717,6 @@ class MultiSourceReportGenerator:
 
         markdown, generated, usage_total = run_agentic_report(
             specs=specs,
-            evidence_items=evidence_items,
             evidence_pack=evidence_pack,
             matched_samples=matched_samples,
             report_description=report_description,
@@ -1122,7 +1112,7 @@ class MultiSourceReportGenerator:
         Pandoc system binary (https://pandoc.org/installing.html).
         """
         try:
-            import pypandoc
+            import pypandoc  # noqa: F401  (checked here for the install hint)
         except ImportError as exc:
             raise ImportError(
                 "DOCX export requires 'pypandoc' and the Pandoc system binary. "
@@ -1132,9 +1122,9 @@ class MultiSourceReportGenerator:
                 "(or: winget install JohnMacFarlane.Pandoc / brew install pandoc / "
                 "apt install pandoc)."
             ) from exc
-        docx_path = md_path.with_suffix(".docx")
-        pypandoc.convert_file(str(md_path), "docx", outputfile=str(docx_path))
-        return docx_path
+        from gaik.software_components._pandoc import markdown_file_to_docx
+
+        return markdown_file_to_docx(md_path, md_path.with_suffix(".docx"))
 
 
 # ---------------------------------------------------------------------------

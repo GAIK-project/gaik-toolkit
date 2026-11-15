@@ -146,7 +146,7 @@ class LLMJudge:
         )
         duration_s = time.perf_counter() - t0
 
-        flags = parse_judge_flags(raw_text)
+        flags, judge_error = _judge_flags_and_error(raw_text)
         usage = JudgeUsage(
             provider=self.model_provider,
             model=self.model,
@@ -156,7 +156,9 @@ class LLMJudge:
             duration_s=duration_s,
             cost_usd=compute_judge_cost_usd(self.model, input_tokens, output_tokens),
         )
-        return ValidationResult(flags=flags, raw_judge_text=raw_text, usage=usage)
+        return ValidationResult(
+            flags=flags, raw_judge_text=raw_text, usage=usage, judge_error=judge_error
+        )
 
     def detect_hallucinations(
         self,
@@ -219,7 +221,7 @@ class LLMJudge:
         )
         duration_s = time.perf_counter() - t0
 
-        flags = parse_hallucination_flags(raw_text)
+        flags, judge_error = _hallucination_flags_and_error(raw_text)
         usage = JudgeUsage(
             provider=self.model_provider,
             model=self.model,
@@ -229,7 +231,9 @@ class LLMJudge:
             duration_s=duration_s,
             cost_usd=compute_judge_cost_usd(self.model, input_tokens, output_tokens),
         )
-        return HallucinationReport(flags=flags, raw_judge_text=raw_text, usage=usage)
+        return HallucinationReport(
+            flags=flags, raw_judge_text=raw_text, usage=usage, judge_error=judge_error
+        )
 
     def judge_text_pair(
         self,
@@ -323,15 +327,7 @@ class LLMJudge:
         system_prompt: str,
     ) -> tuple[str, int, int]:
         """Route a text-only call (no source images) to the right provider."""
-        if self.config is not None:
-            return self._call_shared(user_prompt, system_prompt)
-        provider_call = {
-            "openai": self._call_openai_text,
-            "azure": self._call_openai_text,
-            "anthropic": self._call_anthropic_text,
-            "google": self._call_google_text,
-        }[self.model_provider]
-        return provider_call(user_prompt, system_prompt)
+        return self._dispatch([], user_prompt, system_prompt)
 
     def _call_shared(
         self,
@@ -396,12 +392,13 @@ class LLMJudge:
             }
             for p in source_pages
         ]
+        # Without pages the prompt goes as plain text, as a text-only call.
+        content: str | list[dict] = user_prompt
+        if image_parts:
+            content = [{"type": "text", "text": user_prompt}, *image_parts]
         messages = [
             {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": user_prompt}, *image_parts],
-            },
+            {"role": "user", "content": content},
         ]
         kwargs: dict[str, Any] = {
             "model": self.model,
@@ -448,19 +445,14 @@ class LLMJudge:
             }
             for p in source_pages
         ]
+        content: str | list[dict] = user_prompt
+        if image_parts:
+            content = [*image_parts, {"type": "text", "text": user_prompt}]
         resp = client.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
             system=system_prompt,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        *image_parts,
-                        {"type": "text", "text": user_prompt},
-                    ],
-                }
-            ],
+            messages=[{"role": "user", "content": content}],
         )
         text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
         return text, resp.usage.input_tokens, resp.usage.output_tokens
@@ -511,107 +503,6 @@ class LLMJudge:
             getattr(meta, "candidates_token_count", 0) or 0,
         )
 
-    # ── Text-only provider callers (no images) ────────────────────
-
-    def _call_openai_text(
-        self,
-        user_prompt: str,
-        system_prompt: str,
-    ) -> tuple[str, int, int]:
-        from gaik.software_components.parsers.multimodal_parser.config import (
-            create_openai_client,
-            get_openai_config,
-        )
-
-        config = get_openai_config(use_azure=self.use_azure)
-        client = create_openai_client(config)
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "max_completion_tokens": self.max_tokens,
-            "response_format": {"type": "json_object"},
-        }
-        if self.reasoning_effort:
-            kwargs["reasoning_effort"] = self.reasoning_effort
-
-        resp = client.chat.completions.create(
-            **normalize_chat_kwargs(self.model, kwargs, config=config)
-        )
-        text = resp.choices[0].message.content or ""
-        usage = resp.usage
-        return (
-            text,
-            getattr(usage, "prompt_tokens", 0) or 0,
-            getattr(usage, "completion_tokens", 0) or 0,
-        )
-
-    def _call_anthropic_text(
-        self,
-        user_prompt: str,
-        system_prompt: str,
-    ) -> tuple[str, int, int]:
-        from gaik.software_components.parsers.multimodal_parser.config import (
-            create_claude_client,
-            get_claude_config,
-        )
-
-        config = get_claude_config(use_azure=self.use_azure)
-        client = create_claude_client(config)
-        resp = client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
-        return text, resp.usage.input_tokens, resp.usage.output_tokens
-
-    def _call_google_text(
-        self,
-        user_prompt: str,
-        system_prompt: str,
-    ) -> tuple[str, int, int]:
-        from google import genai
-        from google.genai import types
-
-        if self.use_vertexai:
-            client = genai.Client(
-                vertexai=True,
-                project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
-                location=os.environ.get("GOOGLE_VERTEXAI_LOCATION", "global"),
-            )
-        else:
-            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                raise RuntimeError(
-                    "No Google credentials. Set GOOGLE_VERTEXAI_PROJECT (+ "
-                    "GOOGLE_APPLICATION_CREDENTIALS) and use_vertexai=True, "
-                    "or set GOOGLE_GEMINI_API_KEY."
-                )
-            client = genai.Client(api_key=api_key)
-
-        resp = client.models.generate_content(
-            model=self.model,
-            contents=[user_prompt],
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-                max_output_tokens=self.max_tokens,
-            ),
-        )
-        text = resp.text or ""
-        meta = getattr(resp, "usage_metadata", None)
-        return (
-            text,
-            getattr(meta, "prompt_token_count", 0) or 0,
-            getattr(meta, "candidates_token_count", 0) or 0,
-        )
-
 
 def _strip_json_fences(raw_text: str) -> str:
     """Strip stray ```json``` markdown fences from a model response."""
@@ -624,33 +515,52 @@ def _strip_json_fences(raw_text: str) -> str:
     return text
 
 
-def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
-    """Parse ``{"flags": [...]}`` JSON into typed :class:`ValidationFlag`\\ s.
+def _flag_entries(raw_text: str, what: str) -> tuple[list | None, str | None]:
+    """The ``flags`` list of a judge response, or ``(None, reason)`` when there is none.
 
-    Tolerant of stray markdown fences. Returns an empty list when the response
-    is unparseable so the caller can decide whether to retry.
-
-    Reads both the ``score`` (Likert 1-5) and ``severity`` fields. ``score``
-    defaults to 0 when the judge omits it (severity-mode behaviour).
+    The reason gives the size only: the response can quote the judged content.
     """
     text = _strip_json_fences(raw_text)
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("Could not decode judge response as JSON (%d characters)", len(text))
-        return []
-
+        logger.warning("Could not decode %s response as JSON (%d characters)", what, len(text))
+        return None, f"response is not JSON ({len(text)} characters)"
     flags = data.get("flags") if isinstance(data, dict) else data
     if not isinstance(flags, list):
-        return []
+        logger.warning("The %s response has no flags list", what)
+        return None, "response has no flags list"
+    return flags, None
+
+
+def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
+    """Parse ``{"flags": [...]}`` JSON into typed :class:`ValidationFlag`\\ s.
+
+    Tolerant of stray markdown fences. Returns an empty list when the response
+    is unparseable; :meth:`LLMJudge.validate` reports that case in
+    ``ValidationResult.judge_error``, so an empty list here is not a pass.
+
+    Reads both the ``score`` (Likert 1-5) and ``severity`` fields. ``score``
+    defaults to 0 when the judge omits it (severity-mode behaviour).
+    """
+    return _judge_flags_and_error(raw_text)[0]
+
+
+def _judge_flags_and_error(raw_text: str) -> tuple[list[ValidationFlag], str | None]:
+    flags, error = _flag_entries(raw_text, "judge")
+    if flags is None:
+        return [], error
 
     parsed: list[ValidationFlag] = []
+    unreadable = 0
     for entry in flags:
         if not isinstance(entry, dict):
+            unreadable += 1
             continue
         try:
             severity_raw = str(entry.get("severity", "")).lower()
             if severity_raw not in ("ok", "suspect", "wrong"):
+                unreadable += 1
                 continue
             severity: Severity = severity_raw  # type: ignore[assignment]
             parsed.append(
@@ -668,36 +578,36 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
                 )
             )
         except (TypeError, ValueError):
+            unreadable += 1
             continue
-    return parsed
+    return parsed, _unreadable_entries_error(unreadable, len(flags), "judge")
 
 
 def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
     """Parse ``{"flags": [...]}`` JSON into typed :class:`HallucinationFlag`\\ s.
 
     Tolerant of stray markdown fences. Returns an empty list when the
-    response is unparseable so callers can decide whether to retry.
+    response is unparseable; :meth:`LLMJudge.detect_hallucinations` reports
+    that case in ``HallucinationReport.judge_error``.
     Severity-only entries (no ``score``) are accepted.
     """
-    text = _strip_json_fences(raw_text)
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        logger.warning(
-            "Could not decode hallucination judge response as JSON (%d characters)", len(text)
-        )
-        return []
+    return _hallucination_flags_and_error(raw_text)[0]
 
-    flags = data.get("flags") if isinstance(data, dict) else data
-    if not isinstance(flags, list):
-        return []
+
+def _hallucination_flags_and_error(raw_text: str) -> tuple[list[HallucinationFlag], str | None]:
+    flags, error = _flag_entries(raw_text, "hallucination judge")
+    if flags is None:
+        return [], error
 
     parsed: list[HallucinationFlag] = []
+    unreadable = 0
     for entry in flags:
         if not isinstance(entry, dict):
+            unreadable += 1
             continue
         severity_raw = str(entry.get("severity", "")).lower()
         if severity_raw not in ("ok", "suspect", "wrong"):
+            unreadable += 1
             continue
         # Drop entries the judge marked "ok" — by definition the report
         # only carries fields the caller may want to clear.
@@ -706,6 +616,7 @@ def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
         severity: Severity = severity_raw  # type: ignore[assignment]
         field = str(entry.get("field", "")).strip()
         if not field:
+            unreadable += 1
             continue
         parsed.append(
             HallucinationFlag(
@@ -715,7 +626,19 @@ def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
                 reason=str(entry.get("reason", "")).strip(),
             )
         )
-    return parsed
+    return parsed, _unreadable_entries_error(unreadable, len(flags), "hallucination judge")
+
+
+def _unreadable_entries_error(unreadable: int, total: int, what: str) -> str | None:
+    """An error when any flag entry could not be read, so the verdict is not a pass.
+
+    The readable flags are still returned; the error says how many were not,
+    without their content.
+    """
+    if not unreadable:
+        return None
+    logger.warning("%d of %d %s flags could not be read", unreadable, total, what)
+    return f"{unreadable} of {total} flags could not be read"
 
 
 def parse_text_judgement(raw_text: str) -> tuple[bool, Severity, int, str]:

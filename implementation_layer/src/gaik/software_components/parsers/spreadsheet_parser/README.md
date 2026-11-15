@@ -50,6 +50,14 @@ single table with no sheet heading.
   stays empty.
 - A date at midnight renders as an ISO date and other date-times as
   `YYYY-MM-DD HH:MM:SS`. A whole-number float such as `12.0` renders as `12`.
+- A number is shown with what its Excel number format adds: `0.25` with `0%` is `25%`,
+  `1234.5` with `#,##0.00 "EUR"` is `1234.50 EUR`, `7` with `0000` is `0007`. Nothing of
+  the stored value is dropped: digits the format would round away stay (`0.256` with
+  `0%` is `25.6%`), and no thousands separator is added, because its character depends
+  on the reader's locale. A date keeps the ISO form above whatever its format, and text
+  cells are not changed.
+- A format the parser does not render (scientific notation, fractions, conditions, digits
+  split by text) stays next to the stored value: `0.5 (number format: # ?/?)`.
 - Formula cells show the result stored in the file. A workbook whose formulas have no
   stored results (one written by a library such as openpyxl and never opened in Excel)
   raises `ValueError`; open and save it in Excel or LibreOffice first.

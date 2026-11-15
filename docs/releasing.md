@@ -17,6 +17,12 @@ authenticated requests with synthetic data. Required live checks are chat,
 streaming, SchemaGenerator → DataExtractor, AnswerGenerator, a PDF through
 DocumentClassifier, and KnowledgeCurator → DraftReviewer → ReportSynthesizer on one
 synthetic report section. Embedder is also required when an embedding model is selected.
+For Azure and OpenAI, a transcription check is required as well: a default
+`Transcriber` transcribes a 13-second synthetic Finnish recording
+(`scripts/release_fixtures/`) in one request, which must carry no `prompt`, and again
+in two chunks with caller context, where the first request must carry that context and
+the second must continue from the first transcript. Each transcript must keep the
+words of its sentence. The chunked request needs ffmpeg on PATH.
 It writes a sanitized `results/release-check.json` and exits nonzero for any failed,
 missing, incomplete, or timed-out required check. It never treats having a key as
 successful authentication. Reports contain model IDs and status, never credentials,
@@ -43,6 +49,7 @@ Configure a small representative matrix with environment variables:
 | `RELEASE_AITTA_MODEL` | Exact Aitta catalog model ID |
 | `RELEASE_ANTHROPIC_MODEL` | Exact Anthropic model ID |
 | `RELEASE_<PROVIDER>_EMBEDDING_MODEL` | Optional explicit embedding model/deployment |
+| `RELEASE_<PROVIDER>_TRANSCRIPTION_MODEL` | Exact transcription model/deployment; required for Azure and OpenAI, accepted from `AZURE_TRANSCRIPTION_MODEL`/`OPENAI_TRANSCRIPTION_MODEL`; CI defaults Azure to `gpt-4o-transcribe` |
 | `RELEASE_<PROVIDER>_BACKENDS` | `native` (default), `litellm`, or `native,litellm` |
 
 Standard provider credential variables are used by `get_llm_config()`. Local model
@@ -59,7 +66,8 @@ For Google it uses `gemini/`, and for OpenAI/Aitta it uses `openai/`. CI always 
 the native Azure target even if the repository variable selects only LiteLLM.
 
 Each selected provider gets at most 24 calls through the real provider clients,
-normally about 11 without embeddings. A thin client decorator caps output at 2048 tokens
+normally about 11 without embeddings, plus three transcription requests for Azure and
+OpenAI. A thin client decorator caps output at 2048 tokens
 per call while the components execute their public methods. The budget proxies
 preserve constructor-selected raw OpenAI/Azure SDK paths and native adapter paths;
 they do not replace raw SDK clients with adapters or normalize sampling parameters.

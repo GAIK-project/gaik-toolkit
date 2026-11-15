@@ -10,24 +10,29 @@
   },
   "dependencies": {
     "fumadocs-core": "16.7.9",
-    "fumadocs-mdx": "14.2.11",
+    "fumadocs-mdx": "14.2.14",
     "fumadocs-ui": "16.7.9",
-    "lucide-react": "^1.7.0",
-    "mermaid": "^11.14.0",
-    "next": "16.2.6",
+    "lucide-react": "^1.73.0",
+    "mermaid": "^11.17.2",
+    "next": "16.4.6",
     "next-themes": "^0.4.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
-    "@types/mdx": "^2.0.13",
-    "@types/node": "^25.6.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/mdx": "^2.0.14",
+    "@types/node": "^25.9.9",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "cross-env": "^10.1.0",
-    "postcss": "^8.5.8",
-    "tailwindcss": "^4.2.2",
-    "typescript": "^6.0.2"
+    "postcss": "^8.5.33",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^6.0.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "katex@<0.18.2": "^0.18.2"
+    }
   }
 }

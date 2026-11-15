@@ -56,6 +56,7 @@ function refreshTokenIn(response: NextResponse): string | null {
 
 let refreshes: string[] = [];
 let backendCalls = 0;
+let backendHeaders: Headers | null = null;
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = SUPABASE_URL;
@@ -82,6 +83,7 @@ beforeAll(() => {
     if (url.startsWith(`${SUPABASE_URL}/rest/v1/access_requests`))
       return Response.json({ status: "approved", wizard_access: false });
     backendCalls += 1;
+    backendHeaders = new Headers(init?.headers);
     return Response.json({ ok: true });
   }) as typeof fetch;
 });
@@ -96,6 +98,7 @@ afterAll(() => {
 beforeEach(() => {
   refreshes = [];
   backendCalls = 0;
+  backendHeaders = null;
 });
 
 const expired = () => Math.floor(Date.now() / 1000) - 60;
@@ -107,7 +110,9 @@ function run(cookie: string) {
 test("a POST from a visitor who is not signed in is refused before the backend", async () => {
   const response = await proxy(new NextRequest(RUN, { method: "POST" }));
   expect(response.status).toBe(401);
-  expect(await response.json()).toEqual({ error: "Sign in to use this feature." });
+  expect(await response.json()).toEqual({
+    error: "Sign in to use this feature.",
+  });
   expect(backendCalls).toBe(0);
 });
 
@@ -134,4 +139,69 @@ test("a spent refresh token is refused and the dead session cleared", async () =
   expect(await again.json()).toEqual({ error: "Sign in to use this feature." });
   expect(again.cookies.get(COOKIE)?.value).toBe("");
   expect(backendCalls).toBe(1);
+});
+
+// The access rules match the path the backend routes on, so an encoded letter
+// cannot move a request from one rule to another.
+
+const fresh = () => Math.floor(Date.now() / 1000) + 3600;
+
+function post(url: string, init: { cookie?: string; ownKey?: boolean } = {}) {
+  const headers = new Headers();
+  if (init.cookie) headers.set("cookie", init.cookie);
+  if (init.ownKey) headers.set("x-gaik-model-settings", "e30");
+  return proxy(new NextRequest(url, { method: "POST", headers }));
+}
+
+test("an encoded wizard path meets the wizard gate", async () => {
+  // Approved for the demos, but without wizard access.
+  const cookie = sessionCookie("r1", fresh());
+  for (const path of ["/api/wizard/start", "/api/%77izard/start"]) {
+    const response = await post(`https://demo.test${path}`, { cookie });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Solution Wizard is not available yet.",
+    });
+  }
+  expect(backendCalls).toBe(0);
+});
+
+test("a path the rules cannot judge is not forwarded", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  for (const path of ["/api//wizard/start", "/api/x%2F..%2Fwizard/start"]) {
+    const response = await post(`https://demo.test${path}`, { cookie });
+    expect(response.status).toBe(404);
+  }
+  expect(backendCalls).toBe(0);
+});
+
+test("a visitor with their own model key is asked to sign in", async () => {
+  for (const path of [
+    "/api/extract",
+    "/api/postgres-agent/ask",
+    "/api/%65xtract",
+  ]) {
+    const response = await post(`https://demo.test${path}`, { ownKey: true });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: "Sign in to use this feature.",
+    });
+  }
+  expect(backendCalls).toBe(0);
+});
+
+test("the generic proxy does not pass on the report run header", async () => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const response = await proxy(
+    new NextRequest(RUN, {
+      method: "POST",
+      headers: {
+        cookie: sessionCookie("r1", future),
+        "x-gaik-report-run": "from-the-browser",
+      },
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(backendHeaders?.has("x-gaik-report-run")).toBe(false);
 });

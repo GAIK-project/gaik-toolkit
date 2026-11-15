@@ -1,5 +1,4 @@
 fastapi>=0.128.0
-langfuse==4.15.6
 uvicorn[standard]>=0.40.0
 python-multipart>=0.0.21
 python-dotenv>=1.2.1
@@ -11,9 +10,5 @@ openpyxl>=3.1.0
 # source. 0.8.0 adds the shared provider configs required by the optional
 # per-request model settings and the provider-aware vision/judge adapters.
 gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]==0.8.14
-# Solution Wizard (routers/solution_wizard.py): Claude Agent SDK session per user.
-# Also requires CLAUDE_CODE_USE_FOUNDRY, ANTHROPIC_FOUNDRY_API_KEY and
-# ANTHROPIC_FOUNDRY_RESOURCE in .env.local (or the deployment secret).
-claude-agent-sdk>=0.2.97
 boto3>=1.35.0
 yt-dlp>=2026.8.19

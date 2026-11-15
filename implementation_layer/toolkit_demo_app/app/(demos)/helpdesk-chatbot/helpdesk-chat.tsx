@@ -257,9 +257,18 @@ export function HelpdeskChat({ example }: { example: HelpdeskExample }) {
     setMessages([]);
   }
 
+  // Before the first message the card is as tall as its welcome, so nothing
+  // scrolls inside it; a conversation gets a fixed height and its own scroll.
+  const empty = shown.length === 0 && !demo;
+
   return (
     <ExampleProvider value={example}>
-      <div className="bg-card flex h-[min(76vh,800px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border shadow-sm">
+      <div
+        className={cn(
+          "bg-card flex flex-col overflow-hidden rounded-2xl border shadow-sm",
+          !empty && "h-[min(76vh,800px)] min-h-[520px]",
+        )}
+      >
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="bg-primary text-primary-foreground grid size-9 shrink-0 place-items-center rounded-full">
@@ -319,16 +328,19 @@ export function HelpdeskChat({ example }: { example: HelpdeskExample }) {
           <DemoCaption caption={demo.caption} playing={playing} />
         )}
 
-        <Conversation>
+        {empty && (
+          <div className="px-4 sm:px-6">
+            <Welcome
+              text={example.welcomeText}
+              starters={example.starters}
+              onPick={send}
+              onDemo={example.demo ? startDemo : undefined}
+            />
+          </div>
+        )}
+        <Conversation className={cn(empty && "hidden")}>
           <ConversationContent className="gap-6 px-4 py-5 sm:px-6">
-            {shown.length === 0 && !demo ? (
-              <Welcome
-                text={example.welcomeText}
-                starters={example.starters}
-                onPick={send}
-                onDemo={example.demo ? startDemo : undefined}
-              />
-            ) : (
+            {!empty &&
               shown.map((message, index) => {
                 const isLast = index === shown.length - 1;
                 return message.role === "user" ? (
@@ -365,8 +377,7 @@ export function HelpdeskChat({ example }: { example: HelpdeskExample }) {
                     demo={Boolean(demo)}
                   />
                 );
-              })
-            )}
+              })}
             {!demo &&
               status === "submitted" &&
               messages.at(-1)?.role === "user" && (

@@ -20,16 +20,18 @@ import tempfile
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
     from utils.model_settings import unsupported_option_detail
+    from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
     from api.utils.model_settings import unsupported_option_detail
+    from api.utils.report_runs import require_report_run_grant
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -171,7 +173,7 @@ async def get_example_file(example_id: str, name: str):
 # ---------------------------------------------------------------------------
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def run_stage(
     stage: str = Form(...),
     spec: str = Form(...),

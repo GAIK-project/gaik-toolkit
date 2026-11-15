@@ -109,6 +109,23 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 - Allas is missing any `dental-demo/<video_id>/video.mp4`, `thumbnail.jpg`, or `subtitles.srt`
 - sample playback or thumbnail endpoints fail
 
+## Report runs only from the web app
+
+The report run routes keep their per-user quota in the web app. To make the API
+accept those runs only from the web app's route handlers, give both deployments the
+same token:
+
+```bash
+oc create secret generic gaik-demo-report-run -n gaik \
+  --from-literal=REPORT_RUN_TOKEN="$(openssl rand -base64 32)"
+oc set env deployment/gaik-demo --from=secret/gaik-demo-report-run -n gaik
+oc set env deployment/gaik-demo-api --from=secret/gaik-demo-report-run -n gaik
+```
+
+Set it on the frontend first, or both in one go: an API with the token refuses runs
+from a frontend without it. Until it is set the API logs a warning once and accepts
+runs as before.
+
 ## Environment Variables
 
 ### Frontend (gaik-demo)
@@ -117,11 +134,14 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 | -------------------------------------- | -------------------- | -------------------------------------- |
 | `BACKEND_URL`                          | Internal API URL     | Hardcoded: `http://gaik-demo-api:8000` |
 | `ADMIN_PASSWORD`                       | Admin dashboard auth | Secret: `gaik-demo-admin`              |
-| `ADMIN_SESSION_SECRET`                 | Optional. Signs the admin session cookie; falls back to `ADMIN_PASSWORD` | Secret: `gaik-demo-admin` |
+| `ADMIN_SESSION_SECRET`                 | Signs the admin session cookie; without it the key is derived from `ADMIN_PASSWORD` | Secret: `gaik-demo-admin` |
+| `ADMIN_SIGN_IN_ATTEMPTS`, `ADMIN_SIGN_IN_ATTEMPTS_TOTAL` | Optional. Admin sign-in attempts per address per 15 minutes (5) and in all per hour (30) | `oc set env` |
+| `REPORT_RUN_TOKEN`                     | Optional. Sent by the report route handlers; the API refuses report runs without it once it is set there too | Secret: `gaik-demo-report-run` |
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
-| `WIZARD_ACCESS_SECRET`                 | Unlocks the gated Solution Wizard (`/solution-wizard?key=<secret>`) | Secret: `gaik-demo-admin` |
+| `WIZARD_ACCESS_SECRET`                 | Old wizard gate on `/api/wizard`; read until that gate is removed | Secret: `gaik-demo-admin` |
+| `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
 
 ### Backend (gaik-demo-api)
 
@@ -132,10 +152,11 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 | `AZURE_API_VERSION`         | Azure API version        | Secret: `gaik-demo-api-keys` |
 | `DOCLING_API_BASE`          | Docling parser API URL   | Secret: `gaik-demo-api-keys` |
 | `DOCLING_API_PASSWORD`      | Docling parser API key   | Secret: `gaik-demo-api-keys` |
-| `CLAUDE_CODE_USE_FOUNDRY`   | Solution Wizard: route Claude Agent SDK via Azure Foundry (`1`) | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_FOUNDRY_API_KEY` | Solution Wizard: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_FOUNDRY_RESOURCE`| Solution Wizard: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | Solution Wizard: model id (e.g. `claude-sonnet-5-5`) | Secret: `gaik-demo-api-keys` |
+| `REPORT_RUN_TOKEN`          | Optional. The same value as on the frontend: report runs (Report Writer, v2, Source Normalizer, Knowledge Curator, Knowledge Synthesis) are accepted only with it | Secret: `gaik-demo-report-run` |
+| `ANTHROPIC_FOUNDRY_API_KEY` | Claude server models and the Vision Extractor's Claude path: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_FOUNDRY_RESOURCE`| Claude server models and the Vision Extractor's Claude path: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
+| `CLAUDE_CODE_USE_FOUNDRY`   | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
 
 ## Route Annotations
 

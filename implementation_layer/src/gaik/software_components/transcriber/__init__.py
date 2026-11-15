@@ -13,7 +13,7 @@ Configuration:
 Utilities:
     - split_and_transcribe: Chunk and transcribe long audio files
     - split_and_transcribe_with_context: Transcribe with context awareness
-    - DEFAULT_PROMPT: Default transcription prompt for Whisper
+    - DEFAULT_PROMPT: Legacy English context prompt, available for explicit use only
 
 Example:
     >>> from gaik.software_components.transcriber import Transcriber, get_openai_config

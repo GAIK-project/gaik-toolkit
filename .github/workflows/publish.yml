@@ -6,33 +6,50 @@ on:
     tags:
       - 'v*.*.*'  # Trigger on version tags like v0.1.0
 
-permissions:
-  contents: write      # Required for creating GitHub releases
-  pull-requests: read  # Required for generating release notes
+# Each job asks for the token permissions it needs; nothing is granted by default.
+permissions: {}
 
 jobs:
   # Run tests before publishing
   test:
     uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
     with:
       ref: ${{ github.ref }}  # Pass the tag ref to test workflow
       release_gate: true  # Offline checks AND authenticated component certification are mandatory
-    secrets: inherit  # Pass Azure-test secrets through to the called workflow
+    # Only the provider credentials the release gate (and, on a manual run, the live
+    # LLM tests) use, never the PyPI tokens.
+    secrets:
+      AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+      AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+      AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
+      AZURE_DEPLOYMENT: ${{ secrets.AZURE_DEPLOYMENT }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      AITTA_API_KEY: ${{ secrets.AITTA_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_FOUNDRY_API_KEY: ${{ secrets.ANTHROPIC_FOUNDRY_API_KEY }}
 
   build-and-publish:
     needs: test  # The reusable workflow includes the mandatory live release gate
     runs-on: ubuntu-latest
     environment: release  # Use GitHub environment for protection
+    permissions:
+      contents: write      # Required for creating GitHub releases
+      pull-requests: read  # Required for generating release notes
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ github.ref }}  # Checkout the exact tag commit
+        persist-credentials: false
         fetch-depth: 0  # Required for setuptools-scm to read git tags
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: '3.11'
 
@@ -135,7 +152,7 @@ jobs:
         echo "Installed version: $INSTALLED"
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: dist-package
         path: dist/
@@ -143,7 +160,7 @@ jobs:
 
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
       with:
         generate_release_notes: true
         files: dist/*

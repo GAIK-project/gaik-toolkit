@@ -22,6 +22,7 @@ from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
+from .srt_utils import format_timestamp
 from .whisper_local import transcribe as whisper_local_transcribe
 
 DEFAULT_PROMPT = (
@@ -156,7 +157,7 @@ class Transcriber:
         enhanced_transcript: bool = False,
         max_size_mb: int = 25,
         max_duration_seconds: int = DEFAULT_MAX_DURATION_SECONDS,
-        default_prompt: str = DEFAULT_PROMPT,
+        default_prompt: str | None = None,
         transcription_model: str | None = None,
         enhanced_transcript_instructions: str | None = None,
         language: str = "auto",
@@ -211,8 +212,10 @@ class Transcriber:
         print("=" * 80)
 
         # IMPORTANT: do NOT mutate self.default_prompt across calls.
-        prompt = self.default_prompt + (("\n" + custom_context) if custom_context else "")
-        print(f"Transcription prompt: {len(prompt)} characters")
+        prompt = self.default_prompt
+        if custom_context:
+            prompt = f"{prompt}\n{custom_context}" if prompt is not None else custom_context
+        print(f"Transcription prompt: {len(prompt) if prompt is not None else 0} characters")
 
         effective_model = self._resolve_transcription_model()
         self._warn_ignored_local_options(effective_model)
@@ -370,7 +373,7 @@ class Transcriber:
     def _transcribe_input_remote(
         self,
         input_path: Path,
-        prompt: str,
+        prompt: str | None,
         transcription_model: str,
         usage: UsageCounter | None = None,
     ) -> str:
@@ -418,7 +421,7 @@ class Transcriber:
     def _single_pass_transcription(
         self,
         file_path: Path,
-        prompt: str,
+        prompt: str | None,
         transcription_model: str,
         usage: UsageCounter | None = None,
     ) -> str:
@@ -428,11 +431,17 @@ class Transcriber:
         audio_client = _create_audio_client(self.api_config)
         try:
             with file_path.open("rb") as f:
-                response = audio_client.audio.transcriptions.create(
-                    model=transcription_model,
-                    file=f,
-                    prompt=prompt,
-                )
+                if prompt is None:
+                    response = audio_client.audio.transcriptions.create(
+                        model=transcription_model,
+                        file=f,
+                    )
+                else:
+                    response = audio_client.audio.transcriptions.create(
+                        model=transcription_model,
+                        file=f,
+                        prompt=prompt,
+                    )
             if usage is not None:
                 usage.add(_transcription_usage(response))
             return response.text
@@ -443,13 +452,29 @@ class Transcriber:
         return _create_audio_client(self.api_config)
 
 
+# How much of the previous chunk's transcript a chunk request carries.
+_PREVIOUS_TRANSCRIPT_CHARS = 170
+
+
+def _chunk_prompt(base_prompt: str | None, previous_transcript: str) -> str | None:
+    """The prompt of a chunk after the first: the caller's context, then the end of
+    the previous chunk's transcript.
+
+    The transcript comes last because the provider reads the prompt as the text just
+    before the audio (``whisper-1`` keeps only its final 224 tokens). ``None`` when
+    there is neither, so the request carries no prompt.
+    """
+    tail = previous_transcript[-_PREVIOUS_TRANSCRIPT_CHARS:]
+    return "\n".join(part for part in (base_prompt, tail) if part) or None
+
+
 def split_and_transcribe_with_context(
     audio_path,
     api_config,
     max_size_mb=25,
     max_duration_seconds=DEFAULT_MAX_DURATION_SECONDS,
     audio=None,
-    base_prompt: str = DEFAULT_PROMPT,
+    base_prompt: str | None = None,
     transcription_model: str | None = None,
     usage: UsageCounter | None = None,
 ):
@@ -500,24 +525,23 @@ def split_and_transcribe_with_context(
             end_time = format_timestamp(end_ms / 1000)
             chunk_header = f"\n[Timestamp: {start_time} - {end_time}]\n"
 
-            if i == 0:
-                prompt = base_prompt
-            else:
-                trimmed_context = context_text[-170:] if len(context_text) > 170 else context_text
-                prompt = f"""The following is a continuation of a \
-conversation. Here is the previous part of the transcript:
-
-{trimmed_context}
-
-Continue the transcription, maintaining speaker consistency and dialogue structure."""
+            # The caller's context (names, terms) goes with every chunk, not just the
+            # first; a later chunk also continues from the previous transcript.
+            prompt = base_prompt if i == 0 else _chunk_prompt(base_prompt, context_text)
 
             try:
                 with open(chunk_path, "rb") as chunk_file:
-                    transcript_response = audio_client.audio.transcriptions.create(
-                        model=transcription_model,
-                        file=chunk_file,
-                        prompt=prompt,
-                    )
+                    if prompt is None:
+                        transcript_response = audio_client.audio.transcriptions.create(
+                            model=transcription_model,
+                            file=chunk_file,
+                        )
+                    else:
+                        transcript_response = audio_client.audio.transcriptions.create(
+                            model=transcription_model,
+                            file=chunk_file,
+                            prompt=prompt,
+                        )
 
                     chunk_transcript = transcript_response.text
                     transcripts.append(chunk_header + chunk_transcript)
@@ -558,9 +582,3 @@ def split_and_transcribe(
         max_duration_seconds=max_duration_seconds,
         audio=audio,
     )
-
-
-def format_timestamp(seconds):
-    minutes = int(seconds // 60)
-    seconds = int(seconds % 60)
-    return f"{minutes:02d}:{seconds:02d}"

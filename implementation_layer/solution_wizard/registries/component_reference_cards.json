@@ -101,11 +101,11 @@
       },
       {
         "name": "default_prompt",
-        "type": "str",
-        "default": "Detect the language and extract transcript in the same language.",
-        "effect": "Whisper transcription prompt prepended before custom_context. Override to bias the model toward domain terminology.",
+        "type": "str | None",
+        "default": null,
+        "effect": "Optional context for hosted transcription requests, sent with every chunk of a long recording. The provider expects transcript context in the audio's language, not instructions; None omits the prompt. Use initial_prompt for whisper_local.",
         "selection_relevant": true,
-        "infer_from": "domain_vocabulary is provided OR source language is known in advance and not auto-detected correctly"
+        "infer_from": "Provide only domain vocabulary or transcript context in the audio's language; otherwise leave None. For whisper_local, use initial_prompt instead."
       },
       {
         "name": "initial_prompt",
@@ -1011,8 +1011,8 @@
   "LLMJudge": {
     "import": "from gaik.software_components.validators.llm_judge.llm_judge import LLMJudge",
     "construct": "judge = LLMJudge(config=get_stage_config(config, 'judge'))",
-    "call": "report = judge.detect_hallucinations(source_text=source_text, extracted=extracted_fields)\n    # report.flags: list of HallucinationFlag(.field, .value, .severity, .reason)",
-    "returns": "HallucinationReport(.flags)",
+    "call": "report = judge.detect_hallucinations(source_text=source_text, extracted=extracted_fields)\n    # report.flags: list of HallucinationFlag(.field, .value, .severity, .reason)\n    passed = getattr(report, 'passed', not report.flags)  # gaik 0.8.14 has no passed",
+    "returns": "HallucinationReport(.flags, .judge_error, .passed). judge_error is set when the judge's response could not be read; flags is then empty because there is no verdict, not because nothing was wrong. passed is True only for a readable verdict that flags no field. judge_error and passed arrive in the gaik release after 0.8.14; on 0.8.14 an empty flags list is the only signal, so generated code reads them with getattr.",
     "install_extra": "llm-judge",
     "options": [
       {
@@ -1083,7 +1083,7 @@
     "import": "from gaik.software_components.validators.llm_judge import LLMJudgePanel",
     "construct": "panel = LLMJudgePanel(judges=[judge_a, judge_b])",
     "call": "result = panel.validate(source_pages=pages, extracted=extracted_fields)\n    flags = result.aggregated_flags",
-    "returns": "JudgePanelResult(.aggregated_flags, .agreement_score, .per_judge)",
+    "returns": "JudgePanelResult(.aggregated_flags, .agreement_score, .per_judge, .judge_errors, .passed). A judge whose response could not be read is left out of the aggregation and listed in judge_errors; passed is True only when every judge gave a readable verdict and no key is flagged. agreement_score counts a judge that did not flag a key as ok for it, and is 0.0 with fewer than two readable verdicts, also for a panel of one judge, so a threshold on it needs at least two judges. judge_errors and passed arrive in the gaik release after 0.8.14.",
     "install_extra": "llm-judge",
     "options": [
       {
@@ -2919,5 +2919,59 @@
       }
     ],
     "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed."
+  },
+  "FieldsToDocx": {
+    "import": "from gaik.software_components.fields_to_docx import FieldsToDocx",
+    "construct": "writer = FieldsToDocx()",
+    "call": "result = writer.write(record, output_dir / 'report.docx', title=report_title, labels=field_labels, trace=trace_report, appendix=source_text)\n    word_path = result.path",
+    "returns": "DocxResult(.content bytes, .path Path | None (None when no output_path was given), .rows, .filled); .save(path) writes the same bytes to another .docx path. write() takes one record: a dict (one DataExtractor result item), (label, value) tuples, or rows with label/name and value such as gaik.operations.ExtractedField; several records or an unknown shape raise ValueError.",
+    "install_extra": "fields-to-docx",
+    "options": [
+      {
+        "name": "trace",
+        "type": "TraceReport | dict | None",
+        "default": null,
+        "effect": "For a record: the SourceTracing report or its to_dict(). Each field's first citation becomes the row's evidence, the quote with the verdict in brackets.",
+        "selection_relevant": true,
+        "infer_from": "SourceTracing selected -> pass the report from check_text/check_pdf together with the records it returns, not the raw extraction results"
+      },
+      {
+        "name": "evidence",
+        "type": "bool | None",
+        "default": null,
+        "effect": "Evidence column: None shows it when at least one row has a quote, True always shows it, False hides it.",
+        "selection_relevant": false,
+        "infer_from": "the reader must not see the quotes -> False; otherwise leave None"
+      },
+      {
+        "name": "appendix",
+        "type": "str | list[str] | None",
+        "default": null,
+        "effect": "Adds the source text or transcript after the table; a string is split into paragraphs on blank lines.",
+        "selection_relevant": true,
+        "infer_from": "the report must carry its source text or transcript -> pass it; the source holds personal data that must not be copied into the report -> leave it out"
+      },
+      {
+        "name": "labels",
+        "type": "dict[str, str] | None",
+        "default": null,
+        "effect": "Display labels by field name; a field without one gets its name made readable (work_done -> Work done).",
+        "selection_relevant": false,
+        "infer_from": "field names are not the headings the reader expects, or the report language differs from the field names -> pass labels"
+      },
+      {
+        "name": "headers",
+        "type": "tuple[str, str, str]",
+        "default": [
+          "Field",
+          "Value",
+          "Evidence"
+        ],
+        "effect": "Header texts of the three columns. With true_text, false_text and empty_text (constructor arguments too) it sets the language of the table.",
+        "selection_relevant": true,
+        "infer_from": "report language is not English -> translate headers, true_text, false_text and empty_text"
+      }
+    ],
+    "note": "No model call, no template and no Pandoc: python-docx only, one fixed A4 layout. One record per file; call write() once per record. Leave output_path out to get the bytes only (an HTTP response or object storage)."
   }
 }

@@ -61,8 +61,9 @@ class LLMJudgePanel:
             flags, an agreement metric, and total cost / duration.
         """
         per_judge = [j.validate(source_pages, extracted, rubric) for j in self.judges]
-        aggregated = _aggregate_flags([r.flags for r in per_judge])
-        agreement = _agreement_score([r.flags for r in per_judge])
+        readable = [r.flags for r in per_judge if r.judge_error is None]
+        aggregated = _aggregate_flags(readable)
+        agreement = _agreement_score(readable)
         total_cost = sum(r.usage.cost_usd for r in per_judge)
         total_duration = sum(r.usage.duration_s for r in per_judge)
         return JudgePanelResult(
@@ -71,6 +72,7 @@ class LLMJudgePanel:
             agreement_score=agreement,
             total_cost_usd=total_cost,
             total_duration_s=total_duration,
+            judge_errors=[r.judge_error for r in per_judge if r.judge_error is not None],
         )
 
 
@@ -126,14 +128,16 @@ def _agreement_score(per_judge_flags: list[list[ValidationFlag]]) -> float:
     """Fraction of ``(item_index, field)`` keys where ALL judges agreed on severity.
 
     Simple metric (no Cohen's kappa) — works without a hard pandas dependency.
-    Returns 1.0 for full agreement, 0.0 for total disagreement, and 1.0 when
-    no flags were emitted by any judge.
+    A judge that did not flag a key counts as ``"ok"`` for it, so one judge
+    flagging what the others passed is a disagreement. Returns 1.0 for full
+    agreement (also when no judge flagged anything), 0.0 for total
+    disagreement, and 0.0 when fewer than two verdicts are given.
     """
-    keys: dict[tuple[int, str], list[Severity]] = {}
-    for flags in per_judge_flags:
-        for f in flags:
-            keys.setdefault(_flag_key(f), []).append(f.severity)
+    if len(per_judge_flags) < 2:
+        return 0.0
+    per_judge = [{_flag_key(f): f.severity for f in flags} for flags in per_judge_flags]
+    keys = set().union(*per_judge)
     if not keys:
         return 1.0
-    n_full_agree = sum(1 for sevs in keys.values() if len(set(sevs)) == 1)
+    n_full_agree = sum(1 for key in keys if len({j.get(key, "ok") for j in per_judge}) == 1)
     return n_full_agree / len(keys)

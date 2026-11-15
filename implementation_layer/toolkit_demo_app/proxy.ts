@@ -17,6 +17,7 @@ import {
   isModelStaff,
 } from "@/lib/model-tier";
 import { backendTarget, isApiPath } from "@/lib/backend-target";
+import { routedPath } from "@/lib/request-path";
 import { clientIp } from "@/lib/client-ip";
 import { ratelimit } from "@/lib/rate-limit";
 import {
@@ -41,7 +42,12 @@ function hasBody(method: string): boolean {
 }
 
 export default async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  // The rules below match the path the backend routes on (lib/request-path.ts);
+  // the request is forwarded with the path as it was sent.
+  const rawPath = request.nextUrl.pathname;
+  const pathname = routedPath(rawPath);
+  if (pathname === null)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Read once per request and shared by the wizard and API gates. Reading it can
   // refresh the session, and every response below carries the new cookies.
@@ -50,63 +56,25 @@ export default async function proxy(request: NextRequest) {
   const reply = (response: NextResponse) =>
     withSessionCookies(response, access);
 
-  // Solution Wizard access gate. Two independent ways in:
-  //   1. Team shortcut: /solution-wizard?key=<WIZARD_ACCESS_SECRET> sets a
-  //      30-day `wizard_access` cookie (works without login). Unset the secret
-  //      in the environment to disable this path entirely.
+  // Old Solution Wizard API gate. The wizard runs as Wizard V2 and the demo API no
+  // longer serves /wizard, so nothing behind this path answers; the gate stays
+  // until it is removed with the wizard_access grant. The /solution-wizard page is
+  // only a notice that links to Wizard V2 and is open to everyone. Two ways in:
+  //   1. Team shortcut: the `wizard_access` cookie equal to WIZARD_ACCESS_SECRET.
   //   2. Registered beta testers: a logged-in user whose access_requests row
   //      has wizard_access = true (granted by an admin in /admin).
-  // Dev: BYPASS_AUTH opens the wizard. Default-deny otherwise.
-  if (
-    pathname.startsWith("/solution-wizard") ||
-    pathname.startsWith("/api/wizard")
-  ) {
-    const isApi = pathname.startsWith("/api/wizard");
+  // Dev: BYPASS_AUTH opens it. Default-deny otherwise.
+  if (pathname.startsWith("/api/wizard")) {
     const secret = process.env.WIZARD_ACCESS_SECRET;
-    const cookieKey = request.cookies.get("wizard_access")?.value;
-    const queryKey = request.nextUrl.searchParams.get("key");
     const teamAllowed =
-      !!secret && (cookieKey === secret || queryKey === secret);
-
-    if (teamAllowed) {
-      if (queryKey === secret && cookieKey !== secret) {
-        // First visit with ?key= — set the access cookie and drop the key
-        // from the URL.
-        const cleanUrl = request.nextUrl.clone();
-        cleanUrl.searchParams.delete("key");
-        const response = NextResponse.redirect(cleanUrl);
-        response.cookies.set("wizard_access", secret, {
-          httpOnly: true,
-          secure: true,
-          sameSite: "lax",
-          path: "/",
-          maxAge: 60 * 60 * 24 * 30, // 30 days
-        });
-        return response;
-      }
-      // Otherwise allowed via the team key/cookie — fall through.
-    } else {
-      // No team key: allow registered beta testers (logged-in + wizard_access).
-      const { loggedIn, wizardAccess } = await accessState();
-      if (!wizardAccess) {
-        if (isApi) {
-          return reply(
-            NextResponse.json(
-              { error: "Solution Wizard is not available yet." },
-              { status: 403 },
-            ),
-          );
-        }
-        // Page: send anonymous visitors to sign-in (to register / request
-        // access); send logged-in users without the flag home with a flag so
-        // the onboarding provider can explain how to request beta access.
-        return reply(
-          NextResponse.redirect(
-            new URL(loggedIn ? "/?wizard=denied" : "/sign-in", request.url),
-          ),
-        );
-      }
-      // Otherwise allowed via registered beta access — fall through.
+      !!secret && request.cookies.get("wizard_access")?.value === secret;
+    if (!teamAllowed && !(await accessState()).wizardAccess) {
+      return reply(
+        NextResponse.json(
+          { error: "Solution Wizard is not available yet." },
+          { status: 403 },
+        ),
+      );
     }
   }
 
@@ -151,15 +119,16 @@ export default async function proxy(request: NextRequest) {
 
     // Require login + approval for every backend request that changes state,
     // not just POST: DELETE /video-search/clear empties a table.
-    // A request that carries the user's own model key on a supported route runs
-    // on their credential, so it needs no account. A user still waiting for
-    // approval runs on the daily trial allowance (lib/trial.ts).
+    // A user still waiting for approval runs on the daily trial allowance
+    // (lib/trial.ts). A request that carries the user's own model key on a
+    // supported route runs on their credential: it still needs a signed-in
+    // account, approved or pending, but spends no trial run.
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
-    if (needsApprovedUser(request.method, pathname, ownModelKey)) {
+    if (needsApprovedUser(request.method, pathname)) {
       const state = await accessState();
-      const refusal = await accessRefusal(state, takeTrialRun);
+      const refusal = await accessRefusal(state, takeTrialRun, ownModelKey);
       if (refusal) {
         // Why a run was refused, without who: the page shows the same text.
         console.warn(
@@ -178,7 +147,7 @@ export default async function proxy(request: NextRequest) {
     // Null when the URL would not be on the backend's own origin.
     const targetUrl = backendTarget(
       BACKEND_URL,
-      pathname,
+      rawPath,
       request.nextUrl.search,
     );
     if (!targetUrl) {
@@ -283,6 +252,6 @@ export default async function proxy(request: NextRequest) {
   for (const { name, value } of access?.cookies ?? [])
     request.cookies.set(name, value);
   const response = reply(await updateSession(request));
-  response.headers.set("x-current-path", pathname);
+  response.headers.set("x-current-path", rawPath);
   return response;
 }

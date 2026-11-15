@@ -1,6 +1,6 @@
 "use client";
 
-import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { apiFetch, RateLimitError, failureMessage } from "@/lib/api-client";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import type { TracedSource } from "./format";
 import posthog from "posthog-js";
@@ -118,7 +118,10 @@ export function useExtractionPipeline(demo: {
         body: form,
         signal: abortRef.current.signal,
       });
-      if (!response.ok) throw new Error("Failed to process the report");
+      if (!response.ok)
+        throw new Error(
+          await failureMessage(response, "Failed to process the report"),
+        );
 
       let streamError: Error | null = null;
       await processSSEStream<ExtractionResult>(response, {

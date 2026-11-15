@@ -116,8 +116,11 @@ def main() -> int:
     elif blueprint.package.output_dir:
         # The blueprint may name a folder, but only one under its own folder: where
         # the PoC is written is the caller's choice (--output-dir), not the file's.
+        # The path is read as before (~ expanded, a relative path from the current
+        # folder): run_wizard.py saves the folder it was given, such as "case" for
+        # --blueprint case/use_case.blueprint.json.
         base = blueprint_path.parent.resolve()
-        output_dir = (base / blueprint.package.output_dir).resolve()
+        output_dir = Path(blueprint.package.output_dir).expanduser().resolve()
         if output_dir != base and base not in output_dir.parents:
             print(
                 f"ERROR: the blueprint's package.output_dir {blueprint.package.output_dir!r} "
@@ -165,16 +168,16 @@ Your PoC has been generated at: {poc_dir}
 
 To run it:
   1. Install dependencies:
-         pip install -r {poc_dir / 'requirements.txt'}
+         pip install -r {poc_dir / "requirements.txt"}
   2. Set up your environment:
-         cp {poc_dir / '.env.example'} {poc_dir / '.env'}
+         cp {poc_dir / ".env.example"} {poc_dir / ".env"}
          -- then open .env and fill in your API key
   3. Add a sample input file:
-         See {poc_dir / 'README.md'} for the expected input format
+         See {poc_dir / "README.md"} for the expected input format
   4. Run the pipeline:
-         python {poc_dir / 'run_poc.py'}
+         python {poc_dir / "run_poc.py"}
   5. Inspect the output:
-         Check {poc_dir / 'output'} for the generated result
+         Check {poc_dir / "output"} for the generated result
 
 When you are ready, paste the output here or describe what you see.
 The wizard will help you interpret the result and refine if needed (Gate 3).

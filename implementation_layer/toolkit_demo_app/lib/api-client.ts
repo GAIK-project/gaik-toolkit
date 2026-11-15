@@ -103,3 +103,20 @@ export async function apiFetch(
 
   return response;
 }
+
+/**
+ * Why a failed request failed, for the page to show: the backend's `detail` or the
+ * proxy's `error` (sign in, pending approval, a used-up trial), else `fallback`.
+ */
+export async function failureMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const body = (await response.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null;
+  if (typeof body?.detail === "string") return body.detail;
+  if (typeof body?.error === "string") return body.error;
+  return fallback;
+}

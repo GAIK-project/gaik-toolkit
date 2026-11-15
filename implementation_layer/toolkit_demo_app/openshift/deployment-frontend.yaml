@@ -32,9 +32,9 @@ spec:
                 secretKeyRef:
                   name: gaik-demo-admin
                   key: ADMIN_PASSWORD
-            # Optional team shortcut for the gated Solution Wizard
-            # (/solution-wizard?key=<secret>). Registered users can also get
-            # per-user wizard_access from /admin.
+            # Still read by the old wizard gate on /api/wizard in proxy.ts until
+            # that gate is removed. The /solution-wizard page itself is open and
+            # links to WIZARD_V2_URL (set with `oc set env`, read at run time).
             - name: WIZARD_ACCESS_SECRET
               valueFrom:
                 secretKeyRef:

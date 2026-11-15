@@ -1,14 +1,14 @@
-# A pull request that touches these paths asks @laguagu and @umairalipathan1980 for a
-# review. One of them is enough: whoever did not write the change reviews it.
+# A pull request that touches these paths asks @laguagu for a review. A pull request
+# that @laguagu opens asks nobody, since an author cannot review their own change.
 # Nothing is blocked: no branch rule requires a code owner's approval.
 
-/.github/                                      @laguagu @umairalipathan1980
-/pyproject.toml                                @laguagu @umairalipathan1980
-/release.py                                    @laguagu @umairalipathan1980
-/scripts/release_*.py                          @laguagu @umairalipathan1980
-/implementation_layer/src/gaik/                @laguagu @umairalipathan1980
-/implementation_layer/api/openshift/           @laguagu @umairalipathan1980
-/implementation_layer/toolkit_demo_app/proxy.ts           @laguagu @umairalipathan1980
-/implementation_layer/toolkit_demo_app/lib/api-access.ts  @laguagu @umairalipathan1980
-/implementation_layer/toolkit_demo_app/lib/trial.ts       @laguagu @umairalipathan1980
-/implementation_layer/toolkit_demo_app/openshift/         @laguagu @umairalipathan1980
+/.github/                                      @laguagu
+/pyproject.toml                                @laguagu
+/release.py                                    @laguagu
+/scripts/release_*.py                          @laguagu
+/implementation_layer/src/gaik/                @laguagu
+/implementation_layer/api/openshift/           @laguagu
+/implementation_layer/toolkit_demo_app/proxy.ts           @laguagu
+/implementation_layer/toolkit_demo_app/lib/api-access.ts  @laguagu
+/implementation_layer/toolkit_demo_app/lib/trial.ts       @laguagu
+/implementation_layer/toolkit_demo_app/openshift/         @laguagu
