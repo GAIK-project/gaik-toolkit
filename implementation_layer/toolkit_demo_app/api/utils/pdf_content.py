@@ -65,9 +65,11 @@ from array import array
 from collections.abc import Sequence
 
 #: Decoded bytes the check reads from one file in all. Images are not decoded;
-#: the text, fonts and object streams of a 20 MB document stay below this, and
-#: one check holds a few times it in memory at its peak.
-MAX_DECODED_BYTES = 64 * 1024 * 1024
+#: the text, fonts and object streams of a 20 MB text document stay far below
+#: this, and so do most vector drawings (path data compresses about 7:1). One
+#: check holds a few times its largest stream in memory at its peak, so this is
+#: half of the Solution Wizard's budget.
+MAX_DECODED_BYTES = 128 * 1024 * 1024
 #: Bytes the decoders written in Python read in all: LZW and RunLength input
 #: and PNG predictor rows (cross-reference streams; a few kilobytes in a
 #: normal file).
