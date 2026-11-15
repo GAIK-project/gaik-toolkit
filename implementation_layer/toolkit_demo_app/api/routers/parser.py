@@ -33,6 +33,11 @@ try:
 except ImportError:
     from api.utils.file_content import content_mismatch
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 
 
@@ -157,7 +162,7 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
                 if suffix != ".pdf":
                     raise HTTPException(
                         status_code=502,
-                        detail=f"HH Parser could not parse this {suffix} file: {exc}",
+                        detail=error_detail(exc, f"Parsing this {suffix} file with the HH Parser"),
                     ) from exc
                 parser = PyMuPDFParser()
                 result = parser.parse_document(tmp_path)
@@ -256,7 +261,7 @@ async def parse_document(
         # 400 (wrong file type, too many pages) into a 500.
         raise
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Parser not installed: {e}") from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "Loading the parser")) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
     finally:

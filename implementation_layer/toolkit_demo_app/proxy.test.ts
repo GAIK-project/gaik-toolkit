@@ -82,6 +82,8 @@ beforeAll(() => {
     if (url.startsWith(`${SUPABASE_URL}/rest/v1/access_requests`))
       return Response.json({ status: "approved", wizard_access: false });
     backendCalls += 1;
+    if (url.includes("/unreachable"))
+      throw new TypeError("fetch failed: connect ECONNREFUSED 10.1.2.3:8000");
     return Response.json({ ok: true });
   }) as typeof fetch;
 });
@@ -185,4 +187,17 @@ test("a visitor with their own model key is asked to sign in", async () => {
     });
   }
   expect(backendCalls).toBe(0);
+});
+
+test("an unreachable backend is reported with an id, not the connection error", async () => {
+  const response = await proxy(
+    new NextRequest("https://demo.test/api/unreachable", {
+      headers: { cookie: sessionCookie("r1", fresh()) },
+    }),
+  );
+  expect(response.status).toBe(502);
+  const { error } = await response.json();
+  expect(error).toContain("error id");
+  expect(error).not.toContain("ECONNREFUSED");
+  expect(error).not.toContain("10.1.2.3");
 });

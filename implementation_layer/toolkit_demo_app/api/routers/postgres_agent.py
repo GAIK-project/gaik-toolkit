@@ -14,6 +14,11 @@ import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 logger = logging.getLogger(__name__)
 
 
@@ -211,7 +216,6 @@ async def get_demo_schema():
     try:
         return await asyncio.to_thread(_run_schema, agent)
     except Exception as e:
-        logger.error("postgres_agent schema failed: %s", e)
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
 
@@ -226,7 +230,6 @@ async def ask_question(req: AskRequest):
     try:
         return await asyncio.to_thread(_run_ask, agent, question)
     except Exception as e:
-        logger.error("postgres_agent ask failed: %s", e)
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
 
@@ -240,7 +243,7 @@ def _resolve_agent():
     except ImportError as e:
         raise HTTPException(
             status_code=503,
-            detail=f"postgres_agent component is not available in this build: {e}",
+            detail=error_detail(e, "Loading the postgres_agent component"),
         ) from e
     if agent is None:
         raise HTTPException(
