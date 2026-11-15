@@ -110,14 +110,6 @@ def transcribe(
             r.raise_for_status()
 
         result = r.json()
-        segments = result.get("segments", [])
-
-        if not diarization:
-            plain_text = (result.get("text") or "").strip()
-            if not plain_text and segments:
-                plain_text = " ".join(
-                    seg.get("text", "").strip() for seg in segments if seg.get("text")
-                ).strip()
         elapsed_seconds = time.perf_counter() - start_time
         print(f"Time taken for transcription: {elapsed_seconds:.2f} seconds")
 

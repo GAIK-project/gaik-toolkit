@@ -327,15 +327,7 @@ class LLMJudge:
         system_prompt: str,
     ) -> tuple[str, int, int]:
         """Route a text-only call (no source images) to the right provider."""
-        if self.config is not None:
-            return self._call_shared(user_prompt, system_prompt)
-        provider_call = {
-            "openai": self._call_openai_text,
-            "azure": self._call_openai_text,
-            "anthropic": self._call_anthropic_text,
-            "google": self._call_google_text,
-        }[self.model_provider]
-        return provider_call(user_prompt, system_prompt)
+        return self._dispatch([], user_prompt, system_prompt)
 
     def _call_shared(
         self,
@@ -400,12 +392,13 @@ class LLMJudge:
             }
             for p in source_pages
         ]
+        # Without pages the prompt goes as plain text, as a text-only call.
+        content: str | list[dict] = user_prompt
+        if image_parts:
+            content = [{"type": "text", "text": user_prompt}, *image_parts]
         messages = [
             {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": user_prompt}, *image_parts],
-            },
+            {"role": "user", "content": content},
         ]
         kwargs: dict[str, Any] = {
             "model": self.model,
@@ -452,19 +445,14 @@ class LLMJudge:
             }
             for p in source_pages
         ]
+        content: str | list[dict] = user_prompt
+        if image_parts:
+            content = [*image_parts, {"type": "text", "text": user_prompt}]
         resp = client.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
             system=system_prompt,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        *image_parts,
-                        {"type": "text", "text": user_prompt},
-                    ],
-                }
-            ],
+            messages=[{"role": "user", "content": content}],
         )
         text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
         return text, resp.usage.input_tokens, resp.usage.output_tokens
@@ -501,107 +489,6 @@ class LLMJudge:
         resp = client.models.generate_content(
             model=self.model,
             contents=parts,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-                max_output_tokens=self.max_tokens,
-            ),
-        )
-        text = resp.text or ""
-        meta = getattr(resp, "usage_metadata", None)
-        return (
-            text,
-            getattr(meta, "prompt_token_count", 0) or 0,
-            getattr(meta, "candidates_token_count", 0) or 0,
-        )
-
-    # ── Text-only provider callers (no images) ────────────────────
-
-    def _call_openai_text(
-        self,
-        user_prompt: str,
-        system_prompt: str,
-    ) -> tuple[str, int, int]:
-        from gaik.software_components.parsers.multimodal_parser.config import (
-            create_openai_client,
-            get_openai_config,
-        )
-
-        config = get_openai_config(use_azure=self.use_azure)
-        client = create_openai_client(config)
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "max_completion_tokens": self.max_tokens,
-            "response_format": {"type": "json_object"},
-        }
-        if self.reasoning_effort:
-            kwargs["reasoning_effort"] = self.reasoning_effort
-
-        resp = client.chat.completions.create(
-            **normalize_chat_kwargs(self.model, kwargs, config=config)
-        )
-        text = resp.choices[0].message.content or ""
-        usage = resp.usage
-        return (
-            text,
-            getattr(usage, "prompt_tokens", 0) or 0,
-            getattr(usage, "completion_tokens", 0) or 0,
-        )
-
-    def _call_anthropic_text(
-        self,
-        user_prompt: str,
-        system_prompt: str,
-    ) -> tuple[str, int, int]:
-        from gaik.software_components.parsers.multimodal_parser.config import (
-            create_claude_client,
-            get_claude_config,
-        )
-
-        config = get_claude_config(use_azure=self.use_azure)
-        client = create_claude_client(config)
-        resp = client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
-        return text, resp.usage.input_tokens, resp.usage.output_tokens
-
-    def _call_google_text(
-        self,
-        user_prompt: str,
-        system_prompt: str,
-    ) -> tuple[str, int, int]:
-        from google import genai
-        from google.genai import types
-
-        if self.use_vertexai:
-            client = genai.Client(
-                vertexai=True,
-                project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
-                location=os.environ.get("GOOGLE_VERTEXAI_LOCATION", "global"),
-            )
-        else:
-            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                raise RuntimeError(
-                    "No Google credentials. Set GOOGLE_VERTEXAI_PROJECT (+ "
-                    "GOOGLE_APPLICATION_CREDENTIALS) and use_vertexai=True, "
-                    "or set GOOGLE_GEMINI_API_KEY."
-                )
-            client = genai.Client(api_key=api_key)
-
-        resp = client.models.generate_content(
-            model=self.model,
-            contents=[user_prompt],
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 response_mime_type="application/json",

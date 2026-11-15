@@ -20,14 +20,16 @@ import threading
 from types import SimpleNamespace
 from typing import Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.report_runs import require_report_run_grant
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -124,7 +126,7 @@ def _normalized_sources(files: dict[str, str]):
         raise HTTPException(400, f"Invalid normalized/sources.json: {exc}") from exc
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
     """Curate the sections. Returns a Server-Sent Events stream.
 

@@ -114,7 +114,8 @@ result = transcriber.transcribe(
 
 Remote transcription requests omit `prompt` by default. Set `default_prompt` or pass
 `custom_context` when transcript context is needed; for `whisper_local`, use
-`initial_prompt` instead.
+`initial_prompt` instead. A long recording is sent in chunks: every chunk request
+carries that context, followed by the end of the previous chunk's transcript.
 
 ### TranscriptionResult
 

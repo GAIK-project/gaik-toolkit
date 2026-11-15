@@ -95,8 +95,21 @@ class SectionKnowledge(BaseModel):
 
 def quote_in_text(quote: str, text: str) -> bool:
     """True if ``quote`` occurs in ``text`` verbatim, ignoring differences in whitespace."""
-    squashed = " ".join(quote.split())
-    return bool(squashed) and squashed in " ".join(text.split())
+    return _quote_in_squashed(quote, _squash(text))
+
+
+def _squash(text: str) -> str:
+    """``text`` with every run of whitespace turned into one space."""
+    return " ".join(text.split())
+
+
+def _quote_in_squashed(quote: str, squashed_text: str) -> bool:
+    """:func:`quote_in_text` against a source already passed through :func:`_squash`.
+
+    A caller that checks many quotes against the same sources squashes each source once.
+    """
+    squashed = _squash(quote)
+    return bool(squashed) and squashed in squashed_text
 
 
 class DroppedUnit(BaseModel):
@@ -136,12 +149,12 @@ class KnowledgeBase(BaseModel):
 
         An empty list means every quote was found verbatim.
         """
-        texts = {s.file: s.text for s in sources.sources}
+        texts = {s.file: _squash(s.text) for s in sources.sources}
         return [
             unit
             for section in self.sections
             for unit in section.units
-            if not quote_in_text(unit.quote, texts.get(unit.source.file, ""))
+            if not _quote_in_squashed(unit.quote, texts.get(unit.source.file, ""))
         ]
 
     def save(self, directory: str | Path) -> dict[str, Path]:

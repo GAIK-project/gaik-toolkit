@@ -350,6 +350,7 @@ def test_the_report_writer_refuses_an_unsafe_upload_without_writing_it(
 
     monkeypatch.delenv("DEMO_MALWARE_SCANNER", raising=False)
     monkeypatch.delenv("DEMO_MALWARE_SCAN", raising=False)
+    monkeypatch.delenv("REPORT_RUN_TOKEN", raising=False)
     started: list[bool] = []
     monkeypatch.setattr(report_writer, "_run_options", lambda *a: started.append(True))
     run_dir = tmp_path / "run"

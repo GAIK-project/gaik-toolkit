@@ -162,9 +162,11 @@ result = transcriber.transcribe(
 ```
 
 Remote transcription requests omit the prompt parameter by default. Set default_prompt or
-pass custom_context when you need to provide context in the language spoken in the audio.
-After each successful chunk, its transcript is sent as context for the next chunk.
-initial_prompt applies only to local Whisper transcription.
+pass custom_context when you need to provide context in the language spoken in the audio,
+such as names and terms: the model reads the prompt as text that precedes the audio, not
+as instructions. A long recording is sent in chunks, and every chunk request carries that
+context; after a successful chunk, the next request adds the end of its transcript after
+the context. initial_prompt applies only to local Whisper transcription.
 
 ## Environment Variables
 

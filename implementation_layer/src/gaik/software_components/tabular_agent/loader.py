@@ -429,7 +429,8 @@ def _looks_messy(grid: list[list[Any]], header_row: int | None) -> bool:
 
     shapes: dict[tuple[bool, ...], int] = {}
     for row in body:
-        shapes[_row_shape(row, width)] = shapes.get(_row_shape(row, width), 0) + 1
+        shape = _row_shape(row, width)
+        shapes[shape] = shapes.get(shape, 0) + 1
     dominant = max(shapes.values())
     return (len(body) - dominant) / len(body) > _SHAPE_DEVIATION_LIMIT
 
@@ -574,12 +575,13 @@ _DOMINANT_SHARE_MIN = 0.6
 def _numeric_columns(rows: list[list[Any]], dominant: tuple[bool, ...]) -> set[int]:
     """Indices of columns that hold numbers in the sheet's normal data rows."""
     width = len(dominant)
+    # The normal rows are the same for every column, so find them once.
+    normal = [r for r in rows if _row_shape(r, width) == dominant]
     numeric: set[int] = set()
     for i in range(width):
         if not dominant[i]:
             continue
-        values = [_at(r, i) for r in rows if _row_shape(r, width) == dominant]
-        values = [v for v in values if not _is_blank(v)]
+        values = [v for v in (_at(r, i) for r in normal) if not _is_blank(v)]
         if values and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
             numeric.add(i)
     return numeric
@@ -608,9 +610,9 @@ def _drop_shape_outliers(rows: list[list[Any]]) -> list[list[Any]]:
     if not rows:
         return rows
     width = max(len(r) for r in rows)
+    row_shapes = [_row_shape(row, width) for row in rows]
     shapes: dict[tuple[bool, ...], int] = {}
-    for row in rows:
-        shape = _row_shape(row, width)
+    for shape in row_shapes:
         shapes[shape] = shapes.get(shape, 0) + 1
     dominant, count = max(shapes.items(), key=lambda kv: kv[1])
     if count / len(rows) < _DOMINANT_SHARE_MIN:
@@ -622,8 +624,7 @@ def _drop_shape_outliers(rows: list[list[Any]]) -> list[list[Any]]:
     numeric = _numeric_columns(rows, dominant)
 
     kept: list[list[Any]] = []
-    for row in rows:
-        shape = _row_shape(row, width)
+    for row, shape in zip(rows, row_shapes, strict=True):
         if shape != dominant and all(d for s, d in zip(shape, dominant) if s):
             missing = {i for i in range(width) if dominant[i] and not shape[i]}
             is_sparse = sum(shape) <= _SPARSE_FILL_RATIO * dominant_filled
