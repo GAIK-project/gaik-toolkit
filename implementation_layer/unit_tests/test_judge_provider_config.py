@@ -90,7 +90,7 @@ def test_legacy_astra_invalid_reasoning_fails_before_http(monkeypatch):
         model_provider="openai", use_azure=False, model="gpt-6-astra", reasoning_effort="none"
     )
     with pytest.raises(ValueError, match="reasoning_effort"):
-        judge._call_openai_text("Evaluate this", "Be accurate")
+        judge._dispatch_text("Evaluate this", "Be accurate")
 
 
 def test_additional_provider_uses_shared_environment_loader(monkeypatch):

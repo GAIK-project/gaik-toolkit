@@ -22,6 +22,7 @@ from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
+from .srt_utils import format_timestamp
 from .whisper_local import transcribe as whisper_local_transcribe
 
 DEFAULT_PROMPT = (
@@ -581,9 +582,3 @@ def split_and_transcribe(
         max_duration_seconds=max_duration_seconds,
         audio=audio,
     )
-
-
-def format_timestamp(seconds):
-    minutes = int(seconds // 60)
-    seconds = int(seconds % 60)
-    return f"{minutes:02d}:{seconds:02d}"

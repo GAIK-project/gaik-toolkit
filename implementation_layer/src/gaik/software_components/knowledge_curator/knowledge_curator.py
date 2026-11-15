@@ -26,8 +26,9 @@ from .models import (
     SectionKnowledge,
     SectionSpec,
     SourceRef,
+    _quote_in_squashed,
+    _squash,
     check_sections,
-    quote_in_text,
 )
 from .prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
 
@@ -86,7 +87,7 @@ def _failing_units(
     answer: CurationResponse, sources: NormalizedSources
 ) -> list[tuple[int, str, str]]:
     """``(position, reason, message)`` of every unit whose quote fails the check."""
-    texts = {s.file: s.text for s in sources.sources}
+    texts = {s.file: _squash(s.text) for s in sources.sources}
     failures = []
     for n, unit in enumerate(answer.units, start=1):
         if unit.source.file not in texts:
@@ -97,7 +98,7 @@ def _failing_units(
                     f'unit {n}: file "{unit.source.file}" is not a source; quote "{unit.quote}"',
                 )
             )
-        elif not quote_in_text(unit.quote, texts[unit.source.file]):
+        elif not _quote_in_squashed(unit.quote, texts[unit.source.file]):
             failures.append(
                 (
                     n,

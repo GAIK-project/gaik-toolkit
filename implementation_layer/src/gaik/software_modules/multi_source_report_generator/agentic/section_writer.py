@@ -12,18 +12,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+from ..models import _slug
 from .prompts import SECTION_WRITER_SYSTEM_PROMPT, build_curation_prompt, build_section_user_prompt
 from .reviewer import review_and_polish
 from .state import SectionWriterState
-
-
-def _slug(text: str, *, max_len: int = 40) -> str:
-    keep = [c.lower() if c.isalnum() else "_" for c in text.strip()]
-    s = "".join(keep)
-    while "__" in s:
-        s = s.replace("__", "_")
-    return s.strip("_")[:max_len] or "section"
-
 
 # Characters a file name cannot hold on every platform, and "%" itself.
 _NOT_IN_A_FILE_NAME = re.compile(r'[<>:"/\\|?*%\x00-\x1f]')

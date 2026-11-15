@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 import re
 import time
+import types
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -1634,17 +1635,8 @@ def decimal_field_repr(annotation) -> str | None:
         return "DecimalField"
 
     args: tuple = ()
-    origin = get_origin(annotation)
-    if origin is Union:
+    if get_origin(annotation) in (Union, types.UnionType):
         args = get_args(annotation)
-    else:
-        try:
-            import types as _types
-
-            if isinstance(annotation, _types.UnionType):
-                args = get_args(annotation)
-        except AttributeError:
-            pass
 
     if Decimal in args and type(None) in args:
         return "OptionalDecimalField"

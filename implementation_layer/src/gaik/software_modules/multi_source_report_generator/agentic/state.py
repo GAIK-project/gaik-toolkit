@@ -39,7 +39,6 @@ class ReportState(TypedDict, total=False):
 
 
 class SectionWriterState(TypedDict, total=False):
-    index: int
     section_id: str
     title: str
     instructions: str

@@ -33,6 +33,7 @@ from .models import (
     GeneratedSection,
     ReportGenerationResult,
     ReportSectionSpec,
+    _slug,
 )
 
 # LLM path (monkeypatchable in tests). Imported defensively so the module can be
@@ -127,14 +128,6 @@ when they communicate the same meaning.
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _slug(text: str, *, max_len: int = 40) -> str:
-    keep = [c.lower() if c.isalnum() else "_" for c in text.strip()]
-    s = "".join(keep)
-    while "__" in s:
-        s = s.replace("__", "_")
-    return s.strip("_")[:max_len] or "section"
 
 
 def _normalize_sections(
@@ -529,7 +522,6 @@ class MultiSourceReportGenerator:
         if agentic:
             markdown, generated, usage_total = self._run_agentic(
                 specs=specs,
-                evidence_items=evidence_items,
                 evidence_pack=evidence_pack,
                 sample_markdown=sample_markdown,
                 output_dir=output_dir,
@@ -675,7 +667,6 @@ class MultiSourceReportGenerator:
         self,
         *,
         specs: list[ReportSectionSpec],
-        evidence_items: list[EvidenceItem],
         evidence_pack: str,
         sample_markdown: str | None,
         output_dir: str | Path | None,
@@ -726,7 +717,6 @@ class MultiSourceReportGenerator:
 
         markdown, generated, usage_total = run_agentic_report(
             specs=specs,
-            evidence_items=evidence_items,
             evidence_pack=evidence_pack,
             matched_samples=matched_samples,
             report_description=report_description,
