@@ -79,28 +79,23 @@ oc apply -f networkpolicy-api.yaml
 
 ## Network policy and pod hardening
 
-`networkpolicy-api.yaml` lets only the frontend pods reach the API on port 8000
-(`gaik-demo` to `gaik-demo-api`, and `gaik-demo-staging` to `gaik-demo-api-staging`).
-`proxy.ts` is the only sign-in, approval and trial gate in front of the API, so no other
-pod in the project should reach the API directly. The kubelet's health probes are not
-affected, and the API has no route of its own.
+`networkpolicy-api.yaml` states the intended rule: only the frontend pods reach the API
+on port 8000 (`gaik-demo` to `gaik-demo-api`, and `gaik-demo-staging` to
+`gaik-demo-api-staging`). `proxy.ts` is the only sign-in, approval and trial gate in
+front of the API, so no other pod in the project should reach the API directly. The
+kubelet's health probes are not affected, and the API has no route of its own. The
+selectors match the live pod labels.
 
-Apply the policy file on its own. Never `oc apply` the deployment manifests to a
-running environment: the live deployments carry env vars these files lack.
+**The policy takes effect only when the shared namespace policy is changed.**
+NetworkPolicies add up, and the `gaik` project has `deny-other-namespaces-access`,
+which selects every pod (`podSelector: {}`) and admits every pod in the namespace
+(`from: [{podSelector: {}}]`), next to `allow-from-router` for the router. While that
+policy admits every pod, any pod in the project can still reach the API, with or
+without this file. Changing the shared policy is the project owner's decision; until
+then this file only states the rule.
 
-```bash
-# 1. See what is already there. NetworkPolicies add up: any policy that also selects
-#    the API pods and admits more (an empty rule `ingress: [{}]`, a `from` with
-#    `podSelector: {}` or `namespaceSelector: {}`) still lets other pods in, and the
-#    new policy then changes nothing.
-oc get networkpolicy -n gaik -o yaml
-
-# 2. Check the labels the policy selects on.
-oc get pods -n gaik -L app
-```
-
-If such a policy exists, keep it for the other pods and take the API pods out of its
-`podSelector`, for example:
+When that policy is narrowed, it would keep the other pods and leave the API pods out,
+for example:
 
 ```yaml
 spec:
@@ -111,56 +106,39 @@ spec:
         values: [gaik-demo-api, gaik-demo-api-staging]
 ```
 
+Apply the policy file on its own. Never `oc apply` the deployment manifests to a
+running environment: the live deployments carry env vars these files lack.
+
 ```bash
-# 3. Apply the policy.
+oc get networkpolicy -n gaik -o yaml        # what is there now
 oc apply -f networkpolicy-api.yaml -n gaik
 
-# 4. Check: each frontend still reaches its API, another pod does not.
+# Check: each frontend still reaches its API ...
 oc exec -n gaik deployment/gaik-demo -- \
   bun -e "fetch('http://gaik-demo-api:8000/health').then(r => console.log(r.status))"
 oc exec -n gaik deployment/gaik-demo-staging -- \
   bun -e "fetch('http://gaik-demo-api-staging:8000/health').then(r => console.log(r.status))"
+# ... and, once the shared policy no longer admits every pod, another pod does not
+# (this times out then):
 oc run np-check -n gaik --rm -i --restart=Never --image=curlimages/curl:8.11.1 -- \
   curl -s -m 5 -o /dev/null -w '%{http_code}\n' http://gaik-demo-api:8000/health
-# The last command times out once the policy is in force.
 ```
 
 Roll back with `oc delete networkpolicy gaik-demo-api-from-frontend gaik-demo-api-staging-from-frontend -n gaik`.
 
-The deployment manifests state the pod hardening: no privilege escalation, all Linux
-capabilities dropped, a non-root user and the runtime's default seccomp profile.
-OpenShift's `restricted-v2` SCC may already enforce these; see which SCC the pods run
-under with `oc get pods -n gaik -o custom-columns=NAME:.metadata.name,SCC:.metadata.annotations.openshift\.io/scc`.
-The root filesystem stays writable in both: the API writes model caches, uploads and
-generated files, and Next.js writes its cache under `/app/.next/cache`. Add the same
-settings to a running deployment with `oc patch`, which merges containers by name and
-keeps the env vars. The loop reads each deployment's container name, which may differ
-from the deployment name on staging:
+The deployment manifests state the container hardening: no privilege escalation, all
+Linux capabilities dropped and a non-root user. On Rahti the project's SCC already
+applies these to every pod, with Rahti's own seccomp profile, so nothing needs to be
+patched on the live deployments, and the manifests name no seccomp profile that could
+replace Rahti's. The settings are written down for other clusters. Check what a pod
+runs with:
 
 ```bash
-for d in gaik-demo-api gaik-demo gaik-demo-api-staging gaik-demo-staging; do
-  c=$(oc get deployment/$d -n gaik -o jsonpath='{.spec.template.spec.containers[0].name}')
-  oc patch deployment/$d -n gaik --type=strategic -p "{
-    \"spec\": {\"template\": {\"spec\": {
-      \"securityContext\": {\"runAsNonRoot\": true,
-        \"seccompProfile\": {\"type\": \"RuntimeDefault\"}},
-      \"containers\": [{\"name\": \"$c\", \"securityContext\": {
-        \"allowPrivilegeEscalation\": false,
-        \"capabilities\": {\"drop\": [\"ALL\"]}}}]}}}}"
-  oc rollout status deployment/$d -n gaik --timeout=240s
-done
+oc get pods -n gaik -o custom-columns=NAME:.metadata.name,SCC:.metadata.annotations.openshift\.io/scc
 ```
 
-To take the settings off again, remove them with a JSON patch rather than
-`oc rollout undo`, which on these image-triggered deployments can bring back an older
-image:
-
-```bash
-oc patch deployment/<name> -n gaik --type=json -p '[
-  {"op": "remove", "path": "/spec/template/spec/securityContext/runAsNonRoot"},
-  {"op": "remove", "path": "/spec/template/spec/securityContext/seccompProfile"},
-  {"op": "remove", "path": "/spec/template/spec/containers/0/securityContext"}]'
-```
+The root filesystem stays writable: the API writes model caches, uploads and generated
+files, and Next.js writes its cache under `/app/.next/cache`.
 
 ## Build & Push Images
 

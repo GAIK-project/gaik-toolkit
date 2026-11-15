@@ -6,10 +6,11 @@
 # API directly. The staging pair gets the same rule. Health probes come from the
 # kubelet on the node and are not affected; the API has no route of its own.
 #
-# NetworkPolicies add up: if the project also has a policy that admits every pod
-# in the namespace (podSelector: {}), that policy still lets other pods in. Check
-# with `oc get networkpolicy -n gaik` before relying on this file; see README.md,
-# "Network policy and pod hardening".
+# NetworkPolicies add up. The gaik project's shared policy
+# deny-other-namespaces-access lets every pod in the namespace reach every pod, so
+# this file narrows nothing until that policy is changed to leave the API pods
+# out, which is the project owner's decision. Until then the file states the
+# intended rule. See README.md, "Network policy and pod hardening".
 #
 # Apply this file on its own:
 #
