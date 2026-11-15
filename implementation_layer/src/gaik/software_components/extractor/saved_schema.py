@@ -206,7 +206,18 @@ def _encode_default(value: Any) -> Any:
 def _describe_one(model: type[BaseModel], collect) -> dict:
     fields = []
     for name, info in model.model_fields.items():
-        if info.alias or info.title or info.examples or info.json_schema_extra:
+        if (
+            info.alias
+            or info.validation_alias
+            or info.serialization_alias
+            or info.title
+            or info.examples
+            or info.json_schema_extra
+            or info.discriminator
+            or info.frozen
+            or info.validate_default
+            or info.exclude
+        ):
             raise SavedSchemaError(f"Field {name!r} has options that cannot be saved as data")
         type_node = _describe_type(info.annotation, collect)
         is_decimal = decimal_field_repr(info.annotation) is not None
@@ -229,6 +240,34 @@ def _describe_one(model: type[BaseModel], collect) -> dict:
             entry["default"] = _encode_default(info.default)
         fields.append(entry)
 
+    # Validators, serializers, computed fields, model_post_init and config
+    # options other than "extra" change what the model gives back without
+    # showing in its JSON schema, and the rebuilt model would not have them.
+    decorators = model.__pydantic_decorators__
+    if any(
+        (
+            decorators.validators,
+            decorators.field_validators,
+            decorators.root_validators,
+            decorators.field_serializers,
+            decorators.model_serializers,
+            decorators.model_validators,
+            decorators.computed_fields,
+        )
+    ):
+        raise SavedSchemaError(
+            f"Model {model.__name__!r} has validators or serializers that cannot be saved as data"
+        )
+    if getattr(model, "__pydantic_post_init__", None):
+        raise SavedSchemaError(
+            f"Model {model.__name__!r} has a model_post_init that cannot be saved as data"
+        )
+    other_config = {k: v for k, v in model.model_config.items() if k not in ("extra", "title")}
+    if other_config or model.model_config.get("title") not in (None, model.__name__):
+        raise SavedSchemaError(
+            f"Model {model.__name__!r} has config options that cannot be saved as data: "
+            f"{sorted(model.model_config)}"
+        )
     extra = model.model_config.get("extra")
     return {
         "name": model.__name__,
@@ -306,6 +345,14 @@ def _dependency_order(models: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+class _Built:
+    """The models and enums rebuilt so far, kept apart so neither stands in for the other."""
+
+    def __init__(self) -> None:
+        self.models: dict[str, type[BaseModel]] = {}
+        self.enums: dict[str, type[Enum]] = {}
+
+
 def _expect_keys(node: dict, allowed: set[str], where: str) -> None:
     if not isinstance(node, dict):
         raise SavedSchemaError(f"{where} must be an object")
@@ -314,7 +361,7 @@ def _expect_keys(node: dict, allowed: set[str], where: str) -> None:
         raise SavedSchemaError(f"{where} has unknown keys {sorted(unknown)}")
 
 
-def _build_type(node: Any, built: dict[str, type[BaseModel]], depth: int = 0) -> Any:
+def _build_type(node: Any, built: _Built, depth: int = 0) -> Any:
     if depth > _MAX_TYPE_DEPTH:
         raise SavedSchemaError("Type is nested too deeply")
     if not isinstance(node, dict) or not isinstance(node.get("type"), str):
@@ -357,13 +404,13 @@ def _build_type(node: Any, built: dict[str, type[BaseModel]], depth: int = 0) ->
     if kind == "model":
         _expect_keys(node, {"type", "name"}, "model type")
         name = node.get("name")
-        if name not in built:
+        if not isinstance(name, str) or name not in built.models:
             raise SavedSchemaError(f"Model {name!r} is used before it is described")
-        return built[name]
+        return built.models[name]
     raise SavedSchemaError(f"Unknown type {kind!r}")
 
 
-def _build_enum(node: dict, built: dict[str, Any]) -> type[Enum]:
+def _build_enum(node: dict, built: _Built) -> type[Enum]:
     _expect_keys(node, {"type", "name", "doc", "mixin", "members"}, "enum type")
     name = _check_name(node.get("name"), "Enum name")
     doc = node.get("doc")
@@ -384,9 +431,8 @@ def _build_enum(node: dict, built: dict[str, Any]) -> type[Enum]:
             raise SavedSchemaError(f"enum value {member[1]!r} is not allowed")
         pairs.append((member_name, member[1]))
 
-    key = f"enum:{name}"  # ':' cannot appear in a model name, so no clash
-    if key in built:
-        existing = built[key]
+    if name in built.enums:
+        existing = built.enums[name]
         if [(m.name, m.value) for m in existing] != pairs:
             raise SavedSchemaError(f"Enum {name!r} is described twice with different members")
         return existing
@@ -394,8 +440,12 @@ def _build_enum(node: dict, built: dict[str, Any]) -> type[Enum]:
         enum_cls = Enum(name, pairs, type=_SCALARS[mixin] if mixin else None)
     except Exception as exc:
         raise SavedSchemaError(f"Enum {name!r} could not be rebuilt: {exc}") from exc
+    # Python's Enum leaves out or merges some members without an error (a
+    # private name such as _Status__x, a value given twice); refuse that.
+    if [(m.name, m.value) for m in enum_cls] != pairs:
+        raise SavedSchemaError(f"Enum {name!r} does not rebuild with the members described")
     enum_cls.__doc__ = doc
-    built[key] = enum_cls
+    built.enums[name] = enum_cls
     return enum_cls
 
 
@@ -451,7 +501,7 @@ def _check_enum_member(name: Any) -> str:
     return name
 
 
-def _build_one(spec: dict, built: dict[str, type[BaseModel]]) -> type[BaseModel]:
+def _build_one(spec: dict, built: _Built) -> type[BaseModel]:
     _expect_keys(spec, {"name", "doc", "extra", "fields"}, "model")
     name = _check_name(spec.get("name"), "Model name")
     if keyword.iskeyword(name):
@@ -508,17 +558,16 @@ def build_model(description: dict) -> type[BaseModel]:
     if not isinstance(models, list) or not models:
         raise SavedSchemaError("models must be a non-empty list")
 
-    built: dict[str, type[BaseModel]] = {}
+    built = _Built()
     for spec in models:
         model = _build_one(spec, built)
-        if model.__name__ in built:
+        if model.__name__ in built.models:
             raise SavedSchemaError(f"Model {model.__name__!r} is described twice")
-        built[model.__name__] = model
+        built.models[model.__name__] = model
     root = description.get("root")
-    # built also holds the rebuilt enums ("enum:<name>"); the root must be a model.
-    if not (isinstance(root, str) and _is_model(built.get(root))):
+    if not isinstance(root, str) or root not in built.models:
         raise SavedSchemaError(f"Root model {root!r} is not described")
-    return built[root]
+    return built.models[root]
 
 
 # ---------------------------------------------------------------------------
@@ -629,7 +678,11 @@ def load_saved_model(
         write_model_file(model, model_path)
     except (OSError, SavedSchemaError):
         pass
-    print(f"Rebuilt saved schema {model_name!r} from its requirements")
+    print(
+        f"Rebuilt saved schema {model_name!r} in {model_path.parent} from its requirements "
+        f"and saved it as {model_path.name}; edits made only in the folder's .py file "
+        "are not in it."
+    )
     return model
 
 

@@ -7,8 +7,10 @@ SKILL.md edits output_schema.py, run this so the model file holds the same
 corrections; otherwise the PoC runs on the schema from before them.
 
 The class is the one named "model_name" in output_schema_requirements.json. The
-script imports output_schema.py, the wizard's own file in this workspace, and
-refuses a model the saved format cannot describe (exit code 1, nothing written).
+script imports output_schema.py: the file the wizard wrote and edited in this PoC
+workspace, next to the run_poc.py the wizard runs. Do not point it at a schemas
+folder from elsewhere. It refuses a model the saved format cannot describe (exit
+code 1, nothing written).
 
 Usage:
     python scripts/refresh_schema_model.py --schemas-dir poc/schemas
@@ -26,7 +28,6 @@ from pathlib import Path
 def refresh(schemas_dir: Path) -> Path:
     from gaik.software_components.extractor.saved_schema import (
         SavedSchemaError,
-        read_model_file,
         write_model_file,
     )
 
@@ -47,10 +48,10 @@ def refresh(schemas_dir: Path) -> Path:
         )
 
     # Written next to the old file first, so a refused model leaves it as it was.
+    # write_model_file() refuses a model whose description does not rebuild it.
     tmp_path = model_path.with_suffix(".json.tmp")
     try:
         write_model_file(model, tmp_path)
-        read_model_file(tmp_path)
         tmp_path.replace(model_path)
     finally:
         tmp_path.unlink(missing_ok=True)

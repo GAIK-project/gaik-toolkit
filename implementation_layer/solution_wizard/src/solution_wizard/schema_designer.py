@@ -212,6 +212,24 @@ def _safe_enum_member(v: str) -> str:
     return s.upper() or "UNKNOWN"
 
 
+def _enum_members(values: list[str]) -> list[tuple[str, str]]:
+    """(member name, value) per distinct allowed value, each name used once.
+
+    Two values can give the same name ("a b" and "a-b" both give A_B); the later
+    one gets a number, so neither value is lost from the Enum.
+    """
+    members: list[tuple[str, str]] = []
+    used: set[str] = set()
+    for value in dict.fromkeys(values):
+        base = _safe_enum_member(value)
+        name, n = base, 2
+        while name in used:
+            name, n = f"{base}_{n}", n + 1
+        used.add(name)
+        members.append((name, value))
+    return members
+
+
 def _enum_name(field: str) -> str:
     return "".join(w.title() for w in field.split("_")) + "Enum"
 
@@ -262,7 +280,7 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
         vals = allowed_values.get(field, [])
         if vals and all(isinstance(v, str) for v in vals):
             enum_name = _enum_name(field)
-            members = "\n".join(f"    {_safe_enum_member(v)} = {v!r}" for v in vals)
+            members = "\n".join(f"    {m} = {v!r}" for m, v in _enum_members(vals))
             enum_blocks.append(f"class {enum_name}(str, Enum):\n{members}\n")
 
     field_lines = []
@@ -474,7 +492,7 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
         py_type = _py_type(field_types.get(field, "string"))
         vals = allowed_values.get(field, [])
         if vals and all(isinstance(v, str) for v in vals):
-            kind: Any = Enum(_enum_name(field), {_safe_enum_member(v): v for v in vals}, type=str)
+            kind: Any = Enum(_enum_name(field), _enum_members(vals), type=str)
         elif py_type == "Decimal":
             kind = decimal_field if required else optional_decimal_field
         else:
@@ -545,12 +563,15 @@ def write_schema_files(
     except Exception:
         pass
 
+    model_path = schemas_dir / "output_schema_model.json"
     if model_description is not None:
-        model_path = schemas_dir / "output_schema_model.json"
         model_path.write_text(
             json.dumps(model_description, indent=2, ensure_ascii=False), encoding="utf-8"
         )
         results["output_schema_model.json"] = model_path
+    else:
+        # A model file from an earlier run would no longer match the new files.
+        model_path.unlink(missing_ok=True)
 
     # output_schema_requirements.json -- the file load_schema() reads:
     #   load_schema(schema_dir, "output_schema") => schema_dir / "output_schema_requirements.json"

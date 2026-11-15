@@ -262,6 +262,41 @@ def test_an_allowed_value_that_becomes_an_underscore_name_is_saved_as_data(tmp_p
     assert not any(m.name.startswith("_") for m in enum_cls)
 
 
+def test_allowed_values_that_give_the_same_member_name_are_all_kept(tmp_path):
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    from gaik.software_components.extractor.saved_schema import read_model_file
+
+    spec = {
+        "schema_name": "Test",
+        "fields": ["status"],
+        "required_fields": ["status"],
+        "allowed_values": {"status": ["a b", "a-b", "a_b", "a b"]},
+    }
+    write_schema_files(spec, "Test", tmp_path, "test_uc")
+
+    schemas = tmp_path / "schemas"
+    model = read_model_file(schemas / "output_schema_model.json")
+    saved = [(m.name, m.value) for m in model.model_fields["status"].annotation]
+    assert saved == [("A_B", "a b"), ("A_B_2", "a-b"), ("A_B_3", "a_b")]
+    namespace: dict = {}
+    exec(compile((schemas / "output_schema.py").read_text(), "output_schema.py", "exec"), namespace)
+    assert [(m.name, m.value) for m in namespace["StatusEnum"]] == saved
+
+
+def test_without_the_saved_format_an_earlier_model_file_is_removed(tmp_path, monkeypatch):
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    write_schema_files(SPEC_MINIMAL, "SimpleOutput", tmp_path, "test_uc")
+    model_path = tmp_path / "schemas" / "output_schema_model.json"
+    assert model_path.exists()
+
+    # An older gaik has no saved_schema module: importing it fails.
+    monkeypatch.setitem(sys.modules, "gaik.software_components.extractor.saved_schema", None)
+    written = write_schema_files(SPEC_FULL, "MaintenanceTicket", tmp_path, "test_uc")
+
+    assert not model_path.exists()
+    assert "output_schema_model.json" not in written
+
+
 def test_a_designed_schema_the_saved_format_refuses_leaves_the_folder_as_it_was(
     tmp_path, monkeypatch
 ):

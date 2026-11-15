@@ -260,3 +260,21 @@ def test_a_schema_the_saved_format_refuses_writes_no_schema_file(
     assert status == 1
     assert "cannot be saved as data" in capsys.readouterr().err
     assert list(schema_dir.iterdir()) == []
+
+
+def test_without_the_saved_format_an_earlier_model_file_is_removed(
+    cli, fake_generator, monkeypatch, tmp_path
+):
+    monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
+    schema_dir = tmp_path / "poc" / "schemas"
+    schema_dir.mkdir(parents=True)
+    model_path = schema_dir / "output_schema_model.json"
+    model_path.write_text("{}", encoding="utf-8")
+
+    # An older gaik has no saved_schema module: importing it fails.
+    monkeypatch.setitem(sys.modules, "gaik.software_components.extractor.saved_schema", None)
+    status, _, _ = invoke(cli, monkeypatch, tmp_path, ["--provider", "openai"])
+
+    assert status == 0
+    assert (schema_dir / "output_schema.py").exists()
+    assert not model_path.exists()

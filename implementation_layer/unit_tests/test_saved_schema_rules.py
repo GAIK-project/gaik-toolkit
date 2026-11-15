@@ -242,3 +242,84 @@ def test_a_root_that_names_an_enum_instead_of_a_model_is_refused():
 
     with pytest.raises(SavedSchemaError, match="Root model"):
         build_model(description)
+
+
+def test_a_model_with_a_validator_is_not_saved_as_data():
+    from pydantic import field_validator
+
+    class Ticket(BaseModel):
+        title: str
+
+        @field_validator("title")
+        @classmethod
+        def upper(cls, value: str) -> str:
+            return value.upper()
+
+    with pytest.raises(SavedSchemaError, match="validators"):
+        describe_model(Ticket)
+
+
+def test_a_model_with_a_config_option_other_than_extra_is_not_saved_as_data():
+    from pydantic import ConfigDict
+
+    class Ticket(BaseModel):
+        model_config = ConfigDict(str_strip_whitespace=True)
+        title: str
+
+    with pytest.raises(SavedSchemaError, match="config options"):
+        describe_model(Ticket)
+
+
+def test_a_model_with_model_post_init_is_not_saved_as_data():
+    class Ticket(BaseModel):
+        title: str
+
+        def model_post_init(self, context) -> None:
+            self.title = self.title.strip()
+
+    with pytest.raises(SavedSchemaError, match="model_post_init"):
+        describe_model(Ticket)
+
+
+def test_a_frozen_field_is_not_saved_as_data():
+    class Ticket(BaseModel):
+        title: str = Field(frozen=True)
+
+    with pytest.raises(SavedSchemaError, match="options"):
+        describe_model(Ticket)
+
+
+_STATUS_ENUM = {
+    "type": "enum",
+    "name": "Status",
+    "doc": None,
+    "mixin": "str",
+    "members": [["OPEN", "open"]],
+}
+
+
+@pytest.mark.parametrize("ref", ["Status", "enum:Status"])
+def test_a_model_reference_that_names_an_enum_is_refused(ref):
+    description = _one_model(
+        [
+            {"name": "status", "type": _STATUS_ENUM, "description": None},
+            {"name": "other", "type": {"type": "model", "name": ref}, "description": None},
+        ]
+    )
+
+    with pytest.raises(SavedSchemaError, match="used before it is described"):
+        build_model(description)
+
+
+@pytest.mark.parametrize(
+    "members",
+    [
+        [["_Status__x", "x"], ["OPEN", "open"]],  # a private name is not a member
+        [["OPEN", "open"], ["ALSO_OPEN", "open"]],  # a repeated value is an alias
+    ],
+)
+def test_an_enum_python_would_rebuild_with_fewer_members_is_refused(members):
+    node = {**_STATUS_ENUM, "members": members}
+
+    with pytest.raises(SavedSchemaError, match="members described"):
+        build_model(_one_model([{"name": "status", "type": node, "description": None}]))

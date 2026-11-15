@@ -283,7 +283,8 @@ python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas
 
 If it exits with an error, nothing was written and the PoC would still run the old schema:
 fix `output_schema.py` (the class name must match `model_name` in the requirements JSON,
-and the field types must be ones the schema generator produces) and run it again.
+the field types must be ones the schema generator produces, and the model takes no
+validators, serializers or config options other than `extra`) and run it again.
 
 After each edit, confirm the change with the user before proceeding.
 

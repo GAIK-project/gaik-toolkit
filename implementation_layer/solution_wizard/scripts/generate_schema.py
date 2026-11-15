@@ -361,12 +361,15 @@ def main() -> int:
     py_path.write_text(py_content, encoding="utf-8")
     print(f"\nSchema written to:       {py_path}")
 
+    model_path = schemas_dir / "output_schema_model.json"
     if model_description is not None:
-        model_path = schemas_dir / "output_schema_model.json"
         model_path.write_text(
             json.dumps(model_description, indent=2, ensure_ascii=False), encoding="utf-8"
         )
         print(f"Model written to:        {model_path}")
+    else:
+        # A model file from an earlier run would no longer match the new files.
+        model_path.unlink(missing_ok=True)
 
     # -- Write output_schema_requirements.json (load_schema() contract) --
     req_payload = _requirements_to_json(schema_class, requirements)
