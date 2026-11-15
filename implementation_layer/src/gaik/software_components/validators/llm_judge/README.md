@@ -104,6 +104,34 @@ for working scripts:
 - `demo_pairwise.py` — A/B comparison with `compare_pairwise(swap_and_average=True)`.
 - `demo_calibration.py` — Pearson-r calibration vs. a human-labeled dataset.
 
+## Judged content as data
+
+The content a judge assesses is in its input, so a sentence in it could try to
+steer its own verdict. Every judge call keeps the two apart with
+[`gaik.software_components.source_material`](../../source_material.py):
+
+- The system message holds the judge's rules, the scale, the output format,
+  the sentence in `SOURCE_MATERIAL_INSTRUCTION` and your rubric
+  (`ValidationRubric`: vendor, aspects, checks, `custom_system_suffix`, few-shot
+  examples). `detect_hallucinations` puts its `field_descriptions` there too.
+- The user message holds the task and the judged content, each piece in its
+  own `<source_material>` block with a random id for each call: the extractor
+  output (`answer`), the source text (`source`), the expected value
+  (`reference`), surrounding text (`context`). `compare_pairwise` labels the two
+  outputs `answer a` and `answer b` by the position shown, so the swap pass
+  shows `extracted_b` as `answer a`. A closing tag written in the content is
+  escaped and cannot end its block.
+- Page images go as before; the sentence covers them.
+- Verdict parsing is unchanged: a reply that cannot be read is still reported in
+  `judge_error`, never as a pass.
+
+`build_user_prompt` and `build_hallucination_prompt` keep their parameters, but
+the rubric and the field rules now go in the system message
+(`build_system_prompt(scoring_mode, rubric=...)`,
+`build_hallucination_system_prompt(field_descriptions)`). The instruction lowers
+the chance that judged content steers the verdict; it does not remove it, so
+check high-stakes verdicts by other means as well.
+
 ## Picking a model
 
 We benchmarked seven judge models on a small hand-curated set of

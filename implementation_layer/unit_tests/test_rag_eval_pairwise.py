@@ -21,8 +21,9 @@ class _Judge:
 
     def chat_parsed(self, messages, response_format, temperature=0):
         prompt = messages[1]["content"]
-        first = re.search(r"<response_a>\n(.*?)\n</response_a>", prompt, re.S).group(1)
-        second = re.search(r"<response_b>\n(.*?)\n</response_b>", prompt, re.S).group(1)
+        block = r'<source_material id="[^"]+" label="{}">\n(.*?)\n</source_material'
+        first = re.search(block.format("answer A"), prompt, re.S).group(1)
+        second = re.search(block.format("answer B"), prompt, re.S).group(1)
         self.shown.append((first, second))
         scores = {f"{aspect}_{side}": 3 for aspect in _ASPECTS for side in "ab"}
         return PairwiseVerdict(
