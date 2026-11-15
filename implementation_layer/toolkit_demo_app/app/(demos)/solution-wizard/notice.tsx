@@ -2,11 +2,15 @@
 
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { buttonVariants } from "@/components/ui/button";
-import { ArrowRight, Wand2 } from "lucide-react";
+import { ArrowRight, BookOpen, Wand2 } from "lucide-react";
 
-// The Solution Configuration Wizard runs as its own service (Wizard V2), where
-// each session's agent and its PoC runs are kept apart from other services. This
-// demo no longer runs it; the notice says where it is.
+// The Solution Configuration Wizard is not run in this demo. Wizard V2 is its own
+// service, where each session's agent and its PoC runs are kept apart from other
+// services, and it needs an account from the GAIK team. The first version is a
+// Claude Code skill that runs on the person's own computer.
+const CLASSIC_WIZARD_DOCS =
+  "https://gaik-project.github.io/gaik-toolkit/guidance-layer/solution-configuration-wizard/";
+
 export function SolutionWizardNotice({
   wizardUrl,
 }: {
@@ -20,10 +24,11 @@ export function SolutionWizardNotice({
         title="Solution Configuration Wizard"
         description="From a use case description to a blueprint, a runnable PoC and its documentation"
       />
-      <section className="border-border bg-muted/40 space-y-4 rounded-lg border p-5">
+      <section className="border-primary/40 bg-muted/40 space-y-4 rounded-lg border p-5">
+        <h2 className="text-lg font-semibold">Wizard V2 (recommended)</h2>
         <p>
-          The wizard has moved to its own service, <strong>Wizard V2</strong>.
-          It is not run in this demo any more.
+          The wizard runs as its own service. Sign in with an account from the
+          GAIK team; if you do not have one, ask the team for it.
         </p>
         {wizardUrl ? (
           <a
@@ -39,6 +44,22 @@ export function SolutionWizardNotice({
             Ask the GAIK team for access to Wizard V2.
           </p>
         )}
+      </section>
+      <section className="border-border space-y-4 rounded-lg border p-5">
+        <h2 className="text-lg font-semibold">The first wizard in Claude Code</h2>
+        <p>
+          The first version of the wizard is a Claude Code skill. It runs on
+          your own computer with your own Claude account and needs no GAIK
+          account.
+        </p>
+        <a
+          href={CLASSIC_WIZARD_DOCS}
+          className={buttonVariants({ variant: "outline", className: "gap-2" })}
+          rel="noopener"
+        >
+          How to run it
+          <BookOpen className="size-4" />
+        </a>
       </section>
     </div>
   );
