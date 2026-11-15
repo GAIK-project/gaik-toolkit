@@ -1,0 +1,38 @@
+name: Workflow security
+
+# zizmor audits the GitHub Actions workflows: unpinned actions, token permissions,
+# credentials left in checkouts, template injection and similar. Medium or higher
+# findings fail the job; the remaining low and informational ones are listed in
+# the pull request that added this check.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - '.github/dependabot.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - '.github/dependabot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  zizmor:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Run zizmor
+      uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+      with:
+        advanced-security: false
+        annotations: true
+        min-severity: medium

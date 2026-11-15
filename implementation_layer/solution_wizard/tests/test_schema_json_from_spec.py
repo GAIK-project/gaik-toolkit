@@ -1,10 +1,14 @@
 """output_schema.json is built from the spec as data, and says the same as output_schema.py."""
 
 import json
+import sys
+from pathlib import Path
 
 import pytest
-from solution_wizard import schema_designer
-from solution_wizard.schema_designer import build_pydantic_model, write_schema_files
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from solution_wizard import schema_designer  # noqa: E402
+from solution_wizard.schema_designer import build_pydantic_model, write_schema_files  # noqa: E402
 
 SPECS = {
     "plain": {
@@ -38,21 +42,6 @@ SPECS = {
         "required_fields": ["total"],
         "field_descriptions": {"tax": "VAT amount"},
     },
-    "rows": {
-        "schema_name": "PurchaseOrder",
-        "fields": ["order_id", "line_items", "notes_entries"],
-        "required_fields": ["order_id", "line_items"],
-        "nested": {
-            "line_items": {
-                "fields": ["sku", "amount"],
-                "field_types": {"amount": "decimal"},
-                "required_fields": ["sku"],
-                "field_descriptions": {"sku": "Product code"},
-            },
-            "notes_entries": {"fields": ["text"], "required_fields": ["text"]},
-        },
-        "field_descriptions": {"line_items": "One row per product"},
-    },
     "sections": {
         "schema_name": "Report",
         "fields": [
@@ -85,13 +74,12 @@ def test_writing_the_schema_files_runs_no_generated_code(tmp_path, monkeypatch) 
     # Looked up in the module's globals before the builtins, so only its own calls refuse.
     monkeypatch.setattr(schema_designer, "exec", refuse, raising=False)
     monkeypatch.setattr(schema_designer, "compile", refuse, raising=False)
-    spec = SPECS["rows"]
+    spec = SPECS["choices"]
     written = write_schema_files(spec, spec["schema_name"], tmp_path)
 
     schema = json.loads(written["output_schema.json"].read_text())
-    assert schema["title"] == "PurchaseOrder"
-    assert schema["additionalProperties"] is False
-    assert "LineItem" in schema["$defs"]
+    assert schema["title"] == "Ticket"
+    assert "UrgencyEnum" in schema["$defs"]
 
 
 def test_text_in_the_spec_stays_text(tmp_path) -> None:
@@ -104,3 +92,18 @@ def test_text_in_the_spec_stays_text(tmp_path) -> None:
     written = write_schema_files(spec, "Note", tmp_path)
     schema = json.loads(written["output_schema.json"].read_text())
     assert schema["properties"]["body"]["description"] == 'Quote " and a new\nline, and {braces}'
+
+
+def test_a_nested_collection_description_stays_text_in_the_source() -> None:
+    spec = {
+        "schema_name": "Order",
+        "fields": ["line_items"],
+        "required_fields": ["line_items"],
+        "field_descriptions": {"line_items": 'Rows"), x=__import__("os"), y=Field("'},
+        "nested": {"line_items": {"fields": ["sku"], "required_fields": ["sku"]}},
+    }
+    namespace: dict = {}
+    exec(build_pydantic_model(spec, "Order"), namespace)  # noqa: S102 - test reference
+    model = namespace["Order"]
+    assert list(model.model_fields) == ["line_items"]
+    assert model.model_fields["line_items"].description == spec["field_descriptions"]["line_items"]

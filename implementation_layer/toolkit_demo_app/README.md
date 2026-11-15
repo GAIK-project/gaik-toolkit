@@ -55,13 +55,10 @@ text layer. It roughly triples the output tokens of an extraction.
 
 ### Solution Wizard
 
-Session diagnostics are off: the self-hosted Langfuse pilot was removed from Rahti on
-2026-11-04. The tracing adapter (`api/utils/wizard_tracing.py`) stays and records
-nothing unless `WIZARD_LANGFUSE_ENABLED=true` and the `LANGFUSE_*` variables point at a
-Langfuse instance; [observability/langfuse](observability/langfuse/README.md) has the
-pilot's setup if it is needed again.
-
-- **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC. Access is gated separately from the regular demos: anonymous visitors are sent to `/sign-in`, approved users need a per-user `wizard_access` grant from `/admin`, and the optional team shortcut `/solution-wizard?key=<WIZARD_ACCESS_SECRET>` sets a temporary access cookie.
+The Solution Configuration Wizard runs as its own service, Wizard V2. This demo no
+longer runs it: `/solution-wizard` is open to every visitor, says where the wizard
+is and links to `WIZARD_V2_URL` when that is set. The server reads it at run time, so
+a deployment sets it with `oc set env` and needs no rebuild.
 
 ### No-code Assets
 
@@ -95,13 +92,11 @@ picked, the audio demos still transcribe on the server (local Whisper, else
 or CSC Aitta account. Enter the model/deployment and key; Azure also needs its public
 resource endpoint. **Test connection** makes one small chat request. **Use this key**
 activates it for this browser tab until refresh, navigation away or sign-out. **Clear
-own model** returns to the server models.
+own model** returns to the server models. A run on an own key needs a signed-in account,
+approved or pending; it spends no trial run.
 
 Own settings apply to Extractor, Schema Generator, Classifier, LLM-based Parser modes,
-Vision Extractor, PostgreSQL Agent questions, single LLM Judge tasks and Solution Wizard
-image attachments. Wizard text/document attachments keep their existing local parsing
-or server Docling fallback; audio attachments require clearing own model settings to
-use the server transcription deployment. The conversation uses the hosted Claude Agent SDK.
+Vision Extractor, PostgreSQL Agent questions and single LLM Judge tasks.
 The judge panel, RAG/Tabular sessions, audio workflows and Report Writer use server
 settings; their page notice makes this explicit. Select a vision-capable model for
 images, and use the server settings for mixed-provider workflows.
@@ -213,7 +208,6 @@ toolkit_demo_app/
 | `/video-search` | Semantic dental video search |
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
 | `/report-writer` | Mixed-source report generation |
-| `/wizard` | Solution Configuration Wizard (optional; needs the Azure Foundry env vars) |
 
 API docs: <http://localhost:8000/docs> (Swagger UI)
 

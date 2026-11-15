@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { trialEnabled } from "@/lib/trial";
@@ -58,14 +57,11 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
 });
 
 /**
- * Whether the current request can actually open the Solution Wizard — the
- * per-user `wizard_access` grant (or BYPASS_AUTH) OR the team `?key=` cookie.
- * Mirrors the gate in proxy.ts so the UI matches who can really get in.
+ * Whether the visitor can open /solution-wizard. The page is now a notice that
+ * links to Wizard V2 and proxy.ts lets everyone through, so this is always true;
+ * the nav and the home page entries keep their access branches until the
+ * wizard_access grant is removed.
  */
 export async function getWizardAccess(): Promise<boolean> {
-  if ((await getUserAccessStatus()).wizardAccess) return true;
-  const secret = process.env.WIZARD_ACCESS_SECRET;
-  if (!secret) return false;
-  const cookieStore = await cookies();
-  return cookieStore.get("wizard_access")?.value === secret;
+  return true;
 }

@@ -60,7 +60,8 @@ def _validate_entries(entries: List[Dict[str, Any]]) -> None:
                 f"(must be one of {_VALID_TYPES})."
             )
         path = entry.get("import_path")
-        if path and not (isinstance(path, str) and _IMPORT_PATH_RE.match(path)):
+        # fullmatch: with match, the pattern's "$" also accepts a trailing line break.
+        if path and not (isinstance(path, str) and _IMPORT_PATH_RE.fullmatch(path)):
             raise ValueError(
                 f"Registry entry '{label}' has an import path that is not a gaik module: {path!r}"
             )

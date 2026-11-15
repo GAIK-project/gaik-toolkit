@@ -66,7 +66,7 @@ def make_spec(tmp_path: Path, *, sample_report: bool = True) -> ReportSpec:
     )
 
 
-def fake_pandoc(source, to, outputfile):
+def fake_pandoc(source, to, outputfile, **kwargs):
     shutil.copyfile(source, outputfile)
 
 

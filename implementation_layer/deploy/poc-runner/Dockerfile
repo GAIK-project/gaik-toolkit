@@ -35,7 +35,7 @@ RUN apt-get update \
 # against solution_wizard/gaik_validated_version.txt, and a test keeps this pin
 # equal to it: on 0.8.2 a PoC written to that guidance failed on
 # RunSettings(citations=...), which arrived in 0.8.3.
-ARG GAIK_VERSION=0.8.14
+ARG GAIK_VERSION=0.9.0
 
 # Only the extras the customer's five use cases actually import. `gaik[all-cpu]`
 # was the obvious choice and the wrong one: it pulls classifier/RAG/Finnish-NLP
@@ -57,7 +57,7 @@ ARG GAIK_VERSION=0.8.14
 # anthropic), and the vision-extract extra alone does not pull those in: the
 # first invoice PoC on s4 died on `No module named 'markdown_it'` before any
 # model call. The smoke test below imports vision_extractor for that reason.
-ARG GAIK_EXTRAS="extract,transcriber,enhance-transcript,audio-to-structured-data,llm-judge,vision-extract,multimodal-parser,documents-to-structured-data-cpu,evaluators,report-writer,vector-store,source-tracing"
+ARG GAIK_EXTRAS="extract,transcriber,enhance-transcript,audio-to-structured-data,llm-judge,vision-extract,multimodal-parser,documents-to-structured-data-cpu,evaluators,report-writer,vector-store,source-tracing,fields-to-docx"
 
 # pyyaml is the scaffolded run_poc.py's own import (`import yaml`) and is not a
 # gaik dependency; pydantic and python-dotenv arrive with gaik core. reportlab is

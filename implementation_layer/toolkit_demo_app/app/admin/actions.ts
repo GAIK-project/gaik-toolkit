@@ -1,15 +1,18 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getReportWriterLimits } from "@/lib/report-writer/limits";
 import {
   ADMIN_COOKIE_NAME,
   ADMIN_SESSION_MAX_AGE_SECONDS,
+  adminPasswordMatches,
   createAdminSessionValue,
-  isAdminAuthenticated,
+  currentAdminSessionId,
 } from "@/lib/admin/session";
+import { takeAdminSignInAttempt } from "@/lib/admin/sign-in-limit";
+import { clientIp } from "@/lib/client-ip";
 
 export type AdminResult = {
   error?: string;
@@ -18,12 +21,21 @@ export type AdminResult = {
 
 /**
  * Gate a mutating admin action. Returns an error `AdminResult` when the caller
- * is not an authenticated admin, or `null` when the action may proceed.
+ * is not an authenticated admin, or `null` when the action may proceed. An
+ * allowed action is logged with the admin session it came from and the account
+ * it changes, so a change can be traced to a sign-in until admins have named
+ * accounts (lib/admin/session.ts).
  */
-async function requireAdmin(): Promise<AdminResult | null> {
-  if (!(await isAdminAuthenticated())) {
+async function requireAdmin(
+  action: string,
+  userId: string,
+  detail: string,
+): Promise<AdminResult | null> {
+  const session = await currentAdminSessionId();
+  if (!session) {
     return { error: "Unauthorized" };
   }
+  console.info(`[admin] ${action} user=${userId} ${detail} session=${session}`);
   return null;
 }
 
@@ -52,13 +64,19 @@ export async function verifyAdminPassword(
 
   const { password } = result.data;
 
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminPassword) {
+  if (!process.env.ADMIN_PASSWORD) {
     console.error("ADMIN_PASSWORD environment variable is not set");
     return { error: "Admin access is not configured." };
   }
 
-  if (password !== adminPassword) {
+  // Every attempt counts, before the password is looked at.
+  if (!(await takeAdminSignInAttempt(clientIp(await headers())))) {
+    console.warn("[admin] sign-in refused: too many attempts");
+    return { error: "Too many sign-in attempts. Try again later." };
+  }
+
+  if (!adminPasswordMatches(password)) {
+    console.warn("[admin] sign-in failed");
     return { error: "Invalid password." };
   }
 
@@ -74,6 +92,9 @@ export async function verifyAdminPassword(
     sameSite: "lax",
     maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
   });
+  console.info(
+    `[admin] signed in session=${sessionValue.split(".")[1].slice(0, 8)}`,
+  );
 
   return { success: true };
 }
@@ -92,7 +113,11 @@ export async function updateAccessStatus(
     return { error: result.error.issues[0].message };
   }
 
-  const unauthorized = await requireAdmin();
+  const unauthorized = await requireAdmin(
+    "set-status",
+    result.data.userId,
+    `status=${result.data.status}`,
+  );
   if (unauthorized) return unauthorized;
 
   const supabase = createServiceClient();
@@ -128,7 +153,11 @@ export async function setWizardAccess(
     return { error: result.error.issues[0].message };
   }
 
-  const unauthorized = await requireAdmin();
+  const unauthorized = await requireAdmin(
+    "set-wizard-access",
+    result.data.userId,
+    `wizard_access=${result.data.value}`,
+  );
   if (unauthorized) return unauthorized;
 
   const supabase = createServiceClient();
@@ -157,7 +186,11 @@ export async function resetReportUsage(userId: string): Promise<AdminResult> {
     return { error: result.error.issues[0].message };
   }
 
-  const unauthorized = await requireAdmin();
+  const unauthorized = await requireAdmin(
+    "reset-report-usage",
+    result.data.userId,
+    "reports_count=0",
+  );
   if (unauthorized) return unauthorized;
 
   const supabase = createServiceClient();
@@ -200,7 +233,11 @@ export async function setReportLimitOverride(
     return { error: result.error.issues[0].message };
   }
 
-  const unauthorized = await requireAdmin();
+  const unauthorized = await requireAdmin(
+    "set-report-limit",
+    result.data.userId,
+    `report_limit_override=${result.data.value}`,
+  );
   if (unauthorized) return unauthorized;
 
   const supabase = createServiceClient();

@@ -3675,5 +3675,84 @@
     "example_script_path": "implementation_layer/examples/software_components/RAG/retriever_example.py",
     "readme_path": "implementation_layer/src/gaik/software_components/RAG/vector_store/README.md",
     "install_extra": "vector-store"
+  },
+  {
+    "id": "fields_to_docx",
+    "name": "FieldsToDocx",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json",
+      "validation_report",
+      "text",
+      "transcript",
+      "enhanced_transcript",
+      "parsed_text"
+    ],
+    "output_artifact_types": [
+      "word_document"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "output_path",
+      "title",
+      "metadata",
+      "labels",
+      "trace",
+      "evidence",
+      "appendix",
+      "appendix_title",
+      "footer",
+      "headers",
+      "empty_text",
+      "true_text",
+      "false_text",
+      "font_name",
+      "font_size",
+      "label_width_cm"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Deterministic and fast: writes exactly the values it is given; adds nothing and checks nothing",
+      "cost_sensitivity": "none -- fully local, python-docx only, no API calls",
+      "degrades_on": [
+        "several_records_in_one_file",
+        "deeply_nested_values"
+      ]
+    },
+    "known_limitations": [
+      "One record per file: call write() once per record; several records in one call raise ValueError",
+      "No nested tables: a list or a dict inside a value is written as lines of text in its cell",
+      "No template file: a fixed, neutral layout on an A4 page; restyle the result in Word",
+      "No images, charts or page numbers",
+      "Evidence comes from the first citation of a top-level field; citations of values inside a list (items[0].quantity) are not shown",
+      "The quote is shown as the model gave it; the verdict comes from SourceTracing, this component checks nothing itself"
+    ],
+    "best_for": [
+      "word_report_from_extracted_fields",
+      "human_readable_extraction_output",
+      "evidence_column_with_source_tracing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "write_word_report",
+        "component": "FieldsToDocx",
+        "inputs": [
+          "extracted_data"
+        ],
+        "outputs": [
+          "word_report"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/fields_to_docx/fields_to_docx.py",
+    "import_path": "gaik.software_components.fields_to_docx",
+    "example_script_path": "implementation_layer/examples/software_components/fields_to_docx/fields_to_docx_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/fields_to_docx/README.md",
+    "install_extra": "fields-to-docx"
   }
 ]

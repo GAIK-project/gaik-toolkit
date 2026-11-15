@@ -107,3 +107,91 @@ def test_a_provider_endpoint_or_setting_reference_is_kept(tmp_path, key, value) 
     bp = _blueprint()
     bp.models = {**(bp.models or {}), key: value}
     scaffold_poc(bp, tmp_path)
+
+
+# --------------------------------------------------------------------------- review additions
+
+RAG_EXAMPLE = Path(__file__).parent.parent / "examples" / "rag_workflow_blueprint.json"
+
+
+def _config(poc: Path) -> dict:
+    import yaml
+
+    return yaml.safe_load((poc / "config.yaml").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("where", ["use_case.id", "step id"])
+def test_an_id_that_ends_in_a_line_break_stops_the_scaffolding(tmp_path, where) -> None:
+    bp = _blueprint()
+    if where == "use_case.id":
+        bp.use_case.id = "invoices\n"
+    else:
+        bp.workflow.steps[0].id += "\n"
+    with pytest.raises(ValueError, match="cannot go into the PoC code"):
+        scaffold_poc(bp, tmp_path)
+
+
+def test_a_keyword_as_output_field_stops_the_scaffolding(tmp_path) -> None:
+    bp = _blueprint()
+    bp.target_output_spec["fields"] = ["from"]
+    with pytest.raises(ValueError, match="cannot go into the PoC code"):
+        scaffold_poc(bp, tmp_path)
+
+
+def test_the_automatic_language_setting_is_kept(tmp_path) -> None:
+    bp = _blueprint()
+    bp.technical_spec["language"] = "auto"
+    assert _config(scaffold_poc(bp, tmp_path)["poc_dir"])["language"] == "auto"
+
+
+def test_a_language_that_ends_in_a_line_break_falls_back_to_english(tmp_path) -> None:
+    bp = _blueprint()
+    bp.technical_spec["language"] = "fi\n"
+    assert _config(scaffold_poc(bp, tmp_path)["poc_dir"])["language"] == "en"
+
+
+def test_the_rag_evaluation_framework_keeps_its_name(tmp_path) -> None:
+    poc = scaffold_poc(Blueprint.from_file(RAG_EXAMPLE), tmp_path)["poc_dir"]
+    script = (poc / "evals" / "run_basic_eval.py").read_text(encoding="utf-8")
+    ast.parse(script)
+    assert "Evaluation framework: RAG_eval" in script
+    assert "Evaluation framework: extraction_eval" not in script
+
+
+def test_descriptions_and_allowed_values_stay_text_in_the_schema_source() -> None:
+    from solution_wizard.schema_designer import build_pydantic_model
+
+    statuses = ['paid "in full"', "open\n", "it's"]
+    spec = {
+        "schema_name": "Invoice",
+        "fields": ["total", "status", "note"],
+        "field_types": {"total": "decimal", "status": "string", "note": "string"},
+        "required_fields": ["total"],
+        "field_descriptions": {"total": TEXT, "status": TEXT, "note": TEXT},
+        "allowed_values": {"status": statuses},
+    }
+    source = build_pydantic_model(spec)
+    tree = ast.parse(source)
+    # The text added no statement of its own: no print() call came from it.
+    assert not _calls_named(source, "print")
+    namespace: dict = {}
+    exec(compile(tree, "<schema>", "exec"), namespace)
+    model = namespace["Invoice"]
+    for field in spec["fields"]:
+        assert model.model_fields[field].description == TEXT
+    assert [member.value for member in namespace["StatusEnum"]] == statuses
+
+
+@pytest.mark.parametrize(
+    ("spec", "what"),
+    [
+        ({"fields": ["from"]}, "field name"),
+        ({"fields": ["total: int = 0\nx"]}, "field name"),
+        ({"fields": ["total"], "schema_name": "Invoice(BaseModel)"}, "class name"),
+    ],
+)
+def test_a_name_the_schema_source_cannot_carry_is_refused(spec, what) -> None:
+    from solution_wizard.schema_designer import build_pydantic_model
+
+    with pytest.raises(ValueError, match=f"{what} .* is not a valid Python name"):
+        build_pydantic_model(spec)

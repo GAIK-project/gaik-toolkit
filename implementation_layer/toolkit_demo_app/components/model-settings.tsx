@@ -645,8 +645,9 @@ export function ModelSettingsNotice() {
 }
 
 /**
- * Tells visitors who cannot run a demo yet how to: sign in or use their own key.
- * A pending user on the trial allowance is told the daily limit instead.
+ * Tells visitors who cannot run a demo yet how to: sign in, and once signed in,
+ * use their own key. A pending user on the trial allowance is told the daily
+ * limit instead.
  */
 export function AccessNotice({
   loggedIn,
@@ -661,7 +662,8 @@ export function AccessNotice({
   const settings = useModelSettings();
   const pathname = usePathname();
   if (unlocked) return null;
-  const ownKeyWorks = pageUsesModelSettings(pathname);
+  // An own key runs a demo for a signed-in user (lib/api-access.ts).
+  const ownKeyWorks = loggedIn && pageUsesModelSettings(pathname);
   if (ownKeyWorks && settings) return null;
   if (trialRunsPerDay)
     return (
@@ -685,9 +687,7 @@ export function AccessNotice({
         {loggedIn
           ? "Your access is pending approval, so running demos is off for now."
           : "Sign in to run this demo."}
-        {ownKeyWorks
-          ? " You can also run it with your own model key, without an account."
-          : ""}
+        {ownKeyWorks ? " You can also run it with your own model key." : ""}
       </p>
       <div className="flex gap-2">
         {!loggedIn && (

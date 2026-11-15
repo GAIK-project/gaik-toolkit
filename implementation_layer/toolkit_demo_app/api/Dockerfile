@@ -37,11 +37,6 @@ RUN uv pip install --system --no-cache \
 # pulling the ~2GB CUDA build.
 RUN uv pip install --system --no-cache -r requirements.txt
 
-# Solution Wizard assets (SKILL.md, scripts, registries, templates). The wizard
-# session runs the bundled claude CLI (shipped inside the claude-agent-sdk
-# wheel) with cwd=WIZARD_DIR. Foundry credentials come from deployment env.
-COPY implementation_layer/solution_wizard ./implementation_layer/solution_wizard
-ENV WIZARD_DIR=/app/implementation_layer/solution_wizard
 
 # Copy API application code
 COPY implementation_layer/toolkit_demo_app/api/ .

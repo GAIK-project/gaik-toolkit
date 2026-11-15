@@ -20,8 +20,9 @@ from pydantic import BaseModel
 
 from .augment import SOURCES_FIELD, Augmented, augment_task
 from .matching import (
+    _locate_in_words,
+    _word_spans,
     find_all,
-    locate_in_text,
     tokens,
     value_around_quote,
     value_at,
@@ -94,6 +95,9 @@ class SourceTracing:
         """
         documents = [texts] if isinstance(texts, str) else list(texts)
         token_lists = [tokens(text) for text in documents]
+        # Split each text into located words once, not once per quote.
+        spans = [_word_spans(text) for text in documents]
+        span_words = [[word for word, _, _ in words] for words in spans]
 
         def check(
             index: int, paired: bool, field: str, quote: str, document: int, page: int, value: Any
@@ -106,7 +110,7 @@ class SourceTracing:
             found_in = None
             span = None
             for number in order:
-                span = locate_in_text(documents[number], quote)
+                span = _locate_in_words(spans[number], span_words[number], needle)
                 if span is not None:
                     found_in = number
                     break

@@ -19,7 +19,7 @@ export function HowItWorksCard({ description, children }: HowItWorksCardProps) {
         <AccordionItem value="how-it-works" className="border-none">
           <AccordionTrigger className="text-muted-foreground hover:text-foreground px-6 py-4 text-left text-sm font-medium hover:no-underline">
             <div>
-              How It Works
+              How it works
               {description && (
                 <p className="text-muted-foreground mt-1 text-sm font-normal">
                   {description}

@@ -22,37 +22,37 @@ export const PARSERS: ParserOption[] = [
   {
     id: "auto",
     label: "Auto-detect",
-    hint: "This parser is good for any file when you are not sure which parser to choose: it picks PyMuPDF for a PDF, DOCX for a Word file and Vision for an image. A scanned PDF has no text layer, so choose another parser for it.",
+    hint: "Picks PyMuPDF for a PDF, DOCX for a Word file and Vision for an image. A scanned PDF has no text layer, so choose Vision for it.",
   },
   {
     id: "pymupdf",
     label: "PyMuPDF (Fast, text-based)",
-    hint: "This parser is good for fast, text-only extraction from PDFs with a simple layout and a text layer. It runs locally, with no model calls or costs, and finds nothing in a scanned PDF.",
+    hint: "Fast and local, with no model call: for PDFs with a text layer and a simple layout. Finds nothing in a scanned PDF.",
   },
   {
     id: "docx",
     label: "DOCX (Word documents)",
-    hint: "This parser is good for Word documents. It reads their text and tables quickly and locally, and keeps headings and tables in document order.",
+    hint: "For Word documents: text and tables read locally, in document order.",
   },
   {
     id: "vision",
     label: "Vision (AI-powered, handles images)",
-    hint: "This parser is good for scanned PDFs, photos and other images, and for complex layouts where accurate tables matter. A vision model reads each page, so it is slower than a text parser, and it reads at most 10 pages.",
+    hint: "For scanned PDFs, images and complex tables. A vision model reads each page, so it is slower. At most 10 pages.",
   },
   {
     id: "vision_plus",
     label: "Vision+ (Text+Image Parsing)",
-    hint: "This parser is good for documents where the images matter as well as the text. It combines Docling parsing with a vision model that describes each image at its place in the output, and it handles advanced tables. At most 10 pages.",
+    hint: "For documents where the images matter too: Docling reads the text and a vision model describes each image in place. At most 10 pages.",
   },
   {
     id: "docling_api",
     label: "HH Parser (HH's fast Docling Parser)",
-    hint: "This parser is good for fast, high-quality parsing of PDFs with headings and tables. It uses the GPU-accelerated Docling service hosted by Haaga-Helia and returns markdown with metadata.",
+    hint: "For PDFs with headings and tables: the GPU-accelerated Docling service hosted by Haaga-Helia.",
   },
   {
     id: "multimodal",
     label: "Multimodal (Layout-aware, PDF only)",
-    hint: "This parser is good for PDFs with messy, irregular or multi-page tables, when accurate layout matters more than speed or cost. It sends the whole PDF to a vision-capable model in one call, reads PDF files only, and also gives an HTML view.",
+    hint: "For PDFs with irregular or multi-page tables. The whole PDF goes to a vision model in one call; slower and costlier. PDF only, with an HTML view.",
   },
 ];
 

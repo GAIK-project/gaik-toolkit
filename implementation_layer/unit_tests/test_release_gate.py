@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import subprocess
 import sys
 import tarfile
 import zipfile
+from functools import partialmethod
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -38,10 +40,20 @@ def _passed_result(provider="azure", model="release-model"):
     }
 
 
+_TRANSCRIPTION_ENV = {
+    "RELEASE_AZURE_TRANSCRIPTION_MODEL": "transcribe-deployment",
+    "RELEASE_OPENAI_TRANSCRIPTION_MODEL": "openai-transcribe",
+}
+
+
 def test_ci_required_provider_cannot_be_removed_from_configured_matrix():
     targets = gate.select_targets(
         "openai",
-        {"RELEASE_OPENAI_MODEL": "openai-model", "RELEASE_AZURE_MODEL": "azure-deployment"},
+        {
+            "RELEASE_OPENAI_MODEL": "openai-model",
+            "RELEASE_AZURE_MODEL": "azure-deployment",
+            **_TRANSCRIPTION_ENV,
+        },
         ["azure"],
     )
     assert [target["provider"] for target in targets] == ["azure", "openai"]
@@ -51,7 +63,8 @@ def test_ci_required_provider_cannot_be_removed_from_configured_matrix():
 def test_ci_keeps_native_azure_when_litellm_backend_is_selected():
     targets = gate.select_targets(
         "azure",
-        {"RELEASE_AZURE_MODEL": "deployment", "RELEASE_AZURE_BACKENDS": "litellm"},
+        {"RELEASE_AZURE_MODEL": "deployment", "RELEASE_AZURE_BACKENDS": "litellm"}
+        | _TRANSCRIPTION_ENV,
         ["azure"],
     )
     assert [target["backend"] for target in targets] == ["native", "litellm"]
@@ -122,6 +135,190 @@ def test_selected_embedding_model_is_required_in_result():
     result["checks"]["embedder"] = {"ok": True}
     result["embedding_model"] = "embed-model"
     assert gate.validate_live_result(result, target, 0)
+
+
+def test_an_audio_provider_needs_an_explicit_transcription_model():
+    with pytest.raises(ValueError, match="RELEASE_AZURE_TRANSCRIPTION_MODEL"):
+        gate.select_targets("azure", {"RELEASE_AZURE_MODEL": "deployment"})
+    with pytest.raises(ValueError, match="RELEASE_OPENAI_TRANSCRIPTION_MODEL"):
+        gate.select_targets("openai", {"RELEASE_OPENAI_MODEL": "model"})
+    (target,) = gate.select_targets(
+        "azure", {"RELEASE_AZURE_MODEL": "deployment", "AZURE_TRANSCRIPTION_MODEL": "transcribe"}
+    )
+    assert target["transcription_model"] == "transcribe"
+
+
+@pytest.mark.parametrize(
+    ("providers", "environ", "expected"),
+    [
+        (
+            "azure",
+            {"RELEASE_AZURE_BACKENDS": "native,litellm"},
+            [("azure", "native", "transcribe-deployment"), ("azure", "litellm", "")],
+        ),
+        # A LiteLLM-only selection must not drop the check.
+        (
+            "azure",
+            {"RELEASE_AZURE_BACKENDS": "litellm"},
+            [("azure", "litellm", "transcribe-deployment")],
+        ),
+        (
+            "openai",
+            {"RELEASE_OPENAI_MODEL": "openai-model", "RELEASE_OPENAI_BACKENDS": "litellm"},
+            [("openai", "litellm", "openai-transcribe")],
+        ),
+    ],
+)
+def test_transcription_is_certified_once_per_provider(providers, environ, expected):
+    targets = gate.select_targets(
+        providers, {"RELEASE_AZURE_MODEL": "deployment", **environ, **_TRANSCRIPTION_ENV}
+    )
+    assert [
+        (target["provider"], target["backend"], target["transcription_model"]) for target in targets
+    ] == expected
+
+
+def test_a_provider_without_an_audio_api_cannot_select_a_transcription_model():
+    (target,) = gate.select_targets("google", {"RELEASE_GOOGLE_MODEL": "gemini"})
+    assert target["transcription_model"] == ""
+    with pytest.raises(ValueError, match="no audio API"):
+        gate.select_targets(
+            "google",
+            {"RELEASE_GOOGLE_MODEL": "gemini", "RELEASE_GOOGLE_TRANSCRIPTION_MODEL": "model"},
+        )
+
+
+def test_selected_transcription_model_is_required_in_result():
+    target = {"provider": "azure", "model": "release-model", "transcription_model": "transcribe"}
+    result = _passed_result()
+    assert not gate.validate_live_result(result, target, 0)
+    result["checks"]["transcription"] = {"ok": True}
+    assert not gate.validate_live_result(result, target, 0)
+    result["transcription_model"] = "transcribe"
+    assert gate.validate_live_result(result, target, 0)
+    result["checks"]["transcription"] = {"ok": False}
+    assert not gate.validate_live_result(result, target, 0)
+
+
+class _FakeAudioSegment:
+    """Stands in for pydub's decoded fixture and its chunks, so no ffmpeg is needed."""
+
+    def __init__(self, duration_ms=12_792):
+        self.duration_ms = duration_ms
+
+    def __len__(self):
+        return self.duration_ms
+
+    def __getitem__(self, item):
+        return _FakeAudioSegment(min(item.stop, self.duration_ms) - item.start)
+
+    def export(self, out_f, format="mp3", **kwargs):
+        Path(out_f).write_bytes(b"chunk")
+
+
+_SENTENCES = (
+    "Huoltoteknikko Matti Virtanen ilmoittaa, että pumppu vuotaa kattilahuoneessa.",
+    "Vuoto havaittiin maanantaina kello yhdeksän, ja kiireellisyys on korkea.",
+)
+_BOTH_SENTENCES = " ".join(_SENTENCES)
+
+
+def _fake_audio_provider(monkeypatch, replies):
+    """Route the Transcriber to a fake raw audio client that returns (or raises) the
+    replies in request order: the single request, then the two chunks."""
+    import gaik.software_components.transcriber.transcriber as transcriber_module
+
+    received = []
+    outcomes = iter(replies)
+
+    def create(**kwargs):
+        received.append({key: value for key, value in kwargs.items() if key != "file"})
+        outcome = next(outcomes)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return SimpleNamespace(text=outcome, usage=None)
+
+    raw = SimpleNamespace(audio=SimpleNamespace(transcriptions=SimpleNamespace(create=create)))
+    monkeypatch.setattr(transcriber_module, "_create_audio_client", lambda config: raw)
+    monkeypatch.setattr(
+        transcriber_module.AudioSegment, "from_file", lambda *args, **kwargs: _FakeAudioSegment()
+    )
+    monkeypatch.setattr(transcriber_module.time, "sleep", lambda seconds: None)
+    return received
+
+
+def _transcription_check(tmp_path, max_calls=24):
+    budget = smoke.CallBudget(max_calls, 2048)
+    config = {"use_azure": False, "api_key": "test-key"}
+    return smoke.transcription_check(config, "gpt-4o-transcribe", budget, tmp_path), budget
+
+
+def test_transcription_check_certifies_both_requests_without_keeping_transcripts(
+    monkeypatch, tmp_path
+):
+    received = _fake_audio_provider(monkeypatch, [_BOTH_SENTENCES, *_SENTENCES])
+    observation, budget = _transcription_check(tmp_path)
+
+    assert "prompt" not in received[0]
+    assert received[1]["prompt"] == smoke.TRANSCRIPTION_CONTEXT
+    assert received[2]["prompt"].endswith(_SENTENCES[0])
+    assert budget.calls == 3
+    assert observation["single_requests"] == 1 and observation["chunk_requests"] == 2
+    assert observation["anchor_hits"] == {"single": [4, 4], "chunks": [4, 4], "of": 4}
+    assert "Huoltoteknikko" not in json.dumps(observation)
+
+
+@pytest.mark.parametrize(
+    ("replies", "message"),
+    [
+        # The single request skips the first sentence, as gpt-4o-transcribe did on
+        # robotic speech.
+        ([_SENTENCES[1], *_SENTENCES], "lost a sentence"),
+        # The second chunk comes back in English.
+        ([_BOTH_SENTENCES, _SENTENCES[0], "The leak was found on Monday."], "lost a sentence"),
+        # The second chunk request fails; the Transcriber only marks it in the text.
+        ([_BOTH_SENTENCES, _SENTENCES[0], RuntimeError("chunk failed")], "request failed"),
+    ],
+)
+def test_transcription_check_fails_on_a_lost_sentence_or_a_failed_chunk(
+    monkeypatch, tmp_path, replies, message
+):
+    _fake_audio_provider(monkeypatch, replies)
+    with pytest.raises(AssertionError, match=message):
+        _transcription_check(tmp_path)
+
+
+def test_transcription_check_fails_if_the_default_request_carries_a_prompt(monkeypatch, tmp_path):
+    from gaik.software_components.transcriber import Transcriber
+
+    # The regression of issue #100: an instruction sent as every request's prompt.
+    monkeypatch.setattr(
+        Transcriber,
+        "__init__",
+        partialmethod(Transcriber.__init__, default_prompt="Detect the language."),
+    )
+    _fake_audio_provider(monkeypatch, [_BOTH_SENTENCES, *_SENTENCES])
+    with pytest.raises(AssertionError, match="without a prompt"):
+        _transcription_check(tmp_path)
+
+
+def test_transcription_check_fails_on_a_changed_fixture(monkeypatch, tmp_path):
+    changed = tmp_path / "changed.mp3"
+    changed.write_bytes(b"not the fixture")
+    monkeypatch.setattr(smoke, "TRANSCRIPTION_FIXTURE", changed)
+    received = _fake_audio_provider(monkeypatch, [])
+    with pytest.raises(AssertionError, match="fixture changed"):
+        _transcription_check(tmp_path)
+    assert received == []
+
+
+def test_transcription_requests_count_against_the_shared_budget(monkeypatch, tmp_path):
+    received = _fake_audio_provider(monkeypatch, [_BOTH_SENTENCES, *_SENTENCES])
+    # Two calls left: the single request and the first chunk; the budget refuses the
+    # second chunk before it reaches the provider.
+    with pytest.raises(AssertionError, match="request failed"):
+        _transcription_check(tmp_path, max_calls=2)
+    assert len(received) == 2
 
 
 def test_wheel_version_comes_from_gaik_metadata(tmp_path):
