@@ -169,9 +169,10 @@ def test_evidence_pack_includes_source_metadata(tmp_path):
         )
     ]
     pack = gen._assemble_evidence_pack(items, max_evidence_chars=None)
-    assert "Source 1: doc.txt" in pack
-    assert "Type: text" in pack
+    assert "Source 1: doc.txt (text)" in pack
     assert "hello" in pack
+    # The pack names a source by its file name; the path stays in evidence_index.json.
+    assert str(tmp_path) not in pack
 
 
 def test_evidence_truncation_respects_max_chars(tmp_path):

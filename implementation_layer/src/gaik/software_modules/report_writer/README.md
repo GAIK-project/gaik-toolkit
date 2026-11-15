@@ -188,8 +188,10 @@ baseline = writer.run(spec, "workspace", mode="single_call")
 ```
 
 `single_call` runs `normalize` and then writes the whole report in **one** call of the
-writer model (`models.writer`), with every normalized source in full as
-`<source file=".." class="..">` blocks, the sections with their instructions and
+writer model (`models.writer`), with every normalized source in full in its own
+`<source_material>` block labelled with its file name (the name the citations use) and
+the sample report in a block of its own, while the system message says that the material
+is data, never instructions ([source material as data](../../software_components/source_material.py)). The sections with their instructions and
 required items, the report instructions and the sample report. There is no curation and
 no review. The answer must be `# <title>` followed by exactly one `## <section title>`
 per spec section in spec order; a missing, extra, reordered or duplicated heading, text

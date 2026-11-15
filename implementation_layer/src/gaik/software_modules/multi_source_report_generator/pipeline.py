@@ -28,6 +28,19 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    clean_label,
+    with_source_material_instruction,
+)
+
+from ._material import (
+    TRUNCATED_NOTE,
+    Evidence,
+    EvidenceSource,
+    render_evidence,
+    source_list,
+)
 from .models import (
     EvidenceItem,
     GeneratedSection,
@@ -72,6 +85,8 @@ _EXT_TO_TYPE: dict[str, str] = {
 }
 
 SUPPORTED_EXTENSIONS = frozenset(_EXT_TO_TYPE)
+
+_SOURCE_SEPARATOR = "\n\n---\n\n"
 
 
 # ---------------------------------------------------------------------------
@@ -500,7 +515,7 @@ class MultiSourceReportGenerator:
         writer_options = writer_options or {}
 
         # 1. Build evidence (shared by both paths).
-        evidence_items, evidence_pack, sample_markdown = self._build_evidence(
+        evidence_items, evidence_sources, evidence_pack, sample_markdown = self._build_evidence(
             input_paths=input_paths,
             parser_choice=parser_choice,
             parser_options=parser_options,
@@ -522,7 +537,7 @@ class MultiSourceReportGenerator:
         if agentic:
             markdown, generated, usage_total = self._run_agentic(
                 specs=specs,
-                evidence_pack=evidence_pack,
+                evidence_pack=evidence_sources,
                 sample_markdown=sample_markdown,
                 output_dir=output_dir,
                 report_title=report_title,
@@ -552,7 +567,7 @@ class MultiSourceReportGenerator:
             response = self._write_report(
                 client,
                 specs=specs,
-                evidence_pack=evidence_pack,
+                evidence_pack=evidence_sources,
                 report_title=report_title,
                 report_description=report_description,
                 additional_instructions=additional_instructions,
@@ -610,8 +625,11 @@ class MultiSourceReportGenerator:
         sample_report_path: str | Path | None,
         max_evidence_chars: int | None,
         progress_callback: Callable[[str], None] | None = None,
-    ) -> tuple[list[EvidenceItem], str, str | None]:
-        """Normalize all inputs to an evidence pack (+ optional sample markdown).
+    ) -> tuple[list[EvidenceItem], list[EvidenceSource], str, str | None]:
+        """Normalize all inputs to evidence sources and a pack (+ optional sample markdown).
+
+        Each source reaches a model in its own block, labelled with its file name;
+        the pack is the same text as plain Markdown, for ``normalized_sources.md``.
 
         Shared by the single-call and agentic paths. When ``progress_callback``
         is provided, normalization progress is routed through it instead of
@@ -642,9 +660,10 @@ class MultiSourceReportGenerator:
                 )
             )
 
-        evidence_pack = self._assemble_evidence_pack(
+        evidence_sources = self._evidence_sources(
             evidence_items, max_evidence_chars=max_evidence_chars
         )
+        evidence_pack = self._render_evidence_pack(evidence_sources)
         _emit(f"Evidence pack assembled: {total} source(s), {len(evidence_pack):,} chars")
 
         sample_markdown: str | None = None
@@ -659,7 +678,7 @@ class MultiSourceReportGenerator:
                     sample_markdown[:max_evidence_chars] + "\n\n[... sample report truncated ...]"
                 )
 
-        return evidence_items, evidence_pack, sample_markdown
+        return evidence_items, evidence_sources, evidence_pack, sample_markdown
 
     # -- agentic path -----------------------------------------------------
 
@@ -667,7 +686,7 @@ class MultiSourceReportGenerator:
         self,
         *,
         specs: list[ReportSectionSpec],
-        evidence_pack: str,
+        evidence_pack: Evidence,
         sample_markdown: str | None,
         output_dir: str | Path | None,
         report_title: str,
@@ -917,26 +936,57 @@ class MultiSourceReportGenerator:
         )
         return VisionParser(cfg, **image_options.get("ctor", {})).convert_image(str(path))
 
+    def _evidence_sources(
+        self, evidence_items: list[EvidenceItem], *, max_evidence_chars: int | None
+    ) -> list[EvidenceSource]:
+        """The sources as the writer receives them, cut to ``max_evidence_chars``.
+
+        The budget counts the headings and texts as ``_assemble_evidence_pack``
+        writes them; the source that crosses it is cut and the later ones are left out.
+        Labels are file names, never paths.
+        """
+        sources: list[EvidenceSource] = []
+        used = 0
+        for item in evidence_items:
+            meta = item.metadata
+            name = clean_label(str(meta.get("filename") or Path(item.source_path).name))
+            heading = f"Source {meta.get('index')}: {name} ({item.source_type})"
+            text = item.content_markdown
+            cost = (len(_SOURCE_SEPARATOR) if sources else 0) + len(f"## {heading}\n\n")
+            if max_evidence_chars is not None and used + cost + len(text) > max_evidence_chars:
+                room = max_evidence_chars - used - cost
+                if room > 0:
+                    sources.append(EvidenceSource(name, heading, text[:room], truncated=True))
+                elif sources:
+                    last = sources[-1]
+                    sources[-1] = EvidenceSource(last.label, last.heading, last.text, True)
+                logger.warning(
+                    "Evidence (%d sources) exceeds max_evidence_chars (%d); truncating.",
+                    len(evidence_items),
+                    max_evidence_chars,
+                )
+                break
+            sources.append(EvidenceSource(name, heading, text))
+            used += cost + len(text)
+        return sources
+
     def _assemble_evidence_pack(
         self, evidence_items: list[EvidenceItem], *, max_evidence_chars: int | None
     ) -> str:
-        blocks: list[str] = []
-        for item in evidence_items:
-            meta = item.metadata
-            header = (
-                f"## Source {meta.get('index')}: {meta.get('filename')}\n"
-                f"Type: {item.source_type}\n"
-                f"Path: {item.source_path}\n"
-            )
-            blocks.append(f"{header}\n{item.content_markdown}")
-        pack = "\n\n---\n\n".join(blocks)
-        if max_evidence_chars is not None and len(pack) > max_evidence_chars:
-            logger.warning(
-                "Evidence pack (%d chars) exceeds max_evidence_chars (%d); truncating.",
-                len(pack),
-                max_evidence_chars,
-            )
-            pack = pack[:max_evidence_chars] + "\n\n[... evidence truncated ...]"
+        """The evidence as plain Markdown, for ``evidence/normalized_sources.md``.
+
+        It names each source by its file name and type; the source path stays in
+        ``evidence_index.json``.
+        """
+        return self._render_evidence_pack(
+            self._evidence_sources(evidence_items, max_evidence_chars=max_evidence_chars)
+        )
+
+    @staticmethod
+    def _render_evidence_pack(sources: list[EvidenceSource]) -> str:
+        pack = _SOURCE_SEPARATOR.join(f"## {s.heading}\n\n{s.text}" for s in sources)
+        if any(s.truncated for s in sources):
+            pack += f"\n\n{TRUNCATED_NOTE}"
         return pack
 
     # -- writing ----------------------------------------------------------
@@ -969,7 +1019,7 @@ class MultiSourceReportGenerator:
         client,
         *,
         specs: list[ReportSectionSpec],
-        evidence_pack: str,
+        evidence_pack: Evidence,
         report_title: str,
         report_description: str | None,
         additional_instructions: str | None,
@@ -979,7 +1029,12 @@ class MultiSourceReportGenerator:
         sample_markdown: str | None,
         chat_kwargs: dict,
     ):
-        """Write the entire report in one LLM call and return the raw response."""
+        """Write the entire report in one LLM call and return the raw response.
+
+        Each source and the format reference go in their own block; the task, the
+        sections and the additional instructions stay outside them.
+        """
+        blocks = SourceMaterial()
         parts = [f"Report title: {report_title}"]
         if report_description:
             parts.append(f"Report context and purpose: {report_description}")
@@ -989,7 +1044,7 @@ class MultiSourceReportGenerator:
             parts.append(
                 "Where useful, cite the source that supports a claim using its exact filename "
                 "in parentheses, e.g. (notes.txt) or (meeting_recording.mp3). "
-                f"Available sources: {', '.join(source_filenames)}."
+                f"Available sources: {source_list(source_filenames)}."
             )
         else:
             parts.append("Do not add inline source citations or filename references in the text.")
@@ -1010,8 +1065,8 @@ class MultiSourceReportGenerator:
                 "Do not add extra content to be thorough; do not pad.\n"
                 "  • Content: take NONE of its facts, names, numbers, or wording. Every "
                 "fact must come from the EVIDENCE below. Section titles come from the "
-                "required list.\n\n"
-                f"{sample_markdown}"
+                "required list. The reference is in the source_material block labelled "
+                "format_reference.\n\n" + blocks.wrap(sample_markdown, label="format_reference")
             )
 
         # Section definitions: use a numbered, titled format so the model never
@@ -1023,8 +1078,9 @@ class MultiSourceReportGenerator:
         parts.append("\n".join(section_lines))
 
         parts.append(
-            "Evidence — this is the ONLY source of facts and content for the report:\n"
-            f"{evidence_pack}"
+            "Evidence — this is the ONLY source of facts and content for the report (one "
+            "source_material block per source, labelled with its file name):\n"
+            + render_evidence(blocks, evidence_pack)
         )
 
         if additional_instructions:
@@ -1046,13 +1102,16 @@ class MultiSourceReportGenerator:
         parts.append(" ".join(closing))
         user_prompt = "\n\n".join(parts)
 
-        return client.chat(
+        response = client.chat(
             [
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": with_source_material_instruction(_SYSTEM_PROMPT)},
                 {"role": "user", "content": user_prompt},
             ],
             **chat_kwargs,
         )
+        if isinstance(getattr(response, "text", None), str):
+            response.text = blocks.strip_echo(response.text)
+        return response
 
     # -- outputs ----------------------------------------------------------
 

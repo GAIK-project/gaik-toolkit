@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 
+from .._material import Evidence
 from ..models import GeneratedSection, ReportSectionSpec
 from .section_writer import _merge_usage, create_section_writer_graph
 from .state import ReportState
@@ -68,12 +69,12 @@ def _make_section_runner(spec: ReportSectionSpec, section_graph, id_to_title: di
         # Resolve this section's dependency context from the finalized content
         # of completed layers (available because of the join barrier).
         section_content = state.get("section_content", {})
-        dep_blocks = []
+        # Each dependency is sent in its own block, labelled with its title.
+        dependencies_context: dict[str, str] = {}
         for dep in spec.depends_on:
             content = (section_content.get(dep) or "").strip()
             if content:
-                dep_blocks.append(f"## {id_to_title.get(dep, dep)}\n\n{content}")
-        dependencies_context = "\n\n".join(dep_blocks)
+                dependencies_context[id_to_title.get(dep, dep)] = content
 
         section_state = {
             "section_id": spec.id,
@@ -167,7 +168,7 @@ def build_orchestrator_graph(
 def run_agentic_report(
     *,
     specs: list[ReportSectionSpec],
-    evidence_pack: str,
+    evidence_pack: Evidence,
     matched_samples: dict,
     sample_report_provided: bool,
     output_dir,
@@ -187,6 +188,9 @@ def run_agentic_report(
     reporter,
 ) -> tuple[str, list[GeneratedSection], dict]:
     """Run sections in dependency layers, review each, and assemble the report.
+
+    ``evidence_pack`` is one ``EvidenceSource`` per source, each sent in its own
+    labelled block, or one text sent as a single block.
 
     Returns ``(markdown, generated_sections, usage)``. When ``strict_review`` is
     True and any section has unresolved reviewer edits, raises **before** the

@@ -22,6 +22,10 @@ from gaik.software_components.report_synthesizer import (
     ReportSection,
     ReportSynthesizer,
 )
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    with_source_material_instruction,
+)
 from gaik.software_components.source_normalizer import NormalizedSources, SourceNormalizer
 
 from .prompts import build_single_call_prompt, single_call_system_prompt
@@ -205,17 +209,18 @@ class ReportWriter:
         if progress_callback:
             progress_callback("Writing the whole report in one call")
         config = {**self.config, "model": spec.models.writer} if spec.models.writer else self.config
-        prompt = build_single_call_prompt(spec, sources, _sample_text(spec, workspace))
+        blocks = SourceMaterial()
+        prompt = build_single_call_prompt(spec, sources, _sample_text(spec, workspace), blocks)
+        system = with_source_material_instruction(
+            single_call_system_prompt(spec.settings.citations)
+        )
         response = create_llm_client(config).chat(
-            [
-                {"role": "system", "content": single_call_system_prompt(spec.settings.citations)},
-                {"role": "user", "content": prompt},
-            ],
+            [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
             **spec.settings.writer.chat_kwargs(),
         )
         report = Report(
             title=spec.title,
-            sections=_split_sections(response.text, spec),
+            sections=_split_sections(blocks.strip_echo(response.text), spec),
             review_log=[],
             usage=response.usage,
         )
