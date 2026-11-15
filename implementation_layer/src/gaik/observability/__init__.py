@@ -5,7 +5,9 @@ provider-specific normalizers and a small timing helper. Components
 that call an LLM should report results via these types so downstream
 consumers (logging, dashboards, compliance pipelines) get a consistent
 shape regardless of which component produced the call. ``llm_span`` turns a
-call into an OpenTelemetry span when the ``gaik[otel]`` extra is configured.
+call into an OpenTelemetry span when the ``gaik[otel]`` extra is configured or
+the application has set its own tracer provider (``gaik.observability.tracing``
+says exactly when).
 """
 
 from .pricing import (

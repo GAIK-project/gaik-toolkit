@@ -147,6 +147,67 @@ def test_without_a_recording_tracer_the_call_skips_the_span_s_work(monkeypatch, 
         call.record(None, output_length=1)
 
 
+# -- when spans are emitted: the extra, the application's own provider, the API alone --
+
+
+def only_the_api(monkeypatch, default="proxy"):
+    """No gaik[otel] extra, and no provider set by the application.
+
+    The test process has an SDK provider set globally (by ``spans``), so the
+    API's own default is put back for the test: the proxy provider, or the
+    no-op one.
+    """
+    monkeypatch.setattr(tracing, "_extra", False)
+    provider = trace.ProxyTracerProvider() if default == "proxy" else trace.NoOpTracerProvider()
+    monkeypatch.setattr(trace, "get_tracer_provider", lambda: provider)
+
+
+@needs_exporter
+def test_with_the_extra_spans_are_emitted_without_an_application_provider(monkeypatch, off):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setattr(
+        trace, "get_tracer_provider", lambda: trace.ProxyTracerProvider()
+    )  # the application has set none
+    exporter = InMemorySpanExporter()
+    from opentelemetry.exporter.otlp.proto.http import trace_exporter
+
+    monkeypatch.setattr(trace_exporter, "OTLPSpanExporter", lambda: exporter)
+
+    assert tracing.tracing_enabled()
+    with llm_span("DataExtractor", provider="openai", model="m") as call:
+        assert call.recording
+    tracing._provider.force_flush()
+    (span,) = exporter.get_finished_spans()
+    assert span.attributes["gaik.component.name"] == "DataExtractor"
+    tracing._provider.shutdown()
+
+
+@needs_otel
+def test_without_the_extra_spans_go_to_the_application_s_own_provider(spans, monkeypatch):
+    monkeypatch.setattr(tracing, "_extra", False)
+    # ``spans`` set an SDK TracerProvider as the global one, as an application would.
+    assert isinstance(trace.get_tracer_provider(), TracerProvider)
+
+    assert tracing.tracing_enabled()
+    with llm_span("DataExtractor", provider="openai", model="m") as call:
+        call.record(None, output_length=3)
+    (span,) = spans()
+    assert span.attributes["gaik.component.name"] == "DataExtractor"
+    assert span.attributes["gaik.output.length"] == 3
+
+
+@needs_otel
+@pytest.mark.parametrize("default", ["proxy", "noop"])
+def test_with_only_the_opentelemetry_api_no_spans_are_emitted(default, spans, monkeypatch):
+    only_the_api(monkeypatch, default)
+
+    assert not tracing.tracing_enabled()
+    with llm_span("DataExtractor", provider="openai", model="m") as call:
+        assert not call.recording
+        call.record(None, output_length=3)
+    assert not spans()
+
+
 def test_a_call_becomes_one_span_with_its_usage_and_no_text(spans):
     usage = build_usage_record(
         "openai",

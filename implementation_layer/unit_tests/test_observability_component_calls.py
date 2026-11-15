@@ -18,6 +18,7 @@ from unittest.mock import ANY
 
 import pytest
 from gaik.observability import tracing
+from gaik.software_components import _http
 from gaik.software_components.llm.base import ChatResponse
 from gaik.software_components.llm.traced_client import TracedProviderClient
 from pydantic import BaseModel
@@ -524,6 +525,60 @@ def _transcriber_chunked(mp, tmp_path, error):
     }
 
 
+def _transcriber_without_prompt(mp, tmp_path, error):
+    """Without a prompt the request carries no ``prompt`` key at all (#124)."""
+    from gaik.software_components.transcriber import transcriber as module
+
+    calls = _Calls()
+    client = _Audio(calls, _transcription_response(), error)
+    mp.setattr(module, "_create_audio_client", lambda config: client)
+    instance = object.__new__(module.Transcriber)
+    instance.api_config = {"provider": "openai", "api_key": "test-key"}
+    audio = _file(tmp_path, "talk.mp3")
+    run = lambda: instance._single_pass_transcription(audio, None, "gpt-4o-transcribe")  # noqa: E731
+    return run, {
+        "component": "Transcriber",
+        "input_tokens": 70,
+        "operation": "transcription",
+        "lengths": (None, len(ANSWER)),  # no prompt, so no input length
+        "calls": calls,
+        "requests": [{"model": "gpt-4o-transcribe", "file": ANY}],
+    }
+
+
+def _transcriber_chunked_without_prompt(mp, tmp_path, error):
+    """The first chunk has no prompt; a later one carries the previous transcript (#130)."""
+    from gaik.software_components.transcriber import transcriber as module
+
+    calls = _Calls()
+    client = _Audio(calls, _transcription_response(), error)
+    mp.setattr(module, "_create_audio_client", lambda config: client)
+    mp.setattr(module.time, "sleep", lambda seconds: None)
+    audio = _file(tmp_path, "talk.mp3")
+
+    def run():
+        return module.split_and_transcribe_with_context(
+            str(audio),
+            {"provider": "openai", "api_key": "test-key"},
+            max_duration_seconds=1,  # three chunks of the 2 s fake
+            audio=_FakeAudio(),
+            base_prompt=None,
+            transcription_model="gpt-4o-transcribe",
+        )
+
+    bare = {"model": "gpt-4o-transcribe", "file": ANY}
+    later = {"model": "gpt-4o-transcribe", "file": ANY, "prompt": ANSWER}
+    return run, {
+        "component": "Transcriber",
+        "spans": 3,
+        "swallows": True,
+        "operation": "transcription",
+        "calls": calls,
+        # A failed chunk leaves no transcript, so the next one has no prompt either.
+        "requests": [bare, bare, bare] if error else [bare, later, later],
+    }
+
+
 def _whisper_local(mp, tmp_path, error):
     from gaik.software_components.transcriber import whisper_local
 
@@ -652,11 +707,12 @@ def _vision_extractor(provider):
                 "usageMetadata": {"promptTokenCount": 300, "candidatesTokenCount": 40},
             }
             response = _ns(raise_for_status=lambda: None, json=lambda: payload)
-            mp.setattr(module.requests, "post", _answering(calls, response, error))
+            # Main's _http looks up requests.post at call time.
+            mp.setattr(_http.requests, "post", _answering(calls, response, error))
             call = extractor._call_google
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/"
-                "models/gemini-2.5-flash:generateContent?key=test-key"
+                "models/gemini-2.5-flash:generateContent"
             )
             expected |= {
                 "input_tokens": 300,
@@ -669,7 +725,10 @@ def _vision_extractor(provider):
                 "requests": [
                     {
                         "args": (url,),
-                        "headers": {"Content-Type": "application/json; charset=utf-8"},
+                        "headers": {
+                            "x-goog-api-key": "test-key",
+                            "Content-Type": "application/json; charset=utf-8",
+                        },
                         "json": ANY,
                         "timeout": (30, 300),
                     }
@@ -753,6 +812,7 @@ def _multimodal_parser(provider):
 
         document = _file(tmp_path, "page.png", b"\x89PNG fake")
         run = lambda: call(document, "system", SECRET)[0]  # noqa: E731
+        run.parse = call  # for test_a_missing_pdf_makes_no_span
         return run, expected
 
     return case
@@ -844,6 +904,52 @@ def _llm_judge(provider, *, images=False):
     return case
 
 
+def _classify_text(kind):
+    def case(mp, tmp_path, error):
+        from gaik import operations
+        from gaik.software_components import llm as llm_package
+
+        parsed = _ns(
+            best="invoice",
+            scores=[_ns(label="invoice", probability=0.8), _ns(label="memo", probability=0.2)],
+        )
+        config = {"provider": "openai", "model": "gpt-4.1", "api_key": "test-key"}
+        if kind == "openai":
+            calls = _Calls()
+            client = _raw_openai(calls, _completion(parsed=parsed), error)
+            expected = {
+                "provider": "openai",
+                "input_tokens": 100,
+                "settings": {"gen_ai.request.temperature": 0.0, "gen_ai.request.top_p": 1.0},
+                "calls": calls,
+                "requests": [
+                    {
+                        "model": "gpt-4.1",
+                        "messages": ANY,
+                        "response_format": ANY,
+                        "top_p": 1.0,
+                        "timeout": 120.0,
+                        "temperature": 0.0,
+                    }
+                ],
+            }
+        else:  # a non-OpenAI config gets a ProviderClient
+            fake, client = _provider_client(error, parsed)
+            expected = {
+                "provider": "openai",
+                "calls": fake.calls,
+                "requests": [{"response_format": ANY, "model": "gpt-4.1"}],
+            }
+        mp.setattr(llm_package, "build_compat_client", lambda c: client)
+        settings = operations.OperationSettings(config=config)
+        run = lambda: operations.classify_text(  # noqa: E731
+            SECRET, ["invoice", "memo"], settings=settings
+        )
+        return run, {"component": "classify_text", **expected}
+
+    return case
+
+
 CASES = {
     "TranscriptEnhancer": _transcript_enhancer,
     "SchemaGenerator": _schema_generator,
@@ -861,6 +967,8 @@ CASES = {
     "TextToSpeech": _text_to_speech,
     "Transcriber": _transcriber,
     "Transcriber-chunked": _transcriber_chunked,
+    "Transcriber-no-prompt": _transcriber_without_prompt,
+    "Transcriber-chunked-no-prompt": _transcriber_chunked_without_prompt,
     "whisper_local": _whisper_local,
     "VisionExtractor-openai": _vision_extractor("openai"),
     "VisionExtractor-claude": _vision_extractor("claude"),
@@ -874,6 +982,8 @@ CASES = {
     "LLMJudge-anthropic": _llm_judge("anthropic"),
     "LLMJudge-google": _llm_judge("google"),
     "LLMJudge-shared": _llm_judge("shared"),
+    "classify_text-openai": _classify_text("openai"),
+    "classify_text-shared": _classify_text("shared"),
 }
 
 
@@ -1002,3 +1112,30 @@ def test_a_chunk_s_span_excludes_the_pause_after_it(spans, monkeypatch, tmp_path
     run()
 
     assert pauses == [1, 2, 3]
+
+
+@pytest.mark.parametrize("provider", ["openai", "claude", "shared", "gemini"])
+def test_a_missing_pdf_makes_no_span(provider, spans, monkeypatch, tmp_path):
+    """The PDF is read before the span opens, so a missing file is no model call."""
+    if provider == "gemini":
+        from gaik.software_components.parsers.multimodal_parser import multimodal_parser as module
+
+        calls = _Calls()
+        monkeypatch.setattr(_http.requests, "post", _answering(calls, None, None))
+        parser = object.__new__(module.MultimodalParser)
+        parser.config = {"vertex_ai": False, "api_key": "test-key", "model": "gemini-2.5-flash"}
+        parser.reasoning_effort = "low"
+        parse = parser._call_google
+    else:
+        run, expected = _multimodal_parser(provider)(monkeypatch, tmp_path, None)
+        parse, calls = run.parse, expected["calls"]
+    if provider == "shared":
+        pytest.importorskip("fitz")
+
+    with pytest.raises(Exception) as caught:
+        parse(tmp_path / "missing.pdf", "system", SECRET)
+
+    # PyMuPDF (the shared path) raises its own FileNotFoundError class.
+    assert type(caught.value).__name__ == "FileNotFoundError"
+    assert calls == []
+    assert not spans()

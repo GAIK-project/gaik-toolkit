@@ -672,10 +672,21 @@ def test_putting_a_method_back_gives_the_client_its_own(spans, monkeypatch):
 
 
 def test_with_only_the_opentelemetry_api_the_factory_returns_the_adapter_itself(monkeypatch, off):
-    # chromadb and others bring the API (and SDK) but not the extra's exporter.
+    # chromadb and others bring the API (and SDK) but not the extra's exporter,
+    # and set no tracer provider.
     monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http", None)
+    if trace is not None:
+        tracing_tests.only_the_api(monkeypatch)
+        monkeypatch.setattr(tracing, "_extra", None)  # looked up again, with the exporter gone
     client = create_llm_client({"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"})
     assert type(client).__name__ == "OpenAIProvider"
+
+
+def test_without_the_extra_the_factory_wraps_for_the_application_s_provider(monkeypatch, spans):
+    monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http", None)
+    monkeypatch.setattr(tracing, "_extra", None)  # ``spans`` set the application's provider
+    client = create_llm_client({"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"})
+    assert isinstance(client, TracedProviderClient)
 
 
 def test_a_method_stored_under_another_name_is_stored(spans):

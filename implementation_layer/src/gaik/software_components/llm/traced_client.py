@@ -1,10 +1,11 @@
 """OpenTelemetry spans for every call of a ``ProviderClient``.
 
 ``create_llm_client()`` returns its client wrapped in ``TracedProviderClient``
-when gaik's tracing is on (the ``gaik[otel]`` extra, see
-``gaik.observability.tracing``), so ``chat``, ``chat_parsed``, ``chat_stream``
-and ``embed`` each make one ``llm_call`` span. Without the extra, or with
-``OTEL_SDK_DISABLED=true``, the factory returns the client unwrapped.
+when gaik's tracing is on (the ``gaik[otel]`` extra, or an application's own
+tracer provider; see ``gaik.observability.tracing``), so ``chat``,
+``chat_parsed``, ``chat_stream`` and ``embed`` each make one ``llm_call`` span.
+Otherwise, or with ``OTEL_SDK_DISABLED=true``, the factory returns the client
+unwrapped.
 
 The wrapper changes nothing a caller sees: arguments are passed on as given,
 and results, exceptions and retries are the client's own. Every other
@@ -21,12 +22,13 @@ reports them as it sends the request (``record_request``) and reads the
 response (``record_response``); a stream reports neither. A call made inside a
 component's own ``llm_span`` gets no second span.
 
-The factory wraps only when the ``gaik[otel]`` extra is installed; the
-OpenTelemetry API alone, which other packages bring, leaves the client as it
-is. Limits: a stream's span starts at its first read, so a client whose
-``chat_stream`` fails before returning gets none. A call made in a thread
-started inside a component's ``llm_span`` does not see that span (threads do
-not inherit context), so it gets a span of its own.
+The factory wraps only when the ``gaik[otel]`` extra is installed or the
+application has already set a real global tracer provider; the OpenTelemetry
+API alone, which other packages bring, leaves the client as it is. Limits: a
+stream's span starts at its first read, so a client whose ``chat_stream`` fails
+before returning gets none. A call made in a thread started inside a
+component's ``llm_span`` does not see that span (threads do not inherit
+context), so it gets a span of its own.
 """
 
 from __future__ import annotations

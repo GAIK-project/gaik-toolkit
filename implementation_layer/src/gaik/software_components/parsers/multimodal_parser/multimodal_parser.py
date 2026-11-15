@@ -313,16 +313,15 @@ class MultimodalParser:
         if self.model_provider in _ANTHROPIC_PROVIDERS:
             options["timeout"] = self.config.get("timeout") or _ANTHROPIC_TIMEOUT_S
         try:
+            # The document is read and encoded before the span: the span times the call only.
+            content = build_chat_document_content([pdf_path], user_prompt)
             with llm_span(
                 "MultimodalParser", provider=provider_of(client), model=self.config["model"]
             ) as call:
                 response = client.chat(
                     [
                         {"role": "system", "content": system_prompt},
-                        {
-                            "role": "user",
-                            "content": build_chat_document_content([pdf_path], user_prompt),
-                        },
+                        {"role": "user", "content": content},
                     ],
                     **options,
                 )
@@ -338,6 +337,8 @@ class MultimodalParser:
         self, pdf_path: Path, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict[str, int]]:
         client = create_openai_client(self.config)
+        # The PDF is read and encoded before the span: the span times the call only.
+        content = _build_openai_content(pdf_path, user_prompt)
         with llm_span(
             "MultimodalParser", provider=provider_of(client), model=self.config["model"]
         ) as call:
@@ -345,12 +346,7 @@ class MultimodalParser:
             response = client.responses.create(
                 model=self.config["model"],
                 instructions=system_prompt,
-                input=[
-                    {
-                        "role": "user",
-                        "content": _build_openai_content(pdf_path, user_prompt),
-                    }
-                ],
+                input=[{"role": "user", "content": content}],
                 reasoning={"effort": self.reasoning_effort},
                 max_output_tokens=32768,
             )
@@ -365,6 +361,8 @@ class MultimodalParser:
         self, pdf_path: Path, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict[str, int]]:
         client = create_claude_client(self.config)
+        # The PDF is read and encoded before the span: the span times the call only.
+        content = _build_claude_content(pdf_path, user_prompt)
         with (
             llm_span(
                 "MultimodalParser", provider=provider_of(client), model=self.config["model"]
@@ -375,12 +373,7 @@ class MultimodalParser:
                 system=system_prompt,
                 thinking={"type": "adaptive"},
                 output_config={"effort": self.reasoning_effort},
-                messages=[
-                    {
-                        "role": "user",
-                        "content": _build_claude_content(pdf_path, user_prompt),
-                    },
-                ],
+                messages=[{"role": "user", "content": content}],
             ) as stream,
         ):
             record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})

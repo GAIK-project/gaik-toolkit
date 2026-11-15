@@ -372,6 +372,7 @@ def test_tabular_agent_retries_are_counted_in_one_span(spans, tmp_path, monkeypa
 
 
 def test_gemini_rest_call_in_the_multimodal_parser(spans, monkeypatch, tmp_path):
+    from gaik.software_components import _http
     from gaik.software_components.parsers.multimodal_parser import multimodal_parser as module
 
     payload = {
@@ -380,7 +381,7 @@ def test_gemini_rest_call_in_the_multimodal_parser(spans, monkeypatch, tmp_path)
     }
     response = MagicMock()
     response.json.return_value = payload
-    monkeypatch.setattr(module.requests, "post", lambda *a, **k: response)
+    monkeypatch.setattr(_http.requests, "post", lambda *a, **k: response)
     monkeypatch.setattr(module, "_build_google_body", lambda *a: {})
     parser = object.__new__(module.MultimodalParser)
     parser.config = {"vertex_ai": False, "api_key": "test-key", "model": "gemini-2.5-flash"}
@@ -396,14 +397,26 @@ def test_gemini_rest_call_in_the_multimodal_parser(spans, monkeypatch, tmp_path)
     _assert_clean(span)
 
 
-def test_components_work_the_same_with_tracing_off(off, monkeypatch):
+def test_the_answer_generator_sends_the_same_request_and_answer_with_tracing_off(
+    spans, monkeypatch
+):
+    # Every other direct call site is compared on and off in
+    # test_observability_component_calls.py.
     pytest.importorskip("langchain_core")
+    traced_client = _RawOpenAI(_completion())
+    traced = _answer_generator(traced_client, stream=False).generate("q", [_doc("x")])
+    assert len(spans()) == 1
+
     monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
     tracing._reset_for_tests()
-    generator = _answer_generator(_RawOpenAI(_completion()), stream=False)
+    plain_client = _RawOpenAI(_completion())
+    plain = _answer_generator(plain_client, stream=False).generate("q", [_doc("x")])
 
-    assert generator.generate("q", [_doc("x")]) == ANSWER
     assert not tracing.tracing_enabled()
+    assert plain == traced == ANSWER
+    assert plain_client.calls == traced_client.calls
+    assert len(plain_client.calls) == 1
+    assert len(spans()) == 1  # still only the traced call's
 
 
 def test_a_transcription_span_has_tokens_but_no_cost(spans):
@@ -420,13 +433,23 @@ def test_a_transcription_span_has_tokens_but_no_cost(spans):
     assert "gaik.cost.usd" not in span.attributes
 
 
-def test_no_component_span_without_the_extra(spans, monkeypatch):
+def test_no_component_span_with_only_the_opentelemetry_api(spans, monkeypatch):
     pytest.importorskip("langchain_core")
-    monkeypatch.setattr(tracing, "_extra", False)
+    tracing_tests.only_the_api(monkeypatch)
     generator = _answer_generator(_RawOpenAI(_completion()), stream=False)
 
     assert generator.generate("q", [_doc("x")]) == ANSWER
     assert not spans()
+
+
+def test_without_the_extra_a_component_span_goes_to_the_application_s_provider(spans, monkeypatch):
+    pytest.importorskip("langchain_core")
+    monkeypatch.setattr(tracing, "_extra", False)  # ``spans`` set the application's provider
+    generator = _answer_generator(_RawOpenAI(_completion()), stream=False)
+
+    assert generator.generate("q", [_doc("x")]) == ANSWER
+    (span,) = spans()
+    assert span.attributes["gaik.component.name"] == "AnswerGenerator"
 
 
 def test_llm_judge_text_call_is_one_span(spans, monkeypatch):

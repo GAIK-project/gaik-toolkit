@@ -26,10 +26,23 @@ Enabled by the standard environment variables:
   ``gaik.run.id=...,gaik.config.blueprint_version=3``.
 - ``OTEL_SDK_DISABLED=true`` turns gaik's spans off.
 
-Without an endpoint, gaik's spans go to the application's tracer provider if it
-has set one, at any time, and are otherwise dropped at no cost. Without the
-extra, every call here is a no-op and gaik behaves as before. A fault in the
-instrumentation is logged and never reaches the caller.
+When spans are emitted:
+
+- With the extra and an endpoint: through gaik's own exporter, as above.
+- With the extra and no endpoint: to the application's tracer provider if it
+  has set one, at any time, and otherwise dropped at no cost.
+- Without the extra, when the application has set a real tracer provider of
+  its own (an OpenTelemetry SDK ``TracerProvider``, say) as the global one:
+  to that provider. A client from ``create_llm_client()`` is wrapped only if
+  the provider was set before the client was made.
+- Never with the OpenTelemetry API alone, which other packages bring
+  (chromadb, for one): its global provider is a proxy or no-op one until an
+  application sets a real one, and gaik then makes no spans.
+- Never with ``OTEL_SDK_DISABLED=true``, or with an endpoint set but the extra
+  missing (a warning says why).
+
+When no spans are emitted, every call here is a no-op and gaik behaves as
+before. A fault in the instrumentation is logged and never reaches the caller.
 
 If the collector cannot be reached, a short script waits up to the exporter's
 timeout (``OTEL_EXPORTER_OTLP_TIMEOUT``, 10 s by default) when it exits, while
@@ -159,14 +172,18 @@ def _resolve_tracer() -> Any:
 
 
 def tracing_enabled() -> bool:
-    """Whether the ``gaik[otel]`` extra is installed and gaik's tracing is not off.
+    """Whether gaik makes spans: tracing is not off, and the ``gaik[otel]`` extra
+    is installed or the application has set a real global tracer provider.
 
     The OpenTelemetry API alone, which other packages bring, is not enough.
-    True also when the spans are dropped because nothing collects them (no
-    endpoint and no application provider); ``LLMCallSpan.recording`` tells.
-    Never raises.
+    True also when the spans are dropped because nothing collects them (the
+    extra without an endpoint or an application provider);
+    ``LLMCallSpan.recording`` tells. Never raises.
     """
-    return _get_tracer() is not None and _extra_installed()
+    try:
+        return _get_tracer() is not None and (_extra_installed() or _app_provider_set())
+    except Exception:
+        return False
 
 
 def _extra_installed() -> bool:
@@ -183,6 +200,23 @@ def _extra_installed() -> bool:
         except (ImportError, ValueError):
             _extra = False
     return _extra
+
+
+def _app_provider_set() -> bool:
+    """Whether the application has set a real global tracer provider.
+
+    The API's default is a proxy provider, which stays a proxy until one is set,
+    and the no-op provider is not real either; any other one is the
+    application's (an SDK ``TracerProvider``, usually). Not cached: an
+    application may set its provider at any time. Never raises.
+    """
+    try:
+        from opentelemetry import trace
+
+        provider = trace.get_tracer_provider()
+        return not isinstance(provider, (trace.ProxyTracerProvider, trace.NoOpTracerProvider))
+    except Exception:
+        return False
 
 
 def in_llm_span() -> bool:
@@ -592,10 +626,11 @@ def _current(span: Any) -> Any:
 
 def _start(identity: dict[str, Any], operation: str = "chat") -> Any:
     # The OpenTelemetry API alone, which other packages bring, is not enough:
-    # gaik traces only with its own extra installed, as the client wrapper does.
-    tracer = _get_tracer()
-    if tracer is None or not _extra_installed():
+    # gaik traces with its own extra installed or into the application's own
+    # provider, as the client wrapper does (see tracing_enabled).
+    if not tracing_enabled():
         return None
+    tracer = _get_tracer()
     span = None
     try:
         from opentelemetry.trace import SpanKind
