@@ -157,6 +157,21 @@
       "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/extractor/README.md"
     },
     {
+      "name": "FieldsToDocx",
+      "inputs": [
+        "structured_json",
+        "validation_report",
+        "text",
+        "transcript",
+        "enhanced_transcript",
+        "parsed_text"
+      ],
+      "outputs": [
+        "word_document"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/fields_to_docx/README.md"
+    },
+    {
       "name": "FinnishTextProcessor",
       "inputs": [
         "text"
