@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import inspect
 import logging
 import queue
 import re
@@ -90,7 +91,15 @@ def _example(example_id: str):
     """Load an example spec, whose files must all exist under distinct names."""
     if example_id not in _example_ids():
         raise HTTPException(404, f"Unknown example: {example_id}")
-    spec = _gaik()[1].load(_examples_root() / example_id / "report_spec.json")
+    spec_class = _gaik()[1]
+    path = _examples_root() / example_id / "report_spec.json"
+    # An example may read files of a sibling example (project_meeting reads
+    # ../../multi_source_report_generator/), so its paths may reach anywhere under the
+    # examples' parent folder. A gaik before `root` reads them without that check.
+    if "root" in inspect.signature(spec_class.load).parameters:
+        spec = spec_class.load(path, root=_examples_root().parent)
+    else:
+        spec = spec_class.load(path)
     missing = [str(p.resolve()) for p in _paths(spec) if not p.is_file()]
     if missing:
         raise HTTPException(500, f"Example {example_id} is missing files: {', '.join(missing)}")

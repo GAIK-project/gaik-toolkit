@@ -8,6 +8,7 @@ Main Classes:
     - SourceNormalizer: Convert source files to Markdown texts
     - NormalizedSource: One file's text with its provenance
     - NormalizedSources: The texts of a set of files, saved and loaded as a folder
+    - SourcePathError: A path from a manifest or spec is absolute or leads out of its folder
 
 Example:
     >>> from gaik.software_components.source_normalizer import SourceNormalizer
@@ -16,12 +17,14 @@ Example:
 """
 
 from .models import NormalizedSource, NormalizedSources
+from .paths import SourcePathError
 from .source_normalizer import SourceNormalizer
 
 __all__ = [
     "SourceNormalizer",
     "NormalizedSource",
     "NormalizedSources",
+    "SourcePathError",
 ]
 
 __version__ = "0.1.0"

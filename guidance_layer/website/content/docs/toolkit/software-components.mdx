@@ -818,7 +818,7 @@ flowchart LR
 - Citation-ready text: each PDF page starts with a `[Page N]` line, Word headings become `#` headings, and spreadsheet tables carry the source row numbers
 - Recordings give the raw transcript, which has no per-utterance timestamps
 - Fails loudly: an unsupported type (such as `.pptx`, `.doc` or `.xls`), a missing file, two files with the same name, a PDF with no text layer or a file that yields no text raises instead of being skipped. All paths are checked before the first conversion
-- `save()` writes one Markdown file per source and a `sources.json` manifest, and `NormalizedSources.load()` reads them back, so the texts can be edited before use
+- `save()` writes one Markdown file per source and a `sources.json` manifest, and `NormalizedSources.load()` reads them back, so the texts can be edited before use; `load()` refuses an id that is not a plain file name, or a file that links out of the folder, with `SourcePathError` before reading it
 - Options: `vision_model`, `transcription_model` and `language`
 - Install: `pip install "gaik[source-normalizer]"`. Recordings need OpenAI or Azure OpenAI
 
