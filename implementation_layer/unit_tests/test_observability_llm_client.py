@@ -671,15 +671,38 @@ def test_putting_a_method_back_gives_the_client_its_own(spans, monkeypatch):
     assert client.chat(MESSAGES) == "ok"
 
 
-def test_with_only_the_opentelemetry_api_the_factory_returns_the_adapter_itself(monkeypatch, off):
+@needs_otel
+def test_with_only_the_opentelemetry_api_a_wrapped_client_makes_no_spans(monkeypatch, spans):
     # chromadb and others bring the API (and SDK) but not the extra's exporter,
-    # and set no tracer provider.
+    # and set no tracer provider. The client is wrapped, since an application
+    # may set one later, but its calls make no spans and pass through.
     monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http", None)
-    if trace is not None:
-        tracing_tests.only_the_api(monkeypatch)
-        monkeypatch.setattr(tracing, "_extra", None)  # looked up again, with the exporter gone
+    tracing_tests.only_the_api(monkeypatch)
+    monkeypatch.setattr(tracing, "_extra", None)  # looked up again, with the exporter gone
     client = create_llm_client({"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"})
-    assert type(client).__name__ == "OpenAIProvider"
+    client.raw = _openai_raw()
+
+    assert client.chat(MESSAGES).text == ANSWER
+    assert not spans()
+
+
+@needs_otel
+def test_a_client_made_before_the_application_sets_its_provider_is_traced_after(monkeypatch, spans):
+    monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http", None)
+    monkeypatch.setattr(tracing, "_extra", None)  # no extra
+    real = trace.get_tracer_provider()  # the application's, set by ``spans``
+    current = [trace.ProxyTracerProvider()]  # not set yet
+    monkeypatch.setattr(trace, "get_tracer_provider", lambda: current[0])
+    client = create_llm_client({"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"})
+    client.raw = _openai_raw()
+    assert client.chat(MESSAGES).text == ANSWER
+    assert not spans()
+
+    current[0] = real  # the application sets its provider
+    assert client.chat(MESSAGES).text == ANSWER
+
+    (span,) = spans()
+    assert span.name == "chat gpt-4.1"
 
 
 def test_without_the_extra_the_factory_wraps_for_the_application_s_provider(monkeypatch, spans):

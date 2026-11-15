@@ -120,16 +120,56 @@ def test_with_an_endpoint_gaik_exports_by_itself_and_leaves_the_global_provider_
 
 
 @needs_otel
-def test_an_endpoint_without_the_exporter_warns_and_sends_nothing(monkeypatch, off, caplog):
+def test_an_endpoint_without_the_exporter_or_an_app_provider_warns_and_sends_nothing(
+    monkeypatch, off, caplog
+):
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
     monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http.trace_exporter", None)
+    only_the_api(monkeypatch)
     with caplog.at_level("WARNING", logger=tracing.__name__):
-        assert tracing._resolve_tracer() is None
+        assert tracing._resolve_tracer() is not None  # follows a provider set later
     assert "Install gaik[otel]" in caplog.text
-    monkeypatch.setattr(tracing, "_get_tracer", tracing._resolve_tracer)
+    assert not tracing.tracing_enabled()
     with llm_span("DataExtractor", provider="openai", model="m") as call:
         assert call.recording is False
         call.record(None, output_length=1)
+
+
+@needs_otel
+def test_an_endpoint_without_the_exporter_sends_to_the_app_provider(monkeypatch, spans, caplog):
+    # The endpoint is the application's, for an exporter of its own (gRPC, say).
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http.trace_exporter", None)
+    monkeypatch.setattr(tracing, "_extra", False)
+    with caplog.at_level("WARNING", logger=tracing.__name__):
+        assert tracing.tracing_enabled()
+    assert "Install gaik[otel]" not in caplog.text
+    assert tracing._provider is None  # no exporter of gaik's own
+
+    with llm_span("DataExtractor", provider="openai", model="m") as call:
+        call.record(None, output_length=3)
+
+    (span,) = spans()
+    assert span.attributes["gaik.output.length"] == 3
+
+
+@needs_otel
+def test_an_app_provider_set_after_the_warning_still_gets_the_spans(monkeypatch, spans, caplog):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http.trace_exporter", None)
+    monkeypatch.setattr(tracing, "_extra", False)
+    real = trace.get_tracer_provider()  # the application's, set by ``spans``
+    current = [trace.ProxyTracerProvider()]
+    monkeypatch.setattr(trace, "get_tracer_provider", lambda: current[0])
+    with caplog.at_level("WARNING", logger=tracing.__name__):
+        assert not tracing.tracing_enabled()  # resolved, and cached, now
+    assert "Install gaik[otel]" in caplog.text
+
+    current[0] = real  # the application sets its provider later
+    with llm_span("DataExtractor", provider="openai", model="m"):
+        pass
+
+    assert len(spans()) == 1
 
 
 @needs_otel
@@ -206,6 +246,24 @@ def test_with_only_the_opentelemetry_api_no_spans_are_emitted(default, spans, mo
         assert not call.recording
         call.record(None, output_length=3)
     assert not spans()
+
+
+@needs_otel
+def test_provider_detection_needs_no_noop_provider_class(monkeypatch, spans, caplog):
+    # Older API versions have DefaultTracerProvider, or neither name.
+    real = trace.get_tracer_provider()
+    current = [trace.ProxyTracerProvider()]
+    monkeypatch.setattr(trace, "get_tracer_provider", lambda: current[0])
+    monkeypatch.delattr(trace, "NoOpTracerProvider")
+    assert not tracing._app_provider_set()
+    current[0] = real
+    assert tracing._app_provider_set()
+
+    # Without a proxy provider class gaik cannot tell, and makes no spans.
+    monkeypatch.delattr(trace, "ProxyTracerProvider")
+    with caplog.at_level("DEBUG", logger=tracing.__name__):
+        assert not tracing._app_provider_set()
+    assert "cannot tell" in caplog.text
 
 
 def test_a_call_becomes_one_span_with_its_usage_and_no_text(spans):

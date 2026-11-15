@@ -32,14 +32,15 @@ When spans are emitted:
 - With the extra and no endpoint: to the application's tracer provider if it
   has set one, at any time, and otherwise dropped at no cost.
 - Without the extra, when the application has set a real tracer provider of
-  its own (an OpenTelemetry SDK ``TracerProvider``, say) as the global one:
-  to that provider. A client from ``create_llm_client()`` is wrapped only if
-  the provider was set before the client was made.
+  its own (an OpenTelemetry SDK ``TracerProvider``, say) as the global one, at
+  any time: to that provider. An endpoint set for the application's own
+  exporter (gRPC, say) does not change this.
 - Never with the OpenTelemetry API alone, which other packages bring
   (chromadb, for one): its global provider is a proxy or no-op one until an
-  application sets a real one, and gaik then makes no spans.
-- Never with ``OTEL_SDK_DISABLED=true``, or with an endpoint set but the extra
-  missing (a warning says why).
+  application sets a real one, and gaik makes no spans until then. With an
+  endpoint set but neither the extra nor an application provider, a warning
+  says why.
+- Never with ``OTEL_SDK_DISABLED=true``.
 
 When no spans are emitted, every call here is a no-op and gaik behaves as
 before. A fault in the instrumentation is logged and never reaches the caller.
@@ -156,12 +157,16 @@ def _resolve_tracer() -> Any:
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
     except ImportError:
         # The API alone comes with other packages (chromadb, for one); the
-        # exporter only with the extra. Say why no spans arrive.
-        logger.warning(
-            "An OTLP endpoint is set but the OTLP exporter is not installed, so gaik "
-            "sends no spans. Install gaik[otel]."
-        )
-        return None
+        # exporter only with the extra. The endpoint may be the application's,
+        # for its own exporter: gaik's spans then go to its provider, set now or
+        # later, as without an endpoint. Say why no spans arrive when there is none.
+        if not _app_provider_set():
+            logger.warning(
+                "An OTLP endpoint is set but the OTLP exporter is not installed, so gaik "
+                "sends no spans until the application sets a tracer provider. Install "
+                "gaik[otel]."
+            )
+        return trace.get_tracer("gaik", _gaik_version())
 
     # Resource.create() reads OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES, and
     # the exporter its endpoint, itself. The provider flushes on interpreter exit.
@@ -169,6 +174,20 @@ def _resolve_tracer() -> Any:
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     _provider = provider
     return provider.get_tracer("gaik", _gaik_version())
+
+
+def tracing_available() -> bool:
+    """Whether gaik could make spans in this process, now or later.
+
+    True when OpenTelemetry can be imported and ``OTEL_SDK_DISABLED`` is not
+    set; ``tracing_enabled`` then tells whether spans are made now (the
+    application may set its provider later). For the client wrapper, which is
+    applied once, when a client is made. Never raises.
+    """
+    try:
+        return _get_tracer() is not None
+    except Exception:
+        return False
 
 
 def tracing_enabled() -> bool:
@@ -206,16 +225,30 @@ def _app_provider_set() -> bool:
     """Whether the application has set a real global tracer provider.
 
     The API's default is a proxy provider, which stays a proxy until one is set,
-    and the no-op provider is not real either; any other one is the
-    application's (an SDK ``TracerProvider``, usually). Not cached: an
-    application may set its provider at any time. Never raises.
+    and the no-op provider (``DefaultTracerProvider`` in older API versions) is
+    not real either; any other one is the application's (an SDK
+    ``TracerProvider``, usually). Not cached: an application may set its
+    provider at any time. False, logged at debug level, on an API version
+    without a proxy provider, where gaik cannot tell. Never raises.
     """
     try:
         from opentelemetry import trace
 
-        provider = trace.get_tracer_provider()
-        return not isinstance(provider, (trace.ProxyTracerProvider, trace.NoOpTracerProvider))
+        proxy = getattr(trace, "ProxyTracerProvider", None)
+        if not isinstance(proxy, type):
+            logger.debug("gaik cannot tell whether a tracer provider is set: no proxy provider")
+            return False
+        not_real = (proxy,) + tuple(
+            kind
+            for kind in (
+                getattr(trace, "NoOpTracerProvider", None),
+                getattr(trace, "DefaultTracerProvider", None),
+            )
+            if isinstance(kind, type)
+        )
+        return not isinstance(trace.get_tracer_provider(), not_real)
     except Exception:
+        logger.debug("gaik could not look up the tracer provider", exc_info=True)
         return False
 
 

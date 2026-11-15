@@ -121,6 +121,43 @@ def _file(tmp_path, name, data=b"fake"):
 # (``calls``, compared with ``requests``).
 
 
+def _answer_generator(stream):
+    def case(mp, tmp_path, error):
+        pytest.importorskip("langchain_core")
+        from gaik.software_components.RAG.answer_generator import AnswerGenerator
+
+        calls = _Calls()
+        if stream:
+            words = ["Laskun ", "summa ", "on 12."]
+            chunks = [_ns(choices=[_ns(delta=_ns(content=w))]) for w in words]
+            chunks.insert(1, _ns(choices=[]))  # a chunk without choices is skipped
+            client = _raw_openai(calls, iter(chunks), error)
+        else:
+            client = _raw_openai(calls, _completion(), error)
+        generator = AnswerGenerator(
+            config={"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"},
+            stream=stream,
+        )
+        generator.client = client
+        if stream:
+            run = lambda: "".join(generator.generate("q", SECRET))  # noqa: E731
+        else:
+            run = lambda: generator.generate("q", SECRET)  # noqa: E731
+        request = {"model": "gpt-4.1", "messages": ANY, "temperature": 0.0}
+        expected = {
+            "component": "AnswerGenerator",
+            "settings": {"gen_ai.request.temperature": 0.0},
+            "calls": calls,
+            # Pinned exactly: no stream_options or other key added by tracing.
+            "requests": [request | {"stream": True} if stream else request],
+        }
+        if not stream:
+            expected |= {"input_tokens": 100, "lengths": (ANY, len(ANSWER))}
+        return run, expected
+
+    return case
+
+
 def _transcript_enhancer(mp, tmp_path, error):
     from gaik.software_components.enhance_transcript import TranscriptEnhancer
 
@@ -951,6 +988,8 @@ def _classify_text(kind):
 
 
 CASES = {
+    "AnswerGenerator": _answer_generator(stream=False),
+    "AnswerGenerator-stream": _answer_generator(stream=True),
     "TranscriptEnhancer": _transcript_enhancer,
     "SchemaGenerator": _schema_generator,
     "FormUnderstander": _form_understander,
