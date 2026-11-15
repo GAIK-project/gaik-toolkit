@@ -46,6 +46,10 @@ print(result.answer)
 - **Re-ranked Retrieval** - Optional cross-encoder reranking
 - **Citations** - Optional citation formatting
 - **Conversation History** - Last-n Q/A memory
+- **Retrieved Text as Data** - Each chunk reaches the answer model in its own
+  labelled block, apart from the instructions and the question; history keeps
+  questions and answers, not earlier chunks (see the
+  [Answer Generator README](../../software_components/RAG/answer_generator/README.md))
 
 ---
 
