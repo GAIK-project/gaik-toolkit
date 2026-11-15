@@ -69,13 +69,16 @@ Before setting up, please install:
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\Users\\you\\Documents\\GAIK"]
     }
   }
 }
 ```
 
-3. Save and close the file
+3. Replace `C:\\Users\\you\\Documents\\GAIK` with the folder that holds your purchase orders,
+   BOMs and price lists. The server can read and write only there; never give a whole drive
+   such as `C:\\`.
+4. Save and close the file
 
 **Step 2: Restart Claude Desktop**
 

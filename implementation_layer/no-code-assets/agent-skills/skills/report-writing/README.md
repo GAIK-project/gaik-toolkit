@@ -56,7 +56,8 @@ Use our setup script to configure everything automatically.
 1. Double-click `setup.bat` in this folder
 2. Follow the on-screen prompts:
    - Choose your API provider (OpenAI or Azure)
-   - Enter your API key when asked
+   - Enter your API key (it is saved as your user environment variable, not in a file)
+   - Choose the folder Claude may work on, and keep your recordings there
 
 **Step 2: Configure Claude Desktop**
 
@@ -95,26 +96,21 @@ If you prefer to set things up yourself:
 
 Open Command Prompt and run:
 ```
-pip install mcp==1.30.0 "gaik[transcriber]==0.9.0" python-dotenv==1.2.4
+python -m venv transcription-MCP\.venv
+transcription-MCP\.venv\Scripts\python.exe -m pip install mcp==1.30.0 "gaik[transcriber]==0.9.0" python-dotenv==1.2.4
 ```
 
 **Step 2: Configure API Key**
 
-Create a file named `.env` in the `transcription-MCP` folder with:
-
-For **OpenAI**:
+Save the key as a user environment variable, not in a file. Open Command Prompt and run
+(for **OpenAI**):
 ```
-OPENAI_API_KEY=your_api_key_here
-OPENAI_API_TYPE=openai
+setx OPENAI_API_KEY "your_api_key_here"
 ```
-
-For **Azure OpenAI**:
-```
-AZURE_API_KEY=your_api_key_here
-AZURE_ENDPOINT=your_endpoint_url
-AZURE_TRANSCRIPTION_MODEL=your_transcription_deployment
-OPENAI_API_TYPE=azure
-```
+For **Azure OpenAI**, save `AZURE_API_KEY` the same way and put the endpoint and deployment
+in the server's `env` settings below. On Windows the transcriber reads a key that is missing
+from its own environment from your user environment variables, so the key need not be in
+`claude_desktop_config.json`.
 
 **Step 3: Configure Claude Desktop**
 
@@ -124,19 +120,27 @@ Open `%APPDATA%\Claude\claude_desktop_config.json` and add:
 {
   "mcpServers": {
     "gaik-transcriber": {
-      "command": "python",
-      "args": ["C:\\path\\to\\report-writing\\transcription-MCP\\server.py"],
+      "command": "C:\\path\\to\\report-writing\\transcription-MCP\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\report-writing\\transcription-MCP\\server.py",
+               "--folder", "C:\\Users\\you\\Documents\\GAIK"],
       "timeout": 600000
     },
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\"]
+      "command": "node",
+      "args": ["C:\\path\\to\\report-writing\\filesystem-MCP\\node_modules\\@modelcontextprotocol\\server-filesystem\\dist\\index.js",
+               "C:\\Users\\you\\Documents\\GAIK"]
     }
   }
 }
 ```
 
-**Important:** Replace `C:\\path\\to\\` with the actual path where you saved this folder.
+Install the file access server first: in the `filesystem-MCP` folder run
+`npm ci --omit=dev --ignore-scripts`, which checks every package against the integrity
+hash pinned in `package-lock.json`.
+
+**Important:** Replace `C:\\path\\to\\` with the actual path where you saved this folder,
+and `C:\\Users\\you\\Documents\\GAIK` with the folder Claude may work on. Both servers
+work only inside that folder; never give a whole drive such as `C:\\`.
 
 **Step 4: Install the Skill**
 
@@ -292,7 +296,14 @@ The skill automatically detects what sections to include based on your content:
 
 ### Audio transcription not working
 
-- Check your API key in the `.env` file
+- Check that the key is saved without showing it: in a new Command Prompt run
+  `powershell -c "[bool][Environment]::GetEnvironmentVariable('OPENAI_API_KEY','User')"`
+  (or `AZURE_API_KEY`); `False` means it is missing, so run `setup.bat` again
+- The transcriber only takes audio and video files inside the folder you chose in setup
+  (`--folder` in `claude_desktop_config.json`); move the recording there
+- The key is a user environment variable, so other programs you run can read it too; use a
+  key made for this skill, and remove it when you stop using it:
+  `reg delete HKCU\Environment /v OPENAI_API_KEY /f`
 - Ensure you have an active OpenAI account with credits
 - Try a smaller audio file first to test
 
@@ -365,9 +376,10 @@ report-writing/
 ├── SKILL.md                  # Claude skill definition: main workflow
 ├── EVALUATION.md             # Test scenarios
 ├── reference/                # Detailed handling guides
+├── filesystem-MCP/           # File access server, pinned in package-lock.json
 └── transcription-MCP/        # Audio transcription server
     ├── server.py             # FastMCP implementation
-    └── .env                  # API configuration
+    └── .venv/                # the transcriber's own Python (created by setup.bat)
 ```
 
 ### How It Works
@@ -385,5 +397,6 @@ report-writing/
 ### Dependencies
 
 - **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.9.0`, `python-dotenv==1.2.4`
-- **Node.js packages:** `@modelcontextprotocol/server-filesystem@2026.8.31`
+- **Node.js packages:** `@modelcontextprotocol/server-filesystem@2026.8.31`, installed with
+  `npm ci` from `filesystem-MCP/package-lock.json` (pinned versions and integrity hashes)
 - **External APIs:** OpenAI Whisper API (for audio transcription)

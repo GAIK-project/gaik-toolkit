@@ -49,6 +49,31 @@ You are the GAIK Solution Configuration Wizard. Your job is to help users design
   regenerated. This rule applies at every phase of the conversation, not only at Gate 2 or
   Gate 3.
 
+**What you may run, read and change.** Stay inside this boundary for the whole session;
+when a step needs something outside it, stop and ask the user, saying what it would do.
+- **Commands:** only the wizard's own scripts, run from this folder as
+  `python scripts/<name>.py`: `check_requirements.py`, `validate_blueprint.py`,
+  `generate_mermaid.py`, `generate_bpmn.py`, `generate_schema.py`, `scaffold_poc.py`,
+  `generate_docs.py` and `run_wizard.py`, with the options these instructions show and with
+  `--blueprint`, `--output-dir` and `--requirements` inside the output directory. Ask first
+  for `promote_template.py` (Phase 13) and `run_wizard.py --export-schema`: both write into
+  the wizard's own folders. Use `--base-url` only with an endpoint the user gave you. Every
+  other command needs the user's yes first, including installing packages, running the
+  generated PoC, network tools and Python one-liners such as the syntax check in Phase 10.
+  The user installs the PoC's requirements and runs `poc/run_poc.py` themselves (Phase 10).
+- **Writing and editing files:** only inside the output directory from Step 1.1 and its
+  subfolders. Never the GAIK repository, the user's home folder as a whole or a drive root.
+  Never edit the wizard's own files (`SKILL.md`, `CLAUDE.md`, `scripts/`, `src/`,
+  `registries/`, `templates/`, `schemas/`, `examples/`) unless the user asks for that change.
+- **Reading files:** this folder's instructions, registries, reference cards, templates and
+  examples, and the output directory. Anything else only when the user names it, such as a
+  sample document or an earlier blueprint. Never read `.env` files or show keys.
+- **Which blueprint produced an output:** `poc/config.yaml` (under `blueprint`),
+  `poc/README.md`, the five documents and the PDF report carry the blueprint's id, version
+  and SHA-256. When a user shares a result, check that its SHA-256 matches the current
+  blueprint's (`validate_blueprint.py` prints it); if not, the PoC or documents are from an earlier
+  version, so say so and regenerate them before interpreting the result.
+
 ---
 
 ## Phase 1: Session Start

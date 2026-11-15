@@ -828,7 +828,8 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
     next to the JSON output."""
     if not _wants_pdf(blueprint):
         return ""
-    title = blueprint.use_case.name.replace('"', "'")
+    title = _code_text(blueprint.use_case.name)
+    blueprint_sha256 = blueprint.fingerprint()["blueprint_sha256"]
     return (
         "    # ----- PDF report (technical_spec.output_types includes 'pdf') -----\n"
         "    if _pdf_source is not None:\n"
@@ -837,7 +838,8 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
         '            _pdf_path = output_dir / "result_report.pdf"\n'
         f'            write_pdf_report(_pdf_source, _pdf_path, title="{title}",\n'
         f'                             subtitle="{schema_name}",\n'
-        f'                             metadata={{"Schema": "{schema_name}"}})\n'
+        f'                             metadata={{"Schema": "{schema_name}",\n'
+        f'                                       "Blueprint SHA-256": "{blueprint_sha256}"}})\n'
         '            print(f"PDF report written to: {_pdf_path}")\n'
         "        except Exception as _pdf_exc:  # noqa: BLE001\n"
         '            print(f"WARNING: PDF report generation failed: {_pdf_exc}")\n'
@@ -985,6 +987,8 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         llm_judge_section = "    # LLMJudge and human_review are not in this blueprint's pipeline."
 
     return {
+        # Which blueprint the PoC came from (config.yaml and README.md carry it).
+        "blueprint": bc.fingerprint(),
         "use_case_name": bc.use_case.name,
         "use_case_id": bc.use_case.id,
         "use_case_description": bc.use_case.description,
@@ -1119,6 +1123,9 @@ def _write_config_yaml(variables: dict[str, Any], poc_dir: Path) -> None:
     import yaml
 
     config = {
+        # The blueprint this PoC was generated from; compare blueprint_sha256 with
+        # the current blueprint's to see whether the PoC needs scaffolding again.
+        "blueprint": variables["blueprint"],
         "provider": variables["provider"],
         "use_azure": variables["provider"] == "azure",
         "models": {
@@ -1167,6 +1174,7 @@ def _write_readme(variables: dict[str, Any], poc_dir: Path) -> None:
     tmpl = _read_template("_common", "README.md.tmpl") or ""
     # Markdown: the use case's own words are shown as text, not read as markup.
     shown = {**variables, **{k: md_text(variables[k]) for k in _CODE_TEXT_KEYS if k in variables}}
+    shown.update({f"{k}_text": md_text(v) for k, v in variables["blueprint"].items()})
     (poc_dir / "README.md").write_text(_fill(tmpl, shown), encoding="utf-8")
 
 

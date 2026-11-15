@@ -139,6 +139,7 @@ For each audio/video file, call:
 
 If transcription fails with "file not found":
 - Re-check the path style and ensure Windows drive-letter paths on Windows.
+- If it says the file is outside the approved folders or not audio or video, ask the user to move it into the folder chosen in setup; do not try other paths.
 
 #### Step 4 - Images (Handwritten Notes, Diagrams, Sketches, Figures)
 For each image file (.jpg, .jpeg, .png, .gif, .webp, .bmp, .tiff):

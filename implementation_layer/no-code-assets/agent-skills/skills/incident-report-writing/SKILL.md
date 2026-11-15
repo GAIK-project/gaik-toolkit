@@ -78,6 +78,7 @@ gaik-transcriber:transcribe_audio
 
 **If transcription fails:**
 - Check the path format (ensure Windows drive-letter paths on Windows)
+- If the transcriber says the file is outside the folders approved for transcription, or is not an audio or video file, tell the user and ask them to move the recording into the folder they chose in setup. Do not try other paths or copy the file yourself.
 - Report the error clearly to the user
 - Do NOT proceed with extraction if transcription fails
 
