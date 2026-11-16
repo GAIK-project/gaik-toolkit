@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gaik.software_components.knowledge_curator.models import SectionSpec, check_sections
+from gaik.software_components.source_normalizer.paths import path_inside
 
 
 class ModelSettings(BaseModel):
@@ -88,23 +89,46 @@ class ReportSpec(BaseModel):
         return self
 
     @classmethod
-    def load(cls, path: str | Path) -> ReportSpec:
-        """Read a spec; relative paths are resolved against the spec file's folder."""
+    def load(cls, path: str | Path, *, root: str | Path | None = None) -> ReportSpec:
+        """Read a spec; its paths are relative to the spec file's folder.
+
+        Every source path and the sample report must stay inside ``root``, the spec
+        file's folder by default. They are checked before any file is read: an absolute
+        path, or one that leads out of ``root`` through ``..`` or a symbolic link, raises
+        ``SourcePathError``. Pass a wider ``root`` (a folder that holds the spec's folder)
+        for a spec that names files beside its own folder, e.g. ``../inputs/notes.txt``;
+        with ``root``, an absolute path inside it is taken too.
+
+        Raises:
+            SourcePathError: A path is absolute or leads out of ``root``.
+        """
         path = Path(path)
         spec = cls.model_validate_json(path.read_text(encoding="utf-8"))
-        root = path.resolve().parent
-        spec.sources = {k: [root / p for p in v] for k, v in spec.sources.items()}
+        folder = path.resolve().parent
+        spec.sources = {
+            k: [path_inside(p, folder, root=root, what="source") for p in v]
+            for k, v in spec.sources.items()
+        }
         if spec.sample_report is not None:
-            spec.sample_report = root / spec.sample_report
+            spec.sample_report = path_inside(
+                spec.sample_report, folder, root=root, what="sample report"
+            )
         return spec
 
     def save(self, path: str | Path) -> Path:
-        """Write the spec with paths relative to the spec file's folder, in POSIX form."""
+        """Write the spec with paths relative to the spec file's folder, in POSIX form.
+
+        A file outside that folder is written with ``..``; :meth:`load` then needs a
+        ``root`` that holds it.
+        """
         path = Path(path)
         root = path.resolve().parent
 
         def rel(p: Path) -> str:
-            return Path(os.path.relpath(Path(p).resolve(), root)).as_posix()
+            # The folder is resolved, not the file: a source that is a link keeps its name
+            # and its place, which is what load checks.
+            p = Path(p)
+            return Path(os.path.relpath(p.parent.resolve() / p.name, root)).as_posix()
 
         data = self.model_dump(mode="json")
         data["sources"] = {k: [rel(p) for p in v] for k, v in self.sources.items()}

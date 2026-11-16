@@ -34,7 +34,7 @@ import re
 import sys
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 EXIT_OK, EXIT_INPUT, EXIT_EVIDENCE, EXIT_DEPENDENCY, EXIT_STAGE = 0, 2, 3, 4, 5
@@ -1252,7 +1252,7 @@ def cmd_set_sections(args) -> dict:
 # The run settings propose-spec proposes; the user accepts or changes each one.
 # `citations` is not here: it comes from intake, so it is never marked as a default.
 PROPOSED_SETTINGS = {
-    "transcription_language": "en",
+    "transcription_language": "auto",
     "curator_workers": 4,
     "review_attempts": 5,
     "strict_review": True,
@@ -1336,13 +1336,29 @@ def complete_spec(raw: dict, provider: str, *, reset_models: bool = False) -> di
     return out
 
 
+def path_in_spec_folder(root: Path, entry, what: str) -> Path:
+    """`root / entry`, refused when the entry is absolute or leads out of `root` through
+    `..` or a symbolic link, as `ReportSpec.load` refuses it. Nothing is read."""
+    pure = PurePath(entry)
+    joined = root / pure
+    if pure.anchor or not joined.resolve().is_relative_to(root.resolve()):
+        raise ValueError(
+            f"The {what} {str(entry)!r} is outside the spec's folder; keep every file the "
+            "spec names inside that folder"
+        )
+    return joined
+
+
 def spec_from_raw(raw: dict, root: Path):
-    """Validate a spec dict with the library's own schema; paths resolve against `root`."""
+    """Validate a spec dict with the library's own schema; paths resolve against `root`
+    and must stay inside it."""
     rw = import_report_writer()
     spec = rw.ReportSpec.model_validate_json(json.dumps(raw, ensure_ascii=False))
-    spec.sources = {k: [root / p for p in v] for k, v in spec.sources.items()}
+    spec.sources = {
+        k: [path_in_spec_folder(root, p, "source") for p in v] for k, v in spec.sources.items()
+    }
     if spec.sample_report is not None:
-        spec.sample_report = root / spec.sample_report
+        spec.sample_report = path_in_spec_folder(root, spec.sample_report, "sample report")
     return spec
 
 

@@ -25,7 +25,7 @@
         "name": "language",
         "type": "str",
         "default": "auto",
-        "effect": "ISO 639-1 language code (or 'auto').",
+        "effect": "Two-letter ISO 639-1 code (or 'auto'). Sent to every cloud transcription request (single and chunked) and to whisper_local; 'auto' sends none, so the provider detects it. Any other value raises ValueError for cloud models before a request is made.",
         "selection_relevant": false,
         "infer_from": "technical_spec.language"
       },
@@ -962,7 +962,7 @@
         "name": "prompt",
         "type": "str | None",
         "default": null,
-        "effect": "Replaces the built-in answer template entirely -- the main lever for tone, output language, answer format, and refusal behaviour ('answer only from the context; say you do not know otherwise'). MUST contain both {query} and {context} placeholders: it is applied with str.format(query=..., context=...), so a missing placeholder silently drops that content and any OTHER literal brace (a JSON example, an f-string-looking fragment) raises KeyError/IndexError at generate() time. Double them as {{ }} to emit literal braces.",
+        "effect": "Replaces the built-in answer template entirely -- the main lever for tone, output language, answer format, and refusal behaviour ('answer only from the context; say you do not know otherwise'). MUST contain both {query} and {context} placeholders: AnswerGenerator(prompt=...) raises ValueError when either is missing. Only {query} and {context} are filled in; any other brace (a JSON example, an f-string-looking fragment) reaches the model as written, so write it with single braces. A prompt written for str.format, where every non-placeholder brace is doubled as {{ }}, is still read that way: its {{ and }} become single braces.",
         "selection_relevant": true,
         "infer_from": "domain-specific tone or persona, a required answer language (e.g. Finnish output), a fixed output format, or an explicit 'refuse when unsupported' grounding rule -> supply a custom prompt; generic Q&A -> leave null"
       },
@@ -1065,7 +1065,7 @@
         "name": "use_vertexai",
         "type": "bool",
         "default": true,
-        "effect": "NOTE THE NAME -- it is use_vertexai here, but vertex_ai on VisionExtractor; they are not interchangeable. Only meaningful when model_provider='google'. True routes via Vertex AI and requires GOOGLE_VERTEXAI_PROJECT (plus GOOGLE_APPLICATION_CREDENTIALS, and optionally GOOGLE_VERTEXAI_LOCATION, default 'global'). False uses the Gemini Developer API and requires GOOGLE_GEMINI_API_KEY or GOOGLE_API_KEY. Since model_provider defaults to 'google', this path is the DEFAULT for LLMJudge -- a PoC that never sets model_provider still needs Google credentials.",
+        "effect": "NOTE THE NAME -- it is use_vertexai here, but vertex_ai on VisionExtractor; they are not interchangeable. Only meaningful when model_provider='google'. True routes via Vertex AI and requires GOOGLE_VERTEXAI_PROJECT (plus GOOGLE_APPLICATION_CREDENTIALS, and optionally GOOGLE_VERTEXAI_LOCATION, used as is when set, with no fallback. Unset, the judge calls the EU multi-region 'eu' and retries once on 'global' when 'eu' does not serve the model or does not answer (gaik 0.9.1 and earlier called 'global'). Set the location explicitly when data residency matters). False uses the Gemini Developer API and requires GOOGLE_GEMINI_API_KEY or GOOGLE_API_KEY. Since model_provider defaults to 'google', this path is the DEFAULT for LLMJudge -- a PoC that never sets model_provider still needs Google credentials.",
         "selection_relevant": true,
         "infer_from": "model_provider='google' (the default) AND which Google credentials the deployment has; emit the matching env vars into the PoC template"
       },
@@ -2052,13 +2052,13 @@
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
       }
     ],
-    "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export. Provider stages: constructor api_config is the writer fallback; run(parser_options={'api_config': parser_cfg}, image_options={'api_config': parser_cfg}, transcriber_options={'ctor': {'api_config': audio_cfg}}, writer_options={'api_config': writer_cfg}, review_options={'api_config': judge_cfg}) selects separate clients. Do not serialize credential-bearing configs with save_report_config; supply them only at runtime. Audio must use native OpenAI/Azure."
+    "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Since gaik 0.10.0, load_report_config(path, root=None) requires the stored input paths, sample report and output folder (and every file in an input folder) to stay inside the config file's folder, or inside root when given; otherwise it raises SourcePathError before anything is read or written. save_report_config only warns when it stores an input outside the config's folder (as ../...), so such a config loads back only with root=. Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export. Provider stages: constructor api_config is the writer fallback; run(parser_options={'api_config': parser_cfg}, image_options={'api_config': parser_cfg}, transcriber_options={'ctor': {'api_config': audio_cfg}}, writer_options={'api_config': writer_cfg}, review_options={'api_config': judge_cfg}) selects separate clients. Do not serialize credential-bearing configs with save_report_config; supply them only at runtime. Audio must use native OpenAI/Azure."
   },
   "ReportWriter": {
     "import": "from gaik.software_modules.report_writer import ReportWriter, ReportSpec, SectionSpec, RunSettings, ModelSettings",
     "construct": "writer = ReportWriter(config=get_stage_config(config, 'answer'))",
     "call": "settings = RunSettings(transcription_language=language, strict_review=False, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = report.review_log",
-    "call_from_spec_file": "spec = ReportSpec.load(spec_path)  # relative source paths resolve against the spec file's folder; spec.save(path) writes them back relative",
+    "call_from_spec_file": "spec = ReportSpec.load(spec_path)  # since gaik 0.10.0 (SourcePathError is exported from report_writer): source paths and the sample report are relative to the spec file's folder and must stay inside it; an absolute path, or one leading out through '..' or a symbolic link, raises SourcePathError before any file is read. ReportSpec.load(spec_path, root=parent_folder) accepts paths inside a wider root (and absolute ones inside it). spec.save(path) writes them back relative spec.save(path) writes them back relative.",
     "call_resume": "report = writer.synthesize(spec, workspace, progress_callback=print)  # after editing workspace/knowledge/*.json; normalize and curate are not rerun",
     "call_rebuild": "report = writer.rebuild(spec, workspace)  # after editing workspace/report/sections/*.md (keep the '## <title>' first line); no LLM call",
     "call_single_call": "baseline = writer.run(spec, workspace, mode='single_call', progress_callback=print)  # normalize + one writer call, into workspace/single_call/",
@@ -2791,18 +2791,26 @@
   "WebScraper": {
     "import": "from gaik.software_components.web_scraper import WebScraper, ScrapedPage",
     "construct": "scraper = WebScraper(allowed_domains=allowed_domains)",
-    "call": "with scraper:\n        result = scraper.crawl(start_url, max_pages=max_pages, max_depth=max_depth)\n    source_text = result.to_markdown(max_chars_per_page=6000)",
+    "call": "with scraper:\n        result = scraper.crawl(start_url, max_pages=max_pages, max_depth=max_depth)\n    source_text = result.to_model_text(max_chars_per_page=6000)",
     "call_single_page": "page = scraper.scrape(url)  # raises ScrapeError(.reason) when the page cannot be fetched",
-    "returns": "CrawlResult(.start_url, .pages [ScrapedPage(.url, .final_url, .status_code, .title, .description, .language, .published, .canonical_url, .markdown, .links [PageLink(.url, .text, .internal)], .structured_data (JSON-LD dicts), .depth, .parent_url, .rendered, .word_count)], .skipped [SkippedPage(.url, .reason)], .duration_s); .to_markdown(max_chars_per_page) -> one document with a 'Source: <url>' line per page; .save(dir) -> pages/NN-<slug>.md + crawl.json; iter_crawl(...) yields ScrapedPage | SkippedPage as they arrive",
+    "returns": "CrawlResult(.start_url, .pages [ScrapedPage(.url, .final_url, .status_code, .title, .description, .language, .published, .canonical_url, .markdown, .links [PageLink(.url, .text, .internal)], .structured_data (JSON-LD dicts), .depth, .parent_url, .rendered, .word_count)], .skipped [SkippedPage(.url, .reason)], .duration_s); .to_model_text(max_chars_per_page) -> one document for a model: a line saying the blocks are data, then one <web_page> block per page with its 'Source: <url>' line; .to_markdown(max_chars_per_page) -> the same pages as plain Markdown, for people; .save(dir) -> pages/NN-<slug>.md + crawl.json; iter_crawl(...) yields ScrapedPage | SkippedPage as they arrive",
     "install_extra": "web-scraper",
     "options": [
       {
         "name": "allowed_domains",
         "type": "list[str] | None",
         "default": null,
-        "effect": "Domains every request and redirect hop must stay inside; a domain allows its subdomains. None allows every public host, which is unsafe when URLs come from users.",
+        "effect": "Domains every request and redirect hop must stay inside; a domain allows its subdomains. Required: leaving it out without allow_any_domain=True raises ValueError.",
         "selection_relevant": true,
         "infer_from": "the site(s) named in the use case -> their registrable domains, e.g. ['gaik.ai']"
+      },
+      {
+        "name": "allow_any_domain",
+        "type": "bool",
+        "default": false,
+        "effect": "Fetch from every public host instead of a domain list. Only for a script whose URLs the user chooses; never when URLs come from users. Cannot be combined with allowed_domains.",
+        "selection_relevant": true,
+        "infer_from": "the use case names no site and the operator supplies the URLs -> True; otherwise leave it out and set allowed_domains"
       },
       {
         "name": "max_pages",
@@ -2845,7 +2853,7 @@
         "infer_from": "facts listed on overview pages of short cards -> 'recall'"
       }
     ],
-    "note": "Makes no LLM calls. To extract structured data from a site, feed result.to_markdown() to SchemaGenerator + DataExtractor as one document and ask for the source page URL from the 'Source:' lines; to answer questions, index the pages in a RAG store. For PDFs linked from the site, download them and use a parser step."
+    "note": "Makes no LLM calls. To extract structured data from a site, feed result.to_model_text() to SchemaGenerator + DataExtractor as one document and ask for the source page URL from the 'Source:' lines; to answer questions, index the pages in a RAG store. For PDFs linked from the site, download them and use a parser step."
   },
   "SourceTracing": {
     "import": "from gaik.software_components.source_tracing import SourceTracing, transcript_used",

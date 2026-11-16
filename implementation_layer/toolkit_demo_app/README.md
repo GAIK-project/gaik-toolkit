@@ -15,6 +15,11 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 - **PostgreSQL Agent** - Plain-language → read-only SQL with a sandboxed demo DB
 - **Tabular Agent** - Upload a CSV/Excel file and ask it questions — read-only SQL over DuckDB, messy report sheets cleaned up automatically
 - **LLM-as-Judge** - Score extractor output, detect hallucinations, run a multi-model judge panel
+- **Schema Generator** - Extraction requirements → reusable Pydantic models
+- **Source Normalizer** - Documents, spreadsheets, recordings and images → Markdown that keeps each file's name
+- **Web Scraper** - A website → clean Markdown and structured data
+- **Knowledge Curator** - Verified facts per topic, each with its exact quote and location
+- **Knowledge Synthesizer** - A reviewed, source-grounded report from curated facts
 
 ### Source tracing (Trace sources)
 
@@ -43,6 +48,7 @@ text layer. It roughly triples the output tokens of an extraction.
 - **RAG Builder** - Document upload, indexing, Q&A with citations and debug tools
 - **Audio Structured** - Audio to structured data pipeline
 - **Document Structured** - Document to structured data pipeline
+- **Report Writer v2** - A report in stages (normalize, curate, synthesize, review), every file editable in between
 
 ### Use Cases
 
@@ -52,18 +58,43 @@ text layer. It roughly triples the output tokens of an extraction.
 - **Semantic Video Search** - Vector search across indexed video transcripts (pgvector)
 - **Purchase Order Processing** - PO + BOMs + price list → line-item prices and order draft (`luvata-order` route)
 - **Report Writer** - Mixed-source report generation from documents, spreadsheets, images, audio/video, text, and an optional sample report/template
+- **Helpdesk Chatbot** - Answers from your own services and FAQ, and hands over to a person
 
 ### Solution Wizard
 
-The Solution Configuration Wizard runs as its own service, Wizard V2. This demo no
-longer runs it: `/solution-wizard` is open to every visitor, says where the wizard
-is and links to `WIZARD_V2_URL` when that is set. The server reads it at run time, so
-a deployment sets it with `oc set env` and needs no rebuild.
+`/solution-wizard` is open to every visitor and offers two wizards.
+
+- **Wizard V2** runs as its own service, where each session's agent and PoC runs are
+  kept apart from other services. The page links to `WIZARD_V2_URL` when that is set;
+  the server reads it at run time, so a deployment sets it with `oc set env` and needs
+  no rebuild.
+- **The first wizard** runs in the browser at `/solution-wizard/first`, and on anyone's
+  own computer as a Claude Code skill (the page shows the commands). In the browser its
+  agent is a Claude Agent SDK session inside the demo API pod, with shell tools, so it
+  is held tighter than the other demos:
+  - `proxy.ts` forwards `/api/wizard/*`, reads included, only for a signed-in user an
+    admin has granted the wizard in `/admin` (`wizard_access`), on top of the approval
+    and rate limit every state-changing request meets. There is no shared key.
+  - A session belongs to the user who started it: the proxy names the user to the API
+    and another user's session answers 404.
+  - At most `WIZARD_MAX_SESSIONS` (3) sessions run at once, one per user, each with at
+    most `WIZARD_MAX_MESSAGES` (60) messages. A session idle for 30 minutes is ended.
+  - Attachments (5 per message, 10 MB each) are checked for type, size and content
+    before a parser or a model reads them, and reach the agent marked as data.
+  - A session's workspace and download archives are removed when it ends or goes idle.
+    Sessions are not recorded: the Langfuse diagnostics were not brought back.
+  - The agent's process does not inherit the API's other credentials. This is not a
+    boundary: the agent runs as the same user in the same container as the API.
+
+  It needs `CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY` and
+  `ANTHROPIC_FOUNDRY_RESOURCE` on the API; without them the page says the wizard is
+  not set up. The model is `ANTHROPIC_MODEL` or `ANTHROPIC_DEFAULT_SONNET_MODEL`.
 
 ### No-code Assets
 
 - **Agent skills** (`/skills`) - Download each skill as a .zip, install the coding-agent plugin, and open a "try this" prompt in Claude, Claude Code or Cursor
 - **Prompts** (`/prompts`) - Copy a prompt, or copy it and open ChatGPT or Claude
+- **Desktop app** (`/desktop-app`) - Download the experimental desktop app and its install steps
 
 Both pages are public and read `lib/no-code/catalog.generated.json` and `public/downloads/skills/*.zip`. Those are generated from `implementation_layer/no-code-assets`, because the image is built from this folder alone. After changing a skill, a prompt or `no-code-assets/catalog.json`, run:
 
@@ -87,6 +118,31 @@ set it. A provider without credentials on the server is left out, and
 `DEMO_SERVER_MODELS=provider:model[:staff],…` replaces the list. With Claude or Gemini
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
+
+A route that takes a model name in the request runs only the models it offers, and a
+team-only model only for the team, decided from the session as above. Which models are
+team-only follows the list above (a `DEMO_SERVER_MODELS` entry decides for the model it
+names), whatever credentials the server has. The LLM Judge and the Vision Extractor
+offer the Vision Extractor's model list; the Report Writer, Report Writer v2, Source
+Normalizer, Knowledge Curator and Knowledge Synthesis offer the server's model, the
+listed models on the same provider and `DEMO_EXTRA_CHAT_MODELS` (default
+`gpt-6-luna,gpt-5.5-deployment`, the Report Writer page's defaults), and for
+transcription `DEMO_TRANSCRIPTION_MODELS` (default
+`gpt-4o-transcribe,gpt-4o-mini-transcribe,whisper-1,whisper`).
+Another name is refused with a 422, which lists the names that work, before any model call.
+
+Gemini on Vertex AI: leave `GOOGLE_CLOUD_LOCATION` unset. gaik 0.10.0 and later then ask
+the EU multi-region first and uses the global endpoint for a model the EU does not
+serve, or for ten minutes after the EU failed to answer; each switch is a warning in
+the API log. A location you set is used as given, with no fallback: on 2026-11-16 the
+demo ran with `GOOGLE_CLOUD_LOCATION=eu` on gaik 0.9.1 and Gemini 4 Argon timed out on
+every request, so it went back to `global`. The Vision Extractor's own Gemini calls
+take a fixed `GOOGLE_GENERATE_CONTENT_URL` (see `.env.example`) and have no fallback.
+The deployed demo calls GPT and Claude through an Azure resource in Sweden.
+
+`DEMO_SERVER_MODELS_NOTE` is one sentence the menu shows under the server models,
+for where they run (for example the Azure region). It has no default: that depends on
+the cloud resources behind the keys.
 
 With `AITTA_API_KEY` set, the menu also lists **CSC Aitta** models (Gemma 4 31B and
 gpt-oss 120B by default): open models hosted in Finland. Picking one keeps the whole
@@ -229,6 +285,8 @@ toolkit_demo_app/
 │   ├── (home)/             # Landing page, privacy
 │   ├── (auth)/             # sign-in, sign-up, access-pending
 │   ├── (demos)/            # All demo pages
+│   ├── (wizard)/           # Solution Wizard page (both wizards)
+│   ├── api/                # Next route handlers
 │   └── admin/              # Admin dashboard
 ├── api/                    # FastAPI backend
 │   ├── main.py
@@ -262,6 +320,14 @@ toolkit_demo_app/
 | `/video-search` | Semantic dental video search |
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
 | `/report-writer` | Mixed-source report generation |
+| `/report-writer-v2` | Staged report writer (normalize, curate, synthesize) |
+| `/source-normalizer` | Mixed files → Markdown |
+| `/knowledge-curator` | Facts with verified quotes |
+| `/knowledge-synthesis` | Report from curated facts |
+| `/schema-generator` | Extraction schema from requirements |
+| `/web-scraper` | Web page or site → Markdown |
+| `/model-settings` | Server model list, Aitta warm-up and the own-key connection test |
+| `/wizard` | First Solution Wizard sessions (per-user grant) |
 
 API docs: <http://localhost:8000/docs> (Swagger UI), served only with `DEMO_API_DOCS=true`;
 the deployed API leaves `/docs`, `/redoc` and `/openapi.json` off.

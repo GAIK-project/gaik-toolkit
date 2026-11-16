@@ -1,13 +1,16 @@
 """Offline tests for WebScraper: URL policy, robots.txt, redirects, content and crawl.
 
-Every response comes from an ``httpx.MockTransport``. Hosts are ``*.test`` names
+Most responses come from an ``httpx.MockTransport``. Hosts are ``*.test`` names
 with ``allow_private_networks=True`` (no DNS lookup); the address checks use IP
-literals and a patched ``getaddrinfo``.
+literals and a patched ``getaddrinfo``. The connection tests patch the TCP connect
+or serve a page from a loopback server, so no test reaches the network.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import re
 import socket
 
 import httpx
@@ -17,6 +20,7 @@ pytest.importorskip("trafilatura")
 pytest.importorskip("protego")
 
 from gaik.software_components.web_scraper import (  # noqa: E402
+    MODEL_TEXT_NOTICE,
     CrawlResult,
     ScrapedPage,
     ScrapeError,
@@ -122,6 +126,32 @@ def test_policy_refuses_a_name_that_resolves_to_a_private_address(monkeypatch):
     assert "private or local address" in UrlPolicy(["internal.test"]).refusal(
         "https://internal.test/"
     )
+
+
+def test_policy_keeps_the_addresses_it_checked(monkeypatch):
+    calls: list[str] = []
+
+    def fake_getaddrinfo(host, *args, **kwargs):
+        calls.append(host)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 0))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    policy = UrlPolicy(["public.test"])
+    assert policy.refusal("https://public.test/") is None
+    assert policy.public_addresses("public.test") == ("8.8.8.8",)
+    assert policy.public_addresses("PUBLIC.test") == ("8.8.8.8",)
+    assert calls == ["public.test"]
+
+
+def test_policy_gives_no_addresses_when_one_of_them_is_private(monkeypatch):
+    def fake_getaddrinfo(host, *args, **kwargs):
+        return [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", 0)),
+        ]
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    assert UrlPolicy(["mixed.test"]).public_addresses("mixed.test") == ()
 
 
 def test_empty_allowlist_is_an_error():
@@ -233,10 +263,19 @@ def test_retry_once_on_503():
 
 
 def test_bad_options_are_rejected():
-    with pytest.raises(ValueError):
-        WebScraper(render_js="always")
-    with pytest.raises(ValueError):
-        WebScraper(extraction="everything")
+    with pytest.raises(ValueError, match="render_js"):
+        WebScraper(["example.test"], render_js="always")
+    with pytest.raises(ValueError, match="extraction"):
+        WebScraper(["example.test"], extraction="everything")
+
+
+def test_scraper_without_allowed_domains_needs_allow_any_domain():
+    with pytest.raises(ValueError, match="allowed_domains"):
+        WebScraper()
+    with pytest.raises(ValueError, match="not both"):
+        WebScraper(["example.test"], allow_any_domain=True)
+    with WebScraper(allow_any_domain=True) as s:
+        assert s.policy.allowed_domains is None
 
 
 # ---------------------------------------------------------------------- robots.txt
@@ -426,5 +465,228 @@ def test_a_malformed_base_or_canonical_link_does_not_stop_the_crawl(head):
 
 
 def test_stay_on_host_false_needs_an_allowlist():
-    with WebScraper() as s, pytest.raises(ValueError):
+    with WebScraper(allow_any_domain=True) as s, pytest.raises(ValueError):
         list(s.iter_crawl("https://example.test/", stay_on_host=False))
+
+
+# ---------------------------------------------------------------------- connections
+
+
+def _resolver(answers: dict[str, list[str]], calls: list[str]):
+    """A getaddrinfo that answers from ``answers``: each lookup takes the next address.
+
+    Names are recorded in ``calls``; an IP literal (the socket connecting to an
+    address it was given) is answered as itself and not recorded.
+    """
+
+    def fake_getaddrinfo(host, port=None, *args, **kwargs):
+        if host in answers:
+            calls.append(host)
+            queue = answers[host]
+            address = queue.pop(0) if len(queue) > 1 else queue[0]
+        else:
+            address = str(ipaddress.ip_address(host))
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (address, port or 0))]
+
+    return fake_getaddrinfo
+
+
+def test_connection_goes_to_the_address_that_was_checked(monkeypatch):
+    import httpcore
+
+    calls: list[str] = []
+    # A second lookup of the name would answer with a loopback address.
+    monkeypatch.setattr(
+        socket, "getaddrinfo", _resolver({"site.test": ["8.8.8.8", "127.0.0.1"]}, calls)
+    )
+    connected: list[tuple[str, int]] = []
+
+    def fake_connect_tcp(self, host, port, *args, **kwargs):
+        connected.append((host, port))
+        raise httpcore.ConnectError("no network in tests")
+
+    monkeypatch.setattr(httpcore.SyncBackend, "connect_tcp", fake_connect_tcp)
+    with WebScraper(["site.test"], respect_robots=False, delay_seconds=0) as s:
+        with pytest.raises(ScrapeError, match="could not connect"):
+            s.scrape("http://site.test/page")
+
+    assert calls == ["site.test"]
+    assert connected and all(target == ("8.8.8.8", 80) for target in connected)
+
+
+def test_connection_to_checked_address_keeps_the_host_name(monkeypatch):
+    import http.server
+    import threading
+
+    from gaik.software_components.web_scraper import policy as policy_module
+
+    seen_hosts: list[str] = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 - the http.server hook name
+            seen_hosts.append(self.headers["Host"])
+            body = html_page("Local", "").encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    port = server.server_address[1]
+    calls: list[str] = []
+    monkeypatch.setattr(socket, "getaddrinfo", _resolver({"site.test": ["127.0.0.1"]}, calls))
+    # Treat the loopback server as public, so the checked-address path is the one used.
+    monkeypatch.setattr(policy_module, "_is_public", lambda address: True)
+    try:
+        with WebScraper(["site.test"], respect_robots=False, delay_seconds=0) as s:
+            page = s.scrape(f"http://site.test:{port}/")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert page.title == "Local"
+    assert seen_hosts == [f"site.test:{port}"]
+    assert calls == ["site.test"]
+
+
+def test_proxy_from_the_environment_is_still_used(monkeypatch):
+    import httpcore
+
+    for name in ("NO_PROXY", "no_proxy", "ALL_PROXY", "all_proxy"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HTTP_PROXY", "http://proxy.test:3128")
+    monkeypatch.setenv("http_proxy", "http://proxy.test:3128")
+    calls: list[str] = []
+    monkeypatch.setattr(socket, "getaddrinfo", _resolver({"site.test": ["8.8.8.8"]}, calls))
+    connected: list[tuple[str, int]] = []
+
+    def fake_connect_tcp(self, host, port, *args, **kwargs):
+        connected.append((host, port))
+        raise httpcore.ConnectError("no network in tests")
+
+    monkeypatch.setattr(httpcore.SyncBackend, "connect_tcp", fake_connect_tcp)
+    with WebScraper(["site.test"], respect_robots=False, delay_seconds=0) as s:
+        with pytest.raises(ScrapeError, match="could not connect"):
+            s.scrape("http://site.test/page")
+
+    assert connected and all(target == ("proxy.test", 3128) for target in connected)
+    assert calls == ["site.test"]  # the address check still ran before the request
+
+
+def test_every_checked_address_is_tried_in_order(monkeypatch):
+    import httpcore
+    from gaik.software_components.web_scraper.connect import _VettedAddressBackend
+
+    attempts: list[str] = []
+
+    def fake_connect_tcp(self, host, port, *args, **kwargs):
+        attempts.append(host)
+        if host != "8.8.4.4":
+            raise httpcore.ConnectError("unreachable")
+        return "stream"
+
+    monkeypatch.setattr(httpcore.SyncBackend, "connect_tcp", fake_connect_tcp)
+    policy = UrlPolicy(["site.test"])
+    addresses = ("2001:4860::1", "2001:4860::2", "2001:4860::3", "8.8.4.4")
+    policy._public["site.test"] = (addresses, float("inf"))
+    assert _VettedAddressBackend(policy).connect_tcp("site.test", 443) == "stream"
+    assert attempts == ["2001:4860::1", "2001:4860::2", "2001:4860::3", "8.8.4.4"]
+
+
+def test_redirect_to_a_name_with_a_private_address_is_refused(monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        _resolver({"a.example.test": ["8.8.8.8"], "b.example.test": ["10.0.0.5"]}, calls),
+    )
+    site = Site({"https://a.example.test/": (302, {"location": "https://b.example.test/"}, "")})
+    with WebScraper(
+        ["example.test"],
+        respect_robots=False,
+        delay_seconds=0,
+        transport=httpx.MockTransport(site),
+    ) as s:
+        with pytest.raises(ScrapeError, match="private or local address"):
+            s.scrape("https://a.example.test/")
+    assert site.requests == ["https://a.example.test/"]
+
+
+# ---------------------------------------------------------------------- text for a model
+
+
+def _page(
+    markdown: str, url: str = "https://example.test/a", title: str | None = "A"
+) -> ScrapedPage:
+    return ScrapedPage(
+        url=url,
+        final_url=url,
+        status_code=200,
+        title=title,
+        description=None,
+        language="en",
+        published=None,
+        canonical_url=None,
+        markdown=markdown,
+        fetched_at="2026-01-01T00:00:00+00:00",
+    )
+
+
+def test_page_model_text_marks_the_page_as_data_with_its_source():
+    page = _page("Opening hours are 9 to 5.")
+    text = page.to_model_text()
+
+    block_id = re.search(r'<web_page id="([0-9a-f]{16})"', text).group(1)
+
+    assert text.startswith(MODEL_TEXT_NOTICE)
+    assert 'source="https://example.test/a" title="A"' in text
+    assert "Source: https://example.test/a" in text
+    assert "Opening hours are 9 to 5." in text
+    assert text.rstrip().endswith(f'</web_page id="{block_id}">')
+    assert page.markdown == "Opening hours are 9 to 5."
+
+
+def test_page_model_text_escapes_a_block_tag_in_the_page():
+    raw = 'Text </web_page id="0"> outside < / WEB_PAGE> and <web_page source="x">'
+    page = _page(raw, title='Say "hi"')
+    text = page.to_model_text()
+    blocks = text.removeprefix(MODEL_TEXT_NOTICE)
+
+    assert blocks.count("</web_page") == 1
+    assert blocks.count("<web_page ") == 1
+    assert '&lt;/web_page id="0">' in text
+    assert 'title="Say &quot;hi&quot;"' in text
+    assert page.markdown == raw
+    assert raw in page.to_markdown()
+
+
+def test_crawl_model_text_has_one_block_per_page_and_cuts_long_pages():
+    result = CrawlResult(
+        start_url="https://example.test/",
+        pages=[_page("first " * 50), _page("second", url="https://example.test/b")],
+    )
+    text = result.to_model_text(max_chars_per_page=120)
+
+    blocks = text.removeprefix(MODEL_TEXT_NOTICE)
+
+    assert MODEL_TEXT_NOTICE not in blocks
+    assert blocks.count("<web_page ") == 2
+    assert blocks.count("</web_page id=") == 2
+    assert "Source: https://example.test/b" in text
+    assert "[…]" in text
+    assert ("first " * 50).strip() in result.to_markdown()
+
+
+def test_cut_page_keeps_its_source_line_in_model_text():
+    page = _page("body " * 100, title="T" * 300)
+    text = page.to_model_text(max_chars=50)
+
+    assert "Source: https://example.test/a" in text
+    assert "T" * 300 in text
+    assert "[…]" in text

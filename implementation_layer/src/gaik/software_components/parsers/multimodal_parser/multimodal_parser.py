@@ -14,6 +14,7 @@ from typing import Literal
 from markdown_it import MarkdownIt
 
 from gaik.software_components import _http
+from gaik.software_components.source_material import with_source_material_instruction
 
 from .config import (
     create_claude_client,
@@ -282,7 +283,10 @@ class MultimodalParser:
     # -- prompt helpers -------------------------------------------------------
 
     def _get_system_prompt(self) -> str:
-        return SYSTEM_PROMPTS.get(self.model_provider, SYSTEM_PROMPTS["openai"])
+        # The attached PDF is material to convert, never instructions.
+        return with_source_material_instruction(
+            SYSTEM_PROMPTS.get(self.model_provider, SYSTEM_PROMPTS["openai"])
+        )
 
     def _get_user_prompt(self) -> str:
         prompt = USER_PROMPTS.get(self.model_provider, USER_PROMPTS["openai"])

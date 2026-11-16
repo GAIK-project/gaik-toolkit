@@ -274,7 +274,9 @@ that speaks a protocol on stdout, such as an MCP server on stdio.
 
 The capture belongs to the thread or the asyncio task that opened it, so a `quiet_stdout()`
 block in a coroutine may span an `await`: other tasks on the same event loop print as before.
-A task, or an `asyncio.to_thread` call, started inside the block is captured with it.
+A task, or an `asyncio.to_thread` call, started inside the block is captured with it. A
+thread or a `ThreadPoolExecutor` worker that a component starts itself is not: what it
+prints reaches the real stdout. No operation runs such a component today.
 
 To do this, `sys.stdout` is replaced by a small stand-in the first time an operation runs.
 It stays in place for the life of the process and passes everything else through to the

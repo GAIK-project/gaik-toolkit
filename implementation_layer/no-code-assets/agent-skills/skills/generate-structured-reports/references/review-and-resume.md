@@ -17,9 +17,9 @@ report-runs/<name>/
 
 Never put an input in the workspace's stage folders (`normalized/`, `knowledge/`,
 `report/`, `diagnostics/`) or at `workspace/sample_report.md`: the stages delete or overwrite
-them. Every command that writes refuses a source, sample report or spec found there, and a
-stage folder that is a link or junction to somewhere else: the stage would delete what it
-points to.
+them. Every stage command, and `apply-spec`, `rebuild` and `update-sample`, refuses a source,
+sample report or spec found there, and a stage folder that is a link or junction to somewhere
+else: the stage would delete what it points to.
 
 Diagnostics stay out of `workspace/knowledge/`: `KnowledgeBase.load()` reads every JSON file
 in that folder as a section's knowledge. The workspace holds the user's content; it never goes

@@ -10,8 +10,8 @@
 
 A template is the reusable part of a report spec: its title, language, report-wide
 instructions and sections. Sources, models, settings, sample files and run results are never
-saved. `load` writes the sections as a structure file that `run_report.py set-sections`
-accepts, after the user has reviewed them in chat like any other structure.
+saved. `load` writes the sections as a structure file for
+`run_report.py propose-spec --structure`, reviewed in chat like any other structure.
 
 The library is a folder of one JSON file per template, in a fixed per-user place that no
 skill update replaces: `--library`, else the GAIK_REPORT_TEMPLATES environment variable, else
@@ -314,7 +314,10 @@ def command_load(args: argparse.Namespace) -> dict[str, Any]:
         "language": template.get("language"),
         "instructions": template.get("instructions"),
         "sections": [s["title"] for s in template["structure"]],
-        "next": "Review the sections with the user, then run run_report.py set-sections",
+        "next": (
+            "Review the sections with the user as group (3) of the whole spec: "
+            "run run_report.py propose-spec --structure with this file"
+        ),
     }
 
 

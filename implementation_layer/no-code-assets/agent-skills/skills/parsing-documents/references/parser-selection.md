@@ -45,7 +45,7 @@ from `gaik.software_components.llm`. Supply it through `VisionParser(openai_conf
 | `openai` | `OPENAI_API_KEY`, optional `OPENAI_MODEL` |
 | `azure` | `AZURE_API_KEY`, `AZURE_ENDPOINT`, `AZURE_DEPLOYMENT`; optional `AZURE_API_VERSION` |
 | `google` | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`), optional `GOOGLE_MODEL` |
-| `vertex` | `GOOGLE_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`), optional `GOOGLE_CLOUD_LOCATION` (default `global`); Google application-default credentials or `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS` |
+| `vertex` | `GOOGLE_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`), optional `GOOGLE_CLOUD_LOCATION` (unset: the EU multi-region `eu` first, the global endpoint as its fallback; gaik 0.9.1 and earlier defaulted to `global`); Google application-default credentials or `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS` |
 | `anthropic` | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` |
 | `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE`, optional `ANTHROPIC_MODEL` |
 | `aitta` | `AITTA_API_KEY` (aliases `AITTA_API_TOKEN`, `AITTA_TOKEN`), optional `AITTA_MODEL` |
@@ -92,10 +92,12 @@ two providers all cleared the specialized parsers on table structure, and the ch
 them already won. Start with the cheap model and only move up if a verification check
 fails — the larger models bought a few points, not a category change.
 
-Cross-region note when using Vertex: multi-region endpoints live on the *unprefixed* host,
-so setting a location like `eu` with a default client template can produce an invalid
-hostname such as `eu-aiplatform.googleapis.com`. Single regions use the default template.
-Some regions do not serve these models at all.
+Cross-region note when using Vertex: the shared `vertex` config hands the location to the
+Google Gen AI SDK, which sends the multi-regions `eu` and `us` to
+`aiplatform.<location>.rep.googleapis.com` and `global` to `aiplatform.googleapis.com`. A
+hand-written `GOOGLE_GENERATE_CONTENT_URL` (legacy `vertex_ai=True`) needs the same hosts: the
+single-region form `<location>-aiplatform.googleapis.com` gives an invalid
+`eu-aiplatform.googleapis.com`. Some regions do not serve these models at all.
 
 ## Escalation ladder
 

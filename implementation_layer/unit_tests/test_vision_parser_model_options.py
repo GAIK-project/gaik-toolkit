@@ -190,7 +190,7 @@ def test_native_provider_uses_shared_client_for_image_and_cleanup(monkeypatch, p
     assert parser._clean_markdown(["first", "second"]) == "parsed"
     assert configs == [config]
     assert client.calls[0][0][0]["content"][1]["type"] == "image_url"
-    assert "first" in client.calls[1][0][0]["content"]
+    assert "first" in client.calls[1][0][-1]["content"]
     assert client.calls[0][1]["max_tokens"] == 16000
     assert parser.usage.snapshot() == {"prompt_tokens": 6}
 

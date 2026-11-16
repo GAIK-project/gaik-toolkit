@@ -131,6 +131,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     CALLS.clear()
     monkeypatch.setattr(route, "_gaik", lambda: FakeGaik)
     monkeypatch.setattr(route, "get_api_config", lambda: CONFIG)
+    monkeypatch.setattr(route, "chat_models", lambda: ["gpt-x"])
     app = FastAPI()
     app.include_router(route.router, prefix="/knowledge-curator")
     return TestClient(app)
@@ -357,3 +358,11 @@ def test_an_older_gaik_without_dropped_facts_still_curates(client, monkeypatch):
     assert result[0] == "result"
     assert result[1]["dropped"] == []
     assert sorted(result[1]["artifacts"]) == ["knowledge/roof.json", "knowledge/vent.json"]
+
+
+def test_a_model_the_demo_does_not_offer_is_refused(client):
+    request = {**REQUEST, "options": {**REQUEST["options"], "model": "not-offered"}}
+    response = _run(client, request)
+    assert response.status_code == 422
+    assert "not-offered" in response.json()["detail"]
+    assert CALLS == []

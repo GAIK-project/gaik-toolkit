@@ -88,7 +88,7 @@ A legacy dict with neither `provider` nor `use_azure`, such as `{"api_key": key,
 | `google` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `GOOGLE_MODEL`, default `gemini-2.5-flash` |
 | `aitta` | `AITTA_API_KEY` (aliases: `AITTA_API_TOKEN`, `AITTA_TOKEN`) | `AITTA_MODEL`, default `google/gemma-4-31b-it` |
 | `openai_compatible` | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Explicit server model; no default |
-| `vertex` | `GOOGLE_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`, plus Google credentials | `GOOGLE_MODEL`; region from `GOOGLE_CLOUD_LOCATION`, default `global` |
+| `vertex` | `GOOGLE_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`, plus Google credentials | `GOOGLE_MODEL`; location from `GOOGLE_CLOUD_LOCATION`. Unset, gaik after 0.9.1 uses the EU multi-region (`eu`), and the global endpoint for a model the EU does not serve or while the EU does not answer (logged as a warning); gaik 0.9.1 and earlier use `global`. A location you set is used as given unless you also pass `location_fallback` |
 | `litellm` | `LITELLM_MODEL`; credentials for the selected backend | Provider-prefixed ID, e.g. `azure/gpt-6-luna` |
 
 The Google SDK adapter supports the direct Gemini API and Vertex AI. Vertex accepts application-default credentials (including a `GOOGLE_APPLICATION_CREDENTIALS` file), a `credentials` object, or service-account data via `service_account_json` (`GOOGLE_SERVICE_ACCOUNT_JSON`, inline JSON or a file path). Choose a region where your model is served.

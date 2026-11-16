@@ -4,7 +4,9 @@ The model writes tables as HTML and the rest as Markdown, so the HTML output
 renders both. Rendered HTML goes through :func:`keep_document_markup`, which
 rebuilds it from parsed tags: only the tags and attributes listed here are
 written back, all text is escaped again, links keep only http, https and mailto
-addresses, and the content of script, style and similar elements is removed.
+addresses, the content of script, style and similar elements is removed, and an
+image leaves its alt text. A dropped element that is never closed gives back
+what it swallowed as text.
 """
 
 from __future__ import annotations
@@ -80,13 +82,32 @@ def _attr_value(tag: str, name: str, value: str | None) -> str | None:
 
 
 class _Rebuilder(HTMLParser):
-    def __init__(self) -> None:
+    def __init__(self, source: str, out: list[str], open_tags: list[str]) -> None:
         super().__init__(convert_charrefs=True)
-        self.out: list[str] = []
-        self.open: list[str] = []
+        self.source = source
+        self.out = out
+        self.open = open_tags
         self.dropping: list[str] = []
+        # Where the outermost dropped element began: the output length, the open
+        # tags and the source offset after its start tag. If it is never closed,
+        # the rest of the source is rebuilt from there without it.
+        self.drop_start: tuple[int, list[str], int] | None = None
+        # Computed once per pass, so each start tag costs one lookup.
+        self.line_starts = [0] + [m.end() for m in re.finditer("\n", source)]
+        lowered = source.lower()
+        self.last_end = {t: lowered.rfind(f"</{t}") for t in DROPPED_WITH_CONTENT}
+        # Set when a text-only start tag was dropped on its own: the parser must
+        # not then read what follows as that element's text.
+        self.skip_text_mode = False
+
+    def set_cdata_mode(self, *args, **kwargs) -> None:
+        if self.skip_text_mode:
+            self.skip_text_mode = False
+            return
+        super().set_cdata_mode(*args, **kwargs)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.skip_text_mode = False
         if tag in _DROPPED_VOID:
             return
         if self.dropping:
@@ -96,7 +117,22 @@ class _Rebuilder(HTMLParser):
                 self.dropping.append(tag)
             return
         if tag in DROPPED_WITH_CONTENT:
+            line, col = self.getpos()
+            # getpos() counts lines by "\n" only.
+            offset = self.line_starts[line - 1] + col + len(self.get_starttag_text() or "")
+            if self.last_end[tag] < offset:
+                # No end tag follows, so the element can never close: drop only
+                # its start tag now instead of rebuilding the rest in a new pass.
+                self.skip_text_mode = tag in _TEXT_ONLY
+                return
             self.dropping.append(tag)
+            self.drop_start = (len(self.out), list(self.open), offset)
+            return
+        if tag == "img":
+            # An image is not kept, but its alt text is, as in the Word export.
+            alt = dict(attrs).get("alt")
+            if alt and alt.strip():
+                self.out.append(html.escape(alt.strip(), quote=False))
             return
         if tag not in ALLOWED_TAGS:
             return
@@ -112,7 +148,7 @@ class _Rebuilder(HTMLParser):
             self.open.append(tag)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in VOID_TAGS:
+        if tag in VOID_TAGS or tag == "img":
             self.handle_starttag(tag, attrs)
         # Any other self-closed tag is dropped; it has no content to keep.
 
@@ -148,7 +184,16 @@ class _Rebuilder(HTMLParser):
 
 def keep_document_markup(fragment: str) -> str:
     """Return ``fragment`` rebuilt with only the allowed tags, attributes and links."""
-    rebuilder = _Rebuilder()
-    rebuilder.feed(fragment)
-    rebuilder.close()
-    return "".join(rebuilder.out)
+    out: list[str] = []
+    open_tags: list[str] = []
+    while True:
+        rebuilder = _Rebuilder(fragment, out, open_tags)
+        rebuilder.feed(fragment)
+        if not (rebuilder.dropping and rebuilder.drop_start):
+            rebuilder.close()
+            return "".join(rebuilder.out)
+        # A dropped element that is never closed did not hold the rest of the
+        # page: drop only its start tag and rebuild what follows it.
+        out_len, open_tags, offset = rebuilder.drop_start
+        out = rebuilder.out[:out_len]
+        fragment = fragment[offset:]
