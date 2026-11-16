@@ -807,7 +807,7 @@
         "name": "tsquery_mode",
         "type": "str",
         "default": "or",
-        "effect": "How the keyword arm turns query text into a tsquery, for search_keyword and both hybrid searches. The default is 'or' (it was 'websearch' through gaik 0.8.3). 'websearch' is Postgres' own parser and ANDs every term, so a sentence query only matches a passage containing every stem -- on real prose none, and hybrid silently degrades to vector-only. 'or' keeps the same parse (stemming, stop words, quoted phrases) but ORs the terms and lets ts_rank_cd rank; a leading '-' is read as text, not NOT. 'prefix' ORs prefix matches and suits only an UNSTEMMED index. With a text_processor, 'websearch' lemmatizes only the words and keeps quoted phrases, '-word' and 'or'.",
+        "effect": "How the keyword arm turns query text into a tsquery, for search_keyword and both hybrid searches. The default is 'or' (it was 'websearch' through gaik 0.8.3). 'websearch' is Postgres' own parser and ANDs every term, so a sentence query only matches a passage containing every stem -- on real prose none, and hybrid silently degrades to vector-only. 'or' keeps the same parse (stemming, stop words, quoted phrases) but ORs the terms and lets ts_rank_cd rank; a leading '-' is read as text, not NOT. 'prefix' ORs prefix matches and suits only an UNSTEMMED index. From the gaik release after 0.10.0, with a text_processor, 'websearch' lemmatizes only the words and keeps quoted phrases, '-word' and 'or'.",
         "selection_relevant": true,
         "infer_from": "users type natural-language questions -> leave at 'or'; short keyword or code lookups where every term must appear -> 'websearch'; 'prefix' only for an unstemmed, suffix-heavy corpus, never lemmatized Finnish"
       },
@@ -2926,7 +2926,7 @@
         "infer_from": "several knowledge bases in one persist_path -> one collection_name each"
       }
     ],
-    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. A persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored."
+    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. From the gaik release after 0.10.0, a persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored."
   },
   "FieldsToDocx": {
     "import": "from gaik.software_components.fields_to_docx import FieldsToDocx",

@@ -1430,7 +1430,12 @@ class PgVectorStore:
         if not query_text or self.text_processor is None:
             return query_text
         if self.tsquery_mode == "websearch":
-            expanded = _lemmatize_websearch(query_text, self.text_processor.lemmatize)
+            # A processor may offer only expand_query (the documented minimum); then
+            # each word or phrase is expanded on its own and split into lemmas.
+            lemmatize = getattr(self.text_processor, "lemmatize", None) or (
+                lambda text: self.text_processor.expand_query(text).split()
+            )
+            expanded = _lemmatize_websearch(query_text, lemmatize)
         else:
             expanded = self.text_processor.expand_query(query_text)
         return expanded if expanded else query_text

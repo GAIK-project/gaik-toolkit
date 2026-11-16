@@ -67,6 +67,30 @@ def test_or_mode_still_joins_the_lemmas():
     assert _store("or")._lemmatize_query("kissa ja koiran") == "kissa koira"
 
 
+class _ExpandOnly:
+    """The documented minimum: to_tsvector_text and expand_query, no lemmatize."""
+
+    def to_tsvector_text(self, text):
+        return text
+
+    def expand_query(self, text):
+        return _Processor().expand_query(text)
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [("kissa -koiran", "kissa -koira"), ('"mustan kissa"', '"musta kissa"'), ("kissa", "kissa")],
+)
+def test_websearch_mode_works_with_a_processor_that_only_expands(query, expected):
+    store = PgVectorStore(
+        "postgresql://unused",
+        embedding_dim=3,
+        tsquery_mode="websearch",
+        text_processor=_ExpandOnly(),
+    )
+    assert store._lemmatize_query(query) == expected
+
+
 class _Recorder:
     def __init__(self):
         self.sql = []
