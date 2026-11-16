@@ -3442,7 +3442,7 @@
     },
     "known_limitations": [
       "HTML pages only: PDFs, images and office files are skipped (not HTML), and links to files are not followed in a crawl. Parse downloaded documents with a parser instead.",
-      "Every request and redirect hop must stay inside allowed_domains (a domain allows its subdomains) and resolve to public addresses; allowed_domains is required unless allow_any_domain=True (never for URLs from users). The scraper connects only to the address it checked, so a name that later resolves elsewhere is not followed; the addresses are kept for the scraper's lifetime. HTTP_PROXY, HTTPS_PROXY and NO_PROXY are honoured.",
+      "Every request and redirect hop must stay inside allowed_domains (a domain allows its subdomains) and resolve to public addresses; allowed_domains is required unless allow_any_domain=True (never for URLs from users). With the default transport and no proxy, the scraper connects only to the address it checked, and keeps that address for its lifetime; with render_js, an HTTP_PROXY/HTTPS_PROXY proxy or a custom transport, the name is looked up again there.",
       "Obeys robots.txt by default: disallowed pages are skipped, a 5xx robots.txt blocks the site, and a Crawl-delay above max_crawl_delay (30 s) skips the site.",
       "Crawls breadth-first on the start page's host by default (stay_on_host=True), up to max_pages and max_depth; include_patterns/exclude_patterns are shell patterns on the URL path.",
       "Main-content extraction drops navigation, banners and footers, so facts that live only in a footer (contact details) can be missing; extraction='recall' keeps more blocks.",
