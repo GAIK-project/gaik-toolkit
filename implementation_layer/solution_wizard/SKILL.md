@@ -54,8 +54,9 @@ when a step needs something outside it, stop and ask the user, saying what it wo
 - **Commands:** only the wizard's own scripts, run from this folder as
   `python scripts/<name>.py`: `check_requirements.py`, `validate_blueprint.py`,
   `generate_mermaid.py`, `generate_bpmn.py`, `generate_schema.py`, `scaffold_poc.py`,
-  `generate_docs.py` and `run_wizard.py`, with the options these instructions show and with
-  `--blueprint`, `--output-dir` and `--requirements` inside the output directory. Ask first
+  `generate_docs.py`, `refresh_schema_model.py` (Step 4.5) and `run_wizard.py`, with the
+  options these instructions show and with `--blueprint`, `--output-dir`, `--requirements`
+  and `--schemas-dir` inside the output directory. Ask first
   for `promote_template.py` (Phase 13) and `run_wizard.py --export-schema`: both write into
   the wizard's own folders. Use `--base-url` only with an endpoint the user gave you. Every
   other command needs the user's yes first, including installing packages, running the
