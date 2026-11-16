@@ -736,8 +736,22 @@ def parse_nested_requirements(
         requirements = parse_user_requirements(
             user_description, client=client, model=model, _usage_sink=_usage_sink, **sampling
         )
-        extraction_model = create_extraction_model(requirements)
-        return extraction_model, requirements, analysis
+        leaked = [f for f in requirements.fields if f.field_type == "list[dict]"]
+        if not leaked:
+            extraction_model = create_extraction_model(requirements)
+            return extraction_model, requirements, analysis
+        # A list[dict] field would reach the provider as an open object, which a
+        # strict schema rejects. The task has a repeated collection after all, so
+        # parse it the way a parent with child collections is parsed.
+        print(
+            f"  Flat parse returned repeated collections {[f.field_name for f in leaked]}"
+            " -> using parent-with-nested-list structure"
+        )
+        analysis.structure_type = "parent_with_nested_list"
+        analysis.child_containers = [
+            ChildContainerSpec(container_name=f.field_name, container_description=f.description)
+            for f in leaked
+        ]
 
     if analysis.structure_type == "parent_with_nested_list":
         print("Using parent-with-nested-list structure")
@@ -1773,6 +1787,39 @@ def _normalize_explicit_default(
     return False, None
 
 
+def _enum_numbers(field: FieldSpec) -> list[int | float | Decimal]:
+    """The enum of a numeric field as numbers; a value that does not parse is dropped."""
+    numbers: list[int | float | Decimal] = []
+    for raw in field.enum or []:
+        try:
+            if field.field_type == "int":
+                number = Decimal(str(raw).strip())
+                if number != number.to_integral_value():
+                    continue
+                numbers.append(int(number))
+            elif field.field_type == "float":
+                numbers.append(float(raw))
+            else:
+                numbers.append(Decimal(str(raw).strip()))
+        except (ValueError, ArithmeticError):
+            continue
+    return numbers
+
+
+def _enum_allows(field: FieldSpec, value: object) -> bool:
+    """Whether ``value`` is one of ``field.enum``, compared in the field's own type."""
+    if field.field_type in NUMERIC_FIELD_TYPES:
+        if isinstance(value, bool):
+            return False
+        try:
+            number = Decimal(str(value).strip())
+        except ArithmeticError:
+            return False
+        allowed = _enum_numbers(field)
+        return not allowed or any(number == Decimal(str(n)) for n in allowed)
+    return value in field.enum
+
+
 def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseModel]:
     """
     Create a Pydantic model dynamically from field specifications (strict).
@@ -1803,7 +1850,7 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
 
         has_default, default = _normalize_explicit_default(f)
 
-        if f.enum:
+        if f.enum and f.field_type in ("str", "date"):
             if has_default:
                 if default not in f.enum:
                     f.enum.append(default)
@@ -1811,6 +1858,17 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
             else:
                 values = [""] + f.enum if "" not in f.enum else f.enum
                 annotated = Literal[tuple(values)]  # type: ignore[misc,call-arg]
+        elif f.enum and f.field_type == "list[str]":
+            # Each item is one of the values; an empty list is the "missing" value.
+            annotated = list[Literal[tuple(f.enum)]]  # type: ignore[misc,call-arg,valid-type]
+        elif f.enum and f.field_type == "int":
+            allowed_ints = _enum_numbers(f)
+            if has_default and default not in allowed_ints:
+                allowed_ints.append(default)
+            if allowed_ints:
+                annotated = Literal[tuple(allowed_ints)]  # type: ignore[misc,call-arg]
+        # A float, decimal or bool field keeps its type: apply_field_policies checks
+        # a float or decimal answer against the enum after extraction.
 
         # Numeric and boolean fields have no natural "empty" value the way
         # ""/[] serve str/list fields, so a missing default -- whether never
@@ -1869,7 +1927,7 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
             default_val = None
         elif f.field_type in ("list[str]", "list[dict]"):
             default_val = []
-        elif f.enum:
+        elif f.enum and f.field_type in ("str", "date"):
             default_val = ""
         else:
             default_val = ...
@@ -1943,6 +2001,12 @@ def parse_date(value: str | date | None, output_format: str = "%Y-%m-%d") -> str
         "%b %d, %Y",  # Short month: Apr 25, 2024
         "%d %b %Y",  # Day first short: 25 Apr 2024
     ]
+
+    # The field's own format goes first: "03/07/2024" for a "%m/%d/%Y" field is
+    # 7 March, and trying the day-first formats before it would swap day and month.
+    if output_format in formats:
+        formats.remove(output_format)
+        formats.insert(0, output_format)
 
     for fmt in formats:
         try:
@@ -2139,15 +2203,16 @@ def _resolve_fallback(field: FieldSpec):
 def _holds_items(key: str, value: object, requirements: ExtractionRequirements) -> bool:
     """True when ``value`` is a nested-list schema's item list under ``key``.
 
-    The items are dicts. A list with no items is recognised by its key, which is
-    the container's name and not one of the item fields; reading the first item
-    alone took an empty collection for a flat record.
+    The items are dicts, and the list sits under the container's name, which is
+    not one of the item fields. Reading the first item alone took an empty
+    collection, or a flat record's own ``list[dict]`` field, for the items.
     """
     if not isinstance(value, list):
         return False
-    if value:
-        return isinstance(value[0], dict)
-    return key not in {field.field_name for field in requirements.fields}
+    # A record's own list[dict] field holds dicts too, but its key is a field name.
+    if key in {field.field_name for field in requirements.fields}:
+        return False
+    return not value or isinstance(value[0], dict)
 
 
 def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> dict:
@@ -2171,7 +2236,11 @@ def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> di
         if field.field_type in NUMERIC_FIELD_TYPES and isinstance(value, str) and not value.strip():
             value = _resolve_fallback(field)
 
-        if field.enum and value not in field.enum:
+        if field.enum and field.field_type == "list[str]" and isinstance(value, list):
+            value = [item for item in value if item in field.enum]
+        elif field.enum and field.field_type == "bool":
+            pass
+        elif field.enum and value is not None and not _enum_allows(field, value):
             value = _resolve_fallback(field)
 
         output[name] = value
