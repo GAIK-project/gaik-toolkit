@@ -10,7 +10,7 @@ import {
   type BpmnSelectionInfo,
 } from "@/components/bpmn-modeler";
 import { BpmnZoomControls } from "@/components/bpmn-viewer-toolbar";
-import { FlowLockedNote, FlowUpdatedLine } from "@/components/flow-status";
+import { FlowEditingNote, FlowLockedNote, FlowUpdatedLine } from "@/components/flow-status";
 import { AskStepButton, StepNumber, StepTypeTag, stepTypeLabels } from "@/components/step-type";
 import { Icon } from "@/components/icons";
 import {
@@ -52,6 +52,7 @@ export function BpmnDiagramPanel({
   reloading = false,
   locked = false,
   onUnlock,
+  onLock,
   update = null,
   focusRequest = null,
   onSelectedStepChange,
@@ -82,6 +83,11 @@ export function BpmnDiagramPanel({
    */
   locked?: boolean;
   onUnlock?: () => void;
+  /**
+   * Closes the diagram for edits again ("Lopeta muokkaus"): where `locked`
+   * applies, the way back after "Muokkaa kaaviota".
+   */
+  onLock?: () => void;
   /** The blueprint is one the page brought, not a save made here: from the chat, or from elsewhere. */
   update?: BlueprintUpdate | null;
   /** Select and centre this step's task (a click on the step list). */
@@ -104,7 +110,8 @@ export function BpmnDiagramPanel({
   // Unsaved edits kept from before the tab closed are the user's to save or
   // give up: they never come back into a locked canvas, and the lock opens
   // for the simple flow beside it too.
-  const [hadDraft] = useState(() => drafts.has(sessionId));
+  // Settled once the user closes the canvas again: the draft is gone by then.
+  const [hadDraft, setHadDraft] = useState(() => drafts.has(sessionId));
   const readOnly = locked && !hadDraft;
   useEffect(() => {
     if (locked && hadDraft) onUnlock?.();
@@ -424,6 +431,19 @@ export function BpmnDiagramPanel({
   // The choice is not offered while a save is on its way: its answer settles it.
   const choosing = changedElsewhere && saveState !== "saving";
 
+  /** Back to the diagram last saved: the edits since then go, on the canvas and in the kept draft. */
+  function discard() {
+    if (saving.current) return;
+    showServerDiagram(propXml.current);
+  }
+
+  /** "Lopeta muokkaus": the canvas is read-only again, as it opened. */
+  function lock() {
+    if (saving.current || hasOwnEdits()) return;
+    setHadDraft(false);
+    onLock?.();
+  }
+
   function applyNameChange(next: string) {
     setEditName(next);
     modelerRef.current?.updateSelectedName(next);
@@ -433,7 +453,8 @@ export function BpmnDiagramPanel({
   const typeName = (type: string) => t.wsBpmnTypeNames[`bpmn:${type}`] ?? type;
   const problemText = edit.problems.unconnected.length
     ? fillTemplate(t.bpmnUnconnected, {
-        names: edit.problems.unconnected.map((p) => p.name || p.id).join(", "),
+        // A task just dropped from the palette has no name: its id ("Activity_02hthtd") said nothing.
+        names: edit.problems.unconnected.map((p) => p.name || t.bpmnUnnamedTask).join(", "),
       })
     : edit.problems.unnamed.length
       ? t.bpmnUnnamed
@@ -476,7 +497,8 @@ export function BpmnDiagramPanel({
     status = (
       <span className="inline-flex items-center gap-1.5 text-text-muted">
         <Icon name="check" size={14} className="text-success-text" />
-        {t.wsBpmnSaved}
+        {/* When the wizard hears of it: wizard_api tells the agent with the next chat message. */}
+        {t.bpmnSaved}
       </span>
     );
   } else if (update && !reloading && !draftPending && !changedElsewhere && edit.kind === "none") {
@@ -598,15 +620,29 @@ export function BpmnDiagramPanel({
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" role="status">
                 {status}
                 {edit.kind === "structure" && !choosing && (
-                  <button
-                    type="button"
-                    className="btn-brand px-3 py-1 text-xs"
-                    onClick={() => void save()}
-                    disabled={blocked || reloading || saveState === "saving"}
-                    data-testid="bpmn-save"
-                  >
-                    {t.wsBpmnSave}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="btn-brand px-3 py-1 text-xs"
+                      onClick={() => void save()}
+                      disabled={blocked || reloading || saveState === "saving"}
+                      data-testid="bpmn-save"
+                    >
+                      {t.wsBpmnSave}
+                    </button>
+                    {/* The way back from an edit that cannot or should not be saved
+                        (a task dropped beside the process): without it the only way
+                        out was to undo each step or leave the page. */}
+                    <button
+                      type="button"
+                      className="btn-secondary px-3 py-1 text-xs"
+                      onClick={discard}
+                      disabled={saveState === "saving"}
+                      data-testid="bpmn-discard"
+                    >
+                      {t.bpmnDiscard}
+                    </button>
+                  </>
                 )}
               </div>
             )}
@@ -665,6 +701,15 @@ export function BpmnDiagramPanel({
         )}
       </div>
       {readOnly && onUnlock && <FlowLockedNote onUnlock={onUnlock} testId="bpmn" t={t} />}
+      {!readOnly && (
+        <FlowEditingNote
+          help={t.bpmnEditHelp}
+          onLock={onLock ? lock : undefined}
+          lockWaits={edit.kind !== "none" || saveState === "saving"}
+          testId="bpmn"
+          t={t}
+        />
+      )}
     </section>
   );
 }
