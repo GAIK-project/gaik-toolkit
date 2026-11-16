@@ -18,6 +18,7 @@ try:
     from utils import (
         MODEL,
         get_api_config,
+        require_vision,
         get_model_options,
         load_saved_requirements,
         load_saved_schema,
@@ -28,6 +29,7 @@ except ImportError:
     from api.utils import (
         MODEL,
         get_api_config,
+        require_vision,
         get_model_options,
         load_saved_requirements,
         load_saved_schema,
@@ -66,6 +68,13 @@ try:
     from utils.file_content import content_mismatch
 except ImportError:
     from api.utils.file_content import content_mismatch
+
+try:
+    from utils.errors import error_detail
+    from utils.model_allow_list import check_team_tier, offered_to
+except ImportError:
+    from api.utils.errors import error_detail
+    from api.utils.model_allow_list import check_team_tier, offered_to
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -479,7 +488,9 @@ async def generate_schema(request: GenerateSchemaRequest):
     except HTTPException:
         raise
     except ImportError as exc:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=error_detail(exc, "Loading the extractor")
+        ) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc
 
@@ -510,10 +521,13 @@ async def extract_vision(
     model = model or _server_model()
     request_config = get_request_api_config()
     if request_config is not None:
+        require_vision(request_config)
         model = request_config["model"]
         lib_provider, use_azure, vertex_ai = "openai", request_config["provider"] == "azure", False
     else:
         lib_provider, use_azure, vertex_ai = _provider_settings(model_provider, model)
+        # A team-only model needs the team tier (utils/model_allow_list.py).
+        check_team_tier(model)
 
     for uploaded_file in files:
         _validate_suffix(uploaded_file.filename)
@@ -534,12 +548,12 @@ async def extract_vision(
         try:
             from gaik.software_components.vision_extractor import VisionExtractor
         except ImportError as exc:
+            logger.warning("VisionExtractor is not available: %s", exc)
             raise HTTPException(
                 status_code=500,
                 detail=(
                     "VisionExtractor not available. "
-                    "Update to gaik>=0.5.10 or install the toolkit from source. "
-                    f"({exc})"
+                    "Update to gaik>=0.5.10 or install the toolkit from source."
                 ),
             ) from exc
 
@@ -613,7 +627,8 @@ async def extract_vision(
 
 @router.get("/models")
 async def model_catalogue():
+    # Team-only models are listed only for the team, like the server model menu.
     return {
-        "models": {name: list(_offered_models(name)) for name in PROVIDER_MODELS},
+        "models": {name: offered_to(_offered_models(name)) for name in PROVIDER_MODELS},
         "default": _server_model(),
     }

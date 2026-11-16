@@ -719,6 +719,9 @@ from gaik.software_modules.multi_source_report_generator import (
 # Save the current use-case configuration to a file.
 # Paths (input_paths, output_dir, sample_report_path) are stored relative to
 # the config file so it is portable. All option dicts are stored as-is.
+# load_report_config refuses a path that is absolute or leads out of the config's
+# folder (through ".." or a symbolic link) with SourcePathError; pass
+# root="<a folder that holds both>" for a config that names files beside its folder.
 save_report_config(
     "my_report_config.json",
     input_paths=["materials/"],

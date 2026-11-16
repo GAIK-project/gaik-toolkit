@@ -818,7 +818,7 @@ flowchart LR
 - Citation-ready text: each PDF page starts with a `[Page N]` line, Word headings become `#` headings, and spreadsheet tables carry the source row numbers
 - Recordings give the raw transcript, which has no per-utterance timestamps
 - Fails loudly: an unsupported type (such as `.pptx`, `.doc` or `.xls`), a missing file, two files with the same name, a PDF with no text layer or a file that yields no text raises instead of being skipped. All paths are checked before the first conversion
-- `save()` writes one Markdown file per source and a `sources.json` manifest, and `NormalizedSources.load()` reads them back, so the texts can be edited before use
+- `save()` writes one Markdown file per source and a `sources.json` manifest, and `NormalizedSources.load()` reads them back, so the texts can be edited before use; `load()` refuses an id that is not a plain file name, or a file that links out of the folder, with `SourcePathError` before reading it
 - Options: `vision_model`, `transcription_model` and `language`
 - Install: `pip install "gaik[source-normalizer]"`. Recordings need OpenAI or Azure OpenAI
 
@@ -861,10 +861,10 @@ flowchart LR
 **Key features:**
 - `WebScraper(allowed_domains=["gaik.ai"])`, then `scrape(url)` for one page or `crawl(start_url, max_pages=10, max_depth=2)` for a site. `iter_crawl(...)` yields each page as it arrives, so a crawl can be shown live or stopped
 - Crawl scope: the start page's host, `include_patterns` and `exclude_patterns` on the URL path (`"/fi/news/*"`), and links to files such as PDFs and images are not followed
-- Safe by default: http(s) only, each redirect hop checked, no private, loopback or link-local addresses, a size limit per page. Set `allowed_domains` whenever the URLs come from users
+- Safe by default: `allowed_domains` is required (or an explicit `allow_any_domain=True` for scripts whose URLs you choose yourself), http(s) only, each redirect hop checked, no private, loopback or link-local addresses, and the connection goes to the address that was checked; a size limit per page
 - Polite: robots.txt with wildcards and `Crawl-delay`, `delay_seconds` between requests to one host, and a `User-Agent` that names the toolkit
 - `render_js=True` renders pages in headless Chromium, and `render_js="auto"` only pages whose HTML holds almost no text
-- `CrawlResult.to_markdown()` joins the pages into one document with a `Source:` line per page, ready for the Extractor; `save(directory)` writes one Markdown file per page and `crawl.json`
+- `CrawlResult.to_model_text()` joins the pages into one document for the Extractor, each page in a `<web_page source="...">` block marked as data, not instructions, with its `Source:` line; `to_markdown()` gives the same pages unmarked, and `save(directory)` writes one Markdown file per page and `crawl.json`
 - No LLM calls of its own
 - Install: `pip install "gaik[web-scraper]"`. JavaScript rendering: `pip install "gaik[web-scraper-browser]"` and `playwright install chromium`
 

@@ -68,13 +68,15 @@ on:
       ANTHROPIC_FOUNDRY_API_KEY:
         required: false
 
-# No job writes to the repository.
-permissions:
-  contents: read
+# Nothing is granted by default; each job asks for what it needs, and no job
+# writes to the repository.
+permissions: {}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         # PRs: only Python 3.11 for fast feedback
@@ -141,6 +143,8 @@ jobs:
   # nightly run: the deployed demo installs gaik from PyPI.
   demo-api-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event_name != 'schedule' && !inputs.release_gate
     defaults:
       run:
@@ -164,6 +168,8 @@ jobs:
   # fail the job; lint errors do. Not in the release gate or the nightly run.
   demo-frontend-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event_name != 'schedule' && !inputs.release_gate
     defaults:
       run:
@@ -198,6 +204,8 @@ jobs:
   # (`gh workflow run test.yml`), so a failure here points at the deployment.
   llm-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
     - name: Checkout code
@@ -245,6 +253,8 @@ jobs:
   release-validation:
     if: inputs.release_gate == true
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     environment: release
     timeout-minutes: 60
     steps:

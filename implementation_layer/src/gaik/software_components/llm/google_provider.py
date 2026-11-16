@@ -3,16 +3,57 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+import logging
+import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from pydantic import BaseModel
 
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
+
+
+logger = logging.getLogger(__name__)
+
+# What a default Vertex location was found not to serve, shared by every
+# provider in the process: components build a provider per request, and each
+# would otherwise wait for the same answer again.
+# (project, location, model) the location answered 404 for.
+_NOT_SERVED: set[tuple[str, str, str]] = set()
+# (project, location) -> monotonic time until which the fallback is used, after
+# the location failed with a server error, a timeout or a quota answer.
+_UNAVAILABLE_UNTIL: dict[tuple[str, str], float] = {}
+# How long a failing location is left alone before it is tried again.
+LOCATION_RETRY_SECONDS = 600.0
+# The request timeout when the config sets none and the location has a fallback.
+PREFERRED_LOCATION_TIMEOUT_SECONDS = 120.0
+
+
+def _fallback_location(config: dict) -> str | None:
+    """The location that takes over from the config's own, or None.
+
+    ``location_fallback`` in the config decides, also when it is None. A config
+    with neither key gets the default pair: the EU, then the global endpoint.
+    A location other than the EU is used as given when the fallback is still
+    the one ``get_llm_config`` filled in by default: the location was then set
+    on the returned dict. A fallback the caller named applies with any location.
+    """
+    if "location_fallback" in config:
+        fallback = config["location_fallback"]
+        if config.get("_default_location_fallback") and (config.get("location") or "eu") != "eu":
+            return None
+    else:
+        fallback = None if config.get("location") else "global"
+    return fallback if fallback and fallback != (config.get("location") or "eu") else None
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    return "Timeout" in type(exc).__name__ or isinstance(exc, TimeoutError)
 
 
 def _usage(response) -> dict[str, int]:
@@ -61,15 +102,98 @@ class GoogleProvider:
                 credentials = service_account.Credentials.from_service_account_info(
                     info, scopes=scopes
                 )
-            self.raw = genai.Client(
-                vertexai=True,
-                project=config["project_id"],
-                location=config.get("location", "global"),
-                credentials=credentials,
-                **options,
-            )
+            # No location in the config: the EU first, the global endpoint for a
+            # model the EU does not serve or while the EU does not answer (see
+            # llm/config.py).
+            self.location = config.get("location") or "eu"
+            self._fallback_location = _fallback_location(config)
+            self._project = str(config["project_id"])
+            self._preferred_location = self.location
+            self._clients: dict[str, Any] = {}
+
+            def vertex_client(location: str):
+                if location not in self._clients:
+                    client_options = options
+                    if self._fallback_location and location == self._preferred_location:
+                        preferred = dict(http_options)
+                        if config.get("timeout") is None:
+                            # The SDK waits without a limit, and a request that
+                            # never returns would never reach the fallback. The
+                            # fallback itself keeps the SDK's default.
+                            preferred["timeout"] = int(PREFERRED_LOCATION_TIMEOUT_SECONDS * 1000)
+                        if config.get("max_retries") is None:
+                            # The fallback is the retry: the SDK's own retries would
+                            # hold a request for minutes in a location that is down.
+                            preferred["retry_options"] = genai_types.HttpRetryOptions(attempts=1)
+                        client_options = {"http_options": genai_types.HttpOptions(**preferred)}
+                    self._clients[location] = genai.Client(
+                        vertexai=True,
+                        project=config["project_id"],
+                        location=location,
+                        credentials=credentials,
+                        **client_options,
+                    )
+                return self._clients[location]
+
+            self._vertex_client = vertex_client
+            self.raw = vertex_client(self.location)
         else:
+            self.location = None
+            self._fallback_location = None
             self.raw = genai.Client(api_key=config["api_key"], **options)
+
+    def _use(self, location: str) -> Any:
+        self.location = location
+        self.raw = self._vertex_client(location)
+        return self.raw
+
+    def _in_location(self, call: Callable[[Any], Any], model: str) -> Any:
+        """Run ``call(client)`` in the preferred location, else in the fallback.
+
+        Only a default location has a fallback; one set by the caller or the
+        environment is used as given. The fallback takes the request when the
+        preferred location does not serve the model (404), and for
+        ``LOCATION_RETRY_SECONDS`` after it failed with a server error, a
+        timeout or a quota answer. After that the preferred location is tried
+        again. Each switch is logged, because the global endpoint is not tied
+        to a region.
+        """
+        fallback = self._fallback_location
+        if fallback is None:
+            return call(self.raw)
+        preferred = self._preferred_location
+        down_key = (self._project, preferred)
+        if (self._project, preferred, model) in _NOT_SERVED:
+            return call(self._use(fallback))
+        if _UNAVAILABLE_UNTIL.get(down_key, 0.0) > time.monotonic():
+            return call(self._use(fallback))
+        try:
+            return call(self._use(preferred))
+        except Exception as exc:
+            code = getattr(exc, "code", None)
+            if isinstance(exc, genai_errors.ClientError) and code == 404:
+                _NOT_SERVED.add((self._project, preferred, model))
+                reason = f"does not serve {model}"
+            elif (
+                isinstance(exc, genai_errors.ServerError)
+                or (isinstance(exc, genai_errors.ClientError) and code == 429)
+                or _is_timeout(exc)
+            ):
+                _UNAVAILABLE_UNTIL[down_key] = time.monotonic() + LOCATION_RETRY_SECONDS
+                reason = (
+                    f"did not answer ({type(exc).__name__}{f' {code}' if code else ''}); "
+                    f"it is tried again in {int(LOCATION_RETRY_SECONDS / 60)} minutes"
+                )
+            else:
+                raise
+            logger.warning(
+                "Vertex AI location %r %s. Using %r, which is not tied to a region. "
+                "Set GOOGLE_CLOUD_LOCATION to choose the location.",
+                preferred,
+                reason,
+                fallback,
+            )
+            return call(self._use(fallback))
 
     @staticmethod
     def _text_parts(content: Any) -> list[str]:
@@ -161,10 +285,13 @@ class GoogleProvider:
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         system, rest = self._split_system(messages)
         model = kwargs.pop("model", self.model)
-        response = self.raw.models.generate_content(
-            model=model,
-            contents=self._to_contents(rest),
-            config=self._config_for(system, kwargs or None),
+        contents = self._to_contents(rest)
+        request_config = self._config_for(system, kwargs or None)
+        response = self._in_location(
+            lambda client: client.models.generate_content(
+                model=model, contents=contents, config=request_config
+            ),
+            model,
         )
         usage = _usage(response)
         self.usage.add(usage)
@@ -235,10 +362,12 @@ class GoogleProvider:
                 **kwargs,
             },
         )
-        response = self.raw.models.generate_content(
-            model=model,
-            contents=self._to_contents(rest),
-            config=config,
+        contents = self._to_contents(rest)
+        response = self._in_location(
+            lambda client: client.models.generate_content(
+                model=model, contents=contents, config=config
+            ),
+            model,
         )
         self.usage.add(_usage(response))
         if response.parsed is not None:
@@ -250,16 +379,29 @@ class GoogleProvider:
     def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
         system, rest = self._split_system(messages)
         model = kwargs.pop("model", self.model)
-        stream = self.raw.models.generate_content_stream(
-            model=model,
-            contents=self._to_contents(rest),
-            config=self._config_for(system, kwargs or None),
-        )
-        for chunk in stream:
+        contents = self._to_contents(rest)
+        request_config = self._config_for(system, kwargs or None)
+
+        def first_chunk(client):
+            # The request is sent when the stream is first read, so a missing
+            # model shows there.
+            stream = iter(
+                client.models.generate_content_stream(
+                    model=model, contents=contents, config=request_config
+                )
+            )
+            return next(stream, None), stream
+
+        chunk, stream = self._in_location(first_chunk, model)
+        while chunk is not None:
             if chunk.text:
                 yield chunk.text
+            chunk = next(stream, None)
 
     def embed(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
         model = kwargs.pop("model", self.embedding_model)
-        result = self.raw.models.embed_content(model=model, contents=texts, **kwargs)
+        result = self._in_location(
+            lambda client: client.models.embed_content(model=model, contents=texts, **kwargs),
+            model,
+        )
         return [e.values for e in result.embeddings]

@@ -231,7 +231,7 @@ Software components:
 
 - `WebScraper` – fetches a page or crawls one site breadth-first and returns each page as clean Markdown with its title, language, date, links and JSON-LD
 - Stays inside `allowed_domains` and public addresses on every redirect hop, obeys robots.txt and spaces requests to one host; optional headless Chromium rendering for JavaScript sites
-- `CrawlResult.to_markdown()` heads each page with its `Source:` URL, ready for the Extractor or a RAG index
+- `CrawlResult.to_model_text()` puts each page in a marked block with its source URL, ready for the Extractor or a RAG index; `to_markdown()` gives plain Markdown with a `Source:` line per page
 
 ---
 

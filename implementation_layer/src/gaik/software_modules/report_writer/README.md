@@ -136,9 +136,13 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `settings.citations` | `true` (default) cites the source file and place of each fact, as the report instructions say. `false` writes plain statements with no file names, pages or references, even if the instructions ask for citations; the writers and the reviewer both follow it, and so does the `single_call` baseline |
 | `settings.curator` / `writer` / `reviewer` | `reasoning_effort` and `temperature` for every call of that step; `null` leaves the option unset. Where a model does not take `temperature` with reasoning on, it is dropped; an invalid effort raises before the call |
 
-Relative paths are resolved against the folder of the spec file. `ReportSpec.load(path)`
-makes them absolute and `spec.save(path)` writes them back relative, with `/`, so a spec
-folder can be moved or shared. The spec holds model names only, never credentials: an
+Paths are relative to the folder of the spec file. `ReportSpec.load(path)` makes them
+absolute and `spec.save(path)` writes them back relative, with `/`, so a spec folder can be
+moved or shared. Every path must stay inside the spec's folder: `load` checks them before any
+file is read and raises `SourcePathError` (a `ValueError`) for an absolute path or one that
+leads out of the folder through `..` or a symbolic link. For a spec that names files beside
+its folder, such as `../inputs/notes.txt`, pass a folder that holds both:
+`ReportSpec.load(path, root="project")`. The spec holds model names only, never credentials: an
 unknown key such as `api_key` raises, and so does a spec with no sources, duplicate
 section ids or a `depends_on` on an unknown section.
 

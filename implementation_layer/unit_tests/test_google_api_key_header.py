@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+import requests
 from pydantic import BaseModel
 
 pytest.importorskip("fitz")
@@ -29,14 +30,14 @@ class _Response:
         return self._payload
 
 
-def _capture(monkeypatch, module, payload):
+def _capture(monkeypatch, payload):
     calls = []
 
     def post(url, headers=None, json=None, timeout=None):
         calls.append({"url": url, "headers": headers})
         return _Response(payload)
 
-    monkeypatch.setattr(module.requests, "post", post)
+    monkeypatch.setattr(requests, "post", post)
     return calls
 
 
@@ -49,7 +50,7 @@ def _assert_key_only_in_header(call):
 
 def test_multimodal_parser_sends_the_key_in_a_header(monkeypatch, tmp_path):
     payload = {"candidates": [{"content": {"parts": [{"text": "# Title"}]}}]}
-    calls = _capture(monkeypatch, multimodal_parser, payload)
+    calls = _capture(monkeypatch, payload)
     monkeypatch.setattr(multimodal_parser, "_build_google_body", lambda *a, **k: {})
     parser = SimpleNamespace(
         config={"vertex_ai": False, "api_key": KEY, "model": "gemini-test"},
@@ -69,7 +70,7 @@ def test_vision_extractor_sends_the_key_in_a_header(monkeypatch):
         answer: str
 
     payload = {"candidates": [{"content": {"parts": [{"text": '{"answer": "yes"}'}]}}]}
-    calls = _capture(monkeypatch, vision_extractor, payload)
+    calls = _capture(monkeypatch, payload)
     extractor = SimpleNamespace(
         config={"vertex_ai": False, "api_key": KEY},
         model="gemini-test",

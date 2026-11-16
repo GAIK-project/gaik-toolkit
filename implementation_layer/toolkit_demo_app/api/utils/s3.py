@@ -5,6 +5,8 @@ import os
 
 from fastapi import HTTPException
 
+from .errors import public_error
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,4 +87,6 @@ def generate_presigned_url(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate {label} URL: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=public_error(e, f"Generating the {label} URL")
+        ) from e
