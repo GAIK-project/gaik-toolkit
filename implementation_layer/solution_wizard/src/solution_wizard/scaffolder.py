@@ -380,8 +380,14 @@ def _is_local_stage(stage: str, settings: dict[str, Any], local_hosts: set[str])
         return True
     if settings.get("provider") not in {"openai_compatible", "litellm"}:
         return False
+    base_url = settings.get("base_url")
+    if isinstance(base_url, str) and base_url.strip()[:4].lower() == "env:":
+        # Wizard v2 names a self-hosted endpoint as env:...BASE_URL (its scaffold guard
+        # refuses a literal http address). The PoC resolves it at run time, and
+        # provider_config.py refuses the stage unless the resolved host is local.
+        return True
     try:
-        host = (urlsplit(str(settings.get("base_url") or "")).hostname or "").lower()
+        host = (urlsplit(str(base_url or "")).hostname or "").lower()
     except ValueError:
         return False
     return bool(host) and host in local_hosts
