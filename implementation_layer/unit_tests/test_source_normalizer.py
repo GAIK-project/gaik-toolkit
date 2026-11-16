@@ -25,16 +25,6 @@ from gaik.software_components.source_normalizer import (
 from gaik.software_components.source_normalizer.models import source_id
 from openpyxl import Workbook
 
-
-def _symlink(link, target):
-    """Make ``link`` point at ``target``; skip where making one needs a right
-    this account lacks (WinError 1314 on Windows)."""
-    try:
-        link.symlink_to(target)
-    except OSError as exc:
-        pytest.skip(f"cannot make a symlink here: {exc}")
-
-
 CONFIG = {"provider": "azure", "model": "gpt-test", "api_key": "fake"}
 
 
@@ -364,18 +354,18 @@ def test_load_refuses_a_manifest_id_that_is_not_a_file_name_before_reading(tmp_p
         NormalizedSources.load(tmp_path / "out")
 
 
-def test_load_refuses_a_normalized_file_that_links_out_of_the_folder(tmp_path):
+def test_load_refuses_a_normalized_file_that_links_out_of_the_folder(tmp_path, symlink):
     (tmp_path / "secret.txt").write_text("Outside the folder.", encoding="utf-8")
     _manifest(tmp_path / "out", "01_notes")
-    _symlink(tmp_path / "out" / "01_notes.md", tmp_path / "secret.txt")
+    symlink(tmp_path / "out" / "01_notes.md", tmp_path / "secret.txt")
 
     with pytest.raises(SourcePathError, match="outside the folder"):
         NormalizedSources.load(tmp_path / "out")
 
 
-def test_load_reads_a_normalized_file_linked_inside_the_folder(tmp_path):
+def test_load_reads_a_normalized_file_linked_inside_the_folder(tmp_path, symlink):
     _manifest(tmp_path / "out", "01_notes")
     (tmp_path / "out" / "kept.txt").write_text("Notes.", encoding="utf-8")
-    _symlink(tmp_path / "out" / "01_notes.md", tmp_path / "out" / "kept.txt")
+    symlink(tmp_path / "out" / "01_notes.md", tmp_path / "out" / "kept.txt")
 
     assert NormalizedSources.load(tmp_path / "out").get("notes.txt").text == "Notes."

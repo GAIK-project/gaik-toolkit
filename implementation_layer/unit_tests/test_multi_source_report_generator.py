@@ -17,16 +17,6 @@ from gaik.software_modules.multi_source_report_generator import (
 )
 from gaik.software_modules.multi_source_report_generator import pipeline as msrg
 
-
-def _symlink(link, target):
-    """Make ``link`` point at ``target``; skip where making one needs a right
-    this account lacks (WinError 1314 on Windows)."""
-    try:
-        link.symlink_to(target)
-    except OSError as exc:
-        pytest.skip(f"cannot make a symlink here: {exc}")
-
-
 # ---------------------------------------------------------------------------
 # Fake LLM
 # ---------------------------------------------------------------------------
@@ -446,33 +436,35 @@ def test_load_report_config_refuses_a_path_outside_the_config_folder(tmp_path, p
         msrg.load_report_config(path)
 
 
-def test_load_report_config_refuses_an_input_linked_out_of_the_config_folder(tmp_path):
+def test_load_report_config_refuses_an_input_linked_out_of_the_config_folder(tmp_path, symlink):
     (tmp_path / "elsewhere").mkdir()
     path = _config(tmp_path / "project")
-    _symlink(tmp_path / "project" / "inputs", tmp_path / "elsewhere")
+    symlink(tmp_path / "project" / "inputs", tmp_path / "elsewhere")
 
     with pytest.raises(msrg.SourcePathError, match="outside the folder"):
         msrg.load_report_config(path)
 
 
-def test_load_report_config_refuses_a_file_linked_out_of_an_input_folder(tmp_path):
+def test_load_report_config_refuses_a_file_linked_out_of_an_input_folder(tmp_path, symlink):
     (tmp_path / "secret.txt").write_text("Outside the folder.", encoding="utf-8")
     path = _config(tmp_path / "project")
     (tmp_path / "project" / "inputs").mkdir()
     (tmp_path / "project" / "inputs" / "a.txt").write_text("alpha", encoding="utf-8")
-    _symlink(tmp_path / "project" / "inputs" / "notes.txt", tmp_path / "secret.txt")
+    symlink(tmp_path / "project" / "inputs" / "notes.txt", tmp_path / "secret.txt")
 
     with pytest.raises(msrg.SourcePathError, match="notes.txt"):
         msrg.load_report_config(path)
 
 
-def test_load_report_config_keeps_links_inside_the_folder_and_ignores_other_files(tmp_path):
+def test_load_report_config_keeps_links_inside_the_folder_and_ignores_other_files(
+    tmp_path, symlink
+):
     path = _config(tmp_path / "project")
     inputs = tmp_path / "project" / "inputs"
     inputs.mkdir()
     (inputs / "a.txt").write_text("alpha", encoding="utf-8")
-    _symlink(inputs / "b.txt", inputs / "a.txt")
-    _symlink(inputs / "skipped.xyz", tmp_path)  # not a source file, so not checked
+    symlink(inputs / "b.txt", inputs / "a.txt")
+    symlink(inputs / "skipped.xyz", tmp_path)  # not a source file, so not checked
 
     assert msrg.load_report_config(path)["input_paths"] == [inputs.resolve()]
 
