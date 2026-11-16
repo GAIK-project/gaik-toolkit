@@ -66,7 +66,7 @@ From `implementation_layer/toolkit_demo_app/CLAUDE.md`:
 - **Public:** `(home)` (`/`, `/privacy`, `/desktop-app`, `/prompts`, `/skills`) and `(auth)` (`/sign-in`, `/sign-up`, `/access-pending`).
 - **Demo pages** under `(demos)` are open to look at; running one needs a signed-in, approved account, or a pending one within the trial allowance (`lib/trial.ts`) or on the user's own model key, enforced on the API requests in `proxy.ts` (`lib/api-access.ts`). Visitors who cannot run see a "View only" notice.
 - **Report Writer** additionally enforces a per-user quota (`REPORT_WRITER_MAX_REPORTS`, default 5) in `app/api/report-writer/run/route.ts`. Admins manage it in the `/admin` "Report Writer Usage" tab: per-user counts/tokens, **Reset**, and a per-user **limit override** (`access_requests.report_limit_override`; e.g. demo/team accounts → Unlimited).
-- **Solution Wizard**: `/solution-wizard` links to Wizard V2 (`WIZARD_V2_URL`) and offers the first wizard in the browser (`/solution-wizard/first`). Its API `/api/wizard` needs the per-user `wizard_access` grant from `/admin`, for reads too (`lib/api-access.ts`, `wizardRefusal`).
+- **Solution Wizard**: `/solution-wizard` links to Wizard V2 (`WIZARD_V2_URL`) and offers the first wizard in the browser (`/solution-wizard/first`). Its API `/api/wizard` needs the per-user `wizard_access` grant from `/admin`, for reads too (`lib/api-access.ts`, `wizardRefusal`), and the API answers 503 without `CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY` and `ANTHROPIC_FOUNDRY_RESOURCE` (`api/routers/solution_wizard.py`).
 - **Model settings** let a user run supported demos on their own OpenAI/Azure/Aitta key. The key lives only in the tab's memory and travels as the `x-gaik-model-settings` header to the POST paths allowlisted in both `api/utils/model_settings.py` (`_PATHS`) and `lib/model-settings.ts` (`SUPPORTED_PATHS`); routers pick it up through `get_api_config()`.
 - `BYPASS_AUTH=true` opens everything in local dev.
 
@@ -112,7 +112,8 @@ One folder per demo under `app/(demos)/`; the Solution Wizard page is in `app/(w
 ## API Routes
 
 `api/main.py` mounts one router per feature from `api/routers/`, and each `include_router`
-line names its prefix. Read the router to see which gaik components a demo calls.
+line names its prefix (`luvata_order` sets its own in the router). Read the router to see which
+gaik components a demo calls.
 
 API docs at `http://localhost:8000/docs` when `DEMO_API_DOCS=true` is set in `.env.local` (as in `.env.example`).
 

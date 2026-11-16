@@ -348,12 +348,13 @@ config = get_openai_config(use_azure=True)
 parser = VisionParser(openai_config=config)
 
 pages = parser.convert_pdf("document.pdf", clean_output=True)
-# pages is a list of markdown strings, one per page
+# one merged string with clean_output=True (the default); one string per page with clean_output=False
 ```
 
 `openai_config` also accepts `get_llm_config(...)` for any provider; the model must accept images.
 
-**Returns:** `List[str]` - Markdown content per page
+**Returns:** `List[str]` - one Markdown string per page, or, with `clean_output=True` and more
+than one page, a single string merged by an extra model call
 
 ### PyMuPDFParser
 
