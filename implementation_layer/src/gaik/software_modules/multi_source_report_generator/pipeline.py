@@ -23,6 +23,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import os
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -33,6 +34,7 @@ from gaik.software_components.source_material import (
     clean_label,
     with_source_material_instruction,
 )
+from gaik.software_components.source_normalizer.paths import SourcePathError, path_inside
 
 from ._material import (
     TRUNCATED_NOTE,
@@ -1222,7 +1224,9 @@ def save_report_config(
     """Persist all ``run()`` parameters to a JSON config file for later reuse.
 
     Paths (``input_paths``, ``output_dir``, ``sample_report_path``) are stored
-    relative to the config file's directory so the config is portable. All keys
+    relative to the config file's directory so the config is portable; one outside
+    that directory is stored with ``..``, and ``load_report_config`` then needs a
+    ``root`` that holds it. A path on another drive raises ``SourcePathError``. All keys
     inside option dicts (``transcriber_options``, ``parser_options``, etc.) are
     stored as-is, except credential-bearing configs are rejected. Keep credentials
     in the environment and persist the provider/model selection instead.
@@ -1267,9 +1271,19 @@ def save_report_config(
         # here, while load_report_config reads it relative to the config file.
         absolute = Path(p).resolve()
         try:
-            return str(absolute.relative_to(base.resolve()))
+            rel = Path(os.path.relpath(absolute, base.resolve())).as_posix()
         except ValueError:
-            return str(absolute)  # outside the config's folder or on a different drive
+            raise SourcePathError(
+                f"{Path(p).name} is on another drive than the config file; a config stores "
+                "paths relative to its own folder"
+            ) from None
+        if rel == ".." or rel.startswith("../"):
+            logger.warning(
+                "%s is outside the config's folder; load_report_config needs a root that "
+                "holds both to read it back",
+                Path(p).name,
+            )
+        return rel
 
     # Normalise sections: dataclasses → plain dicts, preserve all fields.
     section_dicts: list[dict[str, Any]] = []
@@ -1318,33 +1332,53 @@ def save_report_config(
     return config_path
 
 
-def load_report_config(path: str | Path) -> dict[str, Any]:
+def load_report_config(path: str | Path, *, root: str | Path | None = None) -> dict[str, Any]:
     """Load a config file saved by ``save_report_config`` and return a dict
     that can be unpacked directly into ``MultiSourceReportGenerator.run()``.
 
-    Relative paths stored in the config are resolved relative to the config
-    file's directory. ``None`` is returned for any key that was not present.
+    The input paths, the sample report and the output folder stored in the config are
+    relative to the config file's directory and must stay inside ``root``, that
+    directory by default. They are checked before anything is read or written, and so
+    is every supported file in an input folder: an absolute path, or one that leads out
+    of ``root`` through ``..`` or a symbolic link, raises ``SourcePathError``. Pass a
+    wider ``root`` for a config that names files beside its own folder; with ``root``,
+    an absolute path inside it is taken too. Paths inside the option dicts (such as a
+    transcriber's ``output_dir``) are returned as stored. ``None`` is returned for any
+    key that was not present.
     """
     config_path = Path(path)
     base = config_path.parent
 
     raw: dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
 
-    def _to_abs(p: str | None) -> Path | None:
+    def _to_abs(p: str | None, what: str) -> Path | None:
         if p is None:
             return None
-        resolved = Path(p)
-        return resolved if resolved.is_absolute() else (base / resolved).resolve()
+        return path_inside(p, base, root=root, what=what).resolve()
+
+    def _input(p: str) -> Path:
+        joined = path_inside(p, base, root=root, what="input path")
+        if joined.is_dir():
+            # A file in the folder may be a link; it must stay inside ``root`` too.
+            for found in sorted(joined.rglob("*")):
+                if found.suffix.lower() in SUPPORTED_EXTENSIONS and found.is_file():
+                    path_inside(
+                        found.relative_to(joined),
+                        joined,
+                        root=root if root is not None else base,
+                        what="input file",
+                    )
+        return joined.resolve()
 
     return {
-        "input_paths": [_to_abs(p) for p in raw.get("input_paths") or []],
+        "input_paths": [_input(p) for p in raw.get("input_paths") or []],
         "sections": raw.get("sections", []),
         "report_title": raw.get("report_title", "Generated Report"),
         "report_description": raw.get("report_description"),
         "additional_instructions": raw.get("additional_instructions"),
         "report_language": raw.get("report_language"),
-        "sample_report_path": _to_abs(raw.get("sample_report_path")),
-        "output_dir": _to_abs(raw.get("output_dir")),
+        "sample_report_path": _to_abs(raw.get("sample_report_path"), "sample report"),
+        "output_dir": _to_abs(raw.get("output_dir"), "output folder"),
         "output_docx": raw.get("output_docx", False),
         "include_evidence_index": raw.get("include_evidence_index", True),
         "include_source_references": raw.get("include_source_references", True),

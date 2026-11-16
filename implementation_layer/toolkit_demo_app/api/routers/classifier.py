@@ -21,6 +21,11 @@ try:
 except ImportError:
     from api.utils.file_content import content_mismatch
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 
 
@@ -96,7 +101,9 @@ async def classify_document(
         }
 
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Classifier not installed: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=error_detail(e, "Loading the classifier")
+        ) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
     finally:

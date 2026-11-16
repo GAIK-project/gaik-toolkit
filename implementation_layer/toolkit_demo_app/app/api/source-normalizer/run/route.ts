@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   const limits = getReportWriterLimits();
   const gate = await gateReportWriter(request, limits.maxReports);
   if (gate instanceof Response) return gate;
-  const { userId } = gate;
+  const { userId, staff } = gate;
 
   // A body over the proxy cap arrives truncated and fails to parse, so reject it
   // by its declared length first.
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   fwd.append("manifest", form.get("manifest") as string);
   for (const f of form.getAll("files") as File[]) fwd.append("files", f, f.name);
 
-  return forwardReportRun("/source-normalizer/run", fwd, async (usage) => {
+  return forwardReportRun("/source-normalizer/run", fwd, staff, async (usage) => {
     if (!userId || !usage.sawResult || !usage.totalTokens) return;
     try {
       await recordReportUsage(userId, 0, usage.totalTokens);

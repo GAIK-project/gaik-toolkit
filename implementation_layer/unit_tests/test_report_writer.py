@@ -30,6 +30,7 @@ from gaik.software_modules.report_writer import (
     ReportWriter,
     RunSettings,
     SectionSpec,
+    SourcePathError,
     StepOptions,
 )
 
@@ -187,6 +188,80 @@ def test_spec_round_trip(tmp_path):
     path.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ValueError, match="api_key"):
         ReportSpec.load(path)
+
+
+def _write_spec(folder: Path, sources: list[str], sample: str | None = None) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    data = json.loads(make_spec(folder).model_dump_json())
+    data["sources"] = {"primary": sources}
+    data["sample_report"] = sample
+    path = folder / "report_spec.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def test_spec_load_reads_sources_in_nested_folders(tmp_path):
+    path = _write_spec(tmp_path, ["inputs/site/day1/notes.txt"], "templates/old/sample.docx")
+
+    spec = ReportSpec.load(path)
+
+    root = tmp_path.resolve()
+    assert spec.sources == {"primary": [root / "inputs" / "site" / "day1" / "notes.txt"]}
+    assert spec.sample_report == root / "templates" / "old" / "sample.docx"
+
+
+@pytest.mark.parametrize(
+    ("sources", "sample", "message"),
+    [
+        (["/etc/hosts"], None, "absolute path"),
+        (["inputs/notes.txt"], "/etc/hosts", "absolute path"),
+        (["../secret.txt"], None, "outside the folder"),
+        (["inputs/../../secret.txt"], None, "outside the folder"),
+        (["inputs/notes.txt"], "../secret.docx", "outside the folder"),
+    ],
+)
+def test_spec_load_refuses_a_path_outside_the_spec_folder(tmp_path, sources, sample, message):
+    path = _write_spec(tmp_path / "project", sources, sample)
+
+    with pytest.raises(SourcePathError, match=message):
+        ReportSpec.load(path)
+
+
+def test_spec_load_refuses_a_source_linked_out_of_the_spec_folder(tmp_path, symlink):
+    (tmp_path / "secret.txt").write_text("Outside the folder.", encoding="utf-8")
+    path = _write_spec(tmp_path / "project", ["inputs/notes.txt"])
+    (tmp_path / "project" / "inputs").mkdir()
+    symlink(tmp_path / "project" / "inputs" / "notes.txt", tmp_path / "secret.txt")
+
+    with pytest.raises(SourcePathError, match="outside the folder"):
+        ReportSpec.load(path)
+
+
+def test_spec_load_with_a_wider_root_reads_files_beside_the_spec_folder(tmp_path):
+    path = _write_spec(tmp_path / "runs" / "one", ["../../inputs/notes.txt"])
+
+    with pytest.raises(SourcePathError):
+        ReportSpec.load(path)
+    spec = ReportSpec.load(path, root=tmp_path)
+
+    assert spec.sources["primary"][0].resolve() == (tmp_path / "inputs" / "notes.txt").resolve()
+    with pytest.raises(SourcePathError):
+        ReportSpec.load(path, root=tmp_path / "runs")
+
+
+def test_spec_save_keeps_a_linked_source_by_its_own_name(tmp_path, symlink):
+    (tmp_path / "shared").mkdir()
+    (tmp_path / "shared" / "budget.csv").write_text("a,b\n", encoding="utf-8")
+    path = _write_spec(tmp_path / "project", ["inputs/budget.csv"])
+    (tmp_path / "project" / "inputs").mkdir()
+    symlink(tmp_path / "project" / "inputs" / "budget.csv", tmp_path / "shared" / "budget.csv")
+
+    spec = ReportSpec.load(path, root=tmp_path)
+    spec.save(path)
+
+    assert json.loads(path.read_text(encoding="utf-8"))["sources"] == {
+        "primary": ["inputs/budget.csv"]
+    }
 
 
 def test_spec_without_sources_raises(tmp_path):

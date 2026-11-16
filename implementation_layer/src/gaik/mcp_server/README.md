@@ -65,7 +65,7 @@ gaik-mcp [--transport stdio|http] [--root DIR] [--env-file FILE]
 
 | Setting | Flag | Environment | Default |
 |---------|------|-------------|---------|
-| Folder that path arguments may point into, and that `fields_to_word` writes to | `--root` | `GAIK_MCP_ROOT` | none on both transports: paths are refused |
+| Folder that path arguments may point into, and that `fields_to_word` writes to | `--root` | `GAIK_MCP_ROOT` | none on both transports: paths are refused; an empty value also means none |
 | Largest file, in megabytes | | `GAIK_MCP_MAX_FILE_MB` | 25 |
 | Longest text argument and returned text window, in characters | | `GAIK_MCP_MAX_TEXT_CHARS` | 100000 |
 | Seconds per model request | | `GAIK_MCP_TIMEOUT` | 120 |
@@ -122,7 +122,8 @@ Notes per tool:
 - **parse_document** reads PDF, DOCX, `.txt` and `.md`. The type is decided from the content,
   not the name. There is no OCR: a scanned PDF is refused. A DOCX that unpacks to more than
   200 MB, or to more than 50 MB of markup, is refused before it is read. Long texts come in
-  windows; call again with `offset` set to `next_offset`. Each call parses the file again.
+  windows; call again with `offset` set to `next_offset`. The server keeps the last four
+  parsed files, so a later window of an unchanged file is not parsed again.
   On a server that has Docling installed (`gaik[parser]`, `gaik[all]`) the first call can
   take a minute, because importing gaik's parsers loads it; with `gaik[mcp]` alone it does
   not.

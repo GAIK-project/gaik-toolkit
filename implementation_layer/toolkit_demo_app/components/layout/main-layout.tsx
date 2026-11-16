@@ -57,7 +57,11 @@ export async function MainLayout({
             }
           />
         )}
-        <ModelSettingsNotice />
+        {accessNotice && (
+          <ModelSettingsNotice
+            loggedIn={!!access?.user || !!access?.bypassAuth}
+          />
+        )}
         {aiNotice && <AiNotice />}
         {access ? (
           <RunAccessProvider
