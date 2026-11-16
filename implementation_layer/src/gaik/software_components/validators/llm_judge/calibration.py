@@ -73,33 +73,58 @@ def calibrate_against_human_labels(
         )
 
         scores = [f.score for f in relevant if f.score]
-        judge_score = sum(scores) / len(scores) if scores else 0.0
+        judge_error = getattr(result, "judge_error", None)
+        # An unreadable response, or one with no scored flag for this field,
+        # has no judge score: it is reported per item and left out of r, the
+        # severity agreement and the means, instead of counting as 0 / "ok".
+        skipped_reason: str | None = None
+        if judge_error:
+            skipped_reason = "judge_error"
+        elif not scores:
+            skipped_reason = "no scored flag"
+        judge_score: float | None = sum(scores) / len(scores) if scores else None
 
-        if relevant:
-            judge_severity: Severity = max(
-                (f.severity for f in relevant), key=lambda s: _SEVERITY_RANK[s]
-            )
+        judge_severity: Severity | None
+        if judge_error:
+            judge_severity = None
+        elif relevant:
+            judge_severity = max((f.severity for f in relevant), key=lambda s: _SEVERITY_RANK[s])
         else:
             judge_severity = "ok"
 
         per_item.append(
             {
                 "human_score": item.human_score,
-                "judge_score": judge_score,
+                "judge_score": None if skipped_reason else judge_score,
                 "human_severity": item.human_severity,
                 "judge_severity": judge_severity,
                 "note": item.note,
                 "n_flags": len(relevant),
                 "cost_usd": result.usage.cost_usd,
+                "skipped": skipped_reason,
+                "judge_error": judge_error,
             }
         )
 
-    n = len(per_item)
-    judge_scores = [p["judge_score"] for p in per_item]
-    human_scores = [float(p["human_score"]) for p in per_item]
-    pearson = _pearson(judge_scores, human_scores) if n > 1 else None
+    skipped = [p for p in per_item if p["skipped"]]
+    if skipped:
+        logger.warning(
+            "calibrate_against_human_labels: %d of %d items have no judge score "
+            "(unreadable response or no scored flag) and are left out of r and the means",
+            len(skipped),
+            len(per_item),
+        )
 
-    sev_compared = [p for p in per_item if p["human_severity"] is not None]
+    n = len(per_item)
+    scored = [p for p in per_item if not p["skipped"]]
+    judge_scores = [p["judge_score"] for p in scored]
+    human_scores = [float(p["human_score"]) for p in scored]
+    n_scored = len(scored)
+    pearson = _pearson(judge_scores, human_scores) if n_scored > 1 else None
+
+    sev_compared = [
+        p for p in per_item if p["human_severity"] is not None and p["judge_severity"] is not None
+    ]
     sev_agree = (
         sum(1 for p in sev_compared if p["human_severity"] == p["judge_severity"])
         / len(sev_compared)
@@ -111,8 +136,8 @@ def calibrate_against_human_labels(
         n_items=n,
         pearson_r=pearson,
         severity_agreement_rate=sev_agree,
-        mean_judge_score=sum(judge_scores) / n if n else 0.0,
-        mean_human_score=sum(human_scores) / n if n else 0.0,
+        mean_judge_score=sum(judge_scores) / n_scored if n_scored else 0.0,
+        mean_human_score=sum(human_scores) / n_scored if n_scored else 0.0,
         per_item=per_item,
     )
 
