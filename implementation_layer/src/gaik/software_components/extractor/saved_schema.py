@@ -62,7 +62,16 @@ from enum import Enum
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Union, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, constr, create_model
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    WithJsonSchema,
+    constr,
+    create_model,
+)
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
@@ -142,7 +151,7 @@ def _describe_type(ann: Any, collect) -> dict:
     if origin is Annotated:
         # Optional[...] keeps a pattern inside: Optional[Annotated[str, constr(...)]].
         base, *metadata = get_args(ann)
-        pattern = _pattern_from_metadata(metadata, is_decimal=False)
+        pattern = _pattern_from_metadata(metadata, decimal_kind=None)
         if base is str and pattern is not None:
             return {"type": "str", "pattern": pattern}
         raise SavedSchemaError(f"Type {ann!r} cannot be saved as data")
@@ -185,14 +194,42 @@ def _describe_enum(enum_cls: type[Enum]) -> dict:
     }
 
 
-def _pattern_from_metadata(metadata: list, is_decimal: bool) -> str | None:
+def _check_decimal_metadata(metadata: list, decimal_kind: str) -> None:
+    """A Decimal field holds what DecimalField / OptionalDecimalField carry, and nothing more.
+
+    That is one ``WithJsonSchema`` with the alias's JSON schema and one
+    ``BeforeValidator`` for the amount text; the rebuild restores both. Any
+    other metadata (``ge``, ``max_digits``, more validators) is refused, since
+    the rebuilt field would not have it.
+    """
+    alias = OptionalDecimalField if decimal_kind == "OptionalDecimalField" else DecimalField
+    expected_schema = next(m for m in get_args(alias)[1:] if isinstance(m, WithJsonSchema))
+    schemas = [m for m in metadata if isinstance(m, WithJsonSchema)]
+    cleaners = [
+        m
+        for m in metadata
+        if isinstance(m, BeforeValidator) and m.json_schema_input_type is PydanticUndefined
+    ]
+    if len(metadata) == 2 and schemas == [expected_schema] and len(cleaners) == 1:
+        return
+    other = [m for m in metadata if not isinstance(m, (WithJsonSchema, BeforeValidator))]
+    if other:
+        raise SavedSchemaError(f"Decimal field constraint {other!r} cannot be saved as data")
+    raise SavedSchemaError(
+        "A Decimal field is saved as data only as DecimalField or OptionalDecimalField"
+    )
+
+
+def _pattern_from_metadata(metadata: list, decimal_kind: str | None) -> str | None:
     """The pattern the generator attaches to a ``str`` field, if any.
 
     ``create_extraction_model`` writes ``Annotated[str, constr(pattern=...)]``.
-    Decimal fields carry the DecimalField metadata, which the rebuild restores.
-    Any other metadata (``ge``, ``max_length``, validators) is refused.
+    Decimal fields carry the DecimalField metadata, which the rebuild restores;
+    see :func:`_check_decimal_metadata`. Any other metadata (``ge``,
+    ``max_length``, validators) is refused.
     """
-    if is_decimal:
+    if decimal_kind is not None:
+        _check_decimal_metadata(metadata, decimal_kind)
         return None
     pattern = None
     for item in metadata:
@@ -252,8 +289,8 @@ def _describe_one(model: type[BaseModel], collect) -> dict:
                 f"Field {name!r} has options that cannot be saved as data: {sorted(options)}"
             )
         type_node = _describe_type(info.annotation, collect)
-        is_decimal = decimal_field_repr(info.annotation) is not None
-        pattern = _pattern_from_metadata(list(info.metadata), is_decimal)
+        decimal_kind = decimal_field_repr(info.annotation)
+        pattern = _pattern_from_metadata(list(info.metadata), decimal_kind)
         if pattern is not None:
             if type_node != {"type": "str"}:
                 raise SavedSchemaError(f"Pattern on non-text field {name!r}")

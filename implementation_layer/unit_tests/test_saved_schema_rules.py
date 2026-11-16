@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from enum import Enum
+from typing import Annotated
 
 import pytest
 from gaik.software_components.extractor.saved_schema import (
@@ -18,11 +20,13 @@ from gaik.software_components.extractor.saved_schema import (
     write_model_file,
 )
 from gaik.software_components.extractor.schema import (
+    DecimalField,
     ExtractionRequirements,
     FieldSpec,
+    OptionalDecimalField,
     create_extraction_model,
 )
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, ValidationError
 
 
 def _one_model(fields: list[dict], name: str = "Ticket") -> dict:
@@ -166,6 +170,48 @@ def test_an_enum_default_that_is_not_a_member_is_refused():
     field = {"name": "p", "type": node, "description": None, "default": "urgent"}
     with pytest.raises(SavedSchemaError, match="not a member"):
         build_model(_one_model([field]))
+
+
+class _BoundedTotal(BaseModel):
+    total: DecimalField = Field(ge=0)
+
+
+class _BoundedOptionalTotal(BaseModel):
+    total: OptionalDecimalField = Field(default=None, max_digits=5)
+
+
+class _CheckedTotal(BaseModel):
+    total: Annotated[DecimalField, AfterValidator(lambda v: v)]
+
+
+@pytest.mark.parametrize("model", [_BoundedTotal, _BoundedOptionalTotal, _CheckedTotal])
+def test_a_decimal_field_with_more_than_the_decimal_field_carries_is_refused(model):
+    with pytest.raises(SavedSchemaError, match="Decimal field"):
+        describe_model(model)
+
+
+def test_a_refused_decimal_limit_is_one_the_original_model_enforces():
+    with pytest.raises(ValidationError):
+        _BoundedTotal(total="-12.50")
+    with pytest.raises(SavedSchemaError):
+        describe_model(_BoundedTotal)
+
+
+def test_a_bare_decimal_field_is_refused():
+    class Plain(BaseModel):
+        total: Decimal
+
+    with pytest.raises(SavedSchemaError, match="DecimalField or OptionalDecimalField"):
+        describe_model(Plain)
+
+
+def test_decimal_fields_as_the_generator_writes_them_are_saved():
+    class Invoice(BaseModel):
+        total: DecimalField = Field(description="Total")
+        fee: OptionalDecimalField = Field(default=None, description="Fee")
+
+    rebuilt = build_model(describe_model(Invoice))
+    assert rebuilt(total="12.40 EUR", fee=None).total == Decimal("12.40")
 
 
 @pytest.mark.parametrize("raw", ["abc", "", "NaN", "Infinity"])
