@@ -8,6 +8,7 @@ validated back through Pydantic.
 from __future__ import annotations
 
 import base64
+import os
 from collections.abc import Iterator
 from typing import Any
 
@@ -15,6 +16,7 @@ import anthropic
 from pydantic import BaseModel
 
 from gaik.observability.tracing import record_request, record_response
+from gaik.software_components.endpoints import ANTHROPIC_URL, foundry_host, host_of, log_endpoint
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
@@ -159,11 +161,14 @@ class AnthropicProvider:
             if config.get(key) is not None
         }
         if config.get("provider") == "anthropic_foundry":
+            log_endpoint("anthropic_foundry", foundry_host(config["resource"]))
             return anthropic.AnthropicFoundry(
                 resource=config["resource"],
                 api_key=config["api_key"],
                 **options,
             )
+        # Without a base_url the SDK itself reads ANTHROPIC_BASE_URL.
+        log_endpoint("anthropic", host_of(os.getenv("ANTHROPIC_BASE_URL") or ANTHROPIC_URL))
         return anthropic.Anthropic(api_key=config["api_key"], **options)
 
     @staticmethod

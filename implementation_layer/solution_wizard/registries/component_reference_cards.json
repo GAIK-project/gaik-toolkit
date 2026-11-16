@@ -47,7 +47,7 @@
         "name": "local_api_base",
         "type": "str",
         "default": null,
-        "effect": "Base URL of the self-hosted whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it.",
+        "effect": "Base URL of the self-hosted whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it. From the gaik release after 0.10.0, the constructor accepts only the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for that address), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS or api_config['allowed_endpoint_hosts']; any other address raises EndpointNotAllowedError (a ValueError). The validated 0.10.0 sends to any address.",
         "selection_relevant": true,
         "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code read it from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app), never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
@@ -146,6 +146,14 @@
         "effect": "Native OpenAI/Azure configuration. Audio endpoints and deployments are separate from chat; Aitta, generic compatible, LiteLLM, Google/Vertex and Anthropic configurations are rejected by the audio guard. The existing explicitly configured local-Whisper path remains separate.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when recordings can be longer than 6 hours: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -410,6 +418,14 @@
         "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for every file before any model call, schema generation included: size (100 MiB), image pixels (89,478,485) and the pages of all files of one call together (500, an image counting as one); a PDF whose pages cannot be counted is refused. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when one call can carry more than 500 pages or very large page images: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -501,6 +517,14 @@
         "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the PDF before it is sent: size (100 MiB), pages (500) and the pixels of each rendered page; a PDF whose pages cannot be counted is refused. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when documents can have more than 500 pages: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -572,9 +596,17 @@
         "name": "openai_config",
         "type": "dict | None",
         "default": null,
-        "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
+        "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags. From the gaik release after 0.10.0, a base_url must be the provider's own host, the address set in the provider's variable (OPENAI_BASE_URL, AZURE_ENDPOINT, AITTA_BASE_URL, ...) or a host in GAIK_ALLOWED_ENDPOINT_HOSTS or the config's allowed_endpoint_hosts; otherwise EndpointNotAllowedError. The PoC's get_stage_config adds a stage address on this machine and the hosts in models.local_endpoints (over http too) to allowed_endpoint_hosts, which the validated 0.10.0 ignores.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the PDF or image before any page is rendered or sent: size (100 MiB), pages (500; with first_pages=N only those pages) and the pixels of each page at the chosen dpi or of the image file (89,478,485). A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when documents can have more than 500 pages: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -593,6 +625,14 @@
         "effect": "DECIDES WHETHER PAGE CITATIONS ARE POSSIBLE. When True (default), extracts plain text concatenated page by page with NO page marker -- page provenance cannot be recovered. When False, inserts explicit '=== PAGE N ===' markers into text_content (see _extract_structured_pdf) AND annotates every text span with (x, y) bounding-box coordinates. This is the cheapest way to get file_name|page_number citations for a text-layer PDF -- free and local, unlike VisionParser -- but the bounding-box tags add real noise to the text that an extraction prompt must tolerate or a preprocessing step must strip. Has no OCR either way: on scanned/image-only PDFs, text_content may come back empty or incomplete regardless of this setting -- check content_length/word_count rather than assuming success means real content.",
         "selection_relevant": true,
         "infer_from": "page-level citations required on a text-layer (non-scanned) PDF -> False, using call_page_citations; downstream needs positional/layout data -> False; otherwise leave True (default, cleanest plain text)"
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the PDF's size (100 MiB) before it is opened; no page limit by default (InputLimits.local_parsing()), InputLimits(max_pages=N) adds one. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -610,6 +650,14 @@
         "effect": "When True, extracts plain paragraph and table text. When False, emits a structured representation with paragraph-index, style-name, and table-cell markers - useful for style-aware downstream processing, but still has no page numbers to offer.",
         "selection_relevant": false,
         "infer_from": "downstream needs paragraph style / formatting metadata -> False; otherwise leave True"
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the file's size (100 MiB) and unpacked size (10 x that) before it is read. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
     "note": "is_supported_file() returns True for both .docx and legacy binary .doc, but parse_document() calls python-docx's Document(), which cannot open the legacy .doc format at all -- a real .doc file raises PackageNotFoundError at parse time, not at the file-type check. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik."
@@ -668,6 +716,14 @@
         "effect": "CPU threads for Docling's local OCR/layout/table-structure pipeline (forwarded to AcceleratorOptions(num_threads=...)). Purely a throughput knob for the on-box processing -- no network cost, unlike the LLM-based parsers. Raising it beyond available CPU cores does not help and can add contention.",
         "selection_relevant": false,
         "infer_from": "high document volume with idle CPU headroom -> raise toward the available core count; constrained/shared environments -> leave default or lower"
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the file before Docling reads it: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -701,6 +757,14 @@
         "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for each file, through its parsers: size (100 MiB) and image pixels; with parser='vision' only the first page of a PDF is rendered and sent. The error is not wrapped in the classification ValueError. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -715,9 +779,17 @@
         "name": "base_url",
         "type": "str | None",
         "default": null,
-        "effect": "API root. None calls TypeSafe directly with a TypeSafe key; the gaik-decide root URL routes through GAIK's shared service with a per-app key. GAIK applications must use gaik-decide, not their own TypeSafe key. The generated code reads GAIK_DECIDE_URL and GAIK_DECIDE_API_KEY; GAIK itself has no environment fallback.",
+        "effect": "API root. None calls TypeSafe directly with a TypeSafe key; the gaik-decide root URL routes through GAIK's shared service with a per-app key. GAIK applications must use gaik-decide, not their own TypeSafe key. The generated code reads GAIK_DECIDE_URL and GAIK_DECIDE_API_KEY; GAIK itself has no environment fallback. From the gaik release after 0.10.0, the key goes only to TypeSafe, gaik-decide.2.rahtiapp.fi, the address set in GAIK_DECIDE_URL or TYPESAFE_BASE_URL (plain http works for that address, e.g. http://gaik-decide:8080 inside the gaik Rahti namespace) and hosts in GAIK_ALLOWED_ENDPOINT_HOSTS; any other base_url raises EndpointNotAllowedError (a ValueError) at construction.",
         "selection_relevant": true,
         "infer_from": "Always the gaik-decide URL for GAIK use cases; ask for it if the user has no gaik-decide key."
+      },
+      {
+        "name": "allowed_endpoint_hosts",
+        "type": "str | Sequence[str] | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0, extra hosts the application allows for base_url, on top of GAIK_ALLOWED_ENDPOINT_HOSTS: a host, *.suffix, or http://host for plain http. The deployment's decision; never fill it from user input. The validated 0.10.0 has no such keyword, so generated code passes none and reads the address from the environment variable named above.",
+        "selection_relevant": false,
+        "infer_from": "Leave unset; read base_url from GAIK_DECIDE_URL."
       },
       {
         "name": "model",
@@ -742,6 +814,14 @@
         "effect": "Retries for 429 and 5xx responses, handled by the TypeSafe SDK.",
         "selection_relevant": false,
         "infer_from": "Keep the default."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the PDF and Word files classify_files reads, through their parsers: size (100 MiB), no page limit by default. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -1163,7 +1243,7 @@
         "name": "api_config",
         "type": "dict | None",
         "default": null,
-        "effect": "Native OpenAI/Azure configuration. Audio endpoints and deployments are separate from chat; Aitta, generic compatible, LiteLLM, Google/Vertex and Anthropic configurations are rejected by the audio guard. The existing explicitly configured local-Whisper path remains separate.",
+        "effect": "Native OpenAI/Azure configuration. Audio endpoints and deployments are separate from chat; Aitta, generic compatible, LiteLLM, Google/Vertex and Anthropic configurations are rejected by the audio guard. The existing explicitly configured local-Whisper path remains separate. From the gaik release after 0.10.0, for Azure speech api_config['tts_endpoint'] with api_config['api_key'] takes precedence over TTS_ENDPOINT with AZURE_API_KEY; the endpoint must be an Azure host, the address in TTS_ENDPOINT or AZURE_ENDPOINT, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS, or the constructor raises EndpointNotAllowedError.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
       }
@@ -1693,6 +1773,14 @@
         "effect": "'vision' parses PDFs with Docling and a vision model that describes images (needs gaik[rag-workflow]: docling, torch). 'text' (gaik>=0.8.10) reads the text layer of PDFs, .docx, .txt and .md with no Docling or vision model (gaik[rag-workflow-text]) and raises ValueError for a scan without a text layer.",
         "selection_relevant": true,
         "infer_from": "scans, figures or diagrams must be understood -> 'vision'; text-based documents -> 'text' with gaik[rag-workflow-text] in requirements"
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
     "note": "End-to-end module: embeds, stores in an internal Chroma VectorStore, retrieves, and answers. Do NOT also add Embedder / Retriever / AnswerGenerator as separate steps. PgVectorStore is a separate PostgreSQL component and is not subsumed by this module."
@@ -1824,9 +1912,9 @@
         "name": "whisper_local_max_audio_minutes",
         "type": "float",
         "default": 360.0,
-        "effect": "TranscriptionConfig field. HARD CAP used ONLY when model=WHISPER_LOCAL -- audio longer than this raises ValueError('Audio too long for whisper_local ...') immediately, before any transcription is attempted. This is a fail-fast guard, not a degrade-gracefully limit: there is no automatic fallback to the cloud path. If the use case has audio that can exceed 6 hours, either raise this explicitly or route long files to a different model.",
+        "effect": "TranscriptionConfig field. HARD CAP used ONLY when model=WHISPER_LOCAL -- audio longer than this raises ValueError('Audio too long for whisper_local ...') immediately, before any transcription is attempted. This is a fail-fast guard, not a degrade-gracefully limit: there is no automatic fallback to the cloud path. If the use case has audio that can exceed 6 hours, either raise this explicitly or route long files to a different model. From the gaik release after 0.10.0, InputLimits.max_media_seconds (default 6 hours) also applies to every backend, whisper_local included, so raising this alone does not admit a longer recording: pass limits=InputLimits(max_media_seconds=...) as well.",
         "selection_relevant": true,
-        "infer_from": "model == WHISPER_LOCAL AND typical/maximum input audio length -> raise if recordings can exceed 6 hours; otherwise leave default and treat as a validation guard"
+        "infer_from": "model == WHISPER_LOCAL AND typical/maximum input audio length -> raise if recordings can exceed 6 hours, together with limits=InputLimits(max_media_seconds=...) on a gaik newer than 0.10.0; otherwise leave default and treat as a validation guard"
       },
       {
         "name": "max_429_retries",
@@ -1843,6 +1931,14 @@
         "effect": "Native OpenAI/Azure configuration. Audio endpoints and deployments are separate from chat; Aitta, generic compatible, LiteLLM, Google/Vertex and Anthropic configurations are rejected by the audio guard. The existing explicitly configured local-Whisper path remains separate.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the recording's length (max_media_seconds, default 6 hours, on every backend) before audio is extracted or any call is made; whisper_local_max_audio_minutes is a second cap for Whisper Local only. A recording without a length in its header (a WebM recorded in a browser) is measured by decoding its audio, and one whose length cannot be read at all is refused. max_media_bytes is off by default. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when recordings can be longer than 6 hours: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
     "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option)."
@@ -2050,6 +2146,14 @@
         "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for every file, through each parser, transcriber and image extractor it builds (a constructor keyword; a ctor option's own limits wins); None keeps each component's defaults. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when recordings can be longer than 6 hours or files over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
     "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Since gaik 0.10.0, load_report_config(path, root=None) requires the stored input paths, sample report and output folder (and every file in an input folder) to stay inside the config file's folder, or inside root when given; otherwise it raises SourcePathError before anything is read or written. save_report_config only warns when it stores an input outside the config's folder (as ../...), so such a config loads back only with root=. Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export. Provider stages: constructor api_config is the writer fallback; run(parser_options={'api_config': parser_cfg}, image_options={'api_config': parser_cfg}, transcriber_options={'ctor': {'api_config': audio_cfg}}, writer_options={'api_config': writer_cfg}, review_options={'api_config': judge_cfg}) selects separate clients. Do not serialize credential-bearing configs with save_report_config; supply them only at runtime. Audio must use native OpenAI/Azure."
@@ -2105,6 +2209,14 @@
         "effect": "Required constructor argument: explicit get_llm_config(provider, ...) dictionary for every stage (vision, transcription, curator, writer, reviewer). Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities -- but audio sources require OpenAI/Azure.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the sources and the sample report, through the SourceNormalizer of normalize (a constructor keyword: ReportWriter(config, limits=...)); None keeps its defaults: 100 MiB per file, 6 hours per recording, no page limit. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when recordings can be longer than 6 hours or files over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
     "spec_settings": [
@@ -2220,6 +2332,14 @@
         "effect": "Transcription language for recordings, e.g. 'en' or 'fi', or 'auto'.",
         "selection_relevant": true,
         "infer_from": "audio sources present -> technical_spec.language code; mixed or unknown -> 'auto'"
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for every file before the first conversion: size (100 MiB), image pixels, sheet rows and recording length (6 hours), passed on to its parsers and the Transcriber; PDFs are read locally, so no page limit by default. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when recordings can be longer than 6 hours or files over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
     "note": "Stage 1 of CURACT report writing, usable on its own to turn a folder of mixed sources into Markdown with provenance. Sources are {source_class: [paths]} or a plain list (source_class=None). The file name is the citation key downstream, so names must be unique. PDFs must have a text layer; for scanned PDFs use a vision parser step instead. ReportWriter already runs this stage -- add it separately only in a custom pipeline."
@@ -2522,13 +2642,21 @@
         "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the PDF's size before Docling runs, then the embedded images before the first vision call: at most 500 (max_images, one call each) of at most 89,478,485 pixels; Docling reads the pages locally, so no page limit by default. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when documents can embed more than 500 images: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
   "DoclingApiClientParser": {
     "import": "from gaik.software_components.parsers import DoclingApiClientParser",
     "construct": "parser = DoclingApiClientParser(api_base=os.environ['DOCLING_API_BASE'], password=os.environ['DOCLING_API_PASSWORD'])",
-    "construct_note": "Requires `import os` -- the PoC templates do not import it, add it explicitly. gaik has NO environment fallback: api_base and password are constructor kwargs and DoclingApiClientParser raises ValueError when either is empty. DOCLING_API_BASE / DOCLING_API_PASSWORD is the convention used by toolkit_demo_app and the OpenShift deployment; the bundled example script uses the older API_BASE / PASSWORD names.",
+    "construct_note": "Requires `import os` -- the PoC templates do not import it, add it explicitly. gaik has NO environment fallback: api_base and password are constructor kwargs and DoclingApiClientParser raises ValueError when either is empty. DOCLING_API_BASE / DOCLING_API_PASSWORD is the convention used by toolkit_demo_app and the OpenShift deployment; the bundled example script uses the older API_BASE / PASSWORD names. From the gaik release after 0.10.0, the constructor accepts only the address set in DOCLING_API_BASE or API_BASE (plain http works for that address), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS; any other api_base raises EndpointNotAllowedError (a ValueError) before the password is sent.",
     "call": "res = parser.parse_document(str(input_path))\n    parsed_text = res['parsed_markdown']",
     "returns": "dict(.source_file, .parsed_markdown, .metadata, .elapsed_seconds)",
     "returns_note": "IMPORTANT: the key is 'parsed_markdown', NOT 'text_content' as on the local DoclingParser. Pages are flattened -- no page-level provenance.",
@@ -2549,6 +2677,22 @@
         "effect": "Timeout for the /health probe issued before each parse.",
         "selection_relevant": false,
         "infer_from": "leave at default unless the service is known to be slow to wake"
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the file before it is uploaded: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "allowed_endpoint_hosts",
+        "type": "str | Sequence[str] | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0, extra hosts the application allows for api_base, on top of DOCLING_API_BASE, API_BASE and GAIK_ALLOWED_ENDPOINT_HOSTS: a host, *.suffix, or http://host for plain http. The deployment's decision; never fill it from user input. The validated 0.10.0 has no such keyword, so generated code passes none and reads the address from the environment variable named above.",
+        "selection_relevant": false,
+        "infer_from": "Leave unset; read api_base from DOCLING_API_BASE."
       }
     ]
   },
@@ -2653,6 +2797,14 @@
         "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for each source file's size (100 MiB) when the agent is created and the data rows of each sheet or file (1,000,000) while it loads; not max_rows, which caps query results. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when files can be over 100 MiB or sheets over 1,000,000 rows: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ]
   },
@@ -2891,7 +3043,16 @@
     "call": "res = parser.parse_document(str(input_path))\n    parsed_text = res['text_content']",
     "returns": "dict(.text_content, .file_name, .file_extension, .content_length, .word_count). The text is Markdown: one '## Sheet: <name>' table per sheet (a .csv gives one table, no heading) with a leading Row column holding the source row number, so a citation can name the sheet and row. parse_spreadsheet(path) returns just the Markdown string.",
     "install_extra": "spreadsheet-parser",
-    "options": [],
+    "options": [
+      {
+        "name": "limits",
+        "type": "InputLimits | None",
+        "default": null,
+        "effect": "From the gaik release after 0.10.0: an InputLimits (gaik.software_components.input_limits) checked for the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. gaik 0.10.0 has neither the parameter nor these refusals, so pass limits= only in a PoC that requires the later release.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; the defaults fit ordinary files. Only with a gaik newer than 0.10.0 and when sheets can have more than 1,000,000 rows: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      }
+    ],
     "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser."
   },
   "VectorStore": {

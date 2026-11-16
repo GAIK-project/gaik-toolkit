@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
+import socket
 import time
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -67,6 +70,14 @@ def _start(api: TestClient, headers: dict) -> str:
     assert response.status_code == 200, response.text
     owner = headers[route.WIZARD_USER_HEADER]
     return next(sid for sid, s in route.WIZARD_SESSIONS.items() if s["owner"] == owner)
+
+
+def _zip(entries: dict[str, bytes]) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        for name, data in entries.items():
+            archive.writestr(name, data)
+    return buf.getvalue()
 
 
 def _file(name: str, payload: bytes) -> dict:
@@ -142,6 +153,60 @@ def test_a_refused_attachment_stops_the_message_before_the_agent(api) -> None:
     assert "report.pdf" in refused.json()["detail"]
     assert Client.started[0].queries == []
     assert route.WIZARD_SESSIONS[sid]["messages"] == 0
+
+
+@pytest.mark.parametrize(
+    "name, payload",
+    [
+        (
+            "report.pdf",
+            b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog /OpenAction "
+            b"<< /S /JavaScript /JS (app.alert(1)) >> >>\nendobj\n%%EOF\n",
+        ),
+        (
+            "plan.docx",
+            _zip(
+                {
+                    "[Content_Types].xml": b"<Types/>",
+                    "word/document.xml": b"<w/>",
+                    "word/vbaProject.bin": b"x",
+                }
+            ),
+        ),
+    ],
+)
+def test_an_attachment_with_active_content_stops_the_message_before_the_agent(
+    api, monkeypatch, name, payload
+) -> None:
+    monkeypatch.delenv("DEMO_MALWARE_SCANNER", raising=False)
+    monkeypatch.delenv("DEMO_MALWARE_SCAN", raising=False)
+    parsed: list[str] = []
+    monkeypatch.setattr(route, "_extract_text", lambda name, *_: parsed.append(name) or "")
+    sid = _start(api, ALICE)
+    body = {"text": "see the file", "files": [_file("notes.txt", b"fine"), _file(name, payload)]}
+
+    refused = api.post(f"/wizard/message/{sid}", json=body, headers=ALICE)
+
+    assert refused.status_code == 422
+    assert refused.json()["detail"].startswith(f"{name}: ")
+    assert parsed == []  # not even the file that passed
+    assert Client.started[0].queries == []
+    assert route.WIZARD_SESSIONS[sid]["messages"] == 0
+
+
+def test_an_attachment_is_not_used_while_the_scanner_is_down(api, monkeypatch) -> None:
+    with socket.socket() as unused:  # a port nothing answers on
+        unused.bind(("127.0.0.1", 0))
+        port = unused.getsockname()[1]
+    monkeypatch.setenv("DEMO_MALWARE_SCANNER", f"127.0.0.1:{port}")
+    monkeypatch.delenv("DEMO_MALWARE_SCAN", raising=False)
+    sid = _start(api, ALICE)
+    body = {"text": "see the file", "files": [_file("notes.txt", b"hello")]}
+
+    refused = api.post(f"/wizard/message/{sid}", json=body, headers=ALICE)
+
+    assert refused.status_code == 503
+    assert Client.started[0].queries == []
 
 
 def test_too_long_a_message_and_too_many_files_are_refused(api) -> None:

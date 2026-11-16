@@ -216,8 +216,16 @@ if solution_wizard is not None:
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "ok", "service": "gaik-demo-api"}
+    """Health check endpoint; ``uploads_scanned`` says whether uploads pass the malware check."""
+    try:
+        from utils import malware_scan
+    except ImportError:
+        from api.utils import malware_scan
+    return {
+        "status": "ok",
+        "service": "gaik-demo-api",
+        "uploads_scanned": malware_scan.enabled(),
+    }
 
 
 @app.get("/")

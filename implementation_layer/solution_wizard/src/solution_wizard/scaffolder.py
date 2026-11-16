@@ -350,6 +350,17 @@ def _local_hosts(blueprint: Blueprint) -> set[str]:
     return _LOCAL_HOSTS | _declared_local_hosts(blueprint)[0]
 
 
+def _local_endpoints(blueprint: Blueprint) -> list[str]:
+    """The hosts models.local_endpoints lists, which the PoC lets gaik send keys to.
+
+    An entry that is not a host name is refused whatever the governance flags say.
+    """
+    hosts, problems = _declared_local_hosts(blueprint)
+    if problems:
+        raise ValueError("; ".join(problems))
+    return sorted(hosts - _LOCAL_HOSTS)
+
+
 def _is_local_stage(stage: str, settings: dict[str, Any], local_hosts: set[str]) -> bool:
     """Whether a stage's model runs on a host the blueprint counts as local.
 
@@ -1154,7 +1165,7 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
             "external_model_api_allowed": handling.external_model_api_allowed,
             "local_processing_required": handling.local_processing_required,
             "contains_personal_data": handling.contains_personal_data,
-            "local_endpoints": sorted(_local_hosts(bc) - _LOCAL_HOSTS),
+            "local_endpoints": _local_endpoints(bc),
         },
         "allow_provider_fallback": models.get("allow_provider_fallback") is True,
         "use_case_name": bc.use_case.name,

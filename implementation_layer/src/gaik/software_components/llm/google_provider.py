@@ -15,6 +15,7 @@ from google.genai import types as genai_types
 from pydantic import BaseModel
 
 from gaik.observability.tracing import record_request, record_response
+from gaik.software_components.endpoints import log_endpoint, vertex_host
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
@@ -110,9 +111,14 @@ class GoogleProvider:
             self._project = str(config["project_id"])
             self._preferred_location = self.location
             self._clients: dict[str, Any] = {}
+            # A location with URL characters would name another host.
+            for location in (self.location, self._fallback_location):
+                if location:
+                    vertex_host(location)
 
             def vertex_client(location: str):
                 if location not in self._clients:
+                    log_endpoint("vertex", vertex_host(location))
                     client_options = options
                     if self._fallback_location and location == self._preferred_location:
                         preferred = dict(http_options)
@@ -140,6 +146,7 @@ class GoogleProvider:
         else:
             self.location = None
             self._fallback_location = None
+            log_endpoint("google", "generativelanguage.googleapis.com")
             self.raw = genai.Client(api_key=config["api_key"], **options)
 
     def _use(self, location: str) -> Any:

@@ -36,6 +36,7 @@ from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
+from ..input_limits import InputLimits
 from .loader import load_sources, lock_down, normalize_sources
 from .models import (
     AnswerResult,
@@ -166,6 +167,12 @@ class TabularAgent:
         max_rows: Hard cap on rows returned by :meth:`run_sql`.
         query_timeout_s: Wall-clock limit for a single query (0 disables it).
         memory_limit: DuckDB memory cap, e.g. ``"1GB"``.
+        limits: Input limits for the source files: ``max_file_bytes`` (checked
+            here, before anything is read) and ``max_table_rows`` per sheet or
+            file (checked while loading). A file over one raises
+            :class:`~gaik.software_components.input_limits.InputLimitError`.
+            Defaults to ``InputLimits()``. Not to be confused with ``max_rows``,
+            which caps the rows a query returns.
         layout_inference: When the LLM may be asked to locate the real table
             inside a messy spreadsheet. ``"auto"`` (default) asks only when the
             deterministic heuristics flag a sheet as messy, so clean files cost
@@ -200,13 +207,15 @@ class TabularAgent:
         extra_instructions: str | None = None,
         answer_language: str = "en",
         temperature: float | None = 0.0,
+        limits: InputLimits | None = None,
     ) -> None:
         if layout_inference not in ("auto", "always", "never"):
             raise ValueError(
                 f"Invalid layout_inference '{layout_inference}': "
                 "must be 'auto', 'always', or 'never'."
             )
-        self.sources = normalize_sources(source)
+        self.limits = limits or InputLimits()
+        self.sources = normalize_sources(source, limits=self.limits)
         self.max_retries = max(1, max_retries)
         self.max_rows = max(1, max_rows)
         self.query_timeout_s = max(0.0, query_timeout_s)
@@ -244,6 +253,7 @@ class TabularAgent:
                     self.sources,
                     layout_inference=self.layout_inference,
                     infer_layout=self._infer_layout,
+                    limits=self.limits,
                 )
                 lock_down(conn)
             except Exception:

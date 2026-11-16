@@ -14,6 +14,8 @@ from pydantic import BaseModel
 def _isolated_provider_environment(monkeypatch):
     for key in ("AITTA_BASE_URL", "AITTA_EMBEDDING_MODEL", "EMBEDDING_MODEL", "LLM_PROVIDER"):
         monkeypatch.delenv(key, raising=False)
+    # The test servers stand in for a deployment's own inference host.
+    monkeypatch.setenv("GAIK_ALLOWED_ENDPOINT_HOSTS", "inference.example")
 
 
 def completion(content):
