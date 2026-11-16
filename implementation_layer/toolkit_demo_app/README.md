@@ -131,7 +131,7 @@ transcription `DEMO_TRANSCRIPTION_MODELS` (default
 `gpt-4o-transcribe,gpt-4o-mini-transcribe,whisper-1,whisper`).
 Another name is refused with a 422, which lists the names that work, before any model call.
 
-Gemini on Vertex AI: leave `GOOGLE_CLOUD_LOCATION` unset. gaik after 0.9.1 then asks
+Gemini on Vertex AI: leave `GOOGLE_CLOUD_LOCATION` unset. gaik 0.10.0 and later then ask
 the EU multi-region first and uses the global endpoint for a model the EU does not
 serve, or for ten minutes after the EU failed to answer; each switch is a warning in
 the API log. A location you set is used as given, with no fallback: on 2026-11-16 the
