@@ -96,6 +96,7 @@ import {
   type SynthesisExample,
   wordCount,
 } from "./synthesis-data";
+import { UploadReminder } from "@/components/upload-reminder";
 
 const API = "/api/knowledge-synthesis";
 const MAX_SECTIONS = 12; // the default server limit; the server enforces its own
@@ -753,6 +754,7 @@ export default function KnowledgeSynthesisPage() {
                       }}
                     />
                   </label>
+                  <UploadReminder />
                 </div>
               </CardContent>
             </Card>

@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Upload, File, X, CheckCircle, ExternalLink } from "lucide-react";
 import { cn, formatFileSize } from "@/lib/utils";
+import { UploadReminder } from "@/components/upload-reminder";
 
 const SAME_FORMAT: Record<string, string> = { JPEG: "JPG", TIF: "TIFF" };
 
@@ -248,6 +249,7 @@ export function FileUpload({
           </motion.p>
         )}
       </AnimatePresence>
+      <UploadReminder />
     </div>
   );
 }

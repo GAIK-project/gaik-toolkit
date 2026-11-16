@@ -88,6 +88,7 @@ import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { UploadReminder } from "@/components/upload-reminder";
 
 interface ChatMessage {
   id: string;
@@ -261,6 +262,7 @@ function UploadDialogContent({
             className="sr-only"
           />
         </label>
+        <UploadReminder />
         {pendingFiles.length > 0 && (
           <div className="space-y-2 rounded-lg border p-3">
             <p className="text-sm font-medium">Pending files</p>
