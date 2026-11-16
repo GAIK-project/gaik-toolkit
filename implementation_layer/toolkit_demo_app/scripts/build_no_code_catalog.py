@@ -39,12 +39,18 @@ REPO_TREE = (
 )
 ZIP_DATE = (2026, 1, 1, 0, 0, 0)
 TEXT_SUFFIXES = {".md", ".txt", ".json", ".py", ".yaml", ".yml", ".toml", ".bat", ".sh"}
-SKIP_NAMES = {"__pycache__", ".DS_Store", "Thumbs.db", ".env"}
+SKIP_NAMES = {"__pycache__", ".DS_Store", "Thumbs.db", ".env", ".venv", "node_modules"}
 # Sample inputs and outputs next to a skill; too large for a setup kit and on GitHub.
 KIT_SKIP = {"data", "images", "output", "sample_data"}
 # A Claude Desktop skill keeps its setup files beside SKILL.md; the uploadable skill
 # zip leaves them out, the setup kit carries them.
-SKILL_SKIP = KIT_SKIP | {"README.md", "USER_GUIDE.md", "setup.bat", "transcription-MCP"}
+SKILL_SKIP = KIT_SKIP | {
+    "README.md",
+    "USER_GUIDE.md",
+    "setup.bat",
+    "transcription-MCP",
+    "filesystem-MCP",
+}
 
 
 def _read_bytes(path: Path) -> bytes:

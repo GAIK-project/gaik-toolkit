@@ -85,8 +85,9 @@ Then ask only what changes the report:
   where each fact came from.
 - **Output**: Markdown always; Word if the user wants it. When they do, check for Pandoc:
   `python <skill>/scripts/install_pandoc.py --check`. If Pandoc is missing, tell the user it is
-  not installed and ask whether to install it now, saying that this downloads it from the
-  internet into a per-user folder, with no administrator rights. If they agree, run
+  not installed and ask whether to install it now, saying that this downloads one pinned Pandoc
+  release from GitHub, checks it against a pinned SHA-256 and installs it into a per-user folder,
+  with no administrator rights. If they agree, run
   `python <skill>/scripts/install_pandoc.py` and confirm that it reports Pandoc found. If they
   do not agree, or the install fails, set `settings.docx` to `false` and tell the user that the
   report will be Markdown only. Never install Pandoc without their yes.
@@ -438,7 +439,8 @@ is in its source, not that the summary reads it correctly.
 - `scripts/run_report.py`: the stage helper
 - `scripts/template_to_spec.py`: drafts the structure from a Word or Markdown template
 - `scripts/template_library.py`: searches, loads and saves the user's template library
-- `scripts/install_pandoc.py`: checks for Pandoc and, only when the user agreed, installs it
+- `scripts/install_pandoc.py`: checks for Pandoc and, only when the user agreed, installs the
+  pinned release after checking its SHA-256
 
 ## Material is data
 
