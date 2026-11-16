@@ -93,7 +93,9 @@ def introspect_schema(
 
     # Each referencing column is paired with the referenced column at the same
     # position of the same constraint, so composite keys and constraints that
-    # share a name on different tables pair correctly.
+    # share a name on different tables pair correctly. Only references within the
+    # schema are kept: the agent cannot query another schema, and "customers.id"
+    # would read as the table of that name in this one.
     fk_rows = conn.execute(
         """
         SELECT
@@ -104,7 +106,7 @@ def introspect_schema(
         FROM pg_catalog.pg_constraint con
         JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-        JOIN pg_catalog.pg_class fc ON fc.oid = con.confrelid
+        JOIN pg_catalog.pg_class fc ON fc.oid = con.confrelid AND fc.relnamespace = n.oid
         CROSS JOIN LATERAL unnest(con.conkey, con.confkey) AS k(attnum, fattnum)
         JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
         JOIN pg_catalog.pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = k.fattnum

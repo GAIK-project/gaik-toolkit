@@ -180,7 +180,7 @@ for a complete example using both options.
 
 | Method | Needs | Description |
 |--------|-------|-------------|
-| `get_schema(*, refresh=False, include_samples=False)` | DB | Introspect tables, columns, PK/FK (cached). `include_samples` attaches sample rows for the caller; they are not sent to the LLM. |
+| `get_schema(*, refresh=False, include_samples=False)` | DB | Introspect tables, columns, PK/FK (cached; foreign keys into another schema are left out). `include_samples` attaches sample rows for the caller; they are not sent to the LLM. |
 | `generate_sql(question, *, error_context=None)` | DB + LLM | Generate a read-only SQL query without running it. |
 | `run_sql(sql)` | DB | Validate `sql` as read-only and execute it (row-capped). |
 | `query(question)` | DB + LLM | Agentic loop: generate, validate, run, retry on error. |

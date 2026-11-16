@@ -23,10 +23,14 @@ pytestmark = pytest.mark.skipif(not PG_URL, reason="set GAIK_TEST_PG_URL to a Po
 def readonly_url():
     suffix = uuid.uuid4().hex[:8]
     schema, role = f"gaik_test_keys_{suffix}", f"gaik_test_ro_{suffix}"
+    other = f"gaik_test_other_{suffix}"
     password = uuid.uuid4().hex
     with psycopg.connect(PG_URL, autocommit=True) as conn:
         conn.execute(f"CREATE SCHEMA {schema}")
+        conn.execute(f"CREATE SCHEMA {other}")
         conn.execute(f"CREATE TABLE {schema}.customers (id int PRIMARY KEY)")
+        # A table of the same name in another schema.
+        conn.execute(f"CREATE TABLE {other}.customers (id int PRIMARY KEY)")
         conn.execute(f"CREATE TABLE {schema}.products (id int PRIMARY KEY)")
         conn.execute(
             f"CREATE TABLE {schema}.regions (country text, code text, PRIMARY KEY (country, code))"
@@ -34,7 +38,8 @@ def readonly_url():
         # Two constraints with the same name on different tables, and a composite key.
         conn.execute(
             f"CREATE TABLE {schema}.orders (id int PRIMARY KEY, customer_id int, "
-            f"CONSTRAINT ref FOREIGN KEY (customer_id) REFERENCES {schema}.customers (id))"
+            f"CONSTRAINT ref FOREIGN KEY (customer_id) REFERENCES {schema}.customers (id), "
+            f"other_customer_id int REFERENCES {other}.customers (id))"
         )
         conn.execute(
             f"CREATE TABLE {schema}.lines (product_id int, country text, code text, "
@@ -49,6 +54,7 @@ def readonly_url():
     yield make_conninfo(**params), schema
     with psycopg.connect(PG_URL, autocommit=True) as conn:
         conn.execute(f"DROP SCHEMA {schema} CASCADE")
+        conn.execute(f"DROP SCHEMA {other} CASCADE")
         conn.execute(f"DROP ROLE {role}")
 
 
@@ -60,6 +66,8 @@ def test_select_only_role_sees_primary_and_foreign_keys(readonly_url):
     assert tables["regions"]["country"].is_primary_key
     assert tables["regions"]["code"].is_primary_key
     assert tables["orders"]["customer_id"].references == "customers.id"
+    # A reference into another schema would read as this schema's customers table.
+    assert tables["orders"]["other_customer_id"].references is None
     assert tables["lines"]["product_id"].references == "products.id"
     assert tables["lines"]["code"].references == "regions.code"
     assert tables["lines"]["country"].references == "regions.country"
