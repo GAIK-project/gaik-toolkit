@@ -289,6 +289,7 @@ def test_normalize(tmp_path, rec):
         "vision_model": "vision-m",
         "transcription_model": "stt-m",
         "language": "auto",
+        "limits": None,  # the normalizer's own defaults
     }
     assert sources.usage == {"prompt_tokens": 5}  # the sources and the sample report
     assert rec.args("normalize")["sources"] == spec.sources
