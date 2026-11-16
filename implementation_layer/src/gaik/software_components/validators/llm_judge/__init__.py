@@ -65,6 +65,7 @@ from .prompts import (
     JUDGE_SYSTEM_PROMPT,
     TEXT_PAIR_SYSTEM_PROMPT,
     build_hallucination_prompt,
+    build_hallucination_system_prompt,
     build_system_prompt,
     build_text_pair_prompt,
     build_user_prompt,
@@ -123,6 +124,7 @@ __all__ = [
     "build_system_prompt",
     "build_text_pair_prompt",
     "build_hallucination_prompt",
+    "build_hallucination_system_prompt",
     "build_user_prompt",
 ]
 
