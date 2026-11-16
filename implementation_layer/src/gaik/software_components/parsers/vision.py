@@ -26,6 +26,11 @@ from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import Provider, resolve_provider
+from gaik.software_components.source_material import (
+    SOURCE_MATERIAL_INSTRUCTION,
+    SourceMaterial,
+    source_material_messages,
+)
 
 try:  # Optional dependency, documented via extra: gaik[vision]
     from dotenv import load_dotenv as _load_dotenv  # type: ignore
@@ -393,10 +398,11 @@ class VisionParser:
     ) -> str:
         logger.info("Parsing page %s", page)
 
+        material = SourceMaterial()
         payload = [
             {
                 "type": "text",
-                "text": self._build_prompt(previous_context),
+                "text": self._build_prompt(previous_context, material),
             },
             {
                 "type": "image_url",
@@ -406,6 +412,10 @@ class VisionParser:
             },
         ]
 
+        # The page image and the previous page's text are material. The rule goes
+        # in the user message: some served vision models refuse a system
+        # message next to an image.
+        payload[0]["text"] = f"{SOURCE_MATERIAL_INSTRUCTION}\n\n{payload[0]['text']}"
         content = self._chat_content([{"role": "user", "content": payload}])
         if content is None:
             raise RuntimeError("Vision model returned empty content")
@@ -415,13 +425,16 @@ class VisionParser:
         logger.info("Cleaning and merging markdown output")
 
         combined = "\n\n---PAGE_BREAK---\n\n".join(markdown_pages)
-        cleanup_prompt = self._cleanup_prompt().format(markdown=combined)
-
-        content = self._chat_content([{"role": "user", "content": cleanup_prompt}])
+        material = SourceMaterial()
+        content = self._chat_content(
+            source_material_messages(
+                self._cleanup_prompt(), material.wrap(combined, label="markdown pages")
+            )
+        )
         if not content:
             raise RuntimeError("Cleanup LLM returned empty output")
 
-        trimmed = content.strip()
+        trimmed = material.strip_echo(content).strip()
         if trimmed.startswith("```"):
             trimmed = trimmed.strip("`").strip()
         return trimmed
@@ -450,7 +463,7 @@ class VisionParser:
             )
         return response.choices[0].message.content
 
-    def _build_prompt(self, previous_context: str | None) -> str:
+    def _build_prompt(self, previous_context: str | None, material: SourceMaterial) -> str:
         if not (previous_context and self.use_context):
             return self.custom_prompt
 
@@ -459,9 +472,7 @@ class VisionParser:
             f"{self.custom_prompt}\n\n"
             "CONTEXT FROM PREVIOUS PAGE:\n"
             "The previous page ended with the following content (last 500 characters):\n"
-            "```\n"
-            f"{tail}\n"
-            "```\n\n"
+            f"{material.wrap(tail, label='end of previous page')}\n\n"
             "If this page continues a table or section from the previous page, "
             "continue it seamlessly without repeating headers."
         )
@@ -513,10 +524,7 @@ class VisionParser:
             "4. **Preserve all real content**: Keep all actual data, headers, footers, and text\n"
             "5. **Clean up formatting**: Ensure proper markdown syntax throughout\n"
             "6. **Do NOT hallucinate**: Only output what you see in the input\n\n"
-            "INPUT MARKDOWN:\n"
-            "```markdown\n"
-            "{markdown}\n"
-            "```\n\n"
+            "INPUT MARKDOWN: the source_material block in the user message.\n\n"
             "OUTPUT: Return ONLY the cleaned, merged markdown. No explanations, no code block "
             "wrappers."
         )
