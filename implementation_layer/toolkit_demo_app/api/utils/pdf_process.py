@@ -1,9 +1,9 @@
 """The PDF check (``pdf_content.check``) in a process of its own.
 
-The check's budgets bound its steps, but one of its pattern searches over
-decoded data holds the interpreter while it runs, and no deadline can stop it
-from inside. In the API's process that would hold every other request; in a
-process of its own it holds only that process:
+The check's budgets and deadline bound its own work, but it is Python code that
+holds the interpreter while it runs, for seconds on a hard file, and a search
+it starts cannot be stopped from inside. In the API's process every other
+request would wait; in a process of its own only that process does:
 
 - It is stopped after ``PROCESS_SECONDS`` and the file refused as too complex.
 - On Linux it may map at most ``PROCESS_MEMORY`` and runs at a lower priority
@@ -30,8 +30,8 @@ except ImportError:
     from api.utils import pdf_content
 
 #: Seconds a check's process may run before it is stopped: longer than the
-#: check's own deadline, which it meets between its steps, for the one search
-#: no deadline inside the process can stop.
+#: check's own deadline, which it looks at between its steps, so that this
+#: stops only a check that overruns that deadline.
 PROCESS_SECONDS = pdf_content.CHECK_SECONDS + 5.0
 #: Address space a check's process may map (Linux). The decode budget keeps a
 #: check well below it; one that needs more is refused.
