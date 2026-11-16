@@ -151,3 +151,63 @@ def test_duckdb_strftime_still_renders_as_written():
 def test_postgres_date_trunc_keeps_its_time_zone():
     out = validate_pg("SELECT date_trunc('month', ts, 'Europe/Helsinki') FROM orders")
     assert "Europe/Helsinki" in out
+
+
+# --- An argument sqlglot drops while parsing is refused ---------------------
+
+
+def test_duckdb_refuses_the_time_zone_date_trunc_drops():
+    # sqlglot reads DuckDB's date_trunc with two arguments and drops the third while
+    # parsing, so the render matches the tree and only the parse shows the loss.
+    with pytest.raises(TabularUnsafeSQLError, match="loses one of its arguments"):
+        validate_duckdb(
+            "SELECT date_trunc('month', ts, 'Europe/Helsinki') FROM orders",
+            allowed_tables=["orders"],
+        )
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT array_agg(name, ', ') FROM orders",
+        "SELECT epoch_ms(ms, 3) FROM orders",
+        "SELECT encode(note, 'latin1') FROM orders",
+    ],
+)
+def test_duckdb_refuses_other_dropped_arguments(sql):
+    with pytest.raises(TabularUnsafeSQLError, match="loses one of its arguments"):
+        validate_duckdb(sql, allowed_tables=["orders"])
+
+
+def test_postgres_refuses_a_dropped_argument():
+    with pytest.raises(UnsafeSQLError, match="loses one of its arguments"):
+        validate_pg("SELECT array_agg(name, ', ') FROM orders")
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        # Values sqlglot rewrites on the way in are still arguments it uses.
+        "SELECT date_trunc('d', ts) FROM orders",
+        "SELECT date_trunc(month, ts) FROM orders",
+        "SELECT date_diff('day', ordered_on, shipped_on) FROM orders",
+        "SELECT strftime(ts, '%-d.%-m.%Y') FROM orders",
+        "SELECT json_extract_string(doc, 'a'), doc ->> '$.b' FROM orders",
+        "SELECT list_sort(tags, 'DESC'), list_sort(tags, 'ASC', 'NULLS FIRST') FROM orders",
+        "SELECT log10(amount), epoch_ms(ms) FROM orders",
+    ],
+)
+def test_duckdb_keeps_arguments_sqlglot_rewrites(sql):
+    validate_duckdb(sql, allowed_tables=["orders"])
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT to_char(ts, 'YYYY-MM'), date_trunc('month', ts) FROM orders",
+        "SELECT json_extract_path(doc, 'a', 'b') FROM orders",
+        "SELECT date_bin('15 minutes', ts, TIMESTAMP '2001-01-01') FROM orders",
+    ],
+)
+def test_postgres_keeps_arguments_sqlglot_rewrites(sql):
+    validate_pg(sql)

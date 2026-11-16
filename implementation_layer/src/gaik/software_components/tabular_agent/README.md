@@ -147,6 +147,11 @@ Queries may only read the loaded tables. A CTE name counts as a CTE only where
 that CTE is in scope; inside its own body (without `RECURSIVE`) or in an
 earlier CTE the name is a table and must be one of the loaded ones.
 
+The SQL that runs is rendered from the checked syntax tree. A query that
+`sqlglot` cannot render without dropping part of it, or that it reads without
+one of a function's arguments (such as a time zone given to `date_trunc`), is
+rejected, so the agent asks the LLM for another one.
+
 **2. A locked-down engine.** External access is enabled only while *our own*
 loader reads the paths you passed in. Before a single generated query runs, the
 connection is closed off permanently:

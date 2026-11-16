@@ -27,9 +27,10 @@ from __future__ import annotations
 from collections.abc import Callable
 
 try:
-    import sqlglot
     from sqlglot import exp
     from sqlglot.errors import ErrorLevel, UnsupportedError
+
+    from gaik.software_components import _sql_parse
 except ImportError as exc:
     raise ImportError(
         "tabular_agent requires 'sqlglot'. Install extras with 'pip install gaik[tabular-agent]'"
@@ -95,7 +96,7 @@ def validate_read_only(sql: str, *, allowed_tables: list[str] | None = None) -> 
         raise UnsafeSQLError("Empty SQL statement.")
 
     try:
-        parsed = sqlglot.parse(sql, read="duckdb")
+        parsed = _sql_parse.parse(sql, "duckdb")
     except Exception as exc:
         raise UnsafeSQLError(f"Could not parse SQL: {exc}") from exc
 
@@ -151,6 +152,16 @@ def validate_read_only(sql: str, *, allowed_tables: list[str] | None = None) -> 
             raise UnsafeSQLError(f"Table '{name}' is not in the allowed table list.")
 
     _walk_tables(statement, frozenset(), check_table)
+
+    # sqlglot ignores an argument it has no slot for, so the tree would run a
+    # different query than the one written.
+    lossy = _sql_parse.dropped_argument(statement)
+    if lossy is not None:
+        raise UnsafeSQLError(
+            "The query cannot be checked as written: a function call loses one of its "
+            f"arguments and would run as {lossy.sql(dialect='duckdb')}. "
+            "Write that call another way."
+        )
 
     # Rendered from the checked tree, so nothing sqlglot did not parse reaches
     # DuckDB; a render that would drop part of the query is refused instead.

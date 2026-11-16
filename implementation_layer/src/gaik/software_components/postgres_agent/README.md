@@ -71,8 +71,9 @@ The agent executes LLM-generated SQL. Three layers limit what it can do:
      and is checked like one. Under `WITH RECURSIVE` every CTE of that `WITH`
      is in scope in every body, as in PostgreSQL;
    - the SQL that runs is rendered from the checked syntax tree. A query that
-     `sqlglot` cannot render without dropping part of it is rejected, so the
-     agent asks the LLM for another one;
+     `sqlglot` cannot render without dropping part of it, or that it reads
+     without one of a function's arguments, is rejected, so the agent asks the
+     LLM for another one;
    - identifiers are compared as PostgreSQL does: unquoted names fold to
      lower case, quoted names keep their case. `"Users"` and `users` are two
      tables. `schema_name` is an unquoted name and folds to lower case too. A
