@@ -71,7 +71,8 @@ export type Case = {
   rerun?: boolean;
   result: {
     record: CaseRecord | CaseRecord[] | null;
-    validation: { passed?: boolean } | null;
+    /** The grounding check's file as the run wrote it; `hallucination_flags` names the values (lib/case-value). */
+    validation: { passed?: boolean; hallucination_flags?: unknown } | null;
     transcript: string;
     document?: string;
     files: string[];

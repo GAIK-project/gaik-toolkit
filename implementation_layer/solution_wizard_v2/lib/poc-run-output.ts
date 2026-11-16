@@ -138,62 +138,54 @@ export function formatValue(
 
 const isFraction = (v: unknown): boolean => typeof v === "number" && v > 0 && v < 1;
 
-/** What a cell of a nested table can hold: one value, or a list of them (a decision's citations). */
-const isCell = (v: unknown): boolean => isScalar(v) || (Array.isArray(v) && v.every(isScalar));
-
-/** A list of flat objects inside a record, as a small table: an order's lines, a meeting's actions. */
-export type NestedTable = {
-  columns: { field: string; label: string }[];
-  rows: string[][];
-};
+/**
+ * Whether a confidence field of these records is on the 0-1 scale, so that
+ * its numbers read as percentages. A bare 0 or 1 does not say its scale (1 of
+ * 5 would read "100 %"), so every number of the field has to lie between 0
+ * and 1 and some confidence of the records has to be a fraction. One rule for
+ * a record's rows, a table's column and a value nested in a list or object.
+ */
+function onUnitScale(records: RunRecord[], field: string): boolean {
+  if (!isConfidenceField(field)) return false;
+  const inRange = records.every((r) => {
+    const v = r[field];
+    return typeof v !== "number" || (v >= 0 && v <= 1);
+  });
+  return inRange && records.some((r) => Object.entries(r).some(([f, v]) => isConfidenceField(f) && isFraction(v)));
+}
 
 /**
- * The table for a value that is a list of flat objects, or null for anything
- * else. The result showed such a field as indented JSON, braces and quotes
- * included, where the case view shows the same value as a table. A cell may
- * hold a short list of its own (the sources of a decision), shown comma-
- * separated: one such field used to turn the whole list back into JSON.
+ * A number inside a record's list or object, as lib/case-value's `number`
+ * says it: a confidence on the 0-1 scale as a percentage, undefined for any
+ * other number. `among` is the object the number is a field of, or every
+ * record of its list, and the scale is read from them as `recordRows` reads it.
  */
-export function nestedTable(value: unknown, words?: ValueWords): NestedTable | null {
-  if (!Array.isArray(value) || value.length === 0) return null;
-  if (!value.every((x) => x !== null && typeof x === "object" && !Array.isArray(x))) return null;
-  const records = value as RunRecord[];
-  if (!records.every((r) => Object.values(r).every(isCell))) return null;
-  const fields: string[] = [];
-  for (const r of records) {
-    for (const f of Object.keys(r)) if (!fields.includes(f)) fields.push(f);
-  }
-  if (fields.length === 0) return null;
-  const cell = (f: string, v: unknown): string =>
-    Array.isArray(v) ? v.map((x) => formatValue(f, x, words)).join(", ") : formatValue(f, v, words);
-  return {
-    columns: fields.map((field) => ({ field, label: fieldLabel(field) })),
-    rows: records.map((r) => fields.map((f) => cell(f, r[f]))),
-  };
+export function nestedNumber(
+  field: string,
+  value: number,
+  words: ValueWords,
+  among: RunRecord[],
+): string | undefined {
+  return value >= 0 && value <= 1 && onUnitScale(among, field) ? formatValue(field, value, words, true) : undefined;
 }
 
 /**
  * The record's fields in the order the run wrote them, each with its value as
- * text. A confidence between 0 and 1 is a percentage. A bare 0 or 1 does not
- * say its scale (1 of 5 would read "100 %"), so it is a percentage only beside
- * another confidence of the record that is a fraction; otherwise it is shown
- * as the run wrote it. A list of flat objects also comes as `table`, for the
- * tab to draw instead of the JSON text in `value`.
+ * text. A confidence between 0 and 1 is a percentage. A bare 0 or 1 is a
+ * percentage only beside another confidence of the record that is a fraction
+ * (`onUnitScale`); otherwise it is shown as the run wrote it. The text stands
+ * for a number or a boolean; a list, an object or a text is laid out by the
+ * result views (components/result-value).
  */
 export function recordRows(
   record: RunRecord,
   words?: ValueWords,
-): { field: string; label: string; value: string; table?: NestedTable }[] {
-  const unitScale = Object.entries(record).some(([f, v]) => isConfidenceField(f) && isFraction(v));
-  return Object.entries(record).map(([field, value]) => {
-    const table = nestedTable(value, words);
-    return {
-      field,
-      label: fieldLabel(field),
-      value: formatValue(field, value, words, isConfidenceField(field) && (unitScale || isFraction(value))),
-      ...(table ? { table } : {}),
-    };
-  });
+): { field: string; label: string; value: string }[] {
+  return Object.entries(record).map(([field, value]) => ({
+    field,
+    label: fieldLabel(field),
+    value: formatValue(field, value, words, onUnitScale([record], field)),
+  }));
 }
 
 export type RecordTable = {
@@ -222,13 +214,7 @@ export function recordTable(records: RunRecord[], words: ValueWords): RecordTabl
   if (shown.length === 0) return null;
   // A column is percentages or it is not: confidences on a 0-100 or 1-5 scale
   // would otherwise show 87 as "87" and 1 as "100 %" in the same column.
-  const percent = new Set(
-    shown.filter(
-      (f) =>
-        isConfidenceField(f) &&
-        records.every((r) => typeof r[f] !== "number" || ((r[f] as number) >= 0 && (r[f] as number) <= 1)),
-    ),
-  );
+  const percent = new Set(shown.filter((f) => onUnitScale(records, f)));
   return {
     columns: shown.map((field) => ({ field, label: fieldLabel(field) })),
     rows: records.map((r) => ({

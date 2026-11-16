@@ -36,10 +36,12 @@ import {
 import { AI_FRONT_MATTER, AI_GENERATOR, AI_RECORD_MARK } from "@/lib/ai-marking";
 import { caseChatReference, keepChatReference } from "@/lib/case-chat";
 import { type AcceptedInput, acceptAttribute, acceptedPhrase, caseErrorText } from "@/lib/case-error";
+import { formatValue, valueText } from "@/lib/case-value";
 import { fillTemplate } from "@/lib/chat-template";
 import { clock, recordingToWav } from "@/lib/recording-wav";
 import { formatSize } from "@/lib/poc-run-output";
 import { FileIcon } from "./file-icon";
+import { GroundingNote, ResultFields } from "./result-value";
 import { Icon, type IconName } from "./icons";
 
 type Props = {
@@ -358,7 +360,6 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
   }
 
   const head = (
-    <div>
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
       <Link href={back} className="icon-btn -ml-1.5" aria-label={s.back} title={s.back} data-testid="case-back">
         <Icon name="arrowLeft" size={18} />
@@ -401,8 +402,6 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
           )}
         </div>
       )}
-    </div>
-    {model && <p className="mt-1.5 max-w-3xl text-sm text-text-muted sm:pl-9" data-testid="case-intro">{s.intro}</p>}
     </div>
   );
 
@@ -1453,34 +1452,13 @@ function JsonField({ value, onChange, className, testId }: { value: unknown; onC
   );
 }
 
-function ValueView({ value }: { value: unknown }) {
-  if (isTable(value)) {
-    const cols = tableColumns(value);
-    return (
-      <table className="w-full text-xs border border-border">
-        <thead className="bg-surface-muted"><tr>{cols.map((k) => <th key={k} className="px-2 py-1 text-left">{humanize(k)}</th>)}</tr></thead>
-        <tbody>
-          {value.map((r, i) => (
-            <tr key={i} className="border-t border-border align-top">
-              {cols.map((k) => <td key={k} className="px-2 py-1">{isStructured(r[k]) ? JSON.stringify(r[k]) : show(r[k]) || "—"}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
-  if (isStructured(value) && !(Array.isArray(value) && value.every((x) => typeof x !== "object"))) {
-    return <code className="text-xs">{JSON.stringify(value)}</code>;
-  }
-  return <>{show(value) || "—"}</>;
-}
-
 function DoneView(p: ViewProps) {
   const { caseData: c, model, s } = p;
   const raw = c.record ?? {};
   const list = Array.isArray(raw) ? raw : [raw];
   const rec = list[0] ?? {};
   const doc = isDocument(raw);
+  const words = { yes: s.yes, no: s.no, none: s.none };
   const name = (model.spec.schema_name || "result").toLowerCase();
   const stamp = c.events.at(-1)?.at;
   const approved = c.status === "approved";
@@ -1500,11 +1478,11 @@ function DoneView(p: ViewProps) {
       : list
           .map(
             (r) => `<table style="border-collapse:collapse;width:100%;font:11pt Helvetica,Arial;margin-bottom:18px">${formFields(model.spec)
-              .map((f) => `<tr><td style="border-bottom:1px solid #bbb;padding:6px;font-weight:bold;width:28%;vertical-align:top">${esc(humanize(f))}</td><td style="border-bottom:1px solid #bbb;padding:6px">${esc(isStructured(r[f]) ? JSON.stringify(r[f], null, 1) : show(r[f]) || "—")}</td></tr>`)
+              .map((f) => `<tr><td style="border-bottom:1px solid #bbb;padding:6px;font-weight:bold;width:28%;vertical-align:top">${esc(humanize(f))}</td><td style="border-bottom:1px solid #bbb;padding:6px;white-space:pre-wrap">${esc(valueText(formatValue(r[f], words)))}</td></tr>`)
               .join("")}</table>`,
           )
           .join("");
-    const when = new Date(String(stamp ?? Date.now())).toLocaleString(p.dateLocale);
+    const when = (stamp ? new Date(stamp) : new Date()).toLocaleString(p.dateLocale);
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="ai-generated" content="true"><meta name="generator" content="${AI_GENERATOR}"><title>${esc(model.title)}</title></head><body style="margin:32px"><h2 style="font-family:Helvetica,Arial">${esc(model.title)}</h2><p style="font-family:Helvetica,Arial">${approved ? s.approvedTitle : s.completedTitle} ${esc(when)}</p>${body}<p style="font:9pt Helvetica,Arial;color:#555">${esc(s.aiMade)}</p></body></html>`);
     w.document.close();
     w.focus();
@@ -1532,36 +1510,38 @@ function DoneView(p: ViewProps) {
         <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap rounded-md border border-border bg-app p-3 text-xs">{toMarkdown(rec)}</pre>
       ) : (
         list.map((r, i) => (
-          <dl key={i} className={`grid grid-cols-[minmax(0,1fr)_minmax(0,3fr)] gap-x-3 gap-y-1.5 text-sm ${list.length > 1 ? "rounded-md border border-border p-3" : ""}`}>
-            {formFields(model.spec).map((f) => (
-              <div key={f} className="contents">
-                <dt className="font-medium text-text-secondary">{humanize(f)}</dt>
-                <dd className="min-w-0 overflow-x-auto"><ValueView value={r[f]} /></dd>
-              </div>
-            ))}
-          </dl>
+          // Several results are parted by a rule and numbered, not boxed.
+          <div key={i} className={list.length > 1 ? "border-t border-border pt-4 first:border-t-0 first:pt-0" : ""} data-testid="case-result">
+            {list.length > 1 && <p className="mb-2 text-xs font-medium text-text-muted">{s.item} {i + 1}</p>}
+            <ResultFields
+              fields={formFields(model.spec).map((f) => ({ field: f, label: humanize(f), shown: formatValue(r[f], words) }))}
+              labels={s}
+              testId="case"
+            />
+          </div>
         ))
       )}
-      {/* One "Vie" for the three formats, not the word three times. */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4" data-testid="case-export">
-        <span className="mr-1 text-sm text-text-muted">{s.export}</span>
-        <button type="button" className="btn-secondary" onClick={() => download(`${name}.json`, "application/json", JSON.stringify(exported, null, 2))}>
-          <Icon name="download" size={15} />
+      {/* One "Vie" for the three formats, not the word three times; each
+          button carries its file type's mark and is named in full. */}
+      <div role="group" aria-label={s.export} className="flex flex-wrap items-center gap-2 border-t border-border pt-4" data-testid="case-export">
+        <span className="mr-1 text-sm text-text-muted" aria-hidden="true">{s.export}</span>
+        <button type="button" className="btn-secondary" aria-label={fillTemplate(s.exportAs, { format: "JSON" })} onClick={() => download(`${name}.json`, "application/json", JSON.stringify(exported, null, 2))}>
+          <FileIcon kind="json" size={16} />
           JSON
         </button>
         {doc ? (
-          <button type="button" className="btn-secondary" onClick={() => download(`${name}.md`, "text/markdown;charset=utf-8", AI_FRONT_MATTER + toMarkdown(rec))}>
-            <Icon name="download" size={15} />
+          <button type="button" className="btn-secondary" aria-label={fillTemplate(s.exportAs, { format: "Markdown" })} onClick={() => download(`${name}.md`, "text/markdown;charset=utf-8", AI_FRONT_MATTER + toMarkdown(rec))}>
+            <FileIcon kind="markdown" size={16} />
             Markdown
           </button>
         ) : (
-          <button type="button" className="btn-secondary" onClick={() => download(`${name}.csv`, "text/csv;charset=utf-8", toCsv(exported))}>
-            <Icon name="download" size={15} />
+          <button type="button" className="btn-secondary" aria-label={fillTemplate(s.exportAs, { format: "CSV" })} onClick={() => download(`${name}.csv`, "text/csv;charset=utf-8", toCsv(exported))}>
+            <FileIcon kind="csv" size={16} />
             CSV
           </button>
         )}
-        <button type="button" className="btn-secondary" onClick={printPdf}>
-          <Icon name="download" size={15} />
+        <button type="button" className="btn-secondary" aria-label={fillTemplate(s.exportAs, { format: "PDF" })} onClick={printPdf}>
+          <FileIcon kind="pdf" size={16} />
           PDF
         </button>
       </div>
@@ -1603,15 +1583,20 @@ function SourceView(p: ViewProps & { files: Case["inputs"]; eventsOnly?: boolean
           )}
         </div>
       )}
-      {validation && (
-        <p
-          className={`flex items-center gap-1.5 text-sm ${validation.passed ? "text-success-text" : "text-warning-text"}`}
-          data-testid="case-grounding"
-        >
-          <Icon name={validation.passed ? "circleCheck" : "circleAlert"} size={15} className="shrink-0" />
-          {validation.passed ? s.groundingOk : s.groundingBad}
-        </p>
-      )}
+      {/* The values the check could not find in the source, when it names them. */}
+      <GroundingNote
+        validation={validation}
+        words={{ yes: s.yes, no: s.no, none: s.none }}
+        labels={{
+          showRaw: s.showRaw,
+          page: s.page,
+          ok: s.groundingOk,
+          bad: s.groundingBad,
+          checkThese: s.groundingCheckThese,
+          checkResult: s.groundingCheckResult,
+        }}
+        testId="case-grounding"
+      />
       {/* The log is for looking something up, so it stays closed until asked for. */}
       {c.events.length > 0 && (
         <details className="group text-sm">

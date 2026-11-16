@@ -153,6 +153,8 @@ export type Dict = {
   pocResultEmpty: string;
   pocResultYes: string;
   pocResultNo: string;
+  /** An empty list in a result, apart from a missing value (a dash). */
+  pocResultEmptyList: string;
   /** A 0-1 confidence as a percentage: {n}. */
   pocResultPercent: string;
   pocResultNeedsReview: string;
@@ -533,8 +535,16 @@ export type Dict = {
   pocCheckAgain: string;
   pocResultTitle: string;
   pocResultNone: string;
+  /** The grounding check passed. */
   pocResultChecksOk: string;
+  /** The grounding check failed. */
   pocResultChecksBad: string;
+  /** What to do, under the values the check names. */
+  pocResultChecksThese: string;
+  /** What to do when the check names no values. */
+  pocResultChecksResult: string;
+  /** The disclosure of a result value with no plain reading. */
+  pocResultShowRaw: string;
   pocResultOpenCases: string;
   pocResultRecord: string;
   pocResultDocument: string;
@@ -846,6 +856,7 @@ const fi: Dict = {
   pocResultEmpty: "Tulos näkyy tässä testiajon jälkeen.",
   pocResultYes: "Kyllä",
   pocResultNo: "Ei",
+  pocResultEmptyList: "Ei yhtään",
   pocResultPercent: "{n} %",
   pocResultNeedsReview: "Tarkistettava",
   pocResultShow: "Näytä",
@@ -1198,6 +1209,9 @@ const fi: Dict = {
   pocResultNone: "Ajo onnistui, mutta se ei kirjoittanut tulostiedostoja output/-kansioon.",
   pocResultChecksOk: "Lähdetarkistus läpi",
   pocResultChecksBad: "Lähdetarkistus: mahdollisia keksittyjä arvoja",
+  pocResultChecksThese: "Tarkista nämä arvot lähteestä ennen kuin käytät tulosta.",
+  pocResultChecksResult: "Tarkista tulos lähteestä ennen kuin käytät sitä.",
+  pocResultShowRaw: "Näytä raakadata",
   pocResultOpenCases: "Avaa tapausnäkymä",
   pocResultRecord: "Tietue",
   pocResultDocument: "Dokumentti",
@@ -1595,6 +1609,7 @@ const en: Dict = {
   pocResultEmpty: "The result shows here after the test run.",
   pocResultYes: "Yes",
   pocResultNo: "No",
+  pocResultEmptyList: "None",
   pocResultPercent: "{n}%",
   pocResultNeedsReview: "Needs review",
   pocResultShow: "Show",
@@ -1946,6 +1961,9 @@ const en: Dict = {
   pocResultNone: "The run succeeded but wrote no output files to output/.",
   pocResultChecksOk: "Grounding check passed",
   pocResultChecksBad: "Grounding check: possible invented values",
+  pocResultChecksThese: "Check these values against the source before you use the result.",
+  pocResultChecksResult: "Check the result against the source before you use it.",
+  pocResultShowRaw: "Show raw",
   pocResultOpenCases: "Open the case view",
   pocResultRecord: "Record",
   pocResultDocument: "Document",

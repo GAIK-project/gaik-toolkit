@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BACKGROUND_SENTENCES, PACE_SENTENCES, withStartLines } from "./chat-background";
-import { DERIVED_TITLE_MAX, sessionTitleFrom, titleExampleIn } from "./session-title";
+import { DERIVED_TITLE_MAX, sessionTitleFrom, shownSessionTitle, titleExampleIn } from "./session-title";
 
 const sentences = BACKGROUND_SENTENCES.fi;
 const pace = PACE_SENTENCES.fi;
@@ -81,5 +81,24 @@ describe("sessionTitleFrom", () => {
     expect(sessionTitleFrom(sentences.technical, source)).toBe("Nimetön sessio");
     expect(sessionTitleFrom(`${sentences.technical}\n${pace.quick}`, source)).toBe("Nimetön sessio");
     expect(sessionTitleFrom("?!", source)).toBe("Nimetön sessio");
+  });
+});
+
+describe("shownSessionTitle", () => {
+  const placeholders = ["Nimetön sessio", "Untitled session"];
+
+  it("keeps a session's own name", () => {
+    expect(shownSessionTitle("Laskujen luokittelu", "Invoice classifier", placeholders)).toBe("Laskujen luokittelu");
+  });
+
+  it("shows the blueprint's name for a session that was never named, in either language", () => {
+    expect(shownSessionTitle("Untitled session", "Release User Guide Updater", placeholders)).toBe("Release User Guide Updater");
+    expect(shownSessionTitle("Nimetön sessio", " Release User Guide Updater ", placeholders)).toBe("Release User Guide Updater");
+  });
+
+  it("leaves the placeholder when the blueprint has no name of its own either", () => {
+    expect(shownSessionTitle("Untitled session", "Nimetön sessio", placeholders)).toBe("Untitled session");
+    expect(shownSessionTitle("Untitled session", "", placeholders)).toBe("Untitled session");
+    expect(shownSessionTitle("Untitled session", undefined, placeholders)).toBe("Untitled session");
   });
 });

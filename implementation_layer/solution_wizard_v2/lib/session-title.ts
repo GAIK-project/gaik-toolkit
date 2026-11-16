@@ -49,3 +49,21 @@ export function sessionTitleFrom(message: string, source: TitleSource): string {
   }
   return line || source.fallback;
 }
+
+/**
+ * The name a page shows for a session. A session started without a name
+ * stores the placeholder ("Untitled session", in the language of that moment)
+ * as its name, and nothing replaces it when the wizard later names the
+ * solution. Where that is so and the blueprint has a name of its own, the
+ * blueprint's name stands for the session.
+ */
+export function shownSessionTitle(
+  title: string,
+  blueprintName: string | null | undefined,
+  placeholders: readonly string[],
+): string {
+  const unnamed = (name: string) => name === "" || placeholders.includes(name);
+  const own = title.trim();
+  const blueprint = (blueprintName ?? "").trim();
+  return unnamed(own) && !unnamed(blueprint) ? blueprint : own;
+}

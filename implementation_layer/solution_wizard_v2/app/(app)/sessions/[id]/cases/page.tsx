@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
-import { getI18n } from "@/lib/i18n";
+import { LOCALES, dictionary, getI18n } from "@/lib/i18n";
 import { getSessionForUser } from "@/lib/session-access";
+import { shownSessionTitle } from "@/lib/session-title";
 import { CASE_STRINGS } from "@/lib/case-strings";
 import { CaseWorkflow } from "@/components/case-workflow";
 import { SessionBar } from "@/components/session-bar";
@@ -15,6 +16,13 @@ export default async function CasesPage({ params }: { params: Promise<{ id: stri
   const session = user ? await getSessionForUser(id, user.email) : undefined;
   if (!session) notFound();
   const s = CASE_STRINGS[locale];
+  // A session never named reads "Untitled session" above the solution's own
+  // name; the blueprint's name stands in for it (lib/session-title).
+  const title = shownSessionTitle(
+    session.title,
+    session.blueprint.name,
+    LOCALES.map((l) => dictionary(l).untitledSession),
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -25,7 +33,7 @@ export default async function CasesPage({ params }: { params: Promise<{ id: stri
             href={`/sessions/${id}?tab=poc`}
             className="rounded-sm transition-colors hover:text-brand-text"
           >
-            {session.title}
+            {title}
           </Link>
         }
       />

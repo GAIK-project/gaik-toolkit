@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/current-user";
-import { getI18n } from "@/lib/i18n";
+import { LOCALES, dictionary, getI18n } from "@/lib/i18n";
+import { shownSessionTitle } from "@/lib/session-title";
 import { OpenChatButton } from "@/components/chat-dock";
 import { SessionChatDock } from "@/components/session-chat-dock";
 import { Icon } from "@/components/icons";
@@ -237,7 +238,16 @@ export default async function SessionPage({
       {!solutionDone && <ForgetWizardRelease sessionId={session.id} />}
       {/* The session's name is the page's heading; the four gates beside it
           say how far the session is, each opening its stage on a press. */}
-      <SessionBar title={session.title} className="session-in">
+      {/* The name the cases page shows too: a session never named goes by
+          its blueprint's name (lib/session-title). */}
+      <SessionBar
+        title={shownSessionTitle(
+          session.title,
+          session.blueprint.name,
+          LOCALES.map((l) => dictionary(l).untitledSession),
+        )}
+        className="session-in"
+      >
         <GateTimeline variant="row" {...timeline} />
       </SessionBar>
 

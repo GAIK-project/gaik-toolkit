@@ -50,6 +50,8 @@ import {
   type RunWarning,
 } from "@/lib/poc-result-state";
 import { FieldSources } from "@/components/poc-field-sources";
+import { GroundingNote, ResultFields } from "@/components/result-value";
+import { formatValue as shownValue, type ValueWords as ShownWords } from "@/lib/case-value";
 import type { Dict } from "@/lib/i18n";
 import {
   documentSections,
@@ -59,7 +61,7 @@ import {
   pocRunOutput,
   recordTable,
   runFileHref,
-  type NestedTable,
+  nestedNumber,
   recordRows,
   restoredRun,
   runEndMessage,
@@ -261,36 +263,6 @@ function LogBox({ lines }: { lines: string[] }) {
   );
 }
 
-
-/** A list field of the result (an order's lines) as a table, where the tab showed its JSON. */
-function NestedTableView({ table }: { table: NestedTable }) {
-  return (
-    <div className="scroll-thin w-full overflow-x-auto rounded-md border border-border [contain:inline-size]" data-testid="poc-run-nested-table">
-      <table className="w-full whitespace-normal text-xs">
-        <thead className="bg-surface-muted">
-          <tr>
-            {table.columns.map((c) => (
-              <th key={c.field} scope="col" className="whitespace-nowrap px-2 py-1 text-left font-medium text-text-secondary">
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {table.rows.map((cells, i) => (
-            <tr key={i} className="border-t border-border align-top">
-              {cells.map((cell, j) => (
-                <td key={j} className="px-2 py-1 text-text">
-                  {cell || "—"}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 /** "1:05" for a run that has gone on for 65 s. */
 function formatElapsed(ms: number): string {
@@ -1241,6 +1213,14 @@ export function WorkspacePanel({
     no: t.pocResultNo,
     percent: t.pocResultPercent,
   };
+  // The same words for the views the cases page shares (components/result-value).
+  const shownWords: ShownWords = {
+    yes: t.pocResultYes,
+    no: t.pocResultNo,
+    none: t.pocResultEmptyList,
+    number: (field, value, among) => nestedNumber(field, value, valueWords, among),
+  };
+  const resultLabels = { showRaw: t.pocResultShowRaw, page: t.pocSources.page };
 
   const typeLabel = stepTypeLabels(t);
 
@@ -2111,14 +2091,6 @@ export function WorkspacePanel({
         <h3 id={`${baseId}-result`} className="text-sm font-semibold text-text">
           {t.pocResultTitle}
         </h3>
-        {runOutput?.validation && (
-          <span
-            className={runOutput.validation.passed ? "badge-success" : "badge-warning"}
-            data-testid="poc-run-grounding"
-          >
-            {runOutput.validation.passed ? t.pocResultChecksOk : t.pocResultChecksBad}
-          </span>
-        )}
         {/* Where the values come from: how many of the model's citations the
             check found in the source, and the snippets under each value. */}
         {trace && sourcesDrawn && (
@@ -2200,6 +2172,21 @@ export function WorkspacePanel({
         <div className="flex flex-col gap-4 border-t border-border px-4 py-3" data-testid="poc-run-output">
           {!hasRunOutput(runOutput) && <p className="text-xs text-text-muted">{t.pocResultNone}</p>}
 
+          {/* The grounding check: a line when it passed, and the values it
+              names when it failed, as the cases view shows it. */}
+          <GroundingNote
+            validation={runOutput.validation}
+            words={shownWords}
+            labels={{
+              ...resultLabels,
+              ok: t.pocResultChecksOk,
+              bad: t.pocResultChecksBad,
+              checkThese: t.pocResultChecksThese,
+              checkResult: t.pocResultChecksResult,
+            }}
+            testId="poc-run-grounding"
+          />
+
           {table ? (
             // Several flat records: one table, a row each. The first column
             // stays put while a phone scrolls the rest sideways; there it is
@@ -2277,29 +2264,28 @@ export function WorkspacePanel({
                       </div>
                     ))
                   ) : (
-                    <table className="w-full text-sm">
-                      <tbody>
-                        {recordRows(record, valueWords).map((row) => (
-                          <tr key={row.field} className="border-t border-border align-top">
-                            <th
-                              scope="row"
-                              className="w-px whitespace-nowrap py-1.5 pr-6 text-left font-medium text-text-muted"
-                            >
-                              {row.label}
-                            </th>
-                            <td className="whitespace-pre-wrap break-words py-1.5 text-text">
-                              {row.table ? <NestedTableView table={row.table} /> : row.value}
-                              {showSources && (
-                                <FieldSources
-                                  sources={sourcesForField(trace, row.field, i, records)}
-                                  labels={t.pocSources}
-                                />
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    // The same layout as a case's result: a list of records
+                    // under its field's name, any other field beside its label.
+                    <ResultFields
+                      fields={recordRows(record, valueWords).map((row) => {
+                        const value = record[row.field];
+                        return {
+                          field: row.field,
+                          label: row.label,
+                          // A number or a boolean is said by the tab's own
+                          // reading (a confidence as a percentage).
+                          shown:
+                            typeof value === "number" || typeof value === "boolean"
+                              ? { kind: "text" as const, text: row.value }
+                              : shownValue(value, shownWords),
+                          below: showSources && (
+                            <FieldSources sources={sourcesForField(trace, row.field, i, records)} labels={t.pocSources} />
+                          ),
+                        };
+                      })}
+                      labels={resultLabels}
+                      testId="poc-run"
+                    />
                   )}
                 </div>
               );

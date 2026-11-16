@@ -468,7 +468,158 @@ test.describe("PoC tab", () => {
     await expect(rows.nth(1)).toHaveAttribute("data-flagged", "true");
     await expect(rows.nth(1).getByRole("rowheader")).toContainText("Tarkistettava");
     await expect(rows.nth(0).getByRole("rowheader")).toHaveText("Lyreco Finland Oy");
+    // A grounding check that passed is one line, as in the cases view.
     await expect(page.getByTestId("poc-run-grounding")).toHaveText("Lähdetarkistus läpi");
+    await expect(page.getByTestId("poc-run-grounding-flags")).toHaveCount(0);
+  });
+
+  // A meeting's minutes: a list of records with a sentence and its sources in
+  // each, as a generated solution writes them.
+  const MINUTES = {
+    meeting_title: "Project Nimbus weekly",
+    recorded: true,
+    attendees: ["Aino Virtanen", "Mikael Lahti", "Sara Niemi"],
+    discussion_summaries: [
+      {
+        agenda_item: "Pilot scope",
+        summary:
+          "The team agreed to run the pilot in Helsinki first, with synthetic data only, and to review the results before any other site is added.",
+        evidence: ["project_nimbus_meeting.wav|00:00:00|00:01:12", "project_nimbus_agenda.pdf|2"],
+      },
+      {
+        agenda_item: "Schedule",
+        summary: "The pilot starts in week 48 and runs for four weeks; the steering group meets after the second week.",
+        evidence: ["project_nimbus_meeting.wav|00:01:12|00:03:40"],
+      },
+    ],
+    owners: [
+      { name: "Aino Virtanen", role: "Lead" },
+      { name: "Sara Niemi", role: "Data" },
+    ],
+    notes: [1, { odd: true }],
+    follow_up: null,
+  };
+
+  async function openMinutes(page: Page, validation: object | null = null) {
+    await fakePoc(page, { record: MINUTES });
+    await page.route(`${API}/runs/run-1/output`, (route) =>
+      route.fulfill({
+        json: {
+          runId: "run-1",
+          record: MINUTES,
+          validation,
+          files: [{ name: "minutes.json", body: JSON.stringify(MINUTES) }],
+          downloads: [],
+          skipped: [],
+        },
+      }),
+    );
+    await openCheckedPoc(page);
+    await runTest(page);
+  }
+
+  test("a record's list of long records is label and value pairs under the field's name, with sources as files", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openMinutes(page);
+    const record = page.getByTestId("poc-run-record");
+
+    // The field's name is a heading above its records, not a column beside them.
+    const field = record.locator('[data-field="discussion_summaries"]');
+    const heading = field.locator("dt").first();
+    await expect(heading).toHaveText("Discussion summaries");
+    const list = field.getByTestId("poc-run-records");
+    const headingBox = (await heading.boundingBox())!;
+    const listBox = (await list.boundingBox())!;
+    expect(headingBox.y + headingBox.height).toBeLessThanOrEqual(listBox.y);
+    expect(Math.abs(headingBox.x - listBox.x)).toBeLessThan(2);
+
+    // Each record is numbered pairs: the sentence has the width, not a third of a table.
+    const first = list.getByRole("listitem").first();
+    await expect(list.locator(":scope > li")).toHaveCount(2);
+    await expect(first.locator("dt")).toHaveText(["Agenda item", "Summary", "Evidence"]);
+    const summary = first.locator("dd").nth(1);
+    await expect(summary).toContainText("The team agreed to run the pilot in Helsinki first");
+    expect((await summary.boundingBox())!.height).toBeLessThan(100);
+    await expect(record.locator("table")).toHaveCount(1);
+
+    // A source reads as its file, with the file type's mark, and where in it.
+    const refs = first.getByTestId("source-ref");
+    await expect(refs).toHaveText(["project_nimbus_meeting.wav0:00–1:12", "project_nimbus_agenda.pdfs. 2"]);
+    await expect(refs.nth(0).locator('svg[data-file-kind="audio"]')).toBeVisible();
+    await expect(refs.nth(1).locator('svg[data-file-kind="pdf"]')).toBeVisible();
+    await expect(record).not.toContainText("|");
+    await expect(record).not.toContainText("00:00:00");
+
+    // A list is lines, a boolean a word, nothing a dash; few short fields stay a table.
+    await expect(record.locator('[data-field="attendees"]').getByRole("listitem")).toHaveText([
+      "Aino Virtanen",
+      "Mikael Lahti",
+      "Sara Niemi",
+    ]);
+    await expect(record.locator('[data-field="recorded"] dd')).toHaveText("Kyllä");
+    await expect(record.locator('[data-field="follow_up"] dd')).toHaveText("—");
+    const owners = record.locator('[data-field="owners"]').getByTestId("poc-run-records-table");
+    await expect(owners.getByRole("columnheader")).toHaveText(["Name", "Role"]);
+    await expect(owners.locator("tbody tr")).toHaveCount(2);
+    // A shape with no plain reading is behind its disclosure, not JSON on the page.
+    const raw = record.locator('[data-field="notes"]');
+    await expect(raw.getByText("Näytä raakadata")).toBeVisible();
+    await expect(raw.locator("pre")).toBeHidden();
+
+    // Nothing scrolls inside the page's own scroll.
+    const boxes = await record.evaluate(
+      (el) =>
+        [...el.querySelectorAll("*")].filter((n) =>
+          /auto|scroll/.test(getComputedStyle(n).overflowX + getComputedStyle(n).overflowY),
+        ).length,
+    );
+    expect(boxes).toBe(0);
+
+    // On a phone the label is above its value and nothing is cut off sideways.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const label = (await first.locator("dt").nth(1).boundingBox())!;
+    const value = (await summary.boundingBox())!;
+    expect(label.y + label.height).toBeLessThanOrEqual(value.y + 1);
+    expect(value.width).toBeGreaterThan(220);
+    for (const ref of await refs.all()) {
+      const box = (await ref.boundingBox())!;
+      expect(box.x + box.width).toBeLessThanOrEqual(390);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  test("a failed grounding check lists the values it names, as the cases view does", async ({ page }) => {
+    await openMinutes(page, {
+      passed: false,
+      hallucination_flags: [
+        { field: "discussion_summaries.0.agenda_item", value: "Pilot scope", reason: "Not in the source." },
+        { field: "attendees", value: "['Aino Virtanen', 'Mikael Lahti']", reason: "" },
+        { field: "follow_up", value: "None", reason: "" },
+        { field: "recorded", value: "True", reason: "" },
+      ],
+    });
+    const grounding = page.getByTestId("poc-run-grounding");
+    await expect(grounding).toContainText("Lähdetarkistus: mahdollisia keksittyjä arvoja");
+    const flags = grounding.getByTestId("poc-run-grounding-flags").locator(":scope > li");
+    await expect(flags).toHaveText([
+      "Discussion summaries › 1 › Agenda item: Pilot scopeNot in the source.",
+      "Attendees: Aino VirtanenMikael Lahti",
+      "Follow up: —",
+      "Recorded: Kyllä",
+    ]);
+    await expect(grounding).toContainText("Tarkista nämä arvot lähteestä ennen kuin käytät tulosta.");
+  });
+
+  test("a failed grounding check that names no values is one line that says what to do", async ({ page }) => {
+    await openMinutes(page, { passed: false });
+    const grounding = page.getByTestId("poc-run-grounding");
+    await expect(grounding).toHaveText(
+      "Lähdetarkistus: mahdollisia keksittyjä arvoja. Tarkista tulos lähteestä ennen kuin käytät sitä.",
+    );
+    await expect(grounding.locator("p")).toHaveCount(1);
+    await expect(page.getByTestId("poc-run-grounding-flags")).toHaveCount(0);
   });
 
   test("the output files are listed once, each with its download and its text", async ({ page }) => {
@@ -543,8 +694,16 @@ test.describe("PoC tab", () => {
     await expect(page.getByTestId("poc-run-table")).toHaveCount(0);
     const record = page.getByTestId("poc-run-record");
     await expect(record).toHaveCount(1);
-    await expect(record.getByRole("row", { name: /Paid/ })).toContainText("Ei");
-    await expect(record.getByRole("row", { name: /Confidence/ })).toContainText("71 %");
+    await expect(record.locator("[data-field] dt")).toHaveText([
+      "Supplier",
+      "Invoice number",
+      "Total amount",
+      "Paid",
+      "Confidence",
+      "Needs review",
+    ]);
+    await expect(record.locator('[data-field="paid"] dd')).toHaveText("Ei");
+    await expect(record.locator('[data-field="confidence"] dd')).toHaveText("71 %");
   });
 
   test("a list of decisions with their sources is a table, and trying the solution sits with the steps", async ({
@@ -564,10 +723,15 @@ test.describe("PoC tab", () => {
     await runTest(page);
 
     // One list inside each row used to turn the whole field back into JSON.
-    const decisions = page.getByTestId("poc-run-record").getByRole("row", { name: /Decisions/ }).first();
-    await expect(decisions).toContainText("Citations");
-    await expect(decisions).toContainText("meeting.wav, agenda.pdf|2");
+    const decisions = page.getByTestId("poc-run-record").locator('[data-field="decisions"]');
+    await expect(decisions.locator("dt").first()).toHaveText("Decisions");
+    const table = decisions.getByTestId("poc-run-records-table");
+    await expect(table.getByRole("columnheader")).toHaveText(["Decision id", "Statement", "Citations"]);
+    // A row's sources are lines in its cell; one that names a page reads as the file and the page.
+    const sources = table.locator("tbody tr").first().getByRole("cell").last();
+    await expect(sources.getByRole("listitem")).toHaveText(["meeting.wav", "agenda.pdfs. 2"]);
     await expect(decisions).not.toContainText("{");
+    await expect(decisions).not.toContainText("|");
     // The fourth step is with the other three, not under the result.
     await expect(page.getByTestId("poc-open-cases")).toBeInViewport();
     // The three finished set-up steps are one line; they open on request.
