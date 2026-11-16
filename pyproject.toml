@@ -474,6 +474,7 @@ all-cpu = [
     "gaik[web-scraper]",
     "gaik[fields-to-docx]",
     "gaik[operations]",
+    "gaik[mcp]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")
