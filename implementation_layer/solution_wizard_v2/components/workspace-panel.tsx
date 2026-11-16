@@ -41,7 +41,14 @@ import { isSandboxBusy, preflightRetryDelayMs, retryAfterMs } from "@/lib/sandbo
 import { autoRunDecision, userInputs, type PocInputFile } from "@/lib/poc-auto-run";
 import { sourceTraceIn, sourcesForField } from "@/lib/poc-source-trace";
 import { CHAT_REPLYING_EVENT, WORKSPACE_SHOW_EVENT, type WorkspacePlace } from "@/lib/chat-events";
-import { publishResultStale, resultIsStale, runWarnings, type RunWarning } from "@/lib/poc-result-state";
+import {
+  handoverState,
+  publishResultStale,
+  publishRunWarnings,
+  resultIsStale,
+  runWarnings,
+  type RunWarning,
+} from "@/lib/poc-result-state";
 import { FieldSources } from "@/components/poc-field-sources";
 import type { Dict } from "@/lib/i18n";
 import {
@@ -166,6 +173,7 @@ function StepCard({
   title,
   status,
   done = false,
+  attention = false,
   muted = false,
   actions,
   testId,
@@ -176,6 +184,8 @@ function StepCard({
   status?: ReactNode;
   /** Ticked when the step's result exists; a step without one stays numbered. */
   done?: boolean;
+  /** The step's result is there and asks to be looked at: marked so, not ticked. */
+  attention?: boolean;
   /** A step that cannot be taken yet. */
   muted?: boolean;
   actions?: ReactNode;
@@ -192,11 +202,16 @@ function StepCard({
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3">
         <span
           className={`mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-            done ? "bg-brand text-on-brand" : "border border-border-strong text-text-secondary"
+            attention
+              ? "bg-warning-bg text-warning-text"
+              : done
+                ? "bg-brand text-on-brand"
+                : "border border-border-strong text-text-secondary"
           }`}
+          data-mark={attention ? "attention" : done ? "done" : "number"}
           aria-hidden
         >
-          {done ? <Icon name="check" size={13} /> : n}
+          {attention ? <Icon name="circleAlert" size={16} /> : done ? <Icon name="check" size={13} /> : n}
         </span>
         <div className="min-w-[12rem] flex-1">
           <h3 className="text-sm font-semibold text-text">{title}</h3>
@@ -648,6 +663,7 @@ export function WorkspacePanel({
   blueprint: initialBlueprint,
   blueprintVersion = null,
   hasSuccessfulRun = false,
+  handoverInBanner = false,
   latestRun = null,
   wizardReplying: replyingAtLoad = false,
   reopenedAt = null,
@@ -665,6 +681,12 @@ export function WorkspacePanel({
   blueprintVersion?: number | null;
   /** wizard_api has recorded a successful sandbox run (#143); opens the deployable download. */
   hasSuccessfulRun?: boolean;
+  /**
+   * The page shows the finished solution's banner with its two actions, trying
+   * the solution and taking the package, over the workspace and in view while
+   * it scrolls: the PoC tab does not offer the same two a second time.
+   */
+  handoverInBanner?: boolean;
   /** The wizard is replying as the page loads (a reload mid-reply). */
   wizardReplying?: boolean;
   /** A gate is reopened and still waits; the value tells one reopening from the next. */
@@ -1545,6 +1567,13 @@ export function WorkspacePanel({
   }, [sessionId, resultStale, digestsRead]);
   useEffect(() => () => publishResultStale(sessionId, false), [sessionId]);
   const hasRunWarnings = runWarningList.length > 0;
+  // The run in view succeeded and said what to check: the last step and the
+  // finished solution's banner (drawn by the page) do not call it a success.
+  const shownRunHasWarnings = hasRunWarnings && runPhase === "succeeded";
+  useEffect(() => {
+    publishRunWarnings(sessionId, shownRunHasWarnings);
+  }, [sessionId, shownRunHasWarnings]);
+  useEffect(() => () => publishRunWarnings(sessionId, false), [sessionId]);
 
   const RUN_PHASE_LABEL: Record<RunPhase, string> = {
     idle: "",
@@ -2397,30 +2426,44 @@ export function WorkspacePanel({
   );
 
   // 4 · The hand-over (#143): wizard_api serves the deployable zip only
-  // after a run it recorded as successful.
+  // after a run it recorded as successful. A run that finished with warnings
+  // is not called a success here either: the step says what to do about it,
+  // and trying the solution comes before taking the package (which stays
+  // possible: warnings inform, they do not block).
+  const handover = handoverState({ packageReady: pocReady, runRecorded, shownRunHasWarnings });
   const useCard = (
     <StepCard
       n={4}
       title={t.pocStepUse}
       done={pocReady && runRecorded}
+      attention={handover === "check"}
       muted={!pocReady}
-      status={!pocReady ? t.pocNeedsPackage : runRecorded ? t.pocUseReady : t.pocDeployableHint}
+      testId="poc-step-use"
+      status={
+        <span data-testid="poc-use-status">
+          {
+            {
+              no_package: t.pocNeedsPackage,
+              locked: t.pocDeployableHint,
+              check: t.pocUseCheck,
+              ready: t.pocUseReady,
+            }[handover]
+          }
+        </span>
+      }
     >
-      {pocReady && (
+      {pocReady && !handoverInBanner && (
         <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
           <a
             href={`/sessions/${sessionId}/cases`}
-            // In its own tab: the session, and a chat reply that may be on its
-            // way, stay open here while the solution is tried there.
-            target="_blank"
-            rel="noopener"
-            className="btn-secondary"
+            // In place, as the finished solution's banner opens it: the
+            // cases page's heading leads back to this tab.
+            className={handover === "check" ? "btn-brand" : "btn-secondary"}
             title={t.pocOpenCasesHint}
             data-testid="poc-open-cases"
           >
             <Icon name="users" size={16} />
             {t.pocOpenCases}
-            <Icon name="externalLink" size={14} className="text-text-muted" />
           </a>
           {runRecorded ? (
             <a
@@ -2449,6 +2492,34 @@ export function WorkspacePanel({
     </StepCard>
   );
 
+  // The package's row in the finished run's card.
+  const deployableRow = (
+    <li>
+      {runRecorded ? (
+        <a
+          href={`/api/sessions/${sessionId}/poc/deployable`}
+          download
+          className={NEXT_ROW}
+          data-testid="poc-deployable"
+        >
+          <Icon name="download" size={16} className="text-text-muted" />
+          <span className="min-w-0 flex-1">{t.pocDeployable}</span>
+        </a>
+      ) : (
+        <button
+          type="button"
+          disabled
+          title={t.pocDeployableHint}
+          className={`${NEXT_ROW} disabled:cursor-not-allowed disabled:opacity-60`}
+          data-testid="poc-deployable"
+        >
+          <Icon name="lock" size={16} className="text-text-muted" />
+          <span className="min-w-0 flex-1">{t.pocDeployable}</span>
+        </button>
+      )}
+    </li>
+  );
+
   // The finished run's card (see setupDone above).
   const setupSummary = setupDone && (
     <section className="rounded-lg border border-border bg-surface" data-testid="poc-setup-summary">
@@ -2456,10 +2527,10 @@ export function WorkspacePanel({
         <span
           aria-hidden
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-            hasRunWarnings ? "bg-warning-bg text-warning-text" : "bg-success-bg text-success-text"
+            shownRunHasWarnings ? "bg-warning-bg text-warning-text" : "bg-success-bg text-success-text"
           }`}
         >
-          <Icon name={hasRunWarnings ? "circleAlert" : "circleCheck"} size={20} />
+          <Icon name={shownRunHasWarnings ? "circleAlert" : "circleCheck"} size={20} />
         </span>
         <div className="min-w-0 flex-1">
           <h3
@@ -2488,48 +2559,28 @@ export function WorkspacePanel({
         </div>
       </div>
       {/* What to do with it, one row each; the approval itself is the bar
-          under the workspace. */}
+          under the workspace. Once the solution is finished its banner has
+          the first two, and running again is the row that is left. */}
+      {(!handoverInBanner || setupFolded) && (
       <ul className="divide-y divide-border border-t border-border">
+        {!handoverInBanner && (
         <li>
           <a
             href={`/sessions/${sessionId}/cases`}
-            // In its own tab: the session, and a chat reply that may be on its
-            // way, stay open here while the solution is tried there.
-            target="_blank"
-            rel="noopener"
+            // In place, as the finished solution's banner opens it: the
+            // cases page's heading leads back to this tab.
             className={NEXT_ROW}
             title={t.pocOpenCasesHint}
             data-testid="poc-open-cases"
           >
             <Icon name="users" size={16} className="text-text-muted" />
             <span className="min-w-0 flex-1">{t.pocOpenCases}</span>
-            <Icon name="externalLink" size={14} className="text-text-muted" />
           </a>
         </li>
-        <li>
-          {runRecorded ? (
-            <a
-              href={`/api/sessions/${sessionId}/poc/deployable`}
-              download
-              className={NEXT_ROW}
-              data-testid="poc-deployable"
-            >
-              <Icon name="download" size={16} className="text-text-muted" />
-              <span className="min-w-0 flex-1">{t.pocDeployable}</span>
-            </a>
-          ) : (
-            <button
-              type="button"
-              disabled
-              title={t.pocDeployableHint}
-              className={`${NEXT_ROW} disabled:cursor-not-allowed disabled:opacity-60`}
-              data-testid="poc-deployable"
-            >
-              <Icon name="lock" size={16} className="text-text-muted" />
-              <span className="min-w-0 flex-1">{t.pocDeployable}</span>
-            </button>
-          )}
-        </li>
+        )}
+        {/* After a run with warnings the package comes last: trying the
+            solution and running again are what the result asks for first. */}
+        {!shownRunHasWarnings && !handoverInBanner && deployableRow}
         {setupFolded && (
           <li>
             <button
@@ -2548,7 +2599,9 @@ export function WorkspacePanel({
             </button>
           </li>
         )}
+        {shownRunHasWarnings && !handoverInBanner && deployableRow}
       </ul>
+      )}
       <div className="border-t border-border px-2.5 py-1.5">
         <button
           type="button"

@@ -429,7 +429,9 @@ export function SolutionPlanView({
           className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-text-muted"
           data-testid="plan-preparing"
         >
-          {t.planPreparing}
+          {/* Under output fields that are already listed, only the steps are
+              still to come: "the structure" read as if nothing were there. */}
+          {outputFields.length > 0 ? t.planPreparingSteps : t.planPreparing}
         </p>
       ) : blueprint.steps.length === 0 ? (
         <p className="text-sm text-text-muted">{t.planEmptySteps}</p>

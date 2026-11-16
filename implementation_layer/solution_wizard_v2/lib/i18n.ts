@@ -128,6 +128,8 @@ export type Dict = {
   planEditBlueprint: string;
   /** In the steps' place while the blueprint is still the draft a new session starts with. */
   planPreparing: string;
+  /** In its place once the output fields are listed above it: only the steps are still to come. */
+  planPreparingSteps: string;
   /** Title of a step's drag handle while there is nothing to reorder. */
   wsFormDragOnly: string;
   /** A business-context item the wizard has not recorded: the control, its name ({item}), the field and the message prefix ({field}). */
@@ -487,6 +489,8 @@ export type Dict = {
   /** A step that opens only once the package exists. */
   pocNeedsPackage: string;
   pocUseReady: string;
+  /** In place of pocUseReady when the run in view finished with warnings. */
+  pocUseCheck: string;
   pocDownloadHint: string;
   /** "{n} riviä": length of the run log behind its disclosure. */
   pocLogLines: string;
@@ -596,6 +600,8 @@ export type Dict = {
   solutionDoneTitle: string;
   /** Beside the download: what the package leaves out. */
   solutionDone: string;
+  /** Before it, when the run the workspace shows finished with warnings. */
+  solutionDoneWarnings: string;
   solutionDoneDownload: string;
   solutionDoneNoRun: string;
   /** Beside the download: the case view, where the solution is tried on own material. */
@@ -821,6 +827,7 @@ const fi: Dict = {
   planEdit: "Muokkaa",
   planEditBlueprint: "Muokkaa blueprintia",
   planPreparing: "Wizard valmistelee ratkaisun rakennetta. Se näkyy tässä, kun se on valmis.",
+  planPreparingSteps: "Wizard valmistelee ratkaisun vaiheita. Ne näkyvät tässä, kun ne ovat valmiit.",
   wsFormDragOnly: "Järjestystä voi muuttaa, kun vaiheita on vähintään kaksi",
   bcAdd: "Lisää",
   bcAddItem: "Lisää: {item}",
@@ -1151,6 +1158,7 @@ const fi: Dict = {
   pocRunSandboxHint: "Generoi paketti ensin.",
   pocNeedsPackage: "Avautuu, kun paketti on generoitu.",
   pocUseReady: "Testiajo onnistui: kokeile ratkaisua omilla tapauksilla tai lataa paketti käyttöönottoon.",
+  pocUseCheck: "Testiajossa jäi tarkistettavaa: katso tulos ja kokeile sitten omilla tapauksilla tai aja uudelleen.",
   pocDownloadHint: "Paketti esimerkkisyötteineen omalle koneelle ajettavaksi.",
   pocLogLines: "{n} riviä",
   pocSuccess: "Onnistui",
@@ -1266,6 +1274,7 @@ const fi: Dict = {
     "Kerro chatissa, mitä haluat ratkaista. Wizard kysyy tarkentavat kysymykset ja täyttää vastauksistasi alla olevan listan. Kun lista on valmis, siirryt Gate 1 -tarkistukseen.",
   solutionDoneTitle: "Ratkaisu on valmis",
   solutionDone: "Paketissa ei ole syöteaineistoa eikä ajon tuloksia.",
+  solutionDoneWarnings: "Viimeisessä testiajossa jäi tarkistettavaa.",
   solutionDoneDownload: "Lataa paketti",
   solutionDoneNoRun: "Paketti avautuu PoC-välilehdellä, kun sandbox-ajo on onnistunut.",
   solutionDoneTry: "Kokeile omilla tapauksilla",
@@ -1567,6 +1576,7 @@ const en: Dict = {
   planEdit: "Edit",
   planEditBlueprint: "Edit blueprint",
   planPreparing: "The wizard is preparing the solution's structure. It appears here when it is ready.",
+  planPreparingSteps: "The wizard is preparing the solution's steps. They appear here when ready.",
   wsFormDragOnly: "The order can be changed once there are two steps",
   bcAdd: "Add",
   bcAddItem: "Add: {item}",
@@ -1896,6 +1906,7 @@ const en: Dict = {
   pocRunSandboxHint: "Generate the package first.",
   pocNeedsPackage: "Opens once the package is generated.",
   pocUseReady: "The test run succeeded: try the solution on your own cases or download the package for deployment.",
+  pocUseCheck: "The test run left things to check: look at the result, then try your own cases or run again.",
   pocDownloadHint: "The package with its sample input, to run on your own machine.",
   pocLogLines: "{n} lines",
   pocSuccess: "Success",
@@ -2011,6 +2022,7 @@ const en: Dict = {
     "Tell the wizard in the chat what you want to solve. It asks follow-up questions and fills in the list below from your answers. When the list is complete, you move on to the Gate 1 review.",
   solutionDoneTitle: "The solution is done",
   solutionDone: "The package has no input data or run results.",
+  solutionDoneWarnings: "The last test run had things to check.",
   solutionDoneDownload: "Download package",
   solutionDoneNoRun: "The package opens on the PoC tab once a sandbox run has succeeded.",
   solutionDoneTry: "Try your own cases",

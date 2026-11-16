@@ -2,12 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   gate3Waits,
+  handoverState,
   packageChangedSinceRun,
   packageReadFor,
   publishResultStale,
+  publishRunWarnings,
   resultIsStale,
   resultStaleFor,
   runWarnings,
+  runWarningsFor,
   subscribeResultStale,
 } from "@/lib/poc-result-state";
 
@@ -135,6 +138,50 @@ describe("runWarnings", () => {
     expect(runWarnings({ warnings: [{ code: "x" }, { message: "  " }, null, { message: "Check the dates." }] })).toEqual([
       { code: "", message: "Check the dates.", records: [] },
     ]);
+  });
+});
+
+describe("handoverState", () => {
+  const recorded = { packageReady: true, runRecorded: true, shownRunHasWarnings: false };
+
+  it("is ready after a recorded run with nothing to check", () => {
+    expect(handoverState(recorded)).toBe("ready");
+  });
+
+  it("asks to check the result when the run in view finished with warnings", () => {
+    expect(handoverState({ ...recorded, shownRunHasWarnings: true })).toBe("check");
+  });
+
+  it("stays locked until a run is recorded, whatever the run in view said", () => {
+    expect(handoverState({ ...recorded, runRecorded: false })).toBe("locked");
+    expect(handoverState({ ...recorded, runRecorded: false, shownRunHasWarnings: true })).toBe("locked");
+  });
+
+  it("has nothing to hand over without a package", () => {
+    expect(handoverState({ packageReady: false, runRecorded: true, shownRunHasWarnings: true })).toBe("no_package");
+  });
+});
+
+describe("the run's warnings between the workspace and the finished solution's banner", () => {
+  // The workspace sends the false as it unmounts (workspace-panel); this pins
+  // what the store does with it, not that the workspace sends it.
+  it("are kept per session, told once per change and cleared by a false", () => {
+    const listener = vi.fn();
+    const stop = subscribeResultStale(listener);
+    expect(runWarningsFor("s1")).toBe(false);
+
+    publishRunWarnings("s1", true);
+    publishRunWarnings("s1", true);
+    expect(runWarningsFor("s1")).toBe(true);
+    expect(runWarningsFor("s2")).toBe(false);
+    // The stale word is another matter.
+    expect(resultStaleFor("s1")).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    publishRunWarnings("s1", false);
+    expect(runWarningsFor("s1")).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(2);
+    stop();
   });
 });
 

@@ -14,6 +14,7 @@ import { Gate1MissingForm } from "@/components/gate1-missing-form";
 import { GatheringView } from "@/components/gathering-view";
 import { ForgetWizardRelease, ReleaseWizardWhenDone } from "@/components/release-wizard";
 import { ShowInWorkspaceButton } from "@/components/show-in-workspace-button";
+import { SolutionDoneBanner } from "@/components/solution-done-banner";
 import { FieldSchemaEditor } from "@/components/field-schema-editor";
 import { fieldSpecsFromTargetOutput } from "@/lib/target-output-spec";
 import { getSessionForUser } from "@/lib/session-access";
@@ -287,44 +288,26 @@ export default async function SessionPage({
 
           {/* The finished solution is said where the eye lands first: the
               heading, the two things to do with it on one line, and beside
-              the download what the package leaves out. Without a run there is
-              no package to take yet, and the line says how to get one. */}
+              them what the package leaves out. Without a run there is no
+              package to take yet, and the line says how to get one. The
+              banner draws itself: it follows what the workspace finds in the
+              run it shows (components/solution-done-banner). */}
           {solutionDone && (
-            <section
-              role="status"
-              aria-labelledby="solution-done-title"
-              data-testid="solution-done"
-              className="mx-4 mt-4 shrink-0 rounded-lg border border-success-border bg-success-bg px-4 py-3 sm:mx-6"
+            <SolutionDoneBanner
+              sessionId={session.id}
+              hasRun={Boolean(session.lastSuccessfulRun)}
+              labels={{
+                title: t.solutionDoneTitle,
+                download: t.solutionDoneDownload,
+                tryCases: t.solutionDoneTry,
+                packageLine: t.solutionDone,
+                warningsLine: t.solutionDoneWarnings,
+                noRun: t.solutionDoneNoRun,
+              }}
             >
-              <h3
-                id="solution-done-title"
-                className="flex items-center gap-2 text-sm font-semibold text-text"
-              >
-                <Icon name="circleCheck" size={18} className="shrink-0 text-success-text" />
-                {t.solutionDoneTitle}
-              </h3>
-              {session.lastSuccessfulRun ? (
-                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <a
-                    href={`/api/sessions/${session.id}/poc/deployable`}
-                    download
-                    className="btn-brand"
-                  >
-                    <Icon name="download" size={16} />
-                    {t.solutionDoneDownload}
-                  </a>
-                  <a href={`/sessions/${session.id}/cases`} className="btn-secondary">
-                    <Icon name="users" size={16} />
-                    {t.solutionDoneTry}
-                  </a>
-                  <p className="text-xs text-text-secondary">{t.solutionDone}</p>
-                </div>
-              ) : (
-                <p className="mt-1 text-sm text-text-secondary">{t.solutionDoneNoRun}</p>
-              )}
               {/* The wizard held for the session is released by the page. */}
               <ReleaseWizardWhenDone sessionId={session.id} replyAhead={replyAhead} />
-            </section>
+            </SolutionDoneBanner>
           )}
 
           {/* Why the step line and the gates went back: read before the
@@ -376,6 +359,8 @@ export default async function SessionPage({
                 blueprint={session.blueprint}
                 blueprintVersion={session.activeVersion}
                 hasSuccessfulRun={Boolean(session.lastSuccessfulRun)}
+                // The banner above offers its two actions exactly then.
+                handoverInBanner={solutionDone && Boolean(session.lastSuccessfulRun)}
                 latestRun={session.latestRun ?? null}
                 wizardReplying={Boolean(session.pendingTurn)}
                 reopenedAt={reopened ? (reopened.at ?? `gate-${reopened.gate}`) : null}

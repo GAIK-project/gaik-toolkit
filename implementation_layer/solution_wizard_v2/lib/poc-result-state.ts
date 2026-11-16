@@ -113,13 +113,57 @@ export function runWarnings(raw: unknown): RunWarning[] {
   return warnings;
 }
 
+/**
+ * What the PoC tab's last step ("use the solution") is about:
+ *
+ * - `no_package`: there is nothing to use yet;
+ * - `locked`: a package, and no run recorded as successful for it;
+ * - `check`: a run is recorded and the run in view finished with warnings, so
+ *   the step does not call it a success and the download is not its first action;
+ * - `ready`: a run is recorded and nothing in view says to check it.
+ *
+ * Warnings inform, they do not block: the download is there in `check` too.
+ */
+export type HandoverState = "no_package" | "locked" | "check" | "ready";
+
+export function handoverState(input: {
+  packageReady: boolean;
+  /** wizard_api has a successful run on record. */
+  runRecorded: boolean;
+  /** The run in view succeeded and its output answer carried warnings. */
+  shownRunHasWarnings: boolean;
+}): HandoverState {
+  if (!input.packageReady) return "no_package";
+  if (!input.runRecorded) return "locked";
+  return input.shownRunHasWarnings ? "check" : "ready";
+}
+
 // The PoC tab knows whether the result is stale; the gate's approve buttons
 // (the bar under the workspace, the one under the wizard's reply) are drawn
 // elsewhere on the page. The tab says it here and they read it, whichever of
 // them is drawn first.
 const staleBySession = new Map<string, boolean>();
 const packageReadBySession = new Map<string, boolean>();
+const warningsBySession = new Map<string, boolean>();
 const listeners = new Set<() => void>();
+
+/**
+ * The workspace's word on the run it shows: it succeeded and its output answer
+ * carried warnings. The session page has the run's id and not its output, so
+ * the finished solution's banner reads this instead of asking for the output
+ * a second time. False when the workspace goes away.
+ */
+export function publishRunWarnings(sessionId: string, hasWarnings: boolean): void {
+  if ((warningsBySession.get(sessionId) ?? false) === hasWarnings) return;
+  if (hasWarnings) warningsBySession.set(sessionId, true);
+  else warningsBySession.delete(sessionId);
+  for (const listener of listeners) listener();
+}
+
+/** Whether the run the workspace shows finished with warnings; told through subscribeResultStale. */
+export function runWarningsFor(sessionId: string): boolean {
+  return warningsBySession.get(sessionId) ?? false;
+}
 
 /**
  * The PoC tab's word on its result; false when the tab goes away.
