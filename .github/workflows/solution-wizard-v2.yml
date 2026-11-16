@@ -13,6 +13,7 @@ on:
       - "implementation_layer/unit_tests/test_sandbox_network_policy.py"
       - ".github/workflows/solution-wizard-v2.yml"
       - ".github/security/**"
+      - ".github/scripts/**"
       # The deploy gate reads this workflow's check runs; a change to the deploy
       # workflow alone must still get them, or that commit cannot be deployed.
       - ".github/workflows/wizard-v2-deploy.yml"
@@ -28,6 +29,7 @@ on:
       - "implementation_layer/unit_tests/test_sandbox_network_policy.py"
       - ".github/workflows/solution-wizard-v2.yml"
       - ".github/security/**"
+      - ".github/scripts/**"
       # The deploy gate reads this workflow's check runs; a change to the deploy
       # workflow alone must still get them, or that commit cannot be deployed.
       - ".github/workflows/wizard-v2-deploy.yml"
@@ -71,7 +73,10 @@ jobs:
         env:
           WIZARD_DATABASE_URL: postgresql+psycopg://wizard:wizard@localhost:5432/wizard
           WIZARD_SESSION_OUTPUT_ROOT: /tmp/wizard-sessions-ci
-        run: pytest -v
+        run: pytest -v --junitxml="$RUNNER_TEMP/junit/wizard-api.xml"
+      - name: Test report (wizard_api)
+        if: always()
+        run: python .github/scripts/junit_summary.py "wizard_api unit tests" "$RUNNER_TEMP/junit/wizard-api.xml"
 
   solution-wizard:
     runs-on: ubuntu-latest
@@ -99,6 +104,7 @@ jobs:
         working-directory: implementation_layer/solution_wizard
         run: >-
           pytest -q
+          --junitxml="$RUNNER_TEMP/junit/solution-wizard.xml"
           --ignore=tests/test_decimal_schema_persistence.py
           --ignore=tests/test_generate_schema_cli.py
           --ignore=tests/test_pipeline_composite_loading.py
@@ -106,6 +112,9 @@ jobs:
           --deselect=implementation_layer/solution_wizard/tests/test_source_tracing.py::test_registry_entry_points_at_real_files_and_a_real_extra
           --deselect=implementation_layer/solution_wizard/tests/test_source_tracing.py::test_card_recipe_matches_the_real_api
           --deselect=implementation_layer/solution_wizard/tests/test_source_tracing.py::test_card_options_are_real_parameters
+      - name: Test report (solution_wizard)
+        if: always()
+        run: python .github/scripts/junit_summary.py "solution_wizard unit tests" "$RUNNER_TEMP/junit/solution-wizard.xml"
 
   solution-wizard-v2:
     runs-on: ubuntu-latest
@@ -131,7 +140,13 @@ jobs:
 
       - name: Unit tests (vitest)
         working-directory: implementation_layer/solution_wizard_v2
-        run: npm run test
+        run: >-
+          npm run test --
+          --reporter=default --reporter=junit
+          --outputFile.junit="$RUNNER_TEMP/junit/web-app.xml"
+      - name: Test report (web app)
+        if: always()
+        run: python .github/scripts/junit_summary.py "Web app unit tests (vitest)" "$RUNNER_TEMP/junit/web-app.xml"
       - name: ESLint
         working-directory: implementation_layer/solution_wizard_v2
         run: npm run lint
@@ -181,9 +196,13 @@ jobs:
       - name: Pytest deploy manifests and scripts
         run: >-
           pytest -q
+          --junitxml="$RUNNER_TEMP/junit/deploy-manifests.xml"
           implementation_layer/unit_tests/test_sandbox_job_manifest.py
           implementation_layer/unit_tests/test_deploy_instances.py
           implementation_layer/unit_tests/test_sandbox_network_policy.py
+      - name: Test report (deploy manifests)
+        if: always()
+        run: python .github/scripts/junit_summary.py "Deploy manifest tests" "$RUNNER_TEMP/junit/deploy-manifests.xml"
 
   # Known vulnerabilities in what the images install, and misconfigurations in
   # the Dockerfiles and OpenShift manifests. The policy (fail on high/critical
