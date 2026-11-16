@@ -63,6 +63,7 @@ import {
   Headset,
   House,
   Lightbulb,
+  LogIn,
   LogOut,
   LucideIcon,
   Menu,
@@ -866,7 +867,7 @@ function MobileNav({
           <div className="px-2">
             <GitHubLink preview={githubPreview} variant="mobile" />
           </div>
-          {isLoggedIn && (
+          {isLoggedIn ? (
             <div className="px-2">
               <button
                 type="button"
@@ -876,6 +877,16 @@ function MobileNav({
                 <LogOut className="h-5 w-5" />
                 Sign out
               </button>
+            </div>
+          ) : (
+            <div className="px-2">
+              <Link
+                href="/sign-in"
+                className="text-foreground hover:bg-muted flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
+              >
+                <LogIn className="h-5 w-5" />
+                Sign in
+              </Link>
             </div>
           )}
         </nav>
@@ -1035,7 +1046,7 @@ export function SiteNav({
             preview={mounted ? githubPreview : null}
             variant="desktop"
           />
-          {isLoggedIn && (
+          {isLoggedIn ? (
             <Button
               variant="ghost"
               size="sm"
@@ -1045,6 +1056,11 @@ export function SiteNav({
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />
+            </Button>
+          ) : (
+            // Demos run only for a signed-in account, so say so where it shows.
+            <Button asChild size="sm">
+              <Link href="/sign-in">Sign in</Link>
             </Button>
           )}
           <MobileNav

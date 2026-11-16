@@ -11,9 +11,9 @@ except ImportError:
     from api.utils.model_settings import request_model_settings
 
 try:
-    from utils.model_settings import is_staff, server_models
+    from utils.model_settings import aitta_model_status, is_staff, server_models
 except ImportError:
-    from api.utils.model_settings import is_staff, server_models
+    from api.utils.model_settings import aitta_model_status, is_staff, server_models
 
 router = APIRouter()
 
@@ -26,6 +26,11 @@ async def list_server_models(request: Request):
     """
     staff = is_staff(request.scope)
     models = server_models()
+    aitta = (
+        await run_in_threadpool(aitta_model_status)
+        if any(m.provider == "aitta" for m in models)
+        else {}
+    )
     return {
         "default": models[0].id if models else None,
         "models": [
@@ -35,6 +40,10 @@ async def list_server_models(request: Request):
                 "model": m.model,
                 "label": m.label,
                 "audio": m.audio,
+                "vision": m.vision,
+                # Aitta only: "running", or "offline" for a model that starts on
+                # the first request (minutes). None when the catalog did not answer.
+                "status": aitta.get(m.model) if m.provider == "aitta" else None,
                 "staff": m.staff,
                 "allowed": staff or not m.staff,
             }

@@ -8,7 +8,11 @@ describe("modelLabel", () => {
     expect(modelLabel("gpt-5.4-mini")).toBe("GPT-5.4 Mini");
     expect(modelLabel("claude-haiku-5-5")).toBe("Claude Haiku 5.5");
     expect(modelLabel("gemini-3.8-flash")).toBe("Gemini 3.8 Flash");
-    expect(modelLabel("google/gemma-4-31b-it")).toBe("Gemma 4 31b It");
+    expect(modelLabel("google/gemma-4-31b-it")).toBe("Gemma 4 31B");
+    expect(modelLabel("openai/whisper-large-v3")).toBe(
+      "Whisper large v3 on CSC Aitta",
+    );
+    expect(modelLabel("mistralai/ministral-3-14b")).toBe("Ministral 3 14b");
     expect(modelLabel("whisper_local")).toBe("Whisper on GAIK's server");
     expect(modelLabel("gpt-4o-transcribe")).toBe("GPT-4o Transcribe");
     expect(modelLabel(null)).toBeNull();

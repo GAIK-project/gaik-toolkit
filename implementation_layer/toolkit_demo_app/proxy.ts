@@ -10,6 +10,7 @@ import {
   encodeModelSettings,
   parseModelSettingsHeader,
   supportsModelSettings,
+  supportsServerModel,
 } from "@/lib/model-settings";
 import {
   ADMIN_COOKIE_NAME,
@@ -181,7 +182,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
     if (
       !modelSettings &&
       isServerModelId(serverModel) &&
-      supportsModelSettings(pathname, request.method)
+      supportsServerModel(pathname, request.method)
     ) {
       headers.set(SERVER_MODEL_HEADER, serverModel);
     }
