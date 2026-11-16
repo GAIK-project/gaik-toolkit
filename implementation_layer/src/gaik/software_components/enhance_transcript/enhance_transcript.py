@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -14,6 +15,25 @@ from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import resolve_provider
+
+logger = logging.getLogger(__name__)
+
+
+def _was_cut_off(response: Any) -> bool:
+    """Whether a chat answer stopped at the token limit (OpenAI, Anthropic or Gemini)."""
+    if response is None:
+        return False
+    choices = getattr(response, "choices", None)
+    if choices:
+        return getattr(choices[0], "finish_reason", None) == "length"
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        return True
+    candidates = getattr(response, "candidates", None)
+    if candidates:
+        reason = getattr(candidates[0], "finish_reason", None)
+        return getattr(reason, "name", reason) == "MAX_TOKENS"
+    return False
+
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 """Optional callback for live pass-by-pass progress updates.
@@ -362,6 +382,11 @@ class TranscriptEnhancer:
             result = self.client.chat(
                 messages=messages, model=self.model, temperature=0.0, **extra_kwargs
             )
+            if _was_cut_off(result.raw):
+                logger.warning(
+                    "Enhanced transcript was cut off at the token limit; kept the input."
+                )
+                return fallback
             text = (result.text or "").strip()
             return text or fallback
         # OpenAI's typed overloads can't match a ``**dict[str, Any]`` splat, so
@@ -379,6 +404,10 @@ class TranscriptEnhancer:
     @staticmethod
     def _extract_response_text(response, fallback_text: str) -> str:
         if not response or not getattr(response, "choices", None):
+            return fallback_text
+
+        if _was_cut_off(response):
+            logger.warning("Enhanced transcript was cut off at the token limit; kept the input.")
             return fallback_text
 
         choice = response.choices[0]

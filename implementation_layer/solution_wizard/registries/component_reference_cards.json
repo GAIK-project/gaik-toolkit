@@ -25,7 +25,7 @@
         "name": "language",
         "type": "str",
         "default": "auto",
-        "effect": "ISO 639-1 language code (or 'auto').",
+        "effect": "Two-letter ISO 639-1 code (or 'auto'). Sent to every cloud transcription request (single and chunked) and to whisper_local; 'auto' sends none, so the provider detects it. Any other value raises ValueError for cloud models before a request is made.",
         "selection_relevant": false,
         "infer_from": "technical_spec.language"
       },
