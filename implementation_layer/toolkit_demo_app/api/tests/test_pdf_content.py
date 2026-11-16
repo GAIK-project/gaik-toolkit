@@ -284,6 +284,39 @@ def test_page_text_across_the_edge_of_a_scan_window_passes(monkeypatch, shift):
     check(_pdf(objects=_stream(6, b"", content)))
 
 
+@pytest.mark.parametrize("gap", [0, 1, 40, 63, 64, 65, 120, 3000])
+@pytest.mark.parametrize(
+    "first, rest",
+    [
+        (b"/S", b"/JavaScript"),
+        (b"/S", b"/Launch"),
+        (b"/JS", b"12 0 R"),
+        (b"/JavaScript", b"7 0 R"),
+        (b"/Subtype", b"/RichMedia"),
+    ],
+)
+@pytest.mark.parametrize("shift", [0, 17, 40])
+def test_a_finding_is_found_whatever_its_gap_and_place_in_a_window(
+    monkeypatch, gap, first, rest, shift
+):
+    monkeypatch.setattr(pdf_content, "SCAN_WINDOW", 64)
+    names = b"/S /P " * 20  # names that begin no finding, before it
+    gap = max(gap, rest[:1].isdigit())  # "/JS12" would be another name
+    action = b"4 0 obj\n<< " + names + b" " * shift + first + b"\n" * gap + rest + b" >>\nendobj\n"
+    with pytest.raises(ActiveContentError):
+        check(_pdf(objects=action))
+
+
+def test_a_window_of_names_that_begin_nothing_is_not_read_name_by_name(monkeypatch):
+    calls: list[int] = []
+    real = pdf_content._match_at
+    monkeypatch.setattr(pdf_content, "_match_at", lambda *a: calls.append(1) or real(*a))
+    # A tagged document names a structure type for every element.
+    elements = b"<< /Type /StructElem /S /P /P 9 0 R /K 1 >>\n" * 20_000
+    check(_pdf(objects=_stream(6, b"/Filter /FlateDecode", zlib.compress(elements))))
+    assert calls == []
+
+
 def test_a_name_followed_by_a_long_gap_is_read_through_it(monkeypatch):
     monkeypatch.setattr(pdf_content, "MAX_GAP", 4096)
     action = b"4 0 obj\n<< /S" + b"\n" * 4000 + b"/JavaScript >>\nendobj\n"

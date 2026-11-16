@@ -179,6 +179,14 @@ _BY_NAME = {
 _CANDIDATE_OVERLAP = 16
 _GAP = re.compile(rb"[\x00\t\n\x0c\r 0-9]*+")
 _TAIL = 16
+# A quick look at a window before its names are read one at a time (``_quiet``):
+# any finding, and a first name followed by a gap longer than the look reads.
+_ANY_FINDING = re.compile(b"|".join(b"(?:" + p.pattern + b")" for p, _ in _FINDINGS))
+_QUICK_GAP = 64
+_LONG_GAP = re.compile(_CANDIDATE.pattern + rb"[\x00\t\n\x0c\r 0-9]{" + b"%d" % _QUICK_GAP + rb"}")
+#: How far past a window the quick look reads: the longest first name, a gap
+#: shorter than ``_QUICK_GAP``, and the rest of a finding after its gap.
+_QUICK_REACH = len(b"/JavaScript") + _QUICK_GAP + _TAIL + 1
 
 _HEX_ESCAPE = re.compile(rb"#([0-9A-Fa-f]{2})")
 _STREAM = re.compile(rb"(?<!end)stream(?:\r\n|\n|\r)")
@@ -433,7 +441,7 @@ def _scan(text: bytes, work: _Budget) -> str | None:
         end = min(n, pos + SCAN_WINDOW)
         work.take(1 + (end - pos) // SCAN_BYTES)
         work.tick()
-        for m in _CANDIDATE.finditer(text, pos, end):
+        for m in () if _quiet(text, pos, end, work) else _CANDIDATE.finditer(text, pos, end):
             if m.end() == end < n:
                 break  # its end is the window's: read again with the next one
             if m.start() <= last:
@@ -448,6 +456,21 @@ def _scan(text: bytes, work: _Budget) -> str | None:
         # The next window overlaps this one, so a name across its end is read.
         pos = end - _CANDIDATE_OVERLAP
     return None
+
+
+def _quiet(text: bytes, pos: int, end: int, work: _Budget) -> bool:
+    """True when no name in ``text[pos:end]`` can begin a finding, so its names
+    need not be read one at a time: no finding begins there, and no first name
+    there is followed by more whitespace and digits than this look reads past
+    the window. Both searches run in C over the window and ``_QUICK_REACH``
+    bytes past it, and count as steps for the bytes they read."""
+    reach = min(len(text), end + _QUICK_REACH)
+    work.take(2 * ((reach - pos) // SCAN_BYTES))
+    found = _ANY_FINDING.search(text, pos, reach)
+    if found is not None and found.start() < end:
+        return False
+    long_gap = _LONG_GAP.search(text, pos, reach)
+    return long_gap is None or long_gap.start() >= end
 
 
 def _match_at(text: bytes, name: re.Match[bytes], work: _Budget) -> str | None:
