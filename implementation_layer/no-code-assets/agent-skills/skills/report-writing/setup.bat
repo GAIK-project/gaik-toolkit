@@ -184,7 +184,7 @@ ffmpeg -version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [INFO] FFmpeg not found.
     echo.
-    echo FFmpeg is optional but recommended for audio files larger than 25MB.
+    echo FFmpeg is optional but needed for audio files larger than 25 MB or longer than 20 minutes.
     echo Download from: https://ffmpeg.org/download.html
     echo.
 ) else (

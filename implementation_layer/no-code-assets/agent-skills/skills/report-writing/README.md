@@ -26,8 +26,8 @@ This skill helps you **create structured reports** from multiple sources without
 
 | Type | Formats |
 |------|---------|
-| Audio/Video | `.mp3`, `.m4a`, `.wav`, `.mp4`, `.mov`, `.avi`, and more |
-| Images | `.jpg`, `.png`, `.gif`, `.webp`, `.bmp`, `.tiff` |
+| Audio/Video | `.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`, `.webm`, `.mp4`, `.mpeg`, `.mpga` |
+| Images | `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp` |
 | Documents | `.pdf`, `.docx`, `.pptx`, `.xlsx` |
 | Notes | `.txt`, `.md`, `.rtf`, `.html` |
 
