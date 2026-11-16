@@ -57,13 +57,20 @@ def find_run(haystack: list[str], needle: list[str]) -> int | None:
     return None
 
 
+def _pieces(number: str) -> list[str]:
+    """A matched number, then each of its space-separated parts when it has more than one.
+
+    A space may group thousands (1 234) or only separate two numbers (010 6061).
+    """
+    parts = number.split()
+    return [number, *parts] if len(parts) > 1 else [number]
+
+
 def _numbers_in(text: str) -> list[float]:
     """Every number in the text, read both the European and the American way."""
     readings: list[float] = []
     for match in _NUMBER.finditer(text):
-        # A space may group thousands (1 234) or only separate two numbers (010 6061).
-        pieces = match.group().split()
-        for piece in [match.group(), *pieces] if len(pieces) > 1 else [match.group()]:
+        for piece in _pieces(match.group()):
             readings += _readings_of(piece)
     return readings
 
@@ -71,7 +78,9 @@ def _numbers_in(text: str) -> list[float]:
 def _signed_numbers_in(text: str) -> list[float]:
     """Like :func:`_numbers_in`, with a minus sign written right before a number kept.
 
-    A dash between two numbers or after a word (10-20, PO-2025) is not a sign.
+    A dash between two numbers or after a word (10-20, PO-2025) is not a sign. The sign
+    belongs to the whole match (-1 234) and to its first part, not to a later number
+    (-10 20).
     """
     readings: list[float] = []
     for match in _NUMBER.finditer(text):
@@ -79,8 +88,9 @@ def _signed_numbers_in(text: str) -> list[float]:
         negative = (
             start > 0 and text[start - 1] in "-−–" and (start == 1 or not text[start - 2].isalnum())
         )
-        for reading in _numbers_in(match.group()):
-            readings.append(-reading if negative else reading)
+        for index, piece in enumerate(_pieces(match.group())):
+            sign = -1 if negative and index <= 1 else 1
+            readings += [sign * reading for reading in _readings_of(piece)]
     return readings
 
 
@@ -126,34 +136,28 @@ def as_number(value: Any) -> float | None:
     return None
 
 
-def _plausible_date(parts: list[int]) -> bool:
-    """Whether three numbers can be a year, a month and a day, in any order."""
-    for year in range(3):
-        month, day = (parts[i] for i in range(3) if i != year)
-        if not (1000 <= parts[year] <= 2999 or parts[year] < 100):
-            continue
-        # Day and month may come in either order: both fit in 1-31 and one is a month.
-        if 1 <= month <= 31 and 1 <= day <= 31 and min(month, day) <= 12:
-            return True
-    return False
-
-
 def date_parts(value: str) -> list[int] | None:
-    """Year, month and day of a date-like value such as 2025-04-11 or 04/11/2025.
+    """The three numbers of a date value such as 2025-04-11 or 04/11/2025, as written.
 
     Three groups of digits with separators are not always a date: a purchase order number
-    formatted as 7200-4453-21 is not, and is compared as text instead.
+    formatted as 7200-4453-21 is not, nor is 12-2025-03, which no date order reads. Such a
+    value is compared as text instead.
     """
     parts = _DATE_PARTS.findall(value)
     if len(parts) != 3 or not re.fullmatch(r"[\d\s./-]+", value.strip()):
         return None
-    numbers = [int(part) for part in parts]
-    return numbers if _plausible_date(numbers) else None
+    return [int(part) for part in parts] if _date_readings(value) else None
 
 
 _NUMERIC_DATE = re.compile(r"(?<!\d)(\d{1,4})([./-]|\s)\s*(\d{1,2})\2\s*(\d{1,4})(?!\d)")
-_DAY_MONTH_YEAR = re.compile(r"(?<!\d)(\d{1,2})\.?\s+([A-Za-z]{3,})\.?,?\s+(\d{4})(?!\d)")
-_MONTH_DAY_YEAR = re.compile(r"\b([A-Za-z]{3,})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})(?!\d)")
+# A named month with the day before it (12 October 2025, 12th Oct 25) or after it
+# (October 12, 2025); the year has four digits or two.
+_DAY_MONTH_YEAR = re.compile(
+    r"(?<!\d)(\d{1,2})(?:st|nd|rd|th)?\.?\s+([A-Za-z]{3,})\.?,?\s+(\d{4}|\d{2})(?!\d)"
+)
+_MONTH_DAY_YEAR = re.compile(
+    r"\b([A-Za-z]{3,})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4}|\d{2})(?!\d)"
+)
 
 
 def _valid(year: int, month: int, day: int) -> tuple[int, int, int] | None:

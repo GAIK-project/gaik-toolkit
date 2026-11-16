@@ -35,6 +35,38 @@ def test_dates_are_compared_in_the_order_they_are_written(value, quote, expected
     assert value_status(value, quote) == expected
 
 
+@pytest.mark.parametrize(
+    ("value", "quote", "expected"),
+    [
+        ("2025-10-12", "12th October 2025", "match"),  # ordinal day before the month
+        ("2025-10-12", "12 Oct 25", "match"),  # two-digit year after a month name
+        ("2025-10-12", "Oct 12, 25", "match"),
+        ("2025-10-13", "12th October 2025", "mismatch"),
+    ],
+)
+def test_a_named_month_date_may_have_an_ordinal_day_or_a_two_digit_year(
+    value, quote, expected
+) -> None:
+    assert value_status(value, quote) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["12-2025-03", "2025-18-04", "03.25.2025"],
+)
+def test_digits_that_cannot_be_read_as_a_written_date_are_compared_as_text(value) -> None:
+    # Three groups of digits that no date order reads (year in the middle, a month of 18,
+    # month first with dots) are not a date: the same characters in the quote still match.
+    assert date_parts(value) is None
+    quote = f"Ref: {value}"
+    assert value_status(value, quote) == "match"
+    assert verdict_of("found", "match", value, quote) == "verified"
+    changed = quote[:-1] + ("9" if quote[-1] != "9" else "8")
+    state = value_status(value, changed)
+    assert state == "mismatch"
+    assert verdict_of("found", state, value, changed) == "check"
+
+
 def test_date_run_takes_each_part_from_its_own_word_in_date_order() -> None:
     words = tokens("Päivämäärä 04.11.2025 klo 10")
     assert date_run(words, date_parts("2025-11-04")) == (1, 3)
@@ -50,6 +82,9 @@ def test_date_run_takes_each_part_from_its_own_word_in_date_order() -> None:
         (20, "Range 10-20 kg", "match"),  # a dash between numbers is not a sign
         (2025, "PO-2025-15903", "match"),  # nor is one after a word
         (250, "Hinta 250,00 EUR", "match"),
+        (20, "-10 20", "match"),  # the sign is the first number's, not the next one's
+        (-10, "-10 20", "match"),
+        (-1234, "Hyvitys -1 234 EUR", "match"),  # a space grouping thousands keeps the sign
     ],
 )
 def test_a_minus_sign_right_before_a_number_is_kept(value, quote, expected) -> None:
