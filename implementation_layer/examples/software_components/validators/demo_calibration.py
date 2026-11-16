@@ -88,7 +88,16 @@ def main() -> None:
     print(report)
     print("\nPer-item:")
     for item in report.per_item:
-        print(f"  human={item['human_score']:.0f}  judge={item['judge_score']:.2f}  {item['note']}")
+        print(format_item(item))
+
+
+def format_item(item: dict) -> str:
+    """One per-item line; a skipped item has no judge score."""
+    if item["judge_score"] is None:
+        judge = f"skipped ({item.get('skipped')})"
+    else:
+        judge = f"{item['judge_score']:.2f}"
+    return f"  human={item['human_score']:.0f}  judge={judge}  {item['note']}"
 
 
 if __name__ == "__main__":
