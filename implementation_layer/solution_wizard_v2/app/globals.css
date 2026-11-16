@@ -485,11 +485,13 @@ body {
   opacity: 0;
 }
 
-/* Small floating panels (a step's properties, the save status, the undo note) ease in. */
+/* Small floating panels (a step's properties, the save status, the undo note)
+   ease in, from --pop-from: a menu that opens under its control comes from
+   above it (components/chat-start). */
 @keyframes pop-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(var(--pop-from, 4px));
   }
   to {
     opacity: 1;

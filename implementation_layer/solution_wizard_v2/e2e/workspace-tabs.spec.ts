@@ -200,14 +200,17 @@ test.describe("Workspace tabs", () => {
     await expect(page.getByTestId("blueprint-step-add")).toHaveCount(0);
     // Before Gate 2 an edit costs nothing yet, so the plan has no note above it.
     await expect(page.getByTestId("blueprint-edit-note")).toHaveCount(0);
-    // The control is in the tab row, at its end, and the read view has no bar of its own.
+    // The control heads the plan, at the end of its first row, next to what it
+    // changes: not at the end of the tab row, which a wide window put far away.
     await expect(edit).toHaveText("Muokkaa blueprintia");
-    const tabRow = (await page.getByRole("tablist").first().boundingBox())!;
+    const bar = plan.getByTestId("blueprint-mode-bar");
+    await expect(bar).toHaveAttribute("data-mode", "read");
+    await expect(bar.getByTestId("blueprint-edit")).toHaveCount(1);
+    const planBox = (await plan.boundingBox())!;
     const editBox = (await edit.boundingBox())!;
-    expect(editBox.y + editBox.height / 2).toBeGreaterThan(tabRow.y);
-    expect(editBox.y + editBox.height / 2).toBeLessThan(tabRow.y + tabRow.height);
-    expect(editBox.x).toBeGreaterThan(tabRow.x + tabRow.width);
-    await expect(page.getByTestId("blueprint-mode-bar")).toHaveCount(0);
+    expect(Math.abs(editBox.x + editBox.width - (planBox.x + planBox.width))).toBeLessThan(12);
+    expect(editBox.y).toBeLessThan((await page.getByTestId("plan-goal").boundingBox())!.y);
+    await expect(page.getByRole("tablist").first().getByTestId("blueprint-edit")).toHaveCount(0);
 
     await expect(async () => {
       if (!(await done.isVisible())) await edit.click({ timeout: 1_000 });
@@ -223,23 +226,31 @@ test.describe("Workspace tabs", () => {
     await expect(edit).toBeFocused();
   });
 
-  test("after Gate 2 Blueprint says it is read-only in the Workflow tab's words, and its edit control carries them", async ({
+  test("after Gate 2 Blueprint says what an edit costs beside its edit control, which stays an edit", async ({
     page,
   }) => {
     await loginAsDev(page);
     await page.goto("/sessions/ses_laskut");
     await selectWorkspaceTab(page, "Blueprint");
 
-    const words = "Vain luku: muutos vaatii uuden paketin ja testiajon. Valitse vaihe ja pyydä muutosta wizardilta.";
-    await expect(page.getByTestId("blueprint-edit-note")).toHaveText(words);
+    // Not "read-only": the blueprint can still be edited here, and the row says what that means.
+    const words = "Testattava paketti tehdään tästä blueprintista: muutos vaatii uuden paketin ja testiajon.";
+    const note = page.getByTestId("blueprint-edit-note");
+    await expect(note).toHaveText(words);
     await expect(page.getByTestId("blueprint-edit")).toHaveAccessibleDescription(words);
     await expect(page.getByTestId("blueprint-edit")).toHaveText("Muokkaa blueprintia");
+    // The note and the control share the plan's first row.
+    const bar = page.getByTestId("blueprint-mode-bar");
+    await expect(bar.getByTestId("blueprint-edit-note")).toHaveCount(1);
+    await expect(bar.getByTestId("blueprint-edit")).toHaveCount(1);
 
-    // The Workflow tab's flow, locked for the same reason.
+    // The Workflow tab's flow is read-only until "Muokkaa" there, and says so.
     await setChatOpen(page, false);
     await selectWorkspaceTab(page, "Työnkulku");
     const locked = page.getByTestId("simple-flow-locked");
-    await expect(locked).toContainText(words);
+    await expect(locked).toContainText(
+      "Vain luku: muutos vaatii uuden paketin ja testiajon. Valitse vaihe ja pyydä muutosta wizardilta.",
+    );
     await expect(locked.getByRole("button")).toHaveText("Muokkaa");
   });
 

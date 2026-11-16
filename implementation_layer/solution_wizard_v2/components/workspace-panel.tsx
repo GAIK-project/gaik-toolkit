@@ -80,6 +80,8 @@ import { isSeedBlueprint } from "@/lib/blueprint-goal";
 import { SolutionPlanView } from "@/components/solution-plan-view";
 import { AskStepButton, StepNumber, StepTypeTag, stepTypeLabels } from "@/components/step-type";
 import { FileIcon } from "@/components/file-icon";
+import { FileTree } from "@/components/file-tree";
+import { BlueprintModeBar } from "@/components/blueprint-mode-bar";
 import { Icon, type IconName } from "@/components/icons";
 
 const BpmnDiagramPanel = dynamic(
@@ -921,9 +923,9 @@ export function WorkspacePanel({
   const [runOutput, setRunOutput] = useState<PocRunOutput | null>(null);
   /** The run the tab follows now; an earlier run's output arriving late is dropped. */
   const activeRunRef = useRef<string | null>(null);
+  // The deployment package as its zip names its files (poc/...).
   const [pocFiles, setPocFiles] = useState<string[]>([]);
-  // What the deployable package carries beside them: blueprint, diagrams, documentation.
-  const [solutionFiles, setSolutionFiles] = useState<string[]>([]);
+  const [pocWorkOnly, setPocWorkOnly] = useState<string[]>([]);
   // `ready`/`problems` come from the api's package check; see lib/poc-package-state.
   const [pocReady, setPocReady] = useState(false);
   const [pocProblems, setPocProblems] = useState<string[]>([]);
@@ -1117,8 +1119,8 @@ export function WorkspacePanel({
         setPocGenerated(state.generated);
         setPocReady(state.ready);
         setPocProblems(state.problems);
-        setPocFiles(state.files);
-        setSolutionFiles(state.solutionFiles);
+        setPocFiles(state.packageFiles);
+        setPocWorkOnly(state.workOnly);
         setPocVersion(state.version);
         // The api's word on whether a run is recorded (#253). The server page
         // seeded this from the same field; a mock/older answer leaves it alone.
@@ -1135,7 +1137,7 @@ export function WorkspacePanel({
           setPocReady(false);
           setPocProblems([]);
           setPocFiles([]);
-          setSolutionFiles([]);
+          setPocWorkOnly([]);
         }
       });
     return () => {
@@ -1837,26 +1839,17 @@ export function WorkspacePanel({
     </button>
   );
 
-  const filesOf = (files: string[], testId: string) => (
-    <ul className="gap-x-6 font-mono text-xs text-text-muted @md:columns-2" data-testid={testId}>
-      {files.map((f) => (
-        <li key={f} className="flex break-inside-avoid items-center gap-1.5 py-px" title={f}>
-          <FileIcon name={f} size={13} />
-          <span className="min-w-0 truncate">{f}</span>
-        </li>
-      ))}
-    </ul>
-  );
-  const fileList = filesOf(pocFiles, "poc-files");
-  // The deployable package's other half: what says what the solution is. Named
-  // for where it goes, since the working copy does not carry it.
-  const solutionList = solutionFiles.length > 0 && (
-    <div className="flex flex-col gap-1.5" data-testid="poc-solution-files">
-      <span className="text-xs font-medium text-text-muted">
-        {t.pocSolutionFiles.replace("{n}", String(solutionFiles.length))}
-      </span>
-      {filesOf(solutionFiles, "poc-solution-files-list")}
-    </div>
+  // The package as the deployment download opens: its folders, then its files.
+  // "Lataa työversio" beside it carries the test input too, which is said.
+  const fileList = (
+    <>
+      <FileTree paths={pocFiles} testId="poc-file-tree" />
+      {pocWorkOnly.length > 0 && (
+        <p className="mt-1.5 text-xs text-text-muted" data-testid="poc-work-only">
+          {t.pocWorkOnly.replace("{names}", pocWorkOnly.join(", "))}
+        </p>
+      )}
+    </>
   );
 
   const packageCard = (
@@ -1966,7 +1959,6 @@ export function WorkspacePanel({
                 {fileList}
               </div>
             )}
-            {solutionList}
           </div>
         </details>
       ) : (
@@ -1977,7 +1969,6 @@ export function WorkspacePanel({
             </summary>
             <div className="mt-2 flex flex-col gap-3">
               {fileList}
-              {solutionList}
             </div>
           </details>
         )
@@ -2708,48 +2699,57 @@ export function WorkspacePanel({
     </section>
   );
 
-  // The Blueprint tab reads first; "Muokkaa blueprintia" is at the end of the
-  // tab row, on that tab and while reading. Not while the blueprint is still
+  // The Blueprint tab reads first; "Muokkaa blueprintia" heads the plan, where
+  // "Valmis" heads the form (BlueprintModeBar). Not while the blueprint is still
   // the draft a new session starts with: there is no solution to edit yet.
-  // After Gate 2 a change no longer matches the tested package, and a line
-  // above the plan says so in the Workflow tab's words for the same state.
+  // From the PoC step on a change no longer matches the package, and the row
+  // says so beside the control: the blueprint can still be edited, so not
+  // "read-only" as the Workflow tab's locked diagrams are. After a saved change
+  // it says the package did not follow, with "Generoi uudelleen" (pocNote), as
+  // the form did.
   const blueprintIsSeed = isSeedBlueprint(blueprint);
   const editNoteId = `${baseId}-edit-note`;
-  const editControl = tab === "json" && !blueprintEditing && !blueprintIsSeed && (
+  const editNoteText = pocNote ?? (wizardStep >= POC_STEP ? t.blueprintEditCost : null);
+  const editControl = !blueprintEditing && !blueprintIsSeed && (
     <button
       ref={takeEditFocus}
       type="button"
-      className="btn-secondary ml-auto shrink-0 px-3 py-1.5"
+      className="btn-secondary shrink-0"
       onClick={() => {
         moveEditFocus.current = true;
         setEditorMounted(true);
         setBlueprintEditing(true);
       }}
-      aria-describedby={wizardStep >= POC_STEP ? editNoteId : undefined}
+      aria-describedby={editNoteText ? editNoteId : undefined}
       data-testid="blueprint-edit"
     >
-      <Icon name="pencil" size={15} />
+      <Icon name="pencil" size={16} />
       {t.planEditBlueprint}
     </button>
   );
-  const editNote = wizardStep >= POC_STEP && !blueprintIsSeed && (
+  const editNote = editNoteText && !blueprintIsSeed && (
     <p
       id={editNoteId}
-      className="flex items-start gap-1.5 text-xs text-text-secondary"
+      className="flex min-w-0 flex-1 basis-64 items-start gap-1.5 text-xs text-text-secondary"
       data-testid="blueprint-edit-note"
+      data-note={pocNote ? "unpackaged" : "cost"}
     >
-      <Icon name="lock" size={13} className="mt-0.5 shrink-0 text-text-muted" />
-      <span>{t.flowLocked}</span>
+      <Icon name="package" size={13} className="mt-0.5 shrink-0 text-text-muted" />
+      <span>{editNoteText}</span>
     </p>
+  );
+  const readBar = editControl && (
+    <BlueprintModeBar mode="read" control={editControl}>
+      {editNote}
+    </BlueprintModeBar>
   );
   const pocLockedNoteId = `${baseId}-poc-locked`;
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* The tabs, and at the row's end the open tab's own control ("Edit
-          blueprint"). The row asks its own width (the chat dock changes it):
-          where the notice does not fit between the two it goes under them, so
-          the control stays on the tab row. */}
+      {/* The tabs and the AI notice. The row asks its own width (the chat
+          dock changes it): where the notice does not fit beside the tabs it
+          goes under them. */}
       <div className="@container mb-4 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
         <div
           ref={tabListRef}
@@ -2811,7 +2811,6 @@ export function WorkspacePanel({
         >
           {t.wsAiMark}
         </p>
-        {editControl}
         {/* What the locked tab's description points at: outside the tab, so
             it is not part of the tab's name. */}
         {pocLocked && (
@@ -2854,7 +2853,7 @@ export function WorkspacePanel({
             {key === "json" && (
               <>
                 {!blueprintEditing && (
-                  <SolutionPlanView blueprint={blueprint} outputFields={outputFields} t={t} note={editNote} />
+                  <SolutionPlanView blueprint={blueprint} outputFields={outputFields} t={t} note={readBar} />
                 )}
                 {editorMounted && (
                   <div className={blueprintEditing ? "" : "hidden"}>

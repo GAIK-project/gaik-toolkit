@@ -186,7 +186,7 @@ test.describe("PoC tab", () => {
     await resetMockSessions(request);
   });
 
-  test("the package details name what the deployment package carries beside the package's files", async ({
+  test("the package's tree has the blueprint, the diagrams and the documentation beside poc/, as the zip has them", async ({
     page,
   }) => {
     const solution = [
@@ -202,22 +202,30 @@ test.describe("PoC tab", () => {
     const details = page.getByTestId("poc-package-details");
     await details.getByText("Paketin tiedot").click();
 
-    // The package's own files as before, and under them the blueprint, the diagrams and the documentation.
-    await expect(details.getByTestId("poc-files").getByRole("listitem")).toHaveText(FILES);
-    const beside = details.getByTestId("poc-solution-files");
-    await expect(beside).toContainText("Käyttöönottopaketissa lisäksi (5)");
-    await expect(beside.getByRole("listitem")).toHaveText(solution);
-    const files = (await details.getByTestId("poc-files").boundingBox())!;
-    expect((await beside.boundingBox())!.y).toBeGreaterThanOrEqual(files.y + files.height);
+    // One tree: docs/ and poc/ at the root, then the files that stand beside them.
+    await expect(details.getByText("Käyttöönottopaketin tiedostot (10)")).toBeVisible();
+    const tree = details.getByTestId("poc-file-tree");
+    await expect(tree.locator(":scope > li")).toHaveText([
+      /^docs\//,
+      /^poc\//,
+      "use_case.blueprint.json",
+      "workflow.bpmn",
+      "workflow.mmd",
+    ]);
+    await expect(tree.locator('li[data-path="docs/"] li')).toHaveText([
+      "technical_specification.md",
+      "user_guide.md",
+    ]);
   });
 
-  test("an api that names nothing beside the package shows the package's files alone", async ({ page }) => {
+  test("an api that names nothing beside the package shows poc/ alone", async ({ page }) => {
     await fakePoc(page, { inputs: false });
     await openCheckedPoc(page);
     const details = page.getByTestId("poc-package-details");
     await details.getByText("Paketin tiedot").click();
-    await expect(details.getByTestId("poc-files").getByRole("listitem")).toHaveText(FILES);
-    await expect(details.getByTestId("poc-solution-files")).toHaveCount(0);
+    const tree = details.getByTestId("poc-file-tree");
+    await expect(tree.locator(":scope > li")).toHaveCount(1);
+    await expect(tree.locator(":scope > li")).toHaveAttribute("data-path", "poc/");
   });
 
   test("a checked package is one status line, with its files and controls behind Paketin tiedot", async ({
@@ -240,7 +248,18 @@ test.describe("PoC tab", () => {
     await details.getByText("Paketin tiedot").click();
     await expect(download).toBeVisible();
     await expect(download).toHaveAttribute("href", `/api/sessions/${SESSION}/poc/download`);
-    await expect(details.getByRole("listitem")).toHaveText(FILES);
+    // The files as a tree under poc/, folders first: an answer that does not
+    // list the deployment package (the mock store) shows its files there.
+    const tree = details.getByTestId("poc-file-tree");
+    await expect(tree.locator('li[data-path$="/"] > span')).toHaveText(["poc/", "schemas/"]);
+    await expect(tree.locator('li[data-path]:not([data-path$="/"])')).toHaveText([
+      "output_schema.py",
+      "config.yaml",
+      "README.md",
+      "requirements.txt",
+      "run_poc.py",
+    ]);
+    await expect(details.getByTestId("poc-work-only")).toHaveCount(0);
 
     // Generating again replaces the package, so it asks first.
     await page.getByRole("button", { name: "Generoi uudelleen" }).click();
@@ -255,6 +274,41 @@ test.describe("PoC tab", () => {
     await page.getByRole("button", { name: "Korvaa paketti" }).click();
     await expect(confirm).toHaveCount(0);
     await expect.poll(() => fake.generations).toBe(1);
+  });
+
+  test("the package's files are the deployment zip's, as it opens, and what only the working version carries is said", async ({
+    page,
+  }) => {
+    await fakePoc(page, { inputs: false });
+    // Registered last, so it answers first: the api's list of the deployment zip.
+    await page.route(`${API}/poc/files`, (route) =>
+      route.fulfill({
+        json: {
+          generated: true,
+          ready: true,
+          problems: [],
+          files: [...FILES, "sample_input/invoice_001.pdf"],
+          package_files: [...FILES.map((f) => `poc/${f}`), "poc/AI-GENERATED.json"],
+          version: "v1",
+        },
+      }),
+    );
+    await openCheckedPoc(page);
+
+    const details = page.getByTestId("poc-package-details");
+    await details.getByText("Paketin tiedot").click();
+    await expect(details.getByText("Käyttöönottopaketin tiedostot (6)")).toBeVisible();
+    const tree = details.getByTestId("poc-file-tree");
+    await expect(tree.locator('li[data-path]:not([data-path$="/"])')).toHaveText([
+      "output_schema.py",
+      "AI-GENERATED.json",
+      "config.yaml",
+      "README.md",
+      "requirements.txt",
+      "run_poc.py",
+    ]);
+    await expect(tree).not.toContainText("sample_input");
+    await expect(details.getByTestId("poc-work-only")).toHaveText("Vain työversiossa: sample_input/");
   });
 
   test("a failed check keeps the step open: its findings, the working copy and Generoi uudelleen", async ({

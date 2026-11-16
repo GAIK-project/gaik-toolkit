@@ -126,6 +126,8 @@ export type Dict = {
   planEdit: string;
   /** The Blueprint tab's edit control, at the end of the tab row. */
   planEditBlueprint: string;
+  /** Beside "Muokkaa blueprintia" from the PoC step on: what a change costs. */
+  blueprintEditCost: string;
   /** In the steps' place while the blueprint is still the draft a new session starts with. */
   planPreparing: string;
   /** In its place once the output fields are listed above it: only the steps are still to come. */
@@ -488,8 +490,8 @@ export type Dict = {
   pocPackageHasErrors: string;
   /** "{n} tiedostoa": the generated files, behind a disclosure. */
   pocFilesToggle: string;
-  /** The blueprint, diagrams and documentation the deployable package carries beside the package's files, with {n}. */
-  pocSolutionFiles: string;
+  /** Under the deployment package's files: what only the working version carries, {names}. */
+  pocWorkOnly: string;
   /** "Ajo käynnissä · {time}" while a sandbox run is going. */
   pocRunElapsed: string;
   pocRunSandboxHint: string;
@@ -845,6 +847,7 @@ const fi: Dict = {
   wsTabLocked: "lukittu",
   planEdit: "Muokkaa",
   planEditBlueprint: "Muokkaa blueprintia",
+  blueprintEditCost: "Testattava paketti tehdään tästä blueprintista: muutos vaatii uuden paketin ja testiajon.",
   planPreparing: "Wizard valmistelee ratkaisun rakennetta. Se näkyy tässä, kun se on valmis.",
   planPreparingSteps: "Wizard valmistelee ratkaisun vaiheita. Ne näkyvät tässä, kun ne ovat valmiit.",
   wsFormDragOnly: "Järjestystä voi muuttaa, kun vaiheita on vähintään kaksi",
@@ -1175,8 +1178,8 @@ const fi: Dict = {
   pocSetupHide: "Piilota",
   pocPackageReady: "Valmis ajettavaksi",
   pocPackageHasErrors: "Paketissa on virheitä",
-  pocFilesToggle: "Paketin tiedostot ({n})",
-  pocSolutionFiles: "Käyttöönottopaketissa lisäksi ({n})",
+  pocFilesToggle: "Käyttöönottopaketin tiedostot ({n})",
+  pocWorkOnly: "Vain työversiossa: {names}",
   pocRunElapsed: "Ajo käynnissä · {time}",
   pocRunSandboxHint: "Generoi paketti ensin.",
   pocNeedsPackage: "Avautuu, kun paketti on generoitu.",
@@ -1605,6 +1608,7 @@ const en: Dict = {
   wsTabLocked: "locked",
   planEdit: "Edit",
   planEditBlueprint: "Edit blueprint",
+  blueprintEditCost: "The package to test is built from this blueprint: a change needs a new package and a test run.",
   planPreparing: "The wizard is preparing the solution's structure. It appears here when it is ready.",
   planPreparingSteps: "The wizard is preparing the solution's steps. They appear here when ready.",
   wsFormDragOnly: "The order can be changed once there are two steps",
@@ -1934,8 +1938,8 @@ const en: Dict = {
   pocSetupHide: "Hide",
   pocPackageReady: "Ready to run",
   pocPackageHasErrors: "The package has errors",
-  pocFilesToggle: "Package files ({n})",
-  pocSolutionFiles: "Also in the deployment package ({n})",
+  pocFilesToggle: "Files in the deployment package ({n})",
+  pocWorkOnly: "Only in the working version: {names}",
   pocRunElapsed: "Running · {time}",
   pocRunSandboxHint: "Generate the package first.",
   pocNeedsPackage: "Opens once the package is generated.",

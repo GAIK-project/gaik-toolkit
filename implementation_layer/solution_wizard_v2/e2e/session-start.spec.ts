@@ -447,7 +447,7 @@ test.describe("a session starts from the first message", () => {
     await expect(pill).toHaveAttribute("aria-expanded", "false");
     await expect(menu).toHaveCount(0);
 
-    // A press opens the menu over the card, starting at its pill: both options, each with a line on what it changes.
+    // A press opens the menu under the card, starting at its pill: both options, each with a line on what it changes.
     await pill.click();
     await expect(pill).toHaveAttribute("aria-expanded", "true");
     await expect(menu).toHaveAccessibleName("Taustasi");
@@ -460,17 +460,12 @@ test.describe("a session starts from the first message", () => {
     const box = (await menu.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(card.x);
     expect(box.x + box.width).toBeLessThanOrEqual(card.x + card.width);
-    expect(box.y + box.height).toBeLessThanOrEqual(card.y);
+    // The field is in the middle of the page, with room under it: the menu does
+    // not rise over the heading and the field, and it is whole in the window.
+    expect(box.y).toBeGreaterThanOrEqual(card.y + card.height);
+    expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+    await expect(page.getByTestId("chat-background").getByRole("menu")).toHaveAttribute("data-side", "below");
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
-    // The AI notice under the card is not under the menu.
-    const notice = page.getByTestId("chat-ai-notice");
-    await expect(notice).toBeVisible();
-    expect(
-      await notice.evaluate((el) => {
-        const at = el.getBoundingClientRect();
-        return el.contains(document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2));
-      }),
-    ).toBe(true);
     // A window that changes size puts the menu away: it was placed for the card as it was.
     await page.setViewportSize({ width: 900, height: 900 });
     await expect(menu).toHaveCount(0);
@@ -542,7 +537,11 @@ test.describe("a session starts from the first message", () => {
     await expect(startField(page)).toHaveValue(text);
     await choose(page, "chat-pace", "Perusteellinen");
     await expect(pill).toHaveAccessibleName("Kysymysten määrä: Perusteellinen");
-    // The arrow keys move in the menu, as in the background's.
+    // Choosing hands the cursor to the field, again on the next frame
+    // (components/start-view); then the arrow keys move in the menu, as in the
+    // background's.
+    await expect(startField(page)).toBeFocused();
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
     await pill.focus();
     await page.keyboard.press("ArrowDown");
     await expect(thorough).toBeFocused();

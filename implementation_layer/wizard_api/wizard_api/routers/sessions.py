@@ -4,6 +4,7 @@ import hashlib
 import io
 import logging
 import os
+import posixpath
 import tempfile
 import uuid
 import zipfile
@@ -252,6 +253,42 @@ def _poc_dir(output_dir: str) -> str | None:
     return poc
 
 
+def _deployable_entries(poc: str) -> list[str]:
+    """What the deployable zip carries under ``poc/``, in the order it is written.
+
+    The package's deployable files and the AI marker, which the download writes
+    in place of any file of that name. The PoC tab's file list and the zip both
+    come from here, so the list shows what the person receiving it gets.
+    """
+    from wizard_api.services import ai_marking, poc_service
+
+    files = [
+        relative
+        for relative in poc_service.deployable_files(poc)
+        if relative != ai_marking.MARKER_FILE
+    ]
+    return [*files, ai_marking.MARKER_FILE]
+
+
+def _deployable_names(session, poc: str) -> list[str]:
+    """Every entry of the deployable zip by the name it has there.
+
+    ``poc/`` and its files (_deployable_entries), then beside it what says what
+    the solution is (``poc_service.solution_file_names``) and the AI marker at
+    the root, as download_deployable_poc writes them.
+    """
+    from wizard_api.services import ai_marking, bpmn_service, poc_service
+
+    names = [
+        posixpath.join("poc", relative.replace(os.sep, "/"))
+        for relative in _deployable_entries(poc)
+    ]
+    names += poc_service.solution_file_names(
+        session.output_dir, can_draw=bpmn_service.solution_wizard_available()
+    )
+    return [*names, ai_marking.MARKER_FILE]
+
+
 @router.get("/{session_id}/poc/files")
 def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     """List the files in the generated PoC folder so the UI can show what the
@@ -277,6 +314,9 @@ def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
     return {
         "generated": True,
         "files": files,
+        # The deployable zip's entries by the names it gives them, for the tab
+        # to show the package as it is handed over (_deployable_names).
+        "package_files": _deployable_names(session, poc),
         # What the deployable package carries beside poc/: the blueprint, the
         # diagrams and the documentation, by the names they have in it.
         "solution_files": poc_service.solution_file_names(
@@ -2351,17 +2391,16 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
     made_from.update({name: {"made_from": "agent_draft"} for name, _ in solution})
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for relative in poc_service.deployable_files(poc):
+        for relative in _deployable_entries(poc):
             if relative == ai_marking.MARKER_FILE:
-                continue
-            if relative == poc_service.CONFIG_NAME and package_config is not None:
+                zf.writestr(
+                    os.path.join("poc", relative),
+                    ai_marking.marker_json(session, "poc-package-deployable"),
+                )
+            elif relative == poc_service.CONFIG_NAME and package_config is not None:
                 zf.writestr(os.path.join("poc", relative), package_config)
             else:
                 zf.write(os.path.join(poc, relative), os.path.join("poc", relative))
-        zf.writestr(
-            os.path.join("poc", ai_marking.MARKER_FILE),
-            ai_marking.marker_json(session, "poc-package-deployable"),
-        )
         if diagram is not None:
             zf.writestr(poc_service.SOLUTION_BPMN_NAME, diagram)
         for name, source in solution:

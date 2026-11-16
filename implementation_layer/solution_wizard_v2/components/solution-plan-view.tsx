@@ -66,7 +66,7 @@ function StepCard({
   const reference = stepReference(step, index, t);
   return (
     <li
-      className="rounded-lg border border-border bg-surface py-3 pl-3 pr-2 sm:pl-4"
+      className="@container rounded-lg border border-border bg-surface py-3 pl-3 pr-2 sm:pl-4"
       data-testid={`plan-step-${index}`}
     >
       <div className="flex items-start gap-3">
@@ -118,15 +118,20 @@ function StepCard({
             </details>
           )}
         </div>
+        {/* Named in words where the card has room: the icon alone did not say
+            that this is how a step is changed. */}
         <button
           type="button"
-          className="icon-btn -mt-1"
+          className="-mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md p-1.5 text-xs font-medium text-text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-brand-soft hover:text-brand-text active:scale-[0.97] @md:px-2"
           onClick={() => askInChat(reference)}
           aria-label={`${t.planAskInChat}: ${reference.label}`}
           title={t.planAskInChat}
           data-testid={`plan-step-${index}-ask`}
         >
           <Icon name="messageSquareText" size={16} />
+          <span className="hidden @md:inline" aria-hidden>
+            {t.planAskInChat}
+          </span>
         </button>
       </div>
     </li>

@@ -489,7 +489,7 @@ test.describe("Blueprint form", () => {
     expect(await panel.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
   });
 
-  test("Muokkaa is at the end of the tab row and Valmis heads the form, with the save status beside it", async ({
+  test("Muokkaa heads the plan and Valmis the form, in the same place, with the save status beside it", async ({
     page,
   }) => {
     await loginAsDev(page);
@@ -499,20 +499,19 @@ test.describe("Blueprint form", () => {
     const edit = page.getByTestId("blueprint-edit");
     const done = page.getByTestId("blueprint-done");
     const bar = page.getByTestId("blueprint-mode-bar").filter({ visible: true });
-    // Reading, the tab has no bar of its own: the control is in the tab row, after the tabs.
-    await expect(bar).toHaveCount(0);
-    const reading = await edit.boundingBox();
-    const tabs = await page.getByRole("tablist").first().boundingBox();
-    expect(reading!.x).toBeGreaterThan(tabs!.x + tabs!.width);
-    expect(reading!.y + reading!.height / 2).toBeGreaterThan(tabs!.y);
-    expect(reading!.y + reading!.height / 2).toBeLessThan(tabs!.y + tabs!.height);
+    // Reading, the plan's first row ends in the control.
+    await expect(bar).toHaveAttribute("data-mode", "read");
+    await expect(bar.getByTestId("blueprint-edit")).toHaveCount(1);
+    const reading = (await edit.boundingBox())!;
 
     await openBlueprintEditor(page);
     await expect(bar).toHaveAttribute("data-mode", "edit");
     await expect(bar).toHaveCount(1);
-    // One control at a time: "Muokkaa" leaves the tab row while the form is open.
+    // One control at a time: "Valmis" takes the place "Muokkaa" had.
     await expect(edit).toHaveCount(0);
     const editing = await done.boundingBox();
+    expect(Math.abs(editing!.x + editing!.width - (reading.x + reading.width))).toBeLessThan(2);
+    expect(Math.abs(editing!.y - reading.y)).toBeLessThan(2);
     // The status is in that row, next to the button.
     await expect(bar.getByTestId("blueprint-save-status")).toHaveText("Tallennettu");
     const saved = await status(page).boundingBox();

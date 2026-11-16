@@ -826,6 +826,13 @@ def test_the_deployable_package_leaves_the_test_data_behind(client, db_session) 
     assert not any("sample_input" in n for n in names)
     assert not any("output/" in n for n in names)
 
+    # The PoC tab lists the package as the zip carries it: the same names,
+    # the AI marker the download writes included, the test data left out.
+    listed = client.get(f"/sessions/{sid}/poc/files").json()
+    assert sorted(listed["package_files"]) == sorted(names)
+    assert "poc/AI-GENERATED.json" in listed["package_files"]
+    assert any("sample_input" in f for f in listed["files"])
+
 
 def _write_solution(output_dir: str, *, ui_view: bool = True) -> None:
     """The files the wizard leaves beside poc/: blueprint, diagrams, documentation."""

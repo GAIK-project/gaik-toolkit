@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type CSSProperties,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { ChatPanelLabels } from "@/lib/chat-activity";
 import {
   DEFAULT_PACE,
@@ -13,6 +22,7 @@ import {
   type Background,
   type Pace,
 } from "@/lib/chat-background";
+import { menuPlacement, type MenuPlacement } from "@/lib/menu-placement";
 import { exampleIn, examplesOffered, toggleExample } from "@/lib/session-start";
 import { Icon, type IconName } from "./icons";
 
@@ -71,8 +81,11 @@ function ChoiceMenu<T extends string>({
   // Where the menu starts in the card: under its pill, or as far left of it as
   // keeps the menu inside the card.
   const [left, setLeft] = useState(0);
+  const [place, setPlace] = useState<MenuPlacement>({ below: false, maxHeight: null });
+  const below = place.below;
   const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
   function show() {
@@ -102,6 +115,15 @@ function ChoiceMenu<T extends string>({
       document.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("resize", onResize);
     };
+  }, [open]);
+
+  // The side the menu opens on is chosen from its own height, before it is
+  // painted, so it never shows on the wrong side first.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const card = trigger.current?.offsetParent;
+    if (!card || !menu.current) return;
+    setPlace(menuPlacement(card.getBoundingClientRect(), menu.current.scrollHeight, window.innerHeight));
   }, [open]);
 
   // The menu opens with the cursor on what is chosen.
@@ -146,13 +168,23 @@ function ChoiceMenu<T extends string>({
       </button>
       {open && (
         <div
+          ref={menu}
           id={menuId}
           role="menu"
           aria-label={name}
-          // Over the card, on the start view too: the AI notice is the line
-          // under the card and stays in view while a choice is made.
-          style={{ left }}
-          className="pop-in absolute bottom-full z-40 mb-2 w-72 max-w-full rounded-xl border border-border bg-surface p-1 shadow-lg"
+          // Under the card or over it (lib/menu-placement), easing in from the
+          // card's side. Under it, it covers the AI notice only while it is open.
+          style={
+            {
+              left,
+              maxHeight: place.maxHeight ?? undefined,
+              "--pop-from": below ? "-4px" : "4px",
+            } as CSSProperties
+          }
+          className={`pop-in absolute z-40 w-72 max-w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-lg ${
+            below ? "top-full mt-2" : "bottom-full mb-2"
+          }`}
+          data-side={below ? "below" : "above"}
           onKeyDown={(e) => {
             const all = items();
             const at = all.indexOf(document.activeElement as HTMLElement);
