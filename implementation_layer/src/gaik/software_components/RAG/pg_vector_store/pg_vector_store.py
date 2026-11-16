@@ -678,7 +678,7 @@ class PgVectorStore:
                 RETURN QUERY
                 WITH semantic AS (
                     SELECT
-                        t.id, t.title, t.content, t.metadata,
+                        t.id,
                         (1 - (t.embedding <=> query_embedding))::FLOAT AS score
                     FROM {table} t
                     WHERE t.embedding IS NOT NULL
@@ -696,6 +696,8 @@ class PgVectorStore:
                     FROM {table} t
                     WHERE t.text_search @@ gaik_tsquery(search_language, query_text, tsquery_mode)
                       AND (filter_metadata IS NULL OR t.metadata @> filter_metadata)
+                    ORDER BY 2 DESC
+                    LIMIT result_limit * 3
                 ),
                 -- Qualified: RETURNS TABLE makes `id` a PL/pgSQL variable too, and
                 -- a bare `id` here fails every call as ambiguous.
@@ -708,16 +710,33 @@ class PgVectorStore:
                             ELSE 0
                         END AS score
                     FROM keyword kw
+                ),
+                -- FULL OUTER JOIN: a row only the keyword arm found is a
+                -- candidate too, scored by its own similarity.
+                candidates AS (
+                    SELECT COALESCE(s.id, k.id) AS cid, s.score AS sem, k.score AS kw
+                    FROM semantic s
+                    FULL OUTER JOIN keyword_normalized k ON s.id = k.id
+                ),
+                scored AS (
+                    SELECT
+                        t.id AS rid, t.title AS rtitle, t.content AS rcontent,
+                        t.metadata AS rmetadata,
+                        COALESCE(
+                            c.sem,
+                            CASE WHEN t.embedding IS NULL THEN 0
+                                 ELSE 1 - (t.embedding <=> query_embedding) END
+                        )::FLOAT AS sem,
+                        COALESCE(c.kw, 0)::FLOAT AS kw
+                    FROM candidates c
+                    JOIN {table} t ON t.id = c.cid
                 )
                 SELECT
-                    s.id, s.title, s.content, s.metadata,
-                    s.score AS semantic_score,
-                    COALESCE(k.score, 0)::FLOAT AS keyword_score,
-                    (sem_weight * s.score +
-                     kw_weight * COALESCE(k.score, 0))::FLOAT AS combined_score
-                FROM semantic s
-                LEFT JOIN keyword_normalized k ON s.id = k.id
-                ORDER BY (sem_weight * s.score + kw_weight * COALESCE(k.score, 0)) DESC
+                    sc.rid, sc.rtitle, sc.rcontent, sc.rmetadata,
+                    sc.sem, sc.kw,
+                    (sem_weight * sc.sem + kw_weight * sc.kw)::FLOAT
+                FROM scored sc
+                ORDER BY (sem_weight * sc.sem + kw_weight * sc.kw) DESC
                 LIMIT result_limit;
             END;
             $$
@@ -1033,6 +1052,9 @@ class PgVectorStore:
 
         Semantic scores (cosine similarity) are in [0, 1]. Keyword scores
         (ts_rank_cd) are normalized to [0, 1] by dividing by the max score.
+        The candidates are the best ``3 * top_k`` of each arm, so a row only
+        the keyword arm finds is returned too (re-run :meth:`setup` on a
+        database made by an older gaik to replace the SQL function).
 
         Args:
             query_embedding: Query vector for semantic search.
@@ -1385,7 +1407,10 @@ class PgVectorStore:
         """Run the query through the configured ``text_processor`` (no-op when not set)."""
         if not query_text or self.text_processor is None:
             return query_text
-        expanded = self.text_processor.expand_query(query_text)
+        if self.tsquery_mode == "websearch":
+            expanded = _lemmatize_websearch(query_text, self.text_processor.lemmatize)
+        else:
+            expanded = self.text_processor.expand_query(query_text)
         return expanded if expanded else query_text
 
     @staticmethod
@@ -1434,3 +1459,41 @@ def _transaction_status(conn: Any) -> str | None:
     info = getattr(conn, "info", None)
     status = getattr(info, "transaction_status", None)
     return getattr(status, "name", None)
+
+
+_WEBSEARCH_TOKEN = re.compile(r'(-?)"([^"]*)"?|(\S+)')
+
+
+def _lemmatize_websearch(query: str, lemmatize: Any) -> str:
+    """Lemmatize a websearch query and keep its operators.
+
+    ``websearch_to_tsquery`` reads ``"..."`` as a phrase, ``-word`` as NOT and
+    ``or`` as OR. Joining the lemmas of the whole query dropped all three, so an
+    excluded word became required. Here only the words are lemmatized.
+    """
+    out: list[str] = []
+    for match in _WEBSEARCH_TOKEN.finditer(query):
+        negate, phrase, word = match.group(1), match.group(2), match.group(3)
+        if word is not None:
+            if word.lower() == "or":
+                out.append("or")
+                continue
+            negate = "-" if word.startswith("-") and len(word) > 1 else ""
+            word = word[1:] if negate else word
+            lemmas = lemmatize(word)
+            if not lemmas:
+                continue
+            if negate and len(lemmas) > 1:
+                out.append('-"' + " ".join(lemmas) + '"')
+            else:
+                out.append(negate + " ".join(lemmas))
+        else:
+            lemmas = lemmatize(phrase)
+            if lemmas:
+                out.append(negate + '"' + " ".join(lemmas) + '"')
+    # An "or" with nothing on one side would be read as the word "or".
+    while out and out[0] == "or":
+        out.pop(0)
+    while out and out[-1] == "or":
+        out.pop()
+    return " ".join(out)

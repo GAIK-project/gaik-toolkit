@@ -34,8 +34,10 @@ with PgVectorStore("postgresql://postgres:postgres@localhost:5432/mydb") as stor
     embeddings = [[0.1, 0.2, ...]]  # from your embedding model
     ids = store.add(docs, embeddings)
 
-    # Semantic search (pure vector similarity)
-    results = store.search_semantic(query_embedding, top_k=5)
+    # Semantic search (pure vector similarity). The default threshold=0.7
+    # drops every row below that cosine similarity; pass 0.0 for recall, for
+    # example when the results go to a Ranker or a RelevanceGate.
+    results = store.search_semantic(query_embedding, top_k=5, threshold=0.0)
 
     # Keyword search (PostgreSQL full-text search)
     results = store.search_keyword("hello", top_k=5)
@@ -100,6 +102,10 @@ distinct terms matched and how close together they are.
 `"or"` and `"prefix"` drop a leading `-` before parsing. Postgres reads it as NOT,
 also in a spaced dash (`Kela - asumistuki`), and a negated term OR-ed with the
 rest would match nearly every row. A dash inside a word (`sote-uudistus`) is kept.
+
+With a `text_processor`, `"websearch"` lemmatizes only the words of the query and
+keeps its operators: `kissa -koiran` becomes `kissa -koira`, and a quoted phrase stays
+a phrase.
 
 Measured on four Finnish sentences plus one long natural question:
 
@@ -176,7 +182,7 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 | `count()` | Total document count |
 | `delete(document_ids)` | Delete by ID, returns deleted count |
 | `search(query_embedding, *, top_k, filters)` | VectorStore-compatible semantic search |
-| `search_semantic(query_embedding, *, top_k, threshold, filters)` | Pure vector search |
+| `search_semantic(query_embedding, *, top_k, threshold, filters)` | Pure vector search; `threshold` (default 0.7) drops rows below that similarity |
 | `search_keyword(query_text, *, top_k, filters)` | Pure FTS keyword search |
 | `search_hybrid(query_embedding, query_text, *, top_k, rrf_k, semantic_weight, keyword_weight, filters)` | RRF hybrid search |
 | `search_hybrid_weighted(query_embedding, query_text, *, top_k, semantic_weight, keyword_weight, filters)` | Weighted hybrid search |

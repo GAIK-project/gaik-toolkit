@@ -31,7 +31,9 @@ from gaik.software_components.RAG.ranker import Ranker
 ranker = Ranker(rrf_k=60)
 
 with PgVectorStore(DATABASE_URL) as store:
-    semantic = store.search_semantic(query_embedding, top_k=50)
+    # threshold=0.0: search_semantic's default of 0.7 is a filter, and it
+    # would drop most relevant chunks before the fusion sees them.
+    semantic = store.search_semantic(query_embedding, top_k=50, threshold=0.0)
     keyword = store.search_keyword(query_text, top_k=50)
 
     hits = ranker.fuse(semantic, keyword, weights=(0.7, 0.3), top_k=10)
