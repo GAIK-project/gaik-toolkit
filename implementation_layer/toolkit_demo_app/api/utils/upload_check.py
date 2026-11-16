@@ -4,7 +4,7 @@
    Routes that take many kinds of file (report writer, source normalizer) skip
    this step and keep their own rules.
 2. What the document carries: DOCX/XLSX/XLSM with a VBA project, macro sheets
-   or ActiveX parts (an ``.xlsm`` without them passes, though Excel marks
+   or ActiveX controls (an ``.xlsm`` without them passes, though Excel marks
    every ``.xlsm`` as macro-enabled), and
    PDF files with JavaScript, launch or import-data actions or rich media
    (``pdf_content``), are refused.
@@ -48,13 +48,14 @@ def _is_macro_part(name: str) -> bool:
     base = lowered.rsplit("/", 1)[-1]
     return (
         base in {"vbaproject.bin", "vbadata.xml"}
-        or ("/activex/" in f"/{lowered}" and base.endswith(".bin"))
+        # An ActiveX control is a binary part or one kept as XML; either runs.
+        or "/activex/" in f"/{lowered}"
         or "/macrosheets/" in f"/{lowered}"
     )
 
 
 def office_has_macros(data: bytes) -> bool:
-    """A VBA project, macro sheet or ActiveX binary, by part name or content type.
+    """A VBA project, macro sheet or ActiveX control, by part name or content type.
 
     The workbook's macro-enabled content type alone is not a macro: Excel
     writes it for every ``.xlsm``, with or without code."""
@@ -71,7 +72,7 @@ def office_has_macros(data: bytes) -> bool:
             lowered = archive.read(info).lower()
     except (zipfile.BadZipFile, OSError, ValueError, KeyError, NotImplementedError):
         return False  # not an archive we can read: the type check reports it
-    return b"vbaproject" in lowered or b"macrosheet" in lowered
+    return b"vbaproject" in lowered or b"macrosheet" in lowered or b"activex" in lowered
 
 
 def content_problem(suffix: str, data: bytes) -> str | None:

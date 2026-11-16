@@ -136,6 +136,34 @@ def test_an_office_file_with_macros_is_refused(suffix, data):
     assert "macros" in content_problem(suffix, data)
 
 
+ACTIVEX_XML = b'<ax:ocx xmlns:ax="http://schemas.microsoft.com/office/2006/activeX"/>'
+ACTIVEX_TYPE = b"application/vnd.ms-office.activeX+xml"
+
+
+@pytest.mark.parametrize(
+    "suffix, data",
+    [
+        # A control kept as XML, not as a binary part.
+        (".docx", _docx({"word/activeX/activeX1.xml": ACTIVEX_XML})),
+        (".xlsx", _zip({"[Content_Types].xml": b"<Types/>", "xl/activeX/activeX1.xml": b"<x/>"})),
+        (".xlsm", _xlsm({"xl/activeX/activeX1.xml": ACTIVEX_XML})),
+        # A control in a part of another name, known by its content type.
+        (
+            ".xlsx",
+            _zip(
+                {
+                    "[Content_Types].xml": b'<Types><Override PartName="/xl/c/c1.xml" '
+                    b'ContentType="' + ACTIVEX_TYPE + b'"/></Types>',
+                    "xl/c/c1.xml": ACTIVEX_XML,
+                }
+            ),
+        ),
+    ],
+)
+def test_an_office_file_with_an_activex_control_in_any_form_is_refused(suffix, data):
+    assert "macros" in content_problem(suffix, data)
+
+
 def test_an_office_file_without_macros_passes():
     assert content_problem(".docx", _docx()) is None
 
