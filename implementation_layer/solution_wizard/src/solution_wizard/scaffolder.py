@@ -298,6 +298,45 @@ def _stage_settings(blueprint: Blueprint) -> dict[str, dict]:
     return stages
 
 
+# The model stages each component calls. A component that calls a model is listed here,
+# so a blueprint's governance flags are checked for every stage its PoC may use; a test
+# keeps it in step with the registry's components that name supported providers.
+_COMPONENT_STAGES: dict[str, set[str]] = {
+    "AudioToStructuredData": {"transcription", "extraction"},
+    "Transcriber": {"transcription"},
+    "ParallelTranscriber": {"transcription"},
+    "TextToSpeech": {"transcription"},
+    "TranscriptEnhancer": {"transcription"},
+    "DocumentsToStructuredData": {"parser", "extraction"},
+    "VisionParser": {"parser"},
+    "VisionPlusParser": {"parser"},
+    "VisionRagParser": {"parser"},
+    "MultimodalParser": {"parser"},
+    "VisionExtractor": {"parser"},
+    "FormUnderstander": {"parser"},
+    "SourceNormalizer": {"parser", "transcription"},
+    "Extractor": {"extraction"},
+    "DataExtractor": {"extraction"},
+    "SchemaGenerator": {"extraction"},
+    "DocumentClassifier": {"extraction"},
+    "RAGWorkflow": {"parser", "embedding", "answer"},
+    "Embedder": {"embedding"},
+    "Retriever": {"embedding"},
+    "AnswerGenerator": {"answer"},
+    "PostgresAgent": {"answer"},
+    "TabularAgent": {"answer"},
+    "MultiSourceReportGenerator": {"answer"},
+    "ReportWriter": {"answer"},
+    "KnowledgeCurator": {"answer"},
+    "ReportSynthesizer": {"answer"},
+    "DraftReviewer": {"answer"},
+    "LLMJudge": {"judge"},
+    "LLMJudgePanel": {"judge"},
+    "ExtractionEvaluator": {"judge"},
+    "RAGEvaluator": {"judge"},
+}
+
+
 def _needed_stages(blueprint: Blueprint, pattern: str) -> set[str]:
     stages = {
         "audio_to_structured": {"transcription", "extraction"},
@@ -305,32 +344,10 @@ def _needed_stages(blueprint: Blueprint, pattern: str) -> set[str]:
         "rag": {"parser", "embedding", "answer"},
     }.get(pattern, {"extraction"}).copy()
     names = set(blueprint.components.selected_building_blocks)
+    names.update(module.name for module in blueprint.components.selected_modules)
     names.update(step.component for step in blueprint.workflow.steps)
-    if names & {"Transcriber", "ParallelTranscriber", "TextToSpeech", "AudioToStructuredData"}:
-        stages.add("transcription")
-    if names & {
-        "VisionParser",
-        "VisionPlusParser",
-        "VisionRagParser",
-        "MultimodalParser",
-        "VisionExtractor",
-    }:
-        stages.add("parser")
-    if "Embedder" in names:
-        stages.add("embedding")
-    if names & {
-        "AnswerGenerator",
-        "PostgresAgent",
-        "TabularAgent",
-        "MultiSourceReportGenerator",
-        "ReportWriter",
-        "KnowledgeCurator",
-        "ReportSynthesizer",
-        "DraftReviewer",
-    }:
-        stages.add("answer")
-    if "LLMJudge" in names:
-        stages.add("judge")
+    for name in names:
+        stages |= _COMPONENT_STAGES.get(name, set())
     return stages
 
 
