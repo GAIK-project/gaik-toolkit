@@ -136,3 +136,15 @@ def test_release_smoke_reports_which_endpoint_answered():
     wrapped = SimpleNamespace(provider="vertex", location=None, _client=global_)
     other = SimpleNamespace(provider="azure")
     assert smoke.vertex_locations([wrapped, eu, global_, other]) == ["eu", "global"]
+
+
+def test_a_global_fallback_named_with_a_regional_location_stays(clients):
+    config = get_llm_config(
+        "vertex",
+        project_id="project",
+        model="gemini-test",
+        location="europe-west4",
+        location_fallback="global",
+    )
+    provider = google_provider.GoogleProvider(config)
+    assert provider._fallback_location == "global"

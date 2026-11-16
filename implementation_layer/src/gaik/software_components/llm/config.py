@@ -109,6 +109,9 @@ def get_llm_config(
     if "location" in overrides and "location_fallback" not in overrides:
         # A location the caller chose is used as given, never swapped for another.
         config.pop("location_fallback", None)
+    if "location_fallback" in overrides:
+        # The caller named the fallback: it applies with any location.
+        config.pop("_default_location_fallback", None)
     config["provider"] = name
     config["use_azure"] = name == Provider.AZURE.value
     if name == Provider.AZURE.value and "azure_audio_endpoint" not in overrides:
@@ -211,6 +214,9 @@ def _vertex_config() -> dict:
         # environment or by the caller is used as given.
         "location": location or VERTEX_DEFAULT_LOCATION,
         "location_fallback": None if location else VERTEX_FALLBACK_LOCATION,
+        # Marks the fallback as the default's, so a location set on this dict
+        # later does not inherit it.
+        "_default_location_fallback": not location,
         # Standard ADC can be a user, service account, or workload identity file.
         # Let google-auth resolve GOOGLE_APPLICATION_CREDENTIALS itself instead
         # of interpreting every ADC file as a service account private key.
