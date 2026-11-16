@@ -33,6 +33,8 @@ def main() -> int:
 
     result = validate(blueprint)
     print(result.summary())
+    # The value generated outputs carry, to tell which blueprint version they came from.
+    print(f"Blueprint SHA-256: {blueprint.fingerprint()['blueprint_sha256']}")
     return 0 if result.ok else 1
 
 

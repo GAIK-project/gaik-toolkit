@@ -24,7 +24,8 @@ load_dotenv(Path(__file__).parent / ".env")
 
 from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
-from provider_config import get_stage_config  # noqa: E402
+from provider_config import external_model_forbidden, get_stage_config  # noqa: E402
+import poc_output  # noqa: E402
 
 
 def load_config() -> dict:
@@ -102,15 +103,14 @@ def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
         print("No saved schema found -- will generate from extraction_requirements.md.")
         return None, None, current_hash
     except Exception as exc:
-        import traceback as _tb
         print(
             f"\nERROR: The approved schema exists but could not be loaded.\n"
+            f"  Model        : {schema_dir}/{schema_name}_model.json\n"
             f"  Schema       : {schema_dir}/{schema_name}.py\n"
             f"  Requirements : {schema_dir}/{schema_name}_requirements.json\n"
-            f"  Reason       : {type(exc).__name__}: {exc}\n\n"
-            f"{_tb.format_exc()}"
+            f"  Reason       : {poc_output.error_detail(exc)}\n\n"
             f"The approved schema has NOT been overwritten.\n"
-            f"To regenerate, delete the two files above and re-run.\n",
+            f"To regenerate, delete the files above and re-run.\n",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -188,7 +188,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="${use_case_name} PoC")
     parser.add_argument("--input", help="Path to document file (overrides sample_input/)")
     parser.add_argument("--synthetic", action="store_true", help="Generate a synthetic sample document")
+    poc_output.add_output_flags(parser)
     args = parser.parse_args()
+    poc_output.configure(args)
 
     config = load_config()
     parser_config = get_stage_config(config, "parser")
@@ -265,10 +267,10 @@ ${source_tracing_section}${llm_judge_section}
     )
 
     print(f"\nExtracted fields written to: {output_path}")
-    print(json.dumps(result.extracted_fields, indent=2, ensure_ascii=False, default=str))
+    poc_output.show_result(result.extracted_fields)
 
     _pdf_source = result.extracted_fields
 ${pdf_report_section}
 
 if __name__ == "__main__":
-    main()
+    poc_output.run(main)

@@ -19,6 +19,7 @@ from pydub import AudioSegment
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
@@ -147,7 +148,16 @@ class TranscriptionResult:
 
 
 class Transcriber:
-    """High-level transcription workflow with optional transcript error fixing."""
+    """High-level transcription workflow with optional transcript error fixing.
+
+    A long recording is split into several paid transcription calls, so a file
+    over ``limits`` (``max_media_seconds``, default 6 hours; ``max_media_bytes``,
+    off by default) is refused with
+    :class:`~gaik.software_components.input_limits.InputLimitError` before the
+    first call. The duration is read with ffprobe (with a timeout) or, when
+    ffprobe cannot read it, from the decoded audio. ``max_size_mb`` and
+    ``max_duration_seconds`` only decide when a file is split into chunks.
+    """
 
     def __init__(
         self,
@@ -169,8 +179,10 @@ class Transcriber:
         initial_prompt: str | None = None,
         local_api_base: str | None = None,
         local_api_key: str | None = None,
+        limits: InputLimits | None = None,
     ) -> None:
         _audio_provider(api_config)
+        self.limits = limits or InputLimits()
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
@@ -203,6 +215,7 @@ class Transcriber:
         input_path = Path(file_path)
         if not input_path.exists():
             raise FileNotFoundError(f"Input file not found: {input_path}")
+        self.limits.check_media(input_path)
 
         job_id = self._generate_job_id(input_path)
 
@@ -231,6 +244,8 @@ class Transcriber:
             audio_duration_s = round(len(AudioSegment.from_file(str(input_path))) / 1000.0, 3)
         except Exception as exc:
             print(f"Could not read audio duration: {exc}")
+        if audio_duration_s is not None:
+            self.limits.check_media_seconds(audio_duration_s, input_path.name)
 
         segments: list[dict] | None = None
         srt_content: str | None = None
@@ -391,6 +406,7 @@ class Transcriber:
             audio = AudioSegment.from_file(
                 input_path
             )  # works for audio, and many video containers via ffmpeg
+            self.limits.check_media_seconds(len(audio) / 1000, input_path.name)
             return split_and_transcribe_with_context(
                 str(input_path),
                 self.api_config,

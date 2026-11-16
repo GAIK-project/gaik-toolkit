@@ -433,7 +433,7 @@ export default function ClassifierPage() {
       <DemoPageHeader
         icon={Tags}
         title="Classifier"
-        description="Automatically sort documents into categories using AI"
+        description="Sort documents into the categories you define"
         className="mb-6"
       />
 

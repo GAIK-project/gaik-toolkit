@@ -8,16 +8,25 @@ import requests
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".m4v"}
 
+# Longest an ffmpeg audio extraction may run before it is stopped.
+FFMPEG_TIMEOUT_SECONDS = 1800
+
 
 def is_video_file(file_path: Path) -> bool:
     return file_path.suffix.lower() in VIDEO_EXTENSIONS
 
 
-def extract_audio_from_video(video_path: Path, output_dir: Path | None = None) -> Path:
+def extract_audio_from_video(
+    video_path: Path,
+    output_dir: Path | None = None,
+    *,
+    timeout: float = FFMPEG_TIMEOUT_SECONDS,
+) -> Path:
     """Extract a mono 16 kHz WAV from a video file and return its path.
 
     The WAV is written into ``output_dir`` when one is given, otherwise beside
-    the video. The caller removes it.
+    the video. The caller removes it. ffmpeg is stopped after ``timeout``
+    seconds and a :class:`RuntimeError` is raised.
     """
     if shutil.which("ffmpeg") is None:
         raise RuntimeError(
@@ -41,7 +50,13 @@ def extract_audio_from_video(video_path: Path, output_dir: Path | None = None) -
         str(output_audio),
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        output_audio.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Audio extraction for '{video_path.name}' took longer than {timeout:.0f} s."
+        ) from exc
     if result.returncode != 0:
         stderr_msg = (result.stderr or "").strip()
         raise RuntimeError(

@@ -72,7 +72,10 @@ def _gen() -> MultiSourceReportGenerator:
 
 def test_constructor_follows_gaik_convention():
     params = inspect.signature(MultiSourceReportGenerator.__init__).parameters
-    assert set(params) - {"self"} == {"api_config", "use_azure"}
+    assert set(params) - {"self"} == {"api_config", "use_azure", "limits"}
+    assert all(
+        params[name].kind is inspect.Parameter.KEYWORD_ONLY for name in set(params) - {"self"}
+    )
 
 
 def test_run_is_public_method_without_input_sources():
