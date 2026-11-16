@@ -234,6 +234,9 @@ package the api image installs) to generate the extraction schema.
 args (baked into the bundle). With Supabase auth, set `WIZARD_ALLOWED_EMAILS`
 (runtime, comma-separated): only the listed accounts get in, and nobody without
 it, since anyone can create an account in the Supabase project with its public key.
+`GAIK_DEMO_URL` (runtime, optional) is where the sign-in page and the account
+menu link back to the GAIK demos; it defaults to `https://gaik-demo.2.rahtiapp.fi`,
+and an empty value hides the link.
 
 ### Supabase sign-in checklist
 

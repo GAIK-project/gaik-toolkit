@@ -7,6 +7,7 @@ import { ACCOUNT_MENU_ITEM } from "@/components/menu-item";
 import { Sidebar } from "@/components/sidebar";
 import type { SessionRow } from "@/components/sidebar-sessions";
 import { getCurrentUser } from "@/lib/current-user";
+import { gaikDemoUrl } from "@/lib/gaik-demo";
 import { getI18n } from "@/lib/i18n";
 import { logger } from "@/lib/logger";
 import { sessionRows } from "@/lib/session-rows";
@@ -43,6 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         email={user.email}
         defaultCollapsed={collapsed}
         loadFailed={loadFailed}
+        demoUrl={gaikDemoUrl()}
         localeSwitcher={<LocaleSwitcher locale={locale} variant="menu" label={t.languageLabel} />}
         signOut={
           <form action={signOut}>
@@ -61,6 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           account: t.accountLabel,
           privacy: t.privacyLink,
           help: t.helpLink,
+          demos: t.gaikDemosLink,
           sessions: {
             nav: t.sessionsNav,
             days: {

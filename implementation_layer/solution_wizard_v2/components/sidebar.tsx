@@ -26,6 +26,7 @@ export type SidebarLabels = {
   account: string;
   privacy: string;
   help: string;
+  demos: string;
   sessions: SessionListLabels;
 };
 
@@ -44,6 +45,7 @@ export function Sidebar({
   labels,
   defaultCollapsed,
   loadFailed,
+  demoUrl,
   localeSwitcher,
   signOut,
 }: {
@@ -54,6 +56,8 @@ export function Sidebar({
   defaultCollapsed: boolean;
   /** The sessions could not be read; the page beside the sidebar still works. */
   loadFailed: boolean;
+  /** The GAIK demos the account menu links back to; null leaves the link out. */
+  demoUrl: string | null;
   localeSwitcher: ReactNode;
   signOut: ReactNode;
 }) {
@@ -175,7 +179,12 @@ export function Sidebar({
     setDrawerOpen(false);
     window.dispatchEvent(new Event(FOCUS_START_EVENT));
   };
-  const accountLabels = { account: labels.account, privacy: labels.privacy, help: labels.help };
+  const accountLabels = {
+    account: labels.account,
+    privacy: labels.privacy,
+    help: labels.help,
+    demos: labels.demos,
+  };
 
   return (
     <>
@@ -295,6 +304,7 @@ export function Sidebar({
               email={email}
               variant="row"
               labels={accountLabels}
+              demoUrl={demoUrl}
               localeSwitcher={localeSwitcher}
               signOut={signOut}
             />
@@ -338,6 +348,7 @@ export function Sidebar({
               email={email}
               variant="rail"
               labels={accountLabels}
+              demoUrl={demoUrl}
               localeSwitcher={localeSwitcher}
               signOut={signOut}
             />

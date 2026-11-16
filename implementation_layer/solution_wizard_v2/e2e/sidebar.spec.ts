@@ -470,6 +470,8 @@ test.describe("the sidebar on a desktop", () => {
     await page.keyboard.press("ArrowDown");
     await expect(menu.getByTestId("privacy-link")).toBeFocused();
     await page.keyboard.press("ArrowDown");
+    await expect(menu.getByTestId("gaik-demos-link")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
     await expect(signOut).toBeFocused();
     await page.keyboard.press("ArrowDown");
     await expect(fi).toBeFocused();
@@ -496,7 +498,8 @@ test.describe("the sidebar on a desktop", () => {
     await expect(account.getByRole("button")).toHaveCount(1);
 
     // The menu opens upward from the row, inside the window: the language,
-    // the help page, the privacy notice, signing out.
+    // the help page, the privacy notice, the way back to the GAIK demos,
+    // signing out.
     await opener.click();
     await expect(menu).toBeVisible();
     await expect(menu.getByRole("group", { name: "Kieli" })).toBeVisible();
@@ -505,8 +508,13 @@ test.describe("the sidebar on a desktop", () => {
       "English",
       "Ohje",
       "Tietosuojaseloste",
+      "GAIK-demot",
       "Kirjaudu ulos",
     ]);
+    await expect(menu.getByTestId("gaik-demos-link")).toHaveAttribute(
+      "href",
+      "https://gaik-demo.2.rahtiapp.fi/",
+    );
     await expect(menu.locator('button[name="locale"][value="fi"]')).toHaveAttribute("aria-current", "true");
     await expect(menu.locator('button[name="locale"][value="en"]')).not.toHaveAttribute("aria-current", "true");
     await expect.poll(() => menu.evaluate((el) => el.getAnimations().length)).toBe(0);
@@ -636,6 +644,7 @@ test.describe("the sidebar on a phone", () => {
         en: menu.locator('button[name="locale"][value="en"]'),
         help: menu.getByTestId("help-link"),
         privacy: menu.getByTestId("privacy-link"),
+        demos: menu.getByTestId("gaik-demos-link"),
         signOut: menu.getByRole("button", { name: "Kirjaudu ulos" }),
       };
       for (const [name, item] of Object.entries(items)) {

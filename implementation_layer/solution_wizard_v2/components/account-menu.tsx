@@ -11,6 +11,7 @@ export type AccountMenuLabels = {
   account: string;
   privacy: string;
   help: string;
+  demos: string;
 };
 
 const GAP = 4;
@@ -23,8 +24,8 @@ const UNPLACED = { left: "0.5rem", bottom: "3.5rem" } as const;
 
 /**
  * Who is signed in, as one row at the sidebar's foot, and what belongs to the
- * account behind it: the language, the help page, the privacy notice and
- * signing out. The
+ * account behind it: the language, the help page, the privacy notice, the way
+ * back to the GAIK demos and signing out. The
  * list is a native popover, like a session row's menu: it is drawn above the
  * sidebar, and Esc, a press elsewhere and the return of focus to the row come
  * with it. The language choice and the sign-out form come from the server as
@@ -34,6 +35,7 @@ export function AccountMenu({
   email,
   variant,
   labels,
+  demoUrl,
   localeSwitcher,
   signOut,
 }: {
@@ -41,6 +43,8 @@ export function AccountMenu({
   /** "row": the initial, the e-mail and a chevron; "rail": the initial alone. */
   variant: "row" | "rail";
   labels: AccountMenuLabels;
+  /** The GAIK demos; null leaves the link out. */
+  demoUrl: string | null;
   localeSwitcher: ReactNode;
   signOut: ReactNode;
 }) {
@@ -167,6 +171,12 @@ export function AccountMenu({
           <Icon name="shieldCheck" size={14} />
           {labels.privacy}
         </Link>
+        {demoUrl && (
+          <a href={demoUrl} data-testid="gaik-demos-link" className={ACCOUNT_MENU_ITEM}>
+            <Icon name="externalLink" size={14} />
+            {labels.demos}
+          </a>
+        )}
         {signOut}
       </div>
     </>

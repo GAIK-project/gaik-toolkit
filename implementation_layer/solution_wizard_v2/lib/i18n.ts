@@ -248,6 +248,8 @@ export type Dict = {
   // the sessions in the sidebar
   privacyLink: string;
   helpLink: string;
+  /** The link back to the GAIK toolkit's demos, on the sign-in page and in the account menu. */
+  gaikDemosLink: string;
   pocInputReminder: string;
   exportSessionOpen: string;
   searchSessions: string;
@@ -917,6 +919,7 @@ const fi: Dict = {
 
   privacyLink: "Tietosuojaseloste",
   helpLink: "Ohje",
+  gaikDemosLink: "GAIK-demot",
   pocInputReminder:
     "Käytä synteettistä tai anonymisoitua aineistoa. Älä lataa henkilötietoja, ellei se ole tarpeen.",
   exportSessionOpen: "Lataa session tiedot ZIP-tiedostona",
@@ -1667,6 +1670,7 @@ const en: Dict = {
 
   privacyLink: "Privacy notice",
   helpLink: "Help",
+  gaikDemosLink: "GAIK demos",
   pocInputReminder:
     "Use synthetic or anonymised material. Do not upload personal data unless it is needed.",
   exportSessionOpen: "Download the session's data as a ZIP file",

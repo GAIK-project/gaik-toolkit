@@ -3,6 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { login } from "./actions";
 import { getI18n } from "@/lib/i18n";
+import { gaikDemoUrl } from "@/lib/gaik-demo";
+import { Icon } from "@/components/icons";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { getApiVersion } from "@/lib/wizard-api-client";
 import { loginError, loginMessage } from "./notices";
@@ -18,6 +20,7 @@ export default async function LoginPage({
   const apiVersion = (await getApiVersion()) ?? "unknown";
   const error = loginError(t, params.error);
   const message = loginMessage(t, params.message);
+  const demoUrl = gaikDemoUrl();
 
   return (
     <main
@@ -25,6 +28,18 @@ export default async function LoginPage({
       className="relative flex min-h-screen items-center justify-center bg-surface p-4"
     >
       <div aria-hidden className="start-backdrop" style={{ "--at": "48%" } as CSSProperties} />
+      {/* Most people come here from the GAIK demos: the way back is in the
+          corner, outside the sign-in itself. */}
+      {demoUrl && (
+        <a
+          href={demoUrl}
+          data-testid="gaik-demos-link"
+          className="absolute left-4 top-4 z-10 inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm text-text-muted transition-colors duration-150 hover:text-text"
+        >
+          <Icon name="arrowLeft" size={14} />
+          {t.gaikDemosLink}
+        </a>
+      )}
       <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-surface p-8 shadow-md">
         <div className="absolute right-8 top-8">
           <LocaleSwitcher locale={locale} />
