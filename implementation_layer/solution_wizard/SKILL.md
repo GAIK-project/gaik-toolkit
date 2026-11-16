@@ -274,6 +274,20 @@ If the user requests changes, apply them **directly** to `output_schema.py` and
 Update only the specific fields the user asked to change. SchemaGenerator was called once
 to establish the base schema; all subsequent refinements are made by you as the agent.
 
+The PoC does not import `output_schema.py`: `load_schema()` reads
+`output_schema_model.json`. After every edit to `output_schema.py`, write that file again:
+
+```bash
+python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas
+```
+
+If it exits with an error, nothing was written and the PoC would still run the old schema:
+fix `output_schema.py` (the class name must match `model_name` in the requirements JSON,
+the field types must be ones the schema generator produces, and the class adds no
+validators, serializers, methods, private attributes or config options other than
+`extra`; keep the generated `DecimalField` / `OptionalDecimalField` helpers as they are)
+and run it again.
+
 After each edit, confirm the change with the user before proceeding.
 
 **Schema constraint checklist — apply before Step 4.6**
@@ -729,7 +743,8 @@ Repeat until the user is satisfied or chooses to proceed:
 
 2. **Diagnose the cause** -- map each problem to its likely source:
    - Missing or wrong field value → `prompts/extraction_requirements.md` is unclear
-   - Wrong schema type or field name → `schemas/output_schema.py` needs updating
+   - Wrong schema type or field name → `schemas/output_schema.py` needs updating, then
+     `scripts/refresh_schema_model.py` (Step 4.5) so `output_schema_model.json` matches
    - Transcript quality issue → `TranscriptEnhancer` may need `additional_instructions`
    - Empty retrieval → document not in `sample_input/` or indexing failed
    - Model/temperature issue → `config.yaml`

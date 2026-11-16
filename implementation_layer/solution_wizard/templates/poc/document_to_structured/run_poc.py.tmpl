@@ -73,11 +73,12 @@ def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
     except Exception as exc:
         print(
             f"\nERROR: The approved schema exists but could not be loaded.\n"
+            f"  Model        : {schema_dir}/{schema_name}_model.json\n"
             f"  Schema       : {schema_dir}/{schema_name}.py\n"
             f"  Requirements : {schema_dir}/{schema_name}_requirements.json\n"
             f"  Reason       : {poc_output.error_detail(exc)}\n\n"
             f"The approved schema has NOT been overwritten.\n"
-            f"To regenerate, delete the two files above and re-run.\n",
+            f"To regenerate, delete the files above and re-run.\n",
             file=sys.stderr,
         )
         sys.exit(1)
