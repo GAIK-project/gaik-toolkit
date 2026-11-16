@@ -1131,3 +1131,98 @@ def is_deployable_path(relative_path: str) -> bool:
 def deployable_files(poc_dir: str) -> list[str]:
     """The package as someone else receives it, relative to poc/."""
     return [rel for rel in regular_files(poc_dir) if is_deployable_path(rel)]
+
+
+#: The folder the wizard writes the solution's documentation into (step 12).
+SOLUTION_DOCS_DIR = "docs"
+#: The documents ``generate_docs.py`` writes there, in its order: solution_wizard's
+#: ``docs_generator.DOC_NAMES``. Kept here because the api hands the documents
+#: over without solution_wizard installed; a test holds the two lists together.
+SOLUTION_DOC_NAMES = (
+    "genai_product_canvas",
+    "technical_specification",
+    "user_guide",
+    "developer_guide",
+    "evaluation_plan",
+)
+#: The diagram's name in the deployable package. It is drawn from the session's
+#: blueprint when the package is taken, not copied, see :func:`stored_bpmn`.
+SOLUTION_BPMN_NAME = artifact_sync.WORKFLOW_BPMN_FILE
+#: A solution file larger than this is left out of the package. The documents
+#: and diagrams the wizard writes are a few kilobytes each.
+MAX_SOLUTION_FILE_BYTES = 5 * 1024 * 1024
+
+
+def _solution_file(root: str, relative: str) -> str | None:
+    """The session's file at ``relative``, when it is a real file of a sane size."""
+    path = os.path.join(root, relative)
+    if not regular_file(path, root) or os.path.getsize(path) > MAX_SOLUTION_FILE_BYTES:
+        return None
+    return path
+
+
+def solution_files(output_dir: str | None) -> list[tuple[str, str]]:
+    """The files beside ``poc/`` that go into the deployable package as they are.
+
+    Each entry is the name the file has in the package and where it is in the
+    session: the blueprint the wizard wrote (the use case, the business and
+    technical specification with the model provider and preferences, the
+    components and the workflow), the workflow as a Mermaid diagram, and the
+    documents ``generate_docs.py`` writes (:data:`SOLUTION_DOC_NAMES`). Only
+    those: anything else in ``docs/`` (a ``.env``, ``__pycache__``, a copy of a
+    test document) stays out. The BPMN diagram is not here; it is drawn when the
+    package is taken (:data:`SOLUTION_BPMN_NAME`).
+
+    Real files only, as in the package: a symlink the agent left is not
+    followed, and neither is a linked ``docs/`` folder.
+    """
+    if not output_dir or not os.path.isdir(output_dir):
+        return []
+    root = os.path.realpath(output_dir)
+    wanted = [artifact_sync.DRAFT_BLUEPRINT_FILE, artifact_sync.WORKFLOW_MMD_FILE]
+    docs = os.path.join(root, SOLUTION_DOCS_DIR)
+    if os.path.isdir(docs) and not os.path.islink(docs):
+        wanted += [f"{SOLUTION_DOCS_DIR}/{name}.md" for name in SOLUTION_DOC_NAMES]
+    found: list[tuple[str, str]] = []
+    for name in wanted:
+        path = _solution_file(root, name)
+        if path is not None:
+            found.append((name, path))
+    return found
+
+
+def solution_file_names(output_dir: str | None, *, can_draw: bool) -> list[str]:
+    """The names the deployable package carries beside ``poc/``, in its order.
+
+    The BPMN diagram is named where the package can draw it from the session's
+    blueprint (``can_draw``: solution_wizard is installed) or falls back to the
+    one the session kept (:func:`stored_bpmn`).
+    """
+    if not output_dir or not os.path.isdir(output_dir):
+        return []
+    names = [name for name, _ in solution_files(output_dir)]
+    if can_draw or stored_bpmn(output_dir) is not None:
+        position = 1 if names[:1] == [artifact_sync.DRAFT_BLUEPRINT_FILE] else 0
+        names.insert(position, SOLUTION_BPMN_NAME)
+    return names
+
+
+def stored_bpmn(output_dir: str | None) -> tuple[str, str] | None:
+    """The diagram already drawn in the session, for when it cannot be drawn again.
+
+    The workspace's (``ui_view/workflow.bpmn``, written on the last chat turn),
+    else the agent's own ``workflow.bpmn``; with where it came from
+    (``"workspace_view"`` or ``"agent_draft"``). Either may be older than the
+    blueprint: a save in the Blueprint form or the diagram rewrites neither.
+    """
+    if not output_dir or not os.path.isdir(output_dir):
+        return None
+    root = os.path.realpath(output_dir)
+    for relative, source in (
+        (artifact_sync.UI_VIEW_BPMN_FILE, "workspace_view"),
+        (artifact_sync.WORKFLOW_BPMN_FILE, "agent_draft"),
+    ):
+        path = _solution_file(root, relative)
+        if path is not None:
+            return path, source
+    return None

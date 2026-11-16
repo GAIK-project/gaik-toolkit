@@ -64,12 +64,26 @@ async function fakePoc(
     record = RECORDS,
     check = "ok",
     inputs = true,
-  }: { record?: unknown; check?: Check; /** Test material is in the package. */ inputs?: boolean } = {},
+    solution,
+  }: {
+    record?: unknown;
+    check?: Check;
+    /** Test material is in the package. */ inputs?: boolean;
+    /** What the deployable package carries beside poc/ (wizard_api's `solution_files`). */
+    solution?: string[];
+  } = {},
 ): Promise<Fake> {
   const fake: Fake = { checks: 0, generations: 0, version: "v1", runs: 0, holdChecks: false };
   await page.route(`${API}/poc/files`, (route) =>
     route.fulfill({
-      json: { generated: true, ready: true, problems: [], files: FILES, version: fake.version },
+      json: {
+        generated: true,
+        ready: true,
+        problems: [],
+        files: FILES,
+        version: fake.version,
+        ...(solution ? { solution_files: solution } : {}),
+      },
     }),
   );
   await page.route(`${API}/poc/input`, (route) =>
@@ -170,6 +184,40 @@ async function runTest(page: Page) {
 test.describe("PoC tab", () => {
   test.beforeEach(async ({ request }) => {
     await resetMockSessions(request);
+  });
+
+  test("the package details name what the deployment package carries beside the package's files", async ({
+    page,
+  }) => {
+    const solution = [
+      "use_case.blueprint.json",
+      "workflow.bpmn",
+      "workflow.mmd",
+      "docs/technical_specification.md",
+      "docs/user_guide.md",
+    ];
+    // No test material: the run waits, so the package step stays in view.
+    await fakePoc(page, { solution, inputs: false });
+    await openCheckedPoc(page);
+    const details = page.getByTestId("poc-package-details");
+    await details.getByText("Paketin tiedot").click();
+
+    // The package's own files as before, and under them the blueprint, the diagrams and the documentation.
+    await expect(details.getByTestId("poc-files").getByRole("listitem")).toHaveText(FILES);
+    const beside = details.getByTestId("poc-solution-files");
+    await expect(beside).toContainText("Käyttöönottopaketissa lisäksi (5)");
+    await expect(beside.getByRole("listitem")).toHaveText(solution);
+    const files = (await details.getByTestId("poc-files").boundingBox())!;
+    expect((await beside.boundingBox())!.y).toBeGreaterThanOrEqual(files.y + files.height);
+  });
+
+  test("an api that names nothing beside the package shows the package's files alone", async ({ page }) => {
+    await fakePoc(page, { inputs: false });
+    await openCheckedPoc(page);
+    const details = page.getByTestId("poc-package-details");
+    await details.getByText("Paketin tiedot").click();
+    await expect(details.getByTestId("poc-files").getByRole("listitem")).toHaveText(FILES);
+    await expect(details.getByTestId("poc-solution-files")).toHaveCount(0);
   });
 
   test("a checked package is one status line, with its files and controls behind Paketin tiedot", async ({

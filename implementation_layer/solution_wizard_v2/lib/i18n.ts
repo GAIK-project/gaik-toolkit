@@ -488,6 +488,8 @@ export type Dict = {
   pocPackageHasErrors: string;
   /** "{n} tiedostoa": the generated files, behind a disclosure. */
   pocFilesToggle: string;
+  /** The blueprint, diagrams and documentation the deployable package carries beside the package's files, with {n}. */
+  pocSolutionFiles: string;
   /** "Ajo käynnissä · {time}" while a sandbox run is going. */
   pocRunElapsed: string;
   pocRunSandboxHint: string;
@@ -1174,6 +1176,7 @@ const fi: Dict = {
   pocPackageReady: "Valmis ajettavaksi",
   pocPackageHasErrors: "Paketissa on virheitä",
   pocFilesToggle: "Paketin tiedostot ({n})",
+  pocSolutionFiles: "Käyttöönottopaketissa lisäksi ({n})",
   pocRunElapsed: "Ajo käynnissä · {time}",
   pocRunSandboxHint: "Generoi paketti ensin.",
   pocNeedsPackage: "Avautuu, kun paketti on generoitu.",
@@ -1932,6 +1935,7 @@ const en: Dict = {
   pocPackageReady: "Ready to run",
   pocPackageHasErrors: "The package has errors",
   pocFilesToggle: "Package files ({n})",
+  pocSolutionFiles: "Also in the deployment package ({n})",
   pocRunElapsed: "Running · {time}",
   pocRunSandboxHint: "Generate the package first.",
   pocNeedsPackage: "Opens once the package is generated.",

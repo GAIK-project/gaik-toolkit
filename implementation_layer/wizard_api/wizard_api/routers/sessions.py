@@ -262,7 +262,7 @@ def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
     poc = _poc_dir(session.output_dir)
     if not poc or not os.path.isdir(poc):
         return {"generated": False, "files": []}
-    from wizard_api.services import poc_service
+    from wizard_api.services import bpmn_service, poc_service
 
     # The record of which inputs the user added is the api's own, not a file of the package.
     files = [
@@ -277,6 +277,11 @@ def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
     return {
         "generated": True,
         "files": files,
+        # What the deployable package carries beside poc/: the blueprint, the
+        # diagrams and the documentation, by the names they have in it.
+        "solution_files": poc_service.solution_file_names(
+            session.output_dir, can_draw=bpmn_service.solution_wizard_available()
+        ),
         "ready": not problems,
         "problems": problems,
         "version": poc_service.package_version(poc),
@@ -2259,6 +2264,34 @@ def list_refinements(session_id: uuid.UUID, db: Session = Depends(get_db)) -> di
     return {"refinements": list(session.session_metadata.get("refinements") or [])}
 
 
+def _package_bpmn(db: Session, session: Any) -> tuple[str | None, dict[str, Any]]:
+    """The deployable package's BPMN diagram, and what it was drawn from.
+
+    Drawn from the session's blueprint as the package is taken, as ``GET /bpmn``
+    draws it: ``ui_view/workflow.bpmn`` is rewritten only on a chat turn, so
+    after a save in the Blueprint form or the diagram it shows the version
+    before. Where the blueprint cannot be drawn, the diagram the session kept
+    (``poc_service.stored_bpmn``), marked as a model's work like a drawn one.
+    """
+    from wizard_api.services import ai_marking, bpmn_service, poc_service
+
+    try:
+        xml = bpmn_service.generate_bpmn_xml(
+            session_service.session_detail(db, session).blueprint.model_dump(),
+            session_id=str(session.id),
+            agent_draft=artifact_sync.read_draft_blueprint(session.output_dir),
+        )
+        return xml, {"made_from": "blueprint", "blueprint_version": session.active_version}
+    except Exception:  # noqa: BLE001 - the package goes out with the diagram the session kept
+        logger.warning("The package's diagram could not be drawn from the blueprint", exc_info=True)
+    stored = poc_service.stored_bpmn(session.output_dir)
+    if stored is None:
+        return None, {}
+    path, source = stored
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        return ai_marking.mark_xml(fh.read()), {"made_from": source}
+
+
 @router.get("/{session_id}/poc/deployable")
 def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)) -> Response:
     """The package as someone else receives it, after a run has proved it (#143).
@@ -2268,6 +2301,14 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
     thing the whole sandbox step exists to prevent — and it leaves behind what
     belongs to developing it: the sample input, the previous run's output, and
     the __pycache__ a package review found being shipped.
+
+    Beside ``poc/`` it carries what says what the solution is: the blueprint,
+    the workflow diagrams and the documentation, as far as the session has them
+    (``poc_service.solution_files``). Someone who receives only the code cannot
+    tell which model, components and review steps were decided, or why. The
+    BPMN diagram is drawn from the session's blueprint as the package is taken
+    (``_package_bpmn``), and ``AI-GENERATED.json`` at the root says what each of
+    these files was made from: the draft and the blueprint can have parted.
     """
     from wizard_api.services import ai_marking, poc_service
 
@@ -2300,6 +2341,14 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
         )
 
     package_config = poc_service.config_with_model_timeout(poc)
+    diagram, diagram_source = _package_bpmn(db, session)
+    solution = poc_service.solution_files(session.output_dir)
+    # The blueprint file, the Mermaid diagram and the documents are the agent's;
+    # a save in the workspace since its draft was adopted is in the BPMN only.
+    made_from: dict[str, dict[str, Any]] = {}
+    if diagram is not None:
+        made_from[poc_service.SOLUTION_BPMN_NAME] = diagram_source
+    made_from.update({name: {"made_from": "agent_draft"} for name, _ in solution})
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for relative in poc_service.deployable_files(poc):
@@ -2312,6 +2361,19 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
         zf.writestr(
             os.path.join("poc", ai_marking.MARKER_FILE),
             ai_marking.marker_json(session, "poc-package-deployable"),
+        )
+        if diagram is not None:
+            zf.writestr(poc_service.SOLUTION_BPMN_NAME, diagram)
+        for name, source in solution:
+            zf.write(source, name)
+        zf.writestr(
+            ai_marking.MARKER_FILE,
+            ai_marking.marker_json(
+                session,
+                "solution-files-deployable",
+                agent_draft_matches_blueprint=not artifact_sync.user_changed_blueprint(db, session),
+                files=made_from,
+            ),
         )
     return Response(
         content=buf.getvalue(),

@@ -17,6 +17,12 @@ export type PocPackageState = {
   ready: boolean;
   problems: string[];
   files: string[];
+  /**
+   * What the deployable package carries beside the package's own files: the
+   * blueprint, the workflow diagrams and the documentation, by their names in
+   * it (`solution_files`). Empty from the mock store and an api without it.
+   */
+  solutionFiles: string[];
   /** The sandbox run wizard_api has recorded as successful, or null (#143, #253). */
   recordedRun: string | null;
   /** Digest of the files a preflight reads; a new one means the agent changed the package. */
@@ -32,6 +38,7 @@ export const NO_POC_PACKAGE: PocPackageState = {
   ready: false,
   problems: [],
   files: [],
+  solutionFiles: [],
   recordedRun: null,
   version: null,
   packageDigest: null,
@@ -45,6 +52,7 @@ export function pocPackageState(raw: unknown): PocPackageState {
     ready?: unknown;
     problems?: unknown;
     files?: unknown;
+    solution_files?: unknown;
     recordedRun?: unknown;
     version?: unknown;
     package_digest?: unknown;
@@ -63,6 +71,7 @@ export function pocPackageState(raw: unknown): PocPackageState {
     ready: d.ready !== false,
     problems: strings(d.problems),
     files: strings(d.files),
+    solutionFiles: strings(d.solution_files),
     recordedRun,
     version,
     packageDigest: text(d.package_digest),
@@ -82,6 +91,9 @@ export function samePocPackage(a: PocPackageState, b: PocPackageState): boolean 
     a.problems.length === b.problems.length &&
     a.problems.every((p, i) => p === b.problems[i]) &&
     a.files.length === b.files.length &&
-    a.files.every((f, i) => f === b.files[i])
+    a.files.every((f, i) => f === b.files[i]) &&
+    // The documentation is written after the test run: the list grows without the package changing.
+    a.solutionFiles.length === b.solutionFiles.length &&
+    a.solutionFiles.every((f, i) => f === b.solutionFiles[i])
   );
 }

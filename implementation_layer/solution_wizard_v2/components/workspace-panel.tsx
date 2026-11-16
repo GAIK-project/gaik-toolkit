@@ -922,6 +922,8 @@ export function WorkspacePanel({
   /** The run the tab follows now; an earlier run's output arriving late is dropped. */
   const activeRunRef = useRef<string | null>(null);
   const [pocFiles, setPocFiles] = useState<string[]>([]);
+  // What the deployable package carries beside them: blueprint, diagrams, documentation.
+  const [solutionFiles, setSolutionFiles] = useState<string[]>([]);
   // `ready`/`problems` come from the api's package check; see lib/poc-package-state.
   const [pocReady, setPocReady] = useState(false);
   const [pocProblems, setPocProblems] = useState<string[]>([]);
@@ -1116,6 +1118,7 @@ export function WorkspacePanel({
         setPocReady(state.ready);
         setPocProblems(state.problems);
         setPocFiles(state.files);
+        setSolutionFiles(state.solutionFiles);
         setPocVersion(state.version);
         // The api's word on whether a run is recorded (#253). The server page
         // seeded this from the same field; a mock/older answer leaves it alone.
@@ -1132,6 +1135,7 @@ export function WorkspacePanel({
           setPocReady(false);
           setPocProblems([]);
           setPocFiles([]);
+          setSolutionFiles([]);
         }
       });
     return () => {
@@ -1833,15 +1837,26 @@ export function WorkspacePanel({
     </button>
   );
 
-  const fileList = (
-    <ul className="gap-x-6 font-mono text-xs text-text-muted @md:columns-2">
-      {pocFiles.map((f) => (
+  const filesOf = (files: string[], testId: string) => (
+    <ul className="gap-x-6 font-mono text-xs text-text-muted @md:columns-2" data-testid={testId}>
+      {files.map((f) => (
         <li key={f} className="flex break-inside-avoid items-center gap-1.5 py-px" title={f}>
           <FileIcon name={f} size={13} />
           <span className="min-w-0 truncate">{f}</span>
         </li>
       ))}
     </ul>
+  );
+  const fileList = filesOf(pocFiles, "poc-files");
+  // The deployable package's other half: what says what the solution is. Named
+  // for where it goes, since the working copy does not carry it.
+  const solutionList = solutionFiles.length > 0 && (
+    <div className="flex flex-col gap-1.5" data-testid="poc-solution-files">
+      <span className="text-xs font-medium text-text-muted">
+        {t.pocSolutionFiles.replace("{n}", String(solutionFiles.length))}
+      </span>
+      {filesOf(solutionFiles, "poc-solution-files-list")}
+    </div>
   );
 
   const packageCard = (
@@ -1951,6 +1966,7 @@ export function WorkspacePanel({
                 {fileList}
               </div>
             )}
+            {solutionList}
           </div>
         </details>
       ) : (
@@ -1959,7 +1975,10 @@ export function WorkspacePanel({
             <summary className="cursor-pointer text-xs font-medium text-text-secondary">
               {t.pocFilesToggle.replace("{n}", String(pocFiles.length))}
             </summary>
-            <div className="mt-2">{fileList}</div>
+            <div className="mt-2 flex flex-col gap-3">
+              {fileList}
+              {solutionList}
+            </div>
           </details>
         )
       )}

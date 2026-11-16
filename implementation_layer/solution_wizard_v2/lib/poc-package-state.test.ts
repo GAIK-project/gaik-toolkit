@@ -15,6 +15,7 @@ describe("pocPackageState", () => {
       ready: true,
       problems: [],
       files: ["run_poc.py"],
+      solutionFiles: [],
       recordedRun: null,
       version: null,
       packageDigest: null,
@@ -34,6 +35,20 @@ describe("pocPackageState", () => {
     expect(s.testedPackage).toBe("d1");
     // An api that keeps none, and values that are not digests.
     expect(pocPackageState({ generated: true, files: [] }).packageDigest).toBeNull();
+  });
+
+  it("reads what the deployable package carries beside the package's files, and notices when it grows", () => {
+    const before = pocPackageState({ generated: true, files: ["run_poc.py"] });
+    expect(before.solutionFiles).toEqual([]);
+    const after = pocPackageState({
+      generated: true,
+      files: ["run_poc.py"],
+      solution_files: ["use_case.blueprint.json", "workflow.bpmn", 7, "docs/user_guide.md"],
+    });
+    expect(after.solutionFiles).toEqual(["use_case.blueprint.json", "workflow.bpmn", "docs/user_guide.md"]);
+    // The documentation arrives after the test run, with the package itself unchanged.
+    expect(samePocPackage(before, after)).toBe(false);
+    expect(samePocPackage(after, pocPackageState({ ...after, solution_files: after.solutionFiles }))).toBe(true);
     expect(pocPackageState({ generated: true, files: [], package_digest: 5, testedPackage: "" })).toMatchObject({
       packageDigest: null,
       testedPackage: null,

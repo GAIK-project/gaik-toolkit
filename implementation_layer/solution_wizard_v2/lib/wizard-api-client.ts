@@ -412,6 +412,8 @@ export async function apiSyncSessionBpmn(id: string, xml: string) {
 export type ApiPocFiles = {
   generated: boolean;
   files: string[];
+  /** What the deployable package carries beside poc/: blueprint, diagrams, documentation. */
+  solution_files?: string[];
   /** Whether the files add up to a package worth handing over (wizard_api's package check). */
   ready?: boolean;
   /** What is missing when `ready` is false. */

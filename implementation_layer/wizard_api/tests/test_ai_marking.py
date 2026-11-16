@@ -78,3 +78,15 @@ def test_the_diagram_opens_with_the_mark(monkeypatch) -> None:
     )
     assert marked.endswith("<bpmn:definitions/>")
     assert ai_marking.mark_xml("<a/>").startswith("<!-- ai_generated: true;")
+    # A diagram the session kept is marked already, and a second mark adds nothing.
+    assert ai_marking.mark_xml(marked) == marked
+
+
+def test_extra_fields_follow_the_standard_ones() -> None:
+    session = SimpleNamespace(id=uuid.uuid4(), active_version=4)
+    marker = json.loads(
+        ai_marking.marker_json(session, "solution-files", files={"workflow.bpmn": {"v": 4}})
+    )
+    assert marker["content"] == "solution-files"
+    assert marker["files"] == {"workflow.bpmn": {"v": 4}}
+    assert list(marker)[-1] == "files"

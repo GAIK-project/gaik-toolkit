@@ -45,6 +45,65 @@ def test_deployable_files_leave_symlinks_out(tmp_path) -> None:
     assert not any(f.startswith("linked_dir") for f in poc_service.deployable_files(str(poc)))
 
 
+def test_the_solutions_files_leave_symlinks_out(tmp_path) -> None:
+    """The blueprint, the diagrams and the documentation go into the deployable
+    package from beside poc/: a link there must not pull another file in."""
+    session = tmp_path / "session"
+    (session / "docs").mkdir(parents=True)
+    (session / "ui_view").mkdir()
+    secret = tmp_path / "secret.txt"
+    secret.write_text("not the session's")
+    (session / "use_case.blueprint.json").write_text("{}")
+    (session / "docs" / "user_guide.md").write_text("# guide")
+    os.symlink(secret, session / "workflow.mmd")
+    # A document the wizard writes, by name, but a link.
+    os.symlink(secret, session / "docs" / "technical_specification.md")
+    os.symlink(secret, session / "ui_view" / "workflow.bpmn")
+    (session / "workflow.bpmn").write_text("<definitions/>")
+
+    found = dict(poc_service.solution_files(str(session)))
+
+    assert sorted(found) == ["docs/user_guide.md", "use_case.blueprint.json"]
+    assert all(os.path.realpath(path) != os.path.realpath(secret) for path in found.values())
+    # The diagram kept for when the blueprint cannot be drawn: the linked
+    # workspace diagram is passed over for the agent's own, a real file.
+    assert poc_service.stored_bpmn(str(session)) == (
+        os.path.join(os.path.realpath(session), "workflow.bpmn"),
+        "agent_draft",
+    )
+
+
+def test_only_the_documents_the_wizard_writes_and_of_a_sane_size(tmp_path, monkeypatch) -> None:
+    """docs/ is the agent's folder: only generate_docs.py's documents are handed over."""
+    session = tmp_path / "session"
+    (session / "docs" / "__pycache__").mkdir(parents=True)
+    for name in ("user_guide.md", "evaluation_plan.md", ".env", "invoice.pdf", "notes.md"):
+        (session / "docs" / name).write_text("x")
+    (session / "docs" / "__pycache__" / "a.pyc").write_text("x")
+    (session / "docs" / "developer_guide.md").write_text("x" * 11)
+    monkeypatch.setattr(poc_service, "MAX_SOLUTION_FILE_BYTES", 10)
+
+    found = [name for name, _ in poc_service.solution_files(str(session))]
+
+    # In the generator's order; the oversized guide stays out.
+    assert found == ["docs/user_guide.md", "docs/evaluation_plan.md"]
+
+
+def test_a_linked_documentation_folder_is_not_read(tmp_path) -> None:
+    session = tmp_path / "session"
+    session.mkdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "user_guide.md").write_text("not the session's")
+    os.symlink(elsewhere, session / "docs")
+
+    assert poc_service.solution_files(str(session)) == []
+    assert poc_service.stored_bpmn(str(session)) is None
+    assert poc_service.stored_bpmn(None) is None
+    assert poc_service.solution_files(None) == []
+    assert poc_service.solution_files(str(tmp_path / "missing")) == []
+
+
 def test_package_checks_do_not_read_through_a_symlink(tmp_path) -> None:
     poc, outside_file = _tree(tmp_path)
     (poc / "run_poc.py").unlink()
