@@ -136,6 +136,7 @@ def _pdf_pages(file: Path) -> list[str]:
     try:
         import pymupdf
 
+        from gaik.software_components.input_limits import InputLimitError
         from gaik.software_components.parsers import PyMuPDFParser
     except ImportError as error:
         raise need("parse_document", "PyMuPDF") from error
@@ -144,6 +145,9 @@ def _pdf_pages(file: Path) -> list[str]:
         page_count = document.page_count
     try:
         marked = PyMuPDFParser().parse_pdf(str(file), page_markers=True)
+    except InputLimitError:
+        # A PDF over a limit says which one; its message names the file, not its path.
+        raise
     except ValueError:
         # The parser's own message holds the full path it was given.
         raise ValueError("the content of the file is not a PDF document") from None

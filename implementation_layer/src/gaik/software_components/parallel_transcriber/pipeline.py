@@ -148,7 +148,7 @@ class ParallelTranscriber:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         # Size and length first: a long recording becomes many paid calls.
-        self._limits.check_media(file_path)
+        probed_seconds = self._limits.check_media(file_path)
 
         cfg = self._config
         model = cfg.model
@@ -205,6 +205,13 @@ class ParallelTranscriber:
                 if duration_minutes > cfg.whisper_local_chunk_duration_minutes:
                     needs_chunking = True
 
+            if (
+                total_duration is None
+                and probed_seconds is None
+                and self._limits.max_media_seconds is not None
+            ):
+                # The first probe could not read the length: measure the audio itself.
+                total_duration = get_audio_duration(str(audio_path))
             if total_duration is not None:
                 self._limits.check_media_seconds(total_duration, file_path.name)
 

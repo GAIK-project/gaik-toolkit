@@ -122,17 +122,19 @@ class RAGWorkflow:
         )
         self.answer_config = answer_config if answer_config is not None else self.api_config
 
+        # A parser class swapped in for these takes limits only when a caller sets them.
+        parser_options = {} if limits is None else {"limits": limits}
         if parser == "text":
             from .text_parser import TextRagParser
 
-            self.parser = TextRagParser(limits=limits)
+            self.parser = TextRagParser(**parser_options)
         else:
             if VisionRagParser is None:
                 raise ImportError(
                     "parser='vision' needs pip install 'gaik[rag-workflow]'; "
                     "parser='text' needs only 'gaik[rag-workflow-text]'"
                 ) from _vision_import_error
-            self.parser = VisionRagParser(vision_config=self.parser_config, limits=limits)
+            self.parser = VisionRagParser(vision_config=self.parser_config, **parser_options)
         self.embedder = Embedder(config=self.embedding_config, model=embedding_model)
         self.vector_store = VectorStore(
             persist=persist,

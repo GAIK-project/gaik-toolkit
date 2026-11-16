@@ -244,6 +244,34 @@ def test_rag_workflow_passes_its_limits_to_the_text_parser():
     assert workflow.parser.limits is limits
 
 
+def test_rag_workflow_without_limits_takes_a_parser_class_that_has_no_limits(monkeypatch):
+    pytest.importorskip("langchain_core")
+    from gaik.software_modules.RAG_workflow import pipeline
+
+    class ParserWithoutLimits:
+        def __init__(self, *, vision_config):
+            self.vision_config = vision_config
+
+    monkeypatch.setattr(pipeline, "VisionRagParser", ParserWithoutLimits)
+    config = {"provider": "openai", "model": "m", "api_key": "k"}
+    try:
+        workflow = pipeline.RAGWorkflow(api_config=config, persist=False)
+    except ImportError as exc:  # pragma: no cover - depends on the installed extras
+        pytest.skip(str(exc))
+    assert workflow.parser.vision_config is config
+
+
+def test_parse_document_reports_a_pdf_over_the_page_limit_as_such(tmp_path):
+    from gaik.operations import parse_document
+
+    pdf = _pdf(tmp_path / "long.pdf", pages=InputLimits().max_pages + 1)
+
+    with pytest.raises(InputLimitError) as caught:
+        parse_document(pdf)
+    assert caught.value.limit == "max_pages"
+    assert str(tmp_path) not in str(caught.value)
+
+
 def test_text_rag_parser_refuses_a_pdf_with_too_many_pages(tmp_path):
     pytest.importorskip("langchain_core")
     from gaik.software_modules.RAG_workflow.text_parser import TextRagParser
@@ -374,6 +402,24 @@ def test_vision_extractor_refuses_an_image_over_the_pixel_limit(tmp_path, monkey
 
     with pytest.raises(InputLimitError, match="max_image_pixels"):
         extractor.suggest_requirements(file_paths=[_png(tmp_path / "c.png", 20, 20)])
+
+
+def test_vision_extractor_checks_the_files_before_it_generates_a_schema(tmp_path, monkeypatch):
+    from gaik.software_components.vision_extractor import VisionExtractor
+
+    extractor = VisionExtractor(
+        api_config={"provider": "openai", "model": "m", "api_key": "k"},
+        limits=InputLimits(max_pages=1),
+    )
+    monkeypatch.setattr(
+        extractor, "_resolve_schema", lambda *a: pytest.fail("schema was generated")
+    )
+    monkeypatch.setattr(extractor, "_call_shared", lambda *a: pytest.fail("model was called"))
+
+    with pytest.raises(InputLimitError, match="max_pages"):
+        extractor.extract(
+            file_paths=[_pdf(tmp_path / "a.pdf", pages=2)], user_requirements="the total"
+        )
 
 
 # -- Docling-based parsers --------------------------------------------------------
@@ -640,6 +686,24 @@ def test_parallel_transcriber_checks_the_measured_length_before_chunking(tmp_pat
         transcriber.transcribe(audio)
 
 
+def test_parallel_transcriber_measures_a_short_file_whose_first_probe_failed(tmp_path, monkeypatch):
+    from gaik.software_components.parallel_transcriber import ParallelTranscriber, pipeline
+
+    audio = tmp_path / "small.mp3"
+    audio.write_bytes(b"\x00" * 64)
+    transcriber = ParallelTranscriber(
+        {"use_azure": False, "api_key": "k"}, limits=InputLimits(max_media_seconds=3600)
+    )
+    monkeypatch.setattr(input_limits, "probe_media_seconds", lambda path, timeout: None)
+    monkeypatch.setattr(pipeline, "has_video_stream", lambda _p: False)
+    monkeypatch.setattr(pipeline, "has_audio_stream", lambda _p: True)
+    monkeypatch.setattr(pipeline, "get_audio_duration", lambda _p: 2 * 3600.0)
+    monkeypatch.setattr(transcriber, "_transcribe_single", lambda *a: pytest.fail("transcribed"))
+
+    with pytest.raises(InputLimitError, match="max_media_seconds"):
+        transcriber.transcribe(audio)
+
+
 def test_audio_duration_probe_has_a_timeout(tmp_path, monkeypatch):
     from gaik.software_components.parallel_transcriber import ffmpeg
 
@@ -731,5 +795,7 @@ def test_tabular_agent_writes_sheet_rows_to_a_private_directory(tmp_path, monkey
     with TabularAgent(path) as agent:
         assert agent.table_names
 
-    assert made and all(mode == 0o700 for _, mode in made)
+    assert made
+    if os.name == "posix":  # Windows reports no owner-only POSIX mode to compare.
+        assert all(mode == 0o700 for _, mode in made)
     assert not any(os.path.exists(name) for name, _ in made)
