@@ -8,7 +8,11 @@ must be one of:
   ``*.openai.azure.com``);
 - the host of an address set in the deployment's own environment for that
   provider (for example ``AZURE_ENDPOINT``, ``OPENAI_BASE_URL`` or
-  ``DOCLING_API_BASE``), over ``http://`` too when the address is set that way;
+  ``DOCLING_API_BASE``), over ``http://`` too when the address is set that way.
+  An http address there on a private network (a private or link-local IP address,
+  or a single-label name such as ``docling`` or ``host.docker.internal``) is used
+  quietly; any other http host is used with a warning, once per host, that the
+  key goes to it without encryption;
 - a host listed in ``GAIK_ALLOWED_ENDPOINT_HOSTS`` (comma-separated), or in the
   ``allowed_endpoint_hosts`` setting the application passes in code;
 - the local machine (``localhost``, ``127.0.0.1``, ``::1``), over ``http://`` too,
@@ -109,6 +113,46 @@ def _is_loopback(host: str) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+_PRIVATE_NETWORKS = tuple(
+    ipaddress.ip_network(net)
+    for net in (
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "169.254.0.0/16",
+        "fc00::/7",
+        "fe80::/10",
+    )
+)
+_PRIVATE_NAMES = {"host.docker.internal"}
+
+_warned_http: set[str] = set()
+
+
+def _is_private_network(host: str) -> bool:
+    """This machine, a private or link-local IP address, or a single-label host name."""
+    if _is_loopback(host) or host in _PRIVATE_NAMES:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return "." not in host
+    return any(address in net for net in _PRIVATE_NETWORKS if net.version == address.version)
+
+
+def _warn_plain_http_once(provider: str, host: str) -> None:
+    with _logged_lock:
+        if host in _warned_http:
+            return
+        _warned_http.add(host)
+    logger.warning(
+        "gaik client: provider=%s sends its key to %s over http://, without encryption. "
+        "Use https:// for a host outside a private network.",
+        provider,
+        host,
+    )
 
 
 def _split_entries(value: str | Iterable[str] | None) -> list[str]:
@@ -215,8 +259,6 @@ def check_endpoint(
     names, http_names = _allowed_entries(allowed_hosts)
     env_names, env_http_names = _env_hosts(provider)
     deployment = [*env_names, *names]
-    # An address the deployment set with http:// in its environment is used as set.
-    http_names = [*env_http_names, *http_names]
     if _is_loopback(host):
         if provider in LOCAL_SERVICE_PROVIDERS or any(
             _host_matches(host, pattern) for pattern in deployment
@@ -228,6 +270,11 @@ def check_endpoint(
         )
     if scheme == "http":
         if any(_host_matches(host, pattern) for pattern in http_names):
+            return host
+        # An address the deployment set with http:// in its environment is used as set.
+        if host in env_http_names:
+            if not _is_private_network(host):
+                _warn_plain_http_once(provider, host)
             return host
         raise EndpointNotAllowedError(
             f"{what} must use https:// (got http:// for host {host!r}). For a server on a "

@@ -25,6 +25,7 @@ def _clean_environment(monkeypatch):
     for name in _ENDPOINT_ENVS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(endpoints, "_logged", set())
+    monkeypatch.setattr(endpoints, "_warned_http", set())
 
 
 @pytest.mark.parametrize(
@@ -107,6 +108,56 @@ def test_an_http_address_set_in_the_provider_env_is_used_as_set(monkeypatch, env
     assert check_endpoint(url, provider=provider) == urlsplit(url).hostname
     with pytest.raises(EndpointNotAllowedError):
         check_endpoint("http://other.example.test", provider=provider)
+
+
+def _http_warnings(caplog):
+    return [r for r in caplog.records if "without encryption" in r.getMessage()]
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "http://10.1.2.3:5001",
+        "http://172.20.0.4",
+        "http://192.168.1.10:8080",
+        "http://169.254.10.1",
+        "http://[fd12:3456::1]:5001",
+        "http://[fe80::1]",
+        "http://docling:5001",
+        "http://host.docker.internal:5001",
+    ],
+)
+def test_an_http_env_address_on_a_private_network_is_used_without_a_warning(
+    monkeypatch, caplog, address
+):
+    monkeypatch.setenv("DOCLING_API_BASE", address)
+    with caplog.at_level(logging.WARNING, logger=endpoints.__name__):
+        assert check_endpoint(address, provider="docling") == urlsplit(address).hostname
+    assert _http_warnings(caplog) == []
+
+
+def test_an_http_env_address_on_a_public_name_is_used_with_one_warning(monkeypatch, caplog):
+    monkeypatch.setenv("DOCLING_API_BASE", "http://docling.example.test:5001")
+    with caplog.at_level(logging.WARNING, logger=endpoints.__name__):
+        for _ in range(3):
+            assert check_endpoint("http://docling.example.test:5001", provider="docling")
+    warnings = _http_warnings(caplog)
+    assert len(warnings) == 1
+    assert "docling.example.test" in warnings[0].getMessage()
+
+
+def test_an_https_env_address_is_used_without_a_warning(monkeypatch, caplog):
+    monkeypatch.setenv("DOCLING_API_BASE", "https://docling.example.test")
+    with caplog.at_level(logging.WARNING, logger=endpoints.__name__):
+        assert check_endpoint("https://docling.example.test", provider="docling")
+    assert _http_warnings(caplog) == []
+
+
+def test_an_http_allow_list_entry_is_used_without_a_warning(monkeypatch, caplog):
+    monkeypatch.setenv("GAIK_ALLOWED_ENDPOINT_HOSTS", "http://docling.example.test")
+    with caplog.at_level(logging.WARNING, logger=endpoints.__name__):
+        assert check_endpoint("http://docling.example.test", provider="docling")
+    assert _http_warnings(caplog) == []
 
 
 def test_an_http_address_in_one_provider_env_is_not_used_for_another(monkeypatch):
