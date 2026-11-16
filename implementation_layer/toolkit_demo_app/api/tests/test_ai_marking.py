@@ -46,7 +46,6 @@ def test_the_marked_routes():
         "/luvata-order/pdf/j1",
         "/dental-transcribe/srt/j1",
         "/dental-transcribe/vtt/j1",
-        "/wizard/download/s1",
         "/text-to-speech",
     ]
     assert all(ai_marking.is_generated_download(p) for p in marked)

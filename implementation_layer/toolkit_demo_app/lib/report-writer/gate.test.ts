@@ -1,5 +1,9 @@
-import { expect, test } from "bun:test";
-import { accessDenial, clientIp } from "./gate";
+import { afterEach, expect, test } from "bun:test";
+import { accessDenial, clientIp, reportRunHeaders } from "./gate";
+
+afterEach(() => {
+  delete process.env.REPORT_RUN_TOKEN;
+});
 
 const row = (over: object = {}) => ({
   status: "approved",
@@ -51,4 +55,10 @@ test("the cap is the per-user override, else the default", () => {
     used: 0,
     limit: 0,
   });
+});
+
+test("a report run carries the run token to the backend only when one is set", () => {
+  expect(reportRunHeaders()).toEqual({});
+  process.env.REPORT_RUN_TOKEN = "sample-run-token";
+  expect(reportRunHeaders()).toEqual({ "x-gaik-report-run": "sample-run-token" });
 });

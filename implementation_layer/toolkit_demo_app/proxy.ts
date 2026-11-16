@@ -27,6 +27,7 @@ import {
   withSessionCookies,
 } from "@/lib/supabase/proxy";
 import { takeTrialRun } from "@/lib/trial";
+import { attachCsp, isPagePath, setCsp } from "@/lib/csp";
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -41,7 +42,16 @@ function hasBody(method: string): boolean {
   return method !== "GET" && method !== "HEAD";
 }
 
+// A page request gets a fresh nonce and its Content-Security-Policy, on the
+// request, so the renderer stamps Next's own scripts with the nonce, and on the
+// response (lib/csp.ts). Kept apart from the routing below.
 export default async function proxy(request: NextRequest) {
+  if (!isPagePath(request.nextUrl.pathname)) return route(request);
+  const csp = attachCsp(request);
+  return setCsp(await route(request), csp);
+}
+
+async function route(request: NextRequest): Promise<NextResponse> {
   // The rules below match the path the backend routes on (lib/request-path.ts);
   // the request is forwarded with the path as it was sent.
   const rawPath = request.nextUrl.pathname;
@@ -49,34 +59,18 @@ export default async function proxy(request: NextRequest) {
   if (pathname === null)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Read once per request and shared by the wizard and API gates. Reading it can
-  // refresh the session, and every response below carries the new cookies.
+  // The old Solution Wizard API is gone: the wizard runs as Wizard V2 and the
+  // demo API serves no /wizard routes, so nothing is forwarded there. The
+  // /solution-wizard page is a notice that links to Wizard V2, open to everyone.
+  if (pathname === "/api/wizard" || pathname.startsWith("/api/wizard/"))
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Read at most once per request, by the API gate. Reading it can refresh the
+  // session, and every response below carries the new cookies.
   let access: AccessState | undefined;
   const accessState = async () => (access ??= await getAccessState(request));
   const reply = (response: NextResponse) =>
     withSessionCookies(response, access);
-
-  // Old Solution Wizard API gate. The wizard runs as Wizard V2 and the demo API no
-  // longer serves /wizard, so nothing behind this path answers; the gate stays
-  // until it is removed with the wizard_access grant. The /solution-wizard page is
-  // only a notice that links to Wizard V2 and is open to everyone. Two ways in:
-  //   1. Team shortcut: the `wizard_access` cookie equal to WIZARD_ACCESS_SECRET.
-  //   2. Registered beta testers: a logged-in user whose access_requests row
-  //      has wizard_access = true (granted by an admin in /admin).
-  // Dev: BYPASS_AUTH opens it. Default-deny otherwise.
-  if (pathname.startsWith("/api/wizard")) {
-    const secret = process.env.WIZARD_ACCESS_SECRET;
-    const teamAllowed =
-      !!secret && request.cookies.get("wizard_access")?.value === secret;
-    if (!teamAllowed && !(await accessState()).wizardAccess) {
-      return reply(
-        NextResponse.json(
-          { error: "Solution Wizard is not available yet." },
-          { status: 403 },
-        ),
-      );
-    }
-  }
 
   // Proxy API requests to backend (except Next.js API routes)
   const isNextApiRoute =
@@ -126,7 +120,7 @@ export default async function proxy(request: NextRequest) {
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
-    if (needsApprovedUser(request.method, pathname)) {
+    if (needsApprovedUser(request.method)) {
       const state = await accessState();
       const refusal = await accessRefusal(state, takeTrialRun, ownModelKey);
       if (refusal) {
@@ -242,16 +236,22 @@ export default async function proxy(request: NextRequest) {
         }),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Proxy error";
-      return reply(NextResponse.json({ error: message }, { status: 502 }));
+      // The reason names the backend's address; it goes to the log, not the page.
+      const id = crypto.randomUUID().slice(0, 12);
+      console.error(`[proxy] error id ${id}: backend request failed:`, error);
+      return reply(
+        NextResponse.json(
+          {
+            error: `The demo API did not answer (error id ${id}). Try again in a moment.`,
+          },
+          { status: 502 },
+        ),
+      );
     }
   }
 
-  // Handle Supabase session for all non-API routes. A refresh in the wizard
-  // gate is handed on, so updateSession does not spend the old token again.
-  for (const { name, value } of access?.cookies ?? [])
-    request.cookies.set(name, value);
-  const response = reply(await updateSession(request));
+  // Handle Supabase session for all non-API routes.
+  const response = await updateSession(request);
   response.headers.set("x-current-path", rawPath);
   return response;
 }
