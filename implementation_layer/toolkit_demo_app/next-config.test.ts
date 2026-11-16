@@ -11,6 +11,7 @@ test("every path gets the security headers", async () => {
 });
 
 test("framing is same-origin only, so the PDF previews keep working", () => {
+  // Pages get the same directive in their nonce policy too (lib/csp.ts).
   expect(value("X-Frame-Options")).toBe("SAMEORIGIN");
   expect(value("Content-Security-Policy")).toContain("frame-ancestors 'self'");
 });

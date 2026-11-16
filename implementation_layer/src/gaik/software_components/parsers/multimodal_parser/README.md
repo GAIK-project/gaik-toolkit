@@ -209,6 +209,12 @@ result = parser.parse("document.pdf")
 | `GOOGLE_API_KEY` | `vertex_ai=False` | — | Direct Gemini API key |
 | `GOOGLE_MODEL` | Always | `gemini-3-flash-preview` | Model name (fallback when `model=None`) |
 
+A failed Gemini request raises the same `requests` exception type as before with a short
+message, e.g. `Gemini request failed: HTTP 429 Too Many Requests`. Its `response` keeps
+only the status code, the reason and a `Retry-After` header. The response body and the URL without its query string go to the debug log
+of `gaik.software_components._http` only. A response without text names only its
+block or finish reason.
+
 ## License
 
 MIT - see [LICENSE](../../../../../LICENSE)

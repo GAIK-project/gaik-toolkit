@@ -5,8 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // account, or a pending one within the trial allowance in lib/trial.ts or on the
 // user's own model key, and that is enforced on the API requests
 // in proxy.ts (see lib/api-access.ts), not by redirecting here. The demo layout
-// shows a "View only" notice to visitors who cannot run yet. The Solution Wizard
-// has its own finer gate in proxy.ts.
+// shows a "View only" notice to visitors who cannot run yet.
 
 // Default route for authenticated users
 const DEFAULT_DEMO_ROUTE = "/";
@@ -40,7 +39,6 @@ export interface AccessState {
   userId: string | null;
   /** Lowercased sign-in email, for the model tier (lib/model-tier.ts). */
   email: string | null;
-  wizardAccess: boolean;
   /**
    * Session cookies Supabase rewrote while reading the user: a refreshed token,
    * or a cleared dead session. The caller sets them on its response.
@@ -54,15 +52,13 @@ const NO_ACCESS: AccessState = {
   pending: false,
   userId: null,
   email: null,
-  wizardAccess: false,
   cookies: [],
 };
 
 /**
- * Read the requesting user's access state in one shot: logged in, approved
- * (general `status`), and Solution Wizard beta grant (`wizard_access`). Used by
- * the proxy's API auth gate and the wizard gate. Independent of the team `?key=`
- * shortcut. `BYPASS_AUTH` opens everything in dev.
+ * Read the requesting user's access state in one shot: logged in, approved or
+ * pending (general `status`). Used by the proxy's API auth gate. `BYPASS_AUTH`
+ * opens everything in dev.
  *
  * An API request skips updateSession, so an expired access token is refreshed
  * here. The refresh spends the refresh token: unless the caller saves the new
@@ -79,7 +75,6 @@ export async function getAccessState(
       pending: false,
       userId: null,
       email: null,
-      wizardAccess: true,
       cookies: [],
     };
 
@@ -106,7 +101,7 @@ export async function getAccessState(
 
   const { data } = await supabase
     .from("access_requests")
-    .select("status, wizard_access")
+    .select("status")
     .eq("user_id", user.id)
     .single();
 
@@ -116,7 +111,6 @@ export async function getAccessState(
     pending: data?.status === "pending",
     userId: user.id,
     email: user.email?.toLowerCase() ?? null,
-    wizardAccess: data?.wizard_access === true,
     cookies,
   };
 }

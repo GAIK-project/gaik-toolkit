@@ -159,13 +159,48 @@ bun dev:api        # API: uv run uvicorn api.main:app --reload
 ```
 
 - Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/docs
+- API Docs: http://localhost:8000/docs (with `DEMO_API_DOCS=true` in `.env.local`, as in `.env.example`)
 
 ### Docker
 
 ```bash
 docker compose up --build
 ```
+
+### Pinned images and the API lock
+
+The images build from pinned base images and Python packages, so a rebuild of
+the same commit installs the same ones. The API image's system packages (ffmpeg,
+tesseract, pandoc) still come from the Debian mirror at build time, and
+`Dockerfile.pnpm` is not pinned.
+
+- `Dockerfile` and `api/Dockerfile` name each base image by tag and digest
+  (`oven/bun:1.4.4@sha256:…`). Dependabot proposes new ones once a month. To
+  move one by hand, look up the digest of the new tag and replace both:
+
+  ```bash
+  docker buildx imagetools inspect oven/bun:1.4.4 | grep -m1 Digest
+  ```
+
+  Take the digest of the multi-platform index (the first `Digest:` line), not
+  of one platform's image.
+- The API image installs every Python package from `api/requirements.lock`,
+  pinned with its hashes (`uv pip install --require-hashes`); a file whose hash
+  is not in the lock fails the build. `api/requirements.txt` stays the list to
+  edit, with the gaik pin. After changing it, write the lock again and commit
+  both:
+
+  ```bash
+  scripts/lock_api_requirements.sh            # keeps the other pins as they are
+  scripts/lock_api_requirements.sh --upgrade  # takes the newest allowed releases
+  ```
+
+  Nothing refreshes the lock on its own: run it with `--upgrade` now and then to
+  take security releases. The lock is for the image: Python 3.12 on linux
+  x86_64, with torch and torchvision as CPU builds from the PyTorch index. It
+  records the sha256 of the `requirements.txt` it was made from, and
+  `api/tests/test_api_image_pins.py` fails when that file has changed since, or
+  when a base image has no digest.
 
 ## Project Structure
 
@@ -209,7 +244,8 @@ toolkit_demo_app/
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
 | `/report-writer` | Mixed-source report generation |
 
-API docs: <http://localhost:8000/docs> (Swagger UI)
+API docs: <http://localhost:8000/docs> (Swagger UI), served only with `DEMO_API_DOCS=true`;
+the deployed API leaves `/docs`, `/redoc` and `/openapi.json` off.
 
 ## Tech Stack
 
