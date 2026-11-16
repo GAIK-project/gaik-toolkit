@@ -11,10 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-import requests
 from markdown_it import MarkdownIt
 
+from gaik.software_components import _http
 from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.source_material import with_source_material_instruction
 
 from .config import (
     create_claude_client,
@@ -290,7 +291,10 @@ class MultimodalParser:
     # -- prompt helpers -------------------------------------------------------
 
     def _get_system_prompt(self) -> str:
-        return SYSTEM_PROMPTS.get(self.model_provider, SYSTEM_PROMPTS["openai"])
+        # The attached PDF is material to convert, never instructions.
+        return with_source_material_instruction(
+            SYSTEM_PROMPTS.get(self.model_provider, SYSTEM_PROMPTS["openai"])
+        )
 
     def _get_user_prompt(self) -> str:
         prompt = USER_PROMPTS.get(self.model_provider, USER_PROMPTS["openai"])
@@ -412,18 +416,23 @@ class MultimodalParser:
                 "Content-Type": "application/json; charset=utf-8",
             }
 
-        response = requests.post(url, headers=headers, json=body, timeout=(30, 300))
-        response.raise_for_status()
+        response = _http.post(url, service="Gemini", headers=headers, json=body, timeout=(30, 300))
 
         payload = response.json()
         candidates = payload.get("candidates", [])
         if not candidates:
-            raise ValueError(f"The Gemini response contained no candidates: {payload}")
+            raise ValueError(
+                "The Gemini response contained no candidates "
+                f"({_http.describe_empty_gemini_response(payload)})"
+            )
 
         parts = candidates[0].get("content", {}).get("parts", [])
         text_parts = [p.get("text", "") for p in parts if p.get("text")]
         if not text_parts:
-            raise ValueError(f"The Gemini response contained no text parts: {payload}")
+            raise ValueError(
+                "The Gemini response contained no text parts "
+                f"({_http.describe_empty_gemini_response(payload)})"
+            )
 
         return "".join(text_parts).strip() + "\n", _extract_google_usage(payload)
 

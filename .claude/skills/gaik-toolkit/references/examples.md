@@ -32,8 +32,8 @@ from gaik.software_components.extractor import SchemaGenerator, DataExtractor
 config = get_openai_config(use_azure=True)
 
 # Step 1: Parse PDF to markdown
-parser = VisionParser(openai_config=config, clean_output=True)
-pages = parser.convert_pdf("invoice.pdf")
+parser = VisionParser(openai_config=config)
+pages = parser.convert_pdf("invoice.pdf", clean_output=True)
 document_text = "\n\n".join(pages)
 
 # Step 2: Generate schema from requirements
@@ -146,7 +146,6 @@ print(f"Single file: {single_result}")
 dir_results = classifier.classify(
     file_or_dir="documents/",
     classes=categories,
-    parser="auto",  # Auto-select parser based on file type
 )
 
 # Group by classification
@@ -335,7 +334,7 @@ fields = [
     ),
     FieldSpec(
         field_name="items",
-        field_type="list",
+        field_type="list[str]",
         description="List of ordered items with SKU, name, quantity, price",
         required=True,
     ),
@@ -360,7 +359,7 @@ requirements = ExtractionRequirements(
 )
 
 # Create Pydantic model from requirements
-from gaik.software_components.extractor.helpers import create_extraction_model
+from gaik.software_components.extractor import create_extraction_model
 schema = create_extraction_model(requirements)
 
 # Parse document
@@ -491,7 +490,7 @@ embedder = Embedder(config=config, model="text-embedding-3-large")
 embeddings, docs = embedder.embed(chunks)
 
 # Store in PostgreSQL
-with PgVectorStore("postgresql://postgres:pass@localhost/ragdb", embedding_dim=3072) as store:
+with PgVectorStore("postgresql://postgres:pass@localhost/ragdb", embedding_dim=3072, vector_type="halfvec") as store:
     store.setup()
     store.add(docs, embeddings)
     print(f"Stored {store.count()} chunks")
@@ -549,7 +548,7 @@ print(result.usage)       # tokens + duration + cost via observability
 **Why single-pass:** the model sees PO and BOMs together in one context, so
 cross-document linking (PO line ↔ BOM material) is handled by the LLM rather
 than by brittle post-extraction joins. Use `include_verification=True` to get
-per-field `confidence_score` + `reasoning` for human-in-the-loop QA.
+per-field `confidence_score` + `confidence_reason` for human-in-the-loop QA.
 
 ---
 
@@ -557,7 +556,7 @@ per-field `confidence_score` + `reasoning` for human-in-the-loop QA.
 
 Generate a reusable Pydantic schema + requirements metadata from a natural
 language task description, without running any extraction. The output is then
-loaded by `DataExtractor` or `VisionExtractor` on later runs via `schema_dir`.
+loaded by `VisionExtractor` on later runs via `schema_dir`.
 
 **Sample location:** `implementation_layer/examples/software_components/schema-generator/`
 
@@ -575,13 +574,13 @@ material number.
 """
 
 generator = SchemaGenerator(config=get_openai_config(use_azure=True))
-extraction_model, requirements = generator.generate_schema(TASK)
+extraction_model = generator.generate_schema(TASK)
+requirements = generator.item_requirements
 
 SCHEMA_DIR = Path("./schema_generated")
-SCHEMA_DIR.mkdir(exist_ok=True)
-# Persist for later reuse — DataExtractor / VisionExtractor pick these up
-# automatically when called with schema_dir=SCHEMA_DIR.
-(SCHEMA_DIR / "requirements.json").write_text(requirements.model_dump_json(indent=2))
+# The sample script writes schema.py + requirements.json, which
+# VisionExtractor(...).extract(..., schema_dir=SCHEMA_DIR) loads; pass
+# extraction_model and requirements to DataExtractor.extract directly.
 ```
 
 **When to do this separately:** batch pipelines where schema generation cost

@@ -19,14 +19,23 @@ import threading
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
+    from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
+    from api.utils.report_runs import require_report_run_grant
+
+try:
+    from utils.errors import component_error
+except ImportError:
+    from api.utils.errors import component_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -77,7 +86,7 @@ def _not_a_file_name(name: str) -> bool:
     return name in (".", "..") or "/" in name or "\x00" in name or Path(name).name != name
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def run(manifest: str = Form(...), files: list[UploadFile] = File(...)):
     """Convert the uploaded files. Returns a Server-Sent Events stream.
 
@@ -108,6 +117,14 @@ async def run(manifest: str = Form(...), files: list[UploadFile] = File(...)):
             f"got {len(files)}",
         )
 
+    options = parsed.options
+    check_model(
+        options.transcription_model,
+        transcription_models(),
+        "transcription model",
+    )
+    check_model(options.vision_model, chat_models(), "vision model")
+
     config = get_api_config()
     tmp = Path(tempfile.mkdtemp(prefix="source_normalizer_"))
     inputs, out = tmp / "inputs", tmp / "normalized"
@@ -120,8 +137,10 @@ async def run(manifest: str = Form(...), files: list[UploadFile] = File(...)):
                 with (inputs / name).open("xb") as target:
                     target.write(await upload.read())
             except OSError as exc:
+                logger.warning("Cannot store an uploaded file name: %s", type(exc).__name__)
                 raise HTTPException(
-                    400, f"The server cannot store the file name {name!r}: {exc}"
+                    400,
+                    f"The server cannot store a file named {name!r}. Rename it and try again.",
                 ) from exc
     except BaseException:
         shutil.rmtree(tmp)
@@ -161,8 +180,7 @@ async def run(manifest: str = Form(...), files: list[UploadFile] = File(...)):
                 "usage": sources.usage,
             }
         except Exception as exc:
-            logger.exception("Source Normalizer failed")
-            outcome["error"] = f"{type(exc).__name__}: {exc}"
+            outcome["error"] = component_error(exc, "Source normalization")
         finally:
             try:
                 shutil.rmtree(tmp)

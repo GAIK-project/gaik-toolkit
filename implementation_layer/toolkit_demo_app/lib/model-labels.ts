@@ -6,6 +6,15 @@ const NAMES: Record<string, string> = {
   "whisper-1": "OpenAI Whisper",
   // HH's own GPU Whisper server; Finnish uses a Finnish fine-tune of large-v3.
   whisper_local: "Whisper on GAIK's server",
+  // CSC Aitta: its catalog IDs do not read well as words.
+  "openai/whisper-large-v3": "Whisper large v3 on CSC Aitta",
+  "openai/whisper-large-v3-turbo": "Whisper large v3 turbo on CSC Aitta",
+  "intfloat/multilingual-e5-large": "multilingual-e5-large on CSC Aitta",
+  "lightonai/modernbert-embed-large": "ModernBERT embed large on CSC Aitta",
+  "google/gemma-4-31b-it": "Gemma 4 31B",
+  "Qwen/Qwen3.8-27B": "Qwen 3.8 27B",
+  "Qwen/Qwen3.6-35B-A3B": "Qwen 3.6 35B",
+  "openai/gpt-oss-120b": "gpt-oss 120B",
 };
 
 /** gpt-6.1-sol -> GPT-6.1 Sol, claude-haiku-5-5 -> Claude Haiku 5.5, gemini-3.8-flash -> Gemini 3.8 Flash. */

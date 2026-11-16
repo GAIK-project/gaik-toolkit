@@ -166,6 +166,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     CALLS.clear()
     monkeypatch.setattr(route, "_gaik", lambda: FakeGaik)
     monkeypatch.setattr(route, "get_api_config", lambda: CONFIG)
+    monkeypatch.setattr(route, "chat_models", lambda: ["wr", "rev"])
     monkeypatch.setattr(route, "_docx", lambda report: b"PK docx bytes")
     app = FastAPI()
     app.include_router(route.router, prefix="/knowledge-synthesis")
@@ -268,7 +269,8 @@ def test_a_docx_failure_keeps_the_report(client, monkeypatch):
     result = _events(_run(client))[-1][1]
 
     assert result["docx_b64"] is None
-    assert "No pandoc executable found" in result["docx_error"]
+    assert "error id" in result["docx_error"]
+    assert "pandoc" not in result["docx_error"]
     assert result["markdown"].startswith("# Site report")
 
 
@@ -376,7 +378,7 @@ def test_rebuild_without_docx_and_with_a_docx_failure(client, monkeypatch):
 
     monkeypatch.setattr(route, "_docx", broken)
     body = _rebuild(client, REBUILD).json()
-    assert body["docx_b64"] is None and "pandoc missing" in body["docx_error"]
+    assert body["docx_b64"] is None and "error id" in body["docx_error"]
     assert body["markdown"].startswith("# Site report")
 
 
@@ -447,3 +449,12 @@ def test_an_older_gaik_refuses_citations_off_with_a_clear_message(client, old_ga
     assert response.status_code == 400
     assert "cannot write a report without citations" in response.json()["detail"]
     assert not CALLS
+
+
+def test_a_writer_or_reviewer_model_the_demo_does_not_offer_is_refused(client):
+    for field in ("writer_model", "reviewer_model"):
+        request = {**REQUEST, "options": {**REQUEST["options"], field: "not-offered"}}
+        response = _run(client, request)
+        assert response.status_code == 422
+        assert "not-offered" in response.json()["detail"]
+    assert CALLS == []

@@ -56,6 +56,13 @@ def _pdf(path):
         document.save(path)
 
 
+_CLOSING_TAG = '</source_material id="{}">'
+
+
+def _id(part):
+    return part["text"].split('<source_material id="', 1)[1].split('"', 1)[0]
+
+
 def test_pdf_is_rendered_as_ordered_png_messages(tmp_path):
     path = tmp_path / "two-pages.pdf"
     _pdf(path)
@@ -76,8 +83,8 @@ def test_text_layer_follows_each_page_image_when_asked(tmp_path):
     content = build_chat_document_content([path], "Read these pages", include_text_layer=True)
     assert [item["type"] for item in content[1:]] == ["text", "image_url", "text"] * 2
     assert content[3]["text"].startswith("Text layer of two-pages.pdf, page 1")
-    assert content[3]["text"].endswith("First page")
-    assert content[6]["text"].endswith("Second page")
+    assert content[3]["text"].endswith("\nFirst page\n" + _CLOSING_TAG.format(_id(content[3])))
+    assert content[6]["text"].endswith("\nSecond page\n" + _CLOSING_TAG.format(_id(content[6])))
 
 
 def test_page_without_text_gets_no_text_layer(tmp_path):
@@ -102,7 +109,7 @@ def test_vision_extractor_sends_the_text_layer_and_parser_does_not(monkeypatch, 
         return [part["text"] for part in call[0][1]["content"] if part["type"] == "text"]
 
     VisionExtractor(api_config=config)._call_shared([path], "system", "user", Name)
-    assert any(text.endswith("First page") for text in texts(client.calls[-1]))
+    assert any("\nFirst page\n</source_material" in text for text in texts(client.calls[-1]))
     MultimodalParser(api_config=config).parse(path)
     assert not any("Text layer" in text for text in texts(client.calls[-1]))
 

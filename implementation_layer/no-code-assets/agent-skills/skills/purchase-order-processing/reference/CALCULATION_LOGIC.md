@@ -277,9 +277,9 @@ Grand_Total = Net_Material_Cost + Total_Fees + Shipping + Tax_Amount
 Net_Material_Cost = $24,289.12
 Total_Fees = $150.00
 Shipping = $450.00
-Tax_Amount = $1,466.35
+Tax_Amount = $1,493.35
 ────────────────────────
-Grand_Total = $26,355.47
+Grand_Total = $26,382.47
 ```
 
 ---
@@ -349,13 +349,13 @@ Total Fees:
   Total Fees = $165.00
 
 Taxable Amount:
-  $24,289.12 + $165.00 = $24,454.12
+  $24,289.12 + $165.00 + $450.00 = $24,904.12
 
 Tax (6%):
-  $24,454.12 × 0.06 = $1,467.25
+  $24,904.12 × 0.06 = $1,494.25
 
 Grand Total:
-  $24,289.12 + $165.00 + $450.00 + $1,467.25 = $26,371.37
+  $24,289.12 + $165.00 + $450.00 + $1,494.25 = $26,398.37
 ```
 
 ---
@@ -389,9 +389,9 @@ New_Fee_Cost = New_Fee × Quantity_Applicable
 
 ### To change tax calculation base:
 
-**To include shipping in tax:**
+**To exclude shipping from tax:**
 ```markdown
-Taxable_Amount = Net_Material_Cost + Total_Fees + Shipping
+Taxable_Amount = Net_Material_Cost + Total_Fees
 ```
 
 **To exclude fees from tax:**

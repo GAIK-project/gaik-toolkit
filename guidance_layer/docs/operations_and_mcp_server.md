@@ -5,7 +5,7 @@ Two packages beside the software components. Neither changes a component.
 - `gaik.operations`: one blocking function per common task, with shared settings.
 - `gaik.mcp_server`: the same functions, and `FieldsToDocx`, as MCP tools for agents.
 
-Both are in gaik from the release after 0.8.14.
+Both are in gaik from 0.9.0.
 
 ## Operations
 

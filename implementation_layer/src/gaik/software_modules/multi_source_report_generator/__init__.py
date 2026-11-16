@@ -9,7 +9,12 @@ from .models import (
     ReportGenerationResult,
     ReportSectionSpec,
 )
-from .pipeline import MultiSourceReportGenerator, load_report_config, save_report_config
+from .pipeline import (
+    MultiSourceReportGenerator,
+    SourcePathError,
+    load_report_config,
+    save_report_config,
+)
 
 __all__ = [
     "MultiSourceReportGenerator",
@@ -19,4 +24,5 @@ __all__ = [
     "GeneratedSection",
     "save_report_config",
     "load_report_config",
+    "SourcePathError",
 ]

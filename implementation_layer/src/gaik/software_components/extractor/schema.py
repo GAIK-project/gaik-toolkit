@@ -261,9 +261,10 @@ class FieldSpec(BaseModel):
     @field_validator("enum")
     @classmethod
     def _enum_nonempty(cls, v: list[str] | None) -> list[str] | None:
-        if v is not None and len(v) == 0:
-            raise ValueError("enum must be a non-empty list when provided")
-        return v
+        # A strict schema cannot say "omit when empty", and open models (Gemma,
+        # Qwen, gpt-oss on Aitta) answer ``"enum": []`` for a field without
+        # choices. That means "no enum": rejecting it cost a retry per field set.
+        return v or None
 
 
 class ExtractionRequirements(BaseModel):
