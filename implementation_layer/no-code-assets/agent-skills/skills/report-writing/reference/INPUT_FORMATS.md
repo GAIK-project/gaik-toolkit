@@ -14,7 +14,7 @@ Detailed handling instructions for each supported input file type.
 ## Audio/Video Recordings
 
 ### Supported Formats
-`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`, `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`
+`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`, `.webm`, `.mp4`, `.mpeg`, `.mpga` (ask for an .mp4 copy of other video files such as .mov, .avi or .mkv)
 
 ### Processing Method
 Use the `gaik-transcriber:transcribe_audio` MCP tool:
@@ -43,7 +43,7 @@ If transcription fails:
 ## Image Files
 
 ### Supported Formats
-`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.tiff`, `.heic`
+`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp` (ask the user for a PNG or JPEG copy of BMP, TIFF or HEIC images)
 
 ### Types of Image Content
 
@@ -171,7 +171,7 @@ Templates and samples are stored in dedicated subfolders:
 ### Identifying Templates
 
 Check `<input_folder>/templates/` for:
-- Any `.docx` or `.pdf` file (use first one found if multiple exist)
+- Any `.docx` file (use the first one found if several exist)
 
 **Template characteristics:**
 - Placeholder text like `[Insert here]`, `<Title>`, `{{content}}`
