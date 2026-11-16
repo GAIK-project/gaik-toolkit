@@ -1,5 +1,12 @@
-import { expect, test } from "bun:test";
-import { accessDenial, clientIp } from "./gate";
+import { afterEach, expect, test } from "bun:test";
+import { accessDenial, clientIp, forwardReportRun, reportRunHeaders } from "./gate";
+
+const realFetch = globalThis.fetch;
+
+afterEach(() => {
+  delete process.env.REPORT_RUN_TOKEN;
+  globalThis.fetch = realFetch;
+});
 
 const row = (over: object = {}) => ({
   status: "approved",
@@ -51,4 +58,38 @@ test("the cap is the per-user override, else the default", () => {
     used: 0,
     limit: 0,
   });
+});
+
+test.each([false, true])("a report run keeps its run token when staff is %p", async (staff) => {
+  process.env.REPORT_RUN_TOKEN = "sample-run-token";
+  let sent = new Headers();
+  globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+    sent = new Headers(init?.headers);
+    return new Response("bad", { status: 400 });
+  }) as typeof fetch;
+
+  await forwardReportRun("/report-writer/run", new FormData(), staff, async () => {});
+
+  expect(sent.get("x-gaik-report-run")).toBe("sample-run-token");
+  expect(sent.get("x-gaik-model-tier")).toBe(staff ? "staff" : null);
+});
+
+test("an unreachable backend is reported with an id, not the connection error", async () => {
+  globalThis.fetch = (async () => {
+    throw new Error("connect ECONNREFUSED 10.1.2.3:8000");
+  }) as unknown as typeof fetch;
+
+  const response = await forwardReportRun("/report-writer/run", new FormData(), false, async () => {});
+
+  expect(response.status).toBe(502);
+  const { error } = await response.json();
+  expect(error).toContain("error id");
+  expect(error).not.toContain("ECONNREFUSED");
+  expect(error).not.toContain("10.1.2.3");
+});
+
+test("a report run carries the run token to the backend only when one is set", () => {
+  expect(reportRunHeaders()).toEqual({});
+  process.env.REPORT_RUN_TOKEN = "sample-run-token";
+  expect(reportRunHeaders()).toEqual({ "x-gaik-report-run": "sample-run-token" });
 });

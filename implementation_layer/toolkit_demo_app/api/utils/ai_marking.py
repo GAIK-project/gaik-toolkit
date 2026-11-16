@@ -32,6 +32,7 @@ _GENERATED_DOWNLOADS = re.compile(
     r"|luvata-order/pdf/[^/]+"
     r"|dental-transcribe/(?:srt|vtt)/[^/]+"
     r"|wizard/download/[^/]+"
+    r"|wizard/files/[^/]+/.+"
     r"|text-to-speech"
     r")$"
 )

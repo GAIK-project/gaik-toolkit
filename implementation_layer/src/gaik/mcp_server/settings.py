@@ -87,7 +87,10 @@ class ServerSettings:
             ValueError: A number is not a positive number, or the root is not a folder, is
                 a whole drive or holds the home folder.
         """
-        folder = root if root is not None else _text(environ, "GAIK_MCP_ROOT")
+        # An empty --root means no root, as an empty GAIK_MCP_ROOT does: Path("") is ".".
+        folder = (
+            (str(root).strip() or None) if root is not None else _text(environ, "GAIK_MCP_ROOT")
+        )
         hosts = [host.strip() for host in allowed_hosts if host.strip()]
         if not hosts:
             listed = _text(environ, "GAIK_MCP_ALLOWED_HOSTS") or ""

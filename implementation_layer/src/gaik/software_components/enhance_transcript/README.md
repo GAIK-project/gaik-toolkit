@@ -128,7 +128,7 @@ for chunk in result.diff_chunks:
 Possible output:
 
 ```python
-DiffChunk(kind="substitute", original="tama", corrected="tama")
+DiffChunk(kind="substitute", original="tama", corrected="tämä")
 DiffChunk(kind="substitute", original="hammas laakari", corrected="hammaslääkäri")
 ```
 
@@ -198,7 +198,8 @@ print(result.diff_chunks)
 
 Azure mode:
 - `AZURE_API_KEY`
-- `AZURE_ENDPOINT` (optional override)
+- `AZURE_ENDPOINT`
+- `AZURE_DEPLOYMENT` (optional, default `gpt-6-luna`)
 - `AZURE_API_VERSION` (optional override)
 
 OpenAI mode:

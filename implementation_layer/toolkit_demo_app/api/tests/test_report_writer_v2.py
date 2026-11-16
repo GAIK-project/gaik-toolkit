@@ -299,7 +299,7 @@ def test_a_name_the_server_cannot_store_is_a_400(client):
     response = _run(client, spec=spec, files=SOURCES[:1])
 
     assert response.status_code == 400
-    assert "The server cannot store the file name" in response.json()["detail"]
+    assert "cannot store a file named" in response.json()["detail"]
     assert RUNS == []
 
 
@@ -354,7 +354,7 @@ def test_a_failing_stage_streams_an_error_and_removes_the_temp_dir(client):
 
     assert events == [
         ("progress", {"message": "Curating Summary"}),
-        ("error", {"message": "ValueError: The curator answer failed validation"}),
+        ("error", {"message": "The curator answer failed validation"}),
     ]
     [(_, workspace)] = RUNS
     assert not workspace.parent.exists()

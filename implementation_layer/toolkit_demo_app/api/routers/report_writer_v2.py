@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import inspect
 import logging
 import queue
 import re
@@ -20,16 +21,25 @@ import tempfile
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
     from utils.model_settings import unsupported_option_detail
+    from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.model_settings import unsupported_option_detail
+    from api.utils.report_runs import require_report_run_grant
+
+try:
+    from utils.errors import component_error
+except ImportError:
+    from api.utils.errors import component_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -90,7 +100,15 @@ def _example(example_id: str):
     """Load an example spec, whose files must all exist under distinct names."""
     if example_id not in _example_ids():
         raise HTTPException(404, f"Unknown example: {example_id}")
-    spec = _gaik()[1].load(_examples_root() / example_id / "report_spec.json")
+    spec_class = _gaik()[1]
+    path = _examples_root() / example_id / "report_spec.json"
+    # An example may read files of a sibling example (project_meeting reads
+    # ../../multi_source_report_generator/), so its paths may reach anywhere under the
+    # examples' parent folder. A gaik before `root` reads them without that check.
+    if "root" in inspect.signature(spec_class.load).parameters:
+        spec = spec_class.load(path, root=_examples_root().parent)
+    else:
+        spec = spec_class.load(path)
     missing = [str(p.resolve()) for p in _paths(spec) if not p.is_file()]
     if missing:
         raise HTTPException(500, f"Example {example_id} is missing files: {', '.join(missing)}")
@@ -171,7 +189,21 @@ async def get_example_file(example_id: str, name: str):
 # ---------------------------------------------------------------------------
 
 
-@router.post("/run")
+def _check_spec_models(models) -> None:
+    """Each step's model must be one the demo offers (utils/model_allow_list.py)."""
+    if models is None:
+        return
+    chat = chat_models()
+    for step in ("vision", "curator", "writer", "reviewer"):
+        check_model(getattr(models, step, None), chat, f"{step} model")
+    check_model(
+        getattr(models, "transcription", None),
+        transcription_models(),
+        "transcription model",
+    )
+
+
+@router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def run_stage(
     stage: str = Form(...),
     spec: str = Form(...),
@@ -193,6 +225,7 @@ async def run_stage(
         parsed = spec_class.model_validate_json(spec)
     except ValidationError as exc:
         raise HTTPException(400, f"Invalid spec: {_errors(exc)}") from exc
+    _check_spec_models(getattr(parsed, "models", None))
     names = [str(p) for p in _paths(parsed)]
     if bad := [n for n in names if _not_a_file_name(n)]:
         raise HTTPException(400, f"Spec files must be file names, not paths: {bad}")
@@ -237,8 +270,10 @@ async def run_stage(
                 with (inputs / name).open("xb") as out:
                     out.write(await upload.read())
             except OSError as exc:
+                logger.warning("Cannot store an uploaded file name: %s", type(exc).__name__)
                 raise HTTPException(
-                    400, f"The server cannot store the file name {name!r}: {exc}"
+                    400,
+                    f"The server cannot store a file named {name!r}. Rename it and try again.",
                 ) from exc
         for path, text in workspace_files.items():
             (workspace / path).parent.mkdir(parents=True, exist_ok=True)
@@ -267,8 +302,9 @@ async def run_stage(
                 result = getattr(writer, stage)(report_spec, workspace, progress_callback=progress)
             outcome["result"] = _result(stage, workspace, result)
         except Exception as exc:
-            logger.exception("Report Writer v2 %s failed", stage)
-            outcome["error"] = unsupported_option_detail(exc) or f"{type(exc).__name__}: {exc}"
+            outcome["error"] = unsupported_option_detail(exc) or component_error(
+                exc, f"The {stage} stage"
+            )
         finally:
             try:
                 shutil.rmtree(tmp)

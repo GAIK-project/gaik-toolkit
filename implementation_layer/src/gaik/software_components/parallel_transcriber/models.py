@@ -85,7 +85,8 @@ class TranscriptionResult:
             "verbose_json": ".json",
         }
         p = Path(path)
-        if p.is_dir():
+        # "output/" names a folder even before it exists.
+        if p.is_dir() or str(path).endswith(("/", "\\")):
             p = p / f"transcription{ext_map.get(self.format, '.txt')}"
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(self.content, encoding=encoding)

@@ -8,6 +8,7 @@ sources, and checks every quote against the source it cites.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
@@ -16,6 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gaik.software_components.llm import create_llm_client
 from gaik.software_components.llm.base import usage_since
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    clean_label,
+    source_material_messages,
+)
 from gaik.software_components.source_normalizer.models import NormalizedSources
 
 from .models import (
@@ -30,7 +36,7 @@ from .models import (
     _squash,
     check_sections,
 )
-from .prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
+from .prompts import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt, source_labels
 
 logger = logging.getLogger(__name__)
 
@@ -83,14 +89,80 @@ class CurationResponse(BaseModel):
     )
 
 
-def _failing_units(
-    answer: CurationResponse, sources: NormalizedSources
-) -> list[tuple[int, str, str]]:
-    """``(position, reason, message)`` of every unit whose quote fails the check."""
-    texts = {s.file: _squash(s.text) for s in sources.sources}
+class _Cited:
+    """What the checks of one run need about the sources, computed once per run.
+
+    ``texts`` holds each source's text with its whitespace squashed, by file name;
+    ``labels`` the block label of each file (:func:`source_labels`); ``files`` the file
+    a label, or the cleaned form of a file name, stands for.
+    """
+
+    def __init__(self, sources: NormalizedSources) -> None:
+        self.texts = {s.file: _squash(s.text) for s in sources.sources}
+        self.labels = source_labels(sources)
+        self.files: dict[str, str] = {}
+        cleaned: dict[str, list[str]] = {}
+        for file in self.texts:
+            cleaned.setdefault(clean_label(file), []).append(file)
+        for name, files in cleaned.items():
+            if name and len(files) == 1 and name not in self.texts:
+                self.files[name] = files[0]
+        for file, label in self.labels.items():
+            if label != file:
+                self.files[label] = file
+
+    def label(self, file: str) -> str:
+        """The label a file was shown with; any other name as it is."""
+        return self.labels.get(file, file)
+
+
+def _verbatim_quote(quote: str, squashed_text: str) -> str | None:
+    """The source's own words for a quote that holds an escaped closing tag, or None.
+
+    A closing block tag written in a source reaches the model with its bracket escaped
+    as ``&lt;``. Each ``&lt;`` of the quote may stand for one such bracket, any character
+    that is neither a letter, a digit nor a space (or for itself); the span found is
+    copied from the source, so it is verbatim.
+    """
+    parts = _squash(quote).split("&lt;")
+    found = re.search(r"(?:&lt;|[^\w\s])".join(re.escape(p) for p in parts), squashed_text)
+    return found.group(0) if found else None
+
+
+def _as_cited(answer: CurationResponse, cited: _Cited) -> CurationResponse:
+    """The answer with each unit's source named by its file and its quote as the source has it.
+
+    A unit cites the label of its source's block, which is the file name except for a
+    file name that is not a clean label (see :func:`source_labels`); such a label, or
+    the cleaned form of the file name, is turned back into the file name. A quote of a
+    closing block tag in a source gets the source's own words back
+    (:func:`_verbatim_quote`), so the quote check and ``verify_quotes`` find it.
+    """
+    units = []
+    for unit in answer.units:
+        file = unit.source.file
+        if file not in cited.texts:
+            file = cited.files.get(file, file)
+        quote = unit.quote
+        text = cited.texts.get(file)
+        if text is not None and "&lt;" in quote and not _quote_in_squashed(quote, text):
+            quote = _verbatim_quote(quote, text) or quote
+        if file != unit.source.file or quote != unit.quote:
+            unit = unit.model_copy(
+                update={"quote": quote, "source": unit.source.model_copy(update={"file": file})}
+            )
+        units.append(unit)
+    return answer.model_copy(update={"units": units})
+
+
+def _failing_units(answer: CurationResponse, cited: _Cited) -> list[tuple[int, str, str]]:
+    """``(position, reason, message)`` of every unit whose quote fails the check.
+
+    The message names a source by the label the model saw it under.
+    """
     failures = []
     for n, unit in enumerate(answer.units, start=1):
-        if unit.source.file not in texts:
+        if unit.source.file not in cited.texts:
             failures.append(
                 (
                     n,
@@ -98,12 +170,13 @@ def _failing_units(
                     f'unit {n}: file "{unit.source.file}" is not a source; quote "{unit.quote}"',
                 )
             )
-        elif not _quote_in_squashed(unit.quote, texts[unit.source.file]):
+        elif not _quote_in_squashed(unit.quote, cited.texts[unit.source.file]):
             failures.append(
                 (
                     n,
                     "quote not found in source",
-                    f'unit {n}: quote "{unit.quote}" not found in "{unit.source.file}"',
+                    f'unit {n}: quote "{unit.quote}" not found in '
+                    f'"{cited.label(unit.source.file)}"',
                 )
             )
     return failures
@@ -247,8 +320,11 @@ class KnowledgeCurator:
         before = self.client.usage.snapshot()
         pool = ThreadPoolExecutor(max_workers=self.max_workers)
         try:
+            cited = _Cited(sources)
             futures = [
-                pool.submit(self._curate_section, sources, s, instructions, progress_callback)
+                pool.submit(
+                    self._curate_section, sources, cited, s, instructions, progress_callback
+                )
                 for s in curated
             ]
             results = [f.result() for f in futures]
@@ -263,20 +339,24 @@ class KnowledgeCurator:
     def _curate_section(
         self,
         sources: NormalizedSources,
+        cited: _Cited,
         section: SectionSpec,
         instructions: str,
         progress_callback: Callable[[str], None] | None,
     ) -> tuple[SectionKnowledge, list[DroppedUnit]]:
         if progress_callback:
             progress_callback(f"Curating {section.title}")
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_user_prompt(sources, section, instructions)},
-        ]
-        answer = self.client.chat_parsed(
+        # Each source in its own block with a random id for this call; the rules stay in
+        # the system message, the section and the report instructions outside the blocks.
+        messages = source_material_messages(
+            SYSTEM_PROMPT,
+            build_user_prompt(sources, section, instructions, SourceMaterial(), cited.labels),
+        )
+        raw = self.client.chat_parsed(
             messages, response_format=CurationResponse, **self.chat_options
         )
-        failing = _failing_units(answer, sources)
+        answer = _as_cited(raw, cited)
+        failing = _failing_units(answer, cited)
         bad_conflicts = _failing_conflicts(answer)
         if failing or bad_conflicts:
             failures = [message for _, _, message in failing]
@@ -287,13 +367,15 @@ class KnowledgeCurator:
             )
             messages = [
                 *messages,
-                {"role": "assistant", "content": answer.model_dump_json()},
+                # the answer as the model gave it, citing the labels it saw
+                {"role": "assistant", "content": raw.model_dump_json()},
                 {"role": "user", "content": build_retry_prompt(failures, bad_conflicts)},
             ]
             answer = self.client.chat_parsed(
                 messages, response_format=CurationResponse, **self.chat_options
             )
-            failing = _failing_units(answer, sources)
+            answer = _as_cited(answer, cited)
+            failing = _failing_units(answer, cited)
             bad_conflicts = _failing_conflicts(answer)
             if not self.drop_unverified:
                 if failing:

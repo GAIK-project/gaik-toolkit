@@ -45,7 +45,9 @@ WORKSPACE = HERE / "output" / EXAMPLE
 
 
 def main() -> None:
-    spec = ReportSpec.load(SPEC_FILE)
+    # project_meeting reads its sources from ../../multi_source_report_generator/, so the
+    # spec's paths may reach anywhere under software_modules/.
+    spec = ReportSpec.load(SPEC_FILE, root=HERE.parent)
     writer = ReportWriter(get_llm_config())
     print(f"Spec: {SPEC_FILE}\nWorkspace: {WORKSPACE}\nMode: {MODE}")
 

@@ -12,13 +12,22 @@ import tempfile
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
+    from utils.report_runs import report_writer_limits, require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
+    from api.utils.report_runs import report_writer_limits, require_report_run_grant
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -145,6 +154,29 @@ def _upload_name(filename: str, used: set[str]) -> str:
     return candidate
 
 
+def _apply_limits(run_config: dict, uploads: list[UploadFile]) -> None:
+    """Hold the page's limits here too (utils/report_runs.py): the number of
+    sections and the total upload size are refused over the limit, and the
+    evidence ceiling is capped at it."""
+    limits = report_writer_limits()
+    sections = run_config.get("sections", [])
+    if isinstance(sections, list) and len(sections) > limits["max_sections"]:
+        raise HTTPException(
+            status_code=400, detail=f"Too many sections (max {limits['max_sections']})"
+        )
+    if sum(uf.size or 0 for uf in uploads) > limits["max_upload_bytes"]:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Uploads exceed the {limits['max_upload_bytes'] // (1024 * 1024)} MB limit",
+        )
+    requested = run_config.get("max_evidence_chars")
+    run_config["max_evidence_chars"] = (
+        min(requested, limits["max_evidence_chars"])
+        if isinstance(requested, int) and not isinstance(requested, bool) and requested > 0
+        else limits["max_evidence_chars"]
+    )
+
+
 def _run_options(run_config: dict, work_dir: Path) -> dict:
     """The component options for one run: only the keys the page sets."""
     options: dict = {"parser_options": {}}
@@ -222,7 +254,28 @@ async def get_example_sample_report():
 # ---------------------------------------------------------------------------
 
 
-@router.post("/run")
+def _check_run_models(run_config: dict) -> None:
+    """The writer, review and transcription models must be ones the demo offers."""
+
+    def named(key: str, field: str):
+        given = run_config.get(key)
+        value = given.get(field) if isinstance(given, dict) else None
+        return value if isinstance(value, str) else None
+
+    offered = chat_models()
+    check_model(named("writer_options", "model"), offered, "writer model")
+    check_model(named("review_options", "model"), offered, "review model")
+    transcriber = run_config.get("transcriber_options")
+    ctor = transcriber.get("ctor") if isinstance(transcriber, dict) else None
+    model = ctor.get("transcription_model") if isinstance(ctor, dict) else None
+    check_model(
+        model if isinstance(model, str) else None,
+        transcription_models(),
+        "transcription model",
+    )
+
+
+@router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def generate_report(
     files: list[UploadFile] = File(...),
     sample_report: UploadFile | None = File(None),
@@ -239,6 +292,11 @@ async def generate_report(
         run_config: dict = json.loads(config)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid config JSON: {exc}") from exc
+    if not isinstance(run_config, dict):
+        raise HTTPException(status_code=400, detail="Config must be a JSON object")
+    _check_run_models(run_config)
+
+    _apply_limits(run_config, [*files, *([sample_report] if sample_report else [])])
 
     # Save uploaded files to a temp directory
     tmp_dir = Path(tempfile.mkdtemp())
@@ -260,7 +318,11 @@ async def generate_report(
             sample_path = str(dest)
     except Exception as exc:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        logger.warning("Cannot store the uploads: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=400,
+            detail="The server cannot store the uploaded files. Rename them and try again.",
+        ) from exc
 
     if not input_paths:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -334,9 +396,9 @@ async def generate_report(
         except Exception as exc:  # noqa: BLE001
             if cancelled.is_set():
                 logger.info("Report generation stopped: the client left")
+                result_holder["error"] = "Report generation stopped: the client left."
             else:
-                logger.exception("Report generation failed")
-            result_holder["error"] = str(exc)
+                result_holder["error"] = error_detail(exc, "Report generation")
         finally:
             try:
                 shutil.rmtree(tmp_dir, ignore_errors=True)

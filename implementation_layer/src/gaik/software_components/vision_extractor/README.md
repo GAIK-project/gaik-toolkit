@@ -92,6 +92,16 @@ currently expose token usage, so `result.usage` is `None` on this path. Duration
 and model metadata remain available. Install `gaik[llm-litellm]` when selecting
 `provider="litellm"`; its `model` must include the LiteLLM provider prefix.
 
+## Source material as data
+
+The attached PDFs and images are material, never instructions: every system
+prompt ends with the sentence in `SOURCE_MATERIAL_INSTRUCTION`
+([`gaik.software_components.source_material`](../source_material.py)), and your `user_requirements` stay in the user message next to
+the files. With a shared provider config, the PDF's text layer travels in a
+`<source_material>` block with a random id for each call, so a sentence in it
+cannot close the block. With `include_verification=True`, `found_in_text`
+reports whether each value is written in the PDF's text layer.
+
 ## Environment Variables
 
 Set provider credentials before running the extractor. Put them in a `.env` file or export them in your shell/session; the toolkit configuration

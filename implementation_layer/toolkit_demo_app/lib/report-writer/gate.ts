@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { EMAIL_UNCONFIRMED, isEmailConfirmed } from "@/lib/api-access";
 import { clientIp } from "@/lib/client-ip";
-import { ratelimit } from "@/lib/rate-limit";
+import { ADMIN_COOKIE_NAME, MODEL_TIER_HEADER, isModelStaff } from "@/lib/model-tier";
+import { checkRateLimit, ratelimit } from "@/lib/rate-limit";
 import {
   pickUsageFromEvents,
   type ReportUsageInfo,
@@ -54,13 +56,19 @@ export function accessDenial(
 /**
  * Auth + approval (or trial) + quota, then the per-IP burst limit (parity with the proxy;
  * these routes are not proxied). Returns the refusal response, or the user id
- * (null under BYPASS_AUTH).
+ * (null under BYPASS_AUTH) and whether the user may run the team-only models
+ * (lib/model-tier.ts), read from the session like the proxy does.
  */
 export async function gateReportWriter(
   request: NextRequest,
   maxReports: number,
-): Promise<NextResponse | { userId: string | null }> {
-  if (BYPASS_AUTH) return { userId: null };
+): Promise<NextResponse | { userId: string | null; staff: boolean }> {
+  if (BYPASS_AUTH)
+    return {
+      userId: null,
+      // As in the proxy: without a session only the admin cookie counts.
+      staff: isModelStaff(null, request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+    };
 
   const supabase = await createClient();
   const {
@@ -81,40 +89,38 @@ export async function gateReportWriter(
   const trialReports = trialEnabled() ? getTrialLimits().reports : 0;
   const denial = accessDenial(row as AccessRow | null, maxReports, trialReports);
   if (denial) return NextResponse.json(denial, { status: 403 });
+  // The per-IP limit comes before the trial run, so a refused request spends
+  // none. While the configured Redis does not answer, it refuses (503).
+  const limited = await checkRateLimit(
+    ratelimit,
+    clientIp(request.headers),
+    "Liian monta pyyntöä. Yritä hetken päästä uudelleen.",
+    "[report-writer]",
+  );
+  if (limited) {
+    return NextResponse.json(
+      { error: limited.error },
+      { status: limited.status, headers: limited.headers },
+    );
+  }
+
   // A pending user's stages also count against the daily trial allowance.
   if (row?.status === "pending") {
+    if (!isEmailConfirmed(user))
+      return NextResponse.json(
+        { error: EMAIL_UNCONFIRMED.error },
+        { status: EMAIL_UNCONFIRMED.status },
+      );
     const trial = await takeTrialRun(user.id);
     if (!trial.ok)
       return NextResponse.json({ error: trial.error }, { status: trial.status });
   }
 
-  if (ratelimit) {
-    try {
-      const { success, limit, remaining, reset } = await ratelimit.limit(
-        clientIp(request.headers),
-      );
-      if (!success) {
-        return NextResponse.json(
-          { error: "Liian monta pyyntöä. Yritä hetken päästä uudelleen." },
-          {
-            status: 429,
-            headers: {
-              "X-RateLimit-Limit": limit.toString(),
-              "X-RateLimit-Remaining": remaining.toString(),
-              "X-RateLimit-Reset": reset.toString(),
-            },
-          },
-        );
-      }
-    } catch (e) {
-      console.warn(
-        "[report-writer] rate limit skipped:",
-        e instanceof Error ? e.message : e,
-      );
-    }
-  }
-
-  return { userId: user.id };
+  const staff = isModelStaff(
+    user.email?.toLowerCase() ?? null,
+    request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+  );
+  return { userId: user.id, staff };
 }
 
 /** Add a run's report count and tokens to the user's access_requests row. */
@@ -142,25 +148,48 @@ export async function recordReportUsage(
   if (error) throw new Error(`Recording usage failed: ${error.message}`);
 }
 
+/** Sent only by these route handlers; the generic proxy never forwards it. */
+export const REPORT_RUN_HEADER = "x-gaik-report-run";
+
+/**
+ * The header that tells the backend this run passed the gate above. The API's
+ * run routes refuse a run without it when REPORT_RUN_TOKEN is set on both
+ * deployments (api/utils/report_runs.py).
+ */
+export function reportRunHeaders(): Record<string, string> {
+  const token = process.env.REPORT_RUN_TOKEN;
+  return token ? { [REPORT_RUN_HEADER]: token } : {};
+}
+
 /**
  * POST the form to the backend and stream its SSE back. When the stream ends,
  * onEnd gets the folded result usage; if it throws, the client receives an
- * `error` event with its message instead of a silent miss.
+ * `error` event with its message instead of a silent miss. `staff` (from
+ * gateReportWriter) tells the API the user may run the team-only models.
  */
 export async function forwardReportRun(
   backendPath: string,
   body: FormData,
+  staff: boolean,
   onEnd: (usage: ReportUsageInfo) => Promise<void>,
 ): Promise<Response> {
   let backendRes: Response;
   try {
     backendRes = await fetch(`${BACKEND_URL}${backendPath}`, {
       method: "POST",
+      // One headers object: the run token and, for the team, the model tier.
+      headers: {
+        ...reportRunHeaders(),
+        ...(staff ? { [MODEL_TIER_HEADER]: "staff" } : {}),
+      },
       body,
     });
   } catch (e) {
+    // The reason names the backend's address; it goes to the log, not the page.
+    const id = crypto.randomUUID().slice(0, 12);
+    console.error(`[report-run] error id ${id}: backend request failed:`, e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Backend error" },
+      { error: `The demo API did not answer (error id ${id}). Try again in a moment.` },
       { status: 502 },
     );
   }

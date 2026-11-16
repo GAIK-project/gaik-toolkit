@@ -18,8 +18,7 @@ pip install "gaik[mcp]"
 For the Jev backend of `classify_text`, add `jev-classifier`: `pip install "gaik[mcp,jev-classifier]"`.
 
 **Note:** the `mcp`, `operations` and `fields-to-docx` extras and the `gaik-mcp` command exist
-from the release after 0.8.14. Until then install from the repository:
-`pip install "gaik[mcp] @ git+https://github.com/GAIK-project/gaik-toolkit.git"`.
+from gaik 0.9.0.
 
 The model tools use the provider gaik is configured for (`LLM_PROVIDER` and the provider's
 variables, for example `AZURE_API_KEY` and `AZURE_ENDPOINT`). `parse_document` and
@@ -66,7 +65,7 @@ gaik-mcp [--transport stdio|http] [--root DIR] [--env-file FILE]
 
 | Setting | Flag | Environment | Default |
 |---------|------|-------------|---------|
-| Folder that path arguments may point into, and that `fields_to_word` writes to | `--root` | `GAIK_MCP_ROOT` | none on both transports: paths are refused |
+| Folder that path arguments may point into, and that `fields_to_word` writes to | `--root` | `GAIK_MCP_ROOT` | none on both transports: paths are refused; an empty value also means none |
 | Largest file, in megabytes | | `GAIK_MCP_MAX_FILE_MB` | 25 |
 | Longest text argument and returned text window, in characters | | `GAIK_MCP_MAX_TEXT_CHARS` | 100000 |
 | Seconds per model request | | `GAIK_MCP_TIMEOUT` | 120 |
@@ -123,7 +122,8 @@ Notes per tool:
 - **parse_document** reads PDF, DOCX, `.txt` and `.md`. The type is decided from the content,
   not the name. There is no OCR: a scanned PDF is refused. A DOCX that unpacks to more than
   200 MB, or to more than 50 MB of markup, is refused before it is read. Long texts come in
-  windows; call again with `offset` set to `next_offset`. Each call parses the file again.
+  windows; call again with `offset` set to `next_offset`. The server keeps the last four
+  parsed files, so a later window of an unchanged file is not parsed again.
   On a server that has Docling installed (`gaik[parser]`, `gaik[all]`) the first call can
   take a minute, because importing gaik's parsers loads it; with `gaik[mcp]` alone it does
   not.
@@ -254,9 +254,10 @@ gated app; its lifespan starts the session manager.
 ## What the server does not do
 
 No tool sends mail or messages, fetches a URL, runs code, loads a schema file or lists a
-folder. The server keeps no state between calls and stores nothing but the Word file a
-client asks it to write. Model calls go to the provider gaik is configured for, and to the
-Jev service only when a client asks for `backend: "jev"`.
+folder. Between calls the server keeps only the last four parsed files in memory, so a later
+window is not parsed again. It stores nothing but the Word file a client asks it to write.
+Model calls go to the provider gaik is configured for, and to the Jev service only when a
+client asks for `backend: "jev"`.
 
 ## License
 

@@ -82,7 +82,7 @@ source, and unresolved conflicts between sources are stated in the text.
 
 - **Saved template:** the structure of an accepted report (title, language, report-wide
   instructions and sections), saved in your template library, outside the run folder, only if you
-  agree, and never with sources, facts or keys. See [Template library](#template-library).
+  agree, and never with sources, facts or keys.
 
 ## Installing the skill
 For **Running in Claude Desktop --> Claude Code**:
@@ -105,10 +105,10 @@ Then, the skill can be invoked as follows:
 Use the generate-structured-reports skill to write a project status report from these meeting recordings and the risk register. 
 ```
 
-When the skill starts for the first time, it installs all the dependencies it needs. You
-only need Python 3.11 or later and an API key (see [Providers and API keys](#providers-and-api-keys)).
-
-The dependencies required by the skill at the time of first run include gaik's report writer module (`gaik[report-writer]`), `ffmpeg`, `audioop-lts`, `pandoc`, and some optional dependencies such as `docling`, and `PyTorch`. 
+The skill needs gaik's report writer (`gaik[report-writer]`); recordings also need `ffmpeg`
+and, on Python 3.13 or later, `audioop-lts`, and Word output needs Pandoc. The agent asks
+before it installs any of them. You only need Python 3.11 or later and an API key (see
+[Providers and API keys](#providers-and-api-keys)).
 
 ## Providers and API keys
 
@@ -226,3 +226,4 @@ setx GAIK_REPORT_REVIEWER_MODEL "reviewer_model_name"
 | `scripts/run_report.py` | The stage helper: `preflight`, `propose-spec`, `apply-spec`, `normalize`, `set-sections`, `curate`, `validate-knowledge`, `synthesize`, `rebuild`, `update-sample` |
 | `scripts/template_to_spec.py` | Drafts the structure from a Word or Markdown template |
 | `scripts/template_library.py` | Searches, loads and saves your template library: `list`, `search`, `show`, `load`, `save` |
+| `scripts/install_pandoc.py` | Checks for Pandoc and, only after you agree, installs it into a per-user folder |

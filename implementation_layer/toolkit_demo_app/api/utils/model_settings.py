@@ -20,6 +20,8 @@ import httpx
 from fastapi import HTTPException
 from starlette.responses import JSONResponse
 
+from .errors import public_error
+
 HEADER = b"x-gaik-model-settings"
 _AZURE_HOST = re.compile(
     r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(?:openai\.azure\.com|services\.ai\.azure\.com)"
@@ -74,6 +76,8 @@ class ServerModel:
     # False when the provider has no speech-to-text: the audio demos then
     # transcribe with the server's own transcriber and extract with this model.
     audio: bool = True
+    # False for a text-only model: demos that send page images refuse it.
+    vision: bool = True
 
     @property
     def id(self) -> str:
@@ -81,12 +85,19 @@ class ServerModel:
 
 
 _server_model: ContextVar[ServerModel | None] = ContextVar("demo_server_model", default=None)
+# Whether the request carries the team tier, set by ModelSettingsMiddleware for the
+# routes that check a named model (utils/model_allow_list.py).
+_staff: ContextVar[bool] = ContextVar("demo_model_staff", default=False)
 
 _LABELS = {
     "gpt-6-luna": "GPT-6 Luna",
     "gpt-6-sol": "GPT-6 Sol",
     "gpt-6.1-sol": "GPT-6.1 Sol",
     "gpt-6-astra": "GPT-6 Astra",
+    "google/gemma-4-31b-it": "Gemma 4 31B",
+    "Qwen/Qwen3.8-27B": "Qwen 3.8 27B",
+    "Qwen/Qwen3.6-35B-A3B": "Qwen 3.6 35B",
+    "openai/gpt-oss-120b": "gpt-oss 120B",
 }
 
 # (family, model, staff only). Families map to the provider that has credentials.
@@ -100,12 +111,51 @@ _DEFAULT_MODELS = (
     ("claude", "claude-opus-5-5", True),
     ("gemini", "gemini-3.8-flash", False),
     ("gemini", "gemini-4-argon", True),
+    # CSC Aitta: open models hosted in Finland. Of the models tested through
+    # gaik on 2026-11-16 these two are worth offering: Gemma reads images, and
+    # gpt-oss answers three times faster (docs/MODEL_REQUIREMENTS.md). Others
+    # can be listed with DEMO_SERVER_MODELS.
+    ("aitta", "google/gemma-4-31b-it", False),
+    ("aitta", "openai/gpt-oss-120b", False),
 )
 _FAMILIES = {
     "gpt": ("azure", "openai"),
     "claude": ("anthropic_foundry", "anthropic"),
     "gemini": ("vertex", "google"),
+    "aitta": ("aitta",),
 }
+
+AITTA_BASE_URL = "https://aitta-api.csc.fi/openai/v1"
+# Aitta chat models that answered an image request with an error or without
+# reading the image (2026-11-16). A model not listed here is taken to read images.
+_AITTA_TEXT_ONLY = (
+    "openai/gpt-oss-",
+    "qwen/qwen3-coder",
+    "qwen/qwen-agentworld",
+    "swiss-ai/apertus",
+    "allenai/olmo",
+    "lumiopen/",
+    "meta-llama/llama-3.3",
+    "tinyllama/",
+)
+
+
+def reads_images(provider: str | None, model: str | None) -> bool:
+    """False for a model known to be text-only. Only Aitta models are listed."""
+    if provider != "aitta" or not model:
+        return True
+    return not model.lower().startswith(_AITTA_TEXT_ONLY)
+
+
+def _aitta_token() -> str | None:
+    import os
+
+    return os.getenv("AITTA_API_KEY") or os.getenv("AITTA_API_TOKEN") or os.getenv("AITTA_TOKEN")
+
+
+def model_name(model: str | None) -> str:
+    """The name a model goes by in the menu, or its ID when it has none."""
+    return _LABELS.get(model or "", model or "The model")
 
 
 def _label(model: str) -> str:
@@ -139,6 +189,7 @@ def _has_credentials(provider: str) -> bool:
             and (env("GOOGLE_PROJECT_ID") or env("GOOGLE_CLOUD_PROJECT"))
         ),
         "google": bool(env("GOOGLE_API_KEY") or env("GEMINI_API_KEY")),
+        "aitta": bool(_aitta_token()),
     }.get(provider, False)
 
 
@@ -158,18 +209,22 @@ def server_models() -> list[ServerModel]:
     """Models the deployment's own credentials can run, default first.
 
     ``DEMO_SERVER_MODELS`` overrides the list as comma-separated
-    ``provider:model`` entries, with ``:staff`` for a team-only model.
-    A provider without credentials is left out.
+    ``provider:model`` entries, with ``:staff`` for a team-only model and
+    ``:text`` for one that cannot read images. A provider without credentials
+    is left out.
     """
     import os
 
     configured = os.getenv("DEMO_SERVER_MODELS", "").strip()
     entries: list[tuple[str, str, bool]] = []
+    text_only: set[tuple[str, str]] = set()
     if configured:
         for item in configured.split(","):
             parts = [p.strip() for p in item.split(":")]
             if len(parts) >= 2 and parts[0] and parts[1]:
-                entries.append((parts[0], parts[1], parts[2:3] == ["staff"]))
+                entries.append((parts[0], parts[1], "staff" in parts[2:]))
+                if "text" in parts[2:]:
+                    text_only.add((parts[0], parts[1]))
     else:
         for family, model, staff in _DEFAULT_MODELS:
             provider = next((p for p in _FAMILIES[family] if _has_credentials(p)), None)
@@ -193,7 +248,9 @@ def server_models() -> list[ServerModel]:
                 model,
                 _label(model),
                 staff=staff,
-                audio=provider in {"azure", "openai"},
+                # Aitta transcribes with its own Whisper (utils/config.py).
+                audio=provider in {"azure", "openai", "aitta"},
+                vision=(provider, model) not in text_only and reads_images(provider, model),
             )
         )
     return models
@@ -202,6 +259,11 @@ def server_models() -> list[ServerModel]:
 def is_staff(scope_or_headers) -> bool:
     headers = scope_or_headers.get("headers", []) if isinstance(scope_or_headers, dict) else []
     return any(k.lower() == TIER_HEADER and v == b"staff" for k, v in headers)
+
+
+def request_is_staff() -> bool:
+    """Whether the current request may run the team-only models."""
+    return _staff.get()
 
 
 def request_server_model() -> ServerModel | None:
@@ -213,10 +275,111 @@ def request_model_settings() -> RequestModelSettings | None:
 
 
 def supports_model_settings(path: str, method: str) -> bool:
-    return method == "POST" and (
-        any(path == prefix or path.startswith(prefix + "/") for prefix in _PATHS)
-        or path.startswith("/wizard/message/")
+    return method == "POST" and any(
+        path == prefix or path.startswith(prefix + "/") for prefix in _PATHS
     )
+
+
+# A picked server model also runs these; an own key does not. The RAG index
+# stays on the server between requests, where a browser key must not, and the
+# transcriber takes a speech model, not the chat model of the key dialog.
+_SERVER_MODEL_PATHS = ("/rag/index", "/rag/load-example", "/transcribe")
+
+
+def supports_server_model(path: str, method: str) -> bool:
+    return supports_model_settings(path, method) or (
+        method == "POST"
+        and any(path == prefix or path.startswith(prefix + "/") for prefix in _SERVER_MODEL_PATHS)
+    )
+
+
+def aitta_speech_model() -> str:
+    import os
+
+    return os.getenv("AITTA_TRANSCRIPTION_MODEL", "openai/whisper-large-v3")
+
+
+def aitta_embedding_model() -> str:
+    import os
+
+    return os.getenv("AITTA_EMBEDDING_MODEL", "intfloat/multilingual-e5-large")
+
+
+_aitta_warmed = 0.0
+
+
+def warm_aitta_models() -> list[str]:
+    """Ask Aitta to start its idle speech and embedding models; returns those asked.
+
+    Aitta stops a model that has been idle, and the next request then waits
+    minutes for it. Called when a user picks an Aitta model, so that the models
+    are up by the time a recording or a document arrives. At most once in five
+    minutes, whoever asks.
+    """
+    import time
+
+    global _aitta_warmed, _aitta_status
+    token = _aitta_token()
+    if not token or (_aitta_warmed and time.monotonic() - _aitta_warmed < 300):
+        return []
+    _aitta_warmed = time.monotonic()
+    statuses = aitta_model_status()
+    asked = []
+    for model in (aitta_speech_model(), aitta_embedding_model()):
+        if statuses.get(model) in {None, "running", "starting", "requested"}:
+            continue
+        try:
+            httpx.post(
+                f"https://aitta-api.csc.fi/model/{model.replace('/', '~')}/preload",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            ).raise_for_status()
+            asked.append(model)
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Aitta preload failed for %s (%s)", model, type(exc).__name__
+            )
+    if asked:
+        _aitta_status = (0.0, {})  # The next list shows them starting.
+    return asked
+
+
+_aitta_status: tuple[float, dict[str, str]] = (0.0, {})
+
+
+def aitta_model_status() -> dict[str, str]:
+    """Aitta's own status per model id ("running", "offline", ...), cached a minute.
+
+    An offline model starts on its first request, which can take minutes. Empty
+    when the deployment has no Aitta key or the catalog does not answer.
+    """
+    import time
+
+    global _aitta_status
+    checked, statuses = _aitta_status
+    if checked and time.monotonic() - checked < 60:
+        return statuses
+    statuses = {}
+    token = _aitta_token()
+    if token:
+        try:
+            response = httpx.get(
+                "https://aitta-api.csc.fi/model",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=5.0,
+            )
+            response.raise_for_status()
+            statuses = {
+                str(m["id"]): str(m.get("status") or "")
+                for m in response.json().get("_embedded", {}).get("models", [])
+                if isinstance(m, dict) and m.get("id")
+            }
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Aitta catalog check failed (%s)", type(exc).__name__
+            )
+    _aitta_status = (time.monotonic(), statuses)
+    return statuses
 
 
 def parse_model_settings(raw: str) -> RequestModelSettings:
@@ -317,9 +480,7 @@ def get_request_api_config() -> dict | None:
         )
     else:
         overrides["base_url"] = (
-            "https://aitta-api.csc.fi/openai/v1"
-            if settings.provider == "aitta"
-            else "https://api.openai.com/v1"
+            AITTA_BASE_URL if settings.provider == "aitta" else "https://api.openai.com/v1"
         )
     if _http_client.get() is not None:
         overrides["http_client"] = _http_client.get()
@@ -347,18 +508,23 @@ def unsupported_option_detail(exc: BaseException) -> str | None:
     )
 
 
-def provider_error_detail(exc: Exception) -> str:
-    """Do not expose remote error bodies from requests using a user's credential."""
+def provider_error_detail(exc: Exception, what: str = "The request") -> str:
+    """A message for a failed request that never carries the exception's own text.
+
+    A request on the user's credential gets a hint about their settings; one on the
+    server's credentials gets an error id, with the exception logged under it
+    (utils/errors.py). An HTTPException raised on purpose keeps its detail.
+    """
     if (detail := unsupported_option_detail(exc)) is not None:
         return detail
+    if isinstance(exc, HTTPException):
+        return str(exc.detail)
     if _settings.get() is not None:
-        if isinstance(exc, HTTPException):
-            return str(exc.detail)
         return (
             "Model request failed. Check your credentials, model or deployment, "
             "and the operation supported by that model."
         )
-    return str(exc)
+    return public_error(exc, what)
 
 
 class _CredentialRedactionFilter(logging.Filter):
@@ -396,6 +562,13 @@ class ModelSettingsMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
+        staff_token = _staff.set(is_staff(scope))
+        try:
+            return await self._call(scope, receive, send)
+        finally:
+            _staff.reset(staff_token)
+
+    async def _call(self, scope, receive, send):
         raw_headers = [v for k, v in scope.get("headers", []) if k.lower() == HEADER]
         if not raw_headers:
             return await self._server_model_call(scope, receive, send)
@@ -452,7 +625,7 @@ class ModelSettingsMiddleware:
         the server's transcriber (``get_transcription_api_config``).
         """
         raw = [v for k, v in scope.get("headers", []) if k.lower() == SERVER_HEADER]
-        if not raw or not supports_model_settings(scope["path"], scope["method"]):
+        if not raw or not supports_server_model(scope["path"], scope["method"]):
             return await self.app(scope, receive, send)
         wanted = raw[0].decode("ascii", "replace").strip()
         chosen = next((m for m in server_models() if m.id == wanted), None)
