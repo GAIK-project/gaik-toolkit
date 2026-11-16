@@ -8,7 +8,7 @@ import { HowItWorks } from "./how-it-works";
 
 export default function HelpdeskChatbotPage() {
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <DemoPageHeader
         icon={Headset}
         title="Helpdesk Chatbot"
