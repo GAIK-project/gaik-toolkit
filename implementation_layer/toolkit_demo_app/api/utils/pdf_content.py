@@ -53,15 +53,18 @@ linear in its input. The bytes the check reads more than once, the bytes it
 decodes and the streams it decodes are counted against budgets, and positions
 are kept in compact arrays, so the check holds bounded memory on any file.
 The steps of the check's own loops (each string and comment it blanks, each
-byte the LZW, RunLength and predictor code reads, each number of an object
-stream's offset table, each stream it decodes) are counted against one more
-budget, and the check also stops at a deadline, so it ends in bounded time on
-any file and any machine.
+byte the LZW, RunLength and predictor code reads, each stream it decodes, each
+offset of an object stream) are counted against one more budget, and so are
+the bytes its patterns read. The patterns read a window at a time and the
+check looks at its deadline between windows, so it ends in bounded time on any
+file and any machine, and no single search keeps other threads waiting long.
+A name followed by more than ``MAX_GAP`` bytes of whitespace and digits is
+refused as not checkable.
 
-Those budgets are the first line. A pattern search over decoded data holds the
-interpreter while it runs and no deadline can stop it, so the upload check runs
-``check`` in a process of its own (``pdf_process``), which runs this file as a
-script and is stopped at a deadline of its own.
+Those budgets are the first line. The upload check runs ``check`` in a process
+of its own (``pdf_process``), which runs this file as a script and is stopped
+at a deadline of its own, so not even a check that outruns its budgets can
+hold the API's interpreter.
 """
 
 from __future__ import annotations
@@ -87,11 +90,18 @@ from collections.abc import Sequence
 MAX_DECODED_BYTES = 128 * 1024 * 1024
 #: Steps of the check's own Python loops in one file: each string, comment or
 #: ``#xx`` escape it reads outside the patterns, each byte the LZW, RunLength
-#: and PNG predictor code reads, each object header it walks, each number of
-#: an object stream's offset table. A step takes about a microsecond, up to
-#: about four on a slow machine. A dense page of text costs about 3,000 steps,
-#: so a text PDF of more than about 1,400 pages is refused as too complex.
+#: and PNG predictor code reads, each object header it walks, each offset of an
+#: object stream, and each ``SCAN_BYTES`` the patterns read. A step takes about
+#: a microsecond, a few on a slow machine.
 MAX_WORK = 4_000_000
+#: Bytes the patterns read for one step.
+SCAN_BYTES = 1024
+#: Bytes one pattern search reads before the check counts them and looks at
+#: its deadline, so no single search runs long.
+SCAN_WINDOW = 256 * 1024
+#: Whitespace and digits read after a name to see what follows it; a name
+#: followed by more is refused as not checkable.
+MAX_GAP = 1024 * 1024
 #: The steps a decoded stream costs besides its bytes.
 STREAM_STEPS = 100
 #: Seconds one check may take whatever its steps; a file that needs more is
@@ -152,6 +162,23 @@ _FINDINGS: tuple[tuple[re.Pattern[bytes], str], ...] = (
     (re.compile(rb"/S" + _WS + rb"/ImportData" + _END), "an action that imports data"),
     (re.compile(rb"/Subtype" + _WS + rb"/RichMedia" + _END), "embedded rich media"),
 )
+# Every pattern above starts with one of these names, so it is tried only where
+# one stands. Each name is short, so a search for them is read a window at a
+# time; what follows a name is whitespace and digits (``_GAP``) and then at most
+# ``_TAIL`` bytes.
+_FIRST_NAMES = (b"S", b"JS", b"JavaScript", b"Subtype")
+_CANDIDATE = re.compile(rb"/(" + b"|".join(_FIRST_NAMES) + rb")" + _END)
+_BY_NAME = {
+    name: tuple(
+        f
+        for f in _FINDINGS
+        if re.match(rb"/([A-Za-z]+)", f[0].pattern).group(1) == name  # type: ignore[union-attr]
+    )
+    for name in _FIRST_NAMES
+}
+_CANDIDATE_OVERLAP = 16
+_GAP = re.compile(rb"[\x00\t\n\x0c\r 0-9]*+")
+_TAIL = 16
 
 _HEX_ESCAPE = re.compile(rb"#([0-9A-Fa-f]{2})")
 _STREAM = re.compile(rb"(?<!end)stream(?:\r\n|\n|\r)")
@@ -288,15 +315,31 @@ def _count(pattern: re.Pattern[bytes], text: bytes) -> int:
 _SPECIAL = re.compile(rb"[(<%]")
 _IN_STRING = re.compile(rb"[()\\]")
 _EOL = re.compile(rb"\r\n|\r|\n")
+_LINE_END = re.compile(rb"[\r\n]")
 _HEX_STRING = re.compile(rb"<[0-9A-Fa-f\x00\t\n\x0c\r ]*+>")
 _COMMENT = re.compile(rb"%[^\r\n]*+")
+
+
+def _search_byte(
+    pattern: re.Pattern[bytes], buf: bytes, i: int, work: _Budget, limit: int | None = None
+) -> re.Match[bytes] | None:
+    """``pattern`` (one byte long) searched from ``i`` a window at a time: a
+    step for the match and one for each ``SCAN_BYTES`` read before it."""
+    n = len(buf) if limit is None else limit
+    while i < n:
+        end = min(n, i + SCAN_WINDOW)
+        m = pattern.search(buf, i, end)
+        work.take(1 + ((m.start() if m else end) - i) // SCAN_BYTES)
+        if m is not None:
+            return m
+        i = end
+    return None
 
 
 def _string_end(buf: bytes, start: int, limit: int, work: _Budget) -> int | None:
     """End of the literal string opening at ``start``; None if it is open at ``limit``."""
     depth, i = 0, start
-    while (m := _IN_STRING.search(buf, i, limit)) is not None:
-        work.take(1)
+    while (m := _search_byte(_IN_STRING, buf, i, work, limit)) is not None:
         c = buf[m.start()]
         if c == 0x5C:  # backslash: the next byte is taken as it is
             i = m.start() + 2
@@ -322,21 +365,22 @@ def _strip(
     to it with each ``%`` read as a comment, so the patterns read both. No
     ``%`` is left in what is returned.
     """
-    if not _SPECIAL.search(buf):
+    n = len(buf)
+    first = _search_byte(_SPECIAL, buf, 0, work)
+    if first is None:
         return buf
     view = memoryview(buf)
     out = bytearray()
-    last = i = 0
-    n = len(buf)
-    while (m := _SPECIAL.search(buf, i)) is not None:
-        work.take(1)
+    last, i = 0, first.start()
+    while (m := _search_byte(_SPECIAL, buf, i, work)) is not None:
         p = m.start()
         b = bisect.bisect_right(barriers, p)
         limit = barriers[b] if b < len(barriers) else n
         c = buf[p]
         if c == 0x25:  # % comment, to the end of the line
-            e = _EOL.search(buf, p, limit)
-            end = e.end() if e else limit
+            # The line end itself is kept, as whitespace.
+            e = _search_byte(_LINE_END, buf, p, work, limit)
+            end = e.start() if e else limit
             out += view[last:p]
             out += b" "
         elif c == 0x28:  # ( literal string
@@ -362,6 +406,7 @@ def _strip(
                 i = p + 1
                 continue
             end = h.end()
+            work.take((end - p) // SCAN_BYTES)
             out += view[last:p]
             out += b" <> "
         last = i = end
@@ -373,13 +418,50 @@ def _strip(
 def _names(stripped: bytes, work: _Budget, open_text: Sequence[bytes] = ()) -> str | None:
     """What ``stripped`` and ``open_text`` (from ``_strip``) name."""
     for text in (stripped, *open_text):
-        text = _unescape(text, work)
-        for pattern, what in _FINDINGS:
-            # A search cannot be stopped while it runs; the deadline is looked
-            # at between searches, and pdf_process stops a search that overruns.
-            work.tick()
-            if pattern.search(text):
+        what = _scan(_unescape(text, work), work)
+        if what:
+            return what
+    return None
+
+
+def _scan(text: bytes, work: _Budget) -> str | None:
+    """What ``text`` names, read a window at a time: each window's bytes count
+    as steps, and the deadline is looked at between windows."""
+    n = len(text)
+    pos, last = 0, -1
+    while pos < n:
+        end = min(n, pos + SCAN_WINDOW)
+        work.take(1 + (end - pos) // SCAN_BYTES)
+        work.tick()
+        for m in _CANDIDATE.finditer(text, pos, end):
+            if m.end() == end < n:
+                break  # its end is the window's: read again with the next one
+            if m.start() <= last:
+                continue  # read with the window before
+            last = m.start()
+            work.take(1)
+            what = _match_at(text, m, work)
+            if what:
                 return what
+        if end == n:
+            break
+        # The next window overlaps this one, so a name across its end is read.
+        pos = end - _CANDIDATE_OVERLAP
+    return None
+
+
+def _match_at(text: bytes, name: re.Match[bytes], work: _Budget) -> str | None:
+    """What the patterns that start with ``name`` find there."""
+    n, start, name_end = len(text), name.start(), name.end()
+    limit = min(n, name_end + MAX_GAP)
+    gap = _GAP.match(text, name_end, limit).end()  # type: ignore[union-attr]
+    work.take((gap - name_end) // SCAN_BYTES)
+    if gap == limit < n:
+        raise TooComplexError(NOT_CHECKABLE)
+    stop = min(n, gap + _TAIL)
+    for pattern, what in _BY_NAME[name.group(1)]:
+        if pattern.match(text, start, stop):
+            return what
     return None
 
 
@@ -837,13 +919,13 @@ def _object_offsets(decoded: bytes, stream_dict: bytes, work: _Budget) -> Sequen
     start = _num(first.group(1))
     if start > len(decoded):
         raise TooComplexError(NOT_CHECKABLE)
-    offsets = array("q")
+    offsets: array[int] = array("q")
     numbers = pos = 0
     while pos < start:
         cut = _SPLIT_AT.search(decoded, min(pos + _TABLE_CHUNK, start), start)
         end = cut.end() if cut else start
         tokens = decoded[pos:end].split()
-        work.take(len(tokens))
+        work.take(len(tokens) + (end - pos) // SCAN_BYTES)
         if not all(map(bytes.isdigit, tokens)):
             raise TooComplexError(NOT_CHECKABLE)
         # Object numbers and offsets alternate; a chunk may begin with either.

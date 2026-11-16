@@ -157,11 +157,11 @@ def _bounded(data: bytes) -> bool:
         b"1" + b" " * 300_000 + b"obj\n",  # a long gap before an object keyword
     ],
 )
-def test_the_check_ends_within_its_budgets_on_any_file(body):
+def test_the_check_stays_within_its_steps_and_deadline_on_any_file(body):
     assert _bounded(_pdf(objects=body))
 
 
-def test_an_object_stream_full_of_comment_marks_ends_within_the_budgets():
+def test_an_object_stream_full_of_comment_marks_stays_within_the_steps():
     text = b"(" + b"/S%" * 100_000
     body = b"10 0 "
     hidden = _stream(
@@ -181,13 +181,13 @@ def test_lzw_decoding_takes_time_in_step_with_the_stream():
     assert pdf_content.MAX_WORK - budgets.work.left == len(encoded)
 
 
-def test_a_large_compressed_stream_with_line_ends_inside_its_length_ends_within_the_budgets():
+def test_a_large_compressed_stream_with_line_ends_inside_its_length_stays_within_the_steps():
     # Over a megabyte decoded, and /Length counts the line end after the data.
     content = zlib.compress(b"q 1 0 0 1 0 0 cm Q\n" * 200_000) + b"\r\n"
     assert _bounded(_pdf(objects=_stream(6, b"/Filter /FlateDecode", content)))
 
 
-def test_many_compressed_streams_damaged_at_their_end_are_read_within_the_budgets():
+def test_many_compressed_streams_damaged_at_their_end_are_read_within_the_steps():
     body = bytes((i * 7919) % 251 for i in range(100_000))
     damaged = zlib.compress(body, 1)[:-4] + b"\xff\xff\xff\xff"  # a wrong checksum
     streams = b"".join(_stream(100 + i, b"/Filter /FlateDecode", damaged) for i in range(100))
@@ -259,6 +259,65 @@ def test_many_small_strings_are_checked_in_memory_in_step_with_the_file(monkeypa
     finally:
         tracemalloc.stop()
     assert peak < 8 * len(data)
+
+
+def test_the_bytes_the_patterns_read_count_as_steps():
+    decoded = b"0 0 m 10 10 l S\n" * 1_000_000  # 16 MB of plain drawing
+    data = _pdf(objects=_stream(6, b"/Filter /FlateDecode", zlib.compress(decoded, 9)))
+    check(data)
+    # Read twice at least: once to blank strings and once by the patterns.
+    assert _steps(data) >= 2 * len(decoded) // pdf_content.SCAN_BYTES
+
+
+@pytest.mark.parametrize("shift", range(0, 40))
+def test_a_name_across_the_edge_of_a_scan_window_is_found(monkeypatch, shift):
+    monkeypatch.setattr(pdf_content, "SCAN_WINDOW", 64)
+    action = b"4 0 obj\n" + b" " * shift + JS_ACTION + b"\nendobj\n"
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(objects=action))
+
+
+@pytest.mark.parametrize("shift", range(0, 40, 3))
+def test_page_text_across_the_edge_of_a_scan_window_passes(monkeypatch, shift):
+    monkeypatch.setattr(pdf_content, "SCAN_WINDOW", 64)
+    content = b" " * shift + b"BT /F1 12 Tf 72 712 Td (/S /JavaScript) Tj ET /Subtype /Form"
+    check(_pdf(objects=_stream(6, b"", content)))
+
+
+def test_a_name_followed_by_a_long_gap_is_read_through_it(monkeypatch):
+    monkeypatch.setattr(pdf_content, "MAX_GAP", 4096)
+    action = b"4 0 obj\n<< /S" + b"\n" * 4000 + b"/JavaScript >>\nendobj\n"
+    with pytest.raises(ActiveContentError, match="JavaScript"):
+        check(_pdf(objects=action))
+
+
+def test_a_name_followed_by_a_gap_longer_than_the_check_reads_is_refused(monkeypatch):
+    monkeypatch.setattr(pdf_content, "MAX_GAP", 4096)
+    action = b"4 0 obj\n<< /S" + b" " * 5000 + b"/Normal >>\nendobj\n"
+    with pytest.raises(TooComplexError, match="cannot be checked"):
+        check(_pdf(objects=action))
+
+
+def test_a_long_offset_list_is_refused_in_memory_in_step_with_the_step_budget():
+    numbers = b"1 2 " * 4_000_000  # 8 million numbers, more steps than the budget
+    decoded = numbers + b"<< >>"
+    stream_dict = f"/Type /ObjStm /N 4000000 /First {len(numbers)}".encode()
+    tracemalloc.start()
+    try:
+        with pytest.raises(TooComplexError, match="too complex"):
+            pdf_content._object_offsets(decoded, stream_dict, pdf_content._Work())
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    # At most one kept offset for two steps, eight bytes each; the whole list
+    # held at once would take many times the size of the numbers.
+    assert peak < 5 * pdf_content.MAX_WORK
+
+
+def test_an_object_stream_lists_its_offsets_in_order():
+    body = b"11 6 10 0 " + b"<< >>\n" + JS_ACTION
+    offsets = pdf_content._object_offsets(body, b"/First 10", pdf_content._Work())
+    assert list(offsets) == [10, 16]
 
 
 # ---------------------------------------------------------------- filters
@@ -706,7 +765,7 @@ def test_a_comment_line_before_a_plain_header_passes():
     check(_pdf(objects=b"% generated object 4\n4 0 obj\n<< /Type /Font >>\nendobj\n"))
 
 
-def test_binary_data_with_many_percent_signs_and_few_line_ends_stays_within_the_budgets():
+def test_binary_data_with_many_percent_signs_and_few_line_ends_stays_within_the_steps():
     binary = (b"7 %" + bytes(range(14, 256))) * 2_000  # no line ends
     image = _stream(6, b"/Subtype /Image /Width 1 /Height 1 /Filter /DCTDecode", binary)
     assert _bounded(_pdf(objects=image))
@@ -736,13 +795,16 @@ def test_an_object_streams_offset_table_is_counted_before_it_is_held(monkeypatch
     assert peak < 6 * len(table)
 
 
-def test_object_stream_offsets_are_read_in_order_whatever_order_they_are_listed_in():
-    body = b"11 9 10 0 12 9 "  # 10 at 0, 11 and 12 at 9, listed out of order
-    decoded = body + b"<< >> 1 2 ()"
-    dictionary = f"/First {len(body)}".encode()
-    offsets = list(pdf_content._object_offsets(decoded, dictionary, pdf_content._Work()))
-    assert offsets == sorted(offsets)
-    assert set(offsets) == {len(body), len(body) + 9}
+@pytest.mark.parametrize("chunk", [1, 2, 3, 5, 8, 13, 1000])
+def test_an_offset_table_read_in_chunks_gives_every_offset(monkeypatch, chunk):
+    monkeypatch.setattr(pdf_content, "_TABLE_CHUNK", chunk)
+    pairs = [(10 + i, (i * 37) % 200) for i in range(40)] + [(99, 37)]  # out of order, one twice
+    table = b" ".join(b"%d %d" % pair for pair in pairs) + b"\n"
+    decoded = table + b"x" * 300
+    offsets = pdf_content._object_offsets(
+        decoded, f"/First {len(table)}".encode(), pdf_content._Work()
+    )
+    assert list(offsets) == sorted(len(table) + offset for _, offset in pairs)
 
 
 @pytest.mark.parametrize(
@@ -760,7 +822,7 @@ def test_an_offset_table_that_cannot_be_read_is_refused(table):
 # ------------------------------------------------- deadline and memory
 
 
-def test_the_deadline_is_looked_at_between_pattern_searches(monkeypatch):
+def test_the_deadline_is_looked_at_between_scan_windows(monkeypatch):
     monkeypatch.setattr(pdf_content, "CHECK_SECONDS", -1.0)  # already past
     with pytest.raises(TooComplexError, match="too complex"):
         pdf_content._names(b"<< /Type /Catalog >>", pdf_content._Work())
