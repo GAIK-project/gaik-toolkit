@@ -105,7 +105,7 @@ const MAX_ATTACHMENTS = 5;
 
 const SUPPORTED_FORMATS = [
   { label: "Documents", exts: ".pdf .docx .txt .md" },
-  { label: "Spreadsheets", exts: ".xlsx .xls .csv" },
+  { label: "Spreadsheets", exts: ".xlsx .csv" },
   { label: "Images", exts: ".jpg .jpeg .png .webp .tiff .gif" },
   { label: "Audio / Video", exts: ".mp3 .mp4 .wav .m4a .ogg .webm .flac" },
 ];
@@ -432,7 +432,7 @@ export default function SolutionWizardPage() {
   // pinned under the conversation.
   const composer = (
     <PromptInput
-      accept=".txt,.md,.docx,.pdf,.csv,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.tiff,.gif,.mp3,.mp4,.wav,.m4a,.ogg,.webm,.flac"
+      accept=".txt,.md,.docx,.pdf,.csv,.xlsx,.jpg,.jpeg,.png,.webp,.tiff,.gif,.mp3,.mp4,.wav,.m4a,.ogg,.webm,.flac"
       multiple
       onSubmit={({ text, files: attached }) => {
         if (text || attached.length > 0) void sendMessage(text, attached);

@@ -159,18 +159,16 @@ _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".gif"}
 _AUDIO_EXTENSIONS = {".mp3", ".mp4", ".wav", ".m4a", ".ogg", ".webm", ".flac"}
 # Every extension here has a content signature in utils/file_content.py.
 ATTACHMENT_EXTENSIONS = (
-    _TEXT_EXTENSIONS
-    | _IMAGE_EXTENSIONS
-    | _AUDIO_EXTENSIONS
-    | {".pdf", ".docx", ".csv", ".xlsx", ".xls"}
+    _TEXT_EXTENSIONS | _IMAGE_EXTENSIONS | _AUDIO_EXTENSIONS | {".pdf", ".docx", ".csv", ".xlsx"}
 )
 
 # ---------------------------------------------------------------------------
 # Session store
 # ---------------------------------------------------------------------------
 
-# session_id -> {client, owner, output_dir, lock, last_active, messages}
+# session_id -> {client, owner, output_dir, cli_home, lock, last_active, messages}
 WIZARD_SESSIONS: dict[str, dict] = {}
+_START_LOCK = asyncio.Lock()
 
 
 class FileAttachment(BaseModel):
@@ -295,7 +293,7 @@ def _extract_text(original_name: str, ext: str, file_bytes: bytes) -> str:
             sep = "| " + " | ".join("---" for _ in rows[0]) + " |"
             body = "\n".join("| " + " | ".join(str(c) for c in row) + " |" for row in rows[1:])
             return "\n".join([header, sep, body])
-        elif ext in (".xlsx", ".xls"):
+        elif ext == ".xlsx":
             from openpyxl import load_workbook
 
             wb = load_workbook(filename=tmp_path, read_only=True, data_only=True)
@@ -382,11 +380,21 @@ def _model() -> str:
     ).strip()
 
 
-def _build_options(output_dir: Path) -> ClaudeAgentOptions:
+def _cli_home(session_id: str) -> Path:
+    """Where one session's CLI keeps its own files, the conversation transcript among them.
+
+    Beside the workspaces, not inside one: the user downloads the workspace.
+    """
+    return WORKSPACES_DIR / ".cli" / session_id
+
+
+def _build_options(output_dir: Path, cli_home: Path) -> ClaudeAgentOptions:
     return ClaudeAgentOptions(
         cwd=str(WIZARD_DIR),
         add_dirs=[str(output_dir)],
-        env=_agent_env(),
+        # The CLI writes each conversation under its configuration directory. A
+        # directory per session lets the session's end remove that too.
+        env={**_agent_env(), "CLAUDE_CONFIG_DIR": str(cli_home)},
         model=_model(),
         allowed_tools=["Read", "Grep", "Glob", "Write", "Edit", "Bash"],
         permission_mode="bypassPermissions",
@@ -659,39 +667,45 @@ async def start_session(
         raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
     _agent_env()  # validate creds before creating anything
 
-    # One session per user: starting again ends the earlier one.
-    for sid in [sid for sid, s in WIZARD_SESSIONS.items() if s.get("owner", "") == owner]:
-        await _close_session(sid)
-    if len(WIZARD_SESSIONS) >= _max_sessions():
-        raise HTTPException(
-            status_code=429,
-            detail="The first wizard is in use by others right now. Try again in a while.",
-        )
+    # One start at a time: the limits are checked and the session registered
+    # without another start in between, also while the CLI is still connecting.
+    async with _START_LOCK:
+        # One session per user: starting again ends the earlier one.
+        for sid in [sid for sid, s in WIZARD_SESSIONS.items() if s.get("owner", "") == owner]:
+            await _close_session(sid)
+        if len(WIZARD_SESSIONS) >= _max_sessions():
+            raise HTTPException(
+                status_code=429,
+                detail="The first wizard is in use by others right now. Try again in a while.",
+            )
 
-    session_id = uuid.uuid4().hex
-    output_dir = WORKSPACES_DIR / session_id
-    output_dir.mkdir(parents=True, exist_ok=True)
+        session_id = uuid.uuid4().hex
+        output_dir = WORKSPACES_DIR / session_id
+        cli_home = _cli_home(session_id)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        cli_home.mkdir(parents=True, exist_ok=True)
 
-    client = ClaudeSDKClient(options=_build_options(output_dir))
-    try:
-        await client.connect()
-    except Exception as exc:  # noqa: BLE001
-        shutil.rmtree(output_dir, ignore_errors=True)
-        raise HTTPException(
-            status_code=502, detail=public_error(exc, "Starting the wizard")
-        ) from exc
+        client = ClaudeSDKClient(options=_build_options(output_dir, cli_home))
+        try:
+            await client.connect()
+        except Exception as exc:  # noqa: BLE001
+            shutil.rmtree(output_dir, ignore_errors=True)
+            shutil.rmtree(cli_home, ignore_errors=True)
+            raise HTTPException(
+                status_code=502, detail=public_error(exc, "Starting the wizard")
+            ) from exc
 
-    session = {
-        "client": client,
-        "owner": owner,
-        "output_dir": output_dir,
-        "lock": asyncio.Lock(),
-        "last_active": time.time(),
-        "messages": 0,
-        # Carried until the user's first message, which it is prepended to.
-        "pending_bootstrap": _bootstrap_prompt(output_dir),
-    }
-    WIZARD_SESSIONS[session_id] = session
+        WIZARD_SESSIONS[session_id] = {
+            "client": client,
+            "owner": owner,
+            "output_dir": output_dir,
+            "cli_home": cli_home,
+            "lock": asyncio.Lock(),
+            "last_active": time.time(),
+            "messages": 0,
+            # Carried until the user's first message, which it is prepended to.
+            "pending_bootstrap": _bootstrap_prompt(output_dir),
+        }
 
     async def gen() -> AsyncGenerator[str, None]:
         # No model call here. Starting a session is now just spawning the CLI
@@ -722,6 +736,7 @@ async def send_message(
     # an ordinary 400 and nothing of the message reaches a parser or the agent.
     attachments = [(_attachment_name(f), *_decode_attachment(f)) for f in body.files]
     session["messages"] = session.get("messages", 0) + 1
+    session["last_active"] = time.time()
 
     async def gen() -> AsyncGenerator[str, None]:
         async with session["lock"]:
@@ -807,8 +822,10 @@ async def download_zip(
 
 
 def _remove_session_files(session_id: str, session: dict) -> None:
-    """Delete a session's workspace and any download archives built from it."""
+    """Delete a session's workspace, the CLI's transcript of it and its download archives."""
     shutil.rmtree(session["output_dir"], ignore_errors=True)
+    if session.get("cli_home"):
+        shutil.rmtree(session["cli_home"], ignore_errors=True)
     for archive in ZIP_DIR.glob(f"{session_id}-*.zip"):
         try:
             archive.unlink(missing_ok=True)
@@ -849,6 +866,11 @@ async def cleanup_idle_sessions() -> None:
     while True:
         await asyncio.sleep(600)
         cutoff = time.time() - SESSION_IDLE_SECONDS
-        stale = [sid for sid, s in WIZARD_SESSIONS.items() if s["last_active"] < cutoff]
+        # A reply still streaming holds the session's lock: that session is in use.
+        stale = [
+            sid
+            for sid, s in WIZARD_SESSIONS.items()
+            if s["last_active"] < cutoff and not s["lock"].locked()
+        ]
         for sid in stale:
             await _close_session(sid)

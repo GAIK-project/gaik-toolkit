@@ -74,7 +74,7 @@ def test_a_file_whose_content_is_not_its_type_never_reaches_a_parser():
 
 
 def test_a_type_the_wizard_does_not_take_is_refused():
-    for name in ["macro.exe", "notes", "old.doc", "clip.mpeg"]:
+    for name in ["macro.exe", "notes", "old.doc", "old.xls", "clip.mpeg"]:
         with pytest.raises(HTTPException) as refused:
             _extract_text_from_attachment(_attachment(name, b"hello"))
         assert refused.value.status_code == 400

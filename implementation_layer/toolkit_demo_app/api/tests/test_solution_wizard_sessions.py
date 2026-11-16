@@ -48,7 +48,8 @@ def api(monkeypatch, tmp_path) -> TestClient:
     monkeypatch.setattr(route, "ZIP_DIR", tmp_path / "zips")
     monkeypatch.setattr(route, "WIZARD_SESSIONS", {})
     monkeypatch.setattr(route, "ClaudeSDKClient", Client)
-    monkeypatch.setattr(route, "_build_options", lambda output_dir: None)
+    monkeypatch.setattr(route, "_build_options", lambda output_dir, cli_home: None)
+    monkeypatch.setattr(route, "_START_LOCK", asyncio.Lock())
     for name in route.REQUIRED_FOUNDRY_VARS:
         monkeypatch.setenv(name, "test")
 
@@ -220,6 +221,9 @@ def test_the_agents_process_does_not_inherit_the_apis_other_credentials(monkeypa
 def test_the_idle_cleanup_ends_the_agent_and_removes_the_workspace(api, monkeypatch) -> None:
     sid = _start(api, ALICE)
     workspace: Path = route.WIZARD_SESSIONS[sid]["output_dir"]
+    cli_home: Path = route.WIZARD_SESSIONS[sid]["cli_home"]
+    (cli_home / "projects").mkdir()
+    (cli_home / "projects" / "transcript.jsonl").write_text("{}", encoding="utf-8")
     route.WIZARD_SESSIONS[sid]["last_active"] = time.time() - route.SESSION_IDLE_SECONDS - 1
     sleeps = 0
 
@@ -236,3 +240,77 @@ def test_the_idle_cleanup_ends_the_agent_and_removes_the_workspace(api, monkeypa
     assert route.WIZARD_SESSIONS == {}
     assert Client.started[0].disconnected
     assert not workspace.exists()
+    assert not cli_home.exists()  # the CLI's transcript of the conversation
+
+
+def test_the_cli_keeps_its_transcript_in_the_sessions_own_directory(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(route, "WIZARD_DIR", tmp_path)
+    monkeypatch.setattr(route, "WORKSPACES_DIR", tmp_path / "workspaces")
+    for name in route.REQUIRED_FOUNDRY_VARS:
+        monkeypatch.setenv(name, "test")
+    workspace = tmp_path / "workspaces" / "s1"
+
+    options = route._build_options(workspace, route._cli_home("s1"))
+
+    home = Path(options.env["CLAUDE_CONFIG_DIR"])
+    assert home == tmp_path / "workspaces" / ".cli" / "s1"
+    assert workspace not in home.parents  # not part of what the user downloads
+
+
+def test_starts_at_the_same_moment_do_not_pass_the_limits(api, monkeypatch) -> None:
+    monkeypatch.setenv("WIZARD_MAX_SESSIONS", "1")
+
+    class SlowClient(Client):
+        async def connect(self) -> None:
+            await asyncio.sleep(0.05)
+
+    monkeypatch.setattr(route, "ClaudeSDKClient", SlowClient)
+
+    async def run() -> list[int]:
+        async def start(owner: str) -> int:
+            try:
+                await route.start_session(owner)
+            except route.HTTPException as refused:
+                return refused.status_code
+            return 200
+
+        return await asyncio.gather(start("alice"), start("alice"), start("bob"))
+
+    statuses = asyncio.run(run())
+
+    assert len(route.WIZARD_SESSIONS) == 1
+    assert sorted(statuses) == [200, 200, 429] or sorted(statuses) == [200, 429, 429]
+
+
+def test_a_session_with_a_reply_in_progress_is_not_idle(api, monkeypatch) -> None:
+    sid = _start(api, ALICE)
+    session = route.WIZARD_SESSIONS[sid]
+    session["last_active"] = time.time() - route.SESSION_IDLE_SECONDS - 1
+    sleeps = 0
+
+    async def sleep(seconds: float) -> None:
+        nonlocal sleeps
+        sleeps += 1
+        if sleeps == 2:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(route.asyncio, "sleep", sleep)
+
+    async def run() -> None:
+        async with session["lock"]:
+            with pytest.raises(asyncio.CancelledError):
+                await route.cleanup_idle_sessions()
+
+    asyncio.run(run())
+
+    assert sid in route.WIZARD_SESSIONS
+    assert session["output_dir"].exists()
+
+
+def test_an_accepted_message_counts_as_activity(api) -> None:
+    sid = _start(api, ALICE)
+    route.WIZARD_SESSIONS[sid]["last_active"] = 0.0
+
+    assert api.post(f"/wizard/message/{sid}", json={"text": "hi"}, headers=ALICE).is_success
+
+    assert route.WIZARD_SESSIONS[sid]["last_active"] > time.time() - 60
