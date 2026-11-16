@@ -108,6 +108,10 @@ def check(data: bytes) -> None:
         process.kill()
         process.communicate()
         raise pdf_content.TooComplexError(pdf_content.TOO_COMPLEX) from None
+    except OSError as exc:  # the process went away while the file was sent
+        process.kill()
+        logger.warning("The PDF check's process could not be reached: %s", exc)
+        raise pdf_content.TooComplexError(pdf_content.NOT_CHECKABLE) from exc
     except BaseException:
         process.kill()  # this thread is being stopped, and so is its check
         raise

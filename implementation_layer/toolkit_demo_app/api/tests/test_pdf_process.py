@@ -133,6 +133,26 @@ def test_a_process_that_fails_or_gives_no_outcome_is_not_checkable(stand_in, scr
     assert _outcome(pdf_process.check, PLAIN) == f"complex: {pdf_content.NOT_CHECKABLE}"
 
 
+def test_a_process_that_goes_away_while_the_file_is_sent_is_not_checkable(stand_in, monkeypatch):
+    stand_in("pass")
+
+    class Gone:
+        killed = False
+
+        def poll(self):
+            return None
+
+        def communicate(self, data=None, timeout=None):
+            raise OSError(22, "the pipe is gone")
+
+        def kill(self):
+            Gone.killed = True
+
+    monkeypatch.setattr(pdf_process, "_start", Gone)
+    assert _outcome(pdf_process.check, PLAIN) == f"complex: {pdf_content.NOT_CHECKABLE}"
+    assert Gone.killed
+
+
 def test_a_check_that_cannot_start_its_process_is_not_checkable(stand_in, monkeypatch):
     stand_in("pass")
 
