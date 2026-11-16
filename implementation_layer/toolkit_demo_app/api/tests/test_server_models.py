@@ -297,6 +297,49 @@ async def test_the_list_carries_aitta_status_and_vision(aitta_env, monkeypatch):
     assert models["azure:gpt-6-luna"]["status"] is None and models["azure:gpt-6-luna"]["vision"]
 
 
+@pytest.mark.asyncio
+async def test_the_list_names_aittas_speech_and_embedding_models(aitta_env, monkeypatch):
+    monkeypatch.setattr(
+        router,
+        "aitta_model_status",
+        lambda: {"openai/whisper-large-v3": "offline", "intfloat/multilingual-e5-large": "running"},
+    )
+    listed = (await _call(_app([]), "GET", "/model-settings/server", {})).json()
+    assert listed["aitta"] == {
+        "speech": {"model": "openai/whisper-large-v3", "status": "offline"},
+        "embedding": {"model": "intfloat/multilingual-e5-large", "status": "running"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_without_aitta_the_list_says_so(server_env):
+    listed = (await _call(_app([]), "GET", "/model-settings/server", {})).json()
+    assert listed["aitta"] is None
+
+
+def test_warming_asks_only_for_idle_models_and_not_twice(aitta_env, monkeypatch):
+    posted = []
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(settings, "_aitta_warmed", 0.0)
+    monkeypatch.setattr(
+        settings,
+        "aitta_model_status",
+        lambda: {"openai/whisper-large-v3": "offline", "intfloat/multilingual-e5-large": "running"},
+    )
+    monkeypatch.setattr(
+        settings.httpx, "post", lambda url, **kwargs: posted.append(url) or Response()
+    )
+    assert settings.warm_aitta_models() == ["openai/whisper-large-v3"]
+    assert posted == ["https://aitta-api.csc.fi/model/openai~whisper-large-v3/preload"]
+    # Within five minutes a second pick asks for nothing.
+    assert settings.warm_aitta_models() == []
+    assert len(posted) == 1
+
+
 def test_e5_embeddings_get_their_prefixes(monkeypatch):
     from api.routers import rag
     from gaik.software_components.RAG.embedder import Embedder

@@ -1,3 +1,4 @@
+import { modelLabel } from "./model-labels";
 import { pageUsesModelSettings } from "./model-settings";
 
 /** What a demo page sends to a model besides text. */
@@ -29,6 +30,19 @@ const SERVER_MODEL_ONLY_PAGES = ["/rag", "/transcriber"];
 export const AITTA_SPEECH_MODEL = "Whisper large v3";
 export const AITTA_EMBEDDING_MODEL = "multilingual-e5-large";
 
+/** Aitta's speech or embedding model, as the server reports it. */
+export interface AittaHelperState {
+  model: string;
+  /** Stopped after being idle: the first request starts it, which takes minutes. */
+  idle: boolean;
+}
+
+/** "Whisper large v3 on CSC Aitta", also for a model ID without a name of its own. */
+export function aittaName(model: string): string {
+  const name = modelLabel(model) ?? model;
+  return name.includes("CSC Aitta") ? name : `${name} on CSC Aitta`;
+}
+
 export interface ActiveModel {
   /** A key the user entered, or a model of the server. */
   own: boolean;
@@ -44,6 +58,9 @@ export interface ActiveModel {
   isDefault: boolean;
   /** A model for the GAIK team only. RAG never builds a collection on one. */
   teamOnly?: boolean;
+  /** With an Aitta server model: the models that transcribe and embed. */
+  aittaSpeech?: AittaHelperState;
+  aittaEmbedding?: AittaHelperState;
 }
 
 export interface ModelUse {
@@ -107,10 +124,20 @@ export function modelUse(path: string, active: ActiveModel): ModelUse {
     return { runsHere, summary, details, problem };
   }
 
+  const speech = active.aittaSpeech
+    ? aittaName(active.aittaSpeech.model)
+    : `${AITTA_SPEECH_MODEL} on CSC Aitta`;
+  const embedding = active.aittaEmbedding
+    ? aittaName(active.aittaEmbedding.model)
+    : `${AITTA_EMBEDDING_MODEL} on CSC Aitta`;
+  const idle = (what: string) =>
+    `It is idle now: the first ${what} starts it, which can take minutes.`;
+
   if (path === "/transcriber") {
+    if (active.aittaSpeech?.idle) details.push(idle("recording"));
     return {
       runsHere,
-      summary: `${AITTA_SPEECH_MODEL} on CSC Aitta transcribes here.`,
+      summary: `${speech} transcribes here.`,
       details,
       problem,
     };
@@ -119,13 +146,17 @@ export function modelUse(path: string, active: ActiveModel): ModelUse {
   if (needs.speech) {
     if (aitta)
       details.push(
-        `Recordings are transcribed by ${AITTA_SPEECH_MODEL} on CSC Aitta.`,
+        `Recordings are transcribed by ${speech}.` +
+          (active.aittaSpeech?.idle ? ` ${idle("recording")}` : ""),
       );
     else if (!active.audio)
       details.push("Recordings are transcribed on the server first.");
   }
   if (needs.embeddings && aitta)
-    details.push(`Embeddings come from ${AITTA_EMBEDDING_MODEL} on CSC Aitta.`);
+    details.push(
+      `Embeddings come from ${embedding}.` +
+        (active.aittaEmbedding?.idle ? ` ${idle("document")}` : ""),
+    );
   if (needs.embeddings && !active.isDefault)
     details.push(
       "A collection keeps the models it was built with: load the documents again after switching.",

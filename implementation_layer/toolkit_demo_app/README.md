@@ -95,7 +95,9 @@ run on Aitta: recordings are transcribed by Aitta's Whisper large v3
 `intfloat/multilingual-e5-large` (`AITTA_EMBEDDING_MODEL`). Nothing falls back to
 another provider. Aitta models are slower (a run takes from 20 seconds to minutes),
 the menu marks a text-only model and an idle one, and a demo that sends page images
-refuses a text-only model before the call. On every demo page a notice says which
+refuses a text-only model before the call. Aitta stops idle models, so a pick also
+asks Aitta to start its speech and embedding models, and the page says when one is
+still idle. On every demo page a notice says which
 model runs it once the user has left the default, and says so when the demo does not
 take the picked model. Aitta is a research service: its terms forbid personal data,
 its token is bound to one CSC user and expires after 90 days, and its rate limit is

@@ -112,6 +112,20 @@ an Aitta model can fail, while the ready-made examples and saved schemas work.
 - The model menu lists Gemma 4 31B (reads images) and gpt-oss 120B (three times
   faster, text only) when the server has `AITTA_API_KEY`. `DEMO_SERVER_MODELS` can list
   others, with `:text` for a text-only one.
+- Idle models: Aitta stops a model that has had no requests (Whisper large v3 and E5
+  were offline again about 40 minutes after their last call), and the next request
+  waits minutes for it. `GET /model-settings/server` therefore reports the state of the
+  speech and embedding models, the demo page says when one is idle, and picking an
+  Aitta model in the menu calls `POST /model-settings/aitta/warm`, which asks Aitta to
+  start the idle ones (at most once in five minutes).
+- `openai/whisper-large-v3-turbo`, the newer and faster Whisper, did not start on
+  2026-11-16: Aitta reported its status as `failed` and requests to it did not return.
+  The demo stays on `openai/whisper-large-v3`; `AITTA_TRANSCRIPTION_MODEL` switches it
+  once turbo runs.
+- The audio pages' listening options belong to the HH Whisper server (a set language,
+  speaker detection, timed text). With an Aitta model picked they are shown as not
+  used, since Aitta's Whisper detects the language itself and returns the text alone.
+  Hints and the transcript fix still apply.
 - Speech: `get_transcription_api_config()` sends recordings to Aitta's Whisper on the
   same key. gaik's `Transcriber` refuses a config with `provider="aitta"`, so the demo
   addresses Aitta's `/audio/transcriptions` as an OpenAI base URL. The local Whisper
