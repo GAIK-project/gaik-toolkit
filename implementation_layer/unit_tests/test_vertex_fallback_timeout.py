@@ -93,6 +93,19 @@ def test_a_location_set_on_the_returned_dict_does_not_fall_back(clients, how):
     assert "http_options" not in clients[0]
 
 
+def test_a_regional_fallback_named_with_the_location_stays(clients):
+    config = get_llm_config(
+        "vertex",
+        project_id="project",
+        model="gemini-test",
+        location="eu",
+        location_fallback="europe-west1",
+    )
+    config["location"] = "europe-west4"
+    provider = google_provider.GoogleProvider(config)
+    assert provider._fallback_location == "europe-west1"
+
+
 def test_release_smoke_runs_the_default_vertex_path(monkeypatch):
     smoke = _load_smoke()
     for name in ("GOOGLE_CLOUD_LOCATION", "GOOGLE_SERVICE_ACCOUNT_JSON"):

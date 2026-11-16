@@ -39,13 +39,15 @@ def _fallback_location(config: dict) -> str | None:
 
     ``location_fallback`` in the config decides, also when it is None. A config
     with neither key gets the default pair: the EU, then the global endpoint.
-    A location other than the default is used as given, also when it was set on
-    a config that still carries the default's fallback.
+    A location other than the EU is used as given when the fallback is the
+    default's global endpoint: the location was then set on a config that
+    still carries the default's fallback. A regional fallback named with it
+    stays.
     """
-    if (config.get("location") or "eu") != "eu":
-        return None
     if "location_fallback" in config:
         fallback = config["location_fallback"]
+        if fallback == "global" and (config.get("location") or "eu") != "eu":
+            return None
     else:
         fallback = None if config.get("location") else "global"
     return fallback if fallback and fallback != (config.get("location") or "eu") else None
