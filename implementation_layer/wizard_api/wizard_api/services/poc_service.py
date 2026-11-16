@@ -566,6 +566,28 @@ def config_with_model_timeout(poc_dir: str) -> str | None:
     return yaml.safe_dump(config, sort_keys=False, allow_unicode=True) if changed else None
 
 
+def _names_a_transcriber(source: str) -> bool:
+    """Whether the code imports or uses a transcribing component.
+
+    A docstring or comment that mentions one does not count: the scaffolder's own
+    ``provider_config.py`` documents its Transcriber arguments in every package.
+    Code that does not parse is searched as text.
+    """
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return bool(_TRANSCRIBING_NAME.search(source))
+    names = scaffold_guard.TRANSCRIBING_COMPONENTS
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in names:
+            return True
+        if isinstance(node, ast.Attribute) and node.attr in names:
+            return True
+        if isinstance(node, ast.alias) and node.name.rsplit(".", 1)[-1] in names:
+            return True
+    return False
+
+
 def _package_transcribes(poc_dir: str) -> bool:
     """Whether the package's code reads the transcription stage or builds a transcriber."""
     for relative in regular_files(poc_dir):
@@ -577,7 +599,7 @@ def _package_transcribes(poc_dir: str) -> bool:
                 source = fh.read()
         except OSError:
             continue
-        if _TRANSCRIPTION_STAGE_CALL.search(source) or _TRANSCRIBING_NAME.search(source):
+        if _TRANSCRIPTION_STAGE_CALL.search(source) or _names_a_transcriber(source):
             return True
     return False
 

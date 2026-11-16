@@ -70,6 +70,8 @@ _SCRIPTS: dict[str, dict[str, str]] = {
         "--skip-validation": _FLAG,
     },
     "validate_blueprint.py": {"--blueprint": _PATH},
+    # Step 4.5 of SKILL.md: rewrites output_schema_model.json from output_schema.py.
+    "refresh_schema_model.py": {"--schemas-dir": _PATH},
 }
 #: Scripts that turn the blueprint into code, so they get its text checked first.
 _SCAFFOLDING_SCRIPTS = frozenset({"scaffold_poc.py"})
