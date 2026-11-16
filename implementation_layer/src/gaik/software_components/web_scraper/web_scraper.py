@@ -223,6 +223,10 @@ class WebScraper:
             raise ValueError("max_pages must be >= 1 and max_depth >= 0")
         if not stay_on_host and self.policy.allowed_domains is None:
             raise ValueError("stay_on_host=False needs allowed_domains")
+        if isinstance(include_patterns, str):
+            include_patterns = [include_patterns]
+        if isinstance(exclude_patterns, str):
+            exclude_patterns = [exclude_patterns]
         include = [p.lower() for p in include_patterns or ()]
         exclude = [p.lower() for p in exclude_patterns or ()]
         try:
@@ -437,11 +441,16 @@ class WebScraper:
             raise too_large
         chunks: list[bytes] = []
         size = 0
-        for chunk in response.iter_bytes():
-            size += len(chunk)
-            if size > limit:
-                raise too_large
-            chunks.append(chunk)
+        try:
+            for chunk in response.iter_bytes():
+                size += len(chunk)
+                if size > limit:
+                    raise too_large
+                chunks.append(chunk)
+        except httpx.TimeoutException as exc:
+            raise ScrapeError(url, "the server stopped sending the page in time") from exc
+        except httpx.HTTPError as exc:
+            raise ScrapeError(url, f"the page could not be read ({type(exc).__name__})") from exc
         return b"".join(chunks)
 
     def _wait_turn(self, url: str) -> None:
