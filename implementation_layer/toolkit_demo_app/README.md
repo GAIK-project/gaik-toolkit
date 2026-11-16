@@ -55,10 +55,33 @@ text layer. It roughly triples the output tokens of an extraction.
 
 ### Solution Wizard
 
-The Solution Configuration Wizard runs as its own service, Wizard V2. This demo no
-longer runs it: `/solution-wizard` is open to every visitor, says where the wizard
-is and links to `WIZARD_V2_URL` when that is set. The server reads it at run time, so
-a deployment sets it with `oc set env` and needs no rebuild.
+`/solution-wizard` is open to every visitor and offers two wizards.
+
+- **Wizard V2** runs as its own service, where each session's agent and PoC runs are
+  kept apart from other services. The page links to `WIZARD_V2_URL` when that is set;
+  the server reads it at run time, so a deployment sets it with `oc set env` and needs
+  no rebuild.
+- **The first wizard** runs in the browser at `/solution-wizard/first`, and on anyone's
+  own computer as a Claude Code skill (the page shows the commands). In the browser its
+  agent is a Claude Agent SDK session inside the demo API pod, with shell tools, so it
+  is held tighter than the other demos:
+  - `proxy.ts` forwards `/api/wizard/*`, reads included, only for a signed-in user an
+    admin has granted the wizard in `/admin` (`wizard_access`), on top of the approval
+    and rate limit every state-changing request meets. There is no shared key.
+  - A session belongs to the user who started it: the proxy names the user to the API
+    and another user's session answers 404.
+  - At most `WIZARD_MAX_SESSIONS` (3) sessions run at once, one per user, each with at
+    most `WIZARD_MAX_MESSAGES` (60) messages. A session idle for 30 minutes is ended.
+  - Attachments (5 per message, 10 MB each) are checked for type, size and content
+    before a parser or a model reads them, and reach the agent marked as data.
+  - A session's workspace and download archives are removed when it ends or goes idle.
+    Sessions are not recorded: the Langfuse diagnostics were not brought back.
+  - The agent's process does not inherit the API's other credentials. This is not a
+    boundary: the agent runs as the same user in the same container as the API.
+
+  It needs `CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY` and
+  `ANTHROPIC_FOUNDRY_RESOURCE` on the API; without them the page says the wizard is
+  not set up. The model is `ANTHROPIC_MODEL` or `ANTHROPIC_DEFAULT_SONNET_MODEL`.
 
 ### No-code Assets
 

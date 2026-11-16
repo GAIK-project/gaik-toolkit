@@ -3,8 +3,27 @@ import {
   PENDING_DENIAL,
   accessRefusal,
   isStateChanging,
+  isWizardApiPath,
   needsApprovedUser,
+  wizardRefusal,
 } from "./api-access";
+
+test("the wizard API is /api/wizard and the paths under it", () => {
+  expect(isWizardApiPath("/api/wizard")).toBe(true);
+  expect(isWizardApiPath("/api/wizard/files/s1/poc/run_poc.py")).toBe(true);
+  expect(isWizardApiPath("/api/wizardry/start")).toBe(false);
+  expect(isWizardApiPath("/api/extract")).toBe(false);
+});
+
+test("the wizard needs a signed-in user with the grant", () => {
+  expect(wizardRefusal({ loggedIn: false, wizardAccess: false })?.status).toBe(
+    401,
+  );
+  expect(wizardRefusal({ loggedIn: true, wizardAccess: false })?.status).toBe(
+    403,
+  );
+  expect(wizardRefusal({ loggedIn: true, wizardAccess: true })).toBeNull();
+});
 
 test("every non-read method needs an approved user", () => {
   for (const method of ["POST", "PUT", "PATCH", "DELETE", "delete"]) {
