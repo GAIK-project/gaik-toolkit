@@ -268,8 +268,10 @@ No model is involved in the check. For each citation:
    and spacing removed, and the quote's words must appear as an unbroken run. The cited page is
    tried first, then the other pages of that file, then the other files.
 2. **Value in the quote?** Numbers are compared as numbers in both European and American
-   formats (`3.000 kg` holds `3000`, `1.234,50` holds `1234.5`); dates by their year, month and
-   day in any order (`11.04.2025` holds `2025-04-11`), including month names; text by its
+   formats (`3.000 kg` holds `3000`, `1.234,50` holds `1234.5`), and a minus sign right before
+   a number belongs to it (`-250,00` does not hold `250`); dates by their year, month and day,
+   read in the order the quote writes them (`11.04.2025` holds `2025-04-11`, not `2025-11-04`;
+   `02/15/2026` may be month first), including month names; text by its
    words, or as the same characters with other separators (`7200-4453-21` for `7200445321`).
 3. **Verdict** from the two answers, as in the table above.
 4. **Position** (PDF): the matched words' boxes from the PDF's own text layer, and the box of
