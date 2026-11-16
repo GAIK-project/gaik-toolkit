@@ -1424,20 +1424,47 @@ _NOT_A_DATE_WORDS = frozenset(
     }
 )
 _LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
+# Words that contain a compound keyword without being a date: Turkish "tarihsel"
+# (historical) and its forms contain "tarih".
+_NOT_A_DATE_PREFIXES = ("tarihsel",)
+# A description counts as naming a date only when a keyword is among its first
+# words ("Date of issue", "Invoice date; ...", "Asiakirjan päivämäärä"). Further
+# on, a date word usually describes something else: "Number printed next to the
+# invoice date". Known limit: a description that names its date late ("When the
+# contract was signed (date)") is not caught when the model typed the field as text.
+_DESCRIPTION_KEYWORD_WORDS = 3
+# Norwegian and Danish date compounds ("leveringsdato", "fødselsdato") end in
+# "sdato". In a description only this ending counts: Italian and Spanish
+# participles end in plain "-dato".
+_DESCRIPTION_DATE_SUFFIX = "sdato"
 
 
 def _has_date_keyword(text: str, *, in_name: bool) -> bool:
-    """Whether ``text`` contains a date keyword as a word, not inside another word."""
+    """Whether ``text`` contains a date keyword as a word, not inside another word.
+
+    "data" (Italian, Portuguese, Polish) is also an English word, so in a name it
+    counts only as the first of several words ("data_consegna", "data_urodzenia"),
+    not in "raw_data" or a bare "data". Known limit: an English name that starts
+    with it, such as "data_quality" typed as text, is still taken for a date.
+    """
     words = _LETTER_WORD_RE.findall(text.lower())
+    if not in_name:
+        words = words[:_DESCRIPTION_KEYWORD_WORDS]
     for position, word in enumerate(words):
+        if word.startswith(_NOT_A_DATE_PREFIXES):
+            continue
         if (
             in_name
             and (word.startswith("date") or word.endswith(_DATE_NAME_SUFFIXES))
             and word not in _NOT_A_DATE_WORDS
         ):
             return True
+        if not in_name and word.endswith(_DESCRIPTION_DATE_SUFFIX):
+            return True
         for keyword in DATE_KEYWORDS:
             if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name and position:
+                continue
+            if keyword == "data" and in_name and (position or len(words) == 1):
                 continue
             if word == keyword:
                 return True
@@ -1476,10 +1503,21 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
         if not _EXPLICIT_PATTERN_RE.search(field_context):
             field.pattern = None
 
+        is_integer_count = (
+            field.field_name == "quantity"
+            or field.field_name.endswith("_quantity")
+            or field.field_name == "count"
+            or field.field_name.endswith("_count")
+        )
         # The model's own type comes first: it read the task, and a date field need
         # not have a date word in its name ("deadline", "valid_until"). The keyword
-        # check catches a date the model typed as text.
-        if field.field_type == "date" or _is_date_field(field.field_name, field.description):
+        # check catches a date the model typed as text; it never retypes a number,
+        # list or other non-text field ("date_entries"), nor a count ("date_count").
+        if field.field_type == "date" or (
+            field.field_type == "str"
+            and not is_integer_count
+            and _is_date_field(field.field_name, field.description)
+        ):
             if _requests_text_representation(field_context):
                 field.field_type = "str"
                 field.format = None
@@ -1501,12 +1539,6 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
 
         # Match the documented type rule for plain quantities/counts, while
         # preserving an explicit request for text or a unit-bearing string.
-        is_integer_count = (
-            field.field_name == "quantity"
-            or field.field_name.endswith("_quantity")
-            or field.field_name == "count"
-            or field.field_name.endswith("_count")
-        )
         if (
             is_integer_count
             and field.field_type == "str"
