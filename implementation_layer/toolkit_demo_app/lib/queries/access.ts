@@ -8,7 +8,7 @@ export interface AccessStatus {
   isUnlocked: boolean;
   /** Pending approval, but may run demos on the daily trial allowance (lib/trial.ts). */
   isTrial: boolean;
-  /** Per-user Solution Wizard beta access (the `wizard_access` flag). */
+  /** The per-user grant that runs the first Solution Wizard in the browser (`wizard_access`). */
   wizardAccess: boolean;
   bypassAuth: boolean;
 }
@@ -57,10 +57,10 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
 });
 
 /**
- * Whether the visitor can open /solution-wizard. The page is now a notice that
- * links to Wizard V2 and proxy.ts lets everyone through, so this is always true;
- * the nav and the home page entries keep their access branches until the
- * wizard_access grant is removed.
+ * Whether the visitor can open /solution-wizard. The page offers both wizards
+ * and is open to everyone, so this is always true. Running the first wizard in
+ * the browser is another matter: that needs `wizardAccess` above, checked on
+ * its API in proxy.ts.
  */
 export async function getWizardAccess(): Promise<boolean> {
   return true;
