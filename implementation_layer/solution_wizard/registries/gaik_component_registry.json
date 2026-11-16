@@ -249,7 +249,8 @@
       "parser_config",
       "embedding_config",
       "answer_config",
-      "parser"
+      "parser",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -279,7 +280,8 @@
       "Initial indexing required before querying",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "Select an available embedding model/deployment separately from the chat model. Anthropic/Foundry has no native embeddings API; Aitta, compatible endpoints and LiteLLM require an explicit embedding model. Rebuild the index after changing provider, model or vector dimensions.",
-      "The default parser='vision' parses PDFs with VisionRagParser (Docling layout + a vision model for images; the rag-workflow extra pulls docling and torch). parser='text' (gaik>=0.8.10, extra rag-workflow-text) reads the text layer without them, but the wizard's RAG template and install_extra use the vision default: choose RAGWorkflow only when image-aware parsing (scans, figures, diagrams) is required, and for text-layer PDFs compose a text parser such as PyMuPDFParser with Embedder, Retriever and AnswerGenerator."
+      "The default parser='vision' parses PDFs with VisionRagParser (Docling layout + a vision model for images; the rag-workflow extra pulls docling and torch). parser='text' (gaik>=0.8.10, extra rag-workflow-text) reads the text layer without them, but the wizard's RAG template and install_extra use the vision default: choose RAGWorkflow only when image-aware parsing (scans, figures, diagrams) is required, and for text-layer PDFs compose a text parser such as PyMuPDFParser with Embedder, Retriever and AnswerGenerator.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "document_qa",
@@ -359,7 +361,8 @@
       "enhanced_transcript_instructions",
       "default_prompt",
       "initial_prompt",
-      "api_config"
+      "api_config",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -382,7 +385,9 @@
       "Built-in transcript enhancement (enhanced_transcript=True) is Finnish-tuned; calls TranscriptEnhancer internally. For audio input, set this option instead of adding a separate TranscriptEnhancer step. For non-Finnish audio, enhancement needs prompt customisation -- default off and flag it.",
       "The hosted models (whisper, whisper-1, gpt-4o-transcribe) return plain text only: .segments, .srt_content and .vtt_content stay None, and diarization/speaker_count/min_speakers/max_speakers are silently ignored. Timestamps and speaker labels require transcription_model='whisper_local'.",
       "whisper_local requires a self-hosted transcription endpoint (local_api_base + local_api_key); transcribe() raises ValueError without both. Confirm the user has one before selecting this path.",
-      "Speaker labels are exposed on .segments only. .srt_content and .vtt_content are built by segments_to_srt/segments_to_vtt, which read start/end/text and drop every other key."
+      "Speaker labels are exposed on .segments only. .srt_content and .vtt_content are built by segments_to_srt/segments_to_vtt, which read start/end/text and drop every other key.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. Change a limit with limits=InputLimits(...).",
+      "From the gaik release after 0.10.0, local_api_base must be the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS; otherwise the constructor raises EndpointNotAllowedError. Read it from that variable."
     ],
     "best_for": [
       "audio_to_transcript",
@@ -681,7 +686,8 @@
       "additional_instructions",
       "reasoning_effort",
       "include_verification",
-      "api_config"
+      "api_config",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -713,7 +719,8 @@
       "Not suitable for audio input",
       "Could be more expensive for large document batches -- prefer DocumentsToStructuredData for plain text PDFs",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
-      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support."
+      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: every file before any model call, schema generation included: size (100 MiB), image pixels (89,478,485) and the pages of all files of one call together (500, an image counting as one); a PDF whose pages cannot be counted is refused. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "scanned_forms",
@@ -770,7 +777,8 @@
     "optional_parameters": [
       "model",
       "parser",
-      "config"
+      "config",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -798,7 +806,8 @@
     "known_limitations": [
       "Categories must be clearly defined; ambiguous categories reduce accuracy",
       "Does not produce structured field extraction -- combine with Extractor for full pipeline",
-      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each file, through its parsers: size (100 MiB) and image pixels; with parser='vision' only the first page of a PDF is rendered and sent. The error is not wrapped in the classification ValueError. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "document_routing",
@@ -855,13 +864,15 @@
     ],
     "optional_parameters": [
       "base_url",
+      "allowed_endpoint_hosts",
       "model",
       "timeout",
       "max_retries",
       "instructions",
       "min_confidence",
       "hierarchy",
-      "max_chars"
+      "max_chars",
+      "limits"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
@@ -878,7 +889,8 @@
       "Uses the Jev model (TypeSafe System One) over HTTP, not a GAIK LLM provider: it needs a gaik-decide or TypeSafe API key passed by the caller, and no llm config, model deployment or provider choice applies",
       "Text is sent to TypeSafe in the United States: do not select it for sensitive personal data or documents that must stay inside CSC, Azure or another chosen provider; use DocumentClassifier there",
       "Text only (PDF and DOCX text layers): no image or scanned-document input, and no written reasoning -- it returns probabilities and a confidence instead",
-      "Single label per text; ambiguous or overlapping categories reduce accuracy, and a min_confidence threshold must be tuned on labelled examples"
+      "Single label per text; ambiguous or overlapping categories reduce accuracy, and a min_confidence threshold must be tuned on labelled examples",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF and Word files classify_files reads, through their parsers: size (100 MiB), no page limit by default. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "document_routing",
@@ -1102,7 +1114,8 @@
       "whisper_local_chunk_parallelism",
       "whisper_local_chunk_duration_minutes",
       "whisper_local_max_audio_minutes",
-      "api_config"
+      "api_config",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -1126,7 +1139,9 @@
       "Does not produce structured output -- use Extractor downstream",
       "Overlap deduplication is SRT-based; use response_format='srt' for the cleanest chunk merging",
       "Produces timestamps but never speaker labels, on any backend. gpt-4o-transcribe-diarize requests diarized output and parses the speaker field, then discards it when building the SRT (and TranscriptionResult exposes only .content, so it cannot be recovered); the whisper_local backend hardcodes diarization=False in its request payload. For speaker attribution use Transcriber(transcription_model='whisper_local', diarization=True).",
-      "The whisper_local backend takes its endpoint from api_config['api_base'] (required) and api_config['key'] or ['api_key'] (optional -- the auth header is omitted when empty). This differs from Transcriber, which uses the local_api_base/local_api_key constructor kwargs and requires both."
+      "The whisper_local backend takes its endpoint from api_config['api_base'] (required) and api_config['key'] or ['api_key'] (optional -- the auth header is omitted when empty). This differs from Transcriber, which uses the local_api_base/local_api_key constructor kwargs and requires both.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend) before audio is extracted or any call is made; whisper_local_max_audio_minutes is a second cap for Whisper Local only. A recording without a length in its header (a WebM recorded in a browser) is measured by decoding its audio, and one whose length cannot be read at all is refused. max_media_bytes is off by default. Change a limit with limits=InputLimits(...).",
+      "From the gaik release after 0.10.0, api_config['api_base'] for whisper_local follows the same rule as Transcriber's local_api_base (LOCAL_TRANSCRIBER_API_BASE, this machine or GAIK_ALLOWED_ENDPOINT_HOSTS), and an Azure audio endpoint must be an Azure host, the address in AZURE_ENDPOINT or a listed host; otherwise EndpointNotAllowedError (at construction for gpt-4o-transcribe-diarize, when the Whisper client is built otherwise)."
     ],
     "best_for": [
       "long_audio_transcription",
@@ -1207,7 +1222,8 @@
       "polish",
       "verbose",
       "additional_instructions",
-      "api_config"
+      "api_config",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -1238,10 +1254,11 @@
       "Orchestrates existing GAIK parsers/transcriber/extractor; no new parsing logic -- inherits each sub-component's limits",
       "Long-form synthesis cost grows with sources x sections; agentic mode is significantly more expensive than single-call",
       "Report content is drawn only from supplied evidence; it does not browse or fetch external sources",
-      "From the gaik release after 0.9.1: load_report_config(path, root=None) requires the stored paths to stay inside the config file's folder, or inside root; otherwise it raises SourcePathError. save_report_config stores an input outside that folder with only a warning, so that config loads back only with root=.",
+      "Since gaik 0.10.0: load_report_config(path, root=None) requires the stored paths to stay inside the config file's folder, or inside root; otherwise it raises SourcePathError. save_report_config stores an input outside that folder with only a warning, so that config loads back only with root=.",
       "Agentic mode requires the multi-source-report-generator-agentic extra (langgraph); DOCX export requires multi-source-report-generator-docx extra and Pandoc system binary",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
-      "Audio stages require a separate native OpenAI/Azure configuration when the extraction or writing provider is Aitta, Anthropic, Google/Vertex, LiteLLM or a generic compatible endpoint. Chat support does not imply audio support."
+      "Audio stages require a separate native OpenAI/Azure configuration when the extraction or writing provider is Aitta, Anthropic, Google/Vertex, LiteLLM or a generic compatible endpoint. Chat support does not imply audio support.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: every file, through each parser, transcriber and image extractor it builds (a constructor keyword; a ctor option's own limits wins); None keeps each component's defaults. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "multi_source_report_writing",
@@ -1331,7 +1348,8 @@
       "review_attempts",
       "strict_review",
       "docx",
-      "citations"
+      "citations",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -1361,7 +1379,7 @@
     },
     "known_limitations": [
       "Report and source set are defined by one ReportSpec (title, language, sections with instructions/required_items/depends_on, report-wide instructions, sources grouped as primary/secondary, optional sample_report, per-step models and settings). The spec holds model names only; any unknown key such as api_key raises.",
-      "From the gaik release after 0.9.1: ReportSpec.load(path, root=None) requires every source path and the sample report to stay inside the spec file's folder, or inside root when given; an absolute path or one leading out through '..' or a symbolic link raises SourcePathError (exported from report_writer, multi_source_report_generator and source_normalizer) before any file is read.",
+      "Since gaik 0.10.0: ReportSpec.load(path, root=None) requires every source path and the sample report to stay inside the spec file's folder, or inside root when given; an absolute path or one leading out through '..' or a symbolic link raises SourcePathError (exported from report_writer, multi_source_report_generator and source_normalizer) before any file is read.",
       "A section with depends_on is DERIVED: it gets no knowledge file and is written only from the reviewed texts of the sections it depends on, never from the sources. Use it for summaries/recommendations, not for sections that need their own evidence.",
       "Supported source files are those of SourceNormalizer: .pdf (text layer only -- a scanned PDF raises), .docx, .xlsx/.csv, .txt/.md, audio (.mp3 .wav .m4a .ogg .flac .webm .mp4 .mpeg .mpga) and images (.png .jpg .jpeg .webp). .pptx, .doc, .xls and other types raise; file names must be unique across all sources because the name is the citation key.",
       "One config drives every stage. Recordings go to the Transcriber with that same config, so a spec with audio sources needs an OpenAI/Azure config; there is no separate audio stage config as in MultiSourceReportGenerator.",
@@ -1369,7 +1387,8 @@
       "synthesize, rebuild and run save report.docx unless settings.docx is false; that needs the Pandoc system binary and raises without it.",
       "usage is not saved, so a stage result read back with load, and the report that rebuild returns, have empty usage.",
       "The single-call baseline sends every source in full; a large source set can exceed the writer model's context window, and the call then fails.",
-      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the sources and the sample report, through the SourceNormalizer of normalize (a constructor keyword: ReportWriter(config, limits=...)); None keeps its defaults: 100 MiB per file, 6 hours per recording, no page limit. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "templated_source_grounded_reports",
@@ -1441,7 +1460,8 @@
       "config",
       "vision_model",
       "transcription_model",
-      "language"
+      "language",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -1472,7 +1492,8 @@
       "Fails instead of skipping: an unsupported type (.pptx, .doc, .xls, ...), a missing path, two files with the same name (the name is the citation key), a recording or image without a config, a PDF with no text layer (e.g. a scan), a failed transcript segment, or a file yielding no text. All files are checked before the first conversion.",
       "Recordings and images need an LLM config; recordings need an OpenAI/Azure config because they go to the Transcriber. Documents need none.",
       "Transcripts carry no per-utterance timestamps (long recordings get one [Timestamp: start - end] line per chunk) and no speaker labels.",
-      "usage is not saved, so it is empty after NormalizedSources.load."
+      "usage is not saved, so it is empty after NormalizedSources.load.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: every file before the first conversion: size (100 MiB), image pixels, sheet rows and recording length (6 hours), passed on to its parsers and the Transcriber; PDFs are read locally, so no page limit by default. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "mixed_sources_to_markdown_with_provenance",
@@ -2295,7 +2316,8 @@
       "profile_samples",
       "extra_instructions",
       "answer_language",
-      "temperature"
+      "temperature",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -2327,7 +2349,8 @@
       "No charts, regression, or forecasting -- SQL only, no Python execution",
       "Whole profiled schema goes in the LLM prompt; best for small/medium files",
       "In a messy sheet, a data row missing a descriptive field can be dropped as a subtotal",
-      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each source file's size (100 MiB) when the agent is created and the data rows of each sheet or file (1,000,000) while it loads; not max_rows, which caps query results. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "csv_excel_question_answering",
@@ -2455,7 +2478,8 @@
       "reasoning_effort",
       "dpi",
       "clean_output",
-      "openai_config"
+      "openai_config",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -2487,7 +2511,8 @@
       "Requires OpenAI or Azure OpenAI access; there is no local-only mode",
       "convert_image (image input) returns a single markdown string, not a page list -- page provenance applies to PDF input only",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
-      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support."
+      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF or image before any page is rendered or sent: size (100 MiB), pages (500; with first_pages=N only those pages) and the pixels of each page at the chosen dpi or of the image file (89,478,485). Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "page_attributed_parsing",
@@ -2541,7 +2566,8 @@
       "vertex_ai",
       "additional_instructions",
       "create_html",
-      "api_config"
+      "api_config",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -2573,7 +2599,8 @@
       "PDF input only -- use DocxParser for Word documents",
       "Requires a premium multimodal model from OpenAI/Azure, Anthropic, or Google (pip install gaik[multimodal-parser])",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
-      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support."
+      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF before it is sent: size (100 MiB), pages (500) and the pixels of each rendered page; a PDF whose pages cannot be counted is refused. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "complex_tables_spanning_pages",
@@ -2623,7 +2650,8 @@
       "enable_formula_enrichment",
       "num_threads",
       "ocr_engine",
-      "use_markdown"
+      "use_markdown",
+      "limits"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [
@@ -2642,7 +2670,8 @@
     "known_limitations": [
       "Slow without a CUDA-enabled GPU -- OCR and formula enrichment dominate runtime on CPU",
       "ocr_engine choice affects language support and system dependencies ('tesseract_cli' requires a system Tesseract install)",
-      "parse_document flattens the document into one text_content string -- no page-level provenance"
+      "parse_document flattens the document into one text_content string -- no page-level provenance",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before Docling reads it: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "scanned_document_ocr",
@@ -2697,7 +2726,8 @@
       "vision_prompt",
       "temperature",
       "reasoning_effort",
-      "vision_config"
+      "vision_config",
+      "limits"
     ],
     "supported_providers": [
       "openai",
@@ -2730,7 +2760,8 @@
       "Requires the 'parser' extra plus OpenAI/Azure access",
       "Returns one flat parsed_markdown string -- no page-level provenance",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
-      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support."
+      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size before Docling runs, then the embedded images before the first vision call: at most 500 (max_images, one call each) of at most 89,478,485 pixels; Docling reads the pages locally, so no page limit by default. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "documents_with_meaningful_images",
@@ -2777,7 +2808,9 @@
     ],
     "optional_parameters": [
       "timeout_seconds",
-      "healthcheck_timeout_seconds"
+      "healthcheck_timeout_seconds",
+      "limits",
+      "allowed_endpoint_hosts"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
@@ -2791,10 +2824,12 @@
     },
     "known_limitations": [
       "Requires access to the Haaga-Helia hosted Docling service. api_base and password are constructor kwargs with NO environment fallback in gaik -- read them from DOCLING_API_BASE / DOCLING_API_PASSWORD in generated code (the convention used by toolkit_demo_app and the OpenShift deployment).",
+      "From the gaik release after 0.10.0, api_base must be the address set in DOCLING_API_BASE or API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS / allowed_endpoint_hosts; otherwise the constructor raises EndpointNotAllowedError.",
       "Raises ValueError at construction when either credential is empty",
       "Sends the document to an external service -- unsuitable when data must not leave the local environment",
       "Returns parsed_markdown (not text_content like the local DoclingParser) and flattens pages -- no page-level provenance",
-      "Declared under the 'parser' extra because that is where requests is pinned; the client itself does not need docling installed locally"
+      "Declared under the 'parser' extra because that is where requests is pinned; the client itself does not need docling installed locally",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before it is uploaded: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "gpu_accelerated_docling_parsing",
@@ -2836,7 +2871,8 @@
     "uses_components": [],
     "required_parameters": [],
     "optional_parameters": [
-      "use_markdown"
+      "use_markdown",
+      "limits"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
@@ -2852,7 +2888,8 @@
     "known_limitations": [
       "No OCR -- cannot read scanned or image-only PDFs (use DoclingParser)",
       "Simple layouts only; tables and multi-column text degrade badly",
-      "Default (use_markdown=True) concatenates pages into one text_content string with no page marker -- no page-level provenance. use_markdown=False inserts '=== PAGE N ===' markers (plus per-line [x:,y:] bounding-box tags) and IS a valid, free/local way to get file_name|page_number citations for text-layer PDFs -- see the reference card's call_page_citations pattern."
+      "Default (use_markdown=True) concatenates pages into one text_content string with no page marker -- no page-level provenance. use_markdown=False inserts '=== PAGE N ===' markers (plus per-line [x:,y:] bounding-box tags) and IS a valid, free/local way to get file_name|page_number citations for text-layer PDFs -- see the reference card's call_page_citations pattern.",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size (100 MiB) before it is opened; no page limit by default (InputLimits.local_parsing()), InputLimits(max_pages=N) adds one. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "fast_local_text_extraction",
@@ -2896,7 +2933,8 @@
     "uses_components": [],
     "required_parameters": [],
     "optional_parameters": [
-      "use_markdown"
+      "use_markdown",
+      "limits"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
@@ -2910,7 +2948,8 @@
     "known_limitations": [
       "Word documents -- use a PDF parser for PDFs. Declares .doc support (is_supported_file() accepts it), but python-docx's Document() cannot open the legacy binary .doc format -- a real .doc file raises PackageNotFoundError at parse time. Treat only .docx as actually supported.",
       "DOCX has no fixed page model, so page-level citations are not possible",
-      "use_markdown=False emits paragraph-index and style markers rather than clean prose"
+      "use_markdown=False emits paragraph-index and style markers rather than clean prose",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB) and unpacked size (10 x that) before it is read. Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "word_document_parsing",
@@ -3564,7 +3603,9 @@
     ],
     "uses_components": [],
     "required_parameters": [],
-    "optional_parameters": [],
+    "optional_parameters": [
+      "limits"
+    ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
     "quality_tradeoffs": {
@@ -3579,7 +3620,8 @@
       "Only .xlsx and .csv; other types, including legacy .xls, raise ValueError",
       "Formula cells show the result stored in the file; a workbook whose formulas have no stored results (written by a library and never opened in Excel) raises ValueError -- open and save it in Excel or LibreOffice first",
       "The first non-empty row is the header; empty rows are dropped and empty sheets omitted; a file with no non-empty rows raises ValueError",
-      "Reads a spreadsheet as text. To ask questions over its data use TabularAgent; for mixed source files use SourceNormalizer, which calls this parser"
+      "Reads a spreadsheet as text. To ask questions over its data use TabularAgent; for mixed source files use SourceNormalizer, which calls this parser",
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). Change a limit with limits=InputLimits(...)."
     ],
     "best_for": [
       "spreadsheet_to_markdown",

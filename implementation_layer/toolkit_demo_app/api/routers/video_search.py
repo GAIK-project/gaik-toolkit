@@ -8,6 +8,10 @@ try:
     from utils import generate_presigned_url, sse_error_response, sse_event
 except ImportError:
     from api.utils import generate_presigned_url, sse_error_response, sse_event
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -195,7 +199,7 @@ async def get_thumbnail_url(video_id: str):
 @router.post("/search", response_model=SearchResponse)
 async def search_videos(
     query: str = Form(...),
-    top_k: int = Form(10),
+    top_k: int = Form(10, ge=1, le=100),
     video_id: str = Form(None),
     search_type: str = Form("hybrid"),
 ):
@@ -203,7 +207,7 @@ async def search_videos(
     Search indexed video segments.
 
     - **query**: Natural language search query
-    - **top_k**: Maximum results (default 10)
+    - **top_k**: Maximum results, 1 to 100 (default 10)
     - **video_id**: Optional filter to search within a specific video
     - **search_type**: hybrid, semantic, or keyword
     """
@@ -282,7 +286,10 @@ async def ingest_srt_stream(
     if not file.filename:
         return sse_error_response("No filename provided")
 
-    srt_content = (await file.read()).decode("utf-8", errors="replace")
+    raw = await file.read()
+    if (problem := await upload_problem(".srt", raw, check_type=False)) is not None:
+        return sse_error_response(problem.message)
+    srt_content = raw.decode("utf-8", errors="replace")
 
     import uuid as uuid_mod
 

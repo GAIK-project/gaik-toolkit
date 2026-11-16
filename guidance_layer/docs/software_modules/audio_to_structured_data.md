@@ -68,5 +68,5 @@ Google, Anthropic and optional LiteLLM text models can be selected through the s
 - `requirements`: Corresponding `ExtractionRequirements`.
 
 ## Schema Persistence (example pattern)
-- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure the schema and `<name>_requirements.json` exist under `schema/`.
-- To generate and save a schema, set `generate_schema=True`; the example uses `pipeline.save_schema(...)` to write both artifacts to `schema/`.
+- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure `<name>_model.json` and `<name>_requirements.json` exist under `schema/`. The model is rebuilt from `<name>_model.json` as data; `<name>.py` is only there to read and is never imported.
+- To generate and save a schema, set `generate_schema=True`; the example uses `pipeline.save_schema(...)` to write the model file, the requirements and a readable `<name>.py` to `schema/`.

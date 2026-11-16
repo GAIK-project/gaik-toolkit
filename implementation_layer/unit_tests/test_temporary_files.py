@@ -150,7 +150,7 @@ def test_extraction_keeps_writing_beside_the_video_by_default(tmp_path, monkeypa
 
     commands = []
 
-    def run(cmd, capture_output=None, text=None):
+    def run(cmd, capture_output=None, text=None, timeout=None):
         commands.append(cmd)
         return type("Done", (), {"returncode": 0, "stderr": ""})()
 

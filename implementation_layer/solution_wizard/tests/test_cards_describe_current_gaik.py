@@ -55,8 +55,7 @@ def test_report_loaders_and_source_path_error_are_described():
     assert "root" in inspect.signature(load_report_config).parameters
 
     writer = CARDS["ReportWriter"]
-    # gaik 0.9.1, the validated release a PoC installs, has no SourcePathError export,
-    # so the import line a PoC copies leaves it out until the pin moves past 0.9.1.
+    # The import line a PoC copies stays the one every supported release has.
     assert "SourcePathError" not in writer["import"]
     assert "root=" in writer["call_from_spec_file"]
     assert "SourcePathError" in writer["call_from_spec_file"]
@@ -85,8 +84,37 @@ def test_judge_card_names_the_eu_default_location():
     effect = _option("LLMJudge", "use_vertexai")["effect"]
     assert "default 'global'" not in effect
     assert "'eu'" in effect and "'global'" in effect
-    # A PoC installs the validated release, which still defaults to 'global'.
-    validated = REPO / "implementation_layer/solution_wizard/gaik_validated_version.txt"
-    if validated.exists() and validated.read_text(encoding="utf-8").strip() == "0.9.1":
-        assert "gaik 0.9.1 calls 'global'" in effect
-        assert "after 0.9.1" in effect
+    # The validated release a PoC installs has the EU default; the card says so.
+    assert "Unset, the judge calls the EU multi-region 'eu'" in effect
+
+
+def _card_class(name: str):
+    """The class a card's import line names, or None when its extra is not installed."""
+    module, names = CARDS[name]["import"].removeprefix("from ").split(" import ", 1)
+    if name not in [part.strip() for part in names.split(",")]:
+        return None
+    try:
+        return getattr(importlib.import_module(module), name, None)
+    except ImportError:
+        return None
+
+
+def test_every_component_that_takes_input_limits_says_so_on_its_card_and_entry():
+    takes_limits = []
+    for name in CARDS:
+        cls = _card_class(name)
+        if cls is not None and "limits" in inspect.signature(cls.__init__).parameters:
+            takes_limits.append(name)
+    assert {"PyMuPDFParser", "VisionExtractor", "ParallelTranscriber"} <= set(takes_limits)
+
+    for name in takes_limits:
+        effect = _option(name, "limits")["effect"]
+        assert "InputLimitError" in effect and "limits=" in effect, name
+        assert "InputLimitError" in _limitations(name), name
+        assert "limits" in get_registry().lookup_by_name(name)["optional_parameters"], name
+
+
+def test_whisper_local_cap_card_says_the_six_hour_input_limit_applies_too():
+    cap = _option("ParallelTranscriber", "whisper_local_max_audio_minutes")
+    assert "max_media_seconds" in cap["effect"]
+    assert "max_media_seconds" in cap["infer_from"]

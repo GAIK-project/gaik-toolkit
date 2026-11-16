@@ -49,7 +49,8 @@ Before setting up, please install:
 1. Double-click `setup.bat` in this folder
 2. Follow the prompts:
    - Choose your API provider (OpenAI or Azure OpenAI)
-   - Enter your API key
+   - Enter your API key (it is saved as your user environment variable, not in a file)
+   - Choose the folder Claude may work on, and keep your recordings there
 
 **Step 2: Configure Claude Desktop**
 
@@ -145,7 +146,14 @@ Process construction diary from [path-to-download-folder]\fin-example-1.mp3
 - Restart Claude Desktop
 
 ### Audio transcription not working
-- Check your API key in `transcription-MCP\.env`
+- Check that the key is saved without showing it: in a new Command Prompt run
+  `powershell -c "[bool][Environment]::GetEnvironmentVariable('OPENAI_API_KEY','User')"`
+  (or `AZURE_API_KEY`); `False` means it is missing, so run `setup.bat` again
+- The transcriber only takes audio and video files inside the folder you chose in setup
+  (`--folder` in `claude_desktop_config.json`); move the recording there
+- The key is a user environment variable, so other programs you run can read it too; use a
+  key made for this skill, and remove it when you stop using it:
+  `reg delete HKCU\Environment /v OPENAI_API_KEY /f`
 - Verify you have OpenAI credits available
 - Test with a smaller audio file first
 
@@ -162,16 +170,21 @@ If you prefer manual configuration:
 
 **Install Dependencies:**
 ```bash
-pip install mcp==1.30.0 "gaik[transcriber]==0.9.1" python-dotenv==1.2.4
+python -m venv transcription-MCP\.venv
+transcription-MCP\.venv\Scripts\python.exe -m pip install mcp==1.30.0 "gaik[transcriber]==0.10.0" python-dotenv==1.2.4
 ```
 
 **Configure API Key:**
 
-Create `transcription-MCP\.env`:
+Save the key as a user environment variable, not in a file. Open Command Prompt and run
+(for **OpenAI**):
 ```
-OPENAI_API_KEY=your_api_key_here
-OPENAI_API_TYPE=openai
+setx OPENAI_API_KEY "your_api_key_here"
 ```
+For **Azure OpenAI**, save `AZURE_API_KEY` the same way and put the endpoint and deployment
+in the server's `env` settings below. On Windows the transcriber reads a key that is missing
+from its own environment from your user environment variables, so the key need not be in
+`claude_desktop_config.json`.
 
 **Configure Claude Desktop:**
 
@@ -180,13 +193,20 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 {
   "mcpServers": {
     "gaik-transcriber": {
-      "command": "python",
-      "args": ["C:\\path\\to\\construction-diary-creation\\transcription-MCP\\server.py"],
+      "command": "C:\\path\\to\\construction-diary-creation\\transcription-MCP\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\construction-diary-creation\\transcription-MCP\\server.py",
+               "--folder", "C:\\Users\\you\\Documents\\GAIK"],
+      "env": {"OPENAI_API_TYPE": "openai"},
       "timeout": 600000
     }
   }
 }
 ```
+
+Replace `C:\\path\\to\\` with where you saved this folder, and `C:\\Users\\you\\Documents\\GAIK` with the folder that holds your recordings.
+
+For Azure OpenAI, `env` holds `"OPENAI_API_TYPE": "azure"`, `AZURE_ENDPOINT` and `AZURE_TRANSCRIPTION_MODEL` instead.
+The folder must not be a whole drive, your whole user folder or a folder that holds this one.
 
 **Install Skill:**
 1. Zip `SKILL.md`
@@ -204,7 +224,7 @@ construction-diary-creation/
 ├── SKILL.md                       # Skill definition: extraction workflow & field specifications
 ├── transcription-MCP/             # Audio transcription MCP server
 │   ├── server.py                  # FastMCP server implementation
-│   └── .env                       # API credentials (created by setup.bat, never committed)
+│   └── .venv/                     # the transcriber's own Python (created by setup.bat)
 ```
 
 ### How It Works
@@ -219,7 +239,7 @@ construction-diary-creation/
 
 ### Dependencies
 
-- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.9.1`, `python-dotenv==1.2.4`
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.10.0`, `python-dotenv==1.2.4`
 - **External APIs:** OpenAI or Azure OpenAI transcription (`gpt-4o-transcribe` by default)
 
 ## Getting Help

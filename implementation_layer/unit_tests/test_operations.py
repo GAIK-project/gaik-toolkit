@@ -258,6 +258,31 @@ def test_the_kind_comes_from_the_content_not_the_name(tmp_path):
     assert parse_document(path).kind == "pdf"
 
 
+def test_a_long_pdf_is_read_whole(tmp_path):
+    path = _pdf(tmp_path / "manual.pdf", [f"Page {n}." for n in range(1, 502)])
+
+    document = parse_document(path)
+
+    assert len(document.pages) == 501
+    assert document.pages[-1] == "Page 501."
+
+
+def test_a_pdf_over_a_parser_limit_is_reported_as_over_the_limit(tmp_path, monkeypatch):
+    from gaik.software_components import parsers
+    from gaik.software_components.input_limits import InputLimitError, InputLimits
+
+    parser_class = parsers.PyMuPDFParser
+    monkeypatch.setattr(
+        parsers, "PyMuPDFParser", lambda: parser_class(limits=InputLimits(max_pages=1))
+    )
+    path = _pdf(tmp_path / "long.pdf", ["One.", "Two."])
+
+    with pytest.raises(InputLimitError, match="max_pages") as caught:
+        parse_document(path)
+    assert "not a PDF" not in str(caught.value)
+    assert str(tmp_path) not in str(caught.value)
+
+
 @pytest.mark.parametrize("name", ["formats.md", "formats.txt"])
 def test_a_note_that_mentions_the_pdf_header_is_text(tmp_path, name):
     text = "# Formats\n\nA PDF starts with the bytes %PDF-1.7 and ends with %%EOF."

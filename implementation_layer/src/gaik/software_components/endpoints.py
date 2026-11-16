@@ -1,8 +1,8 @@
 """Where a credential may be sent: https, and a host the deployment knows.
 
 Every client that sends an API key, token or password with a request checks its
-address here when it is built. The address must use ``https://`` and its host
-must be one of:
+address here when it is built. The address must use ``https://``, except where
+plain http is named below, and its host must be one of:
 
 - the provider's own hosts (for example ``api.openai.com`` or
   ``*.openai.azure.com``);
@@ -29,7 +29,8 @@ An application that forwards user settings to gaik should not forward
 ``allowed_endpoint_hosts``: the list is the deployment's decision. Hosts such as
 Azure in a sovereign cloud, Azure API Management (``*.azure-api.net``) or a local
 server reached by a service name (``host.docker.internal``) are not known to gaik
-and must be listed.
+and must be listed. The Azure patterns accept every Azure resource, not only the
+deployment's own.
 """
 
 from __future__ import annotations
@@ -252,8 +253,8 @@ def check_endpoint(
         what: Name of the setting, used in the error message.
 
     Raises:
-        EndpointNotAllowedError: The address is not https (other than to the local
-            machine) or its host is not one this deployment allows.
+        EndpointNotAllowedError: The address's host, or plain http to it, is not one
+            this deployment allows (see the module docstring).
     """
     scheme, host = _parse(url, what)
     names, http_names = _allowed_entries(allowed_hosts)

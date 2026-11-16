@@ -45,7 +45,7 @@ from `gaik.software_components.llm`. Supply it through `VisionParser(openai_conf
 | `openai` | `OPENAI_API_KEY`, optional `OPENAI_MODEL` |
 | `azure` | `AZURE_API_KEY`, `AZURE_ENDPOINT`, `AZURE_DEPLOYMENT`; optional `AZURE_API_VERSION` |
 | `google` | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`), optional `GOOGLE_MODEL` |
-| `vertex` | `GOOGLE_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`), optional `GOOGLE_CLOUD_LOCATION` (unset: the EU multi-region `eu` first, the global endpoint as its fallback; gaik 0.9.1 and earlier default to `global`); Google application-default credentials or `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS` |
+| `vertex` | `GOOGLE_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`), optional `GOOGLE_CLOUD_LOCATION` (unset: the EU multi-region `eu` first, the global endpoint as its fallback; gaik 0.9.1 and earlier defaulted to `global`); Google application-default credentials or `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS` |
 | `anthropic` | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` |
 | `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE`, optional `ANTHROPIC_MODEL` |
 | `aitta` | `AITTA_API_KEY` (aliases `AITTA_API_TOKEN`, `AITTA_TOKEN`), optional `AITTA_MODEL` |
@@ -54,6 +54,11 @@ from `gaik.software_components.llm`. Supply it through `VisionParser(openai_conf
 
 Explicit `api_key`, `base_url`, `model`, and other overrides are applied before
 validation. Do not copy one provider's credentials into another provider's config.
+From the gaik release after 0.10.0, a `base_url` must be the provider's own host, the
+address set in the provider's variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, ...; plain
+http works for that address) or a host named in `allowed_endpoint_hosts=` or
+`GAIK_ALLOWED_ENDPOINT_HOSTS`; anything else raises `EndpointNotAllowedError` before a
+request.
 For shared Vertex, the service-account value can be a JSON object, JSON text or a
 file path; standard application-default credentials work when it is omitted.
 Aitta defaults to `https://aitta-api.csc.fi/openai/v1` and a 600-second timeout for
@@ -83,11 +88,12 @@ An explicit shared `api_config` supersedes these routing flags.
 
 **`DoclingApiClientParser`** — the remote Docling service's address and password, passed as
 the required keyword arguments `api_base=` and `password=`. It does not read them from the
-environment, so load them in your own code. `api_base` receives the document and the
-password, so it must be `https://` on a host the deployment allows: list the host in
-`GAIK_ALLOWED_ENDPOINT_HOSTS` or pass `allowed_endpoint_hosts=`; a private-network server on
-plain http needs an `http://<host>` entry. Otherwise the constructor raises
-`EndpointNotAllowedError`.
+environment, so load them in your own code, from `DOCLING_API_BASE` (or the older
+`API_BASE`) and `DOCLING_API_PASSWORD`. `api_base` receives the document and the password,
+so from the gaik release after 0.10.0 the constructor accepts only the address set in
+`DOCLING_API_BASE` or `API_BASE` (plain http works for that address), this machine, or a
+host listed in `GAIK_ALLOWED_ENDPOINT_HOSTS` or passed as `allowed_endpoint_hosts=` (an
+`http://<host>` entry for plain http). Anything else raises `EndpointNotAllowedError`.
 
 ## Choosing a provider for vision parsing
 

@@ -16,6 +16,8 @@ from typing import Any
 
 from gaik.software_components.endpoints import check_endpoint, log_endpoint
 
+from ..input_limits import InputLimits
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "jev-1.13.0"
@@ -66,6 +68,8 @@ class JevClassifier:
         max_retries: int = 3,
         client: Any = None,
         allowed_endpoint_hosts: str | Sequence[str] | None = None,
+        *,
+        limits: InputLimits | None = None,
     ):
         """
         Initialize the classifier.
@@ -84,9 +88,12 @@ class JevClassifier:
                 ``system_one`` method). When given, ``api_key`` and ``base_url`` are
                 not used to build a client. Meant for tests and custom transports.
             allowed_endpoint_hosts: Hosts this application allows for ``base_url``
-                besides TypeSafe, gaik-decide, ``GAIK_DECIDE_URL`` and ``TYPESAFE_BASE_URL``;
-                also read from
-                ``GAIK_ALLOWED_ENDPOINT_HOSTS``. ``base_url`` must be https.
+                besides TypeSafe, gaik-decide and the addresses set in ``GAIK_DECIDE_URL``
+                and ``TYPESAFE_BASE_URL`` (plain http works for those); also read from
+                ``GAIK_ALLOWED_ENDPOINT_HOSTS``. Other addresses must be https.
+            limits: Input limits for the PDF and Word files ``classify_files`` reads,
+                passed to their parsers; ``None`` keeps the parsers' defaults (size,
+                no page limit). A file over one raises ``InputLimitError``.
 
         Raises:
             ValueError: If ``api_key`` is empty and no ``client`` is given.
@@ -101,6 +108,7 @@ class JevClassifier:
             ... )
         """
         self.model = model
+        self.limits = limits
         if client is not None:
             self.client = client
             return
@@ -329,13 +337,12 @@ class JevClassifier:
                 }
         return results
 
-    @staticmethod
-    def _extract_text(file: Path) -> str:
-        """Extract the text of a PDF or Word document."""
+    def _extract_text(self, file: Path) -> str:
+        """Extract the text of a PDF or Word document, within ``limits``."""
         if file.suffix.lower() == ".pdf":
             from ..parsers.pymypdf import PyMuPDFParser
 
-            return PyMuPDFParser().parse_document(str(file))["text_content"]
+            return PyMuPDFParser(limits=self.limits).parse_document(str(file))["text_content"]
         from ..parsers.docx_parser import DocxParser
 
-        return DocxParser().parse_document(str(file))["text_content"]
+        return DocxParser(limits=self.limits).parse_document(str(file))["text_content"]

@@ -14,6 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.knowledge_curator import KnowledgeCurator
 from gaik.software_components.knowledge_curator.models import KnowledgeBase
 from gaik.software_components.llm import create_llm_client
@@ -86,13 +87,18 @@ class ReportWriter:
     its input files were edited by hand.
     """
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, *, limits: InputLimits | None = None):
         """
         Args:
             config: LLM config from `get_llm_config()`. The spec's `models` override its
                 model per step, and its `settings` set how each stage runs.
+            limits: Input limits for the sources and the sample report, passed to the
+                `SourceNormalizer` in `normalize`; `None` keeps its defaults
+                (`InputLimits.local_parsing()`). A file over one raises
+                `InputLimitError` before any file is converted.
         """
         self.config = config
+        self.limits = limits
 
     def normalize(
         self, spec: ReportSpec, workspace: str | Path, *, progress_callback: Progress = None
@@ -108,6 +114,7 @@ class ReportWriter:
             vision_model=spec.models.vision,
             transcription_model=spec.models.transcription,
             language=spec.settings.transcription_language,
+            limits=self.limits,
         )
         sources = normalizer.normalize(spec.sources, progress_callback=progress_callback)
         sample = workspace / "sample_report.md"

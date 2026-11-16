@@ -12,8 +12,7 @@ from api.utils.config import (
     get_transcription_api_config,
     require_vision,
 )
-from fastapi import HTTPException
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 SERVER = settings.SERVER_HEADER.decode()
 TIER = settings.TIER_HEADER.decode()
@@ -271,6 +270,19 @@ async def test_an_aitta_pick_keeps_speech_and_embeddings_on_aitta(aitta_env):
         ("transcribe", "google/gemma-4-31b-it"),
         ("extract", "google/gemma-4-31b-it"),
     ]
+
+
+def test_the_aitta_speech_client_may_send_the_token_to_aitta(monkeypatch):
+    # gaik checks an OpenAI config's base_url against OpenAI's hosts; the speech
+    # config names the Aitta address, so the client is built.
+    from api.utils.config import aitta_speech_config
+    from gaik.software_components.config import create_openai_client
+
+    monkeypatch.delenv("GAIK_ALLOWED_ENDPOINT_HOSTS", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    speech = aitta_speech_config({"provider": "aitta", "api_key": "aitta-token", "model": "m"})
+    client = create_openai_client(speech)
+    assert str(client.base_url).startswith("https://aitta-api.csc.fi/openai/v1")
 
 
 @pytest.mark.asyncio
