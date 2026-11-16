@@ -475,12 +475,6 @@ Participants: [Not specified in source materials]
 ```
 Or simply omit the field from the header.
 
-### Missing Dates
-If date not determinable:
-```
-Date: [To be confirmed]
-```
-
 ### Missing Owners for Action Items
 ```
 | 1 | Complete budget review | TBD | 2024-01-15 | M |

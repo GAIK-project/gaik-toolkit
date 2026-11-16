@@ -16,6 +16,8 @@ https://gaik-project.github.io/gaik-toolkit/
 
 **Live Demo:** https://gaik-demo.2.rahtiapp.fi/
 
+**Desktop app (experimental):** [gaik-toolkit-desktop](https://github.com/GAIK-project/gaik-toolkit-desktop) runs extraction, parsing, classification and transcription on your own files, on your own computer. See the [Desktop App](https://gaik-project.github.io/gaik-toolkit/desktop-app/) page.
+
 ## Use different model providers
 
 The Python toolkit provides one `ProviderClient` interface for OpenAI, Azure OpenAI,
@@ -126,14 +128,14 @@ Type this in a Claude Code session or Claude Desktop chat. The wizard guides you
 
 **Option 2 — Web chat (demo website)**
 
-Open the [live demo](https://gaik-demo.2.rahtiapp.fi/) and navigate to **Solution Wizard**. The wizard is in beta: sign in and request wizard access first. Token-by-token streaming, generated files appear in the sidebar, downloadable as a `.zip`.
+Open the live demo's [Solution Wizard page](https://gaik-demo.2.rahtiapp.fi/solution-wizard). It links to Wizard V2, which runs as its own service and needs an account from the GAIK team, and runs this wizard as a web chat at `/solution-wizard/first` for a signed-in user an admin has granted it (**Request access** on the page). The chat streams token by token; generated files appear in the sidebar, downloadable as a `.zip`.
 
 To run the demo locally, install its dependencies and create `.env.local` as described in the [demo app README](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/toolkit_demo_app/README.md); set `BYPASS_AUTH=true` there to open the wizard without signing in:
 
 ```bash
 cd implementation_layer/toolkit_demo_app
 bun dev:all   # starts Next.js frontend + FastAPI backend
-# open http://localhost:3000/solution-wizard
+# open http://localhost:3000/solution-wizard/first
 ```
 
 **Option 3 — Individual scripts (CLI)**

@@ -148,7 +148,6 @@ From the transcription, extract the following 20 fields exactly as specified.
 **9. Liitteet**
 - Description: Number and type of attachments
 - Format: Count and type (e.g., `4 kuvaa, 1 sähköpostin liite, 1 muistiinpano`)
-- Example: `4 photos, 1 email attachment, 1 note`
 - If not mentioned: return `""`
 
 **10. Valvojan huomiot**

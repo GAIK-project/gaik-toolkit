@@ -10,7 +10,10 @@ Two modes share one class:
   Output: long-format ``comparisons_df`` + system ranking.
 
 Both modes are provider-agnostic (any ``ProviderClient``) and ship with
-overridable rubrics via ``ScoringSpec`` / ``PairwiseSpec``.
+overridable rubrics via ``ScoringSpec`` / ``PairwiseSpec``. The rubric goes in
+the system message with the source-material sentence; the question, the
+reference and each response go in the user message, each in its own labelled
+source material block, so text in them is assessed as data, not followed.
 """
 
 from __future__ import annotations
@@ -28,6 +31,8 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
+
+from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 if TYPE_CHECKING:  # pragma: no cover
     import matplotlib.figure
@@ -1133,21 +1138,34 @@ class _PairOutcome:
 def _referenced_messages(
     system_prompt: str, question: str, response: str, reference: str
 ) -> list[dict]:
-    user = (
-        f"User question:\n<question>\n{question}\n</question>\n\n"
-        f"Reference answer:\n<reference_answer>\n{reference}\n</reference_answer>\n\n"
-        f"RAG response to evaluate:\n<RAG_answer>\n{response}\n</RAG_answer>\n"
+    material = SourceMaterial()
+    user = "\n\n".join(
+        [
+            "Evaluate the RAG response in the block labelled answer against the "
+            "reference answer in the block labelled reference, for the user question "
+            "in the block labelled question.",
+            material.wrap(str(question), label="question"),
+            material.wrap(str(reference), label="reference"),
+            material.wrap(str(response), label="answer"),
+        ]
     )
-    return [{"role": "system", "content": system_prompt}, {"role": "user", "content": user}]
+    return source_material_messages(system_prompt, user)
 
 
 def _pairwise_messages(system_prompt: str, question: str, resp_a: str, resp_b: str) -> list[dict]:
-    user = (
-        f"User question:\n<question>\n{question}\n</question>\n\n"
-        f"Response A:\n<response_a>\n{resp_a}\n</response_a>\n\n"
-        f"Response B:\n<response_b>\n{resp_b}\n</response_b>\n"
+    # The labels name only the position shown ("A" first), never the candidate
+    # column, so the judge cannot tell which system wrote which response.
+    material = SourceMaterial()
+    user = "\n\n".join(
+        [
+            "Compare response A (block labelled answer A) with response B (block "
+            "labelled answer B) for the user question in the block labelled question.",
+            material.wrap(str(question), label="question"),
+            material.wrap(str(resp_a), label="answer A"),
+            material.wrap(str(resp_b), label="answer B"),
+        ]
     )
-    return [{"role": "system", "content": system_prompt}, {"role": "user", "content": user}]
+    return source_material_messages(system_prompt, user)
 
 
 def _canonicalize_verdict(

@@ -10,7 +10,7 @@ import {
   parseOwnKnowledge,
 } from "@/lib/helpdesk-chatbot/own-knowledge";
 import { clientIp } from "@/lib/client-ip";
-import { ratelimit } from "@/lib/rate-limit";
+import { checkRateLimit, ratelimit } from "@/lib/rate-limit";
 import { getAccessState } from "@/lib/supabase/proxy";
 import { accessRefusal } from "@/lib/api-access";
 import { takeTrialRun } from "@/lib/trial";
@@ -29,6 +29,21 @@ const MAX_MESSAGES = 40;
 const MAX_BODY_BYTES = 400_000;
 
 export async function POST(request: NextRequest) {
+  // The per-IP limit comes before the trial run, so a refused request spends
+  // none. While the configured Redis does not answer, it refuses (503).
+  const limited = await checkRateLimit(
+    ratelimit,
+    `helpdesk:${clientIp(request.headers)}`,
+    "Too many requests. Try again in a minute.",
+    "[helpdesk-chat]",
+  );
+  if (limited) {
+    return NextResponse.json(
+      { error: limited.error },
+      { status: limited.status, headers: limited.headers },
+    );
+  }
+
   const refusal = await accessRefusal(
     await getAccessState(request),
     takeTrialRun,
@@ -44,22 +59,6 @@ export async function POST(request: NextRequest) {
       { error: "The chatbot is not configured." },
       { status: 503 },
     );
-  }
-
-  if (ratelimit) {
-    try {
-      const { success } = await ratelimit.limit(
-        `helpdesk:${clientIp(request.headers)}`,
-      );
-      if (!success) {
-        return NextResponse.json(
-          { error: "Too many requests. Try again in a minute." },
-          { status: 429 },
-        );
-      }
-    } catch (error) {
-      console.warn("[helpdesk-chat] rate limit unavailable:", error);
-    }
   }
 
   if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) {

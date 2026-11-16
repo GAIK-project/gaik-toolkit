@@ -1399,8 +1399,8 @@ async def document_pipeline_stream(
             steps[0]["message"] = "Parsing document content..."
             yield sse_event("step_update", steps[0])
 
-            # The same parsers, run the same way, as in the Parser demo. A model or a remote
-            # service reads the file in a worker thread, so that it cannot stall the event loop.
+            # The same parsers, run the same way, as in the Parser demo. Every parser, local or
+            # remote, reads the file in a worker thread, so that it cannot stall the event loop.
             parse_started = time.monotonic()
             parsed = await run_parser(tmp_path, suffix, actual_parser_type)
             parse_seconds = time.monotonic() - parse_started

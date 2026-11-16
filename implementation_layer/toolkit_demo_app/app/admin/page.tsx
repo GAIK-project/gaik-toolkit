@@ -69,6 +69,12 @@ export type AccessRequest = {
   report_limit_override: number | null;
   last_report_at: string | null;
   created_at: string;
+  /** Counted use of the first wizard; null when the user has no grant or nothing is counted. */
+  wizard_use: {
+    sessions: number;
+    messages: number;
+    lastAt: string | null;
+  } | null;
 };
 
 async function isAdminAuthenticated(): Promise<boolean> {
@@ -209,8 +215,8 @@ function WizardAccessButton({
         disabled={isPending}
         title={
           granted
-            ? "Revoke Solution Wizard access"
-            : "Grant Solution Wizard access"
+            ? "Revoke the first Solution Wizard in the browser"
+            : "Let this user run the first Solution Wizard in the browser. Its agent has shell tools on the demo API server: grant it only to people you trust with that."
         }
       >
         {isPending ? (
@@ -432,6 +438,34 @@ function UsageRow({
   );
 }
 
+function WizardUseRow({
+  request,
+  onUpdate,
+}: {
+  request: AccessRequest;
+  onUpdate: () => void;
+}) {
+  const use = request.wizard_use;
+  return (
+    <tr className="border-border/50 border-b">
+      <td className="px-4 py-3 text-sm">{request.email}</td>
+      <td className="px-4 py-3 text-sm">{request.full_name}</td>
+      <td className="px-4 py-3 text-sm tabular-nums">
+        {use ? use.sessions.toLocaleString() : "-"}
+      </td>
+      <td className="px-4 py-3 text-sm tabular-nums">
+        {use ? use.messages.toLocaleString() : "-"}
+      </td>
+      <td className="text-muted-foreground px-4 py-3 text-sm">
+        {use?.lastAt ? new Date(use.lastAt).toLocaleString() : "Not used"}
+      </td>
+      <td className="px-4 py-3">
+        <WizardAccessButton request={request} onUpdate={onUpdate} />
+      </td>
+    </tr>
+  );
+}
+
 const TH =
   "text-muted-foreground px-4 py-3 text-left text-sm font-medium whitespace-nowrap";
 
@@ -516,6 +550,21 @@ function Dashboard() {
     );
   }, [requests, query]);
 
+  // The users who hold the first wizard's grant, most recently active first.
+  const wizardUsers = useMemo(
+    () =>
+      filtered
+        .filter((r) => r.wizard_access)
+        .sort((a, b) =>
+          (b.wizard_use?.lastAt ?? "").localeCompare(
+            a.wizard_use?.lastAt ?? "",
+          ),
+        ),
+    [filtered],
+  );
+  const wizardGrants = requests.filter((r) => r.wizard_access).length;
+  const wizardCounted = requests.some((r) => r.wizard_use !== null);
+
   return (
     <div className="bg-background min-h-screen">
       <header className="border-b">
@@ -523,7 +572,7 @@ function Dashboard() {
           <div>
             <h1 className="text-xl font-semibold">GAIK Admin</h1>
             <p className="text-muted-foreground text-sm">
-              Access requests &amp; Report Writer usage
+              Access requests and usage
             </p>
           </div>
           <Button
@@ -574,6 +623,12 @@ function Dashboard() {
           <TabsList className="mb-4">
             <TabsTrigger value="requests">Access Requests</TabsTrigger>
             <TabsTrigger value="usage">Report Writer Usage</TabsTrigger>
+            <TabsTrigger value="wizard">
+              First wizard
+              <span className="text-muted-foreground ml-1.5 tabular-nums">
+                {wizardGrants}
+              </span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="requests">
@@ -604,7 +659,12 @@ function Dashboard() {
                         <th className={TH}>Company</th>
                         <th className={TH}>Use Case</th>
                         <th className={TH}>Status</th>
-                        <th className={TH}>Wizard</th>
+                        <th
+                          className={TH}
+                          title="Runs the first Solution Wizard in the browser. Its agent has shell tools on the demo API server."
+                        >
+                          First wizard
+                        </th>
                         <th className={TH}>Created</th>
                         <th className={TH}>Actions</th>
                       </tr>
@@ -661,6 +721,55 @@ function Dashboard() {
                           key={request.id}
                           request={request}
                           maxReports={maxReports}
+                          onUpdate={loadRequests}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </TableSection>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="wizard">
+            <Card>
+              <CardHeader>
+                <CardTitle>First wizard</CardTitle>
+                <CardDescription>
+                  The accounts that may run the first Solution Wizard in the
+                  browser, and how much each has used it. Its agent has shell
+                  tools on the demo API server, so this list should stay short.
+                  {wizardCounted
+                    ? " Sessions and messages are counted from 16 Nov 2026."
+                    : " Use is not counted: the counter store did not answer."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TableSection
+                  loading={loading}
+                  isEmpty={wizardUsers.length === 0}
+                  emptyText={
+                    wizardGrants === 0
+                      ? "No account holds the grant. Give it from the Access Requests tab."
+                      : "No granted account matches your filter."
+                  }
+                >
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className={TH}>Email</th>
+                        <th className={TH}>Name</th>
+                        <th className={TH}>Sessions</th>
+                        <th className={TH}>Messages</th>
+                        <th className={TH}>Last used</th>
+                        <th className={TH}>Grant</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {wizardUsers.map((request) => (
+                        <WizardUseRow
+                          key={request.id}
+                          request={request}
                           onUpdate={loadRequests}
                         />
                       ))}

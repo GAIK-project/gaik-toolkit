@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from pydantic import BaseModel, ConfigDict
 
 from gaik.software_components.llm import create_llm_client
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    with_source_material_instruction,
+)
 
 from .models import Edit, ReviewResult
 from .prompts import SYSTEM_PROMPT, check_prompt, retry_prompt, review_instruction
@@ -61,26 +67,44 @@ class DraftReviewer:
         self.chat_options = chat_options or {}
         self.client = create_llm_client({**config, "model": model} if model else config)
 
-    def review(self, draft: str, *, reference: str, instructions: str = "") -> ReviewResult:
+    def review(
+        self, draft: str, *, reference: str | Mapping[str, str], instructions: str = ""
+    ) -> ReviewResult:
         """Review ``draft`` against ``reference``.
 
-        ``instructions`` replaces the default checks. Edits that still do not match exactly
-        once after ``max_attempts`` requests, or that a retry answer leaves out entirely,
-        are returned in ``unresolved``.
+        ``reference`` is the reference text, or a mapping of names to texts (for
+        example one entry per source or per earlier section); each piece goes to
+        the model in its own labelled block. ``instructions`` replaces the default
+        checks and stays outside the blocks. The draft and the reference are
+        material: a sentence in them cannot change the checks. Edits that still do
+        not match exactly once after ``max_attempts`` requests, or that a retry
+        answer leaves out entirely, are returned in ``unresolved``.
         """
         if not draft.strip():
             raise ValueError("draft is empty")
-        if not reference.strip():
+        pieces = [reference] if isinstance(reference, str) else list(reference.values())
+        if not any(piece.strip() for piece in pieces):
             raise ValueError("reference is empty")
-        instruction = review_instruction(reference, instructions)
+        system = with_source_material_instruction(SYSTEM_PROMPT)
         text = draft
         applied: list[Edit] = []
         failed: list[tuple[Edit, str]] = []
-        prompt = check_prompt(draft)
+        material = SourceMaterial()
         for attempt in range(1, self.max_attempts + 1):
+            # The same block id for every request of this review, so the instruction
+            # stays the same across retries; a new one only when an applied or failed
+            # edit has written the current id into what is sent.
+            sent = [text] + [f"{e.search}\n{e.replace}\n{e.reason}" for e, _ in failed]
+            if any(material.boundary in piece for piece in sent):
+                material = SourceMaterial()
+            prompt = (
+                retry_prompt(text, failed, attempt - 1, material)
+                if failed
+                else check_prompt(text, material)
+            )
             messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": instruction},
+                {"role": "system", "content": system},
+                {"role": "user", "content": review_instruction(reference, instructions, material)},
                 {"role": "user", "content": prompt},
             ]
             edits = self.client.chat_parsed(
@@ -92,5 +116,4 @@ class DraftReviewer:
             applied.extend(done)
             if not failed:
                 break
-            prompt = retry_prompt(text, failed, attempt)
         return ReviewResult(text=text, applied=applied, unresolved=[edit for edit, _ in failed])

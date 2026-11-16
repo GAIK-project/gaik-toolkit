@@ -21,7 +21,8 @@ from solution_wizard.scaffolder import (
     validate_generated_python,
 )
 
-EXAMPLES = Path(__file__).parent.parent / "examples"
+WIZARD_DIR = Path(__file__).parent.parent
+EXAMPLES = WIZARD_DIR / "examples"
 
 
 def _load_example(filename: str) -> Blueprint:
@@ -169,17 +170,17 @@ def test_requirements_txt_audio_module(tmp_path):
     assert "audio-to-structured-data" in req
 
 
-def test_requirements_txt_needs_the_provider_api_release(tmp_path):
-    """provider_config.py needs gaik 0.8.0, so every gaik line carries that floor,
-    and none allows a gaik newer than the release the wizard was validated with."""
-    major, minor, patch = _VALIDATED_VERSION_FILE.read_text(encoding="utf-8").strip().split(".")
-    spec = f">=0.8.0,<{major}.{minor}.{int(patch) + 1}"
+def test_requirements_txt_pins_the_validated_gaik(tmp_path):
+    """Every gaik line installs the validated release or a later patch of it."""
+    version = (WIZARD_DIR / "gaik_validated_version.txt").read_text(encoding="utf-8").strip()
+    major, minor = version.split(".")[:2]
+    spec = f">={version},<{major}.{int(minor) + 1}"
     bp = _load_example("incident_reporting_blueprint.json")
     scaffold_poc(bp, tmp_path)
     req = (tmp_path / "poc" / "requirements.txt").read_text().splitlines()
     gaik = [line for line in req if line.startswith("gaik")]
     assert f"gaik[audio-to-structured-data]{spec}" in gaik
-    assert all(line.endswith(spec) for line in gaik)
+    assert gaik and all(line.endswith(spec) for line in gaik)
 
     bp.components.selected_modules = []
     bp.components.selected_building_blocks = []
@@ -192,16 +193,16 @@ def test_requirements_txt_keeps_the_floor_without_a_readable_pin(tmp_path, monke
     import solution_wizard.scaffolder as scaffolder
 
     pin = tmp_path / "pin.txt"
-    pin.write_text("0.8.11\n")
+    pin.write_text("0.10.0\n")
     monkeypatch.setattr(scaffolder, "_VALIDATED_VERSION_FILE", pin)
-    assert scaffolder._gaik_specifier() == ">=0.8.0,<0.8.12"
+    assert scaffolder._gaik_version_spec() == ">=0.10.0,<0.11"
 
     monkeypatch.setattr(scaffolder, "_VALIDATED_VERSION_FILE", tmp_path / "missing.txt")
-    assert scaffolder._gaik_specifier() == ">=0.8.0"
+    assert scaffolder._gaik_version_spec() == ">=0.8.0"
     bad = tmp_path / "bad.txt"
-    bad.write_text("0.8.12.dev3\n")
+    bad.write_text("0.10.1.dev3\n")
     monkeypatch.setattr(scaffolder, "_VALIDATED_VERSION_FILE", bad)
-    assert scaffolder._gaik_specifier() == ">=0.8.0"
+    assert scaffolder._gaik_version_spec() == ">=0.8.0"
 
 
 def test_requirements_txt_rag_module(tmp_path):

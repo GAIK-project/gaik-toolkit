@@ -43,6 +43,7 @@ from gaik.software_components.parsers.multimodal_parser.multimodal_parser import
     _extract_google_usage,
     _extract_openai_usage,
 )
+from gaik.software_components.source_material import with_source_material_instruction
 
 from . import text_layer
 from .prompts import SYSTEM_PROMPTS, USER_PROMPTS, VERIFICATION_PROMPT
@@ -1314,7 +1315,8 @@ class VisionExtractor:
         prompt = SYSTEM_PROMPTS.get(self.model_provider, SYSTEM_PROMPTS["openai"])
         if self.include_verification:
             prompt += "\n" + VERIFICATION_PROMPT
-        return prompt
+        # The attached files and their text layer are material, never instructions.
+        return with_source_material_instruction(prompt)
 
     def _get_user_prompt(self, user_requirements: str) -> str:
         prompt = USER_PROMPTS.get(self.model_provider, USER_PROMPTS["openai"]).format(

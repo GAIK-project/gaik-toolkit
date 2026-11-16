@@ -53,12 +53,12 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
         from gaik.software_components.parsers import DocxParser
 
         parser = DocxParser()
-        result = parser.parse_document(tmp_path)
+        result = await run_in_threadpool(parser.parse_document, tmp_path)
     elif parser_type == "pymupdf":
         from gaik.software_components.parsers import PyMuPDFParser
 
         parser = PyMuPDFParser()
-        result = parser.parse_document(tmp_path)
+        result = await run_in_threadpool(parser.parse_document, tmp_path)
     elif parser_type == "vision":
         from gaik.software_components.parsers import VisionParser
 
@@ -142,7 +142,7 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
         if api_base and password:
             try:
                 parser = DoclingApiClientParser(api_base=api_base, password=password)
-                result_raw = parser.parse_document(tmp_path)
+                result_raw = await run_in_threadpool(parser.parse_document, tmp_path)
                 parsed_markdown = result_raw.get("parsed_markdown", "")
                 if parsed_markdown:
                     result = {
@@ -165,7 +165,7 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
                         detail=error_detail(exc, f"Parsing this {suffix} file with the HH Parser"),
                     ) from exc
                 parser = PyMuPDFParser()
-                result = parser.parse_document(tmp_path)
+                result = await run_in_threadpool(parser.parse_document, tmp_path)
                 result.setdefault("metadata", {})["parser"] = "pymupdf"
         else:
             if suffix != ".pdf":
@@ -174,7 +174,7 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
                     detail="HH Parser is not configured; only PDF files can be parsed.",
                 )
             parser = PyMuPDFParser()
-            result = parser.parse_document(tmp_path)
+            result = await run_in_threadpool(parser.parse_document, tmp_path)
             result.setdefault("metadata", {})["parser"] = "pymupdf"
     else:
         raise HTTPException(status_code=400, detail=f"Unknown parser: {parser_type}")

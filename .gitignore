@@ -96,3 +96,6 @@ tmp/pdfs/
 
 # Stack E2E reports written by docker-test.sh
 implementation_layer/wizard_api/.stack-e2e-report/
+
+# Solution Wizard per-session workspaces
+.wizard_workspaces/
