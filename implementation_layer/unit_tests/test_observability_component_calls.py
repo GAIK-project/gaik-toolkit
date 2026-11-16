@@ -19,6 +19,7 @@ from unittest.mock import ANY
 import pytest
 from gaik.observability import tracing
 from gaik.software_components import _http
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import ChatResponse
 from gaik.software_components.llm.traced_client import TracedProviderClient
 from pydantic import BaseModel
@@ -384,6 +385,8 @@ def _parallel_transcriber_instance(mp, calls, error, **config):
         "prompt": SECRET,
         **config,
     }
+    # The fake hosts these cases call; endpoints off the known hosts need listing.
+    mp.setenv("GAIK_ALLOWED_ENDPOINT_HOSTS", "http://whisper.test, audio.test")
     api_config = {"use_azure": False, "api_key": "test-key", "transcription_model": "whisper-1"}
     if settings.get("model") == "whisper_local":
         api_config = {"api_base": "http://whisper.test", "key": "test-key"}
@@ -757,6 +760,8 @@ def _whisper_local(mp, tmp_path, error):
         lambda *a, **k: _ns(raise_for_status=lambda: None, json=lambda: {}),
     )
     audio = _file(tmp_path, "talk.mp3")
+    # The fake hosts this case calls; endpoints off the known hosts need listing.
+    mp.setenv("GAIK_ALLOWED_ENDPOINT_HOSTS", "http://whisper.test, audio.test")
 
     def run():
         return whisper_local.transcribe(
@@ -814,6 +819,7 @@ def _vision_extractor(provider):
         page = _file(tmp_path, "page.png", b"\x89PNG fake")
         extractor = object.__new__(module.VisionExtractor)
         extractor.reasoning_effort = "low"
+        extractor.limits = InputLimits()  # as __init__ sets it
         expected = {"component": "VisionExtractor", "calls": calls}
 
         if provider == "openai":
@@ -927,6 +933,7 @@ def _multimodal_parser(provider):
         calls = _Calls()
         parser = object.__new__(module.MultimodalParser)
         parser.reasoning_effort = "low"
+        parser.limits = InputLimits()  # as __init__ sets it
         expected = {"component": "MultimodalParser", "calls": calls}
 
         if provider == "openai":
