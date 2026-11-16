@@ -269,7 +269,7 @@ result = generator.run(
     parser_options={
         "ctor": {
             # "use_markdown": True,  # PyMuPDFParser: Markdown-formatted output (default True)
-            # "use_ocr": True,       # DoclingParser: enable OCR for scanned pages
+            # "enable_ocr": True,    # DoclingParser: enable OCR for scanned pages
         },
         # "openai_config": custom_config,  # override API config for VisionParser / MultimodalParser
     },
@@ -396,7 +396,7 @@ the credential-bearing stage configs when running the report.
 | Text | `.txt` | Read directly |
 | Markdown | `.md`, `.markdown` | Read directly |
 | CSV | `.csv` | Converted to Markdown table with Python stdlib `csv` |
-| Excel | `.xlsx`, `.xls` | Converted to Markdown table with `openpyxl` |
+| Excel | `.xlsx` (an old `.xls` is refused before any source is read; save it as `.xlsx`) | Converted to Markdown table with `openpyxl` |
 | PDF | `.pdf` | Parsed by `parser_choice` |
 | Word | `.docx` | Parsed by `DocxParser` |
 | Audio | `.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.ogg` | Transcribed by `Transcriber` |
@@ -719,9 +719,11 @@ from gaik.software_modules.multi_source_report_generator import (
 # Save the current use-case configuration to a file.
 # Paths (input_paths, output_dir, sample_report_path) are stored relative to
 # the config file so it is portable. All option dicts are stored as-is.
-# load_report_config refuses a path that is absolute or leads out of the config's
-# folder (through ".." or a symbolic link) with SourcePathError; pass
-# root="<a folder that holds both>" for a config that names files beside its folder.
+# Each path must stay inside the config's folder: save_report_config raises
+# SourcePathError for one outside it, so that load_report_config reads the config
+# back as saved. load_report_config refuses a path that is absolute or leads out of
+# the config's folder (through ".." or a symbolic link); pass root="<a folder that
+# holds both>" for a config written by hand that names files beside its folder.
 save_report_config(
     "my_report_config.json",
     input_paths=["materials/"],

@@ -362,35 +362,31 @@ def test_visionparser_convert_image(tmp_path, monkeypatch):
 
 
 def test_a_saved_config_loads_the_paths_it_was_given(tmp_path, monkeypatch):
-    # Paths relative to the working directory, saved into a config in another folder.
+    # Paths relative to the working directory, saved into a config in a folder above them.
     work = tmp_path / "work"
     (work / "materials").mkdir(parents=True)
     monkeypatch.chdir(work)
-    config_path = tmp_path / "configs" / "report.json"
+    config_path = tmp_path / "report.json"
 
     msrg.save_report_config(
         config_path,
-        input_paths=["materials", config_path.parent / "inside.txt"],
+        input_paths=["materials", tmp_path / "inside.txt"],
         sections=[{"title": "Summary", "instructions": "Summarize."}],
         output_dir="out",
         sample_report_path="materials/sample.md",
     )
-    # The working-directory paths lie beside the config's folder, so they load only with a
-    # root that holds both.
-    with pytest.raises(msrg.SourcePathError, match="outside the folder"):
-        msrg.load_report_config(config_path)
-    loaded = msrg.load_report_config(config_path, root=tmp_path)
+    loaded = msrg.load_report_config(config_path)
 
     assert loaded["input_paths"] == [
         (work / "materials").resolve(),
-        (config_path.parent / "inside.txt").resolve(),
+        (tmp_path / "inside.txt").resolve(),
     ]
     assert loaded["output_dir"] == (work / "out").resolve()
     assert loaded["sample_report_path"] == (work / "materials" / "sample.md").resolve()
-    # Every path is stored relative to the config's folder, so the folders can move.
+    # Every path is stored relative to the config's folder, so the folder can move.
     saved = json.loads(config_path.read_text(encoding="utf-8"))
-    assert saved["input_paths"] == ["../work/materials", "inside.txt"]
-    assert saved["output_dir"] == "../work/out"
+    assert saved["input_paths"] == ["work/materials", "inside.txt"]
+    assert saved["output_dir"] == "work/out"
     assert str(tmp_path) not in config_path.read_text(encoding="utf-8")
 
 

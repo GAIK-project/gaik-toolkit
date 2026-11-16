@@ -3,10 +3,10 @@ genericized.
 
 A mandatory fact/format repair pass for one section: the LLM returns a
 structured ``CorrectionList`` of ``{search, replace, reason}`` edits, which are
-applied with exact then fuzzy (>= 0.9) string matching; unapplied edits are
-retried (up to ``MAX_ATTEMPTS``). Whatever cannot be applied is returned as
-human-readable warnings rather than raising. An optional style-only ``polish``
-pass reuses the same editor.
+applied with an exact, then a normalized, then a fuzzy (>= 0.9) match that must
+be unique; unapplied edits are retried (up to ``MAX_ATTEMPTS``). Whatever cannot be
+applied is returned as human-readable warnings rather than raising. An optional
+style-only ``polish`` pass reuses the same editor.
 
 Uses GAIK's ``ProviderClient.chat_parsed(messages, response_format=...)`` for
 structured output and the stdlib ``difflib`` for fuzzy matching (no extra deps).
@@ -63,35 +63,74 @@ class CorrectionList(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# Curly quotes, en and em dashes and the no-break space, as their plain forms.
+_FOLD = str.maketrans("\u2018\u2019\u201c\u201d\u2013\u2014\u00a0", "''\"\"-- ")
+
+
+def _folded(text: str) -> tuple[str, list[int]]:
+    """``text`` lower-cased, quotes and dashes folded, whitespace runs collapsed to one
+    space, with the index in ``text`` of each kept character."""
+    out: list[str] = []
+    where: list[int] = []
+    for i, ch in enumerate(text.translate(_FOLD)):
+        if ch.isspace():
+            if out and out[-1] == " ":
+                continue
+            ch = " "
+        for c in ch.lower():
+            out.append(c)
+            where.append(i)
+    return "".join(out), where
+
+
+def _unique_find(haystack: str, needle: str) -> int | None:
+    pos = haystack.find(needle)
+    if pos < 0 or haystack.find(needle, pos + 1) >= 0:
+        return None
+    return pos
+
+
 def _find_search_string(text: str, search: str, threshold: float = FUZZY_THRESHOLD) -> str | None:
     """Return the actual substring of ``text`` matching ``search``, or None.
 
-    Handles exact, case-insensitive, and (for longer strings) fuzzy matches.
+    Tries an exact match, then one that ignores case, quote and dash styles and
+    whitespace runs, then (for longer strings) a fuzzy match of at least
+    ``threshold`` checked at every offset. A loose match is taken only when exactly
+    one span of ``text`` fits, so an edit never lands on a shifted or a second span;
+    anything else returns None and the edit stays unresolved.
     """
     if search in text:
         return search
 
-    low = search.lower()
-    text_low = text.lower()
-    if low in text_low:
-        pos = text_low.find(low)
-        return text[pos : pos + len(search)]
+    folded_text, where = _folded(text)
+    folded_search = _folded(search)[0].strip()
+    if folded_search:
+        pos = _unique_find(folded_text, folded_search)
+        if pos is not None:
+            return text[where[pos] : where[pos + len(folded_search) - 1] + 1]
 
     # Too short to fuzzy-match reliably.
     if len(search) < 10:
         return None
 
     n = len(search)
-    best: str | None = None
+    low = search.lower()
     best_ratio = threshold
-    step = max(1, n // 4)
-    for i in range(0, max(1, len(text) - n + 1), step):
-        cand = text[i : i + n]
-        ratio = SequenceMatcher(None, low, cand.lower()).ratio()
-        if ratio >= best_ratio:
-            best_ratio = ratio
-            best = cand
-    return best
+    best: list[int] = []
+    matcher = SequenceMatcher(None, autojunk=False)
+    matcher.set_seq2(low)
+    for i in range(0, max(1, len(text) - n + 1)):
+        matcher.set_seq1(text[i : i + n].lower())
+        if matcher.real_quick_ratio() < best_ratio or matcher.quick_ratio() < best_ratio:
+            continue
+        ratio = matcher.ratio()
+        if ratio > best_ratio:
+            best_ratio, best = ratio, [i]
+        elif ratio == best_ratio:
+            best.append(i)
+    if len(best) != 1:
+        return None
+    return text[best[0] : best[0] + n]
 
 
 def _apply_corrections(

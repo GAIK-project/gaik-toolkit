@@ -367,7 +367,7 @@ Check whether a single GAIK software module covers the use case end-to-end:
 **Report-writer rule.** `ReportWriter` (report writer v2, CURACT) is the default for `multi_source_report`: it curates section-bound fact units with verified verbatim quotes, marks uncovered required items as `(missing: …)`, applies a primary/secondary source hierarchy, reviews every section with a separate `DraftReviewer` call, and saves every stage as editable files so a human can correct `knowledge/*.json` or `report/sections/*.md` and rerun only the later stages. `module_for_pattern` may still return the legacy `multi_source_report_generator`; override it with this rule. Fall back to the legacy `MultiSourceReportGenerator` only when a `ReportWriter` limitation blocks the use case:
 
 - scanned or image-only PDFs (no text layer — `ReportWriter` raises; the legacy module has vision/multimodal/docling parsers via `parser_choice`);
-- source types only the legacy module reads: `.xls`, `.aac`, `.mov`/`.mkv`/`.avi` video, or `.tiff`/`.bmp`/`.gif` images (neither module reads `.pptx` or `.doc`);
+- source types only the legacy module reads: `.aac`, `.mov`/`.mkv`/`.avi` video, or `.tiff`/`.bmp`/`.gif` images (neither module reads `.pptx`, `.doc` or `.xls`);
 - audio sources while the text provider is not OpenAI/Azure — `ReportWriter` sends recordings through its single config, whereas the legacy module takes a separate `transcriber_options={'ctor': {'api_config': ...}}`;
 - structured extraction from images (legacy `image_options` with `VisionExtractor`).
 

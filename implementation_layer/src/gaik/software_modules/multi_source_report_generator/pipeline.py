@@ -57,7 +57,7 @@ _MARKDOWN_EXT = {".md", ".markdown"}
 _PDF_EXT = {".pdf"}
 _DOCX_EXT = {".docx"}
 _CSV_EXT = {".csv"}
-_XLSX_EXT = {".xlsx", ".xls"}
+_XLSX_EXT = {".xlsx"}
 _AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 _VIDEO_EXT = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 _IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".tiff", ".tif", ".bmp", ".gif"}
@@ -133,6 +133,9 @@ when they communicate the same meaning.
 # ---------------------------------------------------------------------------
 
 
+_SECTION_ID = re.compile(r"[A-Za-z0-9_-]+")
+
+
 def _normalize_sections(
     sections: list[ReportSectionSpec | dict[str, Any]],
 ) -> list[ReportSectionSpec]:
@@ -166,6 +169,11 @@ def _normalize_sections(
         # Derive a stable id from the title when not given.
         if not spec.id:
             spec.id = _slug(spec.title)
+        elif not _SECTION_ID.fullmatch(spec.id):
+            # The id names a graph node and a file; ':' is reserved in node names.
+            raise ValueError(
+                f"Section id {spec.id!r} may contain only letters, digits, '_' and '-'."
+            )
         out.append(spec)
 
     # Validate ids and dependencies.
@@ -203,6 +211,11 @@ def _collect_input_files(input_paths: list[str | Path]) -> list[Path]:
         for c in candidates:
             if not c.is_file():
                 continue
+            if c.suffix.lower() == ".xls":
+                # Refused before any source is read, so no parsing or transcription is lost.
+                raise ValueError(
+                    f"{c.name}: the old Excel format .xls is not supported; save it as .xlsx"
+                )
             if c.suffix.lower() not in SUPPORTED_EXTENSIONS:
                 continue
             rp = c.resolve()
@@ -221,9 +234,15 @@ def _csv_to_markdown(path: Path) -> str:
     return _rows_to_markdown_table(rows)
 
 
+def _table_cell(value: Any) -> str:
+    """One cell's text: line breaks joined, ``|`` escaped, as SpreadsheetParser writes it."""
+    text = "" if value is None else str(value)
+    return " ".join(text.splitlines()).replace("|", "\\|")
+
+
 def _rows_to_markdown_table(rows: list[list[Any]]) -> str:
     width = max(len(r) for r in rows)
-    norm = [[str(c) if c is not None else "" for c in r] + [""] * (width - len(r)) for r in rows]
+    norm = [[_table_cell(c) for c in r] + [""] * (width - len(r)) for r in rows]
     header, *body = norm
     lines = [
         "| " + " | ".join(header) + " |",
@@ -870,7 +889,7 @@ class MultiSourceReportGenerator:
     def _parse_docx(self, path: Path) -> str:
         from gaik.software_components.parsers import DocxParser
 
-        return DocxParser().parse_docx(str(path), use_markdown=True)
+        return DocxParser().parse_docx(str(path), keep_structure=True)
 
     def _transcribe(self, path: Path, *, transcriber_options: dict) -> str:
         from gaik.software_components.transcriber import Transcriber
@@ -1075,6 +1094,11 @@ class MultiSourceReportGenerator:
         out.mkdir(parents=True, exist_ok=True)
         (out / "sections").mkdir(exist_ok=True)
         (out / "evidence").mkdir(exist_ok=True)
+        # A reused folder must not keep a previous run's files next to this run's.
+        for old in (out / "sections").glob("*.md"):
+            old.unlink()
+        for name in ("evidence_index.json", "usage.json", "report.docx"):
+            (out / name).unlink(missing_ok=True)
 
         report_path = out / "report.md"
         report_path.write_text(markdown, encoding="utf-8")
@@ -1164,9 +1188,10 @@ def save_report_config(
     """Persist all ``run()`` parameters to a JSON config file for later reuse.
 
     Paths (``input_paths``, ``output_dir``, ``sample_report_path``) are stored
-    relative to the config file's directory so the config is portable; one outside
-    that directory is stored with ``..``, and ``load_report_config`` then needs a
-    ``root`` that holds it. A path on another drive raises ``SourcePathError``. All keys
+    relative to the config file's directory so the config is portable. Each must
+    stay inside that directory, so that ``load_report_config`` reads the config back
+    without a ``root``: a path outside it (also through a symbolic link) or on another
+    drive raises ``SourcePathError``. A link keeps its own name. All keys
     inside option dicts (``transcriber_options``, ``parser_options``, etc.) are
     stored as-is, except credential-bearing configs are rejected. Keep credentials
     in the environment and persist the provider/model selection instead.
@@ -1207,22 +1232,20 @@ def save_report_config(
     def _to_rel(p: str | Path | None) -> str | None:
         if p is None:
             return None
-        # Resolved first: a relative path is relative to the working directory
-        # here, while load_report_config reads it relative to the config file.
-        absolute = Path(p).resolve()
+        # Made absolute first: a relative path is relative to the working directory
+        # here, while load_report_config reads it relative to the config file. Only the
+        # folder is resolved, as ReportSpec.save does: a link keeps its own name.
+        p = Path(p)
+        absolute = p.parent.resolve() / p.name
         try:
             rel = Path(os.path.relpath(absolute, base.resolve())).as_posix()
         except ValueError:
             raise SourcePathError(
-                f"{Path(p).name} is on another drive than the config file; a config stores "
+                f"{p.name} is on another drive than the config file; a config stores "
                 "paths relative to its own folder"
             ) from None
-        if rel == ".." or rel.startswith("../"):
-            logger.warning(
-                "%s is outside the config's folder; load_report_config needs a root that "
-                "holds both to read it back",
-                Path(p).name,
-            )
+        # Refused now rather than written for load_report_config to refuse later.
+        path_inside(rel, base, what="path")
         return rel
 
     # Normalise sections: dataclasses → plain dicts, preserve all fields.
@@ -1348,7 +1371,8 @@ def _coerce_markdown(result: Any) -> str:
         if isinstance(val, str) and val:
             return val
     if isinstance(result, dict):
-        for key in ("clean_markdown", "parsed_markdown", "markdown", "text"):
+        # DoclingParser.parse_document returns its Markdown under "text_content".
+        for key in ("clean_markdown", "parsed_markdown", "markdown", "text", "text_content"):
             if isinstance(result.get(key), str):
                 return result[key]
     if isinstance(result, str):
