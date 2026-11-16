@@ -20,6 +20,8 @@ applies.
 
 from __future__ import annotations
 
+import os
+
 import httpcore
 import httpx
 
@@ -64,7 +66,14 @@ def environment_proxy_mounts() -> dict[str, httpx.BaseTransport | None]:
     """
     try:
         from httpx._utils import get_environment_proxies
-    except ImportError:  # pragma: no cover - an httpx that moved the helper
+    except ImportError as exc:  # an httpx that moved the helper
+        names = ("http_proxy", "https_proxy", "all_proxy")
+        if any(os.environ.get(n) or os.environ.get(n.upper()) for n in names):
+            raise RuntimeError(
+                "a proxy is set in the environment, but this httpx version does not "
+                "expose the helper WebScraper reads it with; pass transport= with the "
+                "proxy, or install an httpx the gaik web-scraper extra supports"
+            ) from exc
         return {}
     return {
         pattern: None if proxy is None else httpx.HTTPTransport(proxy=proxy)

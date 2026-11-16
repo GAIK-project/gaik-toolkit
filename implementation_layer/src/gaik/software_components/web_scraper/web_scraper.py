@@ -3,8 +3,10 @@
 Every request passes the same checks: the URL policy (http(s), allowed domains,
 public addresses only), robots.txt, a delay between requests to the same host, a
 size limit and an HTML content type. Redirects are followed one hop at a time so
-each hop is checked too, and every connection goes to an address the policy
-checked (``connect.VettedAddressTransport``).
+each hop is checked too. With the default transport and no proxy, every connection
+goes to an address the policy checked (``connect.VettedAddressTransport``); with
+``render_js``, a proxy from the environment or a custom transport, the name is
+looked up again there.
 """
 
 from __future__ import annotations
