@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isEmailConfirmed } from "@/lib/api-access";
 
 // Demo pages are open to look at. Running a demo needs a signed-in, approved
 // account, or a pending one within the trial allowance in lib/trial.ts or on the
@@ -36,9 +37,13 @@ export interface AccessState {
   approved: boolean;
   /** Signed up and waiting for approval: may run demos on a trial allowance (lib/trial.ts). */
   pending: boolean;
+  /** The sign-in e-mail address is confirmed; trial runs need it. */
+  emailConfirmed: boolean;
   userId: string | null;
   /** Lowercased sign-in email, for the model tier (lib/model-tier.ts). */
   email: string | null;
+  /** The per-user grant for the first Solution Wizard (`wizard_access`). */
+  wizardAccess: boolean;
   /**
    * Session cookies Supabase rewrote while reading the user: a refreshed token,
    * or a cleared dead session. The caller sets them on its response.
@@ -50,15 +55,18 @@ const NO_ACCESS: AccessState = {
   loggedIn: false,
   approved: false,
   pending: false,
+  emailConfirmed: false,
   userId: null,
   email: null,
+  wizardAccess: false,
   cookies: [],
 };
 
 /**
  * Read the requesting user's access state in one shot: logged in, approved or
- * pending (general `status`). Used by the proxy's API auth gate. `BYPASS_AUTH`
- * opens everything in dev.
+ * pending (general `status`), and the first Solution Wizard's grant
+ * (`wizard_access`). Used by the proxy's API auth gate and its wizard gate.
+ * `BYPASS_AUTH` opens everything in dev.
  *
  * An API request skips updateSession, so an expired access token is refreshed
  * here. The refresh spends the refresh token: unless the caller saves the new
@@ -73,8 +81,10 @@ export async function getAccessState(
       loggedIn: true,
       approved: true,
       pending: false,
+      emailConfirmed: true,
       userId: null,
       email: null,
+      wizardAccess: true,
       cookies: [],
     };
 
@@ -101,7 +111,7 @@ export async function getAccessState(
 
   const { data } = await supabase
     .from("access_requests")
-    .select("status")
+    .select("status, wizard_access")
     .eq("user_id", user.id)
     .single();
 
@@ -109,8 +119,10 @@ export async function getAccessState(
     loggedIn: true,
     approved: data?.status === "approved",
     pending: data?.status === "pending",
+    emailConfirmed: isEmailConfirmed(user),
     userId: user.id,
     email: user.email?.toLowerCase() ?? null,
+    wizardAccess: data?.wizard_access === true,
     cookies,
   };
 }

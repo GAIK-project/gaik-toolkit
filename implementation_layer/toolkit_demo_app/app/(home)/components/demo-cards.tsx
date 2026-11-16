@@ -13,6 +13,7 @@ import {
   Lock,
   type LucideIcon,
   MessageSquare,
+  MonitorDown,
   Wand2,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -268,6 +269,13 @@ const noCodeLinks: {
     href: "/prompts",
     icon: MessageSquare,
   },
+  {
+    title: "Desktop app",
+    description:
+      "Run extraction, parsing and classification on files on your own computer, with your own model key.",
+    href: "/desktop-app",
+    icon: MonitorDown,
+  },
 ];
 
 function Sections({
@@ -378,7 +386,7 @@ function Sections({
           title="No-code Assets"
           intro="Use GAIK's extraction know-how without writing code."
         />
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {noCodeLinks.map(({ title, description, href, icon: Icon }) => (
             <Link
               key={href}

@@ -13,6 +13,8 @@ https://gaik-project.github.io/gaik-toolkit/
 
 **Live Demo:** https://gaik-demo.2.rahtiapp.fi/
 
+**Desktop app (experimental):** [gaik-toolkit-desktop](https://github.com/GAIK-project/gaik-toolkit-desktop) runs extraction, parsing, classification and transcription on your own files, on your own computer. See the [Desktop App](https://gaik-project.github.io/gaik-toolkit/desktop-app/) page.
+
 ## Use different model providers
 
 The Python toolkit provides one `ProviderClient` interface for OpenAI, Azure OpenAI,

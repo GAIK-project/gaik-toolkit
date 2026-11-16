@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { EMAIL_UNCONFIRMED, isEmailConfirmed } from "@/lib/api-access";
 import { clientIp } from "@/lib/client-ip";
 import { ADMIN_COOKIE_NAME, MODEL_TIER_HEADER, isModelStaff } from "@/lib/model-tier";
-import { ratelimit } from "@/lib/rate-limit";
+import { checkRateLimit, ratelimit } from "@/lib/rate-limit";
 import {
   pickUsageFromEvents,
   type ReportUsageInfo,
@@ -88,37 +89,31 @@ export async function gateReportWriter(
   const trialReports = trialEnabled() ? getTrialLimits().reports : 0;
   const denial = accessDenial(row as AccessRow | null, maxReports, trialReports);
   if (denial) return NextResponse.json(denial, { status: 403 });
+  // The per-IP limit comes before the trial run, so a refused request spends
+  // none. While the configured Redis does not answer, it refuses (503).
+  const limited = await checkRateLimit(
+    ratelimit,
+    clientIp(request.headers),
+    "Liian monta pyyntöä. Yritä hetken päästä uudelleen.",
+    "[report-writer]",
+  );
+  if (limited) {
+    return NextResponse.json(
+      { error: limited.error },
+      { status: limited.status, headers: limited.headers },
+    );
+  }
+
   // A pending user's stages also count against the daily trial allowance.
   if (row?.status === "pending") {
+    if (!isEmailConfirmed(user))
+      return NextResponse.json(
+        { error: EMAIL_UNCONFIRMED.error },
+        { status: EMAIL_UNCONFIRMED.status },
+      );
     const trial = await takeTrialRun(user.id);
     if (!trial.ok)
       return NextResponse.json({ error: trial.error }, { status: trial.status });
-  }
-
-  if (ratelimit) {
-    try {
-      const { success, limit, remaining, reset } = await ratelimit.limit(
-        clientIp(request.headers),
-      );
-      if (!success) {
-        return NextResponse.json(
-          { error: "Liian monta pyyntöä. Yritä hetken päästä uudelleen." },
-          {
-            status: 429,
-            headers: {
-              "X-RateLimit-Limit": limit.toString(),
-              "X-RateLimit-Remaining": remaining.toString(),
-              "X-RateLimit-Reset": reset.toString(),
-            },
-          },
-        );
-      }
-    } catch (e) {
-      console.warn(
-        "[report-writer] rate limit skipped:",
-        e instanceof Error ? e.message : e,
-      );
-    }
   }
 
   const staff = isModelStaff(

@@ -206,8 +206,8 @@ runs as before.
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
 | `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
 
-`WIZARD_ACCESS_SECRET` is no longer read: the frontend answers 404 on `/api/wizard`.
-Remove it from both frontend deployments first, then from the secret if it is there
+`WIZARD_ACCESS_SECRET` is no longer read: `/api/wizard` is gated by the per-user
+wizard grant from `/admin`, not by a shared key. Remove it from both frontend deployments first, then from the secret if it is there
 (the patch fails harmlessly when the key is absent):
 
 ```bash
@@ -231,8 +231,9 @@ oc get secret/gaik-demo-admin -n gaik -o jsonpath='{.data}' | grep -q WIZARD_ACC
 | `REPORT_RUN_TOKEN`          | Optional. The same value as on the frontend: report runs (Report Writer, v2, Source Normalizer, Knowledge Curator, Knowledge Synthesis) are accepted only with it | Secret: `gaik-demo-report-run` |
 | `ANTHROPIC_FOUNDRY_API_KEY` | Claude server models and the Vision Extractor's Claude path: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
 | `ANTHROPIC_FOUNDRY_RESOURCE`| Claude server models and the Vision Extractor's Claude path: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
-| `CLAUDE_CODE_USE_FOUNDRY`   | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
+| `CLAUDE_CODE_USE_FOUNDRY`   | The first Solution Wizard in the browser: `1` sends its agent to Azure Foundry. With the two Foundry variables above it turns the wizard on | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | The first wizard's model id (`ANTHROPIC_MODEL` wins when set) | Secret: `gaik-demo-api-keys` |
+| `WIZARD_MAX_SESSIONS`, `WIZARD_MAX_MESSAGES` | Optional. First-wizard sessions at once (3) and messages per session (60) | `oc set env` |
 
 ## Route Annotations
 

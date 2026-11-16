@@ -1,12 +1,14 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { PENDING_DENIAL } from "@/lib/api-access";
+import { LIMITER_RETRY } from "@/lib/rate-limit";
 
 // A signed-up user whose access request is still pending can try the demos at
 // once instead of waiting for an admin, within a daily allowance per user. Sign-up
 // is open, so a shared daily total also bounds what all pending accounts together
 // can spend. The counts live in Upstash Redis; without it the trial is off and
-// pending users wait for approval as before (fail closed).
+// pending users wait for approval as before. While the configured Redis does not
+// answer, trial runs are refused with a 503 until it answers again.
 
 /** A non-negative integer from env; 0 turns the limit's feature off. */
 function countEnv(name: string, def: number): number {
@@ -39,7 +41,7 @@ function getRedis(): Redis | null {
   if (redis !== undefined) return redis;
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  redis = url && token ? new Redis({ url, token }) : null;
+  redis = url && token ? new Redis({ url, token, retry: LIMITER_RETRY }) : null;
   return redis;
 }
 
@@ -53,10 +55,21 @@ export type TrialResult =
   | { ok: true }
   | { ok: false; status: number; error: string };
 
-/** Count one run against the pending user's daily allowance and the shared total. */
-export async function takeTrialRun(userId: string): Promise<TrialResult> {
+/** The refusal while the configured Redis does not answer. */
+export const TRIAL_COUNTER_UNAVAILABLE = {
+  status: 503,
+  error: "Trial runs cannot be counted right now. Try again in a few minutes.",
+};
+
+/**
+ * Count one run against the pending user's daily allowance and the shared total.
+ * `client` is the Redis store; tests pass their own.
+ */
+export async function takeTrialRun(
+  userId: string,
+  client: Redis | null = getRedis(),
+): Promise<TrialResult> {
   const limits = getTrialLimits();
-  const client = getRedis();
   if (!client || limits.runsPerDay === 0 || limits.runsPerDayTotal === 0)
     return { ok: false, ...PENDING_DENIAL };
 
@@ -67,7 +80,11 @@ export async function takeTrialRun(userId: string): Promise<TrialResult> {
       prefix: "gaik-demo:trial-user",
       analytics: false,
     });
-    if (!(await perUser.limit(userId)).success)
+    const own = await perUser.limit(userId);
+    // Ratelimit's timeout answers success uncounted: refuse it like an error.
+    if (own.reason === "timeout")
+      throw new Error("Redis did not answer in time");
+    if (!own.success)
       return {
         ok: false,
         status: 429,
@@ -80,7 +97,10 @@ export async function takeTrialRun(userId: string): Promise<TrialResult> {
       prefix: "gaik-demo:trial-total",
       analytics: false,
     });
-    if (!(await total.limit("all")).success)
+    const shared = await total.limit("all");
+    if (shared.reason === "timeout")
+      throw new Error("Redis did not answer in time");
+    if (!shared.success)
       return {
         ok: false,
         status: 429,
@@ -89,10 +109,10 @@ export async function takeTrialRun(userId: string): Promise<TrialResult> {
       };
   } catch (error) {
     console.warn(
-      "[trial] Redis unavailable, trial runs off:",
+      "[trial] Redis does not answer, trial run refused:",
       error instanceof Error ? error.message : error,
     );
-    return { ok: false, ...PENDING_DENIAL };
+    return { ok: false, ...TRIAL_COUNTER_UNAVAILABLE };
   }
   return { ok: true };
 }
