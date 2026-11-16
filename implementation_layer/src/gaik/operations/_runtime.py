@@ -75,8 +75,9 @@ class _ThreadStdout(io.TextIOBase):
             return False
 
     def fileno(self) -> int:
-        if self._real is None:
-            # A process without a console has no stdout at all.
+        if self._real is None or _buffer() is not None:
+            # A process without a console has no stdout at all, and a capture has no file
+            # descriptor: a caller that asks falls back to `write`.
             raise io.UnsupportedOperation("fileno")
         return self._real.fileno()
 
@@ -91,11 +92,39 @@ class _ThreadStdout(io.TextIOBase):
     def errors(self) -> str | None:  # type: ignore[override]
         return getattr(self._real, "errors", None)
 
+    @property
+    def buffer(self) -> Any:
+        """The real stream's bytes, or bytes into the capture while one is active."""
+        captured = _buffer()
+        if captured is not None:
+            return _CapturedBytes(captured, self.encoding)
+        return self._real.buffer  # type: ignore[union-attr]
+
     def __getattr__(self, name: str) -> Any:
-        # `buffer`, `reconfigure`, `name`, `mode` and the like belong to the real stream.
+        # `reconfigure`, `name`, `mode` and the like belong to the real stream.
         if name.startswith("_"):
             raise AttributeError(name)
         return getattr(self._real, name)
+
+
+class _CapturedBytes(io.RawIOBase):
+    """``sys.stdout.buffer`` inside a capture: bytes are decoded into the capture."""
+
+    def __init__(self, captured: io.StringIO, encoding: str) -> None:
+        super().__init__()
+        self._captured = captured
+        self._encoding = encoding
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, data: Any) -> int:
+        raw = bytes(data)
+        self._captured.write(raw.decode(self._encoding, errors="replace"))
+        return len(raw)
+
+    def close(self) -> None:
+        """Do nothing: the capture is not this adapter's to close."""
 
 
 def _install() -> None:
@@ -111,7 +140,8 @@ def quiet_stdout() -> Iterator[io.StringIO]:
 
     Yields the buffer that holds the printed text. A nested block yields the outer buffer.
     Other threads and tasks print as before, also while this block waits in an ``await``.
-    A task or an ``asyncio.to_thread`` call started inside the block is captured with it.
+    A task or an ``asyncio.to_thread`` call started inside the block is captured with it;
+    a thread or a ``ThreadPoolExecutor`` worker that a component starts itself is not.
     The proxy stays in place for the life of the process.
     """
     outer = _buffer()
