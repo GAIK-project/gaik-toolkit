@@ -83,6 +83,21 @@ braces remain literal, so a JSON example needs no escaping, nested or not:
 `str.format`, where every other brace is doubled (`{{"answer": "..."}}`), still works:
 its `{{` and `}}` become single braces.
 
+### Retrieved text as data
+
+Each retrieved chunk reaches the model inside its own `<source_material>` block
+in the user message, with a random id for each call and a label naming its
+document, page and chunk (`report.pdf, page 3, chunk 12`); the block starts with
+the `[Document: name, Page: X]` line that citations are taken from. The question
+stays outside the blocks, and the system message holds the instructions with the
+sentence in `SOURCE_MATERIAL_INSTRUCTION`
+([`gaik.software_components.source_material`](../../source_material.py)). A
+sentence in an indexed document cannot close its block or change the task. With
+a custom prompt, your template is the user message and `{context}` becomes the
+blocks. Conversation history keeps, as before, the earlier questions and answers
+only, not the chunks retrieved for them. The call and its return value are
+unchanged.
+
 ---
 
 ## Environment Variables

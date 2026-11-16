@@ -470,10 +470,25 @@ class LLMJudge:
         from google.genai import types
 
         if self.use_vertexai:
+            # The EU multi-region unless a location is set (llm/config.py). A model
+            # the EU does not serve is retried on the global endpoint below.
+            location = os.environ.get("GOOGLE_VERTEXAI_LOCATION")
+            # The default location is asked once and for at most two minutes: the
+            # SDK otherwise waits without a limit and would never reach the fallback.
+            bounded = (
+                {}
+                if location
+                else {
+                    "http_options": types.HttpOptions(
+                        timeout=120_000, retry_options=types.HttpRetryOptions(attempts=1)
+                    )
+                }
+            )
             client = genai.Client(
                 vertexai=True,
                 project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
-                location=os.environ.get("GOOGLE_VERTEXAI_LOCATION", "global"),
+                location=location or "eu",
+                **bounded,
             )
         else:
             api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -489,15 +504,43 @@ class LLMJudge:
         for page in source_pages:
             parts.append(types.Part.from_bytes(data=page, mime_type="image/png"))
 
-        resp = client.models.generate_content(
-            model=self.model,
-            contents=parts,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-                max_output_tokens=self.max_tokens,
-            ),
-        )
+        def generate(with_client):
+            return with_client.models.generate_content(
+                model=self.model,
+                contents=parts,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    response_mime_type="application/json",
+                    max_output_tokens=self.max_tokens,
+                ),
+            )
+
+        try:
+            resp = generate(client)
+        except Exception as exc:
+            # The default location falls back when it does not serve the model
+            # (404) or does not answer; one set in the environment does not.
+            code = getattr(exc, "code", None)
+            moves = (
+                isinstance(exc, genai.errors.ServerError)
+                or (isinstance(exc, genai.errors.ClientError) and code in {404, 429})
+                or "Timeout" in type(exc).__name__
+            )
+            if not self.use_vertexai or os.environ.get("GOOGLE_VERTEXAI_LOCATION") or not moves:
+                raise
+            logger.warning(
+                "Vertex AI location 'eu' did not serve %s (%s). Using 'global', which is "
+                "not tied to a region. Set GOOGLE_VERTEXAI_LOCATION to choose the location.",
+                self.model,
+                type(exc).__name__,
+            )
+            resp = generate(
+                genai.Client(
+                    vertexai=True,
+                    project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
+                    location="global",
+                )
+            )
         text = resp.text or ""
         meta = getattr(resp, "usage_metadata", None)
         return (

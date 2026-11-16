@@ -37,6 +37,11 @@ except ImportError:
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 logger = logging.getLogger(__name__)
 try:
     from utils.file_content import content_mismatch
@@ -264,7 +269,7 @@ async def diary_audio_pipeline_stream(
                     yield sse_event("step_update", steps[pdf_step_idx])
                 except Exception as e:
                     steps[pdf_step_idx]["status"] = "error"
-                    steps[pdf_step_idx]["message"] = f"PDF generation failed: {e}"
+                    steps[pdf_step_idx]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[pdf_step_idx])
 
             # Send final result
@@ -280,15 +285,16 @@ async def diary_audio_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
@@ -425,7 +431,7 @@ async def diary_text_pipeline_stream(
                     yield sse_event("step_update", steps[pdf_step_idx])
                 except Exception as e:
                     steps[pdf_step_idx]["status"] = "error"
-                    steps[pdf_step_idx]["message"] = f"PDF generation failed: {e}"
+                    steps[pdf_step_idx]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[pdf_step_idx])
 
             # Send final result
@@ -440,15 +446,16 @@ async def diary_text_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
 
     return StreamingResponse(
         event_generator(),

@@ -51,7 +51,7 @@ spec = ReportSpec.load("report-runs/koivukuja/report_spec.json")
 | `language` | The language the report is written in (default English); not the transcription language |
 | `sections` | The report structure, in report order (below). Proposed with every other key by `run_report.py propose-spec`, agreed with the user after normalization and written by `apply-spec` |
 | `instructions` | Rules for every section: source hierarchy, scope, tone, citation style |
-| `sources` | Files grouped as `primary` and/or `secondary`; at least one file; every file name unique |
+| `sources` | Files grouped as `primary` and/or `secondary`; at least one file; every file name unique. Paths are relative to the spec's folder and stay inside it: an absolute path, or one that leads out through `..` or a link, is refused |
 | `sample_report` | Optional report whose structure, length and tone the new one follows; never its facts |
 | `models` | Optional model or deployment name per step: `vision`, `transcription`, `curator`, `writer`, `reviewer`. A `null` curator, writer or reviewer takes `GAIK_REPORT_<STEP>_MODEL`, else the default for the provider (README, "Changing the provider and the models"), else the provider's configured model; the helper fills these in at run time and never rewrites the spec |
 | `settings` | Optional; how the stages run (below) |
