@@ -20,11 +20,12 @@ import pytest
 pytest.importorskip("psycopg")
 pytest.importorskip("langchain_core")
 
-from gaik.software_components.RAG import ranker as ranker_module  # noqa: E402
 from gaik.software_components.RAG.pg_vector_store import PgVectorStore  # noqa: E402
 from langchain_core.documents import Document  # noqa: E402
 
-RAG_DIR = Path(ranker_module.__file__).resolve().parent.parent
+# The READMEs live in the repository, not in an installed wheel (CI installs gaik
+# from a wheel), so read them from the source tree next to these tests.
+RAG_DIR = Path(__file__).resolve().parents[1] / "src" / "gaik" / "software_components" / "RAG"
 
 _LEMMAS = {"kissa": ["kissa"], "koiran": ["koira"], "mustan": ["musta"], "ja": []}
 _LEMMAS["kerrostaloissa"] = ["kerros", "talo"]
