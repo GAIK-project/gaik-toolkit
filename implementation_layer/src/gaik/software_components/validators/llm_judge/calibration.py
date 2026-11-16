@@ -75,8 +75,11 @@ def calibrate_against_human_labels(
         scores = [f.score for f in relevant if f.score]
         judge_error = getattr(result, "judge_error", None)
         # An unreadable response, or one with no scored flag for this field,
-        # has no judge score: it is reported per item and left out of r, the
-        # severity agreement and the means, instead of counting as 0 / "ok".
+        # has no judge score: it is reported per item and left out of r and the
+        # means, instead of counting as 0. Without any flag for the field it has
+        # no judge severity either and is left out of the severity agreement,
+        # instead of counting as "ok". Flags with a severity but no score
+        # (severity mode) keep their severity, which is what that mode measures.
         skipped_reason: str | None = None
         if judge_error:
             skipped_reason = "judge_error"
@@ -84,13 +87,9 @@ def calibrate_against_human_labels(
             skipped_reason = "no scored flag"
         judge_score: float | None = sum(scores) / len(scores) if scores else None
 
-        judge_severity: Severity | None
-        if judge_error:
-            judge_severity = None
-        elif relevant:
+        judge_severity: Severity | None = None
+        if relevant and not judge_error:
             judge_severity = max((f.severity for f in relevant), key=lambda s: _SEVERITY_RANK[s])
-        else:
-            judge_severity = "ok"
 
         per_item.append(
             {

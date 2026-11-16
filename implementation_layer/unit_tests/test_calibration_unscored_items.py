@@ -11,6 +11,7 @@ from gaik.software_components.validators.llm_judge.schema import (
     JudgeUsage,
     ValidationFlag,
     ValidationResult,
+    ValidationRubric,
 )
 
 
@@ -51,6 +52,35 @@ def test_an_item_with_no_flag_for_the_field_is_left_out() -> None:
     assert report.mean_human_score == pytest.approx(3.0)
     assert report.per_item[3]["judge_score"] is None
     assert report.per_item[3]["skipped"] == "no scored flag"
+
+
+def test_an_item_with_no_flag_for_the_field_has_no_judge_severity() -> None:
+    judge = _ScriptedJudge([_scored(5), _scored(4, field="other")])
+    dataset = [_item(5, severity="ok"), _item(2, severity="wrong")]
+
+    report = calibrate_against_human_labels(judge, dataset, field_filter="total")
+
+    assert report.per_item[1]["skipped"] == "no scored flag"
+    assert report.per_item[1]["judge_severity"] is None
+    # Only the first item is compared, and it agrees.
+    assert report.severity_agreement_rate == pytest.approx(1.0)
+
+
+def test_severity_mode_flags_without_a_score_still_count_in_severity_agreement() -> None:
+    def flagged(severity: str) -> ValidationResult:
+        flag = ValidationFlag(item_index=0, field="total", severity=severity)
+        return ValidationResult(flags=[flag], raw_judge_text="{}", usage=_usage())
+
+    judge = _ScriptedJudge([flagged("wrong"), flagged("ok")])
+    dataset = [_item(1, severity="wrong"), _item(4, severity="suspect")]
+
+    report = calibrate_against_human_labels(
+        judge, dataset, rubric=ValidationRubric(scoring_mode="severity")
+    )
+
+    assert [row["judge_severity"] for row in report.per_item] == ["wrong", "ok"]
+    assert report.severity_agreement_rate == pytest.approx(0.5)
+    assert report.pearson_r is None
 
 
 def test_an_unreadable_judge_response_is_not_severity_ok() -> None:
