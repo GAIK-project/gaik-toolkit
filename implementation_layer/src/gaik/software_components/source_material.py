@@ -142,8 +142,15 @@ class SourceMaterial:
         opening = re.compile(
             rf'^\s*<{SOURCE_MATERIAL_TAG} id="{re.escape(self.boundary)}"[^>\n]*>[ \t]*\n?'
         )
-        closing = re.compile(rf"\n?[ \t]*{re.escape(self.closing_tag)}\s*$")
-        return closing.sub("", opening.sub("", text, count=1), count=1)
+        text = opening.sub("", text, count=1)
+        # The closing tag is taken off with string operations: an unanchored pattern
+        # such as r"\n?[ \t]*</...>\s*$" retries at every position of a long run of
+        # spaces and is quadratic in its length.
+        end = text.rstrip()
+        if not end.endswith(self.closing_tag):
+            return text
+        end = end[: -len(self.closing_tag)].rstrip(" \t")
+        return end[:-1] if end.endswith("\n") else end
 
     def text_part(self, text: str, *, label: str | None = None, part_type: str = "text") -> dict:
         """A multimodal text part holding one block, e.g. next to an image part.
