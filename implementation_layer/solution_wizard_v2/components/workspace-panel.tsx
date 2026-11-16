@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Blueprint, BlueprintStepType } from "@/lib/mock-sessions";
 import {
   nextTabForStepChange,
@@ -40,7 +40,12 @@ import {
 import { isSandboxBusy, preflightRetryDelayMs, retryAfterMs } from "@/lib/sandbox-busy";
 import { autoRunDecision, userInputs, type PocInputFile } from "@/lib/poc-auto-run";
 import { sourceTraceIn, sourcesForField } from "@/lib/poc-source-trace";
-import { CHAT_REPLYING_EVENT, WORKSPACE_SHOW_EVENT, type WorkspacePlace } from "@/lib/chat-events";
+import {
+  CHAT_REFERENCE_EVENT,
+  CHAT_REPLYING_EVENT,
+  WORKSPACE_SHOW_EVENT,
+  type WorkspacePlace,
+} from "@/lib/chat-events";
 import {
   handoverState,
   publishResultStale,
@@ -357,6 +362,68 @@ function WorkflowFlowTab({
 
   // The BPMN editor loads once it is first on screen, and stays for the selection and unsaved edits.
   const diagramVisible = wide || view === "diagram";
+
+  // The diagram at the size of the window: the same element laid over the
+  // page, so a picked step, a zoom level and unsaved BPMN edits come along.
+  const [fullViewChosen, setFullViewChosen] = useState(false);
+  // A diagram that leaves the screen some other way (the list takes its place,
+  // the window narrows) takes the choice with it: it comes back at its place
+  // in the tab, not over the window by itself.
+  const [wasVisible, setWasVisible] = useState(diagramVisible);
+  if (wasVisible !== diagramVisible) {
+    setWasVisible(diagramVisible);
+    if (!diagramVisible) setFullViewChosen(false);
+  }
+  const fullViewOn = fullViewChosen && diagramVisible;
+  const diagramBox = useRef<HTMLDivElement>(null);
+  const fullView = useMemo(
+    () => ({ on: fullViewOn, toggle: () => setFullViewChosen(!fullViewOn) }),
+    [fullViewOn],
+  );
+  useEffect(() => {
+    if (!fullViewOn) return;
+    const box = diagramBox.current;
+    const sizeButton = () => box?.querySelector<HTMLElement>("[data-diagram-expand]");
+    // What Tab stops at in the diagram, in order: the steps, the view controls, an open menu, "Muokkaa".
+    const stops = () =>
+      Array.from(
+        box?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((el) => el.getClientRects().length > 0);
+    let backwards = false;
+    // The page takes over (a step was handed to the chat): the focus is no longer kept here.
+    let left = false;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Tab") backwards = e.shiftKey;
+      // Esc that nothing in the diagram took (a step's menu, a name being typed) puts the page back.
+      // React hears keys on the document too, so a handler that stopped the key is read from the event.
+      if (e.key !== "Escape" || e.defaultPrevented || e.cancelBubble) return;
+      setFullViewChosen(false);
+      sizeButton()?.focus();
+    };
+    // The page under the diagram is out of sight: Tab past the diagram's last stop
+    // comes back to its first, and Shift + Tab past the first to the last.
+    const onFocusIn = (e: FocusEvent) => {
+      if (left || !box || !(e.target instanceof Node) || box.contains(e.target)) return;
+      const all = stops();
+      (all[backwards ? all.length - 1 : 0] ?? sizeButton())?.focus();
+    };
+    // "Kysy wizardilta" on a step opens the chat with the step as its reference:
+    // the chat is under the large view, so the view steps aside for it.
+    const onReference = () => {
+      left = true;
+      setFullViewChosen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("focusin", onFocusIn);
+    window.addEventListener(CHAT_REFERENCE_EVENT, onReference);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("focusin", onFocusIn);
+      window.removeEventListener(CHAT_REFERENCE_EVENT, onReference);
+    };
+  }, [fullViewOn]);
   useEffect(() => {
     if (diagramVisible) setDiagramShown(true);
   }, [diagramVisible]);
@@ -478,7 +545,20 @@ function WorkflowFlowTab({
             />
           </div>
         </div>
-        <div className={`${diagramVisible ? "flex" : "hidden"} min-h-0 min-w-0 flex-1 flex-col`}>
+        <div
+          ref={diagramBox}
+          className={`${diagramVisible ? "flex" : "hidden"} min-h-0 min-w-0 flex-col ${
+            fullViewOn ? "pop-in fixed inset-0 z-50 bg-app p-2 sm:p-3" : "flex-1"
+          }`}
+          data-full-view={fullViewOn}
+          data-testid="flow-diagram-box"
+        >
+          {/* The tab's AI notice is under the large view: it is said here too. */}
+          {fullViewOn && (
+            <p className="mb-2 px-1 text-xs text-text-muted" data-testid="flow-full-view-ai-mark">
+              {t.wsAiMark}
+            </p>
+          )}
           {notation === "flow" ? (
             // Drawn from the blueprint, so it needs no diagram from the server;
             // off screen it is not kept, and it opens fitted each time.
@@ -493,6 +573,7 @@ function WorkflowFlowTab({
                 pocNoteLabel={pocNoteLabel}
                 selectedStepId={selectedStepId}
                 onSelectedStepChange={setSelectedStepId}
+                fullView={fullView}
                 onSaved={(saved, via) => {
                   onBlueprintChange(saved);
                   onSaved(via);
@@ -528,6 +609,7 @@ function WorkflowFlowTab({
               update={blueprintUpdate}
               focusRequest={focusRequest}
               onSelectedStepChange={setSelectedStepId}
+              fullView={fullView}
               // Other tabs get a change once it is saved, never while it is being typed.
               onSynced={({ blueprint: synced }) => {
                 onBlueprintChange(synced);

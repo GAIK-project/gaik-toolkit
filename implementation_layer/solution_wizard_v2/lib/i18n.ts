@@ -167,6 +167,9 @@ export type Dict = {
   // ==== lane:editors ====
   /** Workflow tab and Blueprint form. */
   bpmnFitView: string;
+  /** The diagram at the size of the window, and back. */
+  flowFullView: string;
+  flowFullViewExit: string;
   bpmnPaletteAddTask: string;
   bpmnPaletteConnect: string;
   bpmnPadRename: string;
@@ -870,6 +873,8 @@ const fi: Dict = {
 
   // ==== lane:editors ====
   bpmnFitView: "Sovita näkymään",
+  flowFullView: "Suurenna kaavio",
+  flowFullViewExit: "Pienennä kaavio",
   bpmnPaletteAddTask: "Lisää tehtävä: pudota se nuolen päälle, niin se liitetään prosessiin",
   bpmnPaletteConnect: "Yhdistä vaiheet: vedä vaiheesta toiseen",
   bpmnPadRename: "Nimeä uudelleen",
@@ -1627,6 +1632,8 @@ const en: Dict = {
 
   // ==== lane:editors ====
   bpmnFitView: "Fit to view",
+  flowFullView: "Enlarge the diagram",
+  flowFullViewExit: "Shrink the diagram",
   bpmnPaletteAddTask: "Add a task: drop it on an arrow to put it into the process",
   bpmnPaletteConnect: "Connect steps: drag from one step to another",
   bpmnPadRename: "Rename",

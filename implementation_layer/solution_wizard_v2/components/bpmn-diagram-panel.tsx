@@ -56,9 +56,12 @@ export function BpmnDiagramPanel({
   focusRequest = null,
   onSelectedStepChange,
   onSynced,
+  fullView,
   t,
 }: {
   sessionId: string;
+  /** The diagram at the size of the window, and the control that takes it there and back. */
+  fullView?: { on: boolean; toggle: () => void };
   /** The diagram as the server generated it from the blueprint. */
   xml: string;
   /** The session's blueprint as the page has it: `xml` is drawn from it. */
@@ -519,6 +522,10 @@ export function BpmnDiagramPanel({
           zoomOutLabel={t.wsBpmnZoomOut}
           fitLabel={t.bpmnFitView}
           groupLabel={t.wsBpmnToolbar}
+          expanded={fullView?.on ?? false}
+          onToggleExpanded={fullView?.toggle}
+          expandLabel={t.flowFullView}
+          collapseLabel={t.flowFullViewExit}
         />
 
         {showProps && selection && (

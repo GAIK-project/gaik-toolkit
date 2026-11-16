@@ -295,6 +295,59 @@ test.describe("the gate row of the session bar", () => {
     await expect(row.getByText("Hyväksy luovutus")).toHaveCount(0);
   });
 
+  test("a mouse resting on a stage opens its panel, which follows the pointer and leaves with it; a press keeps it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loginAsDev(page);
+    await page.goto("/sessions/ses_gate2_pending");
+    await hydrated(page);
+    const row = page.getByRole("navigation", { name: "Vaiheet" });
+    const stage = (n: number) => row.getByTestId(`timeline-stage-${n}`);
+    const panel = async (n: number) => page.locator(`#${await stage(n).getAttribute("aria-controls")}`);
+
+    // Resting on a stage opens it without a press.
+    await stage(2).hover();
+    await expect(stage(2)).toHaveAttribute("aria-expanded", "true");
+    await expect(row.getByText("Hyväksy ratkaisun rakenne")).toBeVisible();
+    // The next stage's panel takes its place as the pointer moves along the row.
+    await stage(3).hover();
+    await expect(stage(3)).toHaveAttribute("aria-expanded", "true");
+    await expect(stage(2)).toHaveAttribute("aria-expanded", "false");
+    // The pointer can move into the panel and read it.
+    await (await panel(3)).hover();
+    await page.waitForTimeout(400);
+    await expect(stage(3)).toHaveAttribute("aria-expanded", "true");
+    // Off the row and the panel, it leaves.
+    await page.getByTestId("workspace-phase").hover();
+    await expect(stage(3)).toHaveAttribute("aria-expanded", "false");
+
+    // A press keeps the panel the pointer opened: it stays when the pointer leaves, also over another stage.
+    await stage(1).hover();
+    await expect(stage(1)).toHaveAttribute("aria-expanded", "true");
+    await stage(1).click();
+    await expect(stage(1)).toHaveAttribute("aria-expanded", "true");
+    await stage(3).hover();
+    await page.getByTestId("workspace-phase").hover();
+    await page.waitForTimeout(400);
+    await expect(stage(1)).toHaveAttribute("aria-expanded", "true");
+    // So does a press inside it: the question it asks is not lost to a stray pointer.
+    await page.keyboard.press("Escape");
+    await stage(1).hover();
+    await row.getByTestId("gate-change-1").click();
+    await page.getByTestId("workspace-phase").hover();
+    await page.waitForTimeout(400);
+    await expect(row.getByTestId("gate-reopen-1")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(stage(1)).toHaveAttribute("aria-expanded", "false");
+
+    // A pointer that only crosses the bar opens nothing.
+    await page.mouse.move(700, 24);
+    await page.mouse.move(40, 400, { steps: 4 });
+    await page.waitForTimeout(300);
+    for (const n of [1, 2, 3, 4]) await expect(stage(n)).toHaveAttribute("aria-expanded", "false");
+  });
+
   test("Change in an approved stage asks with the focus on its answer, and Esc still closes the panel", async ({
     page,
   }) => {

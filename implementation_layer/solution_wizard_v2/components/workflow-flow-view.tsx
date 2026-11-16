@@ -305,10 +305,13 @@ export function WorkflowFlowView({
   selectedStepId,
   onSelectedStepChange,
   onSaved,
+  fullView,
   t,
 }: {
   sessionId: string;
   blueprint: Blueprint;
+  /** The diagram at the size of the window, and the control that takes it there and back. */
+  fullView?: { on: boolean; toggle: () => void };
   /** The diagram the server generated from the blueprint; null until it has loaded, or when it cannot be. */
   bpmnXml: string | null;
   /** Edits are off, and the canvas says why; "ask the wizard" stays. */
@@ -417,8 +420,10 @@ export function WorkflowFlowView({
   const viewport = chosenView ?? fitted;
 
   // A step added or removed: the whole flow is shown again, so the change is in view.
+  // So it is when the diagram moves to the window's size or back.
   const stepIds = steps.map((s) => s.id).join("\n");
-  useEffect(() => setChosenView(null), [stepIds]);
+  const fullViewOn = fullView?.on ?? false;
+  useEffect(() => setChosenView(null), [stepIds, fullViewOn]);
 
   const nodes = useMemo(
     () =>
@@ -788,6 +793,10 @@ export function WorkflowFlowView({
           zoomOutLabel={t.wsBpmnZoomOut}
           fitLabel={t.bpmnFitView}
           groupLabel={t.wsBpmnToolbar}
+          expanded={fullViewOn}
+          onToggleExpanded={fullView?.toggle}
+          expandLabel={t.flowFullView}
+          collapseLabel={t.flowFullViewExit}
           testId="simple-flow-zoom"
         />
 

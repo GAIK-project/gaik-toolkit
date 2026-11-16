@@ -4,7 +4,9 @@ import { Icon } from "@/components/icons";
 
 /**
  * The diagram's view controls, one small group in the canvas's top-right
- * corner: zoom out, the zoom level, zoom in, and fit the whole diagram.
+ * corner: zoom out, the zoom level, zoom in, fit the whole diagram, and the
+ * diagram at the size of the window. Fitting and enlarging are two buttons
+ * with two icons: the frame fits, the arrows enlarge.
  * The view the diagram opens on is chosen by itself (lib/bpmn-view-fit).
  */
 export function BpmnZoomControls({
@@ -16,6 +18,10 @@ export function BpmnZoomControls({
   zoomOutLabel,
   fitLabel,
   groupLabel,
+  expanded = false,
+  onToggleExpanded,
+  expandLabel,
+  collapseLabel,
   className = "",
   testId = "bpmn-zoom",
 }: {
@@ -28,10 +34,17 @@ export function BpmnZoomControls({
   zoomOutLabel: string;
   fitLabel: string;
   groupLabel: string;
+  /** The diagram fills the window (the Workflow tab owns that). */
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
+  expandLabel?: string;
+  collapseLabel?: string;
   className?: string;
   /** The simple flow view has the same controls under its own test ids. */
   testId?: string;
 }) {
+  const level = zoom == null ? "–" : `${Math.round(zoom * 100)} %`;
+  const sizeLabel = expanded ? collapseLabel : expandLabel;
   return (
     <div
       role="toolbar"
@@ -46,15 +59,31 @@ export function BpmnZoomControls({
         className="min-w-[3.25rem] select-none text-center text-xs font-medium tabular-nums text-text-secondary"
         data-testid={`${testId}-level`}
       >
-        {zoom == null ? "–" : `${Math.round(zoom * 100)} %`}
+        {level}
       </span>
       <button type="button" className="bpmn-toolbar-btn" onClick={onZoomIn} aria-label={zoomInLabel} title={zoomInLabel}>
         <Icon name="plus" size={16} />
       </button>
-      <span className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
       <button type="button" className="bpmn-toolbar-btn" onClick={onFit} aria-label={fitLabel} title={fitLabel}>
         <Icon name="maximize" size={16} />
       </button>
+      {onToggleExpanded && sizeLabel && (
+        <>
+          <span className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
+          <button
+            type="button"
+            className="bpmn-toolbar-btn"
+            onClick={onToggleExpanded}
+            aria-pressed={expanded}
+            aria-label={sizeLabel}
+            title={sizeLabel}
+            data-diagram-expand
+            data-testid={`${testId}-expand`}
+          >
+            <Icon name={expanded ? "minimize2" : "maximize2"} size={16} />
+          </button>
+        </>
+      )}
     </div>
   );
 }

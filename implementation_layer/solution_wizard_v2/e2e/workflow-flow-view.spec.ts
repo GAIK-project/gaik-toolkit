@@ -160,6 +160,108 @@ test.describe("Workflow tab: the simple flow", () => {
       await expectAllInView(page);
     });
 
+    test("the corner button lays the diagram over the whole window, fitted, and Esc puts the page back", async ({
+      page,
+    }) => {
+      await openAfterGate2(page);
+      const box = page.getByTestId("flow-diagram-box");
+      const controls = page.getByTestId("simple-flow-zoom-controls");
+      const beside = (await box.boundingBox())!;
+      const besideZoom = await zoomLevel(page);
+
+      await controls.getByRole("button", { name: "Suurenna kaavio" }).click();
+      await expect(box).toHaveAttribute("data-full-view", "true");
+      await expect.poll(async () => Math.round((await box.boundingBox())!.width)).toBe(1440);
+      expect(Math.round((await box.boundingBox())!.height)).toBe(900);
+      // The tab's AI notice is under the large view, so the view says it itself.
+      await expect(page.getByTestId("flow-full-view-ai-mark")).toBeVisible();
+      // The flow is fitted to the larger canvas: larger than beside the chat, all of it in view.
+      await expect.poll(() => zoomLevel(page)).toBeGreaterThan(besideZoom);
+      await expectAllInView(page);
+      // Nothing of the page lies over it, and the focus stays inside it.
+      const covered = await box.evaluate((el) => {
+        let under = 0;
+        for (let x = 8; x < innerWidth; x += 120) {
+          for (let y = 8; y < innerHeight; y += 90) {
+            if (!el.contains(document.elementFromPoint(x, y))) under += 1;
+          }
+        }
+        return under;
+      });
+      expect(covered).toBe(0);
+      const smaller = controls.getByRole("button", { name: "Pienennä kaavio" });
+      await expect(smaller).toBeFocused();
+      await expect(smaller).toHaveAttribute("aria-pressed", "true");
+      // Tab goes round the diagram's own stops: past the last one it is on the first again,
+      // every button is reached on the way, and the round ends where it began.
+      const buttons = await box.evaluate(
+        (el) => Array.from(el.querySelectorAll("button:not([disabled])")).filter((b) => b.getClientRects().length > 0).length,
+      );
+      let reached = 0;
+      for (let i = 0; i < 40; i += 1) {
+        await page.keyboard.press("Tab");
+        expect(await box.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+        if (await page.evaluate(() => document.activeElement?.tagName === "BUTTON")) reached += 1;
+        if (await smaller.evaluate((el) => el === document.activeElement)) break;
+      }
+      await expect(smaller).toBeFocused();
+      expect(reached).toBe(buttons);
+      await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Shift+Tab");
+      expect(await box.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+
+      // A step still opens its menu there, and Esc closes the menu first, then the large view.
+      await node(page, 1).click();
+      await expect(menu(page)).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(menu(page)).toHaveCount(0);
+      await expect(box).toHaveAttribute("data-full-view", "true");
+      await page.keyboard.press("Escape");
+      await expect(box).toHaveAttribute("data-full-view", "false");
+      await expect.poll(async () => (await box.boundingBox())!.width).toBe(beside.width);
+      await expect.poll(() => zoomLevel(page)).toBe(besideZoom);
+      await expect(controls.getByRole("button", { name: "Suurenna kaavio" })).toBeFocused();
+
+      // A step handed to the chat from the large view: the view steps aside, and the chat has the cursor.
+      await controls.getByRole("button", { name: "Suurenna kaavio" }).click();
+      await expect(box).toHaveAttribute("data-full-view", "true");
+      await node(page, 2).click();
+      await page.getByTestId("simple-flow-ask").click();
+      await expect(box).toHaveAttribute("data-full-view", "false");
+      await expect(page.getByTestId("chat-reference")).toContainText("Vaihe 3 · Classification");
+      await expect(page.locator('textarea[name="message"]')).toBeFocused();
+    });
+
+    test("fitting and enlarging are two buttons, and the large view does not come back by itself", async ({
+      page,
+    }) => {
+      await openAfterGate2(page);
+      const controls = page.getByTestId("simple-flow-zoom-controls");
+      const box = page.getByTestId("flow-diagram-box");
+      // Zoom out, zoom in, fit, enlarge; the level between them is a figure, not a control.
+      await expect(controls.getByRole("button")).toHaveCount(4);
+      const fitted = await zoomLevel(page);
+      await controls.getByRole("button", { name: "Lähennä" }).click();
+      await expect.poll(() => zoomLevel(page)).toBeGreaterThan(fitted);
+      await controls.getByRole("button", { name: "Sovita näkymään" }).click();
+      await expect.poll(() => zoomLevel(page)).toBe(fitted);
+      await expect(box).toHaveAttribute("data-full-view", "false");
+
+      // Where the list and the diagram take turns, the list takes the large diagram's place
+      // (asked for from the page's own switch, which the large view covers): the diagram comes
+      // back in its place in the tab, not over the window by itself.
+      await page.setViewportSize({ width: 700, height: 900 });
+      await controls.getByRole("button", { name: "Suurenna kaavio" }).click();
+      await expect(box).toHaveAttribute("data-full-view", "true");
+      await page.evaluate(() => document.querySelector<HTMLElement>('[data-testid="flow-view-list"]')?.click());
+      await expect(box).toBeHidden();
+      await page.getByTestId("flow-view-diagram").click();
+      await expect(box).toBeVisible();
+      await expect(box).toHaveAttribute("data-full-view", "false");
+    });
+
     test("a rename saves to the blueprint, shows in the list, and changes nothing but the name", async ({
       page,
       request,
