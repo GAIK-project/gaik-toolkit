@@ -42,10 +42,25 @@ describe("nowLine", () => {
       const t = dictionary(loc);
       for (const step of GATE_STEPS) {
         for (const ran of [false, true]) {
+          // Gate 3 after a run that succeeded: see the next test.
+          if (step === GATE_STEPS[2] && ran) continue;
           expect(nowLine(t, step, buildGateStatus(step), ran)).not.toMatch(/hyväksy|approve/i);
         }
       }
     }
+  });
+
+  it("after a test run that succeeded names the decision bar's two buttons by their labels", () => {
+    for (const loc of LOCALES) {
+      const t = dictionary(loc);
+      const line = nowLine(t, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true);
+      expect(line).toContain(t.gateDecisions[2]);
+      expect(line).toContain(t.gateRequestChanges);
+      expect(line).not.toMatch(/\{\w+\}/);
+    }
+    expect(nowLine(fi, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true)).toBe(
+      "Testi onnistui. Tarkista tulos PoC-välilehdellä ja valitse sitten alareunasta Hyväksy testiajo tai Pyydä muutoksia.",
+    );
   });
 
   it("on an approved gate before the last points onwards instead of asking to check again", () => {

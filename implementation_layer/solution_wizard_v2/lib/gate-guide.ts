@@ -10,8 +10,10 @@ export const MISSING_ANSWER_MAX = 2000;
  * The one line under the phase title: what the user does now, and where. It
  * names what to look at, not the approval: the approve button says that. At
  * Gate 3, and on the PoC step before it, it follows the test run, which is the
- * real task until one has succeeded; once Gate 4 is approved there is only the
- * package left to take.
+ * real task until one has succeeded. After that the decision is all that is
+ * left, and on a wide screen the bar that holds it sits far from the result,
+ * at the bottom right: the line names its two buttons by their labels. Once
+ * Gate 4 is approved there is only the package left to take.
  * On an earlier gate that is already approved (the step came back onto it)
  * there is nothing to check again, only the way on.
  */
@@ -23,7 +25,13 @@ export function nowLine(
 ): string {
   // The lines name the workspace tabs by their labels, so a renamed tab stays right.
   const tabs = (line: string) =>
-    fillTemplate(line, { flow: t.wsTabFlow, json: t.wsTabJson, poc: t.wsTabPoc });
+    fillTemplate(line, {
+      flow: t.wsTabFlow,
+      json: t.wsTabJson,
+      poc: t.wsTabPoc,
+      approve: t.gateDecisions[2] ?? "",
+      request: t.gateRequestChanges,
+    });
   const gate = gateNumber(step);
   // From the PoC step a run that succeeded is waiting for the same decision.
   const runWaits = hasSuccessfulRun && (gate === 3 || step === GATE_STEPS[2] - 1);

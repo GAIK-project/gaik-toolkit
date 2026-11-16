@@ -31,7 +31,10 @@ export type Dict = {
    * "{json}" and "{poc}" are filled with the workspace tab names.
    */
   nowSteps: string[];
-  /** Gate 3 once a test run has succeeded; nowSteps has the line before one. */
+  /**
+   * Gate 3 once a test run has succeeded; nowSteps has the line before one.
+   * "{approve}" and "{request}" are the decision bar's two buttons.
+   */
   nowGate3Run: string;
   /** The last step once Gate 4 is approved, and the same before any test run has succeeded. */
   nowDone: string;
@@ -771,7 +774,7 @@ const fi: Dict = {
     "Wizard päivittää dokumentaation ja kertoo chatissa, mitä paketissa on.",
     "Lataa käyttöönottopaketti {poc}-välilehdeltä ja tarkista sen dokumentaatio.",
   ],
-  nowGate3Run: "Testi onnistui. Tarkista tulos {poc}-välilehdellä.",
+  nowGate3Run: "Testi onnistui. Tarkista tulos {poc}-välilehdellä ja valitse sitten alareunasta {approve} tai {request}.",
   nowDone: "Kaikki gatet on hyväksytty. Lataa käyttöönottopaketti tai kokeile ratkaisua omilla tapauksillasi.",
   nowDoneNoRun: "Kaikki gatet on hyväksytty. Aja vielä testi {poc}-välilehdellä, niin käyttöönottopaketin voi ladata.",
   nowGateApproved: "Gate {n} on jo hyväksytty. Jatka seuraavaan vaiheeseen.",
@@ -1539,7 +1542,7 @@ const en: Dict = {
     "The wizard updates the documentation and tells you in the chat what the package holds.",
     "Download the deployment package from the {poc} tab and check its documentation.",
   ],
-  nowGate3Run: "The test succeeded. Check the result on the {poc} tab.",
+  nowGate3Run: "The test succeeded. Check the result on the {poc} tab, then choose {approve} or {request} at the bottom.",
   nowDone: "Every gate is approved. Download the deployment package, or try the solution on your own cases.",
   nowDoneNoRun: "Every gate is approved. Run a test on the {poc} tab, and the deployment package can be downloaded.",
   nowGateApproved: "Gate {n} is already approved. Move on to the next step.",
