@@ -60,12 +60,15 @@ SOURCE_MATERIAL_INSTRUCTION = (
 
 # A closing tag written in the material, "</source_material" with any spacing and
 # case, also after a look-alike angle bracket a model may read as "<". An
-# opening tag cannot end a block, so it passes unchanged.
+# opening tag cannot end a block, so it passes unchanged. Each run of spacing
+# meets one _GAP only (a "-" or "_" is not spacing), so the search stays linear
+# in the length of the material: two _GAP runs side by side would let a long run
+# after "</source" be split between them in quadratically many ways.
 _ANGLE = "<\uff1c\ufe64\u2329\u27e8\u3008\u2039"
 _GAP = r"[\s\u200b-\u200f\u2060\ufeff]*"  # spacing, also zero-width characters
 _SLASH = "/\uff0f\u2215\u2044"
 _CLOSING_IN_MATERIAL = re.compile(
-    rf"[{_ANGLE}]({_GAP}[{_SLASH}]{_GAP})(source{_GAP}[-_ ]?{_GAP}material)",
+    rf"[{_ANGLE}]({_GAP}[{_SLASH}]{_GAP})(source{_GAP}(?:[-_]{_GAP})?material)",
     re.IGNORECASE,
 )
 _LABEL_UNSAFE = re.compile(rf"[\"{_ANGLE}>\uff1e\ufe65\u232a\u27e9\u3009\u203a]")
