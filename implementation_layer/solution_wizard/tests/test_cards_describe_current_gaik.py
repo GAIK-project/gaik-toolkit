@@ -55,13 +55,15 @@ def test_report_loaders_and_source_path_error_are_described():
     assert "root" in inspect.signature(load_report_config).parameters
 
     writer = CARDS["ReportWriter"]
-    assert "SourcePathError" in writer["import"]
+    # gaik 0.9.1, the validated release a PoC installs, has no SourcePathError export,
+    # so the import line a PoC copies leaves it out until the pin moves past 0.9.1.
+    assert "SourcePathError" not in writer["import"]
     assert "root=" in writer["call_from_spec_file"]
     assert "SourcePathError" in writer["call_from_spec_file"]
     assert "ReportSpec.load(path, root=" in _limitations("ReportWriter")
 
     generator = CARDS["MultiSourceReportGenerator"]
-    assert "SourcePathError" in generator["import"]
+    assert "SourcePathError" not in generator["import"]
     assert "load_report_config(path, root=" in generator["note"]
     assert "load_report_config(path, root=" in _limitations("MultiSourceReportGenerator")
 
