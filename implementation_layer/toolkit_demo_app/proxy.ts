@@ -206,10 +206,14 @@ async function route(request: NextRequest): Promise<NextResponse> {
     ) {
       headers.set(SERVER_MODEL_HEADER, serverModel);
     }
-    // Tell the API whether this user may run the team-only models.
+    // Tell the API whether this user may run the team-only models, from the
+    // session (lib/model-tier.ts): on every run, which may name a model, and on
+    // the two catalogues that list the models. The browser's own copy of this
+    // header is never forwarded: `headers` starts empty.
     if (
-      headers.has(SERVER_MODEL_HEADER) ||
-      backendPath === "/model-settings/server"
+      isStateChanging(request.method) ||
+      backendPath === "/model-settings/server" ||
+      backendPath === "/extract-vision/models"
     ) {
       const { email } = await accessState();
       if (isModelStaff(email, request.cookies.get(ADMIN_COOKIE_NAME)?.value))

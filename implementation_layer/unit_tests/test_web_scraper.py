@@ -593,7 +593,8 @@ def test_every_checked_address_is_tried_in_order(monkeypatch):
 
     monkeypatch.setattr(httpcore.SyncBackend, "connect_tcp", fake_connect_tcp)
     policy = UrlPolicy(["site.test"])
-    policy._public["site.test"] = ("2001:4860::1", "2001:4860::2", "2001:4860::3", "8.8.4.4")
+    addresses = ("2001:4860::1", "2001:4860::2", "2001:4860::3", "8.8.4.4")
+    policy._public["site.test"] = (addresses, float("inf"))
     assert _VettedAddressBackend(policy).connect_tcp("site.test", 443) == "stream"
     assert attempts == ["2001:4860::1", "2001:4860::2", "2001:4860::3", "8.8.4.4"]
 

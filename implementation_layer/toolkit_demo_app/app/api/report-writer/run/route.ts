@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   // 1) Auth + approval + quota, 2) per-IP burst limit
   const gate = await gateReportWriter(request, limits.maxReports);
   if (gate instanceof Response) return gate;
-  const { userId } = gate;
+  const { userId, staff } = gate;
 
   // 3) Parse + validate the multipart body. A body over the proxy cap arrives
   //    truncated and fails to parse, so reject it by its declared length first.
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
   // 5) Forward to the backend, 6) record the run (count + tokens) when a result
   //    event arrived. Failed runs aren't charged.
-  return forwardReportRun("/report-writer/run", fwd, async (usage) => {
+  return forwardReportRun("/report-writer/run", fwd, staff, async (usage) => {
     if (!userId || !usage.sawResult) return;
     try {
       await recordReportUsage(userId, 1, usage.totalTokens);

@@ -26,7 +26,11 @@ function jwt(sub: string, exp: number): string {
   return `${part({ alg: "HS256", typ: "JWT" })}.${part({ sub, exp, role: "authenticated" })}.sig`;
 }
 
-const user = { id: "u1", aud: "authenticated", role: "authenticated" };
+const user: Record<string, string> = {
+  id: "u1",
+  aud: "authenticated",
+  role: "authenticated",
+};
 
 function session(refreshToken: string, expiresAt: number) {
   return {
@@ -103,6 +107,7 @@ beforeEach(() => {
   refreshes = [];
   backendCalls = 0;
   backendHeaders = null;
+  delete user.email;
   accessRow = { status: "approved", wizard_access: false };
 });
 
@@ -276,6 +281,27 @@ test("a visitor with their own model key is asked to sign in", async () => {
     });
   }
   expect(backendCalls).toBe(0);
+});
+
+test("the API learns the model tier from the session, never from the browser", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const send = () =>
+    proxy(
+      new NextRequest("https://demo.test/api/extract", {
+        method: "POST",
+        headers: { cookie, "x-gaik-model-tier": "staff" },
+      }),
+    );
+
+  // Signed in and approved, but not on the team: the browser's header is dropped.
+  expect((await send()).status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-model-tier")).toBeNull();
+
+  // On the team by address: the proxy says so.
+  user.email = "someone@haaga-helia.fi";
+  expect((await send()).status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-model-tier")).toBe("staff");
+  expect(backendCalls).toBe(2);
 });
 
 test("a path that only begins like the wizard API meets the normal gate", async () => {

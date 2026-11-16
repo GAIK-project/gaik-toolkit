@@ -71,8 +71,10 @@ except ImportError:
 
 try:
     from utils.errors import error_detail
+    from utils.model_allow_list import check_team_tier, offered_to
 except ImportError:
     from api.utils.errors import error_detail
+    from api.utils.model_allow_list import check_team_tier, offered_to
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -524,6 +526,8 @@ async def extract_vision(
         lib_provider, use_azure, vertex_ai = "openai", request_config["provider"] == "azure", False
     else:
         lib_provider, use_azure, vertex_ai = _provider_settings(model_provider, model)
+        # A team-only model needs the team tier (utils/model_allow_list.py).
+        check_team_tier(model)
 
     for uploaded_file in files:
         _validate_suffix(uploaded_file.filename)
@@ -623,7 +627,8 @@ async def extract_vision(
 
 @router.get("/models")
 async def model_catalogue():
+    # Team-only models are listed only for the team, like the server model menu.
     return {
-        "models": {name: list(_offered_models(name)) for name in PROVIDER_MODELS},
+        "models": {name: offered_to(_offered_models(name)) for name in PROVIDER_MODELS},
         "default": _server_model(),
     }
