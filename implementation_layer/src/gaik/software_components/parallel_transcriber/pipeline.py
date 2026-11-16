@@ -17,6 +17,7 @@ import concurrent.futures
 import logging
 import re
 import shutil
+import subprocess
 import tempfile
 import threading
 import time
@@ -24,7 +25,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
-from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -64,10 +65,11 @@ class ParallelTranscriber:
             ``transcription_model``, etc.
         config: Optional :class:`TranscriptionConfig`.  Defaults are used
             when omitted.
-        limits: Size and duration limits (``max_media_bytes``,
-            ``max_media_seconds``; default 2 GiB and 6 hours). A file over one is
-            refused with :class:`~gaik.software_components.input_limits.InputLimitError`
-            before audio is extracted or any transcription call is made.
+        limits: Duration and size limits (``max_media_seconds``, default 6 hours;
+            ``max_media_bytes``, off by default). A file over one is refused with
+            :class:`~gaik.software_components.input_limits.InputLimitError` before
+            audio is extracted or any transcription call is made; one whose
+            duration cannot be read at all is refused before the first call.
 
     Example::
 
@@ -210,8 +212,9 @@ class ParallelTranscriber:
                 and probed_seconds is None
                 and self._limits.max_media_seconds is not None
             ):
-                # The first probe could not read the length: measure the audio itself.
-                total_duration = get_audio_duration(str(audio_path))
+                # The first probe could not read the length: measure the audio
+                # that is about to be sent, so a single pass is checked as well.
+                total_duration = self._measured_seconds(audio_path, file_path.name)
             if total_duration is not None:
                 self._limits.check_media_seconds(total_duration, file_path.name)
 
@@ -324,6 +327,22 @@ class ParallelTranscriber:
     # ------------------------------------------------------------------
     # Single-pass transcription
     # ------------------------------------------------------------------
+
+    def _measured_seconds(self, audio_path: Path, name: str) -> float:
+        """The length of ``audio_path``, decoded when its header has none.
+
+        ``InputLimitError`` when neither ffprobe nor decoding can read it.
+        """
+        try:
+            return get_audio_duration(str(audio_path))
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            raise InputLimitError(
+                f"The length of {name} cannot be read, so it cannot be checked against "
+                "InputLimits.max_media_seconds.",
+                limit="max_media_seconds",
+                actual=float("inf"),
+                maximum=self._limits.max_media_seconds,
+            ) from exc
 
     def _transcribe_single(
         self,

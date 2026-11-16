@@ -35,7 +35,8 @@ class TextRagParser:
             from either.
         limits: Size and page limits checked before a file is read; a file over one
             raises ``InputLimitError``. Defaults to
-            :class:`~gaik.software_components.input_limits.InputLimits`.
+            :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`,
+            which limits the size and not the page count.
     """
 
     def __init__(
@@ -54,7 +55,7 @@ class TextRagParser:
             raise ValueError("chunk_chars must be >= 200 and overlap_chars < chunk_chars / 2")
         self.chunk_chars = chunk_chars
         self.overlap_chars = overlap_chars
-        self.limits = limits or InputLimits()
+        self.limits = limits or InputLimits.local_parsing()
 
     def convert_doc_to_chunks(
         self, path: str | Path, document_name: str | None = None

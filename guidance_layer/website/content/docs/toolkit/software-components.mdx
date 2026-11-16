@@ -24,17 +24,18 @@ Every PDF page, image and minute of a recording can become a model call, so the 
 | `InputLimits` field | Default | Checked for |
 |---|---|---|
 | `max_file_bytes` | 100 MiB | documents, spreadsheets, images; a DOCX or XLSX may unpack to 10 × this |
-| `max_pages` | 500 | pages of a PDF (Vision Extractor: all files of one call, an image counting as one page) |
+| `max_pages` | 500; none for the parsers that read pages locally | pages of a PDF sent page by page to a model (Vision Extractor: all files of one call, an image counting as one page). PyMuPDF, Docling, the RAG parsers, Vision Plus and the Source Normalizer default to `InputLimits.local_parsing()`, which has no page limit |
 | `max_table_rows` | 1,000,000 | data rows of one sheet or CSV file (the header and blank rows do not count) |
 | `max_image_pixels` | 89,478,485 | an image file, an embedded image, or a PDF page rendered for a vision model |
 | `max_images` | 500 | embedded images described with a vision model for one document |
-| `max_media_bytes` | 2 GiB | audio and video files |
+| `max_media_bytes` | none | audio and video files; the length below bounds the calls, and a video's size says little about its audio |
 | `max_media_seconds` | 6 hours | recording length, read with ffprobe (with a timeout) or from the decoded audio |
 
 ```python
 from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.parsers import PyMuPDFParser
 
+# PyMuPDF has no page limit by default; this one refuses PDFs over 50 pages or 20 MiB.
 parser = PyMuPDFParser(limits=InputLimits(max_pages=50, max_file_bytes=20 * 1024 * 1024))
 try:
     text = parser.parse_pdf("report.pdf")

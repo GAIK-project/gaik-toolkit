@@ -69,9 +69,10 @@ class SourceNormalizer:
             language: Transcription language, or `auto`.
             limits: Input limits for every file, passed on to the parsers and the
                 Transcriber. Defaults to
-                :class:`~gaik.software_components.input_limits.InputLimits`.
+                :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`:
+                a PDF is read locally, so its page count is not limited.
         """
-        self.limits = limits or InputLimits()
+        self.limits = limits or InputLimits.local_parsing()
         self.config = config
         self.vision_model = vision_model
         self.transcription_model = transcription_model

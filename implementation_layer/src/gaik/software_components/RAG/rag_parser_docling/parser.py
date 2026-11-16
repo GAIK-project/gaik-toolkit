@@ -141,7 +141,7 @@ class DoclingRagParser:
         verbose: bool = True,
         limits: InputLimits | None = None,
     ) -> None:
-        self.limits = limits or InputLimits()
+        self.limits = limits or InputLimits.local_parsing()
         self.summaries = summaries.copy()
 
         device = pick_accelerator(verbose=verbose)

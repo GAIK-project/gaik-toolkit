@@ -26,8 +26,8 @@ def build_chat_document_content(
     prompt: str,
     *,
     include_text_layer: bool = False,
-    limits: InputLimits | None = None,
     material: SourceMaterial | None = None,
+    limits: InputLimits | None = None,
 ) -> list[dict]:
     """Render PDFs as page images and retain native image bytes for vision models.
 
@@ -39,17 +39,17 @@ def build_chat_document_content(
     born-digital PDF (``V-518834`` read as ``V-51884``); the provider's native
     PDF input sends that text too, and an extractor needs the exact characters.
 
-    ``limits`` (default :class:`~gaik.software_components.input_limits.InputLimits`)
-    is checked for the pixels of every page image before any page is rendered,
-    and for the size and pixels of every image file before it is read.
-
     The text layer is source material: it goes inside a ``<source_material>``
     block of ``material`` (a new one when not given), so the caller's system
     prompt should carry
     :data:`~gaik.software_components.source_material.SOURCE_MATERIAL_INSTRUCTION`.
+
+    ``limits`` (default :class:`~gaik.software_components.input_limits.InputLimits`)
+    is checked for the pixels of every page image before any page is rendered,
+    and for the size and pixels of every image file before it is read.
     """
-    limits = limits or InputLimits()
     material = material or SourceMaterial()
+    limits = limits or InputLimits()
     content: list[dict] = [{"type": "text", "text": prompt}]
     for path in file_paths:
         if path.suffix.lower() == ".pdf":

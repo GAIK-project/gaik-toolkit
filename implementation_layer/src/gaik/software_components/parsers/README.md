@@ -89,8 +89,12 @@ The same configuration shape works with `VisionPlusParser(vision_config=...)` an
 A file over a limit is refused with `InputLimitError` (a `ValueError`) before it is
 parsed or sent to a model. Every parser takes `limits=InputLimits(...)`; a field set to
 `None` switches that limit off. Defaults: 100 MiB per file (a DOCX or XLSX may unpack to
-10 × that), 500 PDF pages, 1,000,000 data rows per sheet or CSV, 89,478,485 pixels per image or
-rendered page, and 500 embedded images described per document (`VisionPlusParser`).
+10 × that), 1,000,000 data rows per sheet or CSV, 89,478,485 pixels per image or rendered
+page, and 500 embedded images described per document (`VisionPlusParser`). The 500-page
+limit applies where every page becomes a model call (`VisionParser`, `MultimodalParser`);
+the parsers that read pages locally (`PyMuPDFParser`, `DoclingParser`,
+`DoclingApiClientParser`, `VisionPlusParser`) default to `InputLimits.local_parsing()`,
+which has no page limit.
 
 ```python
 from gaik.software_components.input_limits import InputLimits

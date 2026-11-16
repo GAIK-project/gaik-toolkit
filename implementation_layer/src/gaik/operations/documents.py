@@ -43,6 +43,8 @@ def parse_document(
         FileNotFoundError: There is no such file.
         ValueError: The file is of another kind, holds no text (a scanned PDF), or is a
             DOCX that unpacks to more than the parser may load.
+        InputLimitError: The file is over the parser's input limits (a ``ValueError``
+            whose message names the file and the limit).
         ImportError: The parser's package is not installed.
     """
     settings = settings or OperationSettings()
@@ -146,7 +148,7 @@ def _pdf_pages(file: Path) -> list[str]:
     try:
         marked = PyMuPDFParser().parse_pdf(str(file), page_markers=True)
     except InputLimitError:
-        # A PDF over a limit says which one; its message names the file, not its path.
+        # A PDF over a limit is still a PDF; the message names the file only.
         raise
     except ValueError:
         # The parser's own message holds the full path it was given.
