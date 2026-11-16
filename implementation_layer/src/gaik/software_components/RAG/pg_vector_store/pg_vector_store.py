@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import re
@@ -138,6 +139,26 @@ class HealthReport:
         if self.ok:
             return "ok"
         return "\n".join(f"- {problem}" for problem in self.problems)
+
+
+def _rolls_back_on_error(method):
+    """Roll the connection back when *method* raises, then re-raise.
+
+    psycopg opens a transaction on the first statement. After a failed
+    statement, every later one fails with "current transaction is aborted"
+    until a rollback; after a failure in Python partway through ``add()``, the
+    rows already sent stay pending and the next commit would store them.
+    """
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except BaseException:
+            self._rollback_quietly()
+            raise
+
+    return wrapper
 
 
 class PgVectorStore:
@@ -291,10 +312,31 @@ class PgVectorStore:
 
     def _get_conn(self) -> psycopg.Connection:
         """Return (and lazily create) the database connection."""
+        if self._conn is not None and not self._conn.closed:
+            status = _transaction_status(self._conn)
+            if status == "INERROR":
+                self._conn.rollback()
+            elif status == "UNKNOWN":
+                self._rollback_quietly()
+                self._conn = None
         if self._conn is None or self._conn.closed:
             self._conn = psycopg.connect(self.connection_string, row_factory=dict_row)
             self._apply_session_settings(self._conn)
         return self._conn
+
+    def _rollback_quietly(self) -> None:
+        """Roll back the open transaction; drop a connection that cannot."""
+        conn = self._conn
+        if conn is None or conn.closed:
+            return
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001 - a broken connection is replaced next call
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._conn = None
 
     def _apply_session_settings(self, conn: psycopg.Connection) -> None:
         """Apply per-session GUCs: ``hnsw.ef_search`` and ``hnsw.iterative_scan``.
@@ -338,6 +380,7 @@ class PgVectorStore:
     # Schema setup
     # ------------------------------------------------------------------
 
+    @_rolls_back_on_error
     def setup(self, *, create_extensions: bool = True) -> None:
         """Create extensions, table, indexes, and SQL functions (idempotent).
 
@@ -712,6 +755,7 @@ class PgVectorStore:
     # CRUD operations
     # ------------------------------------------------------------------
 
+    @_rolls_back_on_error
     def add(
         self,
         documents: list[Document],
@@ -781,12 +825,14 @@ class PgVectorStore:
         logger.info("Inserted %d documents into '%s'", len(ids), self.table_name)
         return ids
 
+    @_rolls_back_on_error
     def count(self) -> int:
         """Return the total number of documents in the store."""
         conn = self._get_conn()
         row = conn.execute(f"SELECT COUNT(*) AS cnt FROM {self.table_name}").fetchone()
         return row["cnt"] if row else 0
 
+    @_rolls_back_on_error
     def delete(self, document_ids: list[int]) -> int:
         """Delete documents by their IDs.
 
@@ -823,6 +869,7 @@ class PgVectorStore:
         """
         return self.search_semantic(query_embedding, top_k=top_k, threshold=0.0, filters=filters)
 
+    @_rolls_back_on_error
     def search_semantic(
         self,
         query_embedding: list[float],
@@ -857,6 +904,7 @@ class PgVectorStore:
 
         return self._rows_to_results(rows, score_key="similarity")
 
+    @_rolls_back_on_error
     def search_keyword(
         self,
         query_text: str,
@@ -897,6 +945,7 @@ class PgVectorStore:
 
         return self._rows_to_results(rows, score_key="score")
 
+    @_rolls_back_on_error
     def search_hybrid(
         self,
         query_embedding: list[float],
@@ -969,6 +1018,7 @@ class PgVectorStore:
             extra_keys=("semantic_rank", "keyword_rank", "semantic_similarity"),
         )
 
+    @_rolls_back_on_error
     def search_hybrid_weighted(
         self,
         query_embedding: list[float],
@@ -1031,6 +1081,7 @@ class PgVectorStore:
     # Health
     # ------------------------------------------------------------------
 
+    @_rolls_back_on_error
     def health(self, *, sample_rows: int = 5) -> HealthReport:
         """Check, against the live database, that both search arms can work.
 
@@ -1264,6 +1315,7 @@ class PgVectorStore:
 
         return HealthReport(not problems, problems, details)
 
+    @_rolls_back_on_error
     def relemmatize(self, *, batch_size: int = 500) -> int:
         """Recompute the lemma column for every row with the current ``text_processor``.
 
@@ -1375,3 +1427,10 @@ class PgVectorStore:
             score = float(row[score_key])
             results.append((doc, score))
         return results
+
+
+def _transaction_status(conn: Any) -> str | None:
+    """The connection's transaction status name (``IDLE``, ``INERROR``...)."""
+    info = getattr(conn, "info", None)
+    status = getattr(info, "transaction_status", None)
+    return getattr(status, "name", None)
