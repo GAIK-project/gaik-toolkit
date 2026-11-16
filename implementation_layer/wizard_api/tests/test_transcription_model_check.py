@@ -228,12 +228,9 @@ def test_a_helper_that_only_mentions_a_transcriber_does_not_make_a_package_trans
     # Every scaffolded package has provider_config.py, whose docstring names the Transcriber.
     poc = _package(tmp_path, {"model": "chat-deployment"}, entrypoint=DOCUMENT_ENTRYPOINT)
     Path(poc, "provider_config.py").write_text(
-        'def local_transcriber_options(config, audio_config):
-'
-        '    """Transcriber arguments for self-hosted Whisper."""
-'
-        "    return {}  # ParallelTranscriber takes the same
-",
+        "def local_transcriber_options(config, audio_config):\n"
+        '    """Transcriber arguments for self-hosted Whisper."""\n'
+        "    return {}  # ParallelTranscriber takes the same\n",
         encoding="utf-8",
     )
 
@@ -243,15 +240,10 @@ def test_a_helper_that_only_mentions_a_transcriber_does_not_make_a_package_trans
 @pytest.mark.parametrize(
     "code",
     [
-        "from gaik.software_components.transcriber import Transcriber
-",
-        "import gaik.software_components.transcriber as t
-t.ParallelTranscriber()
-",
-        "x = Transcriber(api_config={})
-",
-        "this does not parse: Transcriber(
-",
+        "from gaik.software_components.transcriber import Transcriber\n",
+        "import gaik.software_components.transcriber as t\nt.ParallelTranscriber()\n",
+        "x = Transcriber(api_config={})\n",
+        "this does not parse: Transcriber(\n",
     ],
 )
 def test_code_that_uses_a_transcriber_still_counts(tmp_path, code) -> None:
