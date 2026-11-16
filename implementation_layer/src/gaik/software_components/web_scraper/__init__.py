@@ -6,8 +6,10 @@ request stays inside a domain allowlist and public addresses, obeys robots.txt a
 waits between requests to the same host. Optional headless Chromium rendering covers
 sites that build their content with JavaScript.
 
-The Markdown is ready for an LLM: hand ``CrawlResult.to_markdown()`` to the
-extractor or a RAG index, each section headed by the URL it came from.
+Hand ``CrawlResult.to_model_text()`` to the extractor, a prompt or a RAG index:
+each page sits in a ``<web_page source="...">`` block marked as data, not
+instructions, headed by the URL it came from. ``to_markdown()`` gives the same
+pages without the marking.
 
 Main Classes:
     - WebScraper: Fetch pages and crawl sites
@@ -15,6 +17,7 @@ Main Classes:
     - CrawlResult: The pages of a crawl, as one Markdown document or saved files
     - SkippedPage: A URL that was tried but not scraped, with the reason
     - UrlPolicy: The allowlist and private-address checks
+    - VettedAddressTransport: The HTTP transport that connects only to checked addresses
     - ScrapeError: Raised by ``WebScraper.scrape`` with the reason
 
 Example:
@@ -25,7 +28,8 @@ Example:
 """
 
 from .browser import browser_available
-from .models import CrawlResult, PageLink, ScrapedPage, SkippedPage
+from .connect import VettedAddressTransport
+from .models import MODEL_TEXT_NOTICE, CrawlResult, PageLink, ScrapedPage, SkippedPage
 from .policy import ScrapeError, UrlPolicy, normalize_url
 from .web_scraper import DEFAULT_USER_AGENT, ROBOTS_AGENT, WebScraper
 
@@ -36,6 +40,8 @@ __all__ = [
     "SkippedPage",
     "CrawlResult",
     "UrlPolicy",
+    "VettedAddressTransport",
+    "MODEL_TEXT_NOTICE",
     "ScrapeError",
     "normalize_url",
     "browser_available",

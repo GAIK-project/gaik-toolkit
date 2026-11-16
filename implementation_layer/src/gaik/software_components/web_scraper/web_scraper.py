@@ -3,7 +3,8 @@
 Every request passes the same checks: the URL policy (http(s), allowed domains,
 public addresses only), robots.txt, a delay between requests to the same host, a
 size limit and an HTML content type. Redirects are followed one hop at a time so
-each hop is checked too.
+each hop is checked too, and every connection goes to an address the policy
+checked (``connect.VettedAddressTransport``).
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ except ImportError as exc:  # pragma: no cover - depends on the installed extra
 from gaik import __version__
 
 from .browser import BrowserRenderer, browser_available
+from .connect import VettedAddressTransport, environment_proxy_mounts
 from .content import Extraction, decode_html, read_page
 from .models import CrawlResult, PageLink, ScrapedPage, SkippedPage
 from .policy import ScrapeError, UrlPolicy, host_of, normalize_url
@@ -63,8 +65,7 @@ class WebScraper:
 
     Args:
         allowed_domains: Domains the scraper may fetch from; a domain allows its
-            subdomains too. ``None`` allows every public host. Set it whenever the
-            URLs come from users.
+            subdomains too. Required unless ``allow_any_domain=True``.
         respect_robots: Obey robots.txt (RFC 9309): disallowed pages are skipped, a
             ``Crawl-delay`` lengthens the delay, and a robots.txt that answers with a
             server error blocks the whole site.
@@ -84,7 +85,16 @@ class WebScraper:
             links to its repository, so a site owner can see who is crawling.
         allow_private_networks: Allow hosts that resolve to private or local
             addresses. Off by default.
+        allow_any_domain: Fetch from every public host instead of a domain list.
+            Off by default, so a scraper built without ``allowed_domains`` raises
+            ``ValueError``; turn it on only for a script whose URLs you choose
+            yourself, never for URLs that come from users.
         transport: An httpx transport, for tests (``httpx.MockTransport``) or a proxy.
+            The default transport connects only to the addresses the policy checked,
+            and the proxies in ``HTTP_PROXY``/``HTTPS_PROXY``/``NO_PROXY`` are used
+            as httpx would. Through a proxy, or with your own transport, the address
+            check is still made before each request, but the name is looked up by
+            the proxy or the transport.
 
     The scraper keeps one HTTP connection pool (and with ``render_js`` one browser);
     close it with :meth:`close` or use it as a context manager. It is not
@@ -110,6 +120,7 @@ class WebScraper:
         max_redirects: int = 5,
         user_agent: str | None = None,
         allow_private_networks: bool = False,
+        allow_any_domain: bool = False,
         transport: httpx.BaseTransport | None = None,
     ):
         if render_js not in (True, False, "auto"):
@@ -120,6 +131,13 @@ class WebScraper:
             raise ValueError("delays must be >= 0 and timeout_seconds > 0")
         if max_page_bytes < 1 or max_redirects < 0:
             raise ValueError("max_page_bytes must be >= 1 and max_redirects >= 0")
+        if allowed_domains is None and not allow_any_domain:
+            raise ValueError(
+                "WebScraper needs allowed_domains, the domains it may fetch from; "
+                "pass allow_any_domain=True to fetch from every public host"
+            )
+        if allowed_domains is not None and allow_any_domain:
+            raise ValueError("pass either allowed_domains or allow_any_domain=True, not both")
 
         self.policy = UrlPolicy(allowed_domains, allow_private_networks=allow_private_networks)
         self.respect_robots = respect_robots
@@ -138,7 +156,9 @@ class WebScraper:
                 "User-Agent": self.user_agent,
                 "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5",
             },
-            transport=transport,
+            transport=transport if transport is not None else VettedAddressTransport(self.policy),
+            # httpx skips the environment's proxies once a transport is given.
+            mounts=environment_proxy_mounts() if transport is None else None,
         )
         # origin -> parsed robots.txt; None allows everything; a str blocks the site
         self._robots: dict[str, Protego | str | None] = {}

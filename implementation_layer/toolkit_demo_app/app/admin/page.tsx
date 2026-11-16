@@ -209,8 +209,8 @@ function WizardAccessButton({
         disabled={isPending}
         title={
           granted
-            ? "Revoke Solution Wizard access"
-            : "Grant Solution Wizard access"
+            ? "Revoke the first Solution Wizard in the browser"
+            : "Let this user run the first Solution Wizard in the browser. Its agent has shell tools on the demo API server: grant it only to people you trust with that."
         }
       >
         {isPending ? (
@@ -604,7 +604,12 @@ function Dashboard() {
                         <th className={TH}>Company</th>
                         <th className={TH}>Use Case</th>
                         <th className={TH}>Status</th>
-                        <th className={TH}>Wizard</th>
+                        <th
+                          className={TH}
+                          title="Runs the first Solution Wizard in the browser. Its agent has shell tools on the demo API server."
+                        >
+                          First wizard
+                        </th>
                         <th className={TH}>Created</th>
                         <th className={TH}>Actions</th>
                       </tr>
