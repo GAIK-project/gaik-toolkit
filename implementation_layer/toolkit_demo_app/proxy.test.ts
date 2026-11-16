@@ -230,6 +230,23 @@ test("the grant alone does not run the wizard for a user who is not approved", a
   expect(backendCalls).toBe(0);
 });
 
+test("ending a wizard session spends no trial run", async () => {
+  // A granted user still waiting for approval; the trial is off here (no Redis),
+  // so a request that needed a trial run would be refused.
+  accessRow = { status: "pending", wizard_access: true };
+  const cookie = sessionCookie("r1", fresh());
+  const end = await proxy(
+    new NextRequest("https://demo.test/api/wizard/end/abc", {
+      method: "DELETE",
+      headers: { cookie },
+    }),
+  );
+  expect(end.status).toBe(200);
+  const start = await post("https://demo.test/api/wizard/start", { cookie });
+  expect(start.status).toBe(403);
+  expect(backendCalls).toBe(1);
+});
+
 test("another route does not get the wizard's user header", async () => {
   accessRow = { status: "approved", wizard_access: true };
   const response = await post(RUN, { cookie: sessionCookie("r1", fresh()) });

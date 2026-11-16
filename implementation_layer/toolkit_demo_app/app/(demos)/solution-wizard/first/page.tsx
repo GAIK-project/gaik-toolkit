@@ -102,6 +102,13 @@ function friendlyActivity(name: string, summary: string): string {
 }
 
 const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_MB = 10;
+
+/** The decoded size of a base64 data URL, in bytes. */
+function dataUrlBytes(url: string): number {
+  const base64 = url.slice(url.indexOf(",") + 1);
+  return Math.floor((base64.length * 3) / 4);
+}
 
 const SUPPORTED_FORMATS = [
   { label: "Documents", exts: ".pdf .docx .txt .md" },
@@ -130,7 +137,7 @@ function AttachButton({ disabled }: { disabled: boolean }) {
         ) : (
           <div className="space-y-1">
             <p className="font-medium">
-              Attach files (max {MAX_ATTACHMENTS}, 10 MB each)
+              Attach files (max {MAX_ATTACHMENTS}, {MAX_ATTACHMENT_MB} MB each)
             </p>
             {SUPPORTED_FORMATS.map(({ label, exts }) => (
               <p key={label}>
@@ -352,7 +359,23 @@ export default function SolutionWizardPage() {
     async (text: string, attachedFiles: FileUIPart[] = []) => {
       const sid = sessionRef.current;
       if (!sid || busy || (!text.trim() && attachedFiles.length === 0)) return;
+      // The server's limits, checked here first: nothing is sent and the
+      // composer keeps the message.
+      if (attachedFiles.length > MAX_ATTACHMENTS) {
+        toast.error(`Attach at most ${MAX_ATTACHMENTS} files per message.`);
+        return;
+      }
+      const tooLarge = attachedFiles.find(
+        (f) => dataUrlBytes(f.url) > MAX_ATTACHMENT_MB * 1024 * 1024,
+      );
+      if (tooLarge) {
+        toast.error(
+          `${tooLarge.filename ?? "A file"} is larger than ${MAX_ATTACHMENT_MB} MB.`,
+        );
+        return;
+      }
       const gen = genRef.current; // capture before any await
+      const messageId = nextId();
       const fileNames = attachedFiles.map((f) => f.filename ?? "file").join(", ");
       const userContent = attachedFiles.length
         ? text.trim()
@@ -361,7 +384,7 @@ export default function SolutionWizardPage() {
         : text;
       setMessages((prev) => [
         ...prev,
-        { id: nextId(), role: "user", content: userContent },
+        { id: messageId, role: "user", content: userContent },
       ]);
       setBusy(true);
       try {
@@ -377,7 +400,11 @@ export default function SolutionWizardPage() {
         });
         if (!res.ok) {
           const detail = await refusalText(res);
-          if (genRef.current === gen) toast.error(detail, { duration: 8000 });
+          if (genRef.current === gen) {
+            toast.error(detail, { duration: 8000 });
+            // The wizard never got it: it does not stay in the conversation.
+            setMessages((prev) => prev.filter((m) => m.id !== messageId));
+          }
           return;
         }
         await consumeTurn(res, gen);
