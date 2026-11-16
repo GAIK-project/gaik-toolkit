@@ -70,6 +70,15 @@ An explicit `transcription_model` always wins over the one in `api_config`.
   it above the ceiling has no effect.
 - `whisper_local` uses the local transcription server path and does not use PyDub chunking.
 
+## Input limits
+
+`max_size_mb` and `max_duration_seconds` decide only when a file is split. The total
+length is limited by `limits=InputLimits(...)`: `max_media_seconds` (6 hours), and
+`max_media_bytes` (off by default). The length is read with ffprobe (60 s timeout) or, when
+ffprobe cannot read it, from the decoded audio, and a file over a limit raises
+`InputLimitError` before the first transcription call. Video-to-audio extraction for
+`whisper_local` stops after 30 minutes.
+
 ## Transcript Error Fixing
 
 If `enhanced_transcript=True`, the transcriber runs the raw transcript through the standalone `enhance_transcript` software component.
@@ -101,6 +110,11 @@ Note: the result field name remains `enhanced_transcript` for compatibility, eve
 When using `transcription_model="whisper_local"`, pass:
 - `local_api_base` (required)
 - `local_api_key` (required)
+
+The audio and the key go only to the address set in `LOCAL_TRANSCRIBER_API_BASE` (plain
+http works for that address), to this machine, or to a host in `GAIK_ALLOWED_ENDPOINT_HOSTS`
+or `api_config["allowed_endpoint_hosts"]`. Any other `local_api_base` raises
+`EndpointNotAllowedError` when the transcriber is built, so read it from that variable.
 
 Optional local parameters:
 - `language="auto"`

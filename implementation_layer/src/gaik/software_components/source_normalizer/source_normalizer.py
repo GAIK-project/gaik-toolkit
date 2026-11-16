@@ -11,6 +11,7 @@ import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import UsageCounter, usage_since
 
 from .models import NormalizedSource, NormalizedSources, source_id
@@ -42,6 +43,10 @@ class SourceNormalizer:
 
     Documents are parsed locally. Recordings go to the Transcriber and images to the
     VisionParser, so they need an LLM config.
+
+    Every file is checked against ``limits`` (size, pages, rows, image pixels,
+    recording length) before the first conversion starts; a file over a limit
+    raises :class:`~gaik.software_components.input_limits.InputLimitError`.
     """
 
     def __init__(
@@ -51,6 +56,7 @@ class SourceNormalizer:
         vision_model: str | None = None,
         transcription_model: str | None = None,
         language: str = "auto",
+        limits: InputLimits | None = None,
     ):
         """
         Initialize SourceNormalizer.
@@ -61,7 +67,12 @@ class SourceNormalizer:
             vision_model: Optional model override for images. Defaults to `config["model"]`.
             transcription_model: Optional Transcriber model, e.g. `gpt-4o-transcribe`.
             language: Transcription language, or `auto`.
+            limits: Input limits for every file, passed on to the parsers and the
+                Transcriber. Defaults to
+                :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`:
+                a PDF is read locally, so its page count is not limited.
         """
+        self.limits = limits or InputLimits.local_parsing()
         self.config = config
         self.vision_model = vision_model
         self.transcription_model = transcription_model
@@ -91,7 +102,7 @@ class SourceNormalizer:
             raise ValueError(f"Duplicate source file names: {duplicates}")
         # Check every file before the slow conversions start.
         for _, path in items:
-            self._source_type(path)
+            self._check_limits(path, self._source_type(path))
 
         before = self.usage.snapshot()
         normalized = []
@@ -128,6 +139,12 @@ class SourceNormalizer:
             raise ValueError(f"{path.name}: {source_type} files need an LLM config")
         return source_type
 
+    def _check_limits(self, path: Path, source_type: str) -> None:
+        if source_type == "audio":
+            self.limits.check_media(path)
+        else:
+            self.limits.check_document(path)
+
     def _convert(self, path: Path) -> tuple[str, str, str]:
         """Return `(source_type, tool, text)` for one file."""
         source_type = self._source_type(path)
@@ -135,18 +152,19 @@ class SourceNormalizer:
             if source_type == "pdf":
                 from gaik.software_components.parsers.pymypdf import PyMuPDFParser
 
-                text = PyMuPDFParser().parse_pdf(str(path), page_markers=True)
+                text = PyMuPDFParser(limits=self.limits).parse_pdf(str(path), page_markers=True)
                 if not _PAGE_MARKER.sub("", text).strip():
                     raise ValueError(f"{path.name}: PDF has no text layer")
             elif source_type == "docx":
                 from gaik.software_components.parsers.docx_parser import DocxParser
 
-                text = DocxParser().parse_docx(str(path), keep_structure=True)
+                text = DocxParser(limits=self.limits).parse_docx(str(path), keep_structure=True)
             elif source_type == "spreadsheet":
                 from gaik.software_components.parsers.spreadsheet_parser import SpreadsheetParser
 
-                text = SpreadsheetParser().parse_spreadsheet(path)
+                text = SpreadsheetParser(limits=self.limits).parse_spreadsheet(path)
             elif source_type == "text":
+                self.limits.check_file_size(path)
                 text = path.read_text(encoding="utf-8-sig")
             elif source_type == "audio":
                 from gaik.software_components.transcriber.transcriber import Transcriber
@@ -157,6 +175,7 @@ class SourceNormalizer:
                         output_dir=workspace,
                         transcription_model=self.transcription_model,
                         language=self.language,
+                        limits=self.limits,
                     )
                     result = transcriber.transcribe(path)
                 text = result.raw_transcript
@@ -169,7 +188,7 @@ class SourceNormalizer:
                 config = self.config
                 if self.vision_model:
                     config = {**config, "model": self.vision_model}
-                parser = VisionParser(config)
+                parser = VisionParser(config, limits=self.limits)
                 text = parser.convert_image(path)
                 self.usage.add(parser.usage.snapshot())
         except Exception as exc:

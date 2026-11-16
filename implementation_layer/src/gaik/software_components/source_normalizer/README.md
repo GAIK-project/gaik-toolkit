@@ -95,6 +95,16 @@ the locator of a fact from a recording is null downstream.
 
 ---
 
+## Input limits
+
+`SourceNormalizer(limits=InputLimits(...))` checks every file before the first
+conversion: documents and images for size (100 MiB) and image pixels, and recordings
+for length (6 hours). PDFs are read locally, so the default
+(`InputLimits.local_parsing()`) has no page limit; set `max_pages` to add one. The
+parsers and the Transcriber get the same limits, so a spreadsheet is also held to
+1,000,000 rows per sheet. A file over a limit raises `InputLimitError` and nothing is
+converted.
+
 ## Save and Load
 
 ```python

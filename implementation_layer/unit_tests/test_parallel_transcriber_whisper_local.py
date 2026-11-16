@@ -14,7 +14,11 @@ from gaik.software_components.parallel_transcriber import (
 
 
 def _api_cfg(**overrides) -> dict:
-    base = {"api_base": "http://whisper.example.com:8080", "key": "test-key"}
+    base = {
+        "api_base": "http://whisper.example.com:8080",
+        "key": "test-key",
+        "allowed_endpoint_hosts": ["http://whisper.example.com"],
+    }
     base.update(overrides)
     return base
 

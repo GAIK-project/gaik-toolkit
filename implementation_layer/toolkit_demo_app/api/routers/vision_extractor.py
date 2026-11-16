@@ -65,9 +65,9 @@ except ImportError:
     from api.utils.schema_view import describe_fields, specs_by_name, structure_of
 
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import error_detail
@@ -538,8 +538,8 @@ async def extract_vision(
         for uploaded_file in files:
             content = await validate_file_size(uploaded_file)
             suffix = Path(uploaded_file.filename or "").suffix.lower()
-            if (mismatch := content_mismatch(suffix, content)) is not None:
-                raise HTTPException(status_code=415, detail=mismatch)
+            if (problem := await upload_problem(suffix, content)) is not None:
+                raise HTTPException(status_code=problem.status, detail=problem.message)
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(content)
                 temp_paths.append(Path(tmp.name))

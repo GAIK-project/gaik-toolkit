@@ -10,6 +10,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from ...input_limits import InputLimits, count_table_rows
+
 # Characters a number format shows as they are, without quotes.
 _PLAIN_TEXT = frozenset("  -+()$€£¥")
 _COLOURS = frozenset({"black", "blue", "cyan", "green", "magenta", "red", "white", "yellow"})
@@ -162,7 +164,7 @@ def _table(
     return "\n".join("| " + " | ".join(line) + " |" for line in lines)
 
 
-def _xlsx_blocks(path: Path) -> list[str]:
+def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
     """One ``## Sheet`` table per non-empty sheet, with the stored results of formulas."""
     from openpyxl import load_workbook
 
@@ -172,7 +174,8 @@ def _xlsx_blocks(path: Path) -> list[str]:
         blocks, results = [], []
         for sheet, formula_sheet in zip(values.worksheets, formulas.worksheets):
             rows, number_formats = [], []
-            for row, formula_cells in zip(sheet.iter_rows(), formula_sheet.iter_rows()):
+            sheet_rows = count_table_rows(sheet.iter_rows(), limits, f"{path.name} / {sheet.title}")
+            for row, formula_cells in zip(sheet_rows, formula_sheet.iter_rows()):
                 rows.append([cell.value for cell in row])
                 number_formats.append([cell.number_format for cell in row])
                 results += [
@@ -200,17 +203,37 @@ class SpreadsheetParser:
 
     The first non-empty row of each sheet is the header. A ``Row`` column holds the
     1-based sheet or CSV row number of each data row, so a citation can name the row.
+
+    A file over its input limits (size, unpacked size, rows per sheet) is refused
+    with ``InputLimitError``; the size is checked before the file is opened.
     """
 
+    def __init__(self, *, limits: InputLimits | None = None) -> None:
+        """
+        Args:
+            limits: Size and row limits; defaults to
+                :class:`~gaik.software_components.input_limits.InputLimits`.
+        """
+        self.limits = limits or InputLimits()
+
     def parse_spreadsheet(self, file_path: str | Path) -> str:
-        """Return the spreadsheet as Markdown: one ``## Sheet: <name>`` table per sheet."""
+        """Return the spreadsheet as Markdown: one ``## Sheet: <name>`` table per sheet.
+
+        Raises:
+            ValueError: For an unsupported type or a spreadsheet without rows.
+            InputLimitError: If the file is over ``max_file_bytes``, an .xlsx unpacks
+                to more than ten times that, or a sheet has more than ``max_table_rows``.
+        """
         path = Path(file_path)
         suffix = path.suffix.lower()
         if suffix == ".xlsx":
-            blocks = _xlsx_blocks(path)
+            self.limits.check_zip_container(path)
+            blocks = _xlsx_blocks(path, self.limits)
         elif suffix == ".csv":
+            self.limits.check_file_size(path)
             with path.open(encoding="utf-8-sig", newline="") as handle:
-                blocks = [table] if (table := _table(csv.reader(handle))) else []
+                rows = count_table_rows(csv.reader(handle), self.limits, path.name)
+                blocks = [table] if (table := _table(rows)) else []
         else:
             raise ValueError(f"{path.name}: unsupported spreadsheet type {suffix}")
         if not blocks:
