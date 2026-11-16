@@ -41,6 +41,10 @@ _VECTOR_TYPES = {"vector": 2000, "halfvec": 4000}
 
 _ITERATIVE_SCAN_MODES = frozenset({"off", "relaxed_order", "strict_order"})
 
+# Advisory lock that serialises setup() across sessions: an arbitrary fixed
+# bigint ("gaik" in ASCII, then a 1).
+_SETUP_LOCK_KEY = 0x6761696B_00000001
+
 # One shared SQL helper rather than the same expression inlined at five call
 # sites, so the three modes cannot drift apart between the keyword arm and the
 # two hybrid functions.
@@ -385,7 +389,8 @@ class PgVectorStore:
         """Create extensions, table, indexes, and SQL functions (idempotent).
 
         Safe to call multiple times -- uses ``IF NOT EXISTS`` and
-        ``CREATE OR REPLACE`` throughout.
+        ``CREATE OR REPLACE`` throughout -- and from several processes at
+        once: concurrent calls on one database run one after another.
 
         Args:
             create_extensions: If ``True`` (default), create the required
@@ -397,6 +402,12 @@ class PgVectorStore:
         table = self.table_name
         vec = self._vec
         lang = self.fts_language
+
+        # Every store shares gaik_tsquery, and two sessions running CREATE OR
+        # REPLACE on one function at once fail with "tuple concurrently
+        # updated": workers starting together each lost all but one setup().
+        # The lock is released when this transaction commits or rolls back.
+        conn.execute("SELECT pg_advisory_xact_lock(%s)", (_SETUP_LOCK_KEY,))
 
         # 1. Extensions (skip on managed DBs where user lacks CREATE privileges)
         if create_extensions:
@@ -696,28 +707,28 @@ class PgVectorStore:
                     FROM {table} t
                     WHERE t.text_search @@ gaik_tsquery(search_language, query_text, tsquery_mode)
                       AND (filter_metadata IS NULL OR t.metadata @> filter_metadata)
-                    ORDER BY 2 DESC
+                    -- The id breaks ties, so which of equally ranked rows make
+                    -- the cut does not depend on the plan.
+                    ORDER BY 2 DESC, 1
                     LIMIT result_limit * 3
                 ),
-                -- Qualified: RETURNS TABLE makes `id` a PL/pgSQL variable too, and
-                -- a bare `id` here fails every call as ambiguous.
-                keyword_normalized AS (
-                    SELECT
-                        kw.id,
-                        CASE
-                            WHEN MAX(kw.score) OVER () > 0
-                            THEN kw.score / MAX(kw.score) OVER ()
-                            ELSE 0
-                        END AS score
-                    FROM keyword kw
+                -- Qualified throughout: RETURNS TABLE makes `id` a PL/pgSQL
+                -- variable too, and a bare `id` fails every call as ambiguous.
+                keyword_max AS (
+                    SELECT MAX(kw.score) AS mx FROM keyword kw
                 ),
                 -- FULL OUTER JOIN: a row only the keyword arm found is a
-                -- candidate too, scored by its own similarity.
+                -- candidate too.
                 candidates AS (
-                    SELECT COALESCE(s.id, k.id) AS cid, s.score AS sem, k.score AS kw
+                    SELECT COALESCE(s.id, k.id) AS cid, s.score AS sem
                     FROM semantic s
-                    FULL OUTER JOIN keyword_normalized k ON s.id = k.id
+                    FULL OUTER JOIN keyword k ON s.id = k.id
                 ),
+                -- Every candidate is scored on both arms: a row the semantic
+                -- arm found keeps its keyword score even when it ranks below
+                -- the keyword arm's cut, and a keyword-only row gets its own
+                -- similarity. The keyword score is ts_rank_cd over the best
+                -- match's, as when the keyword arm had no cut.
                 scored AS (
                     SELECT
                         t.id AS rid, t.title AS rtitle, t.content AS rcontent,
@@ -727,16 +738,26 @@ class PgVectorStore:
                             CASE WHEN t.embedding IS NULL THEN 0
                                  ELSE 1 - (t.embedding <=> query_embedding) END
                         )::FLOAT AS sem,
-                        COALESCE(c.kw, 0)::FLOAT AS kw
+                        CASE
+                            WHEN m.mx > 0 AND t.text_search @@ gaik_tsquery(
+                                search_language, query_text, tsquery_mode
+                            )
+                            THEN ts_rank_cd(
+                                t.text_search,
+                                gaik_tsquery(search_language, query_text, tsquery_mode)
+                            ) / m.mx
+                            ELSE 0
+                        END::FLOAT AS kw
                     FROM candidates c
                     JOIN {table} t ON t.id = c.cid
+                    CROSS JOIN keyword_max m
                 )
                 SELECT
                     sc.rid, sc.rtitle, sc.rcontent, sc.rmetadata,
                     sc.sem, sc.kw,
                     (sem_weight * sc.sem + kw_weight * sc.kw)::FLOAT
                 FROM scored sc
-                ORDER BY (sem_weight * sc.sem + kw_weight * sc.kw) DESC
+                ORDER BY (sem_weight * sc.sem + kw_weight * sc.kw) DESC, sc.rid
                 LIMIT result_limit;
             END;
             $$
@@ -1053,8 +1074,9 @@ class PgVectorStore:
         Semantic scores (cosine similarity) are in [0, 1]. Keyword scores
         (ts_rank_cd) are normalized to [0, 1] by dividing by the max score.
         The candidates are the best ``3 * top_k`` of each arm, so a row only
-        the keyword arm finds is returned too (re-run :meth:`setup` on a
-        database made by an older gaik to replace the SQL function).
+        the keyword arm finds is returned too, and every candidate is scored on
+        both arms (re-run :meth:`setup` on a database made by an older gaik to
+        replace the SQL function).
 
         Args:
             query_embedding: Query vector for semantic search.

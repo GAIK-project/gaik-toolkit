@@ -30,7 +30,9 @@ from gaik.software_components.RAG.ranker import Ranker
 
 ranker = Ranker(rrf_k=60)
 
-with PgVectorStore(DATABASE_URL) as store:
+# hnsw_ef_search=100: an HNSW index scan returns at most hnsw.ef_search rows,
+# and pgvector's default of 40 would cut top_k=50 to 40.
+with PgVectorStore(DATABASE_URL, hnsw_ef_search=100) as store:
     # threshold=0.0: search_semantic's default of 0.7 is a filter, and it
     # would drop most relevant chunks before the fusion sees them.
     semantic = store.search_semantic(query_embedding, top_k=50, threshold=0.0)

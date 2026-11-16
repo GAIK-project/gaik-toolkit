@@ -141,6 +141,13 @@ for +0.7 ms median**.
 PgVectorStore(dsn, hnsw_ef_search=100)
 ```
 
+It also caps the row count: an HNSW index scan returns at most `hnsw.ef_search`
+rows. Measured on pgvector 0.8.7 with 10,000 rows, a `top_k=50` semantic search
+returned 40 rows at the default and 50 with `hnsw_ef_search=100` or
+`hnsw_iterative_scan="relaxed_order"`. The vector arm of both hybrid searches
+reads `3 * top_k` rows, so the cap reaches it above `top_k=13`. Set it to at least
+the largest number of rows a vector search asks for.
+
 Applied per connection. A setting the server rejects is logged as a warning and
 skipped, and the connection stays usable. Behind a transaction pooler a session
 setting does not stick; `health()` reports that, and the fix is a database
@@ -177,7 +184,7 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 
 | Method | Description |
 |--------|-------------|
-| `setup()` | Create extensions, table, indexes, SQL functions |
+| `setup()` | Create extensions, table, indexes, SQL functions; concurrent calls on one database run one after another |
 | `add(documents, embeddings)` | Insert documents, returns list of IDs |
 | `count()` | Total document count |
 | `delete(document_ids)` | Delete by ID, returns deleted count |

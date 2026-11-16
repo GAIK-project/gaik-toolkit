@@ -839,9 +839,9 @@
         "name": "hnsw_ef_search",
         "type": "int | None",
         "default": null,
-        "effect": "Per-connection hnsw.ef_search for the vector arm. None keeps pgvector's default of 40, which trades recall for latency: on one 1,500-dimension corpus, 100 raised recall@20 against an exact scan from 96.2% to 99.2% for +0.7 ms. On a few thousand rows it changes nothing.",
+        "effect": "Per-connection hnsw.ef_search for the vector arm. None keeps pgvector's default of 40, which trades recall for latency: on one 1,500-dimension corpus, 100 raised recall@20 against an exact scan from 96.2% to 99.2% for +0.7 ms. It also caps the row count: an HNSW index scan returns at most ef_search rows, so at the default a top_k above 40 returns 40 rows, and the vector arm of both hybrid searches (3 x top_k rows) is cut above top_k=13.",
         "selection_relevant": false,
-        "infer_from": "a corpus beyond tens of thousands of chunks, or recall mattering more than a millisecond -> 100; otherwise leave None"
+        "infer_from": "a corpus beyond tens of thousands of chunks, recall mattering more than a millisecond, or a vector search asking for more than 40 rows (top_k above 40, a hybrid top_k above 13) -> 100, or at least the most rows asked for; otherwise leave None"
       },
       {
         "name": "vector_type",
