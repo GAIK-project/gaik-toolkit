@@ -405,6 +405,12 @@ def test_the_answer_generator_sends_the_same_request_and_answer_with_tracing_off
     # Every other direct call site is compared on and off in
     # test_observability_component_calls.py.
     pytest.importorskip("langchain_core")
+    # Each call draws a random source-material block id; one fixed id makes the
+    # two requests comparable.
+    monkeypatch.setattr(
+        "gaik.software_components.source_material.secrets",
+        _ns(token_hex=lambda nbytes: "0" * (2 * nbytes)),
+    )
     traced_client = _RawOpenAI(_completion())
     traced = _answer_generator(traced_client, stream=False).generate("q", [_doc("x")])
     assert len(spans()) == 1
