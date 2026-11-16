@@ -150,7 +150,10 @@ earlier CTE the name is a table and must be one of the loaded ones.
 The SQL that runs is rendered from the checked syntax tree. A query that
 `sqlglot` cannot render without dropping part of it, or that it reads without
 one of a function's arguments (such as a time zone given to `date_trunc`), is
-rejected, so the agent asks the LLM for another one.
+rejected, so the agent asks the LLM for another one. The argument check leaves
+out functions `sqlglot` reads with a parser of their own (such as `arg_max` and
+`quantile_cont`), and it is skipped, with a warning, when sqlglot's compiled
+build (`sqlglot[c]`) is installed; the other checks run either way.
 
 **2. A locked-down engine.** External access is enabled only while *our own*
 loader reads the paths you passed in. Before a single generated query runs, the

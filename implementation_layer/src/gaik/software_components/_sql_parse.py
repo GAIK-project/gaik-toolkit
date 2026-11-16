@@ -17,15 +17,23 @@ order that picks another function.
 Functions that sqlglot reads with a parser of their own (``CAST``, ``TRIM``,
 ``ARG_MAX`` and some others) are not built from a list of written arguments, so this
 check does not cover them.
+
+With sqlglot's compiled build (``sqlglot[c]``, the ``sqlglotc`` package) the check is
+skipped: its parser classes are native, an instance attribute cannot be set on them and
+a Python class cannot derive from them. ``parse`` then logs a warning once per dialect
+and returns plain sqlglot's tree, so every read-only check of the validators still runs.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from functools import cache
 
 from sqlglot import exp
 from sqlglot.dialects.dialect import Dialect
+
+logger = logging.getLogger(__name__)
 
 _DROPPED = "gaik_dropped_argument"
 
@@ -37,9 +45,23 @@ def parse(sql: str, dialect: str) -> list[exp.Expression | None]:
     """Parse ``sql`` like ``sqlglot.parse(sql, read=dialect)``, marking lossy calls."""
     reader = Dialect.get_or_raise(dialect)
     parser = reader.parser()
-    # An instance attribute, so the dialect's own parser class is left as it is.
-    parser.FUNCTIONS = _checked_functions(type(parser))
+    functions = _checked_functions(type(parser))
+    try:
+        # An instance attribute, so the dialect's own parser class is left as it is.
+        parser.FUNCTIONS = functions
+    except AttributeError:
+        _warn_unchecked(dialect)
     return parser.parse(reader.tokenize(sql), sql)
+
+
+@cache
+def _warn_unchecked(dialect: str) -> None:
+    logger.warning(
+        "sqlglot's compiled build (sqlglot[c]) is installed, so %s SQL is parsed without "
+        "the check for function arguments that sqlglot drops while parsing. The read-only "
+        "checks still run. Uninstall sqlglotc to keep the argument check.",
+        dialect,
+    )
 
 
 def dropped_argument(tree: exp.Expression) -> exp.Expression | None:
