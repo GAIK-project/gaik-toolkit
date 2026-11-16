@@ -63,10 +63,10 @@ From `implementation_layer/toolkit_demo_app/CLAUDE.md`:
 
 ## Access model
 
-- **Public:** `(home)` (`/`, `/privacy`) and `(auth)` (`/sign-in`, `/sign-up`, `/access-pending`).
-- **All demos** (everything under `(demos)`) require **login + admin approval** — enforced by `PROTECTED_ROUTES` in `lib/supabase/proxy.ts` (pages) plus a login+approval gate on heavy `/api` POSTs in `proxy.ts`. When adding a new demo route, add it to `PROTECTED_ROUTES`.
+- **Public:** `(home)` (`/`, `/privacy`, `/desktop-app`, `/prompts`, `/skills`) and `(auth)` (`/sign-in`, `/sign-up`, `/access-pending`).
+- **Demo pages** under `(demos)` are open to look at; running one needs a signed-in, approved account, or a pending one within the trial allowance (`lib/trial.ts`) or on the user's own model key, enforced on the API requests in `proxy.ts` (`lib/api-access.ts`). Visitors who cannot run see a "View only" notice.
 - **Report Writer** additionally enforces a per-user quota (`REPORT_WRITER_MAX_REPORTS`, default 5) in `app/api/report-writer/run/route.ts`. Admins manage it in the `/admin` "Report Writer Usage" tab: per-user counts/tokens, **Reset**, and a per-user **limit override** (`access_requests.report_limit_override`; e.g. demo/team accounts → Unlimited).
-- **Solution Wizard** needs a per-user `wizard_access` grant (or team `?key=`), independent of approval.
+- **Solution Wizard**: `/solution-wizard` links to Wizard V2 (`WIZARD_V2_URL`) and offers the first wizard in the browser (`/solution-wizard/first`). Its API `/api/wizard` needs the per-user `wizard_access` grant from `/admin`, for reads too (`lib/api-access.ts`, `wizardRefusal`), and the API answers 503 without `CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY` and `ANTHROPIC_FOUNDRY_RESOURCE` (`api/routers/solution_wizard.py`).
 - **Model settings** let a user run supported demos on their own OpenAI/Azure/Aitta key. The key lives only in the tab's memory and travels as the `x-gaik-model-settings` header to the POST paths allowlisted in both `api/utils/model_settings.py` (`_PATHS`) and `lib/model-settings.ts` (`SUPPORTED_PATHS`); routers pick it up through `get_api_config()`.
 - `BYPASS_AUTH=true` opens everything in local dev.
 
@@ -83,9 +83,7 @@ toolkit_demo_app/
 ├── api/
 │   ├── main.py              # FastAPI app with all routers
 │   ├── routers/             # One module per feature
-│   ├── config.py            # Backend config
-│   ├── pdf_generator.py     # PDF output generation
-│   └── sse.py               # Server-sent events helper
+│   └── utils/               # config.py, pdf_generator.py, sse.py and other helpers
 ├── components/
 │   ├── ui/                  # shadcn/ui components
 │   ├── ai-elements/         # AI chat components (message, streamdown)
@@ -109,56 +107,15 @@ toolkit_demo_app/
 
 ## Demo Pages
 
-All under `app/(demos)/`:
-
-| Route | Feature | Toolkit Components |
-|-------|---------|-------------------|
-| `/extractor` | Schema-free structured extraction | SchemaGenerator, DataExtractor |
-| `/vision-extractor` | Single-pass PDF/image -> structured data | VisionExtractor |
-| `/parser` | Multi-backend PDF/DOCX parsing | VisionParser, PyMuPDFParser, DoclingParser, DocxParser |
-| `/classifier` | Zero-shot document classification | DocumentClassifier |
-| `/transcriber` | Whisper + GPT enhancement | Transcriber |
-| `/rag` | Document upload, indexing, Q&A with citations | RAGWorkflow |
-| `/postgres-agent` | Plain-language questions -> read-only SQL over the demo DB | PostgresAgent |
-| `/tabular-agent` | Upload CSV/Excel, ask questions -> read-only SQL (DuckDB) | TabularAgent |
-| `/llm-judge` | Text-pair judging, hallucination detection, judge panel | LLMJudge, LLMJudgePanel |
-| `/audio-structured` | Audio -> structured data pipeline | AudioToStructuredData |
-| `/document-structured` | Document -> structured data pipeline | DocumentsToStructuredData |
-| `/incident-report` | Voice -> structured incident report | AudioToStructuredData |
-| `/diary` | Voice notes -> construction diary | AudioToStructuredData |
-| `/dental-transcription` | Audio/video -> SRT/VTT subtitles | ParallelTranscriber, srt_utils |
-| `/video-search` | Semantic video search (pgvector) | Embedder, PgVectorStore, video_search_helpers |
-| `/text-to-speech` | Text to downloadable speech audio | TextToSpeech |
-| `/luvata-order` | PDF order -> structured Luvata data | DocumentsToStructuredData |
-| `/report-writer` | Mixed source files -> sectioned Markdown report | MultiSourceReportGenerator |
-| `/solution-wizard` | Use-case description -> validated blueprint + PoC | (Claude Agent SDK, wizard skill) |
+One folder per demo under `app/(demos)/`; the Solution Wizard page is in `app/(wizard)/`.
 
 ## API Routes
 
-FastAPI backend at `api/main.py`, routers in `api/routers/`:
+`api/main.py` mounts one router per feature from `api/routers/`, and each `include_router`
+line names its prefix (`luvata_order` sets its own in the router). Read the router to see which
+gaik components a demo calls.
 
-| Prefix | Router | Description |
-|--------|--------|-------------|
-| `/parse` | `parser.py` | Document parsing (PDF, DOCX) |
-| `/classify` | `classifier.py` | Document classification |
-| `/extract` | `extractor.py` | Structured data extraction |
-| `/extract-vision` | `vision_extractor.py` | Single-pass vision extraction (PDF/image -> structured data) |
-| `/transcribe` | `transcriber.py` | Audio/video transcription |
-| `/pipeline` | `pipeline.py` | End-to-end pipelines (audio/document -> structured data) |
-| `/rag` | `rag.py` | RAG pipeline (indexing, Q&A with SSE, debug endpoint) |
-| `/postgres-agent` | `postgres_agent.py` | Text-to-SQL agent against the fixed demo DB |
-| `/tabular-agent` | `tabular_agent.py` | CSV/Excel upload -> session -> text-to-SQL over DuckDB |
-| `/llm-judge` | `llm_judge.py` | LLM-as-judge: text-pair, hallucinations, validate, panel |
-| `/diary` | `diary.py` | Construction diary workflow |
-| `/dental-transcribe` | `dental_transcription.py` | Dental transcription with SRT/VTT subtitles |
-| `/video-search` | `video_search.py` | Semantic dental video search (pgvector) |
-| `/luvata-order` | `luvata_order.py` | Purchase order processing with BOM matching |
-| `/report-writer` | `report_writer.py` | Mixed-source report generation |
-| `/wizard` | `solution_wizard.py` | Solution Configuration Wizard (needs Azure Foundry env vars) |
-| `/text-to-speech` | `text_to_speech.py` | Text-to-speech audio generation |
-| `/health` | (in main.py) | Health check |
-
-API docs available at `http://localhost:8000/docs` (Swagger UI).
+API docs at `http://localhost:8000/docs` when `DEMO_API_DOCS=true` is set in `.env.local` (as in `.env.example`).
 
 ## Environment Variables
 
@@ -190,9 +147,9 @@ NEXT_PUBLIC_SUPABASE_URL=your-url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-key
 SUPABASE_SECRET_KEY=your-key
 
-# Text-to-Speech
-AZURE_TTS_MODEL=gpt-4o-mini-tts
-TTS_ENDPOINT=azure  # or "openai"
+# Text-to-Speech (Azure; see api/.env.example)
+AZURE_TTS_MODEL=tts-hd
+TTS_ENDPOINT=https://<resource>.cognitiveservices.azure.com/openai/deployments/tts-hd/audio/speech?api-version=2025-03-01-preview
 
 # Local Transcriber (optional, for local Whisper)
 LOCAL_TRANSCRIBER_API_BASE=http://your-whisper-host/v1
@@ -224,7 +181,7 @@ NEXT_PUBLIC_POSTHOG_HOST=your-host
   - `deployment-api.yaml` - API deployment (uses placeholder values -- real secrets managed in Rahti)
   - Route: `gaik-demo.2.rahtiapp.fi` with annotations:
     - `haproxy.router.openshift.io/timeout: 15m` (for long-running RAG indexing)
-    - `haproxy.router.openshift.io/proxy-body-size: 50m` (for large PDF uploads)
+    - `haproxy.router.openshift.io/proxy-body-size: 128m` (for large uploads)
     - `haproxy.router.openshift.io/response-buffering: "off"` (for SSE streaming)
 - **Deploy:** push main to the deploy branch, `git push origin main:deploy/demo-app`. A GitHub
   webhook starts the BuildConfigs in `openshift/buildconfigs.yaml`, and the deployments roll

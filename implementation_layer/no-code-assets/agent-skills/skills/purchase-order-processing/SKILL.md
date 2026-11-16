@@ -1,6 +1,6 @@
 ---
 name: purchase-order-processing
-description: Process Purchase Orders and Bills of Material to generate priced Sales Orders
+description: Matches a purchase order and its bills of material (PDFs) against a price list (.xlsx or .csv) and writes a priced sales order and a calculation breakdown, in Claude Desktop with the filesystem MCP server. Use when the user wants to process a purchase order or PO, generate or price a sales order, match BOMs with a PO, or calculate order pricing from a price list.
 ---
 
 # Purchase Order Processing Skill
@@ -255,7 +255,7 @@ Create the following sections as specified in `reference/OUTPUT_FORMAT.md`:
 
 **PRICING SUMMARY:**
 
-Generate pricing summary as specified in `reference/OUTPUT_FORMAT.md` (lines 82-93).
+Generate pricing summary as specified in `reference/OUTPUT_FORMAT.md` (the PRICING SUMMARY block of the Complete Default Format).
 
 If sample_order.docx exists, extract and match its exact format.
 Otherwise, use the default format from OUTPUT_FORMAT.md.
@@ -268,12 +268,12 @@ ALL currency values MUST include comma separators for thousands.
 **Requirements:**
 - Include all required fields in exact order (see OUTPUT_FORMAT.md template)
 - Match field labels exactly (including punctuation)
-- Apply currency formatting rules (see OUTPUT_FORMAT.md lines 146-168)
+- Apply currency formatting rules (see the Currency Formatting section of OUTPUT_FORMAT.md)
 - DO NOT skip, add, or rearrange fields
 
 **See `reference/OUTPUT_FORMAT.md`** for:
-- Complete pricing summary template (lines 82-93)
-- Currency formatting requirements (lines 146-168)
+- Complete pricing summary template (the PRICING SUMMARY block of the Complete Default Format)
+- Currency formatting requirements (Currency Formatting section)
 - Field descriptions and formatting rules 
 
 #### 6.3 Save Output
@@ -298,10 +298,10 @@ The skill generates the following files:
 
 ### 1. Sales Order Document
 
-**Format:**  `.docx` 
+**Format:** `.docx` when `sample_sales_order/sample_order.docx` is used; otherwise the plain-text default of `reference/OUTPUT_FORMAT.md` (`.txt`)
 
-**Filename:** `SO-{SO_Number}_{Customer_Name}_{Date}.[docx]`
-view /mnt/skills/public/docx/SKILL.md skill to generate the docx files.
+**Filename:** `SO-{SO_Number}_{Customer_Name}_{Date}.docx` or `.txt`
+For a .docx, view /mnt/skills/public/docx/SKILL.md first.
 
 **Contents:**
 - Header with SO number and customer PO reference
@@ -388,7 +388,7 @@ view /mnt/skills/public/docx/SKILL.md skill to generate the docx files.
 2. Read BOM1.pdf, BOM2.pdf, BOM3.pdf - match by Material Number
 3. Lookup prices in price_list.xlsx
 4. Calculate: Subtotal $25,567.50 → 5% discount → fees → tax
-5. Generate SO-2025-08472.docx
+5. Generate SO-2025-08472_AutoTech_Manufacturing_2025-11-15.txt and Calculation_Breakdown.txt
 
 ### Example 2: PO Without BOMs
 **User:** "Generate sales order from this PO - no BOMs needed"

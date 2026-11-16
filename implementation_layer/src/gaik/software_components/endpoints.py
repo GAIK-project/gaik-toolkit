@@ -52,7 +52,12 @@ PROVIDER_HOSTS: dict[str, tuple[str, ...]] = {
     "anthropic": ("api.anthropic.com",),
     "anthropic_foundry": ("*.services.ai.azure.com",),
     "google": ("generativelanguage.googleapis.com",),
-    "vertex": ("aiplatform.googleapis.com", "*-aiplatform.googleapis.com"),
+    "vertex": (
+        "aiplatform.googleapis.com",
+        "*-aiplatform.googleapis.com",
+        "aiplatform.eu.rep.googleapis.com",
+        "aiplatform.us.rep.googleapis.com",
+    ),
     "litellm": (),
     "jev": ("api.typesafe.ai", "gaik-decide.2.rahtiapp.fi"),
     "docling": (),
@@ -281,16 +286,25 @@ _RESOURCE_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 _VERTEX_LOCATION = re.compile(r"global|[a-z]+(?:-[a-z0-9]+)*")
 
 
-def vertex_host(location: str) -> str:
-    """Return the Vertex AI host for ``location``: ``global`` or a region (``europe-north1``).
+_VERTEX_MULTI_REGIONS = frozenset({"eu", "us"})
 
-    google-genai puts the location into ``https://{location}-aiplatform.googleapis.com``;
-    a value with URL characters would name another host.
+
+def vertex_host(location: str) -> str:
+    """Return the Vertex AI host for ``location``: ``global``, a multi-region (``eu``, ``us``)
+    or a region (``europe-north1``).
+
+    google-genai puts a region into ``https://{location}-aiplatform.googleapis.com`` and a
+    multi-region into ``https://aiplatform.{location}.rep.googleapis.com``; a value with URL
+    characters would name another host.
     """
     name = location.strip().lower() if isinstance(location, str) else ""
     if not _VERTEX_LOCATION.fullmatch(name):
         raise EndpointNotAllowedError("location must be 'global' or a Google Cloud region name")
-    return "aiplatform.googleapis.com" if name == "global" else f"{name}-aiplatform.googleapis.com"
+    if name == "global":
+        return "aiplatform.googleapis.com"
+    if name in _VERTEX_MULTI_REGIONS:
+        return f"aiplatform.{name}.rep.googleapis.com"
+    return f"{name}-aiplatform.googleapis.com"
 
 
 def foundry_host(resource: str) -> str:

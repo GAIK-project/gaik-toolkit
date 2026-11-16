@@ -57,7 +57,7 @@ class FewShotExample:
 
 @dataclass
 class ValidationRubric:
-    """Per-call instructions appended to the judge's user prompt.
+    """Per-call instructions added to the judge's system prompt.
 
     Consumers (e.g. an OC builder pipeline) hand in vendor-specific check
     sentences. The toolkit stays vendor-agnostic.

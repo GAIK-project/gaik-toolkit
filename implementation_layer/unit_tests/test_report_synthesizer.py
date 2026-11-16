@@ -20,6 +20,7 @@ from gaik.software_components.knowledge_curator.models import (
 from gaik.software_components.llm.base import ChatResponse, UsageCounter
 from gaik.software_components.report_synthesizer import Report, ReportSynthesizer
 from gaik.software_components.report_synthesizer.prompts import writer_system_prompt
+from gaik.software_components.source_material import with_source_material_instruction
 
 CONFIG = {"provider": "openai", "api_key": "x", "model": "base-model"}
 INSTRUCTIONS = "Cite observations as [field observation, date]. REPORT_RULES"
@@ -102,7 +103,7 @@ class _FakeClient:
         self.system = writer_system_prompt(True)  # the system prompt every writer call gets
 
     def chat(self, messages, **kwargs):
-        assert messages[0]["content"] == self.system
+        assert messages[0]["content"] == with_source_material_instruction(self.system)
         prompt = messages[1]["content"]
         sid = re.search(r'<section_to_write id="([^"]+)">', prompt).group(1)
         self.prompts[sid] = prompt
@@ -189,13 +190,20 @@ def test_technical_prompt_has_only_its_own_knowledge(fakes):
 def test_derived_prompt_has_reviewed_prerequisites_and_no_knowledge(fakes):
     _synthesize()
     prompt = fakes.client.prompts["recommendations"]
-    assert '<section id="structures" title="Structures">\nREVIEWED structures\n</section>' in prompt
-    assert '<section id="services" title="Services">\nREVIEWED services\n</section>' in prompt
-    assert "DRAFT" not in prompt and "<knowledge>" not in prompt
+    assert re.search(
+        r'<source_material id="\w+" label="section structures: Structures">\nREVIEWED structures\n'
+        r'</source_material id="\w+">',
+        prompt,
+    )
+    assert re.search(
+        r'<source_material id="\w+" label="section services: Services">\nREVIEWED services\n',
+        prompt,
+    )
+    assert "DRAFT" not in prompt and 'label="knowledge' not in prompt
     assert "STRUCTURES_FACT" not in prompt and "SERVICES_FACT" not in prompt
     summary = fakes.client.prompts["summary"]
     assert "REVIEWED recommendations" in summary and "REVIEWED services" in summary
-    assert "<knowledge>" not in summary
+    assert 'label="knowledge' not in summary
 
 
 def test_derived_sections_are_written_after_their_prerequisites(fakes):
@@ -232,7 +240,7 @@ def test_sample_report_goes_to_writers_only(fakes):
 
 def test_no_sample_report_means_no_format_reference(fakes):
     _synthesize()
-    assert all("<format_reference>" not in p for p in fakes.client.prompts.values())
+    assert all('label="format_reference"' not in p for p in fakes.client.prompts.values())
 
 
 def test_reviewer_reference_and_checks(fakes):
@@ -241,9 +249,12 @@ def test_reviewer_reference_and_checks(fakes):
     assert calls["structures"]["reference"] == STRUCTURES.model_dump_json(indent=2)
     assert calls["services"]["reference"] == SERVICES.model_dump_json(indent=2)
     reference = calls["recommendations"]["reference"]
-    assert reference in fakes.client.prompts["recommendations"]
-    assert "REVIEWED structures" in reference and "REVIEWED services" in reference
-    assert "<knowledge>" not in reference and "SERVICES_FACT" not in reference
+    assert reference == {
+        "section structures: Structures": "REVIEWED structures",
+        "section services: Services": "REVIEWED services",
+    }
+    assert all(text in fakes.client.prompts["recommendations"] for text in reference.values())
+    assert "SERVICES_FACT" not in str(reference)
     for sid, call in calls.items():
         checks = call["instructions"]
         assert "REPORT_RULES" in checks and "(missing: <item>)" in checks

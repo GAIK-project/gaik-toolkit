@@ -339,7 +339,6 @@ async def run(request: RunRequest):
         except Exception as exc:
             if cancelled.is_set():
                 return
-            logger.exception("Web scraper run failed")
             events.put(("error", {"message": provider_error_detail(exc)}))
         finally:
             _running.release()

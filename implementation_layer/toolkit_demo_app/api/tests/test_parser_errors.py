@@ -76,7 +76,8 @@ def test_docx_the_hh_parser_rejects_is_not_handed_to_pymupdf(
     response = _post(client, "a.docx", _minimal_docx(), DOCX_MIME, "docling_api")
 
     assert response.status_code == 502
-    assert "MarkItDown conversion failed" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert "error id" in detail and "MarkItDown" not in detail
 
 
 def test_docx_without_the_hh_parser_says_so(

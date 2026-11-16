@@ -14,6 +14,10 @@ from pydantic import BaseModel, Field
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    source_material_messages,
+)
 
 from ..parsers.docx_parser import DocxParser
 from ..parsers.pymypdf import PyMuPDFParser
@@ -322,16 +326,16 @@ class DocumentClassifier:
         # Create prompt
         classes_str = ", ".join(f"'{c}'" for c in classes if c != "unknown")
 
-        # Truncate to 4000 chars (~1000 tokens) to prevent token limit errors
+        # Truncate to 4000 chars (~1000 tokens) to prevent token limit errors.
+        # The document is material, apart from the task: it cannot pick its class.
+        document_block = SourceMaterial().wrap(text[:4000], label="document")
         user_prompt = f"""Classify the following document into one of \
 these categories: {classes_str}
 
 If the document does not clearly fit any category, classify it as 'unknown'.
 
 Document content:
-```
-{text[:4000]}
-```
+{document_block}
 
 Provide your classification with:
 1. The category that best matches
@@ -339,10 +343,7 @@ Provide your classification with:
 3. Brief reasoning (max 200 characters)
 """
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = source_material_messages(SYSTEM_PROMPT, user_prompt)
 
         try:
             if isinstance(self.client, ProviderClient):

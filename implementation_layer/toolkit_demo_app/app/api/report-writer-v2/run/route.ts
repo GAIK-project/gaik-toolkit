@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const limits = getReportWriterLimits();
   const gate = await gateReportWriter(request, limits.maxReports);
   if (gate instanceof Response) return gate;
-  const { userId } = gate;
+  const { userId, staff } = gate;
 
   let form: FormData;
   try {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   for (const key of ["files", "sample_report"])
     for (const f of form.getAll(key) as File[]) fwd.append(key, f, f.name);
 
-  return forwardReportRun("/report-writer-v2/run", fwd, async (usage) => {
+  return forwardReportRun("/report-writer-v2/run", fwd, staff, async (usage) => {
     if (!userId || !usage.sawResult) return;
     const reports = stage === "synthesize" ? 1 : 0;
     if (!reports && !usage.totalTokens) return;
