@@ -1378,6 +1378,32 @@ def _detect_global_date_format(text: str) -> str | None:
     return None
 
 
+_DATES_WORD_RE = re.compile(r"\bdates?\b", re.IGNORECASE)
+_KEEP_AS_WRITTEN_RE = re.compile(
+    r"\b(?:preserv\w*|retain\w*|verbatim|unchanged|as\s+written|as[\s-]+is)\b|"
+    r"\b(?:keep|leave)\b[^.;\n]*\b(?:exactly|original|as\s+(?:they|it)\s+(?:appears?|are|is))\b",
+    re.IGNORECASE,
+)
+_CONVERT_RE = re.compile(r"\b(?:convert\w*|normali[sz]\w*|iso)\b", re.IGNORECASE)
+
+
+def _keeps_dates_as_written(text: str) -> bool:
+    """Whether a task-level rule asks to keep dates as written.
+
+    "Preserve original wording, dimensions, dates, and labels." and "Preserve
+    dates exactly if the required format cannot be inferred." both count. A
+    clause that names a format or a conversion does not, so "Keep dates in
+    DD.MM.YYYY" is left to the format detection.
+    """
+    for clause in re.split(r"(?<=[.!?;])\s+|\n", text or ""):
+        if not _DATES_WORD_RE.search(clause) or not _KEEP_AS_WRITTEN_RE.search(clause):
+            continue
+        if _detect_date_format(clause) or _CONVERT_RE.search(clause):
+            continue
+        return True
+    return False
+
+
 def _requests_text_representation(text: str) -> bool:
     return bool(_TEXT_REPRESENTATION_RE.search(text))
 
@@ -1491,6 +1517,7 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
     Supports multiple languages for date detection.
     """
     global_date_format = _detect_global_date_format(original_text)
+    keeps_dates_as_written = _keeps_dates_as_written(original_text)
 
     for field in requirements.fields:
         field_context = _field_specific_context(field, original_text)
@@ -1523,16 +1550,20 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
                 field.format = None
                 continue
 
-            field.field_type = "date"
             # The field's own clause in the task text comes first, then a
-            # format the task states for all dates. The parsed description is
-            # the last fallback: the parser is told to keep a field's own
-            # format there, but what it writes must not override the task.
-            field.format = (
-                _detect_date_format(field_context)
-                or global_date_format
-                or _detect_date_format(field.description)
-            )
+            # format the task states for all dates. A task-level rule to keep
+            # dates as written comes next: such a date stays text. The parsed
+            # description is the last fallback: the parser is told to keep a
+            # field's own format there, but what it writes must not override
+            # the task.
+            task_format = _detect_date_format(field_context) or global_date_format
+            if not task_format and keeps_dates_as_written:
+                field.field_type = "str"
+                field.format = None
+                continue
+
+            field.field_type = "date"
+            field.format = task_format or _detect_date_format(field.description)
             continue
 
         field.format = None
