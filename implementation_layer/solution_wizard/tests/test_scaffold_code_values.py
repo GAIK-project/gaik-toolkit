@@ -195,3 +195,44 @@ def test_a_name_the_schema_source_cannot_carry_is_refused(spec, what) -> None:
 
     with pytest.raises(ValueError, match=f"{what} .* is not a valid Python name"):
         build_pydantic_model(spec)
+
+
+# --------------------------------------------------------------------------- nested rows (fork)
+
+NESTED_SPEC = {
+    "schema_name": "PurchaseOrder",
+    "fields": ["po_number", "line_items", "notes"],
+    "required_fields": ["po_number", "line_items"],
+    "field_descriptions": {"line_items": TEXT, "notes": "Free text"},
+    "nested": {
+        "line_items": {
+            "fields": ["article_code", "quantity"],
+            "field_types": {"quantity": "int"},
+            "required_fields": ["quantity"],
+            "field_descriptions": {"article_code": TEXT, "quantity": TEXT},
+        },
+    },
+}
+
+
+@pytest.mark.parametrize("required", [True, False])
+def test_descriptions_of_nested_rows_stay_text_in_the_schema_source(required) -> None:
+    from solution_wizard.schema_designer import build_pydantic_model
+
+    spec = dict(NESTED_SPEC, required_fields=["po_number"] + (["line_items"] if required else []))
+    source = build_pydantic_model(spec)
+    tree = ast.parse(source)
+    assert not _calls_named(source, "print")
+    namespace: dict = {}
+    exec(compile(tree, "<schema>", "exec"), namespace)
+    assert namespace["PurchaseOrder"].model_fields["line_items"].description == TEXT
+    row = namespace["LineItem"].model_fields
+    assert row["article_code"].description == TEXT and row["quantity"].description == TEXT
+
+
+def test_a_keyword_as_a_nested_row_field_stops_the_scaffolding(tmp_path) -> None:
+    bp = _blueprint()
+    assert "line_items" in bp.target_output_spec["fields"]
+    bp.target_output_spec["nested"] = {"line_items": {"fields": ["article_code", "from"]}}
+    with pytest.raises(ValueError, match="'from' of the 'line_items' rows"):
+        scaffold_poc(bp, tmp_path)

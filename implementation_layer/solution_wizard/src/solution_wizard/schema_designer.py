@@ -227,6 +227,18 @@ def _nested_specs(target_output_spec: dict[str, Any]) -> dict[str, dict[str, Any
     }
 
 
+def nested_row_fields(target_output_spec: dict[str, Any]) -> dict[str, list[str]]:
+    """The field names of each nested collection's rows, keyed by container field.
+
+    They become the attributes of a generated row model, so a caller that checks
+    names before generating reads them here instead of the spec's own layout.
+    """
+    return {
+        name: [field for field in spec.get("fields", []) if isinstance(field, str)]
+        for name, spec in _nested_specs(target_output_spec).items()
+    }
+
+
 def _child_model_name(container: str) -> str:
     """``line_items`` -> ``LineItem``. Singular, because the class is one row."""
     words = [w for w in container.split("_") if w]

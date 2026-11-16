@@ -22,7 +22,9 @@ TASK_TAGS = {
 #: How deep the canvas XML may nest; a diagram needs a handful of levels.
 MAX_BPMN_XML_DEPTH = 64
 #: What a canvas edit may give the blueprint: ids are one token, names one line.
-_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,99}$")
+#: Used with fullmatch: with match, ``$`` also accepts an id that ends in a line
+#: break, which the canvas XML can carry as ``&#10;``.
+_ID_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.\-]{0,99}")
 MAX_NAME_CHARS = 200
 # Synthetic generator tasks that should not become blueprint steps.
 _SYNTHETIC_PREFIXES = (
@@ -84,10 +86,10 @@ def _parse(bpmn_xml: str) -> ET.Element:
 
 def _safe_id(raw: str, fallback: str = "step") -> str:
     """An id as the blueprint keeps it: one token of letters, digits and _ . -."""
-    if _ID_RE.match(raw):
+    if _ID_RE.fullmatch(raw):
         return raw
     cleaned = re.sub(r"[^A-Za-z0-9_.\-]+", "_", raw).strip("_.-")[:100]
-    return cleaned if cleaned and _ID_RE.match(cleaned) else fallback
+    return cleaned if cleaned and _ID_RE.fullmatch(cleaned) else fallback
 
 
 def _safe_name(raw: str) -> str:
@@ -225,7 +227,7 @@ def _sync_data_object_names(root: ET.Element, v2_blueprint: dict[str, Any]) -> d
         # Generator ids: DataObjectRef_<artifact_id>
         if rid.startswith("DataObjectRef_"):
             art_id = rid[len("DataObjectRef_") :]
-            if _ID_RE.match(art_id):
+            if _ID_RE.fullmatch(art_id):
                 mapping[art_id] = _safe_name(name)
     return mapping
 

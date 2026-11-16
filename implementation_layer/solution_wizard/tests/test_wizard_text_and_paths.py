@@ -218,6 +218,23 @@ def test_a_task_added_on_the_canvas_gets_a_clean_id_and_a_one_line_name() -> Non
     assert gateway["id"] == "Gateway_ok_x" and gateway["name"] == "Check again"
 
 
+def test_a_canvas_id_that_ends_in_a_line_break_becomes_one_token() -> None:
+    synced = sync_v2_blueprint_from_bpmn_xml(V2, _canvas("Activity_new&#10;", "New"))
+    assert synced["steps"][1]["id"] == "new"
+
+
+def test_a_data_object_id_that_ends_in_a_line_break_gets_no_label() -> None:
+    from solution_wizard.bpmn_sync import _parse, _sync_data_object_names
+
+    root = _parse(
+        '<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL">'
+        '<bpmn:dataObjectReference id="DataObjectRef_report" name="Report" />'
+        '<bpmn:dataObjectReference id="DataObjectRef_notes&#10;" name="Notes" />'
+        "</bpmn:definitions>"
+    )
+    assert _sync_data_object_names(root, V2) == {"report": "Report"}
+
+
 def test_xml_nested_deeper_than_a_diagram_is_refused() -> None:
     deep = "<a>" * (MAX_BPMN_XML_DEPTH + 1) + "</a>" * (MAX_BPMN_XML_DEPTH + 1)
     with pytest.raises(ValueError, match="nests deeper"):
