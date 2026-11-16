@@ -56,6 +56,7 @@ function refreshTokenIn(response: NextResponse): string | null {
 
 let refreshes: string[] = [];
 let backendCalls = 0;
+let backendHeaders: Headers | null = null;
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = SUPABASE_URL;
@@ -82,6 +83,9 @@ beforeAll(() => {
     if (url.startsWith(`${SUPABASE_URL}/rest/v1/access_requests`))
       return Response.json({ status: "approved", wizard_access: false });
     backendCalls += 1;
+    backendHeaders = new Headers(init?.headers);
+    if (url.includes("/unreachable"))
+      throw new TypeError("fetch failed: connect ECONNREFUSED 10.1.2.3:8000");
     return Response.json({ ok: true });
   }) as typeof fetch;
 });
@@ -96,6 +100,7 @@ afterAll(() => {
 beforeEach(() => {
   refreshes = [];
   backendCalls = 0;
+  backendHeaders = null;
 });
 
 const expired = () => Math.floor(Date.now() / 1000) - 60;
@@ -150,15 +155,26 @@ function post(url: string, init: { cookie?: string; ownKey?: boolean } = {}) {
   return proxy(new NextRequest(url, { method: "POST", headers }));
 }
 
-test("an encoded wizard path meets the wizard gate", async () => {
-  // Approved for the demos, but without wizard access.
-  const cookie = sessionCookie("r1", fresh());
-  for (const path of ["/api/wizard/start", "/api/%77izard/start"]) {
-    const response = await post(`https://demo.test${path}`, { cookie });
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({
-      error: "Solution Wizard is not available yet.",
-    });
+test("an old wizard API path is answered 404 and not forwarded", async () => {
+  // A signed-in, approved user, also holding the old team cookie.
+  const savedSecret = process.env.WIZARD_ACCESS_SECRET;
+  process.env.WIZARD_ACCESS_SECRET = "team-key";
+  try {
+    const cookie = `${sessionCookie("r1", fresh())}; wizard_access=team-key`;
+    for (const path of ["/api/wizard/start", "/api/%77izard/start"]) {
+      const response = await post(`https://demo.test${path}`, { cookie });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "Not found" });
+    }
+    const read = await proxy(
+      new NextRequest("https://demo.test/api/wizard/session/abc", {
+        headers: { cookie },
+      }),
+    );
+    expect(read.status).toBe(404);
+  } finally {
+    if (savedSecret === undefined) delete process.env.WIZARD_ACCESS_SECRET;
+    else process.env.WIZARD_ACCESS_SECRET = savedSecret;
   }
   expect(backendCalls).toBe(0);
 });
@@ -185,4 +201,41 @@ test("a visitor with their own model key is asked to sign in", async () => {
     });
   }
   expect(backendCalls).toBe(0);
+});
+
+test("a path that only begins like the old wizard API meets the normal gate", async () => {
+  const response = await proxy(
+    new NextRequest("https://demo.test/api/wizardry/start", { method: "POST" }),
+  );
+  expect(response.status).toBe(401);
+  expect(backendCalls).toBe(0);
+});
+
+test("an unreachable backend is reported with an id, not the connection error", async () => {
+  const response = await proxy(
+    new NextRequest("https://demo.test/api/unreachable", {
+      headers: { cookie: sessionCookie("r1", fresh()) },
+    }),
+  );
+  expect(response.status).toBe(502);
+  const { error } = await response.json();
+  expect(error).toContain("error id");
+  expect(error).not.toContain("ECONNREFUSED");
+  expect(error).not.toContain("10.1.2.3");
+});
+
+test("the generic proxy does not pass on the report run header", async () => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  const response = await proxy(
+    new NextRequest(RUN, {
+      method: "POST",
+      headers: {
+        cookie: sessionCookie("r1", future),
+        "x-gaik-report-run": "from-the-browser",
+      },
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(backendHeaders?.has("x-gaik-report-run")).toBe(false);
 });

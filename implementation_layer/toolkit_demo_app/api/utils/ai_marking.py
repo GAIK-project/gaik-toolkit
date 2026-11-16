@@ -31,7 +31,6 @@ _GENERATED_DOWNLOADS = re.compile(
     r"|diary/pdf/[^/]+"
     r"|luvata-order/pdf/[^/]+"
     r"|dental-transcribe/(?:srt|vtt)/[^/]+"
-    r"|wizard/download/[^/]+"
     r"|text-to-speech"
     r")$"
 )

@@ -11,13 +11,9 @@ export function isStateChanging(method: string): boolean {
   return !READ_METHODS.has(method.toUpperCase());
 }
 
-/**
- * True for a request that needs a signed-in account (see `accessRefusal`).
- * `pathname` is the decoded path from lib/request-path.ts.
- */
-export function needsApprovedUser(method: string, pathname: string): boolean {
-  // The wizard API has its own gate, including the team-key path.
-  return isStateChanging(method) && !pathname.startsWith("/api/wizard");
+/** True for a request that needs a signed-in account (see `accessRefusal`). */
+export function needsApprovedUser(method: string): boolean {
+  return isStateChanging(method);
 }
 
 export interface GateState {

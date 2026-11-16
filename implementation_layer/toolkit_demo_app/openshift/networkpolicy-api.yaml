@@ -1,0 +1,63 @@
+# Only the demo frontend reaches the demo API.
+#
+# The API pods (gaik-demo-api) take requests on port 8000 from the frontend pods
+# (gaik-demo) and from nothing else in the project: proxy.ts is the sign-in,
+# approval and trial gate in front of the API, so no other pod should talk to the
+# API directly. The staging pair gets the same rule. Health probes come from the
+# kubelet on the node and are not affected; the API has no route of its own.
+#
+# NetworkPolicies add up. The gaik project's shared policy
+# deny-other-namespaces-access lets every pod in the namespace reach every pod, so
+# this file narrows nothing until that policy is changed to leave the API pods
+# out, which is the project owner's decision. Until then the file states the
+# intended rule. See README.md, "Network policy and pod hardening".
+#
+# Apply this file on its own:
+#
+#   oc apply -f networkpolicy-api.yaml -n gaik
+#
+# The selectors match the `app` labels in deployment-api.yaml,
+# deployment-frontend.yaml and the services in services.yaml and staging.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gaik-demo-api-from-frontend
+  labels:
+    app: gaik-demo-api
+    app.kubernetes.io/part-of: gaik-toolkit
+spec:
+  podSelector:
+    matchLabels:
+      app: gaik-demo-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gaik-demo
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gaik-demo-api-staging-from-frontend
+  labels:
+    app: gaik-demo-api-staging
+    app.kubernetes.io/part-of: gaik-toolkit
+spec:
+  podSelector:
+    matchLabels:
+      app: gaik-demo-api-staging
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gaik-demo-staging
+      ports:
+        - protocol: TCP
+          port: 8000

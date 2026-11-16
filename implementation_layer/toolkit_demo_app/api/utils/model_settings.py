@@ -20,6 +20,8 @@ import httpx
 from fastapi import HTTPException
 from starlette.responses import JSONResponse
 
+from .errors import public_error
+
 HEADER = b"x-gaik-model-settings"
 _AZURE_HOST = re.compile(
     r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(?:openai\.azure\.com|services\.ai\.azure\.com)"
@@ -213,9 +215,8 @@ def request_model_settings() -> RequestModelSettings | None:
 
 
 def supports_model_settings(path: str, method: str) -> bool:
-    return method == "POST" and (
-        any(path == prefix or path.startswith(prefix + "/") for prefix in _PATHS)
-        or path.startswith("/wizard/message/")
+    return method == "POST" and any(
+        path == prefix or path.startswith(prefix + "/") for prefix in _PATHS
     )
 
 
@@ -347,18 +348,23 @@ def unsupported_option_detail(exc: BaseException) -> str | None:
     )
 
 
-def provider_error_detail(exc: Exception) -> str:
-    """Do not expose remote error bodies from requests using a user's credential."""
+def provider_error_detail(exc: Exception, what: str = "The request") -> str:
+    """A message for a failed request that never carries the exception's own text.
+
+    A request on the user's credential gets a hint about their settings; one on the
+    server's credentials gets an error id, with the exception logged under it
+    (utils/errors.py). An HTTPException raised on purpose keeps its detail.
+    """
     if (detail := unsupported_option_detail(exc)) is not None:
         return detail
+    if isinstance(exc, HTTPException):
+        return str(exc.detail)
     if _settings.get() is not None:
-        if isinstance(exc, HTTPException):
-            return str(exc.detail)
         return (
             "Model request failed. Check your credentials, model or deployment, "
             "and the operation supported by that model."
         )
-    return str(exc)
+    return public_error(exc, what)
 
 
 class _CredentialRedactionFilter(logging.Filter):
