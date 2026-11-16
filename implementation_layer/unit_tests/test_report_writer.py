@@ -33,6 +33,16 @@ from gaik.software_modules.report_writer import (
     StepOptions,
 )
 
+
+def _symlink(link, target):
+    """Make ``link`` point at ``target``; skip where making one needs a right
+    this account lacks (WinError 1314 on Windows)."""
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        pytest.skip(f"cannot make a symlink here: {exc}")
+
+
 CONFIG = {"provider": "openai", "model": "base-model"}
 SAMPLE_TEXT = "# Sample\n\nSample from sample.docx."
 SINGLE_CALL_ANSWER = (
@@ -230,7 +240,7 @@ def test_spec_load_refuses_a_source_linked_out_of_the_spec_folder(tmp_path):
     (tmp_path / "secret.txt").write_text("Outside the folder.", encoding="utf-8")
     path = _write_spec(tmp_path / "project", ["inputs/notes.txt"])
     (tmp_path / "project" / "inputs").mkdir()
-    (tmp_path / "project" / "inputs" / "notes.txt").symlink_to(tmp_path / "secret.txt")
+    _symlink(tmp_path / "project" / "inputs" / "notes.txt", tmp_path / "secret.txt")
 
     with pytest.raises(SourcePathError, match="outside the folder"):
         ReportSpec.load(path)
@@ -253,7 +263,7 @@ def test_spec_save_keeps_a_linked_source_by_its_own_name(tmp_path):
     (tmp_path / "shared" / "budget.csv").write_text("a,b\n", encoding="utf-8")
     path = _write_spec(tmp_path / "project", ["inputs/budget.csv"])
     (tmp_path / "project" / "inputs").mkdir()
-    (tmp_path / "project" / "inputs" / "budget.csv").symlink_to(tmp_path / "shared" / "budget.csv")
+    _symlink(tmp_path / "project" / "inputs" / "budget.csv", tmp_path / "shared" / "budget.csv")
 
     spec = ReportSpec.load(path, root=tmp_path)
     spec.save(path)
