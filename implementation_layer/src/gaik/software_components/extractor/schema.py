@@ -21,6 +21,7 @@ import math
 import re
 import time
 import types
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -217,6 +218,29 @@ NUMERIC_FIELD_TYPES = {"int", "float", "decimal"}
 RequirementsParseMode = Literal["normal", "repeated_item"]
 
 
+def _to_snake_case(name: str) -> str:
+    """Turn a model-written name into a lowercase_with_underscores identifier.
+
+    Letters outside ASCII are kept ("toimituspäivämäärä", "työmaan_sää",
+    "größe"): folding them to underscores made names unreadable and let two names
+    collide. A camelCase name is split at each lower-to-upper boundary ("dueDate"
+    -> "due_date"). Any other run of characters that are not letters or digits
+    becomes one underscore. A name that is already snake_case ASCII is unchanged.
+    """
+    text = unicodedata.normalize("NFC", name or "")
+    split = "".join(
+        f"_{char}"
+        if index and char.isupper() and (text[index - 1].islower() or text[index - 1].isdigit())
+        else char
+        for index, char in enumerate(text)
+    )
+    return re.sub(r"[\W_]+", "_", split).strip("_").lower()
+
+
+def _is_snake_identifier(name: str) -> bool:
+    return bool(name) and name[0].isalpha() and name.isidentifier() and name == name.lower()
+
+
 class FieldSpec(BaseModel):
     """Specification for a single field to extract."""
 
@@ -253,8 +277,9 @@ class FieldSpec(BaseModel):
     @field_validator("field_name")
     @classmethod
     def _snake_case(cls, v: str) -> str:
-        v2 = re.sub(r"[^a-zA-Z0-9]+", "_", v).strip("_").lower()
-        if not re.match(r"^[a-z][a-z0-9_]*$", v2 or ""):
+        """Normalise the name with :func:`_to_snake_case` (non-ASCII letters kept)."""
+        v2 = _to_snake_case(v)
+        if not _is_snake_identifier(v2):
             raise ValueError("field_name must be snake_case and start with a letter")
         return v2
 
@@ -516,10 +541,10 @@ def detect_structure_type(
 
 
 def _sanitize_field_name(name: str, fallback: str = "records") -> str:
-    field_name = re.sub(r"[^a-zA-Z0-9]+", "_", name or "").strip("_").lower()
+    field_name = _to_snake_case(name)
     if not field_name:
         field_name = fallback
-    if not re.match(r"^[a-z]", field_name):
+    if not field_name[0].isalpha():
         field_name = f"{fallback}_{field_name}".strip("_")
     return field_name
 
@@ -1323,10 +1348,13 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
     """
     pieces: list[str] = []
     label = field.field_name.replace("_", " ")
-    # The task may name the field as prose ("delivery date") or as the
-    # identifier itself ("delivery_date", often in backticks).
+    # The task may name the field as prose ("delivery date"), as the identifier
+    # itself ("delivery_date", often in backticks), or run together as the
+    # camelCase it was written in ("deliveryDate").
+    alternatives = {label, field.field_name, field.field_name.replace("_", "")}
     label_re = re.compile(
-        rf"\b(?:{re.escape(label)}|{re.escape(field.field_name)})\b", re.IGNORECASE
+        rf"\b(?:{'|'.join(re.escape(a) for a in sorted(alternatives, key=len, reverse=True))})\b",
+        re.IGNORECASE,
     )
     lines = original_text.splitlines()
 
@@ -1420,8 +1448,8 @@ _COMPOUND_DATE_KEYWORDS = frozenset(
     {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih", "fecha"}
 )
 # In a field name a word may also end in a keyword or start with "date":
-# "birthdate", "leveringsdato", and "duedate" and "dateofbirth", which is what
-# FieldSpec makes of "dueDate" and "dateOfBirth". This is the fallback for a date
+# "birthdate", "leveringsdato", and run-together names such as "duedate" and
+# "dateofbirth" (FieldSpec splits "dueDate" into "due_date"). This is the fallback for a date
 # the model typed as text, so it has to catch those names. The words below start
 # or end the same way without being dates.
 _DATE_NAME_SUFFIXES = ("date", "dato")
