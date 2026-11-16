@@ -151,8 +151,8 @@ class Transcriber:
     """High-level transcription workflow with optional transcript error fixing.
 
     A long recording is split into several paid transcription calls, so a file
-    over ``limits`` (``max_media_bytes``, ``max_media_seconds``; default 2 GiB and
-    6 hours) is refused with
+    over ``limits`` (``max_media_seconds``, default 6 hours; ``max_media_bytes``,
+    off by default) is refused with
     :class:`~gaik.software_components.input_limits.InputLimitError` before the
     first call. The duration is read with ffprobe (with a timeout) or, when
     ffprobe cannot read it, from the decoded audio. ``max_size_mb`` and

@@ -104,10 +104,12 @@ result = transcriber.transcribe(
 ### Input limits
 
 `ParallelTranscriber(api_cfg, config, limits=InputLimits(...))` refuses a file over
-`max_media_bytes` (2 GiB) or `max_media_seconds` (6 hours) with `InputLimitError` before
-audio is extracted or any transcription call is made. The length is read with ffprobe;
-when that fails, it is checked again once the audio is measured, before chunking. Every
-ffprobe call has a 60-second timeout.
+`max_media_seconds` (6 hours) with `InputLimitError` before audio is extracted or any
+transcription call is made, on every backend; `whisper_local_max_audio_minutes` is a
+second cap for Whisper Local only. `max_media_bytes` is off by default: the size of a
+video says little about its audio. The length is read with ffprobe; when that fails, it
+is measured again from the extracted audio before the first call, and a recording whose
+length cannot be read at all is refused. Every ffprobe call has a 60-second timeout.
 
 ### TranscriptionConfig
 

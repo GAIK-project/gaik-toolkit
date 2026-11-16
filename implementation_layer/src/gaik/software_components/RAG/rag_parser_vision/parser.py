@@ -83,9 +83,11 @@ class VisionRagParser:
             limits: Input limits; a PDF over the size or page limit is refused before
                 Docling reads it, and one with more images (or larger ones) than
                 allowed before the first vision call. Defaults to
-                :class:`~gaik.software_components.input_limits.InputLimits`.
+                :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`:
+                Docling reads the pages locally, so only the images, one vision call
+                each, and the size are limited.
         """
-        self.limits = limits or InputLimits()
+        self.limits = limits or InputLimits.local_parsing()
         self.verbose = verbose
         self.save_markdown = save_markdown
 

@@ -731,5 +731,184 @@ def test_tabular_agent_writes_sheet_rows_to_a_private_directory(tmp_path, monkey
     with TabularAgent(path) as agent:
         assert agent.table_names
 
-    assert made and all(mode == 0o700 for _, mode in made)
+    assert made
+    if os.name != "nt":
+        # Windows keeps access in ACLs; st_mode there does not show a private folder.
+        assert all(mode == 0o700 for _, mode in made)
     assert not any(os.path.exists(name) for name, _ in made)
+
+
+# -- defaults that do not refuse ordinary local input ---------------------------------------
+
+
+def test_local_parsers_read_a_pdf_of_any_length_by_default(tmp_path):
+    pytest.importorskip("langchain_core")
+    from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
+    from gaik.software_components.parsers.pymypdf import PyMuPDFParser
+    from gaik.software_components.source_normalizer import SourceNormalizer
+    from gaik.software_modules.RAG_workflow.text_parser import TextRagParser
+
+    pdf = _pdf(tmp_path / "manual.pdf", pages=input_limits.DEFAULT_MAX_PAGES + 1)
+
+    # A page sent to a model is a paid call; a page read locally is not.
+    with pytest.raises(InputLimitError, match="max_pages"):
+        InputLimits().check_pdf(pdf)
+    assert "Page 501 text" in PyMuPDFParser().parse_pdf(str(pdf))
+    assert TextRagParser().convert_doc_to_chunks(pdf)
+    local = InputLimits.local_parsing()
+    assert local.max_pages is None and local.max_file_bytes == input_limits.DEFAULT_MAX_FILE_BYTES
+    assert SourceNormalizer().limits == local
+    assert DoclingApiClientParser(api_base="http://docling.test", password="p").limits == local
+
+
+def test_a_recording_is_limited_by_its_length_not_its_size_by_default(tmp_path, monkeypatch):
+    video = tmp_path / "talk.mp4"
+    video.write_bytes(b"\x00" * 64)
+    monkeypatch.setattr(input_limits, "probe_media_seconds", lambda path, timeout: 3600.0)
+
+    assert InputLimits().max_media_bytes is None
+    assert InputLimits().check_media(video) == 3600.0
+    with pytest.raises(InputLimitError, match="max_media_bytes"):
+        InputLimits(max_media_bytes=10).check_media(video)
+
+
+# -- review follow-ups ------------------------------------------------------------------------
+
+
+def test_rag_workflow_passes_no_limits_to_a_parser_class_without_them(monkeypatch):
+    pytest.importorskip("langchain_core")
+    from gaik.software_modules.RAG_workflow import pipeline
+
+    class ParserWithoutLimits:
+        def __init__(self, *, vision_config):
+            self.vision_config = vision_config
+
+    monkeypatch.setattr(pipeline, "VisionRagParser", ParserWithoutLimits)
+    config = {"provider": "openai", "model": "m", "api_key": "k"}
+
+    workflow = pipeline.RAGWorkflow(api_config=config, persist=False)
+    assert isinstance(workflow.parser, ParserWithoutLimits)
+    assert pipeline.RAGWorkflow(api_config=config, parser="text", persist=False).parser.limits == (
+        InputLimits.local_parsing()
+    )
+
+
+def test_vision_extractor_checks_the_limits_before_it_generates_a_schema(tmp_path, monkeypatch):
+    import importlib
+
+    module = importlib.import_module("gaik.software_components.vision_extractor.vision_extractor")
+    extractor = module.VisionExtractor(
+        api_config={"provider": "openai", "model": "m", "api_key": "k"},
+        limits=InputLimits(max_pages=1),
+    )
+    monkeypatch.setattr(module, "SchemaGenerator", lambda **_: pytest.fail("schema generated"))
+    monkeypatch.setattr(extractor, "_call_shared", lambda *a: pytest.fail("model was called"))
+
+    with pytest.raises(InputLimitError, match="max_pages"):
+        extractor.extract(
+            file_paths=[_pdf(tmp_path / "invoice.pdf", pages=2)],
+            user_requirements="The invoice number",
+        )
+
+
+def _whisper_transcriber(monkeypatch, *, probe, measure):
+    from gaik.software_components.parallel_transcriber import ParallelTranscriber, pipeline
+
+    transcriber = ParallelTranscriber(
+        {"use_azure": False, "api_key": "k"}, limits=InputLimits(max_media_seconds=3600)
+    )
+    monkeypatch.setattr(input_limits, "probe_media_seconds", lambda path, timeout: probe)
+    monkeypatch.setattr(pipeline, "has_video_stream", lambda _p: False)
+    monkeypatch.setattr(pipeline, "has_audio_stream", lambda _p: True)
+    monkeypatch.setattr(pipeline, "get_audio_duration", measure)
+    return transcriber
+
+
+def test_parallel_transcriber_measures_a_single_pass_file_the_first_probe_could_not_read(
+    tmp_path, monkeypatch
+):
+    audio = tmp_path / "note.mp3"
+    audio.write_bytes(b"\x00" * 64)
+    transcriber = _whisper_transcriber(monkeypatch, probe=None, measure=lambda _p: 2 * 3600.0)
+    monkeypatch.setattr(transcriber, "_transcribe_single", lambda *a: pytest.fail("transcribed"))
+
+    with pytest.raises(InputLimitError, match="max_media_seconds"):
+        transcriber.transcribe(audio)
+
+
+def test_parallel_transcriber_refuses_a_recording_whose_length_cannot_be_read(
+    tmp_path, monkeypatch
+):
+    def unreadable(_path):
+        raise subprocess.CalledProcessError(1, "ffprobe")
+
+    audio = tmp_path / "note.mp3"
+    audio.write_bytes(b"\x00" * 64)
+    transcriber = _whisper_transcriber(monkeypatch, probe=None, measure=unreadable)
+    monkeypatch.setattr(transcriber, "_transcribe_single", lambda *a: pytest.fail("transcribed"))
+
+    with pytest.raises(InputLimitError, match="cannot be read"):
+        transcriber.transcribe(audio)
+
+
+def test_parallel_transcriber_does_not_measure_again_after_a_probe_that_read_the_length(
+    tmp_path, monkeypatch
+):
+    audio = tmp_path / "note.mp3"
+    audio.write_bytes(b"\x00" * 64)
+    transcriber = _whisper_transcriber(
+        monkeypatch, probe=60.0, measure=lambda _p: pytest.fail("measured again")
+    )
+    monkeypatch.setattr(transcriber, "_transcribe_single", lambda *a: "transcript")
+
+    assert transcriber.transcribe(audio) == "transcript"
+
+
+def test_report_writer_passes_its_limits_to_the_source_normalizer(tmp_path, monkeypatch):
+    from gaik.software_modules.report_writer import report_writer
+
+    seen = {}
+
+    class Normalizer:
+        def __init__(self, config, **kwargs):
+            seen.update(kwargs)
+            raise RuntimeError("stop after construction")
+
+    monkeypatch.setattr(report_writer, "SourceNormalizer", Normalizer)
+    limits = InputLimits(max_pages=3)
+    spec = SimpleNamespace(
+        models=SimpleNamespace(vision=None, transcription=None),
+        settings=SimpleNamespace(transcription_language="auto"),
+    )
+
+    with pytest.raises(RuntimeError, match="stop"):
+        report_writer.ReportWriter({"model": "m"}, limits=limits).normalize(spec, tmp_path)
+    assert seen["limits"] is limits
+
+
+def test_jev_classifier_reads_files_within_its_limits(tmp_path):
+    from gaik.software_components.jev_classifier import JevClassifier
+
+    pdf = _pdf(tmp_path / "contract.pdf", pages=input_limits.DEFAULT_MAX_PAGES + 1)
+    classifier = JevClassifier(api_key="", client=object(), limits=InputLimits(max_pages=2))
+
+    with pytest.raises(InputLimitError, match="max_pages"):
+        classifier._extract_text(pdf)
+    assert "Page 1 text" in JevClassifier(api_key="", client=object())._extract_text(pdf)
+
+
+def test_multi_source_report_generator_passes_its_limits_to_the_parsers(tmp_path):
+    from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator
+
+    config = {"provider": "openai", "model": "m", "api_key": "k"}
+    limits = InputLimits(max_pages=1)
+    generator = MultiSourceReportGenerator(api_config=config, limits=limits)
+
+    with pytest.raises(InputLimitError, match="max_pages"):
+        generator._parse_pdf(
+            _pdf(tmp_path / "long.pdf", pages=2), parser_choice="auto", parser_options={}
+        )
+    own = InputLimits(max_pages=9)
+    assert generator._limited({"limits": own})["limits"] is own
+    assert generator._limited({"dpi": 100}) == {"limits": limits, "dpi": 100}
+    assert MultiSourceReportGenerator(api_config=config)._limited({"dpi": 100}) == {"dpi": 100}

@@ -104,8 +104,10 @@ class RAGWorkflow:
             last_n: Number of Q/A pairs to keep if conversation_history is True.
             limits: Input limits for the parser (file size, PDF pages, images
                 described); a document over one raises ``InputLimitError`` before it
-                is parsed. Defaults to
-                :class:`~gaik.software_components.input_limits.InputLimits`.
+                is parsed. ``None`` (default) leaves the parser's own defaults
+                (:meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`:
+                no page limit) and passes nothing, so a parser class without a
+                ``limits`` argument still works.
         """
         if parser not in ("vision", "text"):
             raise ValueError(f"parser must be 'vision' or 'text', not {parser!r}")
@@ -122,17 +124,19 @@ class RAGWorkflow:
         )
         self.answer_config = answer_config if answer_config is not None else self.api_config
 
+        # Only set limits are passed: a replacement parser class may not take them.
+        parser_kwargs = {} if limits is None else {"limits": limits}
         if parser == "text":
             from .text_parser import TextRagParser
 
-            self.parser = TextRagParser(limits=limits)
+            self.parser = TextRagParser(**parser_kwargs)
         else:
             if VisionRagParser is None:
                 raise ImportError(
                     "parser='vision' needs pip install 'gaik[rag-workflow]'; "
                     "parser='text' needs only 'gaik[rag-workflow-text]'"
                 ) from _vision_import_error
-            self.parser = VisionRagParser(vision_config=self.parser_config, limits=limits)
+            self.parser = VisionRagParser(vision_config=self.parser_config, **parser_kwargs)
         self.embedder = Embedder(config=self.embedding_config, model=embedding_model)
         self.vector_store = VectorStore(
             persist=persist,

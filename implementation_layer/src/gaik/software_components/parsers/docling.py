@@ -158,9 +158,10 @@ class DoclingParser:
             ocr_engine: OCR engine to use when enable_ocr is True (default: "tesseract_cli")
                        Options: "tesseract_cli", "tesseract", "easyocr", "rapidocr"
             limits: Size and page limits checked before parsing; defaults to
-                :class:`~gaik.software_components.input_limits.InputLimits`.
+                :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`,
+                which limits the size and not the page count.
         """
-        self.limits = limits or InputLimits()
+        self.limits = limits or InputLimits.local_parsing()
         self.summaries = summaries.copy()
         self.docling_available = DOCLING_IMPORT_SUCCESS
 

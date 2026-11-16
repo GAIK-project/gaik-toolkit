@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from gaik.software_components import _http
-
 from gaik.software_components.input_limits import InputLimits
 
 
@@ -41,7 +40,7 @@ class DoclingApiClientParser:
         self.password = password
         self.timeout_seconds = timeout_seconds
         self.healthcheck_timeout_seconds = healthcheck_timeout_seconds
-        self.limits = limits or InputLimits()
+        self.limits = limits or InputLimits.local_parsing()
 
     def parse_document(self, document_path: str | Path) -> dict[str, Any]:
         """Parse a document through remote service and return markdown+metadata."""

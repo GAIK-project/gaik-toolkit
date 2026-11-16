@@ -8,13 +8,19 @@ file that is over a limit with :class:`InputLimitError` before any parsing or
 model call starts.
 
 The defaults are generous enough for ordinary business documents and
-recordings. Pass an :class:`InputLimits` to a component to change them; a
-field set to ``None`` switches that limit off::
+recordings. The page limit applies where every page becomes a model call (the
+vision parsers and extractor); a parser that reads the pages locally (PyMuPDF,
+Docling, the RAG text parser) defaults to :meth:`InputLimits.local_parsing`,
+which has none. A recording is limited by its length, not its size: the size of
+a video says little about its audio.
+
+Pass an :class:`InputLimits` to a component to change them; a field set to
+``None`` switches that limit off::
 
     from gaik.software_components.input_limits import InputLimits
-    from gaik.software_components.parsers import PyMuPDFParser
+    from gaik.software_components.parsers import VisionParser
 
-    parser = PyMuPDFParser(limits=InputLimits(max_pages=50))
+    parser = VisionParser(config, limits=InputLimits(max_pages=50))
 """
 
 from __future__ import annotations
@@ -53,7 +59,8 @@ DEFAULT_MAX_FILE_BYTES = 100 * MIB
 """Largest document, spreadsheet or image file: 100 MiB."""
 
 DEFAULT_MAX_PAGES = 500
-"""Most pages in one PDF (or, for the vision extractor, in one call)."""
+"""Most pages in one PDF sent page by page to a model (or, for the vision extractor,
+in one call). Parsers that read pages locally have no page limit by default."""
 
 DEFAULT_MAX_TABLE_ROWS = 1_000_000
 """Most rows read from one sheet or CSV file."""
@@ -64,8 +71,9 @@ DEFAULT_MAX_IMAGE_PIXELS = 89_478_485
 DEFAULT_MAX_IMAGES = 500
 """Most embedded images described with a vision model for one document."""
 
-DEFAULT_MAX_MEDIA_BYTES = 2048 * MIB
-"""Largest audio or video file: 2 GiB."""
+DEFAULT_MAX_MEDIA_BYTES = None
+"""Largest audio or video file: no limit by default. ``max_media_seconds`` bounds a
+recording's calls, and the size of a video says little about its audio."""
 
 DEFAULT_MAX_MEDIA_SECONDS = 6 * 60 * 60
 """Longest recording: 6 hours."""
@@ -123,14 +131,15 @@ class InputLimits:
         max_file_bytes: Size of a document, spreadsheet or image file. A DOCX or
             XLSX may also unpack to at most ten times this size.
         max_pages: Pages in a PDF. The vision extractor counts every PDF page and
-            image file of one call together.
+            image file of one call together. A parser that reads the pages locally
+            defaults to :meth:`local_parsing`, without this limit.
         max_table_rows: Data rows in one sheet or CSV file; the header row and
             blank rows do not count.
         max_image_pixels: Pixels (width x height) of an image file, an embedded
             image or a PDF page rendered for a vision model.
         max_images: Embedded images of one document that are sent to a vision
             model for a description.
-        max_media_bytes: Size of an audio or video file.
+        max_media_bytes: Size of an audio or video file; off by default.
         max_media_seconds: Duration of an audio or video file.
     """
 
@@ -152,6 +161,16 @@ class InputLimits:
     def unlimited(cls) -> InputLimits:
         """Limits with every check switched off."""
         return cls(**dict.fromkeys(cls.__dataclass_fields__))
+
+    @classmethod
+    def local_parsing(cls) -> InputLimits:
+        """The defaults without the page limit, for a parser that reads pages locally.
+
+        PyMuPDF, Docling and the RAG text parser read a long manual without a model
+        call per page, so its page count is not limited; its size still is. These
+        are their defaults.
+        """
+        return cls(max_pages=None)
 
     # -- single checks ---------------------------------------------------------
 

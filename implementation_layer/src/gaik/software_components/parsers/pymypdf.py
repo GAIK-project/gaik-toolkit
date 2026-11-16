@@ -45,7 +45,8 @@ class PyMuPDFParser:
 
         Args:
             limits: Size and page limits checked before parsing; defaults to
-                :class:`~gaik.software_components.input_limits.InputLimits`.
+                :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`,
+                which limits the size and not the page count.
 
         Raises:
             ImportError: If PyMuPDF is not installed
@@ -53,7 +54,7 @@ class PyMuPDFParser:
         if not PYMUPDF_AVAILABLE:
             raise ImportError("PyMuPDF is not available. Install it with: pip install gaik[parser]")
 
-        self.limits = limits or InputLimits()
+        self.limits = limits or InputLimits.local_parsing()
         self.supported_extensions = [".pdf"]
 
     def parse_pdf(

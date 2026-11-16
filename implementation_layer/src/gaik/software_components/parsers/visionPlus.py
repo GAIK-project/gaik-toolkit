@@ -52,7 +52,7 @@ class VisionPlusParser:
         limits: InputLimits | None = None,
     ) -> None:
         self.verbose = verbose
-        self.limits = limits or InputLimits()
+        self.limits = limits or InputLimits.local_parsing()
 
         # Defer docling imports to avoid heavy import side-effects at module import time.
         try:

@@ -753,7 +753,14 @@ class VisionExtractor:
             1. Both extraction_model and requirements passed → use directly.
             2. schema_dir set and files exist → load from disk.
             3. Otherwise → generate via SchemaGenerator (text LLM call).
+
+        Raises:
+            InputLimitError: A file is over ``limits``; checked first, before a
+                schema is generated or any other model call.
         """
+        file_path_list = [Path(p) for p in file_paths]
+        # Before the schema step too: generating a schema is a paid call.
+        self._check_input_limits(file_path_list)
         if extraction_model is None or requirements is None:
             extraction_model, requirements = self._resolve_schema(user_requirements, schema_dir)
 
@@ -763,7 +770,6 @@ class VisionExtractor:
             else extraction_model
         )
 
-        file_path_list = [Path(p) for p in file_paths]
         t0 = time.perf_counter()
         result_dict, usage = self._extract(file_path_list, llm_model, user_requirements)
         duration_s = round(time.perf_counter() - t0, 3)
@@ -857,6 +863,7 @@ class VisionExtractor:
             prompt += f"\n\nAdditional user guidance to follow: {instructions.strip()}"
 
         file_path_list = [Path(p) for p in file_paths]
+        self._check_input_limits(file_path_list)
         t0 = time.perf_counter()
         result_dict, usage = self._extract(file_path_list, _RequirementsSuggestion, prompt)
         duration_s = round(time.perf_counter() - t0, 3)
@@ -916,7 +923,7 @@ class VisionExtractor:
         extraction_model: type[BaseModel],
         user_requirements: str,
     ) -> tuple[dict, UsageRecord | None]:
-        self._check_input_limits(file_paths)
+        # The public methods have checked file_paths against the input limits.
         system_prompt = self._get_system_prompt()
         user_prompt = self._get_user_prompt(user_requirements)
 
