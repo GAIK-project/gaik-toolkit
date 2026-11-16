@@ -462,9 +462,14 @@ NOT_DOCUMENTS = {
 }
 
 
+def _takes_files(text: str) -> bool:
+    """A router takes files as uploads, or as base64 it decodes (attachments)."""
+    return "UploadFile" in text or "b64decode(" in text
+
+
 @pytest.mark.parametrize(
     "router",
-    sorted(p.name for p in ROUTERS.glob("*.py") if "UploadFile" in p.read_text(encoding="utf-8")),
+    sorted(p.name for p in ROUTERS.glob("*.py") if _takes_files(p.read_text(encoding="utf-8"))),
 )
 def test_every_router_that_takes_a_file_checks_it(router):
     if router in NOT_DOCUMENTS:
