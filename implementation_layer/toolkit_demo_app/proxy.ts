@@ -31,6 +31,7 @@ import {
   withSessionCookies,
 } from "@/lib/supabase/proxy";
 import { takeTrialRun } from "@/lib/trial";
+import { recordWizardUse, wizardUseKind } from "@/lib/wizard-usage";
 import { attachCsp, isPagePath, setCsp } from "@/lib/csp";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -230,6 +231,17 @@ async function route(request: NextRequest): Promise<NextResponse> {
         body,
         ...(modelSettings ? { redirect: "error" as const } : {}),
       });
+
+      // A wizard session the API started, or a message it took, is counted
+      // for the user, for /admin (lib/wizard-usage.ts). Not awaited: the count
+      // must not hold the reply.
+      const wizardUse = wizardApi
+        ? wizardUseKind(request.method, pathname)
+        : null;
+      if (wizardUse && response.ok) {
+        const { userId } = await accessState();
+        if (userId) void recordWizardUse(userId, wizardUse);
+      }
 
       // For SSE streaming responses, pass through directly
       if (response.headers.get("content-type")?.includes("text/event-stream")) {
