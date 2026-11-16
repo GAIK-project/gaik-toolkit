@@ -74,6 +74,20 @@ test.each([false, true])("a report run keeps its run token when staff is %p", as
   expect(sent.get("x-gaik-model-tier")).toBe(staff ? "staff" : null);
 });
 
+test("an unreachable backend is reported with an id, not the connection error", async () => {
+  globalThis.fetch = (async () => {
+    throw new Error("connect ECONNREFUSED 10.1.2.3:8000");
+  }) as unknown as typeof fetch;
+
+  const response = await forwardReportRun("/report-writer/run", new FormData(), false, async () => {});
+
+  expect(response.status).toBe(502);
+  const { error } = await response.json();
+  expect(error).toContain("error id");
+  expect(error).not.toContain("ECONNREFUSED");
+  expect(error).not.toContain("10.1.2.3");
+});
+
 test("a report run carries the run token to the backend only when one is set", () => {
   expect(reportRunHeaders()).toEqual({});
   process.env.REPORT_RUN_TOKEN = "sample-run-token";

@@ -190,8 +190,11 @@ export async function forwardReportRun(
       body,
     });
   } catch (e) {
+    // The reason names the backend's address; it goes to the log, not the page.
+    const id = crypto.randomUUID().slice(0, 12);
+    console.error(`[report-run] error id ${id}: backend request failed:`, e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Backend error" },
+      { error: `The demo API did not answer (error id ${id}). Try again in a moment.` },
       { status: 502 },
     );
   }
