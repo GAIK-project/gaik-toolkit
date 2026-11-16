@@ -45,7 +45,7 @@ from `gaik.software_components.llm`. Supply it through `VisionParser(openai_conf
 | `openai` | `OPENAI_API_KEY`, optional `OPENAI_MODEL` |
 | `azure` | `AZURE_API_KEY`, `AZURE_ENDPOINT`, `AZURE_DEPLOYMENT`; optional `AZURE_API_VERSION` |
 | `google` | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`), optional `GOOGLE_MODEL` |
-| `vertex` | `GOOGLE_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`), optional `GOOGLE_CLOUD_LOCATION` (unset: the EU multi-region `eu` first, the global endpoint as its fallback; gaik 0.9.1 and earlier default to `global`); Google application-default credentials or `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS` |
+| `vertex` | `GOOGLE_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`), optional `GOOGLE_CLOUD_LOCATION` (unset: the EU multi-region `eu` first, the global endpoint as its fallback; gaik 0.9.1 and earlier defaulted to `global`); Google application-default credentials or `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS` |
 | `anthropic` | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` |
 | `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE`, optional `ANTHROPIC_MODEL` |
 | `aitta` | `AITTA_API_KEY` (aliases `AITTA_API_TOKEN`, `AITTA_TOKEN`), optional `AITTA_MODEL` |
