@@ -143,6 +143,10 @@ services:
       WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"
       NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
     # Every *-stack spec, so a new one is picked up without editing this file.
+      # Reports go to the host folder below, so CI can summarise and keep them.
+      PLAYWRIGHT_REPORT_DIR: /reports
+    volumes:
+      - ${STACK_E2E_REPORT_DIR:-./.stack-e2e-report}:/reports
     command: ["npx", "playwright", "test", "stack\\.spec\\.ts", "--workers=1"]
     depends_on:
       wizard-ui-stack-e2e:

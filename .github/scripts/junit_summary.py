@@ -24,6 +24,26 @@ def _cases(root: ET.Element):
     yield from root.iter("testcase")
 
 
+def count(paths: list[Path]) -> dict[str, int] | None:
+    """Passed, failed and skipped over the reports; None when none could be read."""
+    totals = {"passed": 0, "failed": 0, "skipped": 0}
+    read = False
+    for path in paths:
+        try:
+            root = ET.parse(path).getroot()
+        except (OSError, ET.ParseError):
+            continue
+        read = True
+        for case in _cases(root):
+            if case.find("failure") is not None or case.find("error") is not None:
+                totals["failed"] += 1
+            elif case.find("skipped") is not None:
+                totals["skipped"] += 1
+            else:
+                totals["passed"] += 1
+    return totals if read else None
+
+
 def summarize(title: str, paths: list[Path]) -> str:
     totals = {"passed": 0, "failed": 0, "skipped": 0}
     failures: list[tuple[str, str]] = []

@@ -169,6 +169,10 @@ if should_run stack-e2e; then
   finish_step
 
   step "Stack E2E — Playwright (every *-stack spec)"
+  # The container writes its JUnit and HTML reports here (docker-compose.test.yml);
+  # created up front and writable for the container's user.
+  report_dir="${STACK_E2E_REPORT_DIR:-./.stack-e2e-report}"
+  mkdir -p "$report_dir" && chmod a+rwx "$report_dir"
   "${COMPOSE_STACK[@]}" run --rm --no-deps test-e2e-stack
   STACK_E2E_EXIT=$?
   finish_step

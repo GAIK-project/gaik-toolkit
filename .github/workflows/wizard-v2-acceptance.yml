@@ -47,7 +47,20 @@ jobs:
 
       - name: Stack E2E (Postgres + wizard_api + UI)
         working-directory: implementation_layer/wizard_api
+        env:
+          STACK_E2E_REPORT_DIR: ${{ runner.temp }}/stack-e2e
         run: ./scripts/docker-test.sh --step stack-e2e
+      - name: Test report (stack E2E)
+        if: always()
+        run: python3 .github/scripts/junit_summary.py "Whole-stack browser tests" "$RUNNER_TEMP/stack-e2e/junit.xml"
+      - name: Keep the stack E2E results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stack-e2e-report
+          path: ${{ runner.temp }}/stack-e2e
+          retention-days: 30
+          if-no-files-found: ignore
 
       - name: Compose logs on failure
         if: failure()

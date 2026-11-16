@@ -77,6 +77,14 @@ jobs:
       - name: Test report (wizard_api)
         if: always()
         run: python .github/scripts/junit_summary.py "wizard_api unit tests" "$RUNNER_TEMP/junit/wizard-api.xml"
+      - name: Keep the test report (wizard-api)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-wizard-api
+          path: ${{ runner.temp }}/junit
+          retention-days: 90
+          if-no-files-found: ignore
 
   solution-wizard:
     runs-on: ubuntu-latest
@@ -115,6 +123,14 @@ jobs:
       - name: Test report (solution_wizard)
         if: always()
         run: python .github/scripts/junit_summary.py "solution_wizard unit tests" "$RUNNER_TEMP/junit/solution-wizard.xml"
+      - name: Keep the test report (solution-wizard)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-solution-wizard
+          path: ${{ runner.temp }}/junit
+          retention-days: 90
+          if-no-files-found: ignore
 
   solution-wizard-v2:
     runs-on: ubuntu-latest
@@ -147,6 +163,14 @@ jobs:
       - name: Test report (web app)
         if: always()
         run: python .github/scripts/junit_summary.py "Web app unit tests (vitest)" "$RUNNER_TEMP/junit/web-app.xml"
+      - name: Keep the test report (web-app)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-web-app
+          path: ${{ runner.temp }}/junit
+          retention-days: 90
+          if-no-files-found: ignore
       - name: ESLint
         working-directory: implementation_layer/solution_wizard_v2
         run: npm run lint
@@ -176,7 +200,27 @@ jobs:
           CI: "true"
           NEXT_PUBLIC_DEV_AUTH: "true"
           NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
+          PLAYWRIGHT_REPORT_DIR: ${{ runner.temp }}/e2e
         run: npm run test:e2e
+      - name: Test report (browser tests)
+        if: always()
+        run: python .github/scripts/junit_summary.py "Browser tests (Playwright)" "$RUNNER_TEMP/e2e/junit.xml"
+      - name: Keep the browser test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-e2e
+          path: ${{ runner.temp }}/e2e/junit.xml
+          retention-days: 90
+          if-no-files-found: ignore
+      - name: Keep the browser test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: ${{ runner.temp }}/e2e/html
+          retention-days: 14
+          if-no-files-found: ignore
 
   # The manifests under deploy/ are the sandbox's security boundary and the
   # deploy recipe; the tests that assert them live in implementation_layer/
@@ -203,6 +247,14 @@ jobs:
       - name: Test report (deploy manifests)
         if: always()
         run: python .github/scripts/junit_summary.py "Deploy manifest tests" "$RUNNER_TEMP/junit/deploy-manifests.xml"
+      - name: Keep the test report (deploy-manifests)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-deploy-manifests
+          path: ${{ runner.temp }}/junit
+          retention-days: 90
+          if-no-files-found: ignore
 
   # Known vulnerabilities in what the images install, and misconfigurations in
   # the Dockerfiles and OpenShift manifests. The policy (fail on high/critical
