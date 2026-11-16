@@ -151,8 +151,13 @@ For DoclingApiClientParser (Haaga-Helia service):
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `API_BASE` | Yes | Service base URL provided by Haaga-Helia |
+| `API_BASE` | Yes | Service base URL provided by Haaga-Helia (the demo app and generated PoCs read `DOCLING_API_BASE`) |
 | `PASSWORD` | Yes | Service password provided by Haaga-Helia |
+
+The client sends the document and the password only to the address set in `DOCLING_API_BASE`
+or `API_BASE` (plain http works for that address), to this machine, or to a host in
+`GAIK_ALLOWED_ENDPOINT_HOSTS` or `allowed_endpoint_hosts`. Any other `api_base` raises
+`EndpointNotAllowedError` when the client is built.
 
 ---
 

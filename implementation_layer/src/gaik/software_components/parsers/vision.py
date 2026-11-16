@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components.endpoints import check_openai_endpoint
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
@@ -92,6 +93,8 @@ class OpenAIConfig:
     timeout: float | None = None
     max_retries: int | None = None
     http_client: Any = None
+    # Hosts the application allows besides the provider's own (see the endpoints module).
+    allowed_endpoint_hosts: str | Sequence[str] | None = None
 
     def azure_base_endpoint(self) -> str | None:
         """Return the sanitized Azure endpoint without deployment path."""
@@ -181,6 +184,7 @@ class VisionParser:
             Provider.AITTA.value,
         }
         self.config = self._coerce_config(openai_config)
+        self._provider = provider
         self.custom_prompt = custom_prompt or self._default_prompt()
         self.use_context = use_context
         self.max_tokens = max_tokens
@@ -327,6 +331,14 @@ class VisionParser:
 
             if not config.api_version:
                 raise ValueError("Azure API version is required when use_azure=True.")
+            check_openai_endpoint(
+                {
+                    "base_url": config.base_url,
+                    "azure_endpoint": endpoint,
+                    "allowed_endpoint_hosts": config.allowed_endpoint_hosts,
+                },
+                Provider.AZURE.value,
+            )
 
             logger.debug(
                 "Initializing Azure OpenAI client for endpoint %s", config.base_url or endpoint
@@ -342,6 +354,12 @@ class VisionParser:
             )
 
         logger.debug("Initializing standard OpenAI client")
+        check_openai_endpoint(
+            {"base_url": config.base_url, "allowed_endpoint_hosts": config.allowed_endpoint_hosts},
+            self._provider
+            if self._provider in {Provider.OPENAI_COMPATIBLE.value, Provider.AITTA.value}
+            else Provider.OPENAI.value,
+        )
         kwargs: dict[str, Any] = {"api_key": config.api_key, **client_options}
         if config.base_url:
             kwargs["base_url"] = config.base_url
@@ -384,6 +402,7 @@ class VisionParser:
             timeout=timeout,
             max_retries=config.get("max_retries"),
             http_client=config.get("http_client"),
+            allowed_endpoint_hosts=config.get("allowed_endpoint_hosts"),
         )
 
     def _pdf_to_images(

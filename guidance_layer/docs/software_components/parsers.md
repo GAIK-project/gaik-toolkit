@@ -101,7 +101,10 @@ For VisionParser and VisionPlusParser:
 | `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
 | `AZURE_API_VERSION` | Optional | API version (default: 2024-12-01-preview with `parsers.get_openai_config()`, 2025-03-01-preview with `get_llm_config("azure")`) |
 
-For DoclingApiClientParser: `API_BASE` and `PASSWORD` for the hosted service.
+For DoclingApiClientParser: `API_BASE` and `PASSWORD` for the hosted service. The client
+sends the document and the password only to the address set in `DOCLING_API_BASE` or
+`API_BASE` (plain http works for that address), to this machine, or to a host in
+`GAIK_ALLOWED_ENDPOINT_HOSTS` or `allowed_endpoint_hosts`.
 
 **Note:** PyMuPDFParser, DocxParser, and DoclingParser do not require API keys.
 

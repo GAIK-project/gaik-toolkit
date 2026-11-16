@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 from gaik.software_components.llm import get_llm_config
 from gaik.software_components.llm.providers import resolve_provider
 
+# Settings in this PoC's own config that name a provider address.
+_ADDRESS_SETTINGS = ("base_url", "azure_endpoint", "azure_audio_endpoint")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
@@ -36,6 +38,25 @@ def external_model_forbidden(config: dict) -> bool:
     return governance.get("external_model_api_allowed") is False or bool(
         governance.get("local_processing_required")
     )
+
+
+def _allowed_hosts(config: dict, settings: dict) -> list[str]:
+    """Hosts gaik may send this stage's key to beyond its own provider hosts.
+
+    These are a stage address on this machine and the self-hosted servers the approved
+    blueprint lists in models.local_endpoints, over http too. From the gaik release
+    after 0.10.0, any other address goes through gaik's own check: name it in
+    GAIK_ALLOWED_ENDPOINT_HOSTS. gaik 0.10.0 ignores the list.
+    """
+    listed = settings.get("allowed_endpoint_hosts") or []
+    hosts = listed.split(",") if isinstance(listed, str) else list(listed)
+    governance = config.get("governance") or {}
+    hosts.extend(f"http://{entry}" for entry in governance.get("local_endpoints") or [])
+    for key in _ADDRESS_SETTINGS:
+        host = urlsplit(str(settings.get(key) or "")).hostname or ""
+        if host and host.lower() in _LOCAL_HOSTS:
+            hosts.append(host)
+    return hosts
 
 
 def get_stage_config(config: dict, stage: str) -> dict:
@@ -89,6 +110,9 @@ def get_stage_config(config: dict, stage: str) -> dict:
             f"{provider}. Point it at a local endpoint, or change the blueprint's governance "
             "flags with the owner's agreement."
         )
+    hosts = _allowed_hosts(config, settings)
+    if hosts:
+        settings["allowed_endpoint_hosts"] = hosts
     if (
         stage == "transcription"
         and settings.get("transcription_model") == "whisper_local"
