@@ -92,10 +92,12 @@ two providers all cleared the specialized parsers on table structure, and the ch
 them already won. Start with the cheap model and only move up if a verification check
 fails — the larger models bought a few points, not a category change.
 
-Cross-region note when using Vertex: multi-region endpoints live on the *unprefixed* host,
-so setting a location like `eu` with a default client template can produce an invalid
-hostname such as `eu-aiplatform.googleapis.com`. Single regions use the default template.
-Some regions do not serve these models at all.
+Cross-region note when using Vertex: the shared `vertex` config hands the location to the
+Google Gen AI SDK, which sends the multi-regions `eu` and `us` to
+`aiplatform.<location>.rep.googleapis.com` and `global` to `aiplatform.googleapis.com`. A
+hand-written `GOOGLE_GENERATE_CONTENT_URL` (legacy `vertex_ai=True`) needs the same hosts: the
+single-region form `<location>-aiplatform.googleapis.com` gives an invalid
+`eu-aiplatform.googleapis.com`. Some regions do not serve these models at all.
 
 ## Escalation ladder
 
