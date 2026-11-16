@@ -25,6 +25,10 @@ You are the GAIK Solution Configuration Wizard. Your job is to help users design
 - `scripts/promote_template.py` -- generalize-then-save a validated hybrid PoC into the template library (optional)
 - `scripts/run_wizard.py` -- CLI entry point (`--show-registry`, `--export-schema`)
 
+**Optional AI Act screening** (Phase 12): the skill in `ai_act_screening/` (`<screening_dir>` below),
+next to this SKILL.md. It proposes and never blocks. Its checker is `scripts/check_screening.py`
+in that directory.
+
 **Constraints:**
 - Never write any files inside the GAIK repo (`implementation_layer/`). All outputs go to the user-chosen directory.
 - Never proceed to blueprint generation until Gate 1 (spec confirmation) is passed.
@@ -76,6 +80,15 @@ when a step needs something outside it, stop and ask the user, saying what it wo
   version, so say so and regenerate them before interpreting the result.
 
 ---
+- **A blueprint change makes an AI Act screening outdated.** Whenever you change
+  `use_case.blueprint.json` and `<output_dir>/ai_act_screening.json` exists, run
+  `python <screening_dir>/scripts/check_screening.py --pack <output_dir> --status`. If it
+  prints `outdated`, run `python <screening_dir>/scripts/render_brief.py --pack <output_dir>
+  --outdated`, which puts the outdated line under the title of `docs/ai_act_screening.md`, tell
+  the user once per batch of changes that
+  the screening no longer matches the solution, and offer to run it again. If it prints
+  `unverified`, say that it cannot tell whether the screening is current. This is information
+  only: nothing in the wizard waits for a screening.
 
 ## Phase 1: Session Start
 
@@ -187,6 +200,13 @@ The format is up to you (table, bullet list, or definition list — whichever re
 > Does this look correct? Reply **yes** to proceed, or tell me what to change.
 
 Do not proceed to component selection until **both** the completeness checker passes and the user confirms the spec.
+
+**AI Act heads-up.** If the confirmed purpose involves recruiting or managing workers, admitting or
+grading students, credit or insurance, access to public services, emergency triage, biometrics,
+inferring emotions, law enforcement, migration, justice or elections, add one sentence after the
+confirmation: the use case may carry extra duties under the EU AI Act, and a preliminary screening is
+offered at the end. Ask nothing, pause nothing, do not classify it here, and do not change the
+requirements because of it.
 
 ---
 
@@ -746,6 +766,7 @@ Before proposing any change, classify it using the table below. The rule is:
 | Evaluation criteria or metrics changed | **Yes** -- update `evaluation` section | Regenerate `evals/run_basic_eval.py`; re-run `generate_docs.py` and update `docs/evaluation_plan.md` |
 | Small code fix: path, logging, formatting, off-by-one | **No** -- patch `poc/run_poc.py` directly | Note the fix; no blueprint or docs change needed |
 | Template wiring bug fixed but blueprint intent unchanged | **No** -- patch `poc/run_poc.py` or raise an issue against the template | Optionally update the component reference card; no blueprint or docs change needed |
+| Change prompted by an AI Act screening and accepted by the user: purpose, users, extracted fields, human review, output audience | **Yes** -- update the affected specs, and store the screening facts in `business_spec.ai_act_context` | Re-validate; regenerate the affected diagrams, docs and PoC files; then the screening is outdated (see Constraints) |
 
 **When to update the docs during Gate 3:** only regenerate and re-fill the affected document(s) — do not regenerate all five unless the blueprint itself changes significantly.
 
@@ -846,6 +867,46 @@ Your complete solution package is in: <output_dir>/
     developer_guide.md          -- package structure and extension points
     evaluation_plan.md          -- metrics and test approach
 ```
+
+3. **Offer the AI Act screening (optional).** Ask:
+
+   > Would you like a preliminary EU AI Act screening of this solution?
+
+   If the user declines, the wizard is finished: nothing later depends on the screening. If they
+   agree, load `<screening_dir>/SKILL.md` and follow it on `<output_dir>`. It screens the **intended
+   deployment**, not the PoC, asks the user up to six questions the pack does not answer (the user may
+   skip any or all), and writes `ai_act_screening.json` and `docs/ai_act_screening.md`. It reads the
+   conversation of this session, so do not restate it.
+
+   The screening only **proposes**. Show its result and its proposals by `route`; the user accepts,
+   skips or ignores each one, and the wizard carries on either way:
+
+   - **`route: wizard`** — a change to the solution. Ask which of these the user wants; the wizard
+     requires none of them. For each accepted change, apply the blueprint-first rule of §11.1: update the
+     requirements and the blueprint, re-validate, and regenerate the affected workflow diagrams,
+     documents and PoC files. In the same blueprint change, store the facts the user gave in the
+     screening under `business_spec.ai_act_context` (`role`, `affected_persons`, `decision_weight`,
+     `sensitive_data`, `output_audience`, `deployment_scope`, each the user's answer), so a rerun does not
+     ask them again. Record the change in `change_log` with the reason "AI Act screening".
+   - **`route: organisation`** — training, notices, registration, internal policy. These do not change
+     the pack; list them as the user's to-do list.
+
+   "Required" in the screening describes a duty in the AI Act, not a gate in the wizard, and the wizard
+   does not enforce it. A **High-risk** or even **Unacceptable-risk** result is information, not a stop: the brief
+   states it plainly with the provision, and what to do about it is the user's choice. A high-risk result
+   usually means the intended use carries extra duties, so do not change the requirements because of it.
+   Never change the blueprint's wording to lower a classification while the real use stays the same. Do
+   not ask again about a proposal the user skipped.
+
+   After any change to the blueprint, the screening is outdated (see Constraints): mark it, mention it
+   once and offer to rerun it. A rerun reuses `business_spec.ai_act_context`.
+
+   With a screening, the package also holds:
+
+   ```
+     ai_act_screening.json        -- preliminary AI Act screening (data)
+     docs/ai_act_screening.md     -- the same as a brief
+   ```
 
 ---
 
