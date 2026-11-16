@@ -74,7 +74,71 @@ oc apply -f services.yaml
 oc apply -f deployment-api.yaml
 oc apply -f deployment-frontend.yaml
 oc apply -f route.yaml
+oc apply -f networkpolicy-api.yaml
 ```
+
+## Network policy and pod hardening
+
+`networkpolicy-api.yaml` states the intended rule: only the frontend pods reach the API
+on port 8000 (`gaik-demo` to `gaik-demo-api`, and `gaik-demo-staging` to
+`gaik-demo-api-staging`). `proxy.ts` is the only sign-in, approval and trial gate in
+front of the API, so no other pod in the project should reach the API directly. The
+kubelet's health probes are not affected, and the API has no route of its own. The
+selectors match the live pod labels.
+
+**The policy takes effect only when the shared namespace policy is changed.**
+NetworkPolicies add up, and the `gaik` project has `deny-other-namespaces-access`,
+which selects every pod (`podSelector: {}`) and admits every pod in the namespace
+(`from: [{podSelector: {}}]`), next to `allow-from-router` for the router. While that
+policy admits every pod, any pod in the project can still reach the API, with or
+without this file. Changing the shared policy is the project owner's decision; until
+then this file only states the rule.
+
+When that policy is narrowed, it would keep the other pods and leave the API pods out,
+for example:
+
+```yaml
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: NotIn
+        values: [gaik-demo-api, gaik-demo-api-staging]
+```
+
+Apply the policy file on its own. Never `oc apply` the deployment manifests to a
+running environment: the live deployments carry env vars these files lack.
+
+```bash
+oc get networkpolicy -n gaik -o yaml        # what is there now
+oc apply -f networkpolicy-api.yaml -n gaik
+
+# Check: each frontend still reaches its API ...
+oc exec -n gaik deployment/gaik-demo -- \
+  bun -e "fetch('http://gaik-demo-api:8000/health').then(r => console.log(r.status))"
+oc exec -n gaik deployment/gaik-demo-staging -- \
+  bun -e "fetch('http://gaik-demo-api-staging:8000/health').then(r => console.log(r.status))"
+# ... and, once the shared policy no longer admits every pod, another pod does not
+# (this times out then):
+oc run np-check -n gaik --rm -i --restart=Never --image=curlimages/curl:8.11.1 -- \
+  curl -s -m 5 -o /dev/null -w '%{http_code}\n' http://gaik-demo-api:8000/health
+```
+
+Roll back with `oc delete networkpolicy gaik-demo-api-from-frontend gaik-demo-api-staging-from-frontend -n gaik`.
+
+The deployment manifests state the container hardening: no privilege escalation, all
+Linux capabilities dropped and a non-root user. On Rahti the project's SCC already
+applies these to every pod, with Rahti's own seccomp profile, so nothing needs to be
+patched on the live deployments, and the manifests name no seccomp profile that could
+replace Rahti's. The settings are written down for other clusters. Check what a pod
+runs with:
+
+```bash
+oc get pods -n gaik -o custom-columns=NAME:.metadata.name,SCC:.metadata.annotations.openshift\.io/scc
+```
+
+The root filesystem stays writable: the API writes model caches, uploads and generated
+files, and Next.js writes its cache under `/app/.next/cache`.
 
 ## Build & Push Images
 
@@ -140,8 +204,20 @@ runs as before.
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
-| `WIZARD_ACCESS_SECRET`                 | Old wizard gate on `/api/wizard`; read until that gate is removed | Secret: `gaik-demo-admin` |
 | `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
+
+`WIZARD_ACCESS_SECRET` is no longer read: the frontend answers 404 on `/api/wizard`.
+Remove it from both frontend deployments first, then from the secret if it is there
+(the patch fails harmlessly when the key is absent):
+
+```bash
+for d in gaik-demo gaik-demo-staging; do
+  oc set env deployment/$d WIZARD_ACCESS_SECRET- -n gaik
+done
+oc get secret/gaik-demo-admin -n gaik -o jsonpath='{.data}' | grep -q WIZARD_ACCESS_SECRET &&
+  oc patch secret/gaik-demo-admin -n gaik --type=json \
+    -p '[{"op":"remove","path":"/data/WIZARD_ACCESS_SECRET"}]'
+```
 
 ### Backend (gaik-demo-api)
 
@@ -200,6 +276,7 @@ cd implementation_layer/toolkit_demo_app/openshift
 | `deployment-api.yaml`      | Backend API deployment (FastAPI) |
 | `services.yaml`            | ClusterIP services for both      |
 | `route.yaml`               | Public HTTPS route for frontend  |
+| `networkpolicy-api.yaml`   | Only the frontend reaches the API (apply on its own) |
 | `secrets.yaml.example`     | Example secrets template         |
 
 ## Report Writer upload limits

@@ -7,12 +7,14 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
+# Nothing is granted by default; the job asks for what it needs.
+permissions: {}
 
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
     - name: Review the dependencies this pull request changes
       uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0

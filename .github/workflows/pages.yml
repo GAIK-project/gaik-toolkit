@@ -9,9 +9,8 @@ on:
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
-# Only the deploy job may publish to Pages.
-permissions:
-  contents: read
+# Nothing is granted by default; only the deploy job may publish to Pages.
+permissions: {}
 
 concurrency:
   group: "pages"
@@ -20,6 +19,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: guidance_layer/website

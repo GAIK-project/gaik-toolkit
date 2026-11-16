@@ -33,9 +33,23 @@ The wheel is built from the source distribution and both must preserve every
 library Python file, SQL script, and `py.typed` marker byte for byte. The source
 archive allows only the library and build metadata; demo applications, evaluation
 data, environment files, and repository media are excluded by `MANIFEST.in`.
-Artifact names, sizes, and SHA-256 hashes are recorded in the report. The publish
-job repeats this validation and fails if any upload fails, including an existing
-artifact; it does not report a partially uploaded version as successful.
+Artifact names, sizes, and SHA-256 hashes are recorded in the report. In
+`publish.yml`, the `build` job repeats this validation with read-only access and
+hands the files on as an artifact. `publish-pypi` uploads exactly those files and
+fails if any upload fails, including an existing artifact; it does not report a
+partially uploaded version as successful. `verify-install` then installs the
+version from PyPI and compares it with the tag, and only after that does
+`github-release` create the GitHub release.
+
+The upload uses PyPI trusted publishing: PyPI accepts a short-lived OIDC token
+issued to `publish.yml` in the `release` environment, and `publish-pypi` is the
+only job allowed to request one. No PyPI token is stored. A maintainer of the
+`gaik` project on PyPI sets this up once, under the project's Publishing settings:
+add a GitHub trusted publisher with this repository's owner and name, workflow
+`publish.yml` and environment `release`. Do this before the next tag; without it
+the gate runs and the upload then fails. Keep the `release` environment limited to
+`v*` tags with a required reviewer. Once a release has gone out this way, delete
+the old `PYPI_API_TOKEN` secret and revoke that token on PyPI.
 
 Configure a small representative matrix with environment variables:
 

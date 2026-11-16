@@ -13,12 +13,14 @@ on:
       - ".github/workflows/pages.yml"
       - ".github/workflows/docs-site.yml"
 
-permissions:
-  contents: read
+# Nothing is granted by default; the job asks for what it needs.
+permissions: {}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: guidance_layer/website

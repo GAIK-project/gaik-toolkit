@@ -11,8 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-import requests
 from markdown_it import MarkdownIt
+
+from gaik.software_components import _http
 
 from .config import (
     create_claude_client,
@@ -401,18 +402,23 @@ class MultimodalParser:
                 "Content-Type": "application/json; charset=utf-8",
             }
 
-        response = requests.post(url, headers=headers, json=body, timeout=(30, 300))
-        response.raise_for_status()
+        response = _http.post(url, service="Gemini", headers=headers, json=body, timeout=(30, 300))
 
         payload = response.json()
         candidates = payload.get("candidates", [])
         if not candidates:
-            raise ValueError(f"The Gemini response contained no candidates: {payload}")
+            raise ValueError(
+                "The Gemini response contained no candidates "
+                f"({_http.describe_empty_gemini_response(payload)})"
+            )
 
         parts = candidates[0].get("content", {}).get("parts", [])
         text_parts = [p.get("text", "") for p in parts if p.get("text")]
         if not text_parts:
-            raise ValueError(f"The Gemini response contained no text parts: {payload}")
+            raise ValueError(
+                "The Gemini response contained no text parts "
+                f"({_http.describe_empty_gemini_response(payload)})"
+            )
 
         return "".join(text_parts).strip() + "\n", _extract_google_usage(payload)
 
