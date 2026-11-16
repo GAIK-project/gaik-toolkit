@@ -1,5 +1,6 @@
 "use client";
 
+import { ComponentSource } from "@/components/demo/component-source";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { PageTransition } from "@/components/demo/page-transition";
 import {
@@ -736,6 +737,7 @@ export default function RAGPage() {
               <p className="text-muted-foreground hidden text-sm sm:block">
                 Ask questions about your documents
               </p>
+              <ComponentSource className="mt-1.5 hidden sm:flex" />
             </div>
           </div>
 

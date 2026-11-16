@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from api.routers import vision_extractor as route
+from api.utils import model_allow_list
 from fastapi import HTTPException, UploadFile
 from gaik.software_components.extractor import ExtractionRequirements, FieldSpec
 from gaik.software_components.extractor.schema import create_extraction_model
@@ -114,6 +115,8 @@ def test_google_is_offered_only_with_credentials(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> None:
     captured: dict = {}
+    # Claude Sonnet is a team-only model: run as the team.
+    monkeypatch.setattr(model_allow_list, "request_is_staff", lambda: True)
 
     class FakeVisionExtractor:
         def __init__(self, **kwargs):

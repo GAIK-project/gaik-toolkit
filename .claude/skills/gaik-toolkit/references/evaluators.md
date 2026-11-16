@@ -97,8 +97,11 @@ Generic pipeline → outputs runner. Hand a callable
 ```python
 from gaik.software_components.evaluators import BatchEvaluationRunner
 
+extractor = DataExtractor(config=config)
+
 def pipeline(item):
-    return DataExtractor(...).extract(item.input, schema=...).fields
+    # extract() returns one dict per document; evaluate_dataset takes one per item
+    return extractor.extract(model, requirements, user_requirements, [item.input])[0]
 
 runner = BatchEvaluationRunner(pipeline, on_error="skip")
 runner_result = runner.run(dataset)

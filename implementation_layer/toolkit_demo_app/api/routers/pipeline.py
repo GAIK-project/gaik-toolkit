@@ -20,6 +20,8 @@ try:
         get_api_config,
         get_model_options,
         get_transcription_api_config,
+        on_aitta,
+        require_vision,
         load_schema,
         save_schema,
         sse_event,
@@ -49,6 +51,8 @@ except ImportError:
         get_api_config,
         get_model_options,
         get_transcription_api_config,
+        on_aitta,
+        require_vision,
         load_schema,
         save_schema,
         sse_event,
@@ -127,6 +131,8 @@ def _pdf_path(job_id: str) -> Path:
 def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config: dict):
     validate_vision_page_limit(tmp_path, suffix, parser_type)
 
+    if parser_type in {"vision", "vision_plus"}:
+        require_vision(config)
     if parser_type == "vision":
         from gaik.software_components.parsers import VisionParser
 
@@ -940,7 +946,8 @@ async def audio_pipeline_stream(
             cloud_model = transcription_config.get("transcription_model", "whisper")
             model_used = cloud_model
             transcribe_started = time.monotonic()
-            if prefer_local_first and local_api_base and local_api_key:
+            # An Aitta run stays on Aitta: its Whisper, not the local server first.
+            if prefer_local_first and local_api_base and local_api_key and not on_aitta(config):
                 try:
                     transcription = await asyncio.to_thread(
                         transcribe_with, transcription_model="whisper_local"
@@ -1392,8 +1399,8 @@ async def document_pipeline_stream(
             steps[0]["message"] = "Parsing document content..."
             yield sse_event("step_update", steps[0])
 
-            # The same parsers, run the same way, as in the Parser demo. A model or a remote
-            # service reads the file in a worker thread, so that it cannot stall the event loop.
+            # The same parsers, run the same way, as in the Parser demo. Every parser, local or
+            # remote, reads the file in a worker thread, so that it cannot stall the event loop.
             parse_started = time.monotonic()
             parsed = await run_parser(tmp_path, suffix, actual_parser_type)
             parse_seconds = time.monotonic() - parse_started

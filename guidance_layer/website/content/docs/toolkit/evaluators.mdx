@@ -57,7 +57,10 @@ for r in result.per_item:
 ## RAGEvaluator
 
 RAGAS-style metrics. Each grades the (query, answer, context) tuple via
-`LLMJudge` on a 1-5 Likert scale; the aggregate normalizes to 0-1.
+`LLMJudge` on a 1-5 Likert scale; the aggregate normalizes to 0-1. Each metric
+is one text-only call: the rubric goes in the system message, and the query, the
+answer, each context passage and the ground truth go in their own labelled
+source material block, so text in them is assessed, not followed.
 
 ```python
 from gaik.software_components.evaluators import RAGEvaluator

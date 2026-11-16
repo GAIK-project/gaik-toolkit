@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
+from gaik.software_components.source_material import SourceMaterial
+
 from .models import Edit
 
 SYSTEM_PROMPT = """\
@@ -26,34 +30,50 @@ DEFAULT_CHECKS = """\
 - Do not rewrite the style and do not reorder the content."""
 
 
-def review_instruction(reference: str, instructions: str) -> str:
+def _reference_blocks(material: SourceMaterial, reference: str | Mapping[str, str]) -> str:
+    """The reference material, one labelled block per piece (one block for a plain string)."""
+    if isinstance(reference, str):
+        return material.wrap(reference, label="reference")
+    return "\n\n".join(material.wrap(text, label=label) for label, text in reference.items())
+
+
+def review_instruction(
+    reference: str | Mapping[str, str], instructions: str, material: SourceMaterial
+) -> str:
+    """The checks, outside the blocks, followed by the reference material in its blocks."""
     return (
         "Check the text against the reference material and fix problems with targeted "
         "search-and-replace edits. Make only the changes the checks call for.\n\n"
         f"Checks:\n{instructions.strip() or DEFAULT_CHECKS}\n\n"
-        f"Reference material (inside <reference>):\n<reference>\n{reference}\n</reference>"
+        "Reference material (each piece in its own source_material block, labelled with "
+        "its name):\n" + _reference_blocks(material, reference)
     )
 
 
-def check_prompt(text: str) -> str:
+def check_prompt(text: str, material: SourceMaterial) -> str:
     return (
-        f"Text to review (inside <text>):\n<text>\n{text}\n</text>\n\n"
-        "Copy each 'search' EXACTLY from this text so the passage can be located."
+        "Text to review (in the source_material block labelled text):\n"
+        + material.wrap(text, label="text")
+        + "\n\nCopy each 'search' EXACTLY from this text so the passage can be located."
     )
 
 
-def retry_prompt(text: str, failed: list[tuple[Edit, str]], attempt: int) -> str:
+def retry_prompt(
+    text: str, failed: list[tuple[Edit, str]], attempt: int, material: SourceMaterial
+) -> str:
     listed = "\n\n".join(
         f"  search: {edit.search!r}\n  replace: {edit.replace!r}\n"
         f"  reason: {edit.reason}\n  error: {error}"
         for edit, error in failed
     )
     return (
-        f"You have proposed edits to this text {attempt} time(s), but these edits could "
-        f"not be applied:\n\n{listed}\n\n"
-        "The edits that did apply are already in the current text below; do not repeat "
-        "them. Return NEW edits that make the failed changes, each with a 'search' that "
-        "occurs exactly once in the current text. An empty list leaves the failed edits "
-        "unresolved.\n\n"
-        f"Current text (inside <text>):\n<text>\n{text}\n</text>"
+        f"You have proposed edits to this text {attempt} time(s), but the edits in the "
+        "source_material block labelled failed_edits could not be applied.\n\n"
+        + material.wrap(listed, label="failed_edits")
+        + "\n\nThe edits that did apply are already in the current text below; do not "
+        "repeat them. Return NEW edits that make the failed changes, each with a 'search' "
+        "that occurs exactly once in the current text. An empty list leaves the failed "
+        "edits unresolved.\n\n"
+        "Current text (in the source_material block labelled text):\n"
+        + material.wrap(text, label="text")
     )

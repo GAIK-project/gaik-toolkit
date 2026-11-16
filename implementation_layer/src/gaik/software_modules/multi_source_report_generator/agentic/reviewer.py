@@ -14,10 +14,17 @@ structured output and the stdlib ``difflib`` for fuzzy matching (no extra deps).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from difflib import SequenceMatcher
 
 from pydantic import BaseModel, Field
 
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    with_source_material_instruction,
+)
+
+from .._material import Evidence
 from .prompts import build_polish_instruction, build_reviewer_instruction
 
 MAX_ATTEMPTS = 5
@@ -121,7 +128,7 @@ def _request_corrections(
     client, instruction: str, user_prompt: str, chat_kwargs: dict
 ) -> CorrectionList:
     messages = [
-        {"role": "system", "content": _EDITOR_SYSTEM_PROMPT},
+        {"role": "system", "content": with_source_material_instruction(_EDITOR_SYSTEM_PROMPT)},
         {"role": "user", "content": instruction},
         {"role": "user", "content": user_prompt},
     ]
@@ -134,39 +141,51 @@ def _request_corrections(
     return CorrectionList.model_validate(result)
 
 
-def _check_prompt(text: str) -> str:
+def _check_prompt(text: str, blocks: SourceMaterial) -> str:
     return (
-        "Text to review (inside <text>):\n<text>\n"
-        f"{text}\n</text>\n\n"
-        "If you make corrections, copy each 'search' field EXACTLY from this text "
+        "Text to review (in the source_material block labelled text):\n"
+        + blocks.wrap(text, label="text")
+        + "\n\nIf you make corrections, copy each 'search' field EXACTLY from this text "
         "so the passage can be located."
     )
 
 
-def _retry_prompt(text: str, failed: list[dict], attempt: int) -> str:
+def _retry_prompt(text: str, failed: list[dict], attempt: int, blocks: SourceMaterial) -> str:
     failed_info = "\n\n".join(
         f"  search: {f['search']!r}\n  replace: {f['replace']!r}\n  error: {f['error']}"
         for f in failed
     )
     return (
-        f"You have attempted to correct this text {attempt} time(s), but the following "
-        "edits could not be applied because their search strings were not found:\n\n"
-        f"{failed_info}\n\n"
-        "Re-read the instructions and decide whether these changes are still needed. "
+        f"You have attempted to correct this text {attempt} time(s), but the edits in the "
+        "source_material block labelled failed_edits could not be applied because their "
+        "search strings were not found.\n\n"
+        + blocks.wrap(failed_info, label="failed_edits")
+        + "\n\nRe-read the instructions and decide whether these changes are still needed. "
         "If so, produce NEW corrections whose 'search' strings EXACTLY match the current "
-        "text below.\n\n"
-        f"<text>\n{text}\n</text>"
+        "text below.\n\n" + blocks.wrap(text, label="text")
     )
+
+
+Instruction = str | Callable[[SourceMaterial], str]
+"""The editor's instruction, or a function that builds it with the request's blocks."""
+
+
+def _instruction_for(instruction: Instruction, blocks: SourceMaterial) -> str:
+    return instruction(blocks) if callable(instruction) else instruction
 
 
 def diff_editor_run(
     *,
     text: str,
-    instruction: str,
+    instruction: Instruction,
     client,
     chat_kwargs: dict,
 ) -> tuple[str, list[dict], list[str], int]:
     """Run the check -> apply -> retry loop.
+
+    The requests share one block id, so the instruction stays the same across
+    retries; a new id is drawn, and a callable ``instruction`` rebuilt with it, only
+    when an applied or failed edit has written the current id into what is sent.
 
     Returns ``(corrected_text, applied_edits, warnings, num_proposed)``.
     ``warnings`` lists edits that could not be applied after all retries.
@@ -174,7 +193,10 @@ def diff_editor_run(
     current = text
     applied: list[dict] = []
 
-    first = _request_corrections(client, instruction, _check_prompt(current), chat_kwargs)
+    blocks = SourceMaterial()
+    first = _request_corrections(
+        client, _instruction_for(instruction, blocks), _check_prompt(current, blocks), chat_kwargs
+    )
     num_proposed = len(first.corrections)
     pending = first.corrections
 
@@ -188,8 +210,14 @@ def diff_editor_run(
             break
         if attempt >= MAX_ATTEMPTS:
             break
+        sent = [current] + [f"{f['search']}\n{f['replace']}" for f in failed]
+        if any(blocks.boundary in piece for piece in sent):
+            blocks = SourceMaterial()
         pending = _request_corrections(
-            client, instruction, _retry_prompt(current, failed, attempt), chat_kwargs
+            client,
+            _instruction_for(instruction, blocks),
+            _retry_prompt(current, failed, attempt, blocks),
+            chat_kwargs,
         ).corrections
 
     warnings = [
@@ -203,7 +231,7 @@ def diff_editor_run(
 def review_and_polish(
     *,
     draft: str,
-    evidence: str,
+    evidence: Evidence,
     title: str,
     instructions: str,
     sample_section: str,
@@ -211,7 +239,7 @@ def review_and_polish(
     include_source_references: bool,
     report_description: str | None,
     additional_instructions: str | None = None,
-    dependencies_context: str,
+    dependencies_context: Mapping[str, str] | None,
     client,
     chat_kwargs: dict,
     polish: bool,
@@ -219,17 +247,21 @@ def review_and_polish(
     label: str,
 ) -> tuple[str, list[dict], list[str]]:
     """Mandatory fact/format repair, then optional style-only polish."""
-    instruction = build_reviewer_instruction(
-        title=title,
-        instructions=instructions,
-        evidence=evidence,
-        sample_section=sample_section,
-        has_sample=has_sample,
-        include_source_references=include_source_references,
-        report_description=report_description,
-        additional_instructions=additional_instructions,
-        dependencies_context=dependencies_context,
-    )
+
+    def instruction(blocks: SourceMaterial) -> str:
+        return build_reviewer_instruction(
+            blocks=blocks,
+            title=title,
+            instructions=instructions,
+            evidence=evidence,
+            sample_section=sample_section,
+            has_sample=has_sample,
+            include_source_references=include_source_references,
+            report_description=report_description,
+            additional_instructions=additional_instructions,
+            dependencies_context=dependencies_context,
+        )
+
     text, applied, warnings, num_proposed = diff_editor_run(
         text=draft, instruction=instruction, client=client, chat_kwargs=chat_kwargs
     )

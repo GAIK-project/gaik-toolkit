@@ -106,7 +106,10 @@ sources = NormalizedSources.load("output/sources")
 text = sources.get("maintenance_log.xlsx").text
 ```
 
-The saved Markdown files can be read and edited before curation. Texts that are already
+The saved Markdown files can be read and edited before curation. `load` checks each id in
+`sources.json` before it reads the file: an id must be a plain file name, and its `<id>.md`
+must stay inside the folder (a symbolic link that leads out of it is refused), else
+`SourcePathError` (a `ValueError`) is raised. Texts that are already
 available can be wrapped with `NormalizedSources.from_texts({"notes.txt": text})`.
 
 See the [example](../../../../examples/software_components/source_normalizer/source_normalizer_example.py)

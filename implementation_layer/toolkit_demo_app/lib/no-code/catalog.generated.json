@@ -1,7 +1,7 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.6.12",
+    "version": "0.6.18",
     "marketplace": "GAIK-project/gaik-toolkit",
     "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
   },
@@ -19,20 +19,20 @@
       ],
       "setup": [
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/incident-report-writing-setup-kit.zip",
-        "zipBytes": 39671
+        "zipBytes": 57837
       },
       "tryPrompt": "Use the incident-report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing) to turn my audio recording into an incident report. I will attach the file next.",
       "files": [
         "SKILL.md"
       ],
       "zip": "/downloads/skills/incident-report-writing.zip",
-      "zipBytes": 14214,
+      "zipBytes": 14539,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing"
     },
@@ -49,20 +49,20 @@
       ],
       "setup": [
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/construction-diary-creation-setup-kit.zip",
-        "zipBytes": 37843
+        "zipBytes": 55894
       },
       "tryPrompt": "Use the construction-diary-creation skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
       "files": [
         "SKILL.md"
       ],
       "zip": "/downloads/skills/construction-diary-creation.zip",
-      "zipBytes": 15258,
+      "zipBytes": 15464,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation"
     },
@@ -71,9 +71,9 @@
       "group": "no-code",
       "title": "Purchase order processing",
       "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
-      "description": "Process Purchase Orders and Bills of Material to generate priced Sales Orders",
+      "description": "Matches a purchase order and its bills of material (PDFs) against a price list (.xlsx or .csv) and writes a priced sales order and a calculation breakdown, in Claude Desktop with the filesystem MCP server. Use when the user wants to process a purchase order or PO, generate or price a sales order, match BOMs with a PO, or calculate order pricing from a price list.",
       "input": "PO, BOM PDFs and a price list",
-      "output": "Word (.docx) and calculation breakdown",
+      "output": "A priced sales order (.txt, or .docx with a sample sales order) and its calculation",
       "needs": [
         "Filesystem MCP server"
       ],
@@ -82,7 +82,7 @@
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": null,
-      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
+      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing) to turn the purchase order, its BOMs and the price list in my folder <folder path> into a priced sales order.",
       "files": [
         "EVALUATION.md",
         "SKILL.md",
@@ -93,7 +93,7 @@
         "reference/PRICING_RULES.md"
       ],
       "zip": "/downloads/skills/purchase-order-processing.zip",
-      "zipBytes": 107093,
+      "zipBytes": 108494,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing"
     },
@@ -111,13 +111,13 @@
       ],
       "setup": [
         "Windows only. Needs Python 3.11+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber and the file access server, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment and the file access server from pinned, hash-checked packages, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/report-writing-setup-kit.zip",
-        "zipBytes": 74320
+        "zipBytes": 141146
       },
       "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing) to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [
@@ -127,7 +127,7 @@
         "reference/OUTPUT_SECTIONS.md"
       ],
       "zip": "/downloads/skills/report-writing.zip",
-      "zipBytes": 46962,
+      "zipBytes": 47157,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing"
     },
@@ -173,7 +173,7 @@
         "scripts/setup_env.sh"
       ],
       "zip": "/downloads/skills/brief-to-slides.zip",
-      "zipBytes": 538323,
+      "zipBytes": 538322,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/brief-to-slides",
       "guideUrl": null
     },
@@ -197,7 +197,7 @@
         "references/parser-selection.md"
       ],
       "zip": "/downloads/skills/parsing-documents.zip",
-      "zipBytes": 19058,
+      "zipBytes": 19346,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/parsing-documents",
       "guideUrl": null
     },
@@ -221,7 +221,7 @@
         "references/measuring-extraction.md"
       ],
       "zip": "/downloads/skills/extracting-structured-data.zip",
-      "zipBytes": 22939,
+      "zipBytes": 22943,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/extracting-structured-data",
       "guideUrl": null
     },
@@ -247,7 +247,7 @@
         "references/postgres-without-gaik.md"
       ],
       "zip": "/downloads/skills/searching-documents.zip",
-      "zipBytes": 42379,
+      "zipBytes": 42415,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents",
       "guideUrl": null
     },
@@ -278,7 +278,7 @@
         "scripts/template_to_spec.py"
       ],
       "zip": "/downloads/skills/generate-structured-reports.zip",
-      "zipBytes": 174123,
+      "zipBytes": 178981,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports",
       "guideUrl": null
     }

@@ -204,14 +204,53 @@ def build_requirements_text(target_output_spec: dict[str, Any]) -> str:
 def _safe_enum_member(v: str) -> str:
     """Convert an allowed value to a valid Python identifier for an Enum member."""
     s = re.sub(r"[^a-zA-Z0-9_]", "_", str(v))
-    # Enum members must not start with a digit
-    if s and s[0].isdigit():
+    # Enum members must not start with a digit. A leading underscore gets the
+    # prefix too: Python's Enum reserves _sunder_ names (a value "-x-" would give
+    # "_X_") and does not make a member of a __dunder__ name.
+    if s and (s[0].isdigit() or s[0] == "_"):
         s = f"V_{s}"
     return s.upper() or "UNKNOWN"
 
 
+def _enum_members(values: list[str]) -> list[tuple[str, str]]:
+    """(member name, value) per distinct allowed value, each name used once.
+
+    Two values can give the same name ("a b" and "a-b" both give A_B); the later
+    one gets a number, so neither value is lost from the Enum.
+    """
+    members: list[tuple[str, str]] = []
+    used: set[str] = set()
+    for value in dict.fromkeys(values):
+        base = _safe_enum_member(value)
+        name, n = base, 2
+        while name in used:
+            name, n = f"{base}_{n}", n + 1
+        used.add(name)
+        members.append((name, value))
+    return members
+
+
 def _enum_name(field: str) -> str:
     return "".join(w.title() for w in field.split("_")) + "Enum"
+
+
+def _enum_names(fields: list[str], allowed_values: dict[str, Any]) -> dict[str, str]:
+    """The Enum class name per field with allowed values, each name used once.
+
+    Two fields can give the same name ("a_b" and "a__b" both give ABEnum); the
+    later one gets a number, so neither Enum replaces the other.
+    """
+    names: dict[str, str] = {}
+    for field in fields:
+        vals = allowed_values.get(field, [])
+        if not (vals and all(isinstance(v, str) for v in vals)):
+            continue
+        base = _enum_name(field)
+        name, n = base, 2
+        while name in names.values():
+            name, n = f"{base[: -len('Enum')]}{n}Enum", n + 1
+        names[field] = name
+    return names
 
 
 def _source_name(value: Any, what: str) -> str:
@@ -255,21 +294,21 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
     if has_enum:
         imports.append("from enum import Enum")
 
+    enum_names = _enum_names(fields, allowed_values)
     enum_blocks = []
     for field in fields:
         vals = allowed_values.get(field, [])
-        if vals and all(isinstance(v, str) for v in vals):
-            enum_name = _enum_name(field)
-            members = "\n".join(f"    {_safe_enum_member(v)} = {v!r}" for v in vals)
+        if field in enum_names:
+            enum_name = enum_names[field]
+            members = "\n".join(f"    {m} = {v!r}" for m, v in _enum_members(vals))
             enum_blocks.append(f"class {enum_name}(str, Enum):\n{members}\n")
 
     field_lines = []
     needs_decimal_helper = False
     for field in fields:
         py_type = _py_type(field_types.get(field, "string"))
-        vals = allowed_values.get(field, [])
-        if vals and all(isinstance(v, str) for v in vals):
-            py_type = _enum_name(field)
+        if field in enum_names:
+            py_type = enum_names[field]
 
         desc = str(field_descriptions.get(field) or "")
         # Use Field(description=...) so the description propagates into JSON Schema
@@ -426,7 +465,8 @@ def build_requirements_json(
 def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
     """The model that build_pydantic_model()'s source defines, built from the spec as data.
 
-    write_schema_files() needs the model only for its JSON Schema. Building it
+    write_schema_files() needs the model for its JSON Schema and its saved
+    description (output_schema_model.json). Building it
     with pydantic.create_model keeps the spec's text as values: no source code
     is assembled from it and nothing is executed. Field for field it follows
     build_pydantic_model(), so the JSON Schema is the same.
@@ -463,6 +503,7 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
     descriptions: dict[str, str] = spec.get("field_descriptions", {})
     allowed_values: dict[str, Any] = spec.get("allowed_values", {})
 
+    enum_names = _enum_names(fields, allowed_values)
     definitions: dict[str, Any] = {}
     for field in fields:
         desc = descriptions.get(field, "")
@@ -470,8 +511,8 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
         described = {"description": desc} if desc else {}
         py_type = _py_type(field_types.get(field, "string"))
         vals = allowed_values.get(field, [])
-        if vals and all(isinstance(v, str) for v in vals):
-            kind: Any = Enum(_enum_name(field), {_safe_enum_member(v): v for v in vals}, type=str)
+        if field in enum_names:
+            kind: Any = Enum(enum_names[field], _enum_members(vals), type=str)
         elif py_type == "Decimal":
             kind = decimal_field if required else optional_decimal_field
         else:
@@ -498,6 +539,7 @@ def write_schema_files(
     """Write all schema artefacts into output_dir/schemas/.
 
     File layout that load_schema(schema_dir, "output_schema") expects:
+        schemas/output_schema_model.json          <- the model as data (what is loaded)
         schemas/output_schema.py                  <- Pydantic model; class name = schema_name
         schemas/output_schema_requirements.json   <- {"model_name": ..., "requirements": ...}
 
@@ -512,21 +554,44 @@ def write_schema_files(
     class_name = schema_name or target_output_spec.get("schema_name") or "OutputSchema"
     results: dict[str, Path] = {}
 
+    # The model is built from the spec as data, never by running output_schema.py.
+    model_cls = _model_from_spec(target_output_spec, class_name)
+
+    # output_schema_model.json -- what load_schema() rebuilds the model from in
+    # gaik releases that load saved schemas as data (output_schema.py is then
+    # never imported). Older gaik has no saved_schema module and reads the .py.
+    # It is described before any file is written, so a model the saved format
+    # refuses leaves the folder as it was instead of half-written.
+    try:
+        from gaik.software_components.extractor.saved_schema import describe_model
+    except ImportError:
+        describe_model = None
+    model_description = describe_model(model_cls) if describe_model is not None else None
+
     # output_schema.py -- class must be named class_name so load_schema can find it
     py_content = build_pydantic_model(target_output_spec, class_name)
     py_path = schemas_dir / "output_schema.py"
     py_path.write_text(py_content, encoding="utf-8")
     results["output_schema.py"] = py_path
 
-    # output_schema.json (human-readable JSON Schema; best-effort). The model
-    # is built from the spec as data, never by running output_schema.py.
+    # output_schema.json (human-readable JSON Schema; best-effort).
     try:
-        json_schema = _model_from_spec(target_output_spec, class_name).model_json_schema()
+        json_schema = model_cls.model_json_schema()
         json_path = schemas_dir / "output_schema.json"
         json_path.write_text(json.dumps(json_schema, indent=2), encoding="utf-8")
         results["output_schema.json"] = json_path
     except Exception:
         pass
+
+    model_path = schemas_dir / "output_schema_model.json"
+    if model_description is not None:
+        model_path.write_text(
+            json.dumps(model_description, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        results["output_schema_model.json"] = model_path
+    else:
+        # A model file from an earlier run would no longer match the new files.
+        model_path.unlink(missing_ok=True)
 
     # output_schema_requirements.json -- the file load_schema() reads:
     #   load_schema(schema_dir, "output_schema") => schema_dir / "output_schema_requirements.json"

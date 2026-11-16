@@ -25,7 +25,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"
 
 from gaik.software_modules.audio_to_structured_data import AudioToStructuredData  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
-from provider_config import get_stage_config  # noqa: E402
+from provider_config import (  # noqa: E402
+    external_model_forbidden,
+    get_stage_config,
+    local_transcriber_options,
+)
+import poc_output  # noqa: E402
 
 
 def load_config() -> dict:
@@ -78,15 +83,14 @@ def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
         print("No saved schema found -- will generate from extraction_requirements.md.")
         return None, None, current_hash
     except Exception as exc:
-        import traceback as _tb
         print(
             f"\nERROR: The approved schema exists but could not be loaded.\n"
+            f"  Model        : {schema_dir}/{schema_name}_model.json\n"
             f"  Schema       : {schema_dir}/{schema_name}.py\n"
             f"  Requirements : {schema_dir}/{schema_name}_requirements.json\n"
-            f"  Reason       : {type(exc).__name__}: {exc}\n\n"
-            f"{_tb.format_exc()}"
+            f"  Reason       : {poc_output.error_detail(exc)}\n\n"
             f"The approved schema has NOT been overwritten.\n"
-            f"To regenerate, delete the two files above and re-run.\n",
+            f"To regenerate, delete the files above and re-run.\n",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -121,7 +125,9 @@ def main() -> None:
         action="store_true",
         help="Audio input cannot be synthesised automatically. Place a real .wav or .mp3 in sample_input/ instead.",
     )
+    poc_output.add_output_flags(parser)
     args = parser.parse_args()
+    poc_output.configure(args)
 
     if args.synthetic:
         print(
@@ -157,8 +163,11 @@ def main() -> None:
     transcriber_ctor = {
         "output_dir": str(Path(__file__).parent / "output"),
         "compress_audio": True,
-        "enhanced_transcript": True,
+        # Enhancement sends the transcript to the transcription stage's cloud provider.
+        "enhanced_transcript": not external_model_forbidden(config),
         "language": language,
+        # Self-hosted Whisper: its endpoint and key from LOCAL_TRANSCRIBER_API_*.
+        **local_transcriber_options(config, audio_config),
     }
     extractor_ctor = {}
     if extraction_model:
@@ -202,7 +211,7 @@ ${source_tracing_section}${llm_judge_section}
     )
 
     print(f"\nExtracted fields written to: {output_path}")
-    print(json.dumps(result.extracted_fields, indent=2, ensure_ascii=False, default=str))
+    poc_output.show_result(result.extracted_fields)
 
     if result.transcription:
         transcript_path = output_dir / f"{input_file.stem}_transcript.txt"
@@ -217,4 +226,4 @@ ${source_tracing_section}${llm_judge_section}
 ${pdf_report_section}
 
 if __name__ == "__main__":
-    main()
+    poc_output.run(main)

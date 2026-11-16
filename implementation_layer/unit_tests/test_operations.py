@@ -1018,7 +1018,8 @@ def test_another_provider_goes_through_its_provider_client(monkeypatch):
     assert (result.label, result.backend) == ("urgent", "llm")
     assert seen["model"] == "fake-model"
     assert seen["messages"][1]["content"].startswith("How urgent?")
-    assert "temperature" not in seen
+    # The provider maps or drops what its model does not take.
+    assert seen["temperature"] == 0.0 and "top_p" not in seen
 
 
 @pytest.mark.parametrize(

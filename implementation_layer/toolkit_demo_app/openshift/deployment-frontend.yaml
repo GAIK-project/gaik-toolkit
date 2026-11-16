@@ -44,15 +44,8 @@ spec:
                 secretKeyRef:
                   name: gaik-demo-admin
                   key: ADMIN_PASSWORD
-            # Still read by the old wizard gate on /api/wizard in proxy.ts until
-            # that gate is removed. The /solution-wizard page itself is open and
-            # links to WIZARD_V2_URL (set with `oc set env`, read at run time).
-            - name: WIZARD_ACCESS_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: gaik-demo-admin
-                  key: WIZARD_ACCESS_SECRET
-                  optional: true
+            # The /solution-wizard page is open and links to WIZARD_V2_URL (set
+            # with `oc set env`, read at run time).
             - name: SUPABASE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
