@@ -126,3 +126,16 @@ def test_gemini_keeps_fields_named_like_schema_keywords():
     assert set(book["required"]) == set(book["properties"])
     # The keywords themselves are still stripped.
     assert "title" not in schema and "title" not in book
+
+
+def test_an_empty_enum_from_a_model_means_no_enum():
+    """Open models answer ``"enum": []`` for a field without choices; a strict schema
+    cannot forbid it, and rejecting it failed the whole schema generation."""
+    parsed = ExtractionRequirements.model_validate_json(
+        '{"use_case_name": "invoice", "fields": [{"field_name": "seller", '
+        '"field_type": "str", "description": "Seller", "enum": []}]}'
+    )
+    assert parsed.fields[0].enum is None
+    assert FieldSpec(
+        field_name="status", field_type="str", description="Status", enum=["open", "paid"]
+    ).enum == ["open", "paid"]

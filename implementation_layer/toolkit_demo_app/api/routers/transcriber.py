@@ -7,9 +7,13 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 try:
-    from utils import validate_audio_file_size
+    from utils import get_transcription_api_config, validate_audio_file_size
+    from utils.config import server_api_config
+    from utils.model_settings import request_server_model
 except ImportError:
-    from api.utils import validate_audio_file_size
+    from api.utils import get_transcription_api_config, validate_audio_file_size
+    from api.utils.config import server_api_config
+    from api.utils.model_settings import request_server_model
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -17,6 +21,11 @@ try:
     from utils.file_content import content_mismatch
 except ImportError:
     from api.utils.file_content import content_mismatch
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
 
 router = APIRouter()
 
@@ -84,8 +93,19 @@ async def transcribe_audio(
 
     enhanced = fix_transcription_errors
 
+    # A picked Aitta model transcribes with Aitta's Whisper and nothing else:
+    # no local server first, no other model behind it.
+    chosen = request_server_model()
+    if chosen is not None:
+        aitta = chosen.provider == "aitta"
+    else:
+        # No pick: a deployment whose own model is on Aitta transcribes there too.
+        try:
+            aitta = server_api_config().get("provider") == "aitta"
+        except HTTPException:
+            aitta = False
     use_azure = bool(os.getenv("AZURE_API_KEY"))
-    if not use_azure:
+    if not use_azure and not aitta:
         raise HTTPException(
             status_code=500,
             detail="AZURE_API_KEY environment variable must be set",
@@ -109,7 +129,11 @@ async def transcribe_audio(
     try:
         from gaik.software_components.transcriber import Transcriber, get_openai_config
 
-        config = get_openai_config(use_azure=use_azure)
+        if aitta:
+            config = get_transcription_api_config()
+            prefer_local_first = False
+        else:
+            config = get_openai_config(use_azure=use_azure)
         local_api_base = os.getenv("LOCAL_TRANSCRIBER_API_BASE")
         local_api_key = os.getenv("LOCAL_TRANSCRIBER_API_KEY")
 
@@ -207,9 +231,11 @@ async def transcribe_audio(
             usage=result.usage or None,
         )
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Transcriber not installed: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=error_detail(e, "Loading the transcriber")
+        ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 

@@ -47,13 +47,13 @@
       "title": "Purchase order processing",
       "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
       "input": "PO, BOM PDFs and a price list",
-      "output": "Word (.docx) and calculation breakdown",
+      "output": "A priced sales order (.txt, or .docx with a sample sales order) and its calculation",
       "needs": ["Filesystem MCP server"],
       "setup": [
         "Needs Node.js. Add the file access server to claude_desktop_config.json as shown in the setup guide, then restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
-      "tryPrompt": "Use the purchase-order-processing skill ({url}) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next."
+      "tryPrompt": "Use the purchase-order-processing skill ({url}) to turn the purchase order, its BOMs and the price list in my folder <folder path> into a priced sales order."
     },
     {
       "id": "report-writing",

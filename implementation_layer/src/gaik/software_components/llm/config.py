@@ -48,6 +48,12 @@ _REQUIRED_FIELDS = {
 }
 
 
+# Vertex AI: the EU multi-region first, the global endpoint for a model the EU
+# does not serve. The global endpoint is not tied to a region.
+VERTEX_DEFAULT_LOCATION = "eu"
+VERTEX_FALLBACK_LOCATION = "global"
+
+
 def _embedding_model_default(provider: str) -> str:
     if provider in (Provider.OPENAI.value, Provider.AZURE.value):
         return os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
@@ -100,6 +106,12 @@ def get_llm_config(
     else:
         raise ValueError(f"Unsupported provider: {name}")
     config.update(overrides)
+    if "location" in overrides and "location_fallback" not in overrides:
+        # A location the caller chose is used as given, never swapped for another.
+        config.pop("location_fallback", None)
+    if "location_fallback" in overrides:
+        # The caller named the fallback: it applies with any location.
+        config.pop("_default_location_fallback", None)
     config["provider"] = name
     config["use_azure"] = name == Provider.AZURE.value
     if name == Provider.AZURE.value and "azure_audio_endpoint" not in overrides:
@@ -193,10 +205,18 @@ def _google_config() -> dict:
 
 
 def _vertex_config() -> dict:
+    location = _env("GOOGLE_CLOUD_LOCATION")
     return {
         "provider": Provider.VERTEX.value,
         "project_id": _env("GOOGLE_PROJECT_ID", "GOOGLE_CLOUD_PROJECT"),
-        "location": _env("GOOGLE_CLOUD_LOCATION", default="global"),
+        # The EU multi-region keeps requests in the EU. A model it does not serve
+        # falls back to the global endpoint, with a warning; a location set in the
+        # environment or by the caller is used as given.
+        "location": location or VERTEX_DEFAULT_LOCATION,
+        "location_fallback": None if location else VERTEX_FALLBACK_LOCATION,
+        # Marks the fallback as the default's, so a location set on this dict
+        # later does not inherit it.
+        "_default_location_fallback": not location,
         # Standard ADC can be a user, service account, or workload identity file.
         # Let google-auth resolve GOOGLE_APPLICATION_CREDENTIALS itself instead
         # of interpreting every ADC file as a service account private key.

@@ -105,6 +105,16 @@ config = get_llm_config("aitta")
 
 ---
 
+### Source material as data
+
+The classifier sends the document text (the first 4000 characters) as material,
+apart from the task: the system message holds the classification rules and the
+sentence in `SOURCE_MATERIAL_INSTRUCTION`, and the user message holds the
+categories and the text inside a `<source_material>` block with a random id for
+each call ([`gaik.software_components.source_material`](../source_material.py)). A sentence in the document cannot close the block or
+pick its own class; the class is also limited to the categories you pass, plus
+`unknown`.
+
 ## Environment Variables
 
 | Variable | Required | Description |

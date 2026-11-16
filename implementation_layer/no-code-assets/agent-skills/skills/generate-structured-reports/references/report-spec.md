@@ -51,8 +51,8 @@ spec = ReportSpec.load("report-runs/koivukuja/report_spec.json")
 | `language` | The language the report is written in (default English); not the transcription language |
 | `sections` | The report structure, in report order (below). Proposed with every other key by `run_report.py propose-spec`, agreed with the user after normalization and written by `apply-spec` |
 | `instructions` | Rules for every section: source hierarchy, scope, tone, citation style |
-| `sources` | Files grouped as `primary` and/or `secondary`; at least one file; every file name unique |
-| `sample_report` | Optional report whose structure, length and tone the new one follows; never its facts |
+| `sources` | Files grouped as `primary` and/or `secondary`; at least one file; every file name unique. Paths are relative to the spec's folder and stay inside it: an absolute path, or one that leads out through `..` or a link, is refused |
+| `sample_report` | Optional report whose structure, length and tone the new one follows; never its facts. Like the sources, it must be inside the spec's folder |
 | `models` | Optional model or deployment name per step: `vision`, `transcription`, `curator`, `writer`, `reviewer`. A `null` curator, writer or reviewer takes `GAIK_REPORT_<STEP>_MODEL`, else the default for the provider (README, "Changing the provider and the models"), else the provider's configured model; the helper fills these in at run time and never rewrites the spec |
 | `settings` | Optional; how the stages run (below) |
 
@@ -60,7 +60,7 @@ spec = ReportSpec.load("report-runs/koivukuja/report_spec.json")
 
 | Key | Meaning |
 |---|---|
-| `id` | Letters, digits, `_` and `-` only, unique in the spec. `set-sections` makes it from the title |
+| `id` | Letters, digits, `_` and `-` only, unique in the spec. `propose-spec --structure` and `set-sections` make it from the title |
 | `title` | The heading, in the report's own words and language |
 | `instructions` | What the section covers and how |
 | `required_items` | Facts the section must cover. Each one no source covers becomes `(missing: <item>)`. Name a fact ("ventilation system and its age"), not a topic ("details"); vague items cannot be checked |
@@ -81,12 +81,12 @@ writer or reviewer default. `null` leaves the step to the provider's configured 
 
 ### Settings
 
-`propose-spec` proposes `transcription_language` `en` and `strict_review` `true`; the other
-settings start at the library defaults below. The user accepts or changes each one.
+`propose-spec` proposes `strict_review` `true`; the other settings start at the library
+defaults below. The user accepts or changes each one.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `transcription_language` | `auto` | Language of the recordings, e.g. `fi` |
+| `transcription_language` | `auto` | Language of the recordings as a two-letter ISO-639-1 code, e.g. `fi`, sent with every transcription request; `auto` lets the model detect it |
 | `curator_workers` | 4 | Sections curated in parallel |
 | `review_attempts` | 5 | Most reviewer requests per section |
 | `strict_review` | `false` | `true` fails synthesis when a reviewer edit cannot be applied. It does not mean every unsupported statement is found |

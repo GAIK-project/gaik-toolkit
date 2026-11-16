@@ -2,6 +2,7 @@ import { OnboardingProvider } from "@/components/onboarding/onboarding-provider"
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "@/components/ui/toaster";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Fraunces, JetBrains_Mono, Sora } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -58,11 +59,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Every page renders per request, so Next can stamp the request's CSP nonce
+  // on its scripts (lib/csp.ts); a prerendered page would carry none.
+  await connection();
   return (
     <html lang="en">
       <body

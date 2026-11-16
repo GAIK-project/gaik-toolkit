@@ -13,7 +13,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from solution_wizard.blueprint import Blueprint
-from solution_wizard.scaffolder import scaffold_poc
+from solution_wizard.scaffolder import _gaik_version_spec, scaffold_poc
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 MODELS = {
@@ -438,7 +438,7 @@ def test_answer_stage_components_get_the_answer_provider_extra_and_checks(tmp_pa
         if step.component:
             step.component = component
     poc = scaffold_poc(bp, tmp_path)["poc_dir"]
-    assert "gaik[llm-google]>=0.8.0" in (poc / "requirements.txt").read_text()
+    assert f"gaik[llm-google]{_gaik_version_spec()}" in (poc / "requirements.txt").read_text()
     bp.models["answer_config"] = {"provider": "litellm", "model": "gpt-6-luna"}
     with pytest.raises(ValueError, match="answer_config needs a provider-prefixed"):
         scaffold_poc(bp, tmp_path)

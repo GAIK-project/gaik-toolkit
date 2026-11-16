@@ -31,8 +31,18 @@ from .schema_designer import write_extraction_requirements, write_schema_files
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "poc"
 
-# provider_config.py and the stage-config constructor arguments need gaik 0.8.0.
-_MIN_GAIK_VERSION = "0.8.0"
+# A generated PoC installs the gaik release the wizard was validated against
+# (gaik_validated_version.txt), or a later patch of it. A lower floor let pip keep
+# an older gaik whose components the registry and cards no longer describe.
+_VALIDATED_VERSION_FILE = Path(__file__).parent.parent.parent / "gaik_validated_version.txt"
+
+
+def _gaik_version_spec() -> str:
+    """Return the pip specifier for gaik, for example ``>=0.9.1,<0.10``."""
+    version = _VALIDATED_VERSION_FILE.read_text(encoding="utf-8").strip()
+    major, minor = (int(part) for part in version.split(".")[:2])
+    return f">={version},<{major}.{minor + 1}"
+
 
 _PROVIDERS = {
     "azure",
@@ -1095,9 +1105,10 @@ def _write_requirements_txt(blueprint: Blueprint, poc_dir: Path) -> None:
         requirement = f"gaik[{extra}]"
         if extra and requirement not in lines:
             lines.append(requirement)
-    lines = [f"{line}>={_MIN_GAIK_VERSION}" if line.startswith("gaik[") else line for line in lines]
+    spec = _gaik_version_spec()
+    lines = [f"{line}{spec}" if line.startswith("gaik[") else line for line in lines]
     if not any(line.startswith("gaik[") for line in lines):
-        lines.append(f"gaik>={_MIN_GAIK_VERSION}")
+        lines.append(f"gaik{spec}")
     lines.append("pyyaml")
     if _wants_pdf(blueprint):
         lines.append("reportlab>=4.0")

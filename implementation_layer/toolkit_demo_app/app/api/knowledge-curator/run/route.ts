@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const limits = getReportWriterLimits();
   const gate = await gateReportWriter(request, limits.maxReports);
   if (gate instanceof Response) return gate;
-  const { userId } = gate;
+  const { userId, staff } = gate;
 
   const declaredBytes = Number(request.headers.get("content-length") ?? 0);
   if (declaredBytes > REPORT_REQUEST_MAX_BYTES) {
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   fwd.append("request", form.get("request") as string);
   fwd.append("artifacts", form.get("artifacts") as File, "artifacts.json");
 
-  return forwardReportRun("/knowledge-curator/run", fwd, async (usage) => {
+  return forwardReportRun("/knowledge-curator/run", fwd, staff, async (usage) => {
     if (!userId || !usage.sawResult || !usage.totalTokens) return;
     try {
       await recordReportUsage(userId, 0, usage.totalTokens);

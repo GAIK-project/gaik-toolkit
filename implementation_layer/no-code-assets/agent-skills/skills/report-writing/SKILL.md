@@ -425,7 +425,7 @@ NEXT STEPS
 5. Fuses all content with separators
 6. Analyzes content for section signals
 7. Generates Word document with applicable sections only
-8. Saves to outputs and presents to user
+8. Saves to input_documents/ and presents it to the user
 
 ### Example 2: With Template
 
