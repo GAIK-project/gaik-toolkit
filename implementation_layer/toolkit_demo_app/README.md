@@ -88,6 +88,10 @@ set it. A provider without credentials on the server is left out, and
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
 
+`DEMO_SERVER_MODELS_NOTE` is one sentence the menu shows under the server models,
+for where they run (for example the Azure region). It has no default: that depends on
+the cloud resources behind the keys.
+
 With `AITTA_API_KEY` set, the menu also lists **CSC Aitta** models (Gemma 4 31B and
 gpt-oss 120B by default): open models hosted in Finland. Picking one keeps the whole
 run on Aitta: recordings are transcribed by Aitta's Whisper large v3
