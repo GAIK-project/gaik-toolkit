@@ -19,7 +19,8 @@ def merge_dicts(left: dict | None, right: dict | None) -> dict:
 
 class ReportState(TypedDict, total=False):
     # --- inputs (set once, read-only during the run) ---
-    evidence_pack: str
+    # One EvidenceSource per source (each sent in its own block), or one text.
+    evidence_pack: Any
     source_filenames: list
     report_description: str | None
     additional_instructions: str | None
@@ -42,13 +43,13 @@ class SectionWriterState(TypedDict, total=False):
     section_id: str
     title: str
     instructions: str
-    evidence_pack: str
-    # Finalized content of this section's dependencies (assembled markdown), or
-    # "" when the section has no dependencies.
-    dependencies_context: str
+    evidence_pack: Any
+    # Finalized content of this section's dependencies, label -> text (each sent
+    # in its own block), or {} when the section has no dependencies.
+    dependencies_context: dict[str, str]
     # The evidence the writer/reviewer actually use: the curated brief when
     # curation is on, otherwise the full evidence pack.
-    active_evidence: str
+    active_evidence: Any
     curated_brief: str
     sample_section: str
     has_sample: bool
