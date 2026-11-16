@@ -3,6 +3,7 @@ import { loginAsDev } from "./helpers/auth";
 import { resetMockSessions } from "./helpers/mock";
 import { createSession } from "./helpers/session";
 import { PACE_SENTENCES } from "../lib/chat-background";
+import { choicePill, choose } from "./helpers/start-choice";
 
 /**
  * The chat's one composer: a reference chip for "ask about this" from the page
@@ -309,38 +310,47 @@ data: ${JSON.stringify({ done: true })}
 
     const empty = page.getByTestId("chat-empty");
     await expect(empty).toContainText("Hei! Olen tekoälyavustaja.");
-    // One of two, in the tools row of the message field.
-    const choice = page.getByRole("radiogroup", { name: "Taustasi" });
-    const nonTechnical = choice.getByRole("radio", { name: "En ole tekninen" });
-    const technical = choice.getByRole("radio", { name: "Tekninen", exact: true });
+    // A pill in the tools row of the message field, with the choice's menu behind it.
+    const background = choicePill(page, "chat-background");
 
-    // The choice is shown on the control; the field holds only what is typed.
-    await nonTechnical.click();
-    await expect(nonTechnical).toHaveAttribute("aria-checked", "true");
+    // The choice is shown on the pill; the field holds only what is typed.
+    await choose(page, "chat-background", "En ole tekninen");
+    await expect(background).toHaveAccessibleName("Taustasi: En ole tekninen");
     await expect(field(page)).toHaveValue("");
     await expect(field(page)).toBeFocused();
 
-    // The other one takes its place; pressing it again takes the choice back.
-    await technical.click();
-    await expect(technical).toHaveAttribute("aria-checked", "true");
-    await expect(nonTechnical).toHaveAttribute("aria-checked", "false");
+    // The other one takes its place; choosing it again takes the choice back.
+    await choose(page, "chat-background", "Tekninen");
+    await expect(background).toHaveAccessibleName("Taustasi: Tekninen");
     await expect(field(page)).toHaveValue("");
-    await technical.click();
-    await expect(technical).toHaveAttribute("aria-checked", "false");
+    await choose(page, "chat-background", "Tekninen");
+    await expect(background).toHaveAccessibleName("Taustasi");
     await expect(field(page)).toHaveValue("");
+
+    // The menu opens over the field's card in a running chat, and stays inside the chat.
+    await background.click();
+    const menu = (await page.getByTestId("chat-background").getByRole("menu").boundingBox())!;
+    const dock = (await page.getByTestId("chat-dock").boundingBox())!;
+    expect(menu.y + menu.height).toBeLessThanOrEqual((await field(page).boundingBox())!.y);
+    expect(menu.x).toBeGreaterThanOrEqual(dock.x);
+    expect(menu.x + menu.width).toBeLessThanOrEqual(dock.x + dock.width);
+    // Esc is the menu's: the chat stays open.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("chat-background").getByRole("menu")).toHaveCount(0);
+    await expect(page.getByTestId("chat-dock")).toHaveAttribute("data-chat-open", "true");
 
     // Choosing leaves what is already written as it is.
     await field(page).pressSequentially("Haluan luokitella laskut.");
-    await technical.click();
-    await expect(technical).toHaveAttribute("aria-checked", "true");
+    await choose(page, "chat-background", "Tekninen");
+    await expect(background).toHaveAccessibleName("Taustasi: Tekninen");
     await expect(field(page)).toHaveValue("Haluan luokitella laskut.");
 
     // How much the wizard asks is chosen the same way: quick to begin with,
     // and nothing is written into the field.
-    const pace = page.getByRole("radiogroup", { name: "Kysymysten määrä" });
-    await expect(pace.getByRole("radio", { name: "Nopea" })).toHaveAttribute("aria-checked", "true");
-    await pace.getByRole("radio", { name: "Perusteellinen" }).click();
-    await expect(pace.getByRole("radio", { name: "Perusteellinen" })).toHaveAttribute("aria-checked", "true");
+    const pace = choicePill(page, "chat-pace");
+    await expect(pace).toHaveAccessibleName("Kysymysten määrä: Nopea");
+    await choose(page, "chat-pace", "Perusteellinen");
+    await expect(pace).toHaveAccessibleName("Kysymysten määrä: Perusteellinen");
     await expect(field(page)).toHaveValue("Haluan luokitella laskut.");
 
     // The wizard gets the choices as the first lines of the first message,
@@ -367,11 +377,8 @@ data: ${JSON.stringify({ done: true })}
 
     // The choices are remembered for the next session; its field starts empty.
     await newSession(page);
-    await expect(page.getByRole("radio", { name: "Tekninen", exact: true })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    await expect(page.getByRole("radio", { name: "Perusteellinen" })).toHaveAttribute("aria-checked", "true");
+    await expect(choicePill(page, "chat-background")).toHaveAccessibleName("Taustasi: Tekninen");
+    await expect(choicePill(page, "chat-pace")).toHaveAccessibleName("Kysymysten määrä: Perusteellinen");
     await expect(field(page)).toHaveValue("");
   });
 

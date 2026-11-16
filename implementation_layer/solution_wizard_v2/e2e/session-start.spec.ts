@@ -4,6 +4,7 @@ import { setMockSessionStep } from "./helpers/dev-step";
 import { resetMockSessions } from "./helpers/mock";
 import { motion, recordMotion } from "./helpers/motion";
 import { createSession, hydrated, startFromMessage } from "./helpers/session";
+import { choiceOption, choicePill, choose } from "./helpers/start-choice";
 import { PACE_SENTENCES, START_LINES_ROOM } from "../lib/chat-background";
 import { MAX_CHAT_MESSAGE_CHARS } from "../lib/chat-limits";
 
@@ -202,7 +203,7 @@ test.describe("a session starts from the first message", () => {
     const sent = chatPosts(page);
     const prompt = "Haluamme poimia toimittajien PDF-laskuista keskeiset kentät.";
     // Who the user is is chosen beside the field; the field holds the example only.
-    await page.getByRole("radio", { name: "Tekninen", exact: true }).click();
+    await choose(page, "chat-background", "Tekninen");
     await expect(startField(page)).toHaveValue("");
     await page.getByTestId("chat-examples").getByRole("button", { name: "Laskun kentät" }).click();
     await expect(startField(page)).toHaveValue(prompt);
@@ -232,7 +233,7 @@ test.describe("a session starts from the first message", () => {
     // The next start remembers who the user said they are, and its field is empty.
     await page.getByTestId("new-session").click();
     await page.waitForURL("/");
-    await expect(page.getByRole("radio", { name: "Tekninen", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(choicePill(page, "chat-background")).toHaveAccessibleName("Taustasi: Tekninen");
     await expect(startField(page)).toHaveValue("");
   });
 
@@ -411,7 +412,7 @@ test.describe("a session starts from the first message", () => {
         ? route.fulfill({ status: 503, body: "" })
         : route.fulfill({ status: 200, contentType: "text/event-stream", body: reply });
     });
-    await page.getByRole("radio", { name: "En ole tekninen" }).click();
+    await choose(page, "chat-background", "En ole tekninen");
     await startField(page).fill(text);
     await startField(page).press("Enter");
 
@@ -434,51 +435,85 @@ test.describe("a session starts from the first message", () => {
     await expect(field(page)).toHaveValue("");
   });
 
-  test("the background choice is a thumb that slides to the pressed option and is in place without a press", async ({
-    page,
-  }) => {
-    const choice = page.getByRole("radiogroup", { name: "Taustasi" });
-    const nonTechnical = choice.getByRole("radio", { name: "En ole tekninen" });
-    const technical = choice.getByRole("radio", { name: "Tekninen", exact: true });
-    const thumb = page.getByTestId("chat-background-thumb");
-    // How far the thumb's edges are from the option's, in px.
-    const off = async (option: typeof technical) => {
-      const [a, b] = await Promise.all([thumb.boundingBox(), option.boundingBox()]);
-      return a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.x + a.width - b.x - b.width)) : Infinity;
-    };
+  test("the background choice is a pill that opens a menu saying what each option changes", async ({ page }) => {
+    const pill = choicePill(page, "chat-background");
+    const menu = page.getByTestId("chat-background").getByRole("menu");
+    const technical = choiceOption(page, "chat-background", "Tekninen");
+    const nonTechnical = choiceOption(page, "chat-background", "En ole tekninen");
 
-    // Nothing is chosen yet: no thumb.
-    await expect(thumb).toHaveCount(0);
+    // Nothing is chosen yet: the pill says what the choice is about, and no menu is open.
+    await expect(pill).toHaveAccessibleName("Taustasi");
+    await expect(pill).toHaveText("Taustasi");
+    await expect(pill).toHaveAttribute("aria-expanded", "false");
+    await expect(menu).toHaveCount(0);
+
+    // A press opens the menu over the card, starting at its pill: both options, each with a line on what it changes.
+    await pill.click();
+    await expect(pill).toHaveAttribute("aria-expanded", "true");
+    await expect(menu).toHaveAccessibleName("Taustasi");
+    await expect(menu.getByRole("menuitemradio")).toHaveCount(2);
+    await expect(nonTechnical).toContainText("Wizard kysyy arkikielellä ja ehdottaa oletukset teknisiin kohtiin.");
+    await expect(technical).toContainText("Wizard käyttää teknisiä termejä ja kysyy teknisistä valinnoista suoraan.");
+    await expect(nonTechnical).toHaveAttribute("aria-checked", "false");
+    await expect(technical).toHaveAttribute("aria-checked", "false");
+    const card = (await page.getByTestId("start-view").locator("form > div").first().boundingBox())!;
+    const box = (await menu.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(card.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(card.x + card.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(card.y);
+    expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
+    // The AI notice under the card is not under the menu.
+    const notice = page.getByTestId("chat-ai-notice");
+    await expect(notice).toBeVisible();
+    expect(
+      await notice.evaluate((el) => {
+        const at = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2));
+      }),
+    ).toBe(true);
+    // A window that changes size puts the menu away: it was placed for the card as it was.
+    await page.setViewportSize({ width: 900, height: 900 });
+    await expect(menu).toHaveCount(0);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await pill.click();
+
+    // Choosing closes the menu, shows the choice on the pill and hands the cursor to the field, which stays empty.
     await technical.click();
-    await expect.poll(() => off(technical)).toBeLessThan(1);
-    // The options differ in width, and the thumb takes the pressed one's.
-    await nonTechnical.click();
-    await expect(thumb).toHaveCSS("transition-property", "transform, width");
-    await expect(thumb).toHaveCSS("transition-duration", "0.2s");
-    await expect.poll(() => off(nonTechnical)).toBeLessThan(1);
-    expect((await nonTechnical.boundingBox())!.width).not.toBe((await technical.boundingBox())!.width);
-
-    // The arrow keys move the choice and stay in the group; the field is not written in.
-    await nonTechnical.focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(technical).toHaveAttribute("aria-checked", "true");
-    await expect(technical).toBeFocused();
-    await expect.poll(() => off(technical)).toBeLessThan(1);
+    await expect(menu).toHaveCount(0);
+    await expect(pill).toHaveAccessibleName("Taustasi: Tekninen");
+    await expect(pill).toHaveText("Tekninen");
+    await expect(startField(page)).toBeFocused();
     await expect(startField(page)).toHaveValue("");
+
+    // From the keyboard: the arrow opens the menu on what is chosen, the arrows move in it, Enter chooses.
+    await pill.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(technical).toBeFocused();
+    await expect(technical).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("ArrowUp");
+    await expect(nonTechnical).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(menu).toHaveCount(0);
+    await expect(pill).toHaveAccessibleName("Taustasi: En ole tekninen");
+
+    // Esc and a press elsewhere close the menu without choosing; Esc leaves the focus on the pill.
+    await pill.click();
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await expect(pill).toBeFocused();
+    await pill.click();
+    await page.getByRole("heading", { name: "Mitä haluat ratkaista?" }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(pill).toHaveAccessibleName("Taustasi: En ole tekninen");
 
     // A choice remembered from before is simply there when the view opens.
     await page.reload();
     await hydrated(page);
-    await expect(technical).toHaveAttribute("aria-checked", "true");
-    expect(await off(technical)).toBeLessThan(1);
-    await expect(thumb).toHaveCSS("transition-duration", "0s");
+    await expect(pill).toHaveAccessibleName("Taustasi: En ole tekninen");
 
-    // With reduced motion a press moves the thumb at once.
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await nonTechnical.click();
-    await expect(nonTechnical).toHaveAttribute("aria-checked", "true");
-    await expect(thumb).toHaveCSS("transition-property", "none");
-    expect(await off(nonTechnical)).toBeLessThan(1);
+    // Choosing the chosen one again takes the choice back.
+    await choose(page, "chat-background", "En ole tekninen");
+    await expect(pill).toHaveAccessibleName("Taustasi");
   });
 
   test("how much the wizard asks is chosen beside the field: quick unless the user says thorough", async ({
@@ -486,39 +521,35 @@ test.describe("a session starts from the first message", () => {
   }) => {
     const sent = chatPosts(page);
     const text = "Poimi sopimuksista irtisanomisajat.";
-    const pace = page.getByRole("radiogroup", { name: "Kysymysten määrä" });
-    const quick = pace.getByRole("radio", { name: "Nopea" });
-    const thorough = pace.getByRole("radio", { name: "Perusteellinen" });
-    const thumb = page.getByTestId("chat-pace-thumb");
-    const under = async (option: typeof quick) => {
-      const [a, b] = await Promise.all([thumb.boundingBox(), option.boundingBox()]);
-      return a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.x + a.width - b.x - b.width)) : Infinity;
-    };
+    const pill = choicePill(page, "chat-pace");
+    const quick = choiceOption(page, "chat-pace", "Nopea");
+    const thorough = choiceOption(page, "chat-pace", "Perusteellinen");
 
-    // Quick to begin with, and the thumb is behind it without having moved there.
+    // Quick to begin with, said on the pill without a press.
+    await expect(pill).toHaveAccessibleName("Kysymysten määrä: Nopea");
+    await pill.click();
     await expect(quick).toHaveAttribute("aria-checked", "true");
     await expect(thorough).toHaveAttribute("aria-checked", "false");
-    expect(await under(quick)).toBeLessThan(1);
-    await expect(thumb).toHaveCSS("transition-duration", "0s");
+    await expect(quick).toContainText("Kysyy vain välttämättömän, mieluiten yhdellä kierroksella, ja olettaa loput.");
+    await expect(thorough).toContainText("Kysyy kaiken, mitä yksityiskohtien saamiseksi oikein tarvitaan.");
+    await page.keyboard.press("Escape");
 
     // The choice writes nothing into the field, empty or not, and one of the
-    // two is always chosen: pressing the chosen one again leaves it chosen.
+    // two is always chosen: choosing the chosen one again leaves it chosen.
     await startField(page).fill(text);
-    await thorough.click();
-    await expect(thorough).toHaveAttribute("aria-checked", "true");
-    await expect(quick).toHaveAttribute("aria-checked", "false");
-    await expect(thumb).toHaveCSS("transition-duration", "0.2s");
-    await expect.poll(() => under(thorough)).toBeLessThan(1);
+    await choose(page, "chat-pace", "Perusteellinen");
+    await expect(pill).toHaveAccessibleName("Kysymysten määrä: Perusteellinen");
     await expect(startField(page)).toHaveValue(text);
-    await thorough.click();
-    await expect(thorough).toHaveAttribute("aria-checked", "true");
-    // The arrow keys move it, as in the background choice.
-    await thorough.focus();
-    await page.keyboard.press("ArrowLeft");
-    await expect(quick).toHaveAttribute("aria-checked", "true");
+    await choose(page, "chat-pace", "Perusteellinen");
+    await expect(pill).toHaveAccessibleName("Kysymysten määrä: Perusteellinen");
+    // The arrow keys move in the menu, as in the background's.
+    await pill.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(thorough).toBeFocused();
+    await page.keyboard.press("ArrowDown");
     await expect(quick).toBeFocused();
-    await page.keyboard.press("ArrowRight");
-    await expect(thorough).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("Escape");
+    await expect(pill).toHaveAccessibleName("Kysymysten määrä: Perusteellinen");
     await expect(startField(page)).toHaveValue(text);
 
     // The first message carries the pace as a line ahead of the user's words;
@@ -539,7 +570,7 @@ test.describe("a session starts from the first message", () => {
     // The choice is remembered for the next session.
     await page.getByTestId("new-session").click();
     await page.waitForURL("/");
-    await expect(thorough).toHaveAttribute("aria-checked", "true");
+    await expect(pill).toHaveAccessibleName("Kysymysten määrä: Perusteellinen");
     await expect(startField(page)).toHaveValue("");
   });
 });
@@ -594,12 +625,30 @@ test.describe("a session starts from the first message, on a phone", () => {
     expect(button.x + button.width).toBeLessThanOrEqual(card.x + card.width);
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
 
-    // Where an option is drawn as its icon alone, it keeps its name.
-    const group = page.getByRole("radiogroup", { name: "Kysymysten määrä" });
-    const thorough = group.getByRole("radio", { name: "Perusteellinen" });
-    await expect(group.getByRole("radio", { name: "Nopea" })).toHaveAttribute("aria-checked", "true");
-    await thorough.click();
-    await expect(thorough).toHaveAttribute("aria-checked", "true");
+    // The longest pair of choices on a narrow phone: the pills give way, and none reaches the send button.
+    await choose(page, "chat-background", "En ole tekninen");
+    await choose(page, "chat-pace", "Perusteellinen");
+    await page.setViewportSize({ width: 360, height: 780 });
+    const tight = {
+      background: (await page.getByTestId("chat-background").boundingBox())!,
+      pace: (await choicePill(page, "chat-pace").boundingBox())!,
+      send: (await page.getByTestId("start-view").getByRole("button", { name: "Lähetä" }).boundingBox())!,
+    };
+    expect(tight.background.x + tight.background.width).toBeLessThanOrEqual(tight.pace.x);
+    expect(tight.pace.x + tight.pace.width).toBeLessThanOrEqual(tight.send.x);
+    expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
+    await choose(page, "chat-pace", "Nopea");
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    // Each pill names its choice, also where it is drawn as its icon alone, and its menu stays on the screen.
+    const pill = choicePill(page, "chat-pace");
+    await expect(pill).toHaveAccessibleName("Kysymysten määrä: Nopea");
+    await pill.click();
+    const menu = (await page.getByTestId("chat-pace").getByRole("menu").boundingBox())!;
+    expect(menu.x).toBeGreaterThanOrEqual(0);
+    expect(menu.x + menu.width).toBeLessThanOrEqual(390);
+    await choose(page, "chat-pace", "Perusteellinen");
+    await expect(pill).toHaveAccessibleName("Kysymysten määrä: Perusteellinen");
     await expect(startField(page)).toHaveValue("");
   });
 });
@@ -640,16 +689,15 @@ test.describe("session start in the chat", () => {
     const examples = page.getByTestId("chat-examples");
 
     // The background choice puts nothing into the field, before an example or after it.
-    const nonTechnical = page.getByRole("radio", { name: "En ole tekninen" });
-    await nonTechnical.click();
-    await expect(nonTechnical).toHaveAttribute("aria-checked", "true");
+    await choose(page, "chat-background", "En ole tekninen");
+    await expect(choicePill(page, "chat-background")).toHaveAccessibleName("Taustasi: En ole tekninen");
     await expect(input).toHaveValue("");
     const invoice = examples.getByRole("button", { name: "Laskun kentät" });
     await invoice.click();
     await expect(invoice).toHaveAttribute("aria-pressed", "true");
     await expect(input).toHaveValue("Haluamme poimia toimittajien PDF-laskuista keskeiset kentät.");
     await expect(input).toBeFocused();
-    await page.getByRole("radio", { name: "Tekninen", exact: true }).click();
+    await choose(page, "chat-background", "Tekninen");
     await expect(input).toHaveValue("Haluamme poimia toimittajien PDF-laskuista keskeiset kentät.");
     await expect(invoice).toHaveAttribute("aria-pressed", "true");
 

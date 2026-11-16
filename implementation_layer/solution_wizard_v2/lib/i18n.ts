@@ -687,11 +687,15 @@ export type Dict = {
       nonTechnicalText: string;
       technical: string;
       technicalText: string;
+      nonTechnicalHint: string;
+      technicalHint: string;
       pace: string;
       quick: string;
       quickText: string;
       thorough: string;
       thoroughText: string;
+      quickHint: string;
+      thoroughHint: string;
       /** The empty chat while it is the page (lib/session-start): the question,
        *  what the wizard does with the answer, what to write, and examples. */
       start: {
@@ -1394,11 +1398,15 @@ const fi: Dict = {
       nonTechnicalText: BACKGROUND_SENTENCES.fi.nonTechnical,
       technical: "Tekninen",
       technicalText: BACKGROUND_SENTENCES.fi.technical,
+      nonTechnicalHint: "Wizard kysyy arkikielellä ja ehdottaa oletukset teknisiin kohtiin.",
+      technicalHint: "Wizard käyttää teknisiä termejä ja kysyy teknisistä valinnoista suoraan.",
       pace: "Kysymysten määrä",
       quick: "Nopea",
       quickText: PACE_SENTENCES.fi.quick,
       thorough: "Perusteellinen",
       thoroughText: PACE_SENTENCES.fi.thorough,
+      quickHint: "Kysyy vain välttämättömän, mieluiten yhdellä kierroksella, ja olettaa loput.",
+      thoroughHint: "Kysyy kaiken, mitä yksityiskohtien saamiseksi oikein tarvitaan.",
       start: {
         title: "Mitä haluat ratkaista?",
         lede: "Kuvaa ongelma. Wizard kysyy loput.",
@@ -2146,11 +2154,15 @@ const en: Dict = {
       nonTechnicalText: BACKGROUND_SENTENCES.en.nonTechnical,
       technical: "Technical",
       technicalText: BACKGROUND_SENTENCES.en.technical,
+      nonTechnicalHint: "The wizard asks in plain language and suggests defaults for the technical parts.",
+      technicalHint: "The wizard uses technical terms and asks about technical choices directly.",
       pace: "How much to ask",
       quick: "Quick",
       quickText: PACE_SENTENCES.en.quick,
       thorough: "Thorough",
       thoroughText: PACE_SENTENCES.en.thorough,
+      quickHint: "Asks only what it must, in one round if it can, and assumes the rest.",
+      thoroughHint: "Asks what it needs to get the details right.",
       start: {
         title: "What do you want to solve?",
         lede: "Describe the problem. The wizard asks the rest.",

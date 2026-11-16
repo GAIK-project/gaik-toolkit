@@ -133,7 +133,8 @@ export function ComposerCard({
   return (
     <div
       ref={boxRef}
-      className={`flex ${tools ? "flex-col" : "items-end gap-1"} rounded-2xl border border-border-strong bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:ring-3 focus-within:ring-brand/25 ${
+      // A choice's menu hangs from the card, over it (components/chat-start).
+      className={`relative flex ${tools ? "flex-col" : "items-end gap-1"} rounded-2xl border border-border-strong bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:ring-3 focus-within:ring-brand/25 ${
         large ? "p-2 shadow-md" : "p-1.5 shadow-sm"
       }`}
     >
@@ -162,7 +163,7 @@ export function ComposerCard({
       />
       {tools ? (
         <div className="flex min-h-9 items-center gap-2 pl-0.5 pt-1">
-          {/* A container: the tools give up their labels for icons when the row is narrow. */}
+          {/* A container: a tool gives up its label for its icon when the row is narrow. */}
           <div className="@container flex min-w-0 flex-1 items-center gap-2">{tools}</div>
           {send}
         </div>

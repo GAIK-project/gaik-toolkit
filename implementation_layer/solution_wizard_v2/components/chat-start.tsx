@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ChatPanelLabels } from "@/lib/chat-activity";
 import {
   DEFAULT_PACE,
@@ -33,23 +33,25 @@ export function chipClass(on: boolean): string {
   }`;
 }
 
-/** When a choice's labels give way to its icons: the width of the tools row
- *  it stands in (components/composer-card), where the two choices and the
- *  send button share one line. */
+/** When a choice's label gives way to its icon: the width of the tools row it
+ *  stands in (components/composer-card), where the two choices and the send
+ *  button share one line. The longer label goes first. */
 type Compact = "narrow" | "narrowest";
 const LABEL_HIDDEN: Record<Compact, string> = {
-  narrow: "@max-[30rem]:sr-only",
-  narrowest: "@max-[18.5rem]:sr-only",
-};
-const OPTION_TIGHT: Record<Compact, string> = {
-  narrow: "@max-[30rem]:px-2",
-  narrowest: "@max-[18.5rem]:px-2",
+  narrow: "@max-[12rem]:sr-only",
+  narrowest: "@max-[17rem]:sr-only",
 };
 
-// One of two, in the tools row of the message field: a group of radio buttons
-// with a thumb behind the chosen one. The choice is state only: nothing is
-// written into the field.
-function TwoChoice<T extends string>({
+type ChoiceOption<T extends string> = { value: T; label: string; hint: string; icon: IconName };
+
+/** The menu's width in px (w-72); narrower where the card is. */
+const MENU_WIDTH = 288;
+
+// One choice in the tools row of the message field, the way chat tools offer
+// theirs: a pill that names what is chosen and opens a short menu, each option
+// with a line on what it changes. The choice is state only: nothing is written
+// into the field.
+function ChoiceMenu<T extends string>({
   name,
   testId,
   options,
@@ -57,114 +59,161 @@ function TwoChoice<T extends string>({
   onChoose,
   compact,
 }: {
-  /** The group's accessible name. */
+  /** What is being chosen: the menu's name, and the pill's words while nothing is chosen. */
   name: string;
   testId: string;
-  options: readonly { value: T; label: string; icon: IconName }[];
+  options: readonly ChoiceOption<T>[];
   chosen: T | null;
   onChoose: (value: T) => void;
   compact: Compact;
 }) {
-  const group = useRef<HTMLDivElement>(null);
-  // The thumb behind the labels: where the chosen option stands in the group.
-  // The options differ in width, so it is measured.
-  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
-  // The thumb slides only when a press moved it. A choice remembered from an
-  // earlier session, or one whose option moved with the window, is in place
-  // at once.
-  const pressed = useRef(false);
-  const [slides, setSlides] = useState(false);
+  const [open, setOpen] = useState(false);
+  // Where the menu starts in the card: under its pill, or as far left of it as
+  // keeps the menu inside the card.
+  const [left, setLeft] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
 
-  const place = useCallback(() => {
-    const on = group.current?.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]');
-    const next = on ? { left: on.offsetLeft, width: on.offsetWidth } : null;
-    setThumb((now) => (now?.left === next?.left && now?.width === next?.width ? now : next));
-  }, []);
-  const labels = options.map((option) => option.label).join("\n");
-  // Before the paint, so the thumb is never seen where the choice was.
-  useLayoutEffect(() => {
-    setSlides(pressed.current);
-    pressed.current = false;
-    place();
-  }, [place, chosen, labels]);
-  // The options change width with the row they stand in.
-  useEffect(() => {
-    const el = group.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      setSlides(false);
-      place();
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [place]);
-
-  function choose(value: T) {
-    pressed.current = true;
-    onChoose(value);
+  function show() {
+    const pill = trigger.current;
+    const card = pill?.offsetParent;
+    if (pill && card) {
+      const width = Math.min(MENU_WIDTH, card.clientWidth);
+      setLeft(Math.max(0, Math.min(pill.offsetLeft, card.clientWidth - width)));
+    }
+    setOpen(true);
   }
+  const current = options.find((option) => option.value === chosen) ?? null;
+
+  const items = () => Array.from(box.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? []);
+
+  // A press anywhere else puts the menu away. So does a window that changes
+  // size: the menu was placed for the card as it was.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && !box.current?.contains(e.target)) setOpen(false);
+    };
+    const onResize = () => setOpen(false);
+    document.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [open]);
+
+  // The menu opens with the cursor on what is chosen.
+  useEffect(() => {
+    if (!open) return;
+    const all = items();
+    (all.find((el) => el.getAttribute("aria-checked") === "true") ?? all[0])?.focus();
+  }, [open]);
 
   return (
-    <div
-      ref={group}
-      role="radiogroup"
-      aria-label={name}
-      data-testid={testId}
-      className="relative inline-flex shrink-0 items-center gap-0.5 rounded-full bg-surface-muted p-0.5"
-      onKeyDown={(e) => {
-        // The arrow keys move the choice, as in any group of radio buttons.
-        const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
-        if (!step) return;
-        e.preventDefault();
-        const radios = Array.from(group.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? []);
-        const at = radios.indexOf(document.activeElement as HTMLButtonElement);
-        const next = (Math.max(at, 0) + step + options.length) % options.length;
-        if (chosen !== options[next].value) choose(options[next].value);
-        // A press hands the cursor to the field; the keyboard stays in the group.
-        requestAnimationFrame(() => requestAnimationFrame(() => radios[next]?.focus()));
-      }}
-    >
-      {thumb && (
-        <span
-          aria-hidden
-          data-testid={`${testId}-thumb`}
-          className={`pointer-events-none absolute inset-y-0.5 left-0 rounded-full bg-surface shadow-xs ${
-            slides ? "transition-[transform,width] duration-200 ease-out motion-reduce:transition-none" : ""
+    // The pills share the row's width: a long label is cut short before a
+    // pill reaches the send button.
+    <div ref={box} className="min-w-0" data-testid={testId}>
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        // The pill shows the choice; its name says what the choice is about.
+        aria-label={current ? `${name}: ${current.label}` : name}
+        title={current ? `${name}: ${current.label}` : name}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+          e.preventDefault();
+          show();
+        }}
+        className={`inline-flex max-w-full items-center gap-1.5 rounded-full border border-border-strong px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:text-brand-text active:scale-[0.97] pointer-coarse:py-1.5 ${
+          open ? "border-brand bg-brand-soft text-brand-text" : current ? "text-text" : "text-text-secondary"
+        }`}
+      >
+        <Icon name={current?.icon ?? options[0].icon} size={14} className="shrink-0" />
+        <span className={`min-w-0 truncate ${LABEL_HIDDEN[compact]}`}>{current?.label ?? name}</span>
+        <Icon
+          name="chevronDown"
+          size={13}
+          className={`-mr-0.5 shrink-0 opacity-70 transition-transform duration-150 ease-out motion-reduce:transition-none ${
+            open ? "rotate-180" : ""
           }`}
-          style={{ width: thumb.width, transform: `translateX(${thumb.left}px)` }}
         />
+      </button>
+      {open && (
+        <div
+          id={menuId}
+          role="menu"
+          aria-label={name}
+          // Over the card, on the start view too: the AI notice is the line
+          // under the card and stays in view while a choice is made.
+          style={{ left }}
+          className="pop-in absolute bottom-full z-40 mb-2 w-72 max-w-full rounded-xl border border-border bg-surface p-1 shadow-lg"
+          onKeyDown={(e) => {
+            const all = items();
+            const at = all.indexOf(document.activeElement as HTMLElement);
+            if (e.key === "Escape") {
+              // This Esc is the menu's: the chat it stands in stays open.
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(false);
+              trigger.current?.focus();
+            } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              const step = e.key === "ArrowDown" ? 1 : -1;
+              all[(Math.max(at, 0) + step + all.length) % all.length]?.focus();
+            } else if (e.key === "Home" || e.key === "End") {
+              e.preventDefault();
+              all[e.key === "Home" ? 0 : all.length - 1]?.focus();
+            } else if (e.key === "Tab") {
+              setOpen(false);
+            }
+          }}
+        >
+          <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-text-muted" aria-hidden>
+            {name}
+          </p>
+          {options.map((option) => {
+            const on = chosen === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={on}
+                onClick={() => {
+                  setOpen(false);
+                  onChoose(option.value);
+                }}
+                className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-surface-muted focus:bg-surface-muted focus:outline-none"
+              >
+                <Icon
+                  name={option.icon}
+                  size={16}
+                  className={`mt-0.5 shrink-0 ${on ? "text-brand-text" : "text-text-muted"}`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-sm font-medium ${on ? "text-brand-text" : "text-text"}`}>
+                    {option.label}
+                  </span>
+                  <span className="block text-xs leading-snug text-text-secondary">{option.hint}</span>
+                </span>
+                {on && <Icon name="check" size={16} className="mt-0.5 shrink-0 text-brand-text" />}
+              </button>
+            );
+          })}
+        </div>
       )}
-      {options.map((option, i) => {
-        const on = chosen === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            // Names the option where only its icon is drawn.
-            title={option.label}
-            tabIndex={on || (chosen === null && i === 0) ? 0 : -1}
-            onClick={() => choose(option.value)}
-            className={`relative inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-[color,transform] duration-150 ease-out active:scale-[0.97] pointer-coarse:py-1.5 ${OPTION_TIGHT[compact]} ${
-              on ? "text-brand-text" : "text-text-secondary hover:text-text"
-            } ${
-              // Until the thumb is measured (the page as the server sent it),
-              // the chosen option carries the thumb's look itself.
-              on && !thumb ? "bg-surface shadow-xs" : ""
-            }`}
-          >
-            <Icon name={option.icon} size={14} className="shrink-0" />
-            <span className={LABEL_HIDDEN[compact]}>{option.label}</span>
-          </button>
-        );
-      })}
     </div>
   );
 }
 
 // Before the first message: who is the user? The wizard is told with the
-// first message (lib/chat-background). Pressing the chosen one again takes
+// first message (lib/chat-background). Choosing the chosen one again takes
 // the choice back.
 export function BackgroundChoice({
   labels,
@@ -178,20 +227,19 @@ export function BackgroundChoice({
   const options = useMemo(
     () =>
       [
-        { value: "nonTechnical", label: labels.nonTechnical, icon: "user" },
-        { value: "technical", label: labels.technical, icon: "codeXml" },
+        { value: "nonTechnical", label: labels.nonTechnical, hint: labels.nonTechnicalHint, icon: "user" },
+        { value: "technical", label: labels.technical, hint: labels.technicalHint, icon: "codeXml" },
       ] as const,
-    [labels.nonTechnical, labels.technical],
+    [labels.nonTechnical, labels.nonTechnicalHint, labels.technical, labels.technicalHint],
   );
   return (
-    <TwoChoice
+    <ChoiceMenu
       name={labels.background}
       testId="chat-background"
       options={options}
       chosen={chosen}
       onChoose={onChoose}
-      // Its labels stay as long as the row has room for them beside the
-      // other choice's icons.
+      // The longer of the two labels: the first to give way to its icon.
       compact="narrowest"
     />
   );
@@ -212,13 +260,13 @@ export function PaceChoice({
   const options = useMemo(
     () =>
       [
-        { value: "quick", label: labels.quick, icon: "zap" },
-        { value: "thorough", label: labels.thorough, icon: "listChecks" },
+        { value: "quick", label: labels.quick, hint: labels.quickHint, icon: "zap" },
+        { value: "thorough", label: labels.thorough, hint: labels.thoroughHint, icon: "listChecks" },
       ] as const,
-    [labels.quick, labels.thorough],
+    [labels.quick, labels.quickHint, labels.thorough, labels.thoroughHint],
   );
   return (
-    <TwoChoice
+    <ChoiceMenu
       name={labels.pace}
       testId="chat-pace"
       options={options}
