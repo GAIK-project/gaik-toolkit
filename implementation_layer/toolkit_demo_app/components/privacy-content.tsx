@@ -100,7 +100,7 @@ export function PrivacyContent() {
         <p>
           The first Solution Wizard in the browser keeps your conversation and
           the files it generates only while the session runs: they are removed
-          when you leave the page or restart, or after 30 minutes without
+          when you leave the page or restart, or after about 30 minutes without
           activity.
         </p>
         <p className="mt-2">

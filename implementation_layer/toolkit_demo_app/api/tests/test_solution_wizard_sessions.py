@@ -113,7 +113,8 @@ def test_no_more_sessions_start_than_the_limit(api, monkeypatch) -> None:
 
     refused = api.post("/wizard/start", headers={route.WIZARD_USER_HEADER: "carol"})
 
-    assert refused.status_code == 429
+    assert refused.status_code == 503
+    assert "in use by others" in refused.json()["detail"]
     assert len(route.WIZARD_SESSIONS) == 2
     assert len(Client.started) == 2
 
@@ -126,7 +127,8 @@ def test_a_session_takes_no_more_messages_than_the_limit(api, monkeypatch) -> No
 
     refused = api.post(f"/wizard/message/{sid}", json={"text": "hi"}, headers=ALICE)
 
-    assert refused.status_code == 429
+    assert refused.status_code == 409
+    assert "message limit" in refused.json()["detail"]
     assert len(Client.started[0].queries) == 2
 
 
@@ -279,7 +281,7 @@ def test_starts_at_the_same_moment_do_not_pass_the_limits(api, monkeypatch) -> N
     statuses = asyncio.run(run())
 
     assert len(route.WIZARD_SESSIONS) == 1
-    assert sorted(statuses) == [200, 200, 429] or sorted(statuses) == [200, 429, 429]
+    assert sorted(statuses) == [200, 200, 503] or sorted(statuses) == [200, 503, 503]
 
 
 def test_a_session_with_a_reply_in_progress_is_not_idle(api, monkeypatch) -> None:

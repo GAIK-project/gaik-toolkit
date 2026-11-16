@@ -20,10 +20,19 @@ interface WizardFileBrowserProps {
 
 /** What a complete run leaves behind, in the order the wizard writes it. */
 const EXPECTED_ARTIFACTS = [
-  { label: "Blueprint", detail: "blueprint.json — the validated configuration" },
+  {
+    label: "Blueprint",
+    detail: "blueprint.json — the validated configuration",
+  },
   { label: "Workflow diagrams", detail: "Mermaid and BPMN 2.0" },
-  { label: "Schema", detail: "The extraction contract, when the use case needs one" },
-  { label: "Proof of concept", detail: "Runnable Python you can execute locally" },
+  {
+    label: "Schema",
+    detail: "The extraction contract, when the use case needs one",
+  },
+  {
+    label: "Proof of concept",
+    detail: "Runnable Python you can execute locally",
+  },
   { label: "Documentation", detail: "User and developer guides" },
 ] as const;
 
@@ -52,7 +61,10 @@ function listDir(files: string[], path: string[]): DirListing {
   };
 }
 
-export function WizardFileBrowser({ files, sessionId }: WizardFileBrowserProps) {
+export function WizardFileBrowser({
+  files,
+  sessionId,
+}: WizardFileBrowserProps) {
   const [path, setPath] = useState<string[]>([]);
 
   // If files change and the current path no longer exists, reset to root.
@@ -61,8 +73,9 @@ export function WizardFileBrowser({ files, sessionId }: WizardFileBrowserProps) 
   const isEmptyHere =
     listing.folders.length === 0 && listing.files.length === 0;
 
+  // Each segment encoded: a generated file's name can hold "#", "?" or a space.
   const fileHref = (full: string) =>
-    `/api/wizard/files/${sessionId}/${full}`;
+    `/api/wizard/files/${sessionId}/${full.split("/").map(encodeURIComponent).join("/")}`;
 
   return (
     <div className="flex h-full flex-col">

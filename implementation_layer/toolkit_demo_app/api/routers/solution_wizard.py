@@ -123,6 +123,7 @@ REQUIRED_FOUNDRY_VARS = [
 ]
 DEFAULT_MODEL = "claude-sonnet-5-5"
 SESSION_IDLE_SECONDS = 30 * 60  # reap sessions idle longer than this
+CLEANUP_INTERVAL_SECONDS = 60  # how often the idle sessions are looked for
 # Download archives, named <session_id>-<random>.zip so a session's own can be found.
 ZIP_DIR = Path(tempfile.gettempdir()) / "gaik-wizard-downloads"
 
@@ -674,8 +675,10 @@ async def start_session(
         for sid in [sid for sid, s in WIZARD_SESSIONS.items() if s.get("owner", "") == owner]:
             await _close_session(sid)
         if len(WIZARD_SESSIONS) >= _max_sessions():
+            # Not 429: the page's fetch wrapper takes that for the proxy's rate
+            # limit and shows its own text instead of this one.
             raise HTTPException(
-                status_code=429,
+                status_code=503,
                 detail="The first wizard is in use by others right now. Try again in a while.",
             )
 
@@ -729,7 +732,7 @@ async def send_message(
         raise HTTPException(status_code=409, detail="The wizard is still responding.")
     if session.get("messages", 0) >= _max_messages():
         raise HTTPException(
-            status_code=429,
+            status_code=409,
             detail="This session has reached its message limit. Download the files and restart.",
         )
     # Every attachment is checked before the reply starts, so a refused file is
@@ -864,7 +867,7 @@ async def end_session(session_id: str, owner: str = Header("", alias=WIZARD_USER
 async def cleanup_idle_sessions() -> None:
     """Background loop: disconnect + drop sessions idle beyond the timeout."""
     while True:
-        await asyncio.sleep(600)
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
         cutoff = time.time() - SESSION_IDLE_SECONDS
         # A reply still streaming holds the session's lock: that session is in use.
         stale = [
