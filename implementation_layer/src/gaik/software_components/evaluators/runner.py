@@ -26,7 +26,7 @@ class RunnerResult:
     durations_s: list[float]
     total_duration_s: float
     n_failures: int = 0
-    failures: list[tuple[int, BaseException]] = field(default_factory=list)
+    failures: list[tuple[int, Exception]] = field(default_factory=list)
 
     def succeeded(self) -> list[Any]:
         """Outputs only for items that did not raise."""
@@ -60,14 +60,14 @@ class BatchEvaluationRunner:
     def run(self, dataset: EvaluationDataset) -> RunnerResult:
         outputs: list[Any] = []
         durations: list[float] = []
-        failures: list[tuple[int, BaseException]] = []
+        failures: list[tuple[int, Exception]] = []
 
         t_total = time.perf_counter()
         for idx, item in enumerate(dataset):
             t0 = time.perf_counter()
             try:
                 out = self.pipeline(item)
-            except BaseException as exc:
+            except Exception as exc:
                 if self.on_error == "raise":
                     raise
                 logger.warning("Pipeline failed on item %d: %s", idx, exc, exc_info=True)

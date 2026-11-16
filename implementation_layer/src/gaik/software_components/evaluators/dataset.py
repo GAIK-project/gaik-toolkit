@@ -71,7 +71,7 @@ class EvaluationDataset:
     def from_jsonl(cls, path: str | Path) -> EvaluationDataset:
         path = Path(path)
         items: list[EvaluationItem] = []
-        with path.open(encoding="utf-8") as fh:
+        with path.open(encoding="utf-8-sig") as fh:
             for line_no, line in enumerate(fh, start=1):
                 line = line.strip()
                 if not line:
@@ -87,7 +87,7 @@ class EvaluationDataset:
     def from_csv(cls, path: str | Path) -> EvaluationDataset:
         path = Path(path)
         items: list[EvaluationItem] = []
-        with path.open(encoding="utf-8", newline="") as fh:
+        with path.open(encoding="utf-8-sig", newline="") as fh:
             reader = csv.DictReader(fh)
             for row in reader:
                 items.append(_item_from_dict(dict(row)))

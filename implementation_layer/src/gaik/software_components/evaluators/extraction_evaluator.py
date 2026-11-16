@@ -248,16 +248,17 @@ class ExtractionEvaluator:
         ``score >= 4`` is the conventional "equivalent" cut-off.
         """
         assert self.judge is not None
+        extracted_text = str(extracted) if extracted is not None else ""
+        expected_text = str(expected) if expected is not None else ""
+        if not extracted_text.strip() and not expected_text.strip():
+            return 5, "both empty"
         try:
             judgement = self.judge.judge_text_pair(
-                extracted_text=str(extracted) if extracted is not None else "",
-                expected_text=str(expected) if expected is not None else "",
+                extracted_text=extracted_text,
+                expected_text=expected_text,
                 field_name=field_name,
             )
-        except ValueError:
-            # Both sides empty — caller should have short-circuited already.
-            return 5, "both empty"
-        except Exception:  # pragma: no cover - judge / network failure
+        except Exception:  # judge, configuration or network failure
             logger.exception(
                 "Semantic match judge call failed for field %r; falling back to non-match",
                 field_name,
