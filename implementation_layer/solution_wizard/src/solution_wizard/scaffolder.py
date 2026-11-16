@@ -162,8 +162,13 @@ _CREDENTIAL_NAME_RE = re.compile(
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
-def _setting_problems(settings: dict[str, Any], where: str) -> list[str]:
-    """Endpoints and ``env:`` references the generated configuration would follow."""
+def _setting_problems(
+    settings: dict[str, Any], where: str, local_hosts: set[str] = _LOCAL_HOSTS
+) -> list[str]:
+    """Endpoints and ``env:`` references the generated configuration would follow.
+
+    Plain http is accepted only for this machine and the hosts in models.local_endpoints.
+    """
     from urllib.parse import urlsplit
 
     problems: list[str] = []
@@ -185,7 +190,7 @@ def _setting_problems(settings: dict[str, Any], where: str) -> list[str]:
             except ValueError:
                 problems.append(f"{where}.{key} {value!r} (not a URL)")
                 continue
-            local = url.scheme == "http" and host in _LOCAL_HOSTS
+            local = url.scheme == "http" and host in local_hosts
             if not (url.scheme == "https" or local) or not host or url.username or url.password:
                 problems.append(
                     f"{where}.{key} {value!r} (an https endpoint without credentials in it)"
@@ -223,7 +228,7 @@ def _model_id(value, where: str):
 def _stage_settings(blueprint: Blueprint) -> dict[str, dict]:
     """Resolve nonsecret, deterministic settings without loading credentials."""
     models = blueprint.models or {}
-    provider = _provider_name(models.get("provider", "azure"))
+    provider = _provider_name(models.get("provider", DEFAULT_PROVIDER))
     shared = {key: models[key] for key in _CONFIG_OPTIONS if models.get(key) is not None}
     if not shared.get("model") and (models.get("extraction_model") or models.get("answer_model")):
         shared["model"] = models.get("extraction_model") or models["answer_model"]
@@ -269,7 +274,7 @@ def _stage_settings(blueprint: Blueprint) -> dict[str, dict]:
                 settings[model_key] = _model_id(
                     settings[model_key], f"models ({stage}.{model_key})"
                 )
-        problems = _setting_problems(settings, f"models ({stage})")
+        problems = _setting_problems(settings, f"models ({stage})", _local_hosts(blueprint))
         if problems:
             raise ValueError("Unsafe model settings: " + "; ".join(problems))
         stages[stage] = settings
@@ -312,7 +317,127 @@ def _needed_stages(blueprint: Blueprint, pattern: str) -> set[str]:
     return stages
 
 
-def _validate_stage_settings(stages: dict[str, dict], needed: set[str]) -> None:
+# The provider a blueprint gets when models.provider is not set. It is a cloud
+# provider, so a blueprint that allows no external model API never gets it.
+DEFAULT_PROVIDER = "azure"
+
+
+# A models.local_endpoints entry: a bare host name, no scheme, port or path.
+_HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+_HOST_RE = re.compile(rf"{_HOST_LABEL}(?:\.{_HOST_LABEL})*")
+
+
+def _declared_local_hosts(blueprint: Blueprint) -> tuple[set[str], list[str]]:
+    """The host names in models.local_endpoints, and the entries that are not host names."""
+    declared = (blueprint.models or {}).get("local_endpoints") or []
+    if not isinstance(declared, list):
+        return set(), ["models.local_endpoints must be a list of host names"]
+    hosts, problems = set(), []
+    for entry in declared:
+        text = str(entry).strip().lower()
+        if isinstance(entry, str) and _HOST_RE.fullmatch(text):
+            hosts.add(text)
+        else:
+            problems.append(
+                f"models.local_endpoints entry {entry!r} must be a host name such as "
+                "'gpu.lan', without scheme, port or path"
+            )
+    return hosts, problems
+
+
+def _local_hosts(blueprint: Blueprint) -> set[str]:
+    """Hosts that count as local processing: this machine, plus models.local_endpoints."""
+    return _LOCAL_HOSTS | _declared_local_hosts(blueprint)[0]
+
+
+def _is_local_stage(stage: str, settings: dict[str, Any], local_hosts: set[str]) -> bool:
+    """Whether a stage's model runs on a host the blueprint counts as local.
+
+    Self-hosted Whisper (``whisper_local``) for transcription, or an
+    ``openai_compatible``/``litellm`` stage whose ``base_url`` names a local host. Every
+    other provider is an external model API.
+    """
+    from urllib.parse import urlsplit
+
+    if stage == "transcription" and settings.get("transcription_model") == "whisper_local":
+        return True
+    if settings.get("provider") not in {"openai_compatible", "litellm"}:
+        return False
+    try:
+        host = (urlsplit(str(settings.get("base_url") or "")).hostname or "").lower()
+    except ValueError:
+        return False
+    return bool(host) and host in local_hosts
+
+
+def external_model_forbidden(blueprint: Blueprint) -> bool:
+    """Whether governance.data_handling allows no external model API."""
+    handling = blueprint.governance.data_handling
+    return (not handling.external_model_api_allowed) or handling.local_processing_required
+
+
+def _needed(blueprint: Blueprint) -> set[str]:
+    return _needed_stages(blueprint, _determine_pattern(blueprint))
+
+
+def defaulted_stages(blueprint: Blueprint) -> list[str]:
+    """Stages the PoC uses that get the default provider: no models.provider, no own one."""
+    models = blueprint.models or {}
+    if models.get("provider"):
+        return []
+
+    def own_provider(stage: str) -> bool:
+        override = models.get(f"{stage}_config")
+        return isinstance(override, dict) and bool(override.get("provider"))
+
+    return sorted(stage for stage in _needed(blueprint) if not own_provider(stage))
+
+
+def governance_problems(blueprint: Blueprint) -> list[str]:
+    """Stages whose provider the blueprint's governance flags do not allow.
+
+    A blueprint with ``external_model_api_allowed: false`` or
+    ``local_processing_required: true`` needs every stage the PoC uses on a local
+    host, and never gets the default cloud provider.
+    """
+    if not external_model_forbidden(blueprint):
+        return []
+    entries = _declared_local_hosts(blueprint)[1]
+    try:
+        defaulted = defaulted_stages(blueprint)
+        if defaulted:
+            return entries + [
+                "governance allows no external model API, but no provider is set for the "
+                f"{', '.join(defaulted)} stage(s), so the PoC would use the default "
+                f"{DEFAULT_PROVIDER!r}. Set models.provider or each stage's config to a "
+                "local endpoint"
+            ]
+        stages = _stage_settings(blueprint)
+        needed = _needed(blueprint)
+    except ValueError as exc:
+        return entries + [
+            "governance allows no external model API, and the model settings cannot be "
+            f"checked: {exc}"
+        ]
+    local_hosts = _local_hosts(blueprint)
+    return entries + [
+        f"governance allows no external model API, but the {stage} stage uses "
+        f"{stages[stage]['provider']!r}"
+        + (f" at {stages[stage]['base_url']!r}" if stages[stage].get("base_url") else "")
+        + "; use a local endpoint (localhost, or a host listed in models.local_endpoints)"
+        for stage in sorted(needed)
+        if not _is_local_stage(stage, stages[stage], local_hosts)
+    ]
+
+
+def _validate_stage_settings(
+    stages: dict[str, dict], needed: set[str], external_forbidden: bool = False
+) -> None:
+    """Refuse stage settings the generated PoC cannot run with.
+
+    ``external_forbidden``: the blueprint allows no external model API, so a
+    ``whisper_local`` transcription stage reads no OpenAI/Azure credentials.
+    """
     if "transcription" in needed and stages["transcription"]["provider"] not in {"openai", "azure"}:
         raise ValueError(
             "Audio requires an OpenAI/Azure transcription_config. Set "
@@ -339,7 +464,18 @@ def _validate_stage_settings(stages: dict[str, dict], needed: set[str]) -> None:
             raise ValueError(
                 "Set an explicit models.embedding_config.embedding_model for this provider."
             )
-    if {"openai", "openai_compatible"} <= {stages[stage]["provider"] for stage in needed}:
+    # A whisper_local stage with no external model API reads no OPENAI_API_KEY: its
+    # transcript enhancement is off and its endpoint comes from LOCAL_TRANSCRIBER_API_*.
+    keyed = {
+        stage
+        for stage in needed
+        if not (
+            external_forbidden
+            and stage == "transcription"
+            and stages[stage].get("transcription_model") == "whisper_local"
+        )
+    }
+    if {"openai", "openai_compatible"} <= {stages[stage]["provider"] for stage in keyed}:
         raise ValueError(
             "An openai stage and an openai_compatible stage would both read OPENAI_API_KEY "
             "and OPENAI_BASE_URL, sending one key to both endpoints. Use one of them for "
@@ -725,7 +861,9 @@ def _build_generic_judge_section(has_llm_judge: bool) -> str:
             if report.flags:
                 print(f"WARNING: {len(report.flags)} hallucination flag(s) detected:")
                 for flag in report.flags:
-                    print(f"  field={flag.field}  value={flag.value}  reason={flag.reason}")
+                    # The value and the reason quote content: shown only with --verbose.
+                    print(f"  field={flag.field}" + (f"  value={flag.value}  reason={flag.reason}"
+                                                     if poc_output.VERBOSE else ""))
             if judge_error:
                 print(f"WARNING: the judge's response could not be read ({judge_error}).")
             elif not report.flags:
@@ -745,7 +883,7 @@ def _build_generic_judge_section(has_llm_judge: bool) -> str:
         except ImportError:
             print("LLMJudge skipped: gaik[llm-judge] not installed.")
         except Exception as _judge_exc:
-            print(f"LLMJudge warning: {_judge_exc}")"""
+            print(f"LLMJudge warning: {poc_output.short_error(_judge_exc)}")"""
 
 
 def _build_source_tracing_setup(has_source_tracing: bool) -> str:
@@ -812,7 +950,10 @@ def _build_source_tracing_section(has_source_tracing: bool, pattern: str) -> str
         "        )\n"
         "        for item in trace_report.items:\n"
         '            if item.verdict != "verified":\n'
-        '                print(f"  {item.verdict:<9} {item.field}: {item.value!r}  quote: {item.quote!r}")\n'
+        "                # The value and its quote are content: shown only with --verbose.\n"
+        '                print(f"  {item.verdict:<9} {item.field}"\n'
+        '                      + (f": {item.value!r}  quote: {item.quote!r}"\n'
+        '                         if poc_output.VERBOSE else ""))\n'
         '        print(f"Source trace report: {trace_path}")\n'
     )
 
@@ -863,9 +1004,16 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     if problems:
         raise ValueError("blueprint values cannot go into the PoC code: " + "; ".join(problems))
     models = bc.models or {}
-    provider = _provider_name(models.get("provider", "azure"))
+    provider = _provider_name(models.get("provider", DEFAULT_PROVIDER))
     stages = _stage_settings(blueprint)
-    _validate_stage_settings(stages, _needed_stages(blueprint, pattern))
+    _validate_stage_settings(
+        stages, _needed_stages(blueprint, pattern), external_model_forbidden(blueprint)
+    )
+    governance = governance_problems(blueprint)
+    if governance:
+        raise ValueError(
+            "The blueprint's governance flags refuse this PoC: " + "; ".join(governance)
+        )
     use_azure = str(provider == "azure")
 
     # Determine model names
@@ -962,7 +1110,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
             if report.flags:
                 print(f"WARNING: {len(report.flags)} hallucination flag(s) detected:")
                 for flag in report.flags:
-                    print(f"  field={flag.field}  value={flag.value}  reason={flag.reason}")
+                    # The value and the reason quote content: shown only with --verbose.
+                    print(f"  field={flag.field}" + (f"  value={flag.value}  reason={flag.reason}"
+                                                     if poc_output.VERBOSE else ""))
             if judge_error:
                 print(f"WARNING: the judge's response could not be read ({judge_error}).")
             elif not report.flags:
@@ -987,7 +1137,7 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     except ImportError:
         print("LLMJudge skipped: gaik[llm-judge] not installed.")
     except Exception as _judge_exc:
-        print(f"LLMJudge warning: {_judge_exc}")
+        print(f"LLMJudge warning: {poc_output.short_error(_judge_exc)}")
 
     # -- Human review (blueprint step: supervisor_review) --
     print("\\nNOTE: Human review (supervisor approval) is not executed in the PoC.")
@@ -996,9 +1146,17 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     else:
         llm_judge_section = "    # LLMJudge and human_review are not in this blueprint's pipeline."
 
+    handling = bc.governance.data_handling
     return {
         # Which blueprint the PoC came from (config.yaml and README.md carry it).
         "blueprint": bc.fingerprint(),
+        "governance": {
+            "external_model_api_allowed": handling.external_model_api_allowed,
+            "local_processing_required": handling.local_processing_required,
+            "contains_personal_data": handling.contains_personal_data,
+            "local_endpoints": sorted(_local_hosts(bc) - _LOCAL_HOSTS),
+        },
+        "allow_provider_fallback": models.get("allow_provider_fallback") is True,
         "use_case_name": bc.use_case.name,
         "use_case_id": bc.use_case.id,
         "use_case_description": bc.use_case.description,
@@ -1146,6 +1304,11 @@ def _write_config_yaml(variables: dict[str, Any], poc_dir: Path) -> None:
         },
         "stages": variables["stage_settings"],
         "language": variables["language"],
+        # The blueprint's governance flags; provider_config.py refuses an external model
+        # API at run time when they allow none.
+        "governance": variables["governance"],
+        # A stage without a provider fails unless the blueprint asked for the default.
+        "allow_provider_fallback": variables["allow_provider_fallback"],
         "paths": {
             "sample_input": "sample_input/",
             "output": "output/",
@@ -1240,6 +1403,12 @@ def scaffold_poc(
         _read_template("_common", "provider_config.py.tmpl") or "", encoding="utf-8"
     )
     files_created.append(provider_helper)
+
+    output_helper = poc_dir / "poc_output.py"
+    output_helper.write_text(
+        _read_template("_common", "poc_output.py.tmpl") or "", encoding="utf-8"
+    )
+    files_created.append(output_helper)
 
     # Schema files
     # Primary path: if generate_schema.py was already run during Phase 5 of the
@@ -1342,7 +1511,18 @@ def scaffold_poc(
     pattern_key = _derive_pattern_key(blueprint)
     template_save_path = TEMPLATES_DIR / pattern_key / "run_poc.py.tmpl"
 
+    # A stage without its own provider gets the default; say so instead of choosing silently.
+    defaulted = defaulted_stages(blueprint)
+    notes = (
+        [
+            f"No provider is set for the {', '.join(defaulted)} stage(s); config.yaml uses "
+            f"the default {DEFAULT_PROVIDER!r}. Set models.provider to choose another."
+        ]
+        if defaulted
+        else []
+    )
     return {
+        "notes": notes,
         "poc_dir": poc_dir,
         "pattern": pattern,
         "template_wired": template_wired,
