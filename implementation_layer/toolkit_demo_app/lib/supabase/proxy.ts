@@ -39,6 +39,8 @@ export interface AccessState {
   userId: string | null;
   /** Lowercased sign-in email, for the model tier (lib/model-tier.ts). */
   email: string | null;
+  /** The per-user grant for the first Solution Wizard (`wizard_access`). */
+  wizardAccess: boolean;
   /**
    * Session cookies Supabase rewrote while reading the user: a refreshed token,
    * or a cleared dead session. The caller sets them on its response.
@@ -52,13 +54,15 @@ const NO_ACCESS: AccessState = {
   pending: false,
   userId: null,
   email: null,
+  wizardAccess: false,
   cookies: [],
 };
 
 /**
  * Read the requesting user's access state in one shot: logged in, approved or
- * pending (general `status`). Used by the proxy's API auth gate. `BYPASS_AUTH`
- * opens everything in dev.
+ * pending (general `status`), and the first Solution Wizard's grant
+ * (`wizard_access`). Used by the proxy's API auth gate and its wizard gate.
+ * `BYPASS_AUTH` opens everything in dev.
  *
  * An API request skips updateSession, so an expired access token is refreshed
  * here. The refresh spends the refresh token: unless the caller saves the new
@@ -75,6 +79,7 @@ export async function getAccessState(
       pending: false,
       userId: null,
       email: null,
+      wizardAccess: true,
       cookies: [],
     };
 
@@ -101,7 +106,7 @@ export async function getAccessState(
 
   const { data } = await supabase
     .from("access_requests")
-    .select("status")
+    .select("status, wizard_access")
     .eq("user_id", user.id)
     .single();
 
@@ -111,6 +116,7 @@ export async function getAccessState(
     pending: data?.status === "pending",
     userId: user.id,
     email: user.email?.toLowerCase() ?? null,
+    wizardAccess: data?.wizard_access === true,
     cookies,
   };
 }

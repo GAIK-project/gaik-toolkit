@@ -1,7 +1,10 @@
 import {
+  WIZARD_USER_HEADER,
   accessRefusal,
   isStateChanging,
+  isWizardApiPath,
   needsApprovedUser,
+  wizardRefusal,
 } from "@/lib/api-access";
 import {
   MODEL_SETTINGS_HEADER,
@@ -60,13 +63,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
   if (pathname === null)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // The old Solution Wizard API is gone: the wizard runs as Wizard V2 and the
-  // demo API serves no /wizard routes, so nothing is forwarded there. The
-  // /solution-wizard page is a notice that links to Wizard V2, open to everyone.
-  if (pathname === "/api/wizard" || pathname.startsWith("/api/wizard/"))
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  // Read at most once per request, by the API gate. Reading it can refresh the
+  // Read at most once per request, by the API gates. Reading it can refresh the
   // session, and every response below carries the new cookies.
   let access: AccessState | undefined;
   const accessState = async () => (access ??= await getAccessState(request));
@@ -108,6 +105,24 @@ async function route(request: NextRequest): Promise<NextResponse> {
         console.warn(
           "[rate-limit] Redis unavailable, skipping rate limit:",
           error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
+    // The first Solution Wizard has a gate of its own on top of the one below,
+    // for every method: the per-user grant (lib/api-access.ts, wizardRefusal).
+    const wizardApi = isWizardApiPath(pathname);
+    if (wizardApi) {
+      const refusal = wizardRefusal(await accessState());
+      if (refusal) {
+        console.warn(
+          `[wizard-gate] ${refusal.status} ${request.method} ${pathname}`,
+        );
+        return reply(
+          NextResponse.json(
+            { error: refusal.error },
+            { status: refusal.status },
+          ),
         );
       }
     }
@@ -178,6 +193,14 @@ async function route(request: NextRequest): Promise<NextResponse> {
           ),
         );
       }
+    }
+
+    // A wizard session belongs to the user who started it. The API takes the
+    // user from this header, which only the proxy sets: the headers sent to the
+    // backend are built here, not copied from the browser's request.
+    if (wizardApi) {
+      const { userId } = await accessState();
+      if (userId) headers.set(WIZARD_USER_HEADER, userId);
     }
 
     // A server model the user picked. The API checks it against its own list.

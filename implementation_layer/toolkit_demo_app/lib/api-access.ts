@@ -16,6 +16,35 @@ export function needsApprovedUser(method: string): boolean {
   return isStateChanging(method);
 }
 
+/** The first Solution Wizard's API: the paths under /api/wizard. */
+export function isWizardApiPath(pathname: string): boolean {
+  return pathname === "/api/wizard" || pathname.startsWith("/api/wizard/");
+}
+
+/** The backend header that names the user a wizard session belongs to. */
+export const WIZARD_USER_HEADER = "x-gaik-wizard-user";
+
+/**
+ * Why a first-wizard request is refused, or null when it may go on. Its agent
+ * has shell tools and runs in the demo API pod, so approval is not enough: an
+ * admin grants the wizard to each user (`wizard_access`, set in /admin). This
+ * holds for reads too, since they list and download a session's files. A
+ * request that changes state also meets `accessRefusal`.
+ */
+export function wizardRefusal(state: {
+  loggedIn: boolean;
+  wizardAccess: boolean;
+}): Refusal | null {
+  if (!state.loggedIn)
+    return { status: 401, error: "Sign in to use this feature." };
+  if (!state.wizardAccess)
+    return {
+      status: 403,
+      error: "The first wizard in the browser needs access from the GAIK team.",
+    };
+  return null;
+}
+
 export interface GateState {
   loggedIn: boolean;
   approved: boolean;
