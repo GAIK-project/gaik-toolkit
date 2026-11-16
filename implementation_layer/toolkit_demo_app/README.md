@@ -55,10 +55,33 @@ text layer. It roughly triples the output tokens of an extraction.
 
 ### Solution Wizard
 
-The Solution Configuration Wizard runs as its own service, Wizard V2. This demo no
-longer runs it: `/solution-wizard` is open to every visitor, says where the wizard
-is and links to `WIZARD_V2_URL` when that is set. The server reads it at run time, so
-a deployment sets it with `oc set env` and needs no rebuild.
+`/solution-wizard` is open to every visitor and offers two wizards.
+
+- **Wizard V2** runs as its own service, where each session's agent and PoC runs are
+  kept apart from other services. The page links to `WIZARD_V2_URL` when that is set;
+  the server reads it at run time, so a deployment sets it with `oc set env` and needs
+  no rebuild.
+- **The first wizard** runs in the browser at `/solution-wizard/first`, and on anyone's
+  own computer as a Claude Code skill (the page shows the commands). In the browser its
+  agent is a Claude Agent SDK session inside the demo API pod, with shell tools, so it
+  is held tighter than the other demos:
+  - `proxy.ts` forwards `/api/wizard/*`, reads included, only for a signed-in user an
+    admin has granted the wizard in `/admin` (`wizard_access`), on top of the approval
+    and rate limit every state-changing request meets. There is no shared key.
+  - A session belongs to the user who started it: the proxy names the user to the API
+    and another user's session answers 404.
+  - At most `WIZARD_MAX_SESSIONS` (3) sessions run at once, one per user, each with at
+    most `WIZARD_MAX_MESSAGES` (60) messages. A session idle for 30 minutes is ended.
+  - Attachments (5 per message, 10 MB each) are checked for type, size and content
+    before a parser or a model reads them, and reach the agent marked as data.
+  - A session's workspace and download archives are removed when it ends or goes idle.
+    Sessions are not recorded: the Langfuse diagnostics were not brought back.
+  - The agent's process does not inherit the API's other credentials. This is not a
+    boundary: the agent runs as the same user in the same container as the API.
+
+  It needs `CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY` and
+  `ANTHROPIC_FOUNDRY_RESOURCE` on the API; without them the page says the wizard is
+  not set up. The model is `ANTHROPIC_MODEL` or `ANTHROPIC_DEFAULT_SONNET_MODEL`.
 
 ### No-code Assets
 
@@ -88,6 +111,47 @@ set it. A provider without credentials on the server is left out, and
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
 
+A route that takes a model name in the request runs only the models it offers, and a
+team-only model only for the team, decided from the session as above. Which models are
+team-only follows the list above (a `DEMO_SERVER_MODELS` entry decides for the model it
+names), whatever credentials the server has. The LLM Judge and the Vision Extractor
+offer the Vision Extractor's model list; the Report Writer, Report Writer v2, Source
+Normalizer, Knowledge Curator and Knowledge Synthesis offer the server's model, the
+listed models on the same provider and `DEMO_EXTRA_CHAT_MODELS` (default
+`gpt-6-luna,gpt-5.5-deployment`, the Report Writer page's defaults), and for
+transcription `DEMO_TRANSCRIPTION_MODELS` (default
+`gpt-4o-transcribe,gpt-4o-mini-transcribe,whisper-1,whisper`).
+Another name is refused with a 422, which lists the names that work, before any model call.
+
+Gemini on Vertex AI: leave `GOOGLE_CLOUD_LOCATION` unset. gaik after 0.9.1 then asks
+the EU multi-region first and uses the global endpoint for a model the EU does not
+serve, or for ten minutes after the EU failed to answer; each switch is a warning in
+the API log. A location you set is used as given, with no fallback: on 2026-11-16 the
+demo ran with `GOOGLE_CLOUD_LOCATION=eu` on gaik 0.9.1 and Gemini 4 Argon timed out on
+every request, so it went back to `global`. The Vision Extractor's own Gemini calls
+take a fixed `GOOGLE_GENERATE_CONTENT_URL` (see `.env.example`) and have no fallback.
+The deployed demo calls GPT and Claude through an Azure resource in Sweden.
+
+`DEMO_SERVER_MODELS_NOTE` is one sentence the menu shows under the server models,
+for where they run (for example the Azure region). It has no default: that depends on
+the cloud resources behind the keys.
+
+With `AITTA_API_KEY` set, the menu also lists **CSC Aitta** models (Gemma 4 31B and
+gpt-oss 120B by default): open models hosted in Finland. Picking one keeps the whole
+run on Aitta: recordings are transcribed by Aitta's Whisper large v3
+(`AITTA_TRANSCRIPTION_MODEL`), the Transcriber uses it too, and RAG embeds with
+`intfloat/multilingual-e5-large` (`AITTA_EMBEDDING_MODEL`). Nothing falls back to
+another provider. Aitta models are slower (a run takes from 20 seconds to minutes),
+the menu marks a text-only model and an idle one, and a demo that sends page images
+refuses a text-only model before the call. Aitta stops idle models, so a pick also
+asks Aitta to start its speech and embedding models, and the page says when one is
+still idle. On every demo page a notice says which
+model runs it once the user has left the default, and says so when the demo does not
+take the picked model. Aitta is a research service: its terms forbid personal data,
+its token is bound to one CSC user and expires after 90 days, and its rate limit is
+per user and minute. What was tested is in
+[docs/MODEL_REQUIREMENTS.md](docs/MODEL_REQUIREMENTS.md).
+
 **Use your own key…** in the same menu lets users select their own OpenAI, Azure OpenAI
 or CSC Aitta account. Enter the model/deployment and key; Azure also needs its public
 resource endpoint. **Test connection** makes one small chat request. **Use this key**
@@ -115,6 +179,9 @@ family can be selected where available. Vision Extractor's server-side menu can 
 with comma-separated `DEMO_OPENAI_MODELS`, `DEMO_CLAUDE_MODELS`, and `DEMO_GOOGLE_MODELS`.
 Aitta defaults to `google/gemma-4-31b-it`, which passed the integration's text, schema,
 extraction and vision checks. Cold starts can take several minutes.
+
+A signed-out visitor sees **Sign in** in the nav instead of the model menu: every run
+needs an account.
 
 ### Prerequisites
 
@@ -159,13 +226,48 @@ bun dev:api        # API: uv run uvicorn api.main:app --reload
 ```
 
 - Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/docs
+- API Docs: http://localhost:8000/docs (with `DEMO_API_DOCS=true` in `.env.local`, as in `.env.example`)
 
 ### Docker
 
 ```bash
 docker compose up --build
 ```
+
+### Pinned images and the API lock
+
+The images build from pinned base images and Python packages, so a rebuild of
+the same commit installs the same ones. The API image's system packages (ffmpeg,
+tesseract, pandoc) still come from the Debian mirror at build time, and
+`Dockerfile.pnpm` is not pinned.
+
+- `Dockerfile` and `api/Dockerfile` name each base image by tag and digest
+  (`oven/bun:1.4.4@sha256:…`). Dependabot proposes new ones once a month. To
+  move one by hand, look up the digest of the new tag and replace both:
+
+  ```bash
+  docker buildx imagetools inspect oven/bun:1.4.4 | grep -m1 Digest
+  ```
+
+  Take the digest of the multi-platform index (the first `Digest:` line), not
+  of one platform's image.
+- The API image installs every Python package from `api/requirements.lock`,
+  pinned with its hashes (`uv pip install --require-hashes`); a file whose hash
+  is not in the lock fails the build. `api/requirements.txt` stays the list to
+  edit, with the gaik pin. After changing it, write the lock again and commit
+  both:
+
+  ```bash
+  scripts/lock_api_requirements.sh            # keeps the other pins as they are
+  scripts/lock_api_requirements.sh --upgrade  # takes the newest allowed releases
+  ```
+
+  Nothing refreshes the lock on its own: run it with `--upgrade` now and then to
+  take security releases. The lock is for the image: Python 3.12 on linux
+  x86_64, with torch and torchvision as CPU builds from the PyTorch index. It
+  records the sha256 of the `requirements.txt` it was made from, and
+  `api/tests/test_api_image_pins.py` fails when that file has changed since, or
+  when a base image has no digest.
 
 ## Project Structure
 
@@ -209,7 +311,8 @@ toolkit_demo_app/
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
 | `/report-writer` | Mixed-source report generation |
 
-API docs: <http://localhost:8000/docs> (Swagger UI)
+API docs: <http://localhost:8000/docs> (Swagger UI), served only with `DEMO_API_DOCS=true`;
+the deployed API leaves `/docs`, `/redoc` and `/openapi.json` off.
 
 ## Tech Stack
 

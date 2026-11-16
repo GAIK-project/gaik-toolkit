@@ -88,3 +88,6 @@ implementation_layer/src/gaik/_version.py
 **/docs/superpowers/
 tmp/pdfs/
 /development_plans
+
+# Solution Wizard per-session workspaces
+.wizard_workspaces/

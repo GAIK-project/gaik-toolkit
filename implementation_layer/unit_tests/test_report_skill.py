@@ -916,13 +916,9 @@ def test_word_bullet_lists_become_required_items(tmp_path):
 
 def test_a_copied_run_folder_stays_current(tmp_path, capsys):
     # The run record keys sources by file name and content, not by path: copying or moving
-    # the run folder (with paths that still reach the same inputs) must not look like a change.
+    # the run folder (its inputs move with it) must not look like a change.
     first = tmp_path / "runs" / "one"
-    first.mkdir(parents=True)
-    write_spec(tmp_path)  # creates tmp_path/inputs
-    spec = json.loads((tmp_path / "report_spec.json").read_text(encoding="utf-8"))
-    spec["sources"] = {k: ["../../" + p for p in v] for k, v in spec["sources"].items()}
-    (first / "report_spec.json").write_text(json.dumps(spec), encoding="utf-8")
+    write_spec(first)  # creates runs/one/inputs
     assert full_run(capsys, first / "report_spec.json", first / "ws")["current"] is True
 
     second = tmp_path / "runs" / "two"
@@ -1320,6 +1316,26 @@ def test_propose_spec_spells_out_every_key_and_leaves_the_spec_alone(
     assert proposal["settings"]["citations"] is True
     assert any("(default)" in line for line in out["review"])
     assert spec.read_text(encoding="utf-8") == before
+
+
+def test_a_proposal_naming_a_file_outside_the_spec_folder_is_refused(
+    capsys, tmp_path, clean_model_env
+):
+    (tmp_path / "secret.txt").write_text("Outside the folder.", encoding="utf-8")
+    spec = agreed_spec(
+        tmp_path / "project", sources={"primary": ["inputs/site_notes.txt", "../secret.txt"]}
+    )
+    code, out = propose(capsys, spec, tmp_path, "--provider", "openai")
+    assert any("outside the spec's folder" in error for error in out["errors"])
+
+    raw = json.loads(spec.read_text(encoding="utf-8"))
+    raw["sources"] = {"primary": [str((tmp_path / "secret.txt").resolve())]}
+    with pytest.raises(ValueError, match="outside the spec's folder"):
+        rr.spec_from_raw(raw, spec.parent)
+    raw["sources"] = {"primary": ["inputs/site_notes.txt"]}
+    assert rr.spec_from_raw(raw, spec.parent).sources["primary"] == [
+        spec.parent / "inputs" / "site_notes.txt"
+    ]
 
 
 def test_propose_spec_keeps_the_users_edits_and_resets_models_on_request(

@@ -32,6 +32,10 @@ Extraction = Literal["precision", "balanced", "recall"]
 _LINK_TEXT = re.compile(r"\[([^\]]*)\]\(")
 _BLANK_LINES = re.compile(r"\n{3,}")
 _SPACES = re.compile(r"\s+")
+_XML_DECLARATION = re.compile(r"\A\s*<\?xml[^>]*\?>")
+# Labels the WHATWG Encoding Standard (and so every browser) reads as windows-1252:
+# pages labelled Latin-1 routinely use its euro sign and typographic quotes.
+_WINDOWS_1252_LABELS = {"iso-8859-1", "iso8859-1", "latin1", "latin-1", "l1", "us-ascii", "ascii"}
 _META_CHARSET = re.compile(rb"""<meta[^>]+charset=["']?([A-Za-z0-9._-]+)""", re.IGNORECASE)
 _SKIPPED_SCHEMES = ("mailto:", "tel:", "javascript:", "data:", "sms:", "ftp:")
 _MAX_LINKS = 500
@@ -63,6 +67,8 @@ def decode_html(body: bytes, content_type: str) -> str:
         meta = _META_CHARSET.search(body[:4096])
         if meta:
             charset = meta.group(1).decode("ascii", "replace")
+    if charset and charset.lower() in _WINDOWS_1252_LABELS:
+        charset = "cp1252"
     try:
         return body.decode(charset or "utf-8", errors="replace")
     except LookupError:
@@ -178,6 +184,8 @@ def read_page(
     html: str, page_url: str, policy: UrlPolicy, extraction: Extraction = "balanced"
 ) -> PageContent:
     """Read an HTML page fetched from ``page_url`` (the URL after redirects)."""
+    # lxml refuses a str that carries an XML encoding declaration (XHTML pages).
+    html = _XML_DECLARATION.sub("", html, count=1)
     try:
         tree = lxml.html.fromstring(html)
     except (etree.ParserError, ValueError):
