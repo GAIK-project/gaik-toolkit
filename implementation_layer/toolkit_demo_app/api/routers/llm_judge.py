@@ -30,6 +30,11 @@ try:
 except ImportError:
     from api.utils.file_content import content_mismatch
 
+try:
+    from utils.errors import component_error
+except ImportError:
+    from api.utils.errors import component_error
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -85,7 +90,8 @@ def _make_judge(provider: JudgeProvider, model: str | None):
     try:
         from gaik.software_components.validators import LLMJudge
     except ImportError as e:
-        raise HTTPException(status_code=503, detail=f"{JUDGE_NOT_AVAILABLE_DETAIL} ({e})") from e
+        logger.warning("LLMJudge is not available: %s", e)
+        raise HTTPException(status_code=503, detail=JUDGE_NOT_AVAILABLE_DETAIL) from e
 
     request_config = get_request_api_config()
     if request_config is not None:
@@ -102,11 +108,11 @@ def _make_judge(provider: JudgeProvider, model: str | None):
             status_code=503,
             detail=(
                 f"Provider SDK for '{provider}' is not installed. "
-                f"Try `pip install 'gaik[llm-{provider}]'`. ({e})"
+                f"Try `pip install 'gaik[llm-{provider}]'`."
             ),
         ) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=provider_error_detail(e)) from e
+        raise HTTPException(status_code=400, detail=component_error(e)) from e
 
 
 def _flag_dict(flag) -> dict[str, Any]:
@@ -269,7 +275,10 @@ async def validate_pdf(
         try:
             pages = _render_pdf_pages(content)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to render PDF: {e}") from e
+            logger.warning("Cannot render the PDF: %s", type(e).__name__)
+            raise HTTPException(
+                status_code=400, detail="Could not render the PDF. Check that it opens."
+            ) from e
 
         if not pages:
             raise HTTPException(status_code=400, detail="PDF has no pages to inspect")
@@ -277,9 +286,8 @@ async def validate_pdf(
         try:
             from gaik.software_components.validators import ValidationRubric
         except ImportError as e:
-            raise HTTPException(
-                status_code=503, detail=f"{JUDGE_NOT_AVAILABLE_DETAIL} ({e})"
-            ) from e
+            logger.warning("ValidationRubric is not available: %s", e)
+            raise HTTPException(status_code=503, detail=JUDGE_NOT_AVAILABLE_DETAIL) from e
 
         try:
             rubric_obj = ValidationRubric(**rubric_payload)
@@ -377,7 +385,7 @@ async def panel_text_pair(request: PanelTextPairRequest):
                 context=request.context,
             )
         except Exception as e:
-            per_judge.append({"provider": label, "error": str(e)})
+            per_judge.append({"provider": label, "error": provider_error_detail(e)})
             continue
 
         severities.append(verdict.severity)

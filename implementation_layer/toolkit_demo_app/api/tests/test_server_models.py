@@ -6,7 +6,13 @@ import httpx
 import pytest
 from api.routers import model_settings as router
 from api.utils import model_settings as settings
-from api.utils.config import get_api_config, get_transcription_api_config
+from api.utils.config import (
+    get_api_config,
+    get_rag_api_config,
+    get_transcription_api_config,
+    require_vision,
+)
+from fastapi import HTTPException
 from fastapi import FastAPI
 
 SERVER = settings.SERVER_HEADER.decode()
@@ -27,6 +33,11 @@ def server_env(monkeypatch):
         "GOOGLE_SERVICE_ACCOUNT_JSON",
         "GOOGLE_PROJECT_ID",
         "GOOGLE_CLOUD_PROJECT",
+        "AITTA_API_KEY",
+        "AITTA_API_TOKEN",
+        "AITTA_TOKEN",
+        "AITTA_TRANSCRIPTION_MODEL",
+        "AITTA_EMBEDDING_MODEL",
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("AZURE_API_KEY", "server-key")
@@ -94,7 +105,18 @@ def _app(observed):
 
     @app.post("/rag/index")
     async def rag():
+        config = get_rag_api_config()
+        observed.append((config["model"], config.get("embedding_model")))
+        return {}
+
+    @app.post("/tabular-agent/ask")
+    async def tabular():
         observed.append(get_api_config()["model"])
+        return {}
+
+    @app.post("/parse")
+    async def parse():
+        require_vision(get_api_config())
         return {}
 
     return app
@@ -153,6 +175,215 @@ async def test_claude_extracts_audio_after_the_server_transcribes(server_env):
     assert observed == [("transcribe", "gpt-6-luna"), ("extract", "claude-haiku-5-5")]
     # Routes outside model settings keep the server default.
     observed.clear()
-    response = await _call(app, "POST", "/rag/index", {SERVER: "azure:gpt-6-sol"})
+    response = await _call(app, "POST", "/tabular-agent/ask", {SERVER: "azure:gpt-6-sol"})
     assert response.status_code == 200
     assert observed == ["gpt-6-luna"]
+    # RAG follows a pick whose provider embeds; Claude has no embeddings, so it
+    # stays on the default.
+    observed.clear()
+    await _call(app, "POST", "/rag/index", {SERVER: "azure:gpt-6-sol"})
+    await _call(app, "POST", "/rag/index", {SERVER: "anthropic_foundry:claude-haiku-5-5"})
+    assert [model for model, _ in observed] == ["gpt-6-sol", "gpt-6-luna"]
+
+
+@pytest.mark.asyncio
+async def test_rag_never_builds_a_collection_on_a_team_model(server_env):
+    # A collection is queried later without the team check, so it stays on the default.
+    observed = []
+    app = _app(observed)
+    pick = {SERVER: "azure:gpt-6-astra", TIER: "staff"}
+    assert (await _call(app, "POST", "/rag/index", pick)).status_code == 200
+    assert [model for model, _ in observed] == ["gpt-6-luna"]
+
+
+@pytest.fixture
+def aitta_env(server_env, monkeypatch):
+    monkeypatch.setenv("AITTA_API_KEY", "aitta-token")
+    monkeypatch.setattr(settings, "_aitta_status", (0.0, {}))
+
+
+def test_aitta_models_are_listed_only_with_a_token(server_env, monkeypatch):
+    assert not any(m.provider == "aitta" for m in settings.server_models())
+    monkeypatch.setenv("AITTA_API_KEY", "aitta-token")
+    models = {m.id: m for m in settings.server_models()}
+    gemma = models["aitta:google/gemma-4-31b-it"]
+    assert (gemma.label, gemma.staff, gemma.audio, gemma.vision) == (
+        "Gemma 4 31B",
+        False,
+        True,
+        True,
+    )
+    assert models["aitta:openai/gpt-oss-120b"].vision is False
+    # The server's own model still leads the list.
+    assert next(iter(models)) == "azure:gpt-6-luna"
+
+
+@pytest.mark.asyncio
+async def test_env_list_can_mark_a_model_text_only(aitta_env, monkeypatch):
+    monkeypatch.setenv("DEMO_SERVER_MODELS", "aitta:some/new-model:text, aitta:other/model")
+    models = {m.id: m for m in settings.server_models()}
+    assert models["aitta:some/new-model"].vision is False
+    assert models["aitta:other/model"].vision is True
+    # The mark also stops image requests, not only the menu.
+    app = _app([])
+    refused = await _call(app, "POST", "/parse", {SERVER: "aitta:some/new-model"})
+    assert refused.status_code == 400
+    assert (await _call(app, "POST", "/parse", {SERVER: "aitta:other/model"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_an_aitta_pick_keeps_speech_and_embeddings_on_aitta(aitta_env):
+    observed = []
+    app = _app(observed)
+
+    @app.post("/transcribe")
+    async def transcribe():
+        speech = get_transcription_api_config()
+        observed.append(
+            (
+                speech["provider"],
+                speech["base_url"],
+                speech["transcription_model"],
+                speech["api_key"],
+                speech["model"],
+            )
+        )
+        return {}
+
+    pick = {SERVER: "aitta:google/gemma-4-31b-it"}
+    assert (await _call(app, "POST", "/transcribe", pick)).status_code == 200
+    # gaik's Transcriber takes OpenAI configs, so Aitta is addressed as an OpenAI base URL.
+    assert observed == [
+        (
+            "openai",
+            "https://aitta-api.csc.fi/openai/v1",
+            "openai/whisper-large-v3",
+            "aitta-token",
+            "google/gemma-4-31b-it",
+        )
+    ]
+    observed.clear()
+    assert (await _call(app, "POST", "/rag/index", pick)).status_code == 200
+    assert observed == [("google/gemma-4-31b-it", "intfloat/multilingual-e5-large")]
+    observed.clear()
+    assert (await _call(app, "POST", "/pipeline/audio/stream", pick)).status_code == 200
+    assert observed == [
+        ("transcribe", "google/gemma-4-31b-it"),
+        ("extract", "google/gemma-4-31b-it"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_text_only_model_is_refused_before_images_are_sent(aitta_env):
+    app = _app([])
+    ok = await _call(app, "POST", "/parse", {SERVER: "aitta:google/gemma-4-31b-it"})
+    assert ok.status_code == 200
+    refused = await _call(app, "POST", "/parse", {SERVER: "aitta:openai/gpt-oss-120b"})
+    assert refused.status_code == 400
+    assert refused.json()["detail"].startswith("gpt-oss 120B cannot read images")
+    with pytest.raises(HTTPException):
+        require_vision({"provider": "aitta", "model": "openai/gpt-oss-120b"})
+    assert require_vision({"provider": "azure", "model": "gpt-6-luna"})
+
+
+@pytest.mark.asyncio
+async def test_the_list_carries_aitta_status_and_vision(aitta_env, monkeypatch):
+    monkeypatch.setattr(router, "aitta_model_status", lambda: {"google/gemma-4-31b-it": "running"})
+    listed = (await _call(_app([]), "GET", "/model-settings/server", {})).json()
+    models = {m["id"]: m for m in listed["models"]}
+    assert models["aitta:google/gemma-4-31b-it"]["status"] == "running"
+    assert models["aitta:openai/gpt-oss-120b"]["status"] is None
+    assert models["aitta:openai/gpt-oss-120b"]["vision"] is False
+    assert models["azure:gpt-6-luna"]["status"] is None and models["azure:gpt-6-luna"]["vision"]
+
+
+@pytest.mark.asyncio
+async def test_the_list_names_aittas_speech_and_embedding_models(aitta_env, monkeypatch):
+    monkeypatch.setattr(
+        router,
+        "aitta_model_status",
+        lambda: {"openai/whisper-large-v3": "offline", "intfloat/multilingual-e5-large": "running"},
+    )
+    listed = (await _call(_app([]), "GET", "/model-settings/server", {})).json()
+    assert listed["aitta"] == {
+        "speech": {"model": "openai/whisper-large-v3", "status": "offline"},
+        "embedding": {"model": "intfloat/multilingual-e5-large", "status": "running"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_without_aitta_the_list_says_so(server_env):
+    listed = (await _call(_app([]), "GET", "/model-settings/server", {})).json()
+    assert listed["aitta"] is None
+
+
+def test_warming_asks_only_for_idle_models_and_not_twice(aitta_env, monkeypatch):
+    posted = []
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(settings, "_aitta_warmed", 0.0)
+    monkeypatch.setattr(
+        settings,
+        "aitta_model_status",
+        lambda: {"openai/whisper-large-v3": "offline", "intfloat/multilingual-e5-large": "running"},
+    )
+    monkeypatch.setattr(
+        settings.httpx, "post", lambda url, **kwargs: posted.append(url) or Response()
+    )
+    assert settings.warm_aitta_models() == ["openai/whisper-large-v3"]
+    assert posted == ["https://aitta-api.csc.fi/model/openai~whisper-large-v3/preload"]
+    # Within five minutes a second pick asks for nothing.
+    assert settings.warm_aitta_models() == []
+    assert len(posted) == 1
+
+
+def test_e5_embeddings_get_their_prefixes(monkeypatch):
+    from api.routers import rag
+    from gaik.software_components.RAG.embedder import Embedder
+
+    sent = []
+
+    def fake_embed(self, documents, *, batch_size=None):
+        sent.extend(documents)
+        return [[0.0] for _ in documents], []
+
+    monkeypatch.setattr(Embedder, "__init__", lambda self, config, model=None: None)
+    monkeypatch.setattr(Embedder, "embed", fake_embed)
+    embedder = rag._demo_embedder(
+        {"provider": "aitta", "embedding_model": "intfloat/multilingual-e5-large"}
+    )
+    vectors, docs = embedder.embed(["first chunk"])
+    assert embedder.embed_query("what?") == [0.0]
+    assert sent == ["passage: first chunk", "query: what?"]
+    # The stored chunk keeps its own text, without the prefix.
+    assert [d.page_content for d in docs] == ["first chunk"] and len(vectors) == 1
+    # Aitta refuses an input over E5's 512 tokens, so a long chunk is cut for its vector.
+    sent.clear()
+    _, long_docs = embedder.embed(["x" * 5000])
+    assert len(sent[0]) == len("passage: ") + rag.E5_CHAR_LIMITS[0]
+    assert len(long_docs[0].page_content) == 5000
+
+
+def test_e5_cuts_shorter_when_aitta_refuses_the_batch(monkeypatch):
+    from api.routers import rag
+    from gaik.software_components.RAG.embedder import Embedder
+
+    lengths = []
+
+    def refuse_long(self, documents, *, batch_size=None):
+        lengths.append(len(documents[0]))
+        if len(documents[0]) > 400:
+            raise RuntimeError("HTTP 500")
+        return [[0.0] for _ in documents], []
+
+    monkeypatch.setattr(Embedder, "__init__", lambda self, config, model=None: None)
+    monkeypatch.setattr(Embedder, "embed", refuse_long)
+    embedder = rag._demo_embedder(
+        {"provider": "aitta", "embedding_model": "intfloat/multilingual-e5-large"}
+    )
+    vectors, _ = embedder.embed(["x" * 5000])
+    assert vectors == [[0.0]]
+    assert lengths == [len("passage: ") + limit for limit in rag.E5_CHAR_LIMITS]

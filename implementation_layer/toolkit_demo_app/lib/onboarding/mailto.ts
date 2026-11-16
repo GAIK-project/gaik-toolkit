@@ -3,7 +3,7 @@
  *
  * The Wizard is a gated beta with no self-serve unlock: a prospective tester
  * reaches the GAIK team with a short company intro and their use case, and an
- * admin grants `wizard_access` (see proxy.ts and /admin).
+ * admin grants `wizard_access` (see /admin).
  */
 
 /** GAIK research & development contact (also shown on the privacy page). */

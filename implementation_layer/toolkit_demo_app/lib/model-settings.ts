@@ -152,6 +152,23 @@ export function parseModelSettingsHeader(raw: string): ModelSettings {
 /** A server model the user picked: `provider:model`, run on the server's keys. */
 export const SERVER_MODEL_HEADER = "x-gaik-server-model";
 
+// A picked server model also runs these; an own key does not. The RAG index
+// stays on the server between requests, where a browser key must not, and the
+// transcriber takes a speech model, not the chat model of the key dialog.
+const SERVER_MODEL_PATHS = [
+  "/api/rag/index",
+  "/api/rag/load-example",
+  "/api/transcribe",
+];
+
+export function supportsServerModel(path: string, method = "POST"): boolean {
+  if (supportsModelSettings(path, method)) return true;
+  if (method.toUpperCase() !== "POST") return false;
+  return SERVER_MODEL_PATHS.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
 export function isServerModelId(value: unknown): value is string {
   return (
     typeof value === "string" &&

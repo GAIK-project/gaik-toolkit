@@ -12,6 +12,11 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -172,7 +177,7 @@ async def list_videos():
             for row in rows
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
 
 
 @router.get("/videos/{video_id}/play")
@@ -252,7 +257,7 @@ async def search_videos(
             total_results=len(formatted),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
 
 
 @router.post("/ingest/stream")
@@ -358,13 +363,14 @@ async def ingest_srt_stream(
             )
 
         except Exception as e:
+            message = error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -382,4 +388,4 @@ async def clear_all_segments():
         conn.commit()
         return {"deleted": result.rowcount, "message": "All segments cleared"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e

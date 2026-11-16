@@ -3,14 +3,21 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Check, ChevronDown, KeyRound, Loader2, Lock } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Box,
+  KeyRound,
+  Loader2,
+  Lock,
+  TriangleAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Azure } from "@/components/ui/svgs/azure";
 import { Openai } from "@/components/ui/svgs/openai";
 import { Csc } from "@/components/ui/svgs/csc";
 import { Gemma } from "@/components/ui/svgs/gemma";
-import { Meta } from "@/components/ui/svgs/meta";
 import { Claude } from "@/components/ui/svgs/claude";
 import { Gemini } from "@/components/ui/svgs/gemini";
 import {
@@ -56,6 +63,14 @@ import {
   useServerModels,
   type ServerModel,
 } from "@/lib/server-model-store";
+import {
+  AITTA_SPEECH_MODEL,
+  aittaName,
+  aittaReadsImages,
+  modelUse,
+  type ActiveModel,
+} from "@/lib/model-use";
+import { useRunAccess } from "@/components/run-access";
 
 const LABELS = { openai: "OpenAI", azure: "Azure OpenAI", aitta: "CSC Aitta" };
 const CUSTOM = "__custom__";
@@ -78,21 +93,16 @@ const PRESETS: Record<ModelProvider, Preset[]> = {
     {
       id: "google/gemma-4-31b-it",
       label: "Gemma 4 31B",
-      note: "tested",
+      note: "reads images",
       Icon: Gemma,
     },
     {
       id: "openai/gpt-oss-120b",
       label: "gpt-oss 120B",
-      note: "text only",
+      note: "fastest, text only",
       Icon: Openai,
     },
-    {
-      id: "LumiOpen/Llama-Poro-2-70B-Instruct",
-      label: "Poro 2 70B",
-      note: "Finnish, simple schemas",
-      Icon: Meta,
-    },
+    { id: "Qwen/Qwen3.8-27B", label: "Qwen 3.8 27B", note: "reads images" },
   ],
 };
 
@@ -431,9 +441,9 @@ export function ModelSettingsButton({
             </div>
             {draft.provider === "aitta" && (
               <p className="text-muted-foreground text-xs">
-                Experimental. A model that is starting can take minutes to
-                answer, and one model serves every call, so demos that need
-                several models stay on the server.
+                Recordings are transcribed by {AITTA_SPEECH_MODEL} on Aitta with
+                the same token. An idle model can take minutes to start. Aitta
+                is a research service: do not send personal data.
               </p>
             )}
             {message && (
@@ -479,49 +489,175 @@ export function ModelSettingsButton({
 
 function ProviderIcon({
   provider,
+  model = "",
   className,
 }: {
   provider: string;
+  /** Aitta serves models of many makers: the icon follows the model. */
+  model?: string;
   className?: string;
 }) {
   if (provider.startsWith("anthropic"))
     return <Claude className={className} aria-hidden />;
   if (provider === "google" || provider === "vertex")
     return <Gemini className={className} />;
+  if (provider === "aitta") {
+    const id = model.toLowerCase();
+    if (id.startsWith("google/gemma"))
+      return <Gemma className={className} aria-hidden />;
+    if (id.startsWith("openai/"))
+      return <Openai className={className} aria-hidden />;
+    return <Box className={className} aria-hidden />;
+  }
   return <Openai className={className} aria-hidden />;
+}
+
+/** The model that runs requests now: the user's key, else the picked or default server model. */
+function useActiveModel(loggedIn: boolean): ActiveModel | null {
+  const catalog = useServerModels(loggedIn);
+  const picked = useServerModel();
+  const settings = useModelSettings();
+  if (settings)
+    return {
+      own: true,
+      provider: settings.provider,
+      model: settings.model,
+      label: settings.model,
+      vision: settings.provider !== "aitta" || aittaReadsImages(settings.model),
+      audio: true,
+      isDefault: false,
+    };
+  // A page can load the list for its own use; a signed-out visitor still runs nothing.
+  if (!loggedIn || !catalog) return null;
+  const id = picked ?? catalog.default;
+  const model = catalog.models.find((m) => m.id === id) ?? catalog.models[0];
+  if (!model) return null;
+  return {
+    own: false,
+    provider: model.provider,
+    model: model.model,
+    label: model.label,
+    vision: model.vision,
+    audio: model.audio,
+    isDefault: model.id === catalog.default,
+    teamOnly: model.staff,
+    ...(model.provider === "aitta" && catalog.aitta
+      ? {
+          aittaSpeech: helperState(catalog.aitta.speech),
+          aittaEmbedding: helperState(catalog.aitta.embedding),
+        }
+      : {}),
+  };
+}
+
+function helperState(helper: { model: string; status: string | null }) {
+  // No status means the catalog did not answer: say nothing rather than guess.
+  return {
+    model: helper.model,
+    idle: helper.status !== null && helper.status !== "running",
+  };
+}
+
+/**
+ * Set when Aitta's Whisper transcribes the recordings of this page: its name,
+ * such as "Whisper large v3 on CSC Aitta". The audio pages use it to say which
+ * of their options then apply, since those belong to the HH Whisper server.
+ */
+export function useAittaSpeech(): string | null {
+  const pathname = usePathname();
+  const { loggedIn } = useRunAccess();
+  const active = useActiveModel(loggedIn);
+  if (!active || active.provider !== "aitta") return null;
+  if (!modelUse(pathname, active).runsHere) return null;
+  return active.aittaSpeech
+    ? aittaName(active.aittaSpeech.model)
+    : `${AITTA_SPEECH_MODEL} on CSC Aitta`;
+}
+
+function ModelRow({
+  model,
+  isDefault,
+}: {
+  model: ServerModel;
+  isDefault: boolean;
+}) {
+  const tags: string[] = [];
+  if (isDefault) tags.push("default");
+  if (!model.vision) tags.push("text only");
+  // Aitta starts an idle model on its first request.
+  if (model.status === "failed") tags.push("unavailable");
+  else if (model.status && model.status !== "running") tags.push("idle");
+  return (
+    <DropdownMenuRadioItem
+      value={model.id}
+      disabled={!model.allowed}
+      title={
+        !model.allowed
+          ? "For the GAIK project team"
+          : tags.includes("unavailable")
+            ? "Aitta reports that this model failed to start"
+            : tags.includes("idle")
+              ? "Idle on Aitta: the first request starts it, which can take minutes"
+              : undefined
+      }
+    >
+      <ProviderIcon
+        provider={model.provider}
+        model={model.model}
+        className="size-4"
+      />
+      <span className="whitespace-nowrap">{model.label}</span>
+      <span className="text-muted-foreground ml-auto flex items-center gap-1.5 text-xs">
+        {tags.join(" · ")}
+        {!model.allowed && <Lock className="size-3.5" aria-label="Team only" />}
+      </span>
+    </DropdownMenuRadioItem>
+  );
 }
 
 /**
  * The model menu in the nav. A signed-in user sees the model in use and can
  * switch among the server's models without a key; their own key stays an
- * advanced option. Without server models (signed out, or a clone with no
- * server keys) it is the plain own-key button.
+ * advanced option. Signed out it renders nothing: the nav shows Sign in, and
+ * every run needs an account. A clone with no server keys gets the plain
+ * own-key button.
  */
 export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
   const catalog = useServerModels(loggedIn);
   const picked = useServerModel();
   const settings = useModelSettings();
   const pathname = usePathname();
-  const usedHere = pageUsesModelSettings(pathname);
+  const active = useActiveModel(loggedIn);
 
-  if (!loggedIn || !catalog || catalog.models.length === 0)
+  if (!loggedIn) return null;
+  // While the list loads, hold the button's place instead of showing the
+  // own-key button for a moment and then swapping it.
+  if (!catalog && !settings)
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        className="gap-1.5"
+        aria-label="Loading the models"
+      >
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        <span className="hidden sm:inline">Model</span>
+      </Button>
+    );
+  if (!catalog || catalog.models.length === 0 || !active)
     return <ModelSettingsButton />;
 
-  const activeId = picked ?? catalog.default;
-  const active: ServerModel | undefined =
-    catalog.models.find((m) => m.id === activeId) ?? catalog.models[0];
-  const label = settings
-    ? `Own · ${settings.model}`
-    : (active?.label ?? "Server model");
-  const status = settings
-    ? usedHere
-      ? "Your own model runs this demo"
-      : "This demo runs on the server default"
-    : usedHere
-      ? `${active?.label} runs this demo`
-      : "This demo runs on the server default";
-  const transcribedFirst = !settings && usedHere && active && !active.audio;
+  const use = modelUse(pathname, active);
+  const label = settings ? `Own · ${settings.model}` : active.label;
+  const pickedModel = catalog.models.find((m) => m.id === picked);
+  const activeId = settings
+    ? ""
+    : (pickedModel?.id ?? catalog.default ?? catalog.models[0].id);
+  const serverModels = catalog.models.filter((m) => m.provider !== "aitta");
+  const aittaModels = catalog.models.filter((m) => m.provider === "aitta");
   const someLocked = catalog.models.some((m) => !m.allowed);
+  const status = use.problem ?? use.summary;
 
   return (
     <>
@@ -535,14 +671,15 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
               settings &&
                 "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15",
             )}
-            aria-label={`Model: ${label}. ${status}.`}
+            aria-label={`Model: ${label}. ${status}`}
             title={status}
           >
             {settings ? (
               <KeyRound className="size-4 shrink-0" aria-hidden />
             ) : (
               <ProviderIcon
-                provider={active?.provider ?? "azure"}
+                provider={active.provider}
+                model={active.model}
                 className="size-4 shrink-0"
               />
             )}
@@ -552,51 +689,78 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
               aria-hidden="true"
               className={cn(
                 "ring-card absolute top-1 right-1 size-2 rounded-full ring-2",
-                usedHere ? "bg-emerald-500" : "bg-muted-foreground/50",
+                use.problem
+                  ? "bg-amber-500"
+                  : use.runsHere
+                    ? "bg-emerald-500"
+                    : "bg-muted-foreground/50",
               )}
             />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
-          <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-            {status}
-            {transcribedFirst && (
-              <span className="block">
-                Audio is transcribed on the server first.
-              </span>
-            )}
-          </DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-80">
+          <div className="space-y-0.5 px-2 py-1.5 text-xs" role="status">
+            <p
+              className={cn(
+                "font-medium",
+                use.problem && "text-amber-700 dark:text-amber-400",
+              )}
+            >
+              {status}
+            </p>
+            {use.details.map((detail) => (
+              <p key={detail} className="text-muted-foreground">
+                {detail}
+              </p>
+            ))}
+          </div>
           <DropdownMenuSeparator />
-          <DropdownMenuLabel>Server models</DropdownMenuLabel>
           <DropdownMenuRadioGroup
-            value={settings ? "" : (active?.id ?? "")}
+            value={activeId}
             onValueChange={(id) => {
               setModelSettings(null);
               setServerModel(id === catalog.default ? null : id);
+              // Aitta stops idle models: start its speech and embedding models
+              // now, so that they are up when a recording or document arrives.
+              if (id.startsWith("aitta:"))
+                void apiFetch("/api/model-settings/aitta/warm", {
+                  method: "POST",
+                }).catch(() => {});
             }}
           >
-            {catalog.models.map((model) => {
-              return (
-                <DropdownMenuRadioItem
-                  key={model.id}
-                  value={model.id}
-                  disabled={!model.allowed}
-                  title={
-                    model.allowed ? undefined : "For the GAIK project team"
-                  }
-                >
-                  <ProviderIcon provider={model.provider} className="size-4" />
-                  <span className="whitespace-nowrap">{model.label}</span>
-                  <span className="text-muted-foreground ml-auto text-xs">
-                    {model.id === catalog.default ? (
-                      "default"
-                    ) : !model.allowed ? (
-                      <Lock className="size-3.5" aria-label="Team only" />
-                    ) : null}
-                  </span>
-                </DropdownMenuRadioItem>
-              );
-            })}
+            {serverModels.length > 0 && (
+              <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+                GAIK server models
+              </DropdownMenuLabel>
+            )}
+            {serverModels.map((model) => (
+              <ModelRow
+                key={model.id}
+                model={model}
+                isDefault={model.id === catalog.default}
+              />
+            ))}
+            {aittaModels.length > 0 && (
+              <>
+                {serverModels.length > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuLabel className="text-muted-foreground flex items-center gap-2 text-xs font-normal">
+                  <Csc className="h-4 w-auto shrink-0" aria-hidden />
+                  CSC Aitta · open models hosted in Finland
+                </DropdownMenuLabel>
+                {aittaModels.map((model) => (
+                  <ModelRow
+                    key={model.id}
+                    model={model}
+                    isDefault={model.id === catalog.default}
+                  />
+                ))}
+                <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs">
+                  Slower than the server models: a run takes from 20 seconds to
+                  minutes. Speech and embeddings then run on Aitta too. No
+                  personal data.
+                </p>
+              </>
+            )}
           </DropdownMenuRadioGroup>
           {someLocked && (
             <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs">
@@ -618,27 +782,77 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
   );
 }
 
-export function ModelSettingsNotice() {
-  const settings = useModelSettings();
+/**
+ * On a demo page, says which model runs it once the user has left the server
+ * default: their own key or another server model. Also says when the demo does
+ * not take that model, and when the model cannot do what the demo needs.
+ */
+export function ModelSettingsNotice({
+  loggedIn = true,
+}: { loggedIn?: boolean } = {}) {
   const pathname = usePathname();
-  if (!settings) return null;
+  const active = useActiveModel(loggedIn);
+  if (!active || (!active.own && active.isDefault)) return null;
+  const use = modelUse(pathname, active);
+  const aitta = active.provider === "aitta" && use.runsHere;
   return (
-    <div className="border-border bg-muted/40 mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm">
-      <p>
-        {pageUsesModelSettings(pathname) ? (
-          <>
-            Own model: <strong>{LABELS[settings.provider]}</strong> ·{" "}
-            {settings.model}
-            {pathname === "/solution-wizard"
-              ? " (image attachments only; conversation uses hosted Claude)"
-              : ""}
-          </>
-        ) : (
-          "This demo uses server settings. Your own model is active on supported demos."
-        )}
-      </p>
-      <Button variant="ghost" size="sm" onClick={() => setModelSettings(null)}>
-        Clear own key
+    <div
+      role="status"
+      data-testid="model-use-notice"
+      className={cn(
+        "mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm",
+        use.problem
+          ? "border-amber-500/40 bg-amber-500/10"
+          : "border-border bg-muted/40",
+      )}
+    >
+      <div className="min-w-0 flex-1 basis-64 space-y-0.5">
+        <p className="flex items-center gap-2">
+          {use.problem ? (
+            <TriangleAlert
+              className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
+              aria-hidden
+            />
+          ) : (
+            use.runsHere && (
+              <ProviderIcon
+                provider={active.provider}
+                model={active.model}
+                className="size-4 shrink-0"
+              />
+            )
+          )}
+          <span>
+            {use.problem ?? use.summary}
+            {use.runsHere && active.own && (
+              <span className="text-muted-foreground">
+                {" "}
+                ({LABELS[active.provider as ModelProvider]})
+              </span>
+            )}
+          </span>
+        </p>
+        {[
+          ...use.details,
+          ...(aitta
+            ? [
+                "CSC Aitta is a research service: do not send personal data. Its models are slower: a run takes from 20 seconds to minutes.",
+              ]
+            : []),
+        ].map((line) => (
+          <p key={line} className="text-muted-foreground text-xs">
+            {line}
+          </p>
+        ))}
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() =>
+          active.own ? setModelSettings(null) : setServerModel(null)
+        }
+      >
+        {active.own ? "Clear own key" : "Use the default model"}
       </Button>
     </div>
   );

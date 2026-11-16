@@ -22,16 +22,21 @@ except ImportError:
     from api.utils.model_settings import provider_error_detail
 
 try:
-    from utils.config import get_model_options
+    from utils.config import get_model_options, require_vision
     from utils.model_settings import get_request_api_config
 except ImportError:
-    from api.utils.config import get_model_options
+    from api.utils.config import get_model_options, require_vision
     from api.utils.model_settings import get_request_api_config
 
 try:
     from utils.file_content import content_mismatch
 except ImportError:
     from api.utils.file_content import content_mismatch
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
 
 router = APIRouter()
 
@@ -57,7 +62,7 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
     elif parser_type == "vision":
         from gaik.software_components.parsers import VisionParser
 
-        vision_config = get_api_config()
+        vision_config = require_vision(get_api_config())
         parser = VisionParser(openai_config=vision_config, **get_model_options(vision_config))
         # VisionParser uses convert_pdf() which returns list of markdown pages.
         # Model calls run in a worker thread so a slow provider cannot stall the loop.
@@ -69,7 +74,7 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
     elif parser_type == "vision_plus":
         from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
 
-        vision_config = get_api_config()
+        vision_config = require_vision(get_api_config())
         parser = VisionRagParser(
             vision_config=vision_config,
             verbose=False,
@@ -95,7 +100,7 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
         # Use the shared deployment model unless a parser-specific model is configured.
         # Override with AZURE_MULTIMODAL_DEPLOYMENT without redeploy.
         request_config = get_request_api_config()
-        config = request_config or get_api_config()
+        config = require_vision(request_config or get_api_config())
         if request_config is None and os.getenv("AZURE_MULTIMODAL_DEPLOYMENT"):
             config = {**config, "model": os.environ["AZURE_MULTIMODAL_DEPLOYMENT"]}
         # With api_config the parser reads reasoning_effort from that config.
@@ -157,7 +162,7 @@ async def run_parser(tmp_path: str, suffix: str, parser_type: str) -> dict:
                 if suffix != ".pdf":
                     raise HTTPException(
                         status_code=502,
-                        detail=f"HH Parser could not parse this {suffix} file: {exc}",
+                        detail=error_detail(exc, f"Parsing this {suffix} file with the HH Parser"),
                     ) from exc
                 parser = PyMuPDFParser()
                 result = parser.parse_document(tmp_path)
@@ -256,7 +261,7 @@ async def parse_document(
         # 400 (wrong file type, too many pages) into a 500.
         raise
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Parser not installed: {e}") from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "Loading the parser")) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
     finally:
