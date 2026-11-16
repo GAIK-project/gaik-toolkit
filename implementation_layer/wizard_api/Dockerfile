@@ -35,7 +35,7 @@ RUN pip install --no-cache-dir -e /solution_wizard
 # them to check a call before the user's first run (#256). The two lists are
 # kept equal by a test (test_deploy_instances).
 ARG GAIK_VERSION=0.9.0
-ARG GAIK_EXTRAS="extract,transcriber,enhance-transcript,audio-to-structured-data,llm-judge,vision-extract,multimodal-parser,documents-to-structured-data-cpu,evaluators,report-writer,vector-store,source-tracing,fields-to-docx"
+ARG GAIK_EXTRAS="extract,transcriber,enhance-transcript,audio-to-structured-data,llm-judge,vision-extract,multimodal-parser,documents-to-structured-data-cpu,evaluators,report-writer,vector-store,source-tracing,fields-to-docx,tabular-agent"
 # pyyaml, reportlab, pandas: the package check parses an entrypoint's imports and
 # looks them up in this image, because it holds the same packages as the runner.
 # Without one of them here a PoC that imports it is held back as "not ready"
@@ -65,6 +65,7 @@ for module in (
     "gaik.software_components.transcriber",
     "gaik.software_components.validators",
     "gaik.software_components.source_tracing",
+    "gaik.software_components.tabular_agent",
     # vector-store: gaik imports chromadb inside VectorStore.__init__, at the first
     # call, so only an explicit import here catches a runner without it (#268).
     "chromadb",
