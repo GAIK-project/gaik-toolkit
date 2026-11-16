@@ -443,8 +443,8 @@ SO-[number]_[customer]_[date].[ext]
 
 ### Examples
 ```
-SO-2025-08472_AutoTech-Manufacturing_2025-11-15.docx
-SO-2025-08472_AutoTech-Manufacturing_2025-11-15.txt
+SO-2025-08472_AutoTech_Manufacturing_2025-11-15.docx
+SO-2025-08472_AutoTech_Manufacturing_2025-11-15.txt
 ```
 
 ---
@@ -480,7 +480,7 @@ Price Comparison (PO vs Calculated):
   Item 3: PO $10,080.00 vs Calculated $10,080.00 ✓
 
 Output Generated:
-  SO-2025-08472_AutoTech-Manufacturing_2025-11-15.docx
+  SO-2025-08472_AutoTech_Manufacturing_2025-11-15.docx
 
 ═══════════════════════════════════════════════════════════════
 ```
