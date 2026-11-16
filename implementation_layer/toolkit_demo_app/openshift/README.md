@@ -58,9 +58,10 @@ Every upload is checked before a route uses it (`api/utils/upload_check.py`):
 
 1. **Type:** its content must match its extension. The report writer, source normalizer and
    knowledge synthesis routes keep their own type rules instead.
-2. **Content:** DOCX, XLSX and XLSM files with macros or ActiveX parts are refused. PDF files
+2. **Content:** DOCX, XLSX and XLSM files with macros or ActiveX controls are refused. PDF files
    are refused when they contain JavaScript, launch or import-data actions or rich media, also
-   inside compressed object streams (`api/utils/pdf_content.py`).
+   inside compressed object streams (`api/utils/pdf_content.py`). Each PDF is checked in a
+   process of its own (`api/utils/pdf_process.py`): at most 20 s and 1 GiB, two at a time.
 3. **Malware:** a ClamAV scan (`api/utils/malware_scan.py`) when `DEMO_MALWARE_SCANNER` is set.
 
 A refused file gets 422. When the scanner is set but does not answer, the upload gets 503 and

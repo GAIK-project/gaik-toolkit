@@ -11,7 +11,9 @@
 3. Malware: the ClamAV scan (``malware_scan``), when a scanner is configured.
 
 Step 2 runs in a small pool of its own, so slow checks never hold the threads
-other routes use; the PDF check also stops at its own deadline.
+other routes use. The PDF check runs in a process of its own (``pdf_process``),
+so it never holds the API's interpreter, and that process is stopped at a
+deadline.
 
 ``upload_problem`` returns what to answer, or None for a file the route may use.
 """
@@ -25,10 +27,10 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 try:
-    from utils import malware_scan, pdf_content
+    from utils import malware_scan, pdf_content, pdf_process
     from utils.file_content import content_mismatch
 except ImportError:
-    from api.utils import malware_scan, pdf_content
+    from api.utils import malware_scan, pdf_content, pdf_process
     from api.utils.file_content import content_mismatch
 
 _OFFICE = {".docx", ".xlsx", ".xlsm"}
@@ -79,7 +81,7 @@ def content_problem(suffix: str, data: bytes) -> str | None:
         return MACRO_MESSAGE
     if suffix == ".pdf" or data.startswith(b"%PDF-"):
         try:
-            pdf_content.check(data)
+            pdf_process.check(data)
         except (pdf_content.ActiveContentError, pdf_content.TooComplexError) as exc:
             text = str(exc)
             return text[:1].upper() + text[1:] + "."

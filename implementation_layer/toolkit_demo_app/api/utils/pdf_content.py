@@ -53,16 +53,27 @@ linear in its input. The bytes the check reads more than once, the bytes it
 decodes and the streams it decodes are counted against budgets, and positions
 are kept in compact arrays, so the check holds bounded memory on any file.
 The steps of the check's own loops (each string and comment it blanks, each
-byte the LZW, RunLength and predictor code reads, each stream it decodes) are
-counted against one more budget, and the check also stops at a deadline, so it
-ends in bounded time on any file and any machine.
+byte the LZW, RunLength and predictor code reads, each number of an object
+stream's offset table, each stream it decodes) are counted against one more
+budget, and the check also stops at a deadline, so it ends in bounded time on
+any file and any machine.
+
+Those budgets are the first line. A pattern search over decoded data holds the
+interpreter while it runs and no deadline can stop it, so the upload check runs
+``check`` in a process of its own (``pdf_process``), which runs this file as a
+script and is stopped at a deadline of its own.
 """
 
 from __future__ import annotations
 
 import base64
 import bisect
+import itertools
+import json
+import operator
+import os
 import re
+import sys
 import time
 import zlib
 from array import array
@@ -76,8 +87,10 @@ from collections.abc import Sequence
 MAX_DECODED_BYTES = 128 * 1024 * 1024
 #: Steps of the check's own Python loops in one file: each string, comment or
 #: ``#xx`` escape it reads outside the patterns, each byte the LZW, RunLength
-#: and PNG predictor code reads, each object header it walks. A step takes
-#: about a microsecond, up to two on a slow machine.
+#: and PNG predictor code reads, each object header it walks, each number of
+#: an object stream's offset table. A step takes about a microsecond, up to
+#: about four on a slow machine. A dense page of text costs about 3,000 steps,
+#: so a text PDF of more than about 1,400 pages is refused as too complex.
 MAX_WORK = 4_000_000
 #: The steps a decoded stream costs besides its bytes.
 STREAM_STEPS = 100
@@ -105,6 +118,7 @@ class TooComplexError(ValueError):
 
 
 NOT_CHECKABLE = "the PDF's content cannot be checked; save it again as a standard PDF"
+TOO_COMPLEX = "the PDF is too complex to be checked"
 
 
 class _UndecodableError(TooComplexError):
@@ -223,7 +237,10 @@ class _Budget:
     def take(self, n: int) -> None:
         self.left -= n
         if self.left < 0:
-            raise TooComplexError("the PDF is too complex to be checked")
+            raise TooComplexError(TOO_COMPLEX)
+
+    def tick(self) -> None:
+        """Stop here when time is up; a plain budget has no deadline."""
 
 
 class _Work(_Budget):
@@ -239,8 +256,11 @@ class _Work(_Budget):
         self.clock += n
         if self.clock >= 1024:
             self.clock = 0
-            if time.monotonic() > self.deadline:
-                raise TooComplexError("the PDF is too complex to be checked")
+            self.tick()
+
+    def tick(self) -> None:
+        if time.monotonic() > self.deadline:
+            raise TooComplexError(TOO_COMPLEX)
 
 
 class _Budgets:
@@ -255,6 +275,12 @@ def _num(digits: bytes) -> int:
     reads as one past every file, so a viewer's limits never come into it."""
     digits = digits.lstrip(b"0") or b"0"
     return int(digits) if len(digits) <= 18 else 10**18
+
+
+def _count(pattern: re.Pattern[bytes], text: bytes) -> int:
+    """How often ``pattern`` occurs in ``text``: 0, 1, or 2 for twice or more.
+    No list of the matches is built, however many there are."""
+    return sum(1 for _ in itertools.islice(pattern.finditer(text), 2))
 
 
 # ------------------------------------------------------------------ strings
@@ -349,6 +375,9 @@ def _names(stripped: bytes, work: _Budget, open_text: Sequence[bytes] = ()) -> s
     for text in (stripped, *open_text):
         text = _unescape(text, work)
         for pattern, what in _FINDINGS:
+            # A search cannot be stopped while it runs; the deadline is looked
+            # at between searches, and pdf_process stops a search that overruns.
+            work.tick()
             if pattern.search(text):
                 return what
     return None
@@ -419,6 +448,14 @@ def _take(raw: _Budget | None, n: int) -> None:
         raw.take(n)
 
 
+def _out_of_memory(exc: zlib.error) -> None:
+    """Refuse when zlib could not allocate (Z_MEM_ERROR, -4): that is no
+    damage in the data, which may decode with memory to spare, so reading
+    only what came before it could miss the rest."""
+    if str(exc).startswith("Error -4 "):
+        raise TooComplexError(TOO_COMPLEX) from exc
+
+
 def _flate(
     data: bytes, start: int, budgets: _Budgets, parms: dict[bytes, int], raw: _Budget | None
 ) -> bytes:
@@ -439,7 +476,8 @@ def _flate(
             saved = decomp.copy()
             try:
                 piece = decomp.decompress(chunk, _OUT_CHUNK)
-            except zlib.error:
+            except zlib.error as exc:
+                _out_of_memory(exc)
                 # Damaged here: what decodes before the damage is still read,
                 # as a viewer that keeps a damaged stream's start reads it.
                 _keep_until_damage(saved, bytes(chunk), budgets, out)
@@ -448,8 +486,8 @@ def _flate(
             out += piece
             if not piece and len(decomp.unconsumed_tail) == len(chunk):
                 break  # no progress
-    except zlib.error:
-        pass
+    except zlib.error as exc:
+        _out_of_memory(exc)
     consumed = pos - start - len(decomp.unconsumed_tail) - len(decomp.unused_data)
     _take(raw, max(consumed, 0))
     return bytes(out)
@@ -481,7 +519,8 @@ def _keep_until_damage(
         trial = _Budget(min(budgets.decoded.left, _MAX_TRIAL_BYTES))
         try:
             _drain(decomp.copy(), chunk[:size], trial, None)
-        except zlib.error:
+        except zlib.error as exc:
+            _out_of_memory(exc)
             return False
         return True
 
@@ -499,8 +538,8 @@ def _keep_until_damage(
             hi = mid
     try:
         _drain(decomp, chunk[:lo], budgets.decoded, out)
-    except zlib.error:
-        pass
+    except zlib.error as exc:
+        _out_of_memory(exc)
 
 
 def _until(data: bytes, start: int, marker: bytes, raw: _Budget | None) -> bytes:
@@ -679,7 +718,7 @@ def _png_unpredict(data: bytes, parms: dict[bytes, int], budgets: _Budgets) -> b
 def _filters(stream_dict: bytes) -> tuple[list[bytes], bool]:
     """The filter names, as a viewer reads them, and whether they were given
     as a list; refuses what it cannot read."""
-    keys = len(_FILTER_KEY.findall(stream_dict))
+    keys = _count(_FILTER_KEY, stream_dict)
     if keys == 0:
         return [], False
     if keys == 1 and _FILTER_NULL.search(stream_dict):
@@ -695,7 +734,7 @@ def _read_parms(entry: bytes) -> dict[bytes, int]:
     """One filter's parameters; refuses one given twice or not as a plain number."""
     parms: dict[bytes, int] = {}
     for key, (key_rx, value_rx) in _PARM.items():
-        count = len(key_rx.findall(entry))
+        count = _count(key_rx, entry)
         if count == 0:
             continue
         m = value_rx.search(entry)
@@ -714,7 +753,7 @@ def _parms(stream_dict: bytes, filters: list[bytes], listed: bool) -> list[list[
     per filter, in the filters' order. Refuses parameters this check cannot
     pair or apply."""
     none: list[dict[bytes, int]] = [{} for _ in filters]
-    keys = len(_PARMS_KEY.findall(stream_dict))
+    keys = _count(_PARMS_KEY, stream_dict)
     if keys == 0:
         return [none]
     if keys > 1:
@@ -777,25 +816,49 @@ def _decode(
     return out
 
 
-def _object_offsets(decoded: bytes, stream_dict: bytes, work: _Budget) -> list[int]:
-    """Where an object stream's objects begin, as it lists them.
+#: Where ``bytes.split()`` splits; an offset table is cut there into chunks.
+_SPLIT_AT = re.compile(rb"[\t\n\x0b\x0c\r ]")
+_TABLE_CHUNK = 64 * 1024
+
+
+def _object_offsets(decoded: bytes, stream_dict: bytes, work: _Budget) -> Sequence[int]:
+    """Where an object stream's objects begin, as it lists them, in order.
 
     Refuses a stream whose ``/First`` or offset list cannot be read: a viewer
     reads its objects from them, so its strings cannot be told from its names.
     An offset past the end names no object a viewer could read, and is dropped.
+    The list is read a chunk at a time, each number a step, and only the
+    offsets are kept, in an array: a list too long to check is refused before
+    it is held.
     """
     first = _FIRST.search(stream_dict)
-    if not first or len(_FIRST_KEY.findall(stream_dict)) > 1:
+    if not first or _count(_FIRST_KEY, stream_dict) > 1:
         raise TooComplexError(NOT_CHECKABLE)
     start = _num(first.group(1))
     if start > len(decoded):
         raise TooComplexError(NOT_CHECKABLE)
-    numbers = decoded[:start].split()
-    work.take(len(numbers))
-    if len(numbers) % 2 or not all(n.isdigit() for n in numbers):
+    offsets = array("q")
+    numbers = pos = 0
+    while pos < start:
+        cut = _SPLIT_AT.search(decoded, min(pos + _TABLE_CHUNK, start), start)
+        end = cut.end() if cut else start
+        tokens = decoded[pos:end].split()
+        work.take(len(tokens))
+        if not all(map(bytes.isdigit, tokens)):
+            raise TooComplexError(NOT_CHECKABLE)
+        # Object numbers and offsets alternate; a chunk may begin with either.
+        for token in tokens[1 - numbers % 2 :: 2]:
+            offset = start + _num(token)
+            if offset < len(decoded):
+                offsets.append(offset)
+        numbers += len(tokens)
+        pos = end
+    if numbers % 2:
         raise TooComplexError(NOT_CHECKABLE)
-    offsets = sorted({start + _num(n) for n in numbers[1::2]})
-    return [o for o in offsets if o < len(decoded)] or [start]
+    if not all(map(operator.lt, offsets, itertools.islice(offsets, 1, None))):
+        work.take(2 * len(offsets))  # sorting them
+        offsets = array("q", sorted(offsets))
+    return offsets or array("q", [start])
 
 
 def _single_dict(stripped: bytes) -> bool:
@@ -930,3 +993,53 @@ def check(data: bytes) -> None:
             )
             if what:
                 raise ActiveContentError(f"PDF files that contain {what} are not accepted")
+
+
+# ------------------------------------------------------------------ own process
+#
+# ``pdf_process`` runs this file as a script (``python -I -S pdf_content.py
+# <memory>``), a new process for each file, and reads its outcome.
+
+
+def _limit_process(memory: int) -> None:
+    """At most ``memory`` bytes of address space and a lower priority than the
+    API's, where the system sets them for a process (Linux); elsewhere the
+    budgets alone bound the check."""
+    try:
+        import resource
+    except ImportError:
+        return
+    if memory > 0:
+        try:
+            _, hard = resource.getrlimit(resource.RLIMIT_AS)
+            soft = memory if hard == resource.RLIM_INFINITY else min(memory, hard)
+            resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
+        except (ValueError, OSError):
+            pass
+    try:
+        os.nice(10)
+    except OSError:
+        pass
+
+
+def _serve() -> None:
+    """One PDF on stdin, its outcome as one JSON object on stdout."""
+    _limit_process(int(sys.argv[1]) if len(sys.argv) > 1 else 0)
+    data = sys.stdin.buffer.read()
+    if not data:
+        return  # a spare process the API no longer needs
+    try:
+        check(data)
+        outcome = {"outcome": "pass", "message": ""}
+    except ActiveContentError as exc:
+        outcome = {"outcome": "active", "message": str(exc)}
+    except TooComplexError as exc:
+        outcome = {"outcome": "complex", "message": str(exc)}
+    except MemoryError:
+        outcome = {"outcome": "complex", "message": TOO_COMPLEX}
+    sys.stdout.write(json.dumps(outcome))
+    sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    _serve()

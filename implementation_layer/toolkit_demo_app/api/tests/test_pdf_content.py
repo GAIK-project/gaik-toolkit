@@ -157,11 +157,11 @@ def _bounded(data: bytes) -> bool:
         b"1" + b" " * 300_000 + b"obj\n",  # a long gap before an object keyword
     ],
 )
-def test_the_check_ends_quickly_on_any_file(body):
+def test_the_check_ends_within_its_budgets_on_any_file(body):
     assert _bounded(_pdf(objects=body))
 
 
-def test_an_object_stream_full_of_comment_marks_ends_quickly():
+def test_an_object_stream_full_of_comment_marks_ends_within_the_budgets():
     text = b"(" + b"/S%" * 100_000
     body = b"10 0 "
     hidden = _stream(
@@ -181,13 +181,13 @@ def test_lzw_decoding_takes_time_in_step_with_the_stream():
     assert pdf_content.MAX_WORK - budgets.work.left == len(encoded)
 
 
-def test_a_large_compressed_stream_with_line_ends_inside_its_length_ends_quickly():
+def test_a_large_compressed_stream_with_line_ends_inside_its_length_ends_within_the_budgets():
     # Over a megabyte decoded, and /Length counts the line end after the data.
     content = zlib.compress(b"q 1 0 0 1 0 0 cm Q\n" * 200_000) + b"\r\n"
     assert _bounded(_pdf(objects=_stream(6, b"/Filter /FlateDecode", content)))
 
 
-def test_many_compressed_streams_damaged_at_their_end_are_read_quickly():
+def test_many_compressed_streams_damaged_at_their_end_are_read_within_the_budgets():
     body = bytes((i * 7919) % 251 for i in range(100_000))
     damaged = zlib.compress(body, 1)[:-4] + b"\xff\xff\xff\xff"  # a wrong checksum
     streams = b"".join(_stream(100 + i, b"/Filter /FlateDecode", damaged) for i in range(100))
@@ -247,7 +247,10 @@ def test_the_check_stops_at_its_deadline(monkeypatch):
         check(_pdf(objects=b"(a)" * 10_000))
 
 
-def test_many_small_strings_are_checked_in_memory_in_step_with_the_file():
+def test_many_small_strings_are_checked_in_memory_in_step_with_the_file(monkeypatch):
+    # Memory, not time: tracing slows the check, which a busy machine could
+    # push past the deadline.
+    monkeypatch.setattr(pdf_content, "CHECK_SECONDS", 600.0)
     data = _pdf(objects=b"4 0 obj\n[" + b"(a)" * 300_000 + b"]\nendobj\n")
     tracemalloc.start()
     try:
@@ -703,7 +706,78 @@ def test_a_comment_line_before_a_plain_header_passes():
     check(_pdf(objects=b"% generated object 4\n4 0 obj\n<< /Type /Font >>\nendobj\n"))
 
 
-def test_binary_data_with_many_percent_signs_and_few_line_ends_is_quick():
+def test_binary_data_with_many_percent_signs_and_few_line_ends_stays_within_the_budgets():
     binary = (b"7 %" + bytes(range(14, 256))) * 2_000  # no line ends
     image = _stream(6, b"/Subtype /Image /Width 1 /Height 1 /Filter /DCTDecode", binary)
     assert _bounded(_pdf(objects=image))
+
+
+# ------------------------------------------------- object stream offsets
+
+
+def test_an_object_streams_offset_table_is_counted_before_it_is_held(monkeypatch):
+    monkeypatch.setattr(pdf_content, "MAX_WORK", 20_000)
+    monkeypatch.setattr(pdf_content, "CHECK_SECONDS", 600.0)  # the steps refuse it
+    table = b"12 34 " * 200_000  # far more numbers than the steps left
+    hidden = _stream(
+        9,
+        f"/Type /ObjStm /N 200000 /First {len(table)} /Filter /FlateDecode".encode(),
+        zlib.compress(table + JS_ACTION, 9),
+    )
+    tracemalloc.start()
+    try:
+        with pytest.raises(TooComplexError, match="too complex"):
+            check(_pdf(objects=hidden))
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    # The decoded stream and its copies, not a list of its numbers (which
+    # takes about 16 times the table).
+    assert peak < 6 * len(table)
+
+
+def test_object_stream_offsets_are_read_in_order_whatever_order_they_are_listed_in():
+    body = b"11 9 10 0 12 9 "  # 10 at 0, 11 and 12 at 9, listed out of order
+    decoded = body + b"<< >> 1 2 ()"
+    dictionary = f"/First {len(body)}".encode()
+    offsets = list(pdf_content._object_offsets(decoded, dictionary, pdf_content._Work()))
+    assert offsets == sorted(offsets)
+    assert set(offsets) == {len(body), len(body) + 9}
+
+
+@pytest.mark.parametrize(
+    "table",
+    [b"10 0 11", b"10 0 1x 5", b"10 -0"],  # odd, a token that is not a number
+)
+def test_an_offset_table_that_cannot_be_read_is_refused(table):
+    decoded = table + b" << >>"
+    with pytest.raises(TooComplexError, match="cannot be checked"):
+        pdf_content._object_offsets(
+            decoded, f"/First {len(table) + 1}".encode(), pdf_content._Work()
+        )
+
+
+# ------------------------------------------------- deadline and memory
+
+
+def test_the_deadline_is_looked_at_between_pattern_searches(monkeypatch):
+    monkeypatch.setattr(pdf_content, "CHECK_SECONDS", -1.0)  # already past
+    with pytest.raises(TooComplexError, match="too complex"):
+        pdf_content._names(b"<< /Type /Catalog >>", pdf_content._Work())
+
+
+def test_zlib_running_out_of_memory_is_not_read_as_damaged_data(monkeypatch):
+    class OutOfMemory:
+        eof = False
+        unconsumed_tail = unused_data = b""
+
+        def copy(self):
+            return self
+
+        def decompress(self, data, max_length=0):
+            raise zlib.error("Error -4 while decompressing data")
+
+    monkeypatch.setattr(pdf_content.zlib, "decompressobj", OutOfMemory)
+    stream = _stream(6, b"/Filter /FlateDecode", zlib.compress(b"q Q " * 100))
+    with pytest.raises(TooComplexError, match="too complex"):
+        check(_pdf(objects=stream))
