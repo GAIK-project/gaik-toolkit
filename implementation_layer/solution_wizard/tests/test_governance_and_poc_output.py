@@ -116,6 +116,52 @@ def test_a_listed_host_may_use_plain_http_and_a_malformed_entry_is_named(tmp_pat
     assert any("must be a host name" in p for p in problems)
 
 
+def test_every_component_that_calls_a_model_has_its_stages_checked():
+    """A component missing from the stage map was never checked against the flags."""
+    import json
+
+    from solution_wizard.scaffolder import _COMPONENT_STAGES
+
+    registry = json.loads(
+        (Path(__file__).parent.parent / "registries" / "gaik_component_registry.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    calls_a_model = {c["name"] for c in registry if c.get("supported_providers")}
+    assert calls_a_model - set(_COMPONENT_STAGES) == set()
+
+
+def test_a_judge_panel_on_a_cloud_provider_is_refused():
+    blueprint = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
+    for step in blueprint.workflow.steps:
+        if step.component == "LLMJudge":
+            step.component = "LLMJudgePanel"
+    blocks = blueprint.components.selected_building_blocks
+    blueprint.components.selected_building_blocks = [
+        "LLMJudgePanel" if b == "LLMJudge" else b for b in blocks
+    ]
+    blueprint.models = {
+        **LOCAL,
+        "transcription_config": {"provider": "openai", "transcription_model": "whisper_local"},
+        "judge_config": {"provider": "anthropic", "model": "m"},
+    }
+    blueprint.governance.data_handling.external_model_api_allowed = False
+    problems = _rule13(validate(blueprint))
+    assert any("judge stage uses 'anthropic'" in p for p in problems)
+
+
+def test_a_module_named_only_in_selected_modules_counts():
+    from solution_wizard.blueprint import SelectedModule
+
+    blueprint = _document(models={**LOCAL, "answer_config": {"provider": "openai", "model": "m"}})
+    blueprint.governance.data_handling.external_model_api_allowed = False
+    assert _rule13(validate(blueprint)) == []  # no step answers questions
+    blueprint.components.selected_modules.append(
+        SelectedModule(id="rag_workflow", name="RAGWorkflow")
+    )
+    assert any("answer stage uses 'openai'" in p for p in _rule13(validate(blueprint)))
+
+
 @pytest.mark.parametrize("personal", ["yes", "likely", "yes (names, phone numbers)"])
 def test_personal_data_sent_to_an_external_provider_is_flagged(personal):
     result = validate(_document(personal=personal))
