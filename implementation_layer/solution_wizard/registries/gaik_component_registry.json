@@ -1238,7 +1238,7 @@
       "Orchestrates existing GAIK parsers/transcriber/extractor; no new parsing logic -- inherits each sub-component's limits",
       "Long-form synthesis cost grows with sources x sections; agentic mode is significantly more expensive than single-call",
       "Report content is drawn only from supplied evidence; it does not browse or fetch external sources",
-      "From the gaik release after 0.9.1: load_report_config(path, root=None) requires the stored paths to stay inside the config file's folder, or inside root; otherwise it raises SourcePathError. save_report_config stores an input outside that folder with only a warning, so that config loads back only with root=.",
+      "From the gaik release after 0.9.1: load_report_config(path, root=None) requires the stored paths to stay inside the config file's folder, or inside root; otherwise it raises SourcePathError. save_report_config raises SourcePathError for a path outside that folder, so a saved config loads back without root=.",
       "Agentic mode requires the multi-source-report-generator-agentic extra (langgraph); DOCX export requires multi-source-report-generator-docx extra and Pandoc system binary",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "Audio stages require a separate native OpenAI/Azure configuration when the extraction or writing provider is Aitta, Anthropic, Google/Vertex, LiteLLM or a generic compatible endpoint. Chat support does not imply audio support."
