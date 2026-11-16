@@ -1,5 +1,5 @@
 {
-  "about": "Use cases for run_usecases.py. Each should end in a different package. 'expect.component' is a regular expression matched against the components of the blueprint's steps. 'scenarios' are what the walk tries on the way: reload_mid_reply, language_offer, reopen_in_panel, change_in_chat (after Gate 2), change_after_gate3, end_session. 'change' is the text of the change request. 'inputs' (optional) are sample files beside this file, uploaded for the PoC run.",
+  "about": "Use cases for run_usecases.py. Each should end in a different package. 'expect.component' is a regular expression matched against the components of the blueprint's steps. 'scenarios' are what the walk tries on the way: reload_mid_reply, language_offer, reopen_in_panel, change_in_chat (after Gate 2), change_after_gate3, end_session. 'change' is the text of the change request. 'inputs' (optional) are sample files beside this file, uploaded for the PoC run; those in inputs/ are synthetic and built by make_inputs.py. 'pace' (optional) is quick or thorough: the web app's pace line goes ahead of the description. 'answers' (optional) are scripted answers, each with 'keywords' or a 'topic', a 'text' and optionally 'repeatable': see SKILL.md.",
   "cases": [
     {
       "id": "invoice-extraction",
@@ -8,6 +8,7 @@
       "description": "Taloushallintomme saa noin 300 ostolaskua kuukaudessa PDF-tiedostoina, osa skannattuja. Jokaisesta laskusta pitää poimia toimittajan nimi, laskun numero, laskun päiväys, eräpäivä, veroton summa, arvonlisävero ja loppusumma. Tulos tarvitaan JSON-tiedostona, jonka kirjanpitäjä tarkistaa ennen vientiä kirjanpitoon. Epävarmat arvot pitää merkitä tarkistettaviksi.",
       "expect": { "component": "extract|structured|parser" },
       "scenarios": ["reload_mid_reply", "reopen_in_panel", "change_after_gate3"],
+      "inputs": ["inputs/invoice-1001.pdf", "inputs/invoice-1002.pdf"],
       "change": "Huomasin puutteen: poimittaviin kenttiin pitää lisätä vielä viitenumero. Päivitä ratkaisu sen mukaan."
     },
     {
@@ -17,6 +18,7 @@
       "description": "Meillä on noin 40 henkilöstöohjetta PDF- ja Word-tiedostoina: lomat, matkustus, etätyö, sairauspoissaolot. Työntekijät kysyvät niistä HR:ltä samoja asioita viikoittain. Haluamme ratkaisun, jolta työntekijä kysyy suomeksi vapaalla tekstillä ja joka vastaa ohjeiden perusteella ja näyttää, mistä ohjeesta vastaus on. Jos ohjeista ei löydy vastausta, sen pitää sanoa niin eikä arvata.",
       "expect": { "component": "rag|retriev|vector|search" },
       "scenarios": ["language_offer", "change_in_chat"],
+      "inputs": ["inputs/policy-leave.pdf", "inputs/policy-remote-work.pdf", "inputs/policy-questions.txt"],
       "change": "Yksi muutos vielä: vastauksessa pitää näkyä ohjeen nimen lisäksi myös sivunumero, jolta tieto löytyy. Päivitä ratkaisu sen mukaan."
     },
     {
@@ -26,6 +28,7 @@
       "description": "Vastaava työnjohtaja sanelee työmaapäiväkirjan puhelimeen päivän päätteeksi, noin viiden minuutin äänitallenteen. Tallenteesta pitää saada rakenteinen päiväkirja: päivämäärä, sää, työmaan vahvuus, tehdyt työvaiheet, poikkeamat ja huomiot sekä seuraavan päivän suunnitelma. Tulos tarvitaan Word-dokumenttina, jonka työnjohtaja tarkistaa ja hyväksyy.",
       "expect": { "component": "audio|transcri" },
       "scenarios": ["change_after_gate3", "end_session"],
+      "inputs": ["inputs/site-diary.mp3"],
       "change": "Lisätään vielä yksi kenttä: työmaalla käyneet vierailijat. Päivitä ratkaisu sen mukaan."
     },
     {
@@ -43,6 +46,11 @@
       "description": "Kiinteistön kuntotarkastaja tekee kohteesta muistiinpanot tekstinä, sanelee havaintoja äänitteelle ja saa taloyhtiöltä aiemman kuntotarkastusraportin PDF:nä. Näistä pitää kirjoittaa kuntotarkastusraportti kiinteällä rakenteella: kohteen tiedot, rakenteet, LVI, sähkö, havaitut riskit ja suositellut toimenpiteet. Jokaisen väitteen pitää perustua lähteeseen, ja raportista pitää näkyä, mitä lähteistä ei löytynyt.",
       "expect": { "component": "report" },
       "scenarios": ["change_in_chat"],
+      "inputs": [
+        "inputs/condition-notes.txt",
+        "inputs/condition-dictation.mp3",
+        "inputs/condition-earlier-report.pdf"
+      ],
       "change": "Raporttiin tarvitaan vielä oma osio: arvio korjausten kiireellisyydestä kolmiportaisella asteikolla. Päivitä ratkaisu sen mukaan."
     },
     {
@@ -51,7 +59,8 @@
       "locale": "fi",
       "description": "Myyntipäälliköt saavat kuukausittain Excel-tiedoston, jossa on myyntirivit: päivämäärä, asiakas, tuote, määrä, yksikköhinta ja myyjä. He haluavat kysyä datasta suomeksi, esimerkiksi paljonko tuotetta X myytiin maaliskuussa tai kuka myyjä myi eniten viime kvartaalilla. Vastaus tarvitaan taulukkona, ja käytetty kysely pitää näyttää, jotta sen voi tarkistaa.",
       "expect": { "component": "sql|tabular|duckdb|postgres" },
-      "scenarios": ["end_session"]
+      "scenarios": ["end_session"],
+      "inputs": ["inputs/sales-rows.xlsx", "inputs/sales-questions.txt"]
     }
   ]
 }
