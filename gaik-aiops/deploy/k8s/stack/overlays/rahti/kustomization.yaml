@@ -1,0 +1,53 @@
+# Rahti (CSC OpenShift): the stack in its own project, gaik-aiops. Images for MLflow and the sink are
+# built on Rahti (buildconfigs.yaml); the upstream images come from quay.io and ghcr.io where they are
+# published, to stay clear of Docker Hub's pull limits. Secrets are created on Rahti by
+# create-secrets.sh and never live in git. See README.md.
+#
+# Render (the load restrictor is needed because the configuration lives in deploy/compose):
+#   oc kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/stack/overlays/rahti
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The project is created once with `oc new-project` (README.md); it is not a resource here.
+namespace: gaik-aiops
+
+resources:
+  - ../../base
+  - buildconfigs.yaml
+  - mlflow-auth.yaml
+  - routes.yaml
+  - networkpolicy-router.yaml
+
+images:
+  # Built on Rahti into the project's own image streams.
+  - name: gaik-aiops/mlflow
+    newName: image-registry.openshift-image-registry.svc:5000/gaik-aiops/aiops-mlflow
+    newTag: latest
+  - name: gaik-aiops/collection-sink
+    newName: image-registry.openshift-image-registry.svc:5000/gaik-aiops/aiops-sink
+    newTag: latest
+  # The same versions as the base, from the registries their projects publish to besides Docker Hub.
+  - name: prom/prometheus
+    newName: quay.io/prometheus/prometheus
+  - name: prom/alertmanager
+    newName: quay.io/prometheus/alertmanager
+  - name: otel/opentelemetry-collector-contrib
+    newName: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib
+
+configMapGenerator:
+  - name: mlflow-auth-nginx
+    files: [nginx.conf=mlflow-auth-nginx.conf]
+
+patches:
+  - path: patch-grafana-public-url.yaml
+  - path: patch-mlflow-public-host.yaml
+    target: {kind: Deployment, name: mlflow}
+  # grafana-setup needs only Python's standard library; the MLflow image has it, so no Docker Hub pull.
+  - target: {kind: Deployment, name: grafana-setup}
+    patch: |-
+      - op: test
+        path: /spec/template/spec/containers/0/image
+        value: python:3.12-alpine
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: gaik-aiops/mlflow

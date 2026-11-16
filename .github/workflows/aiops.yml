@@ -42,7 +42,9 @@ jobs:
           docker run --rm --entrypoint promtool -v "$PWD/deploy/compose/prometheus:/p:ro" -w /p/tests \
             prom/prometheus:v3.2.1 test rules collection-alerts.test.yml wizard-alerts.test.yml
       - name: Kubernetes manifests render
-        run: kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/stack/overlays/local > /dev/null
+        run: |
+          kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/stack/overlays/local > /dev/null
+          kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/stack/overlays/rahti > /dev/null
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Unit tests (stack tests skip without a stack)
         working-directory: gaik-aiops/shared/collection/sink

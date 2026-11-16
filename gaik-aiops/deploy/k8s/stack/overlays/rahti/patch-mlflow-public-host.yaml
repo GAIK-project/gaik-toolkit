@@ -1,0 +1,12 @@
+# MLflow refuses requests whose Host header or Origin it does not know (DNS rebinding and cross-site
+# protection). Add the public address that mlflow-auth passes on. The test ops fail the render if the
+# base's arguments move, instead of replacing the wrong one.
+- op: test
+  path: /spec/template/spec/containers/0/args/6
+  value: --allowed-hosts=mlflow:5000,localhost:5000,127.0.0.1:5000
+- op: replace
+  path: /spec/template/spec/containers/0/args/6
+  value: --allowed-hosts=mlflow:5000,localhost:5000,127.0.0.1:5000,mlflow-gaik-aiops.2.rahtiapp.fi
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --cors-allowed-origins=https://mlflow-gaik-aiops.2.rahtiapp.fi

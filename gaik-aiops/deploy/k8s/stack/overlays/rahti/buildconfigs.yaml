@@ -1,0 +1,61 @@
+# The stack's own images, built on Rahti from this public repository's Dockerfiles into the project's
+# image streams. Nothing is pushed from a laptop, and no registry credentials are needed.
+#
+#   oc start-build aiops-mlflow --follow      # from the branch in spec.source.git.ref
+#   oc start-build aiops-sink --follow
+#
+# To build a branch that is not pushed, upload the folder instead:
+#   oc start-build aiops-mlflow --from-dir=gaik-aiops/deploy/compose/mlflow --follow
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: aiops-mlflow
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: aiops-sink
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: aiops-mlflow
+spec:
+  source:
+    git:
+      uri: https://github.com/NCF-public/gaik-toolkit-configuration-wizard-v2.git
+      ref: develop
+    contextDir: gaik-aiops/deploy/compose/mlflow
+  strategy:
+    type: Docker
+    dockerStrategy: {}
+  output:
+    to: {kind: ImageStreamTag, name: "aiops-mlflow:latest"}
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 2Gi}
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: aiops-sink
+spec:
+  source:
+    git:
+      uri: https://github.com/NCF-public/gaik-toolkit-configuration-wizard-v2.git
+      ref: develop
+    contextDir: gaik-aiops/shared/collection/sink
+  strategy:
+    type: Docker
+    dockerStrategy: {}
+  output:
+    to: {kind: ImageStreamTag, name: "aiops-sink:latest"}
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  runPolicy: Serial
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2

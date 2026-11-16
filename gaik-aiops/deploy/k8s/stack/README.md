@@ -10,6 +10,7 @@ same configuration.
 |---|---|
 | `base/` | Workloads, Services, PVCs and NetworkPolicies, environment-neutral (no namespace, no secrets) |
 | `overlays/local/` | Local k3s: namespace, locally built images, local-only secrets, an OpenShift-like UID |
+| `overlays/rahti/` | Rahti: its own project, images built on Rahti, Routes for Grafana and MLflow (behind basic auth), secrets created on Rahti ([README](overlays/rahti/README.md)) |
 | `test.sh` | Deploys to k3s, checks the network policies, runs the stack tests through port-forwards |
 
 ## Run locally (k3s)
@@ -44,13 +45,12 @@ Always pass `--context` explicitly; never apply with whatever context happens to
 - **Network policies:** ingress is denied unless allowed. Pods in the namespace talk to each other.
   Other namespaces reach only the collector's OTLP ports (4317, 4318), and only when labelled
   `gaik-aiops/producer=true`.
-- **No public endpoints in the base:** MLflow has no sign-in of its own and gets no Route. Grafana's
-  Route and TLS belong in the environment overlay.
+- **No public endpoints in the base:** MLflow has no sign-in of its own and gets no Route there.
+  Routes, TLS and the sign-in in front of MLflow belong in the environment overlay (`overlays/rahti`).
 
 ## Not yet covered
 
-- A Rahti overlay: Routes, secrets from the secrets store, image builds (BuildConfig), storage class,
-  and a NetworkPolicy for the OpenShift router to reach Grafana
+- The collector's OTLP Route for producers in other projects (M2; designed in `overlays/rahti/README.md`)
 - OpenBao on Kubernetes; the pseudonymisation key comes from a Secret here
 - A purge CronJob for `collection.purge_expired()`
 - MLflow runs two workers within a 2 GiB limit; size it against real use before the hackathon

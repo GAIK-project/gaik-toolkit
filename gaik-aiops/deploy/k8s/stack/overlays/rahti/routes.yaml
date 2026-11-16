@@ -1,0 +1,33 @@
+# Public HTTPS addresses. spec.host is left out, so Rahti assigns <route>-<project>.2.rahtiapp.fi:
+#   grafana -> https://grafana-gaik-aiops.2.rahtiapp.fi  (Grafana's own sign-in)
+#   mlflow  -> https://mlflow-gaik-aiops.2.rahtiapp.fi   (basic auth in mlflow-auth, then MLflow)
+# Both names also appear in patch-grafana-public-url.yaml and patch-mlflow-public-host.yaml; change
+# them together. The collector's OTLP port gets no Route yet (M2, see README.md).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: grafana
+  labels: {app.kubernetes.io/name: grafana}
+  annotations:
+    haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
+spec:
+  to: {kind: Service, name: grafana, weight: 100}
+  port: {targetPort: 3000}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: mlflow
+  labels: {app.kubernetes.io/name: mlflow-auth}
+  annotations:
+    haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
+    haproxy.router.openshift.io/timeout: 5m
+spec:
+  to: {kind: Service, name: mlflow-auth, weight: 100}
+  port: {targetPort: 8080}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
