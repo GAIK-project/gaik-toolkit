@@ -420,7 +420,14 @@ def governance_problems(blueprint: Blueprint) -> list[str]:
     ]
 
 
-def _validate_stage_settings(stages: dict[str, dict], needed: set[str]) -> None:
+def _validate_stage_settings(
+    stages: dict[str, dict], needed: set[str], external_forbidden: bool = False
+) -> None:
+    """Refuse stage settings the generated PoC cannot run with.
+
+    ``external_forbidden``: the blueprint allows no external model API, so a
+    ``whisper_local`` transcription stage reads no OpenAI/Azure credentials.
+    """
     if "transcription" in needed and stages["transcription"]["provider"] not in {"openai", "azure"}:
         raise ValueError(
             "Audio requires an OpenAI/Azure transcription_config. Set "
@@ -447,7 +454,18 @@ def _validate_stage_settings(stages: dict[str, dict], needed: set[str]) -> None:
             raise ValueError(
                 "Set an explicit models.embedding_config.embedding_model for this provider."
             )
-    if {"openai", "openai_compatible"} <= {stages[stage]["provider"] for stage in needed}:
+    # A whisper_local stage with no external model API reads no OPENAI_API_KEY: its
+    # transcript enhancement is off and its endpoint comes from LOCAL_TRANSCRIBER_API_*.
+    keyed = {
+        stage
+        for stage in needed
+        if not (
+            external_forbidden
+            and stage == "transcription"
+            and stages[stage].get("transcription_model") == "whisper_local"
+        )
+    }
+    if {"openai", "openai_compatible"} <= {stages[stage]["provider"] for stage in keyed}:
         raise ValueError(
             "An openai stage and an openai_compatible stage would both read OPENAI_API_KEY "
             "and OPENAI_BASE_URL, sending one key to both endpoints. Use one of them for "
@@ -976,7 +994,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     models = bc.models or {}
     provider = _provider_name(models.get("provider", DEFAULT_PROVIDER))
     stages = _stage_settings(blueprint)
-    _validate_stage_settings(stages, _needed_stages(blueprint, pattern))
+    _validate_stage_settings(
+        stages, _needed_stages(blueprint, pattern), external_model_forbidden(blueprint)
+    )
     governance = governance_problems(blueprint)
     if governance:
         raise ValueError(

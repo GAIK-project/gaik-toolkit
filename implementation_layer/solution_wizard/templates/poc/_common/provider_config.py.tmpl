@@ -1,5 +1,6 @@
 """Load independent provider credentials and settings for each PoC stage."""
 
+import os
 import sys
 from urllib.parse import urlsplit
 
@@ -9,19 +10,24 @@ from gaik.software_components.llm.providers import resolve_provider
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
+def _local_host(url: str, governance: dict) -> bool:
+    """Whether the URL names this machine or a host listed in models.local_endpoints."""
+    declared = governance.get("local_endpoints") or []
+    hosts = _LOCAL_HOSTS | {str(h).strip().lower() for h in declared if str(h).strip()}
+    try:
+        host = (urlsplit(str(url or "")).hostname or "").lower()
+    except ValueError:
+        return False
+    return bool(host) and host in hosts
+
+
 def _is_local(stage: str, provider: str, settings: dict, governance: dict) -> bool:
     """Whether the stage's model runs on a host the blueprint counts as local."""
     if stage == "transcription" and settings.get("transcription_model") == "whisper_local":
         return True
     if provider not in {"openai_compatible", "litellm"}:
         return False
-    declared = governance.get("local_endpoints") or []
-    hosts = _LOCAL_HOSTS | {str(h).strip().lower() for h in declared if str(h).strip()}
-    try:
-        host = (urlsplit(str(settings.get("base_url") or "")).hostname or "").lower()
-    except ValueError:
-        return False
-    return bool(host) and host in hosts
+    return _local_host(settings.get("base_url"), governance)
 
 
 def external_model_forbidden(config: dict) -> bool:
@@ -83,6 +89,14 @@ def get_stage_config(config: dict, stage: str) -> dict:
             f"{provider}. Point it at a local endpoint, or change the blueprint's governance "
             "flags with the owner's agreement."
         )
+    if (
+        stage == "transcription"
+        and settings.get("transcription_model") == "whisper_local"
+        and external_model_forbidden(config)
+    ):
+        # Self-hosted Whisper with no external model API: transcript enhancement is off,
+        # so the stage reads no OpenAI/Azure credentials (see local_transcriber_options).
+        return {**settings, "provider": provider, "use_azure": provider == "azure"}
     try:
         result = get_llm_config(provider, **settings)
     except ValueError:
@@ -94,3 +108,30 @@ def get_stage_config(config: dict, stage: str) -> dict:
     if stage == "embedding" and not result.get("embedding_model"):
         raise ValueError("Configure an embedding model served by stages.embedding.provider.")
     return result
+
+
+def local_transcriber_options(config: dict, audio_config: dict) -> dict:
+    """Transcriber arguments for self-hosted Whisper (transcription_model: whisper_local).
+
+    gaik reads no environment for these, so they come from LOCAL_TRANSCRIBER_API_BASE
+    and LOCAL_TRANSCRIBER_API_KEY. When the blueprint allows no external model API, the
+    endpoint must be on localhost or on a host listed in models.local_endpoints.
+    Returns {} for any other transcription model.
+    """
+    if audio_config.get("transcription_model") != "whisper_local":
+        return {}
+    api_base = os.environ.get("LOCAL_TRANSCRIBER_API_BASE", "").strip()
+    api_key = os.environ.get("LOCAL_TRANSCRIBER_API_KEY", "").strip()
+    if not api_base or not api_key:
+        raise ValueError(
+            "transcription_model is whisper_local: set LOCAL_TRANSCRIBER_API_BASE and "
+            "LOCAL_TRANSCRIBER_API_KEY in .env to the self-hosted Whisper endpoint."
+        )
+    if external_model_forbidden(config) and not _local_host(
+        api_base, config.get("governance") or {}
+    ):
+        raise ValueError(
+            "The blueprint allows no external model API, but LOCAL_TRANSCRIBER_API_BASE "
+            "names a host that is neither localhost nor listed in models.local_endpoints."
+        )
+    return {"local_api_base": api_base, "local_api_key": api_key}

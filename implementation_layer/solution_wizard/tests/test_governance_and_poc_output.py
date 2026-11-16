@@ -288,3 +288,74 @@ def test_a_single_rag_question_prints_its_answer_only_with_verbose():
     assert query_branch.index("if poc_output.VERBOSE:") < query_branch.index(
         'print(f"A: {answer}")'
     )
+
+
+# --------------------------------------------------------------------------- local audio
+
+
+def _local_audio(provider="openai", external=False) -> Blueprint:
+    blueprint = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
+    blueprint.models = {
+        **LOCAL,
+        "transcription_config": {"provider": provider, "transcription_model": "whisper_local"},
+    }
+    blueprint.governance.data_handling.external_model_api_allowed = external
+    return blueprint
+
+
+@pytest.mark.parametrize("provider", ["openai", "azure"])
+def test_a_local_whisper_stage_scaffolds_beside_a_local_openai_compatible_stage(tmp_path, provider):
+    blueprint = _local_audio(provider)
+    assert _rule13(validate(blueprint)) == []
+    poc = scaffold_poc(blueprint, tmp_path)["poc_dir"]
+    config = yaml.safe_load((poc / "config.yaml").read_text(encoding="utf-8"))
+    assert config["stages"]["transcription"]["transcription_model"] == "whisper_local"
+
+
+def test_an_openai_whisper_stage_with_enhancement_on_still_refuses_openai_compatible(tmp_path):
+    with pytest.raises(ValueError, match="would both read OPENAI_API_KEY"):
+        scaffold_poc(_local_audio("openai", external=True), tmp_path)
+
+
+def test_the_local_audio_poc_gives_the_transcriber_its_local_endpoint(tmp_path, monkeypatch):
+    poc = scaffold_poc(_local_audio(), tmp_path)["poc_dir"]
+    run_poc = (poc / "run_poc.py").read_text(encoding="utf-8")
+    assert "**local_transcriber_options(config, audio_config)" in run_poc
+    module = _load(poc / "provider_config.py", "provider_config_local_audio", tmp_path)
+    config = yaml.safe_load((poc / "config.yaml").read_text(encoding="utf-8"))
+
+    def no_credentials(provider, **settings):
+        raise AssertionError("credentials must not be read")
+
+    monkeypatch.setattr(module, "get_llm_config", no_credentials)
+    audio_config = module.get_stage_config(config, "transcription")
+
+    monkeypatch.delenv("LOCAL_TRANSCRIBER_API_BASE", raising=False)
+    monkeypatch.delenv("LOCAL_TRANSCRIBER_API_KEY", raising=False)
+    with pytest.raises(ValueError, match="LOCAL_TRANSCRIBER_API_BASE"):
+        module.local_transcriber_options(config, audio_config)
+
+    monkeypatch.setenv("LOCAL_TRANSCRIBER_API_KEY", "test-key")
+    monkeypatch.setenv("LOCAL_TRANSCRIBER_API_BASE", "https://whisper.example.com")
+    with pytest.raises(ValueError, match="neither localhost nor listed"):
+        module.local_transcriber_options(config, audio_config)
+
+    monkeypatch.setenv("LOCAL_TRANSCRIBER_API_BASE", "http://localhost:8080")
+    options = module.local_transcriber_options(config, audio_config)
+    assert options == {"local_api_base": "http://localhost:8080", "local_api_key": "test-key"}
+    assert module.local_transcriber_options(config, {"transcription_model": "whisper-1"}) == {}
+
+    # The Transcriber the PoC builds takes the self-hosted Whisper path with these options.
+    transcriber_module = pytest.importorskip("gaik.software_components.transcriber.transcriber")
+    calls = []
+    monkeypatch.setattr(
+        transcriber_module,
+        "whisper_local_transcribe",
+        lambda **kw: calls.append(kw) or {"text": "ok", "segments": []},
+    )
+    transcriber = transcriber_module.Transcriber(
+        api_config=audio_config, output_dir=tmp_path / "out", **options
+    )
+    assert transcriber._resolve_transcription_model() == "whisper_local"
+    assert transcriber._transcribe_input_local(tmp_path / "a.wav")[0] == "ok"
+    assert calls[0]["api_base"] == "http://localhost:8080"
