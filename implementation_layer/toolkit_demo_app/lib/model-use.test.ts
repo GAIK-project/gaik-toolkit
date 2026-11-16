@@ -65,6 +65,8 @@ describe("modelUse", () => {
     );
     // Claude has no embeddings, so RAG stays on the default.
     expect(modelUse("/rag", claude).runsHere).toBe(false);
+    // A collection outlives the team check, so a team model never builds one.
+    expect(modelUse("/rag", { ...gemma, teamOnly: true }).runsHere).toBe(false);
     expect(modelUse("/transcriber", luna).runsHere).toBe(false);
     expect(modelUse("/text-to-speech", luna).summary).toBe(
       "This demo runs on the server's own model.",

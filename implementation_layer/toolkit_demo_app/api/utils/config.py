@@ -124,8 +124,13 @@ def get_rag_api_config() -> dict:
     """The config that embeds and answers for a RAG collection.
 
     A picked server model applies when its provider also serves embeddings
-    (Azure, OpenAI, Aitta). Any other pick leaves RAG on the server default.
+    (Azure, OpenAI, Aitta). Any other pick leaves RAG on the server default, and
+    so does a team-only model: a collection outlives the request that built it,
+    and its questions arrive without the team check.
     """
+    chosen = request_server_model()
+    if chosen is not None and chosen.staff:
+        return server_api_config()
     config = get_api_config()
     if on_aitta(config):
         return {**config, "embedding_model": aitta_embedding_model()}
@@ -140,7 +145,12 @@ def require_vision(config: dict) -> dict:
     Such a model answers an image request with an error, or with text that
     ignores the image, so the demo stops here and says which kind of model to pick.
     """
-    if not reads_images(config.get("provider"), config.get("model")):
+    chosen = request_server_model()
+    # The deployment can mark a model text-only (DEMO_SERVER_MODELS, ":text").
+    marked_text_only = (
+        chosen is not None and chosen.model == config.get("model") and not chosen.vision
+    )
+    if marked_text_only or not reads_images(config.get("provider"), config.get("model")):
         raise HTTPException(
             400,
             f"{model_name(config.get('model'))} cannot read images or scanned pages. "

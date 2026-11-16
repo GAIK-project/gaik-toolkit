@@ -8,9 +8,11 @@ from pathlib import Path
 
 try:
     from utils import get_transcription_api_config, validate_audio_file_size
+    from utils.config import server_api_config
     from utils.model_settings import request_server_model
 except ImportError:
     from api.utils import get_transcription_api_config, validate_audio_file_size
+    from api.utils.config import server_api_config
     from api.utils.model_settings import request_server_model
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -94,7 +96,14 @@ async def transcribe_audio(
     # A picked Aitta model transcribes with Aitta's Whisper and nothing else:
     # no local server first, no other model behind it.
     chosen = request_server_model()
-    aitta = chosen is not None and chosen.provider == "aitta"
+    if chosen is not None:
+        aitta = chosen.provider == "aitta"
+    else:
+        # No pick: a deployment whose own model is on Aitta transcribes there too.
+        try:
+            aitta = server_api_config().get("provider") == "aitta"
+        except HTTPException:
+            aitta = False
     use_azure = bool(os.getenv("AZURE_API_KEY"))
     if not use_azure and not aitta:
         raise HTTPException(

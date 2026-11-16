@@ -42,6 +42,8 @@ export interface ActiveModel {
   audio: boolean;
   /** The server's own default: what runs when nothing is picked. */
   isDefault: boolean;
+  /** A model for the GAIK team only. RAG never builds a collection on one. */
+  teamOnly?: boolean;
 }
 
 export interface ModelUse {
@@ -85,7 +87,10 @@ export function modelUse(path: string, active: ActiveModel): ModelUse {
     if (active.own) runsHere = false;
     else if (path === "/transcriber") runsHere = aitta;
     // RAG needs embeddings from the same provider: Claude and Gemini have none here.
-    else runsHere = ["azure", "openai", "aitta"].includes(active.provider);
+    else
+      runsHere =
+        ["azure", "openai", "aitta"].includes(active.provider) &&
+        !active.teamOnly;
   }
 
   if (!runsHere) {

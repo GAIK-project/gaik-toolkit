@@ -50,6 +50,10 @@ export async function apiFetch(
     supportsServerModel(target.pathname, options?.method ?? "GET");
   if (
     serverModelRoute &&
+    // An own key replaces the server pick everywhere: where the key does not
+    // reach (RAG, the Transcriber), the request runs on the server default,
+    // never on an earlier pick the menu no longer shows.
+    !settings &&
     !headers.has(MODEL_SETTINGS_HEADER) &&
     serverModel &&
     !headers.has(SERVER_MODEL_HEADER)

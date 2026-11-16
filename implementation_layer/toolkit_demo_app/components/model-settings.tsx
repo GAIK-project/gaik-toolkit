@@ -538,6 +538,7 @@ function useActiveModel(loggedIn: boolean): ActiveModel | null {
     vision: model.vision,
     audio: model.audio,
     isDefault: model.id === catalog.default,
+    teamOnly: model.staff,
   };
 }
 

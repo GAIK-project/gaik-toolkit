@@ -186,6 +186,16 @@ async def test_claude_extracts_audio_after_the_server_transcribes(server_env):
     assert [model for model, _ in observed] == ["gpt-6-sol", "gpt-6-luna"]
 
 
+@pytest.mark.asyncio
+async def test_rag_never_builds_a_collection_on_a_team_model(server_env):
+    # A collection is queried later without the team check, so it stays on the default.
+    observed = []
+    app = _app(observed)
+    pick = {SERVER: "azure:gpt-6-astra", TIER: "staff"}
+    assert (await _call(app, "POST", "/rag/index", pick)).status_code == 200
+    assert [model for model, _ in observed] == ["gpt-6-luna"]
+
+
 @pytest.fixture
 def aitta_env(server_env, monkeypatch):
     monkeypatch.setenv("AITTA_API_KEY", "aitta-token")
@@ -208,11 +218,17 @@ def test_aitta_models_are_listed_only_with_a_token(server_env, monkeypatch):
     assert next(iter(models)) == "azure:gpt-6-luna"
 
 
-def test_env_list_can_mark_a_model_text_only(aitta_env, monkeypatch):
+@pytest.mark.asyncio
+async def test_env_list_can_mark_a_model_text_only(aitta_env, monkeypatch):
     monkeypatch.setenv("DEMO_SERVER_MODELS", "aitta:some/new-model:text, aitta:other/model")
     models = {m.id: m for m in settings.server_models()}
     assert models["aitta:some/new-model"].vision is False
     assert models["aitta:other/model"].vision is True
+    # The mark also stops image requests, not only the menu.
+    app = _app([])
+    refused = await _call(app, "POST", "/parse", {SERVER: "aitta:some/new-model"})
+    assert refused.status_code == 400
+    assert (await _call(app, "POST", "/parse", {SERVER: "aitta:other/model"})).status_code == 200
 
 
 @pytest.mark.asyncio
