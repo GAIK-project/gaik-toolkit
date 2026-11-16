@@ -6,6 +6,7 @@ FastAPI backend that provides REST endpoints for the GAIK toolkit components.
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -31,11 +32,13 @@ from gaik import __version__ as gaik_version  # noqa: E402
 try:
     from routers import model_settings
     from utils.ai_marking import AIMarkMiddleware
+    from utils.errors import public_error
     from utils.model_settings import ModelSettingsMiddleware
     from utils.ops import OpsMiddleware
 except ImportError:
     from api.routers import model_settings
     from api.utils.ai_marking import AIMarkMiddleware
+    from api.utils.errors import public_error
     from api.utils.model_settings import ModelSettingsMiddleware
     from api.utils.ops import OpsMiddleware
 
@@ -110,12 +113,20 @@ async def lifespan(app: FastAPI):
     logger.info("GAIK Demo API shutting down...")
 
 
+# The interactive docs and the OpenAPI description are for local development. They
+# are off unless DEMO_API_DOCS=true (.env.example sets it for a local run); the
+# container image does not set it.
+API_DOCS = os.getenv("DEMO_API_DOCS", "").strip().lower() in {"1", "true", "yes"}
+
 app = FastAPI(
     title="GAIK Toolkit Demo API",
     description="REST API for GAIK toolkit components",
     version=gaik_version,
     lifespan=lifespan,
     redirect_slashes=False,
+    docs_url="/docs" if API_DOCS else None,
+    redoc_url="/redoc" if API_DOCS else None,
+    openapi_url="/openapi.json" if API_DOCS else None,
 )
 
 # CORS for Next.js frontend (allowing all origins for cluster-internal usage)
@@ -134,12 +145,8 @@ app.add_middleware(AIMarkMiddleware)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for unhandled errors."""
-    logger.error(f"Unhandled error: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"},
-    )
+    """Global exception handler for unhandled errors: an error id, never the exception text."""
+    return JSONResponse(status_code=500, content={"detail": public_error(exc)})
 
 
 # Include routers
@@ -198,7 +205,7 @@ async def root():
     return {
         "name": "GAIK Toolkit Demo API",
         "version": gaik_version,
-        "docs": "/docs",
+        **({"docs": "/docs"} if API_DOCS else {}),
         "endpoints": {
             "parse": "/parse - Document parsing (PDF, DOCX)",
             "classify": "/classify - Document classification",

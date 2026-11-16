@@ -48,7 +48,7 @@ Without it pydub only warns at import, then fails deep inside the transcriber.
 
 ## Version pinning
 
-`GAIK_VERSION` pins the toolkit the runs execute against (currently 0.9.0 from
+`GAIK_VERSION` pins the toolkit the runs execute against (currently 0.9.1 from
 PyPI). A generated PoC's `requirements.txt` asks for `gaik[extract]` and friends
 unversioned, so without the pin two runs a week apart could use different
 toolkits. The wizard's component registry is synced against one version — bump

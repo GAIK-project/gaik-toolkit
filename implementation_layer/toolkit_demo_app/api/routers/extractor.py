@@ -61,6 +61,11 @@ try:
 except ImportError:
     from api.utils.file_content import content_mismatch
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -225,7 +230,7 @@ async def generate_schema(request: GenerateSchemaRequest):
         )
 
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "Loading the extractor")) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
@@ -291,7 +296,7 @@ async def extract_data_plain_language(request: PlainLanguageExtractRequest):
         )
 
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "Loading the extractor")) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
@@ -366,7 +371,7 @@ async def extract_data(request: ExtractRequest):
         )
 
     except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "Loading the extractor")) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 

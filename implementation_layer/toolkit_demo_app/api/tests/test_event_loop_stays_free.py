@@ -305,7 +305,7 @@ def test_rag_index(monkeypatch, threads, workflow) -> None:
         threads.mark("parse")
         return [Document(page_content="text", metadata={})] * 2, parser_choice
 
-    monkeypatch.setattr(rag, "get_api_config", lambda: CONFIG)
+    monkeypatch.setattr(rag, "get_rag_api_config", lambda: CONFIG)
     monkeypatch.setattr(rag, "_build_demo_workflow", lambda config, collection_id: workflow)
     monkeypatch.setattr(rag, "_parse_document_to_chunks", parse)
     pdf = (rag.EXAMPLE_DIR / rag.EXAMPLE_DOCUMENTS[0]["filename"]).read_bytes()

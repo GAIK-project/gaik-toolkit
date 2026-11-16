@@ -9,6 +9,10 @@ openpyxl>=3.1.0
 # git tags; the API installs the published wheel instead of building gaik from
 # source. 0.8.0 adds the shared provider configs required by the optional
 # per-request model settings and the provider-aware vision/judge adapters.
-gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]==0.8.14
+gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]==0.9.0
 boto3>=1.35.0
+# CPU-only builds from the PyTorch index (README: "Pinned images and the API lock"); without
+# them gaik[all-cpu] would resolve the ~2GB CUDA build.
+torch
+torchvision
 yt-dlp>=2026.8.19

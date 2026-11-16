@@ -88,6 +88,22 @@ set it. A provider without credentials on the server is left out, and
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
 
+With `AITTA_API_KEY` set, the menu also lists **CSC Aitta** models (Gemma 4 31B and
+gpt-oss 120B by default): open models hosted in Finland. Picking one keeps the whole
+run on Aitta: recordings are transcribed by Aitta's Whisper large v3
+(`AITTA_TRANSCRIPTION_MODEL`), the Transcriber uses it too, and RAG embeds with
+`intfloat/multilingual-e5-large` (`AITTA_EMBEDDING_MODEL`). Nothing falls back to
+another provider. Aitta models are slower (a run takes from 20 seconds to minutes),
+the menu marks a text-only model and an idle one, and a demo that sends page images
+refuses a text-only model before the call. Aitta stops idle models, so a pick also
+asks Aitta to start its speech and embedding models, and the page says when one is
+still idle. On every demo page a notice says which
+model runs it once the user has left the default, and says so when the demo does not
+take the picked model. Aitta is a research service: its terms forbid personal data,
+its token is bound to one CSC user and expires after 90 days, and its rate limit is
+per user and minute. What was tested is in
+[docs/MODEL_REQUIREMENTS.md](docs/MODEL_REQUIREMENTS.md).
+
 **Use your own key…** in the same menu lets users select their own OpenAI, Azure OpenAI
 or CSC Aitta account. Enter the model/deployment and key; Azure also needs its public
 resource endpoint. **Test connection** makes one small chat request. **Use this key**
@@ -115,6 +131,9 @@ family can be selected where available. Vision Extractor's server-side menu can 
 with comma-separated `DEMO_OPENAI_MODELS`, `DEMO_CLAUDE_MODELS`, and `DEMO_GOOGLE_MODELS`.
 Aitta defaults to `google/gemma-4-31b-it`, which passed the integration's text, schema,
 extraction and vision checks. Cold starts can take several minutes.
+
+A signed-out visitor sees **Sign in** in the nav instead of the model menu: every run
+needs an account.
 
 ### Prerequisites
 
@@ -159,13 +178,48 @@ bun dev:api        # API: uv run uvicorn api.main:app --reload
 ```
 
 - Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/docs
+- API Docs: http://localhost:8000/docs (with `DEMO_API_DOCS=true` in `.env.local`, as in `.env.example`)
 
 ### Docker
 
 ```bash
 docker compose up --build
 ```
+
+### Pinned images and the API lock
+
+The images build from pinned base images and Python packages, so a rebuild of
+the same commit installs the same ones. The API image's system packages (ffmpeg,
+tesseract, pandoc) still come from the Debian mirror at build time, and
+`Dockerfile.pnpm` is not pinned.
+
+- `Dockerfile` and `api/Dockerfile` name each base image by tag and digest
+  (`oven/bun:1.4.4@sha256:…`). Dependabot proposes new ones once a month. To
+  move one by hand, look up the digest of the new tag and replace both:
+
+  ```bash
+  docker buildx imagetools inspect oven/bun:1.4.4 | grep -m1 Digest
+  ```
+
+  Take the digest of the multi-platform index (the first `Digest:` line), not
+  of one platform's image.
+- The API image installs every Python package from `api/requirements.lock`,
+  pinned with its hashes (`uv pip install --require-hashes`); a file whose hash
+  is not in the lock fails the build. `api/requirements.txt` stays the list to
+  edit, with the gaik pin. After changing it, write the lock again and commit
+  both:
+
+  ```bash
+  scripts/lock_api_requirements.sh            # keeps the other pins as they are
+  scripts/lock_api_requirements.sh --upgrade  # takes the newest allowed releases
+  ```
+
+  Nothing refreshes the lock on its own: run it with `--upgrade` now and then to
+  take security releases. The lock is for the image: Python 3.12 on linux
+  x86_64, with torch and torchvision as CPU builds from the PyTorch index. It
+  records the sha256 of the `requirements.txt` it was made from, and
+  `api/tests/test_api_image_pins.py` fails when that file has changed since, or
+  when a base image has no digest.
 
 ## Project Structure
 
@@ -209,7 +263,8 @@ toolkit_demo_app/
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
 | `/report-writer` | Mixed-source report generation |
 
-API docs: <http://localhost:8000/docs> (Swagger UI)
+API docs: <http://localhost:8000/docs> (Swagger UI), served only with `DEMO_API_DOCS=true`;
+the deployed API leaves `/docs`, `/redoc` and `/openapi.json` off.
 
 ## Tech Stack
 

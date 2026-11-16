@@ -268,7 +268,8 @@ def test_a_docx_failure_keeps_the_report(client, monkeypatch):
     result = _events(_run(client))[-1][1]
 
     assert result["docx_b64"] is None
-    assert "No pandoc executable found" in result["docx_error"]
+    assert "error id" in result["docx_error"]
+    assert "pandoc" not in result["docx_error"]
     assert result["markdown"].startswith("# Site report")
 
 
@@ -376,7 +377,7 @@ def test_rebuild_without_docx_and_with_a_docx_failure(client, monkeypatch):
 
     monkeypatch.setattr(route, "_docx", broken)
     body = _rebuild(client, REBUILD).json()
-    assert body["docx_b64"] is None and "pandoc missing" in body["docx_error"]
+    assert body["docx_b64"] is None and "error id" in body["docx_error"]
     assert body["markdown"].startswith("# Site report")
 
 

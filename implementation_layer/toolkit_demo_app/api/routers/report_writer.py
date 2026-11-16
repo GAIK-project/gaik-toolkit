@@ -22,6 +22,11 @@ except ImportError:
     from api.utils import get_api_config, sse_event
     from api.utils.report_runs import report_writer_limits, require_report_run_grant
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -289,7 +294,11 @@ async def generate_report(
             sample_path = str(dest)
     except Exception as exc:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        logger.warning("Cannot store the uploads: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=400,
+            detail="The server cannot store the uploaded files. Rename them and try again.",
+        ) from exc
 
     if not input_paths:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -363,9 +372,9 @@ async def generate_report(
         except Exception as exc:  # noqa: BLE001
             if cancelled.is_set():
                 logger.info("Report generation stopped: the client left")
+                result_holder["error"] = "Report generation stopped: the client left."
             else:
-                logger.exception("Report generation failed")
-            result_holder["error"] = str(exc)
+                result_holder["error"] = error_detail(exc, "Report generation")
         finally:
             try:
                 shutil.rmtree(tmp_dir, ignore_errors=True)

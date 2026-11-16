@@ -11,9 +11,23 @@ except ImportError:
     from api.utils.model_settings import request_model_settings
 
 try:
-    from utils.model_settings import is_staff, server_models
+    from utils.model_settings import (
+        aitta_embedding_model,
+        aitta_model_status,
+        aitta_speech_model,
+        is_staff,
+        server_models,
+        warm_aitta_models,
+    )
 except ImportError:
-    from api.utils.model_settings import is_staff, server_models
+    from api.utils.model_settings import (
+        aitta_embedding_model,
+        aitta_model_status,
+        aitta_speech_model,
+        is_staff,
+        server_models,
+        warm_aitta_models,
+    )
 
 router = APIRouter()
 
@@ -26,7 +40,27 @@ async def list_server_models(request: Request):
     """
     staff = is_staff(request.scope)
     models = server_models()
+    aitta = (
+        await run_in_threadpool(aitta_model_status)
+        if any(m.provider == "aitta" for m in models)
+        else {}
+    )
+    has_aitta = any(m.provider == "aitta" for m in models)
     return {
+        # With an Aitta model picked, these transcribe and embed. An idle one
+        # starts on its first request, which can take minutes.
+        "aitta": {
+            "speech": {
+                "model": aitta_speech_model(),
+                "status": aitta.get(aitta_speech_model()),
+            },
+            "embedding": {
+                "model": aitta_embedding_model(),
+                "status": aitta.get(aitta_embedding_model()),
+            },
+        }
+        if has_aitta
+        else None,
         "default": models[0].id if models else None,
         "models": [
             {
@@ -35,12 +69,22 @@ async def list_server_models(request: Request):
                 "model": m.model,
                 "label": m.label,
                 "audio": m.audio,
+                "vision": m.vision,
+                # Aitta only: "running", or "offline" for a model that starts on
+                # the first request (minutes). None when the catalog did not answer.
+                "status": aitta.get(m.model) if m.provider == "aitta" else None,
                 "staff": m.staff,
                 "allowed": staff or not m.staff,
             }
             for m in models
         ],
     }
+
+
+@router.post("/aitta/warm")
+async def warm_aitta():
+    """Start Aitta's idle speech and embedding models ahead of the first run."""
+    return {"asked": await run_in_threadpool(warm_aitta_models)}
 
 
 @router.post("/test")
