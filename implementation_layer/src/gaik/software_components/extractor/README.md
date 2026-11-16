@@ -238,10 +238,10 @@ See [implementation_layer/examples/software_components/extractor/](../../../../e
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **Examples**: [implementation_layer/examples/software_components/extractor/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/extractor)
-- **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
+- **Contributing**: [CONTRIBUTING.md](../../../../../guidance_layer/CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
-MIT - see [LICENSE](../LICENSE)
+MIT - see [LICENSE](../../../../../LICENSE)
 

@@ -73,7 +73,7 @@
       "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
       "description": "Matches a purchase order and its bills of material (PDFs) against a price list (.xlsx or .csv) and writes a priced sales order and a calculation breakdown, in Claude Desktop with the filesystem MCP server. Use when the user wants to process a purchase order or PO, generate or price a sales order, match BOMs with a PO, or calculate order pricing from a price list.",
       "input": "PO, BOM PDFs and a price list",
-      "output": "Word (.docx) and calculation breakdown",
+      "output": "A priced sales order (.txt, or .docx with a sample sales order) and its calculation",
       "needs": [
         "Filesystem MCP server"
       ],
@@ -82,7 +82,7 @@
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": null,
-      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
+      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing) to turn the purchase order, its BOMs and the price list in my folder <folder path> into a priced sales order.",
       "files": [
         "EVALUATION.md",
         "SKILL.md",
@@ -117,7 +117,7 @@
       ],
       "kit": {
         "zip": "/downloads/skills/report-writing-setup-kit.zip",
-        "zipBytes": 74389
+        "zipBytes": 74575
       },
       "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing) to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [

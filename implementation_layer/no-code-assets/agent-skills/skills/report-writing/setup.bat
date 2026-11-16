@@ -268,12 +268,11 @@ echo.
 echo    1. Open this file in Notepad:
 echo       %APPDATA%\Claude\claude_desktop_config.json
 echo.
-echo    2. If the file doesn't exist, create it.
-echo.
-echo    3. Copy the ENTIRE content from:
+echo    2. If it is missing or empty, paste the ENTIRE content of:
 echo       %CONFIG_FILE%
 echo.
-echo    4. Paste it into claude_desktop_config.json and SAVE.
+echo    3. Otherwise add only the gaik-transcriber entry to its mcpServers section
+echo       and keep everything else. Then SAVE.
 echo.
 echo    TIP: Press Win+R, paste the path above, and press Enter to open it.
 echo.

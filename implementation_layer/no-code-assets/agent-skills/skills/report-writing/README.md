@@ -63,12 +63,11 @@ Use our setup script to configure everything automatically.
 The script will create a configuration file. You need to copy it to Claude Desktop:
 
 1. Open the generated file `claude_desktop_config.json` (the script offers to open it)
-2. Copy all the content
-3. Open Claude Desktop's config file:
+2. Open Claude Desktop's config file:
    - Press `Win + R`
    - Paste: `%APPDATA%\Claude\claude_desktop_config.json`
    - Press Enter
-4. Paste the content and save
+3. If that file is missing or empty, paste the whole generated content. Otherwise add only the `"gaik-transcriber": {...}` entry to its existing `"mcpServers"` object, keep everything else, and save.
 
 **Step 3: Restart Claude Desktop**
 
