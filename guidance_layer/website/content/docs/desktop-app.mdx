@@ -42,9 +42,21 @@ toolkit (`SchemaGenerator`, `DataExtractor`, the parsers, `DocumentClassifier` a
 | Files | Uploaded to the demo server for processing | Read where they are; only their text or page images go to your model provider |
 | Scope | Every component, module and use case | Four batch tools for files and folders |
 
-## Run it
+## Install it
 
-The app needs [bun](https://bun.sh) and [uv](https://docs.astral.sh/uv/).
+On Windows, download the installer from the
+[latest release](https://github.com/GAIK-project/gaik-toolkit-desktop/releases/latest) and
+run it. Nothing else needs to be installed first.
+
+- The installer is not code-signed, so Windows shows "Windows protected your PC". Choose
+  **More info**, then **Run anyway**.
+- The first start downloads Python and the `gaik` package (about 350 MB) and needs an
+  internet connection.
+- The app opens on **Get started**: it shows the engine installing, asks for your model
+  endpoint and key, and offers three sample invoices to try.
+
+To run it from source instead (needs [bun](https://bun.sh) and
+[uv](https://docs.astral.sh/uv/)):
 
 ```bash
 git clone https://github.com/GAIK-project/gaik-toolkit-desktop.git
@@ -53,11 +65,8 @@ bun install
 bun start
 ```
 
-The first start installs the engine (Python and `gaik`, about 300 MB). Then open
-**Settings** and enter your model endpoint and key.
-
 <Callout type="warn">
-Experimental: tried on Windows 11 only, with no signed installer and no automatic
-updates. Its limits are listed in the
+Experimental: tried on Windows 11 only. The installer is not code-signed and the app
+does not update itself. Its limits are listed in the
 [repository README](https://github.com/GAIK-project/gaik-toolkit-desktop#limits).
 </Callout>
