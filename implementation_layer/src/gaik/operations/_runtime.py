@@ -10,12 +10,14 @@ variable: every thread and every asyncio task has its own, so a block may span a
 from __future__ import annotations
 
 import asyncio
+import codecs
 import contextlib
 import contextvars
 import functools
 import io
 import sys
 import threading
+import weakref
 from collections.abc import Callable, Iterator
 from typing import Any, TextIO, TypeVar
 
@@ -28,6 +30,10 @@ _capture: contextvars.ContextVar[io.StringIO | None] = contextvars.ContextVar(
     "gaik_quiet_stdout", default=None
 )
 _install_lock = threading.Lock()
+# One bytes adapter per capture buffer, so a character split across writes decodes whole.
+_bytes_adapters: weakref.WeakKeyDictionary[io.StringIO, _CapturedBytes] = (
+    weakref.WeakKeyDictionary()
+)
 
 
 def _buffer() -> io.StringIO | None:
@@ -97,7 +103,11 @@ class _ThreadStdout(io.TextIOBase):
         """The real stream's bytes, or bytes into the capture while one is active."""
         captured = _buffer()
         if captured is not None:
-            return _CapturedBytes(captured, self.encoding)
+            with _install_lock:
+                adapter = _bytes_adapters.get(captured)
+                if adapter is None:
+                    adapter = _bytes_adapters[captured] = _CapturedBytes(captured, self.encoding)
+            return adapter
         return self._real.buffer  # type: ignore[union-attr]
 
     def __getattr__(self, name: str) -> Any:
@@ -113,14 +123,14 @@ class _CapturedBytes(io.RawIOBase):
     def __init__(self, captured: io.StringIO, encoding: str) -> None:
         super().__init__()
         self._captured = captured
-        self._encoding = encoding
+        self._decoder = codecs.getincrementaldecoder(encoding)(errors="replace")
 
     def writable(self) -> bool:
         return True
 
     def write(self, data: Any) -> int:
         raw = bytes(data)
-        self._captured.write(raw.decode(self._encoding, errors="replace"))
+        self._captured.write(self._decoder.decode(raw))
         return len(raw)
 
     def close(self) -> None:

@@ -69,6 +69,10 @@ class _Bytes(io.BytesIO):
     def close(self) -> None:
         """Stay readable after the wrapper around it is collected."""
 
+    def fileno(self) -> int:
+        """A real console stream has a descriptor; a capture must not hand it out."""
+        return 1
+
 
 def _real_stdout(monkeypatch: pytest.MonkeyPatch) -> io.BytesIO:
     """A real stdout to watch. Set in the test body: pytest's own capture replaces
@@ -101,9 +105,20 @@ def test_stdout_buffer_outside_a_capture_is_the_real_one(monkeypatch):
 
 def test_fileno_is_refused_inside_a_capture(monkeypatch):
     _real_stdout(monkeypatch)
+    assert sys.stdout.fileno() == 1
     with quiet_stdout():
         with pytest.raises(io.UnsupportedOperation):
             sys.stdout.fileno()
+
+
+def test_a_character_split_across_buffer_writes_is_decoded_whole(monkeypatch):
+    _real_stdout(monkeypatch)
+    encoded = "ä.".encode()
+    with quiet_stdout() as printed:
+        sys.stdout.buffer.write(encoded[:1])
+        sys.stdout.buffer.write(encoded[1:])
+
+    assert printed.getvalue() == "ä."
 
 
 # MCP server ---------------------------------------------------------------------------------
