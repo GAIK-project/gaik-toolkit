@@ -4,8 +4,8 @@ This template defines the format for the `Calculation_Breakdown.txt` file that i
 
 ## Format Consistency
 
-**Important:** The Calculation Breakdown and Sales Order documents use consistent text formatting:
-- Both use plain text format (`.txt` files, UTF-8 encoding)
+**Important:** When no sample sales order is provided, the Calculation Breakdown and Sales Order use consistent text formatting:
+- Both are plain text (`.txt`, UTF-8); with a sample, the Sales Order is `.docx` and only the breakdown stays `.txt`
 - Both follow 80-character width standard
 - Both use `=` characters for major sections, `-` for subsections
 - Both use consistent currency formatting ($X,XXX.XX format)
@@ -57,11 +57,13 @@ Extracted from PO.pdf:
 
 Matched in Price List ({Price_List_Item_No}):
   - Unit Price: ${Unit_Price}
+  - Cutting Fee: ${Cutting_Fee}
   - Testing Fee: ${Testing_Fee}
   - Cert Fee: ${Cert_Fee}
 
 Calculations:
   Material Cost  = {Quantity} × ${Unit_Price}        = ${Material_Cost}
+  Cutting Fee    = ${Cutting_Fee} × {Cuts}           = ${Cutting_Cost}
   Testing Fee    = ${Testing_Fee} × {Lots}           = ${Testing_Cost}
   Cert Fee       = ${Cert_Fee} × {Certs}             = ${Cert_Cost}
   --------------------------------------------------------
@@ -86,6 +88,10 @@ Net Material Cost:
   = ${Material_Subtotal} - ${Volume_Discount}
   = ${Net_Material_Cost}
 
+Cutting Fees:
+  = ${Item1_Cutting} + ${Item2_Cutting} + ... + ${ItemN_Cutting}
+  = ${Total_Cutting_Fees}
+
 Testing Fees:
   = ${Item1_Testing} + ${Item2_Testing} + ... + ${ItemN_Testing}
   = ${Total_Testing_Fees}
@@ -98,7 +104,7 @@ Shipping (from PO):
   = ${Shipping}
 
 Subtotal (before tax):
-  = ${Net_Material_Cost} + ${Total_Testing_Fees} + ${Total_Cert_Fees} + ${Shipping}
+  = ${Net_Material_Cost} + ${Total_Cutting_Fees} + ${Total_Testing_Fees} + ${Total_Cert_Fees} + ${Shipping}
   = ${Subtotal_Before_Tax}
 
 Tax ({Tax_Rate}%):

@@ -1238,6 +1238,7 @@
       "Orchestrates existing GAIK parsers/transcriber/extractor; no new parsing logic -- inherits each sub-component's limits",
       "Long-form synthesis cost grows with sources x sections; agentic mode is significantly more expensive than single-call",
       "Report content is drawn only from supplied evidence; it does not browse or fetch external sources",
+      "From the gaik release after 0.9.1: load_report_config(path, root=None) requires the stored paths to stay inside the config file's folder, or inside root; otherwise it raises SourcePathError. save_report_config stores an input outside that folder with only a warning, so that config loads back only with root=.",
       "Agentic mode requires the multi-source-report-generator-agentic extra (langgraph); DOCX export requires multi-source-report-generator-docx extra and Pandoc system binary",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "Audio stages require a separate native OpenAI/Azure configuration when the extraction or writing provider is Aitta, Anthropic, Google/Vertex, LiteLLM or a generic compatible endpoint. Chat support does not imply audio support."
@@ -1360,6 +1361,7 @@
     },
     "known_limitations": [
       "Report and source set are defined by one ReportSpec (title, language, sections with instructions/required_items/depends_on, report-wide instructions, sources grouped as primary/secondary, optional sample_report, per-step models and settings). The spec holds model names only; any unknown key such as api_key raises.",
+      "From the gaik release after 0.9.1: ReportSpec.load(path, root=None) requires every source path and the sample report to stay inside the spec file's folder, or inside root when given; an absolute path or one leading out through '..' or a symbolic link raises SourcePathError (exported from report_writer, multi_source_report_generator and source_normalizer) before any file is read.",
       "A section with depends_on is DERIVED: it gets no knowledge file and is written only from the reviewed texts of the sections it depends on, never from the sources. Use it for summaries/recommendations, not for sections that need their own evidence.",
       "Supported source files are those of SourceNormalizer: .pdf (text layer only -- a scanned PDF raises), .docx, .xlsx/.csv, .txt/.md, audio (.mp3 .wav .m4a .ogg .flac .webm .mp4 .mpeg .mpga) and images (.png .jpg .jpeg .webp). .pptx, .doc, .xls and other types raise; file names must be unique across all sources because the name is the citation key.",
       "One config drives every stage. Recordings go to the Transcriber with that same config, so a spec with audio sources needs an OpenAI/Azure config; there is no separate audio stage config as in MultiSourceReportGenerator.",
@@ -3442,7 +3444,7 @@
     },
     "known_limitations": [
       "HTML pages only: PDFs, images and office files are skipped (not HTML), and links to files are not followed in a crawl. Parse downloaded documents with a parser instead.",
-      "Every request and redirect hop must stay inside allowed_domains (a domain allows its subdomains) and resolve to public addresses; allowed_domains is required unless allow_any_domain=True (never for URLs from users). With the default transport and no proxy, the scraper connects only to the address it checked, and keeps that address for its lifetime; with render_js, an HTTP_PROXY/HTTPS_PROXY proxy or a custom transport, the name is looked up again there.",
+      "Every request and redirect hop must stay inside allowed_domains (a domain allows its subdomains) and resolve to public addresses; allowed_domains is required unless allow_any_domain=True (never for URLs from users). With the default transport and no proxy, the scraper connects only to the address it checked, and keeps that address for five minutes before looking the name up and checking it again; with render_js, an HTTP_PROXY/HTTPS_PROXY proxy or a custom transport, the name is looked up again there.",
       "Obeys robots.txt by default: disallowed pages are skipped, a 5xx robots.txt blocks the site, and a Crawl-delay above max_crawl_delay (30 s) skips the site.",
       "Crawls breadth-first on the start page's host by default (stay_on_host=True), up to max_pages and max_depth; include_patterns/exclude_patterns are shell patterns on the URL path.",
       "Main-content extraction drops navigation, banners and footers, so facts that live only in a footer (contact details) can be missing; extraction='recall' keeps more blocks.",
@@ -3566,7 +3568,7 @@
     "supported_providers": [],
     "cost_relevant_parameters": [],
     "quality_tradeoffs": {
-      "speed_vs_accuracy": "Fast and lossless for cell values; carries no layout, charts or cell formatting",
+      "speed_vs_accuracy": "Fast and keeps every stored digit, but a number is shown as its Excel number format shows it (25%, 1234.50 EUR, 0007), not as the bare stored value; a format it does not render is written as the plain value plus '(number format: ...)'. Formulas give their stored results. Carries no layout or charts",
       "cost_sensitivity": "none -- fully local, no API calls",
       "degrades_on": [
         "very_large_sheets_for_downstream_llm_context",

@@ -1252,7 +1252,7 @@ def cmd_set_sections(args) -> dict:
 # The run settings propose-spec proposes; the user accepts or changes each one.
 # `citations` is not here: it comes from intake, so it is never marked as a default.
 PROPOSED_SETTINGS = {
-    "transcription_language": "en",
+    "transcription_language": "auto",
     "curator_workers": 4,
     "review_attempts": 5,
     "strict_review": True,

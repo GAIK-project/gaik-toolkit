@@ -11,12 +11,13 @@ from typing import Any, Literal
 
 from gaik.software_components.llm import create_llm_client, get_llm_config, resolve_provider
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import SourceMaterial
 
 from .pricing import compute_judge_cost_usd
 from .prompts import (
-    HALLUCINATION_SYSTEM_PROMPT,
     TEXT_PAIR_SYSTEM_PROMPT,
     build_hallucination_prompt,
+    build_hallucination_system_prompt,
     build_system_prompt,
     build_text_pair_prompt,
     build_user_prompt,
@@ -137,8 +138,10 @@ class LLMJudge:
             raise ValueError("source_pages must contain at least one page image")
 
         rubric = rubric or ValidationRubric()
-        system_prompt = build_system_prompt(rubric.scoring_mode)
-        user_prompt = build_user_prompt(extracted, rubric)
+        # The rubric is the caller's instruction and goes in the system message;
+        # the extractor output is judged material and goes in a block.
+        system_prompt = build_system_prompt(rubric.scoring_mode, rubric=rubric)
+        user_prompt = build_user_prompt(extracted, material=SourceMaterial())
 
         t0 = time.perf_counter()
         raw_text, input_tokens, output_tokens = self._dispatch(
@@ -212,13 +215,12 @@ class LLMJudge:
         user_prompt = build_hallucination_prompt(
             source_text=source_text,
             extracted=non_empty,
-            field_descriptions=field_descriptions,
+            material=SourceMaterial(),
         )
+        system_prompt = build_hallucination_system_prompt(field_descriptions)
 
         t0 = time.perf_counter()
-        raw_text, input_tokens, output_tokens = self._dispatch_text(
-            user_prompt, HALLUCINATION_SYSTEM_PROMPT
-        )
+        raw_text, input_tokens, output_tokens = self._dispatch_text(user_prompt, system_prompt)
         duration_s = time.perf_counter() - t0
 
         flags, judge_error = _hallucination_flags_and_error(raw_text)
@@ -276,6 +278,7 @@ class LLMJudge:
             expected_text=expected_text,
             field_name=field_name,
             context=context,
+            material=SourceMaterial(),
         )
 
         t0 = time.perf_counter()

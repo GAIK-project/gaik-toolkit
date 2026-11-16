@@ -23,6 +23,9 @@ For Azure and OpenAI, a transcription check is required as well: a default
 in two chunks with caller context, where the first request must carry that context and
 the second must continue from the first transcript. Each transcript must keep the
 words of its sentence. The chunked request needs ffmpeg on PATH.
+The check does not yet set `language`. Until it does, certify once by hand that the
+Azure transcription deployment accepts `Transcriber(language="fi")`, since the
+`language` field is now sent to cloud models and a deployment could reject it.
 It writes a sanitized `results/release-check.json` and exits nonzero for any failed,
 missing, incomplete, or timed-out required check. It never treats having a key as
 successful authentication. Reports contain model IDs and status, never credentials,

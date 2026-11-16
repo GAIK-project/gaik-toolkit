@@ -8,7 +8,7 @@ Transform workplace incident and safety observation audio recordings into struct
 
 This skill extracts structured information from employee or supervisor audio recordings describing incidents, near misses, safety observations, or safety initiatives. Simply provide an audio file, and Claude will:
 
-- **Transcribe** the audio recording using Whisper AI
+- **Transcribe** the audio recording with OpenAI or Azure OpenAI (`gpt-4o-transcribe` by default)
 - **Extract** 17 standardized fields for incident reporting
 - **Generate** a formatted Word document with a professional 2-column table
 - **Validate** data against predefined fixed-option lists
@@ -26,7 +26,7 @@ The skill extracts essential incident report information including:
 
 ### Supported Audio Formats
 
-`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`, `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`
+`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`, `.mp4`, `.webm` (convert `.mov`, `.avi` or `.mkv` to one of these first)
 
 ---
 
@@ -37,7 +37,7 @@ Before setting up, please install:
 1. **Claude Desktop** — Download from [claude.ai/download](https://claude.ai/download)
 2. **Python 3.11+** — Download from [python.org](https://www.python.org/downloads/)
    - During installation, check **"Add Python to PATH"**
-3. **OpenAI API Key** (REQUIRED for transcription) — Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+3. **OpenAI API key or Azure OpenAI credentials** (required for transcription) — an OpenAI key comes from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
 ---
 
@@ -55,9 +55,8 @@ Before setting up, please install:
 **Step 2: Configure Claude Desktop**
 
 1. The script creates `claude_desktop_config.json` — open it when prompted
-2. Copy all the content
-3. Press `Win + R`, paste: `%APPDATA%\Claude\claude_desktop_config.json`, press Enter
-4. Paste the content and save
+2. Press `Win + R`, paste: `%APPDATA%\Claude\claude_desktop_config.json`, press Enter
+3. If that file is missing or empty, paste the whole generated content. Otherwise add only the `"gaik-transcriber": {...}` entry to its existing `"mcpServers"` object, keep everything else, and save.
 
 **Step 3: Restart Claude Desktop**
 
@@ -284,7 +283,7 @@ incident-report-writing/
 
 1. **MCP Server Launch** — Claude Desktop starts `transcription-MCP/server.py` as a background process
 2. **Skill Invocation** — User provides audio file path
-3. **Transcription** — MCP server calls OpenAI Whisper API to transcribe audio
+3. **Transcription** — the MCP server sends the audio to the OpenAI or Azure OpenAI transcription API (`gpt-4o-transcribe` unless `OPENAI_TRANSCRIPTION_MODEL` or `AZURE_TRANSCRIPTION_MODEL` names another)
 4. **Extraction** — Claude analyzes transcript and extracts 17 structured fields
 5. **Validation** — Fixed-option fields validated against predefined lists
 6. **Document Generation** — Word document created with 2-column table
@@ -293,7 +292,7 @@ incident-report-writing/
 ### Dependencies
 
 - **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.9.1`, `python-dotenv==1.2.4`
-- **External APIs:** OpenAI Whisper API (for audio transcription)
+- **External APIs:** OpenAI or Azure OpenAI transcription (`gpt-4o-transcribe` by default)
 
 ### Anti-Hallucination Design
 
@@ -328,4 +327,4 @@ This skill is designed for:
 This skill is part of the GAIK toolkit. Built using:
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) - MCP server framework (its `FastMCP` API, `mcp` 1.x)
 - [GAIK](https://github.com/GAIK-project/gaik-toolkit) - Audio transcription library (`gaik` on PyPI)
-- OpenAI Whisper API - Speech-to-text transcription
+- OpenAI or Azure OpenAI transcription API (`gpt-4o-transcribe` by default) - Speech-to-text

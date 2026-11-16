@@ -32,7 +32,7 @@ input_folder/
    - Subtotal: $25,567.50
    - Volume Discount (5%): -$1,278.38
    - Fees: $165.00
-   - Tax (6%): $1,467.25
+   - Tax (6%): $1,494.25
 6. Generate sales order using default text format
 7. No validation warnings
 
@@ -558,6 +558,6 @@ def test_scenario_1():
     result = run_skill("test_data/scenario_1/")
     assert result.bom_matches == 3
     assert result.price_matches == 3
-    assert abs(result.grand_total - 26371.37) < 0.01
+    assert abs(result.grand_total - 26398.37) < 0.01
     assert len(result.warnings) == 0
 ```

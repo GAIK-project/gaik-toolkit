@@ -8,6 +8,15 @@ module's VERY IMPORTANT / content-guideline / FORMAT REFERENCE rules grafted in.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    with_source_material_instruction,
+)
+
+from .._material import Evidence, render_evidence, render_sections, source_list
+
 # ---------------------------------------------------------------------------
 # Section writer
 # ---------------------------------------------------------------------------
@@ -57,9 +66,10 @@ when they communicate the same meaning.
 
 def build_section_user_prompt(
     *,
+    blocks: SourceMaterial,
     title: str,
     instructions: str,
-    evidence: str,
+    evidence: Evidence,
     sample_section: str,
     has_sample: bool,
     report_description: str | None,
@@ -67,15 +77,18 @@ def build_section_user_prompt(
     source_filenames: list[str],
     report_language: str | None,
     include_source_references: bool,
-    dependencies_context: str = "",
+    dependencies_context: Mapping[str, str] | None = None,
 ) -> str:
+    """The writer request: every source, earlier section and format reference in its own
+    block of ``blocks``; the task and the instructions outside them."""
     parts = [f"Report section to write: {title}"]
     if report_description:
         parts.append(f"Report context: {report_description}")
     if dependencies_context:
         parts.append(
-            "ALREADY-WRITTEN REPORT SECTIONS (context for this section):\n"
-            f"{dependencies_context}\n\n"
+            "ALREADY-WRITTEN REPORT SECTIONS (context for this section; one source_material "
+            "block each, labelled with the section id and title):\n"
+            f"{render_sections(blocks, dependencies_context)}\n\n"
             "Use these completed sections as the basis for this section (e.g. to summarize "
             "or build on them). You may also use the evidence below. Do not contradict the "
             "completed sections."
@@ -86,7 +99,7 @@ def build_section_user_prompt(
         parts.append(
             "Where useful, cite the source that supports a claim using its exact filename "
             "in parentheses, e.g. (notes.txt) or (meeting_recording.mp3). "
-            f"Available sources: {', '.join(source_filenames)}."
+            f"Available sources: {source_list(source_filenames)}."
         )
     else:
         parts.append("Do not add inline source citations or filename references in the text.")
@@ -102,8 +115,9 @@ def build_section_user_prompt(
             "or bullet points and the same per-item length as this reference. "
             "Do not add extra paragraphs or bullets to be thorough.\n"
             "  • Content: take NONE of its facts, names, numbers, or wording — "
-            "every fact must come from the evidence below.\n\n"
-            f"{sample_section}"
+            "every fact must come from the evidence below. The reference is in the "
+            "source_material block labelled format_reference.\n\n"
+            + blocks.wrap(sample_section, label="format_reference")
         )
     else:
         parts.append(
@@ -113,7 +127,9 @@ def build_section_user_prompt(
 
     parts.append(f"Content to cover:\n{instructions}")
     parts.append(
-        f"Evidence — this is the ONLY source of facts and content for the section:\n{evidence}"
+        "Evidence — this is the ONLY source of facts and content for the section (one "
+        "source_material block per source, labelled with its file name; a curated brief "
+        "names the file of each fact):\n" + render_evidence(blocks, evidence)
     )
     if additional_instructions:
         parts.append(f"ADDITIONAL INSTRUCTIONS:\n{additional_instructions}")
@@ -138,16 +154,18 @@ def build_section_user_prompt(
 
 def build_reviewer_instruction(
     *,
+    blocks: SourceMaterial,
     title: str,
     instructions: str,
-    evidence: str,
+    evidence: Evidence,
     sample_section: str,
     has_sample: bool,
     include_source_references: bool,
     report_description: str | None,
     additional_instructions: str | None = None,
-    dependencies_context: str = "",
+    dependencies_context: Mapping[str, str] | None = None,
 ) -> str:
+    """The review goals, outside the blocks, then the reference material in its blocks."""
     intro = f"You are reviewing a drafted report section titled '{title}'"
     if report_description:
         intro += f" (report context: {report_description})"
@@ -212,12 +230,19 @@ def build_reviewer_instruction(
     parts.append("")
     parts.append(f"Section instructions:\n{instructions}")
     if has_sample and sample_section:
-        parts.append(f"FORMAT REFERENCE:\n{sample_section}")
+        parts.append("FORMAT REFERENCE:\n" + blocks.wrap(sample_section, label="format_reference"))
     if dependencies_context:
-        parts.append(f"ALREADY-WRITTEN REPORT SECTIONS (a valid source):\n{dependencies_context}")
-        parts.append(f"Evidence (also a valid source of facts):\n{evidence}")
+        parts.append(
+            "ALREADY-WRITTEN REPORT SECTIONS (a valid source; one block each):\n"
+            + render_sections(blocks, dependencies_context)
+        )
+        parts.append(
+            "Evidence (also a valid source of facts):\n" + render_evidence(blocks, evidence)
+        )
     else:
-        parts.append(f"Evidence (the only allowed source of facts):\n{evidence}")
+        parts.append(
+            "Evidence (the only allowed source of facts):\n" + render_evidence(blocks, evidence)
+        )
     return "\n".join(parts)
 
 
@@ -253,7 +278,12 @@ of your own — only collect the relevant facts as background material.
 
 
 def build_curation_prompt(
-    *, title: str, instructions: str, evidence: str, report_description: str | None
+    *,
+    blocks: SourceMaterial,
+    title: str,
+    instructions: str,
+    evidence: Evidence,
+    report_description: str | None,
 ) -> tuple[str, str]:
     context = f"\nReport context: {report_description}" if report_description else ""
     user = (
@@ -261,7 +291,9 @@ def build_curation_prompt(
         f"The section must cover:\n{instructions}\n\n"
         "From the source material below, extract ONLY the facts relevant to this "
         "section. Organise them as a concise, structured list of facts (with brief "
-        "context). Do not write the section itself.\n\n"
-        f"Source material:\n{evidence}"
+        "context), and give each fact the file name of its source block, so it can be "
+        "cited. Do not write the section itself.\n\n"
+        "Source material (one source_material block per source, labelled with its file "
+        f"name):\n{render_evidence(blocks, evidence)}"
     )
-    return _CURATION_SYSTEM_PROMPT, user
+    return with_source_material_instruction(_CURATION_SYSTEM_PROMPT), user

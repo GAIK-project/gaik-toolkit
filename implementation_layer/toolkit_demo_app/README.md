@@ -15,6 +15,11 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 - **PostgreSQL Agent** - Plain-language → read-only SQL with a sandboxed demo DB
 - **Tabular Agent** - Upload a CSV/Excel file and ask it questions — read-only SQL over DuckDB, messy report sheets cleaned up automatically
 - **LLM-as-Judge** - Score extractor output, detect hallucinations, run a multi-model judge panel
+- **Schema Generator** - Extraction requirements → reusable Pydantic models
+- **Source Normalizer** - Documents, spreadsheets, recordings and images → Markdown that keeps each file's name
+- **Web Scraper** - A website → clean Markdown and structured data
+- **Knowledge Curator** - Verified facts per topic, each with its exact quote and location
+- **Knowledge Synthesizer** - A reviewed, source-grounded report from curated facts
 
 ### Source tracing (Trace sources)
 
@@ -43,6 +48,7 @@ text layer. It roughly triples the output tokens of an extraction.
 - **RAG Builder** - Document upload, indexing, Q&A with citations and debug tools
 - **Audio Structured** - Audio to structured data pipeline
 - **Document Structured** - Document to structured data pipeline
+- **Report Writer v2** - A report in stages (normalize, curate, synthesize, review), every file editable in between
 
 ### Use Cases
 
@@ -52,6 +58,7 @@ text layer. It roughly triples the output tokens of an extraction.
 - **Semantic Video Search** - Vector search across indexed video transcripts (pgvector)
 - **Purchase Order Processing** - PO + BOMs + price list → line-item prices and order draft (`luvata-order` route)
 - **Report Writer** - Mixed-source report generation from documents, spreadsheets, images, audio/video, text, and an optional sample report/template
+- **Helpdesk Chatbot** - Answers from your own services and FAQ, and hands over to a person
 
 ### Solution Wizard
 
@@ -87,6 +94,7 @@ text layer. It roughly triples the output tokens of an extraction.
 
 - **Agent skills** (`/skills`) - Download each skill as a .zip, install the coding-agent plugin, and open a "try this" prompt in Claude, Claude Code or Cursor
 - **Prompts** (`/prompts`) - Copy a prompt, or copy it and open ChatGPT or Claude
+- **Desktop app** (`/desktop-app`) - Download the experimental desktop app and its install steps
 
 Both pages are public and read `lib/no-code/catalog.generated.json` and `public/downloads/skills/*.zip`. Those are generated from `implementation_layer/no-code-assets`, because the image is built from this folder alone. After changing a skill, a prompt or `no-code-assets/catalog.json`, run:
 
@@ -277,6 +285,8 @@ toolkit_demo_app/
 │   ├── (home)/             # Landing page, privacy
 │   ├── (auth)/             # sign-in, sign-up, access-pending
 │   ├── (demos)/            # All demo pages
+│   ├── (wizard)/           # Solution Wizard page (both wizards)
+│   ├── api/                # Next route handlers
 │   └── admin/              # Admin dashboard
 ├── api/                    # FastAPI backend
 │   ├── main.py
@@ -310,6 +320,14 @@ toolkit_demo_app/
 | `/video-search` | Semantic dental video search |
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
 | `/report-writer` | Mixed-source report generation |
+| `/report-writer-v2` | Staged report writer (normalize, curate, synthesize) |
+| `/source-normalizer` | Mixed files → Markdown |
+| `/knowledge-curator` | Facts with verified quotes |
+| `/knowledge-synthesis` | Report from curated facts |
+| `/schema-generator` | Extraction schema from requirements |
+| `/web-scraper` | Web page or site → Markdown |
+| `/model-settings` | Server model list, Aitta warm-up and the own-key connection test |
+| `/wizard` | First Solution Wizard sessions (per-user grant) |
 
 API docs: <http://localhost:8000/docs> (Swagger UI), served only with `DEMO_API_DOCS=true`;
 the deployed API leaves `/docs`, `/redoc` and `/openapi.json` off.
