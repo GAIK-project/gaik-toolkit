@@ -482,8 +482,8 @@ test.describe("Workflow tab", () => {
     await expect(page.getByTestId("chat-reference")).toContainText("Vaihe 3 · Classification");
     await setChatOpen(page, false);
 
-    // "Muokkaa" opens the canvas where it stands: the tools appear and the picked step stays picked.
-    await locked.getByRole("button", { name: "Muokkaa" }).click();
+    // "Muokkaa kaaviota" opens the canvas where it stands: the tools appear and the picked step stays picked.
+    await locked.getByRole("button", { name: "Muokkaa kaaviota" }).click();
     await expect(panel).toHaveAttribute("data-locked", "false");
     await expect(locked).toHaveCount(0);
     await waitForDiagram(page, { edit: false });

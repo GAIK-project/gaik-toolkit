@@ -251,7 +251,7 @@ test.describe("Workspace tabs", () => {
     await expect(locked).toContainText(
       "Vain luku: muutos vaatii uuden paketin ja testiajon. Valitse vaihe ja pyydä muutosta wizardilta.",
     );
-    await expect(locked.getByRole("button")).toHaveText("Muokkaa");
+    await expect(locked.getByRole("button")).toHaveText("Muokkaa kaaviota");
   });
 
   test("a step card's chat button opens the chat with a reference to that step", async ({ page }) => {

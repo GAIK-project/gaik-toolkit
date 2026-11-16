@@ -102,7 +102,7 @@ test.describe("#93 PoC package generation (stack)", () => {
     // A second run is the case the acceptance criteria call out: the scaffolder
     // leaves an existing schema alone so a reviewed one survives, which would
     // otherwise make this a silent no-op.
-    await page.getByRole("button", { name: "Generoi uudelleen" }).click();
+    await page.getByRole("button", { name: "Generoi paketti uudelleen" }).click();
     await expect(page.getByText("✓ Kirjoitettu poc/run_poc.py")).toBeVisible({
       timeout: 30_000,
     });

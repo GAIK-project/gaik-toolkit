@@ -54,7 +54,7 @@ test.describe("#94 the PoC run view reports real runs (stack)", () => {
     // One generates the package, the other runs it. The old single button
     // promised a run it never performed.
     await expect(
-      page.getByRole("button", { name: /Generoi PoC-paketti|Generoi uudelleen/ }),
+      page.getByRole("button", { name: /Generoi PoC-paketti|Generoi paketti uudelleen/ }),
     ).toBeVisible();
     await expect(page.getByTestId("poc-run-sandbox")).toBeVisible();
   });

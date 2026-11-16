@@ -241,7 +241,7 @@ test.describe("PoC tab", () => {
     await expect(page.getByTestId("poc-package-status")).toHaveText("Valmis ajettavaksi");
     await expect(details).toHaveJSProperty("open", false);
     await expect(download).toBeHidden();
-    await expect(page.getByRole("button", { name: "Generoi uudelleen" })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Generoi paketti uudelleen" })).toBeHidden();
     // The primary generate button is for a session with no package only.
     await expect(page.getByRole("button", { name: "Generoi PoC-paketti" })).toHaveCount(0);
 
@@ -262,7 +262,7 @@ test.describe("PoC tab", () => {
     await expect(details.getByTestId("poc-work-only")).toHaveCount(0);
 
     // Generating again replaces the package, so it asks first.
-    await page.getByRole("button", { name: "Generoi uudelleen" }).click();
+    await page.getByRole("button", { name: "Generoi paketti uudelleen" }).click();
     const confirm = page.getByTestId("poc-regen-confirm");
     await expect(confirm).toContainText("Uusi paketti korvaa nykyisen.");
     await expect(page.getByRole("button", { name: "Korvaa paketti" })).toBeFocused();
@@ -270,7 +270,7 @@ test.describe("PoC tab", () => {
     await expect(confirm).toHaveCount(0);
     expect(fake.generations).toBe(0);
 
-    await page.getByRole("button", { name: "Generoi uudelleen" }).click();
+    await page.getByRole("button", { name: "Generoi paketti uudelleen" }).click();
     await page.getByRole("button", { name: "Korvaa paketti" }).click();
     await expect(confirm).toHaveCount(0);
     await expect.poll(() => fake.generations).toBe(1);
@@ -325,7 +325,7 @@ test.describe("PoC tab", () => {
     await expect(page.getByTestId("poc-package-details")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Lataa työversio" })).toBeVisible();
     // Replacing a package that cannot run needs no second question.
-    await page.getByRole("button", { name: "Generoi uudelleen" }).click();
+    await page.getByRole("button", { name: "Generoi paketti uudelleen" }).click();
     await expect(page.getByTestId("poc-regen-confirm")).toHaveCount(0);
     await expect.poll(() => fake.generations).toBe(1);
   });
@@ -373,7 +373,7 @@ test.describe("PoC tab", () => {
     await expect(page.getByTestId("poc-run-output")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("poc-result-from")).toHaveText("Aineisto: invoice_001.pdf");
     expect(fake.runs).toBe(1);
-    await expect(page.getByTestId("poc-run-sandbox")).toHaveText("Aja uudelleen");
+    await expect(page.getByTestId("poc-run-sandbox")).toHaveText("Aja testi uudelleen");
 
     // The package has not changed: looking at another tab and back starts nothing.
     await page.getByRole("tab", { name: "Blueprint" }).click();
@@ -822,9 +822,9 @@ test.describe("PoC tab", () => {
     await expect(done.getByTestId("poc-result-from")).toHaveText("Aineisto: invoice_001.pdf");
     await expect(page.getByTestId("poc-result-from")).toHaveCount(1);
     await expect(done.getByRole("listitem")).toHaveText([
-      "Kokeile omilla tapauksilla",
+      "Kokeile ratkaisua omilla tapauksilla",
       "Lataa käyttöönottopaketti",
-      "Aja uudelleen",
+      "Aja testi uudelleen",
     ]);
     await expect(page.getByTestId("poc-package-status")).toHaveCount(0);
     await expect(page.getByTestId("poc-inputs")).toHaveCount(0);
@@ -943,7 +943,7 @@ test.describe("a blueprint saved after the PoC package was made", () => {
     await expect(note).toContainText("Blueprint päivitettiin, mutta PoC-paketti ei päivity itsestään.");
     // The note does not send the user to look for the control: it has it.
     await expect(note).not.toContainText("PoC-välilehdellä");
-    await note.getByRole("button", { name: "Generoi uudelleen" }).click();
+    await note.getByRole("button", { name: "Generoi paketti uudelleen" }).click();
 
     await expect(page.getByRole("tab", { name: "PoC" })).toHaveAttribute("aria-selected", "true");
     // The same question the tab's own control asks: a new package replaces this one.
@@ -1018,7 +1018,7 @@ test.describe("PoC tab, a run that finished with warnings", () => {
     );
   const SUCCEEDED = "Testiajo onnistui: kokeile ratkaisua omilla tapauksilla tai lataa paketti käyttöönottoon.";
   const TO_CHECK =
-    "Testiajossa jäi tarkistettavaa: katso tulos ja kokeile sitten omilla tapauksilla tai aja uudelleen.";
+    "Testiajossa jäi tarkistettavaa: katso tulos ja kokeile sitten ratkaisua omilla tapauksilla tai aja testi uudelleen.";
 
   test("the warnings wizard_api found in the output are on the result, and the run is not called a success", async ({
     page,
@@ -1044,8 +1044,8 @@ test.describe("PoC tab, a run that finished with warnings", () => {
     await expect(summary.getByRole("heading")).toHaveText("Ajo päättyi, tarkista tulos");
     await expect(page.getByText("onnistui")).toHaveCount(0);
     await expect(summary.getByRole("listitem")).toHaveText([
-      "Kokeile omilla tapauksilla",
-      "Aja uudelleen",
+      "Kokeile ratkaisua omilla tapauksilla",
+      "Aja testi uudelleen",
       "Lataa käyttöönottopaketti",
     ]);
     await expect(page.getByTestId("poc-deployable")).toHaveAttribute("href", `/api/sessions/${SESSION}/poc/deployable`);
@@ -1061,9 +1061,9 @@ test.describe("PoC tab, a run that finished with warnings", () => {
     await expect(summary.getByRole("heading")).toHaveText("Ajo onnistui");
     await expect(page.getByTestId("poc-run-warnings")).toHaveCount(0);
     await expect(summary.getByRole("listitem")).toHaveText([
-      "Kokeile omilla tapauksilla",
+      "Kokeile ratkaisua omilla tapauksilla",
       "Lataa käyttöönottopaketti",
-      "Aja uudelleen",
+      "Aja testi uudelleen",
     ]);
   });
 
@@ -1151,7 +1151,7 @@ test.describe("PoC tab, a run that finished with warnings", () => {
     const actions = done.getByRole("link");
     // Until the workspace shows a run, the banner is as for any finished solution.
     await expect(done).toHaveAttribute("data-tone", "success");
-    await expect(actions).toHaveText(["Lataa paketti", "Kokeile omilla tapauksilla"]);
+    await expect(actions).toHaveText(["Lataa käyttöönottopaketti", "Kokeile ratkaisua omilla tapauksilla"]);
 
     await runTest(page);
     await expect(done).toHaveAttribute("data-tone", "warning");
@@ -1163,7 +1163,7 @@ test.describe("PoC tab, a run that finished with warnings", () => {
     const lineBox = (await line.boundingBox())!;
     const firstAction = (await actions.first().boundingBox())!;
     expect(lineBox.y + lineBox.height).toBeLessThanOrEqual(firstAction.y);
-    await expect(actions).toHaveText(["Kokeile omilla tapauksilla", "Lataa paketti"]);
+    await expect(actions).toHaveText(["Kokeile ratkaisua omilla tapauksilla", "Lataa käyttöönottopaketti"]);
     await expect(page.getByTestId("solution-done-try")).toHaveClass(/\bbtn-brand\b/);
     await expect(page.getByTestId("solution-done-download")).toHaveClass(/\bbtn-secondary\b/);
     await expect(page.getByTestId("solution-done-download")).toHaveAttribute(
@@ -1193,7 +1193,7 @@ test.describe("PoC tab, a run that finished with warnings", () => {
     await expect(done).toHaveAttribute("data-tone", "success");
     await expect(done).toHaveClass(/\bbg-success-bg\b/);
     await expect(page.getByTestId("solution-done-warnings")).toHaveCount(0);
-    await expect(done.getByRole("link")).toHaveText(["Lataa paketti", "Kokeile omilla tapauksilla"]);
+    await expect(done.getByRole("link")).toHaveText(["Lataa käyttöönottopaketti", "Kokeile ratkaisua omilla tapauksilla"]);
     await expect(page.getByTestId("solution-done-download")).toHaveClass(/\bbtn-brand\b/);
     await expect(page.getByTestId("solution-done-try")).toHaveClass(/\bbtn-secondary\b/);
     // Each of the two is on the page once, in the banner; the last step still says where the run stands.

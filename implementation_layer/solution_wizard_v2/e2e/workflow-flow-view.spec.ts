@@ -500,8 +500,8 @@ test.describe("Workflow tab: the simple flow", () => {
       await expect(menu(page)).toHaveCount(0);
       expect(saves).toEqual([]);
 
-      // "Muokkaa" opens the edits here, as on the Blueprint tab.
-      await locked.getByRole("button", { name: "Muokkaa" }).click();
+      // "Muokkaa kaaviota" opens the edits here, as on the Blueprint tab.
+      await locked.getByRole("button", { name: "Muokkaa kaaviota" }).click();
       await expect(locked).toHaveCount(0);
       await node(page, 2).click();
       await expect(page.getByTestId("simple-flow-name")).toHaveValue("Classification");

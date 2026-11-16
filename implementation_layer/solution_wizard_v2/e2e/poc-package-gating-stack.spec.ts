@@ -95,7 +95,7 @@ test.describe("#191 the PoC package is gated (stack)", () => {
     // 7 September plan names as the source of the misunderstanding.
     await expect(page.getByRole("button", { name: "Aja PoC", exact: true })).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: /Generoi PoC-paketti|Generoi uudelleen/ }),
+      page.getByRole("button", { name: /Generoi PoC-paketti|Generoi paketti uudelleen/ }),
     ).toBeVisible();
   });
 });
