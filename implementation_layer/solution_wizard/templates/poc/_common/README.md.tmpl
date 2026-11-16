@@ -42,7 +42,21 @@ python run_poc.py
 python run_poc.py --synthetic
 ```
 
-Results are written to `output/`.
+Results are written to `output/`. The run prints counts, field names and file names,
+not the extracted values; add `--verbose` to print them as well. (A RAG PoC's interactive
+mode shows each answer, since you asked the question there; `--query` prints the answer
+only with `--verbose`.) An error is printed as one short line; add `--debug` for the full
+traceback.
+
+The files in `output/` hold the extracted content as plain, unencrypted files. Who may
+read them and how long they are kept is the owner's decision: delete them when they are
+no longer needed, above all when the inputs hold personal data.
+
+Every stage in `config.yaml` names its provider. If one is removed, the run stops,
+unless the blueprint set `models.allow_provider_fallback: true`; then the run warns and
+uses the top-level `provider`. When the blueprint allows no external model API
+(`governance` in `config.yaml`), a stage that would call one stops the run before any
+credential is read, and audio transcripts are not sent for enhancement.
 
 ---
 
