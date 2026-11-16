@@ -68,10 +68,15 @@ The agent executes LLM-generated SQL. Three layers limit what it can do:
      as the LLM wrote it;
    - a CTE name counts as a CTE only where that CTE is in scope. Inside its
      own body (without `RECURSIVE`) or in an earlier CTE the name is a table
-     and is checked like one;
+     and is checked like one. Under `WITH RECURSIVE` every CTE of that `WITH`
+     is in scope in every body, as in PostgreSQL;
+   - the SQL that runs is rendered from the checked syntax tree. A query that
+     `sqlglot` cannot render without dropping part of it is rejected, so the
+     agent asks the LLM for another one;
    - identifiers are compared as PostgreSQL does: unquoted names fold to
      lower case, quoted names keep their case. `"Users"` and `users` are two
-     tables.
+     tables. `schema_name` is an unquoted name and folds to lower case too. A
+     `table_allowlist` entry that matches no table is logged as a warning.
 2. **A read-only transaction per query.** `run_sql()` runs each query in its
    own transaction, started `READ ONLY` and always rolled back, with a
    `statement_timeout`. A write fails in PostgreSQL, and a session setting
@@ -174,7 +179,7 @@ for a complete example using both options.
 
 | Method | Needs | Description |
 |--------|-------|-------------|
-| `get_schema(*, refresh=False, include_samples=False)` | DB | Introspect tables, columns, PK/FK (cached). `include_samples` attaches sample rows. |
+| `get_schema(*, refresh=False, include_samples=False)` | DB | Introspect tables, columns, PK/FK (cached). `include_samples` attaches sample rows for the caller; they are not sent to the LLM. |
 | `generate_sql(question, *, error_context=None)` | DB + LLM | Generate a read-only SQL query without running it. |
 | `run_sql(sql)` | DB | Validate `sql` as read-only and execute it (row-capped). |
 | `query(question)` | DB + LLM | Agentic loop: generate, validate, run, retry on error. |
