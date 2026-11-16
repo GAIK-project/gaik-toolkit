@@ -661,6 +661,20 @@ review_options={
 
 If `review_options=None`, the reviewer and polish pass reuse the writer client/config.
 
+## Source material as data
+
+Each source reaches the writer, the curator and the reviewer in its own
+`<source_material>` block, labelled with its file name, the name the citations use; the
+format reference, a curated brief and every already-written section a dependent section
+builds on get blocks of their own. The block id is random and new for every call, and a
+closing tag written in a source is escaped, so the source cannot end its block
+([`gaik.software_components.source_material`](../../software_components/source_material.py)).
+The system messages add the sentence in `SOURCE_MATERIAL_INSTRUCTION`; the report title,
+the section instructions, `additional_instructions` and the review goals stay outside the
+blocks. The prompts name a source by its file name only, never by its path; the path
+stays in `evidence_index.json`. Reviewer edits are applied without a person's approval,
+as before.
+
 ## Output Files
 
 When `output_dir` is set:

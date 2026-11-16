@@ -107,7 +107,7 @@ gaik-mcp --transport http --port 8000
 
 **HTTP.** The server does not start without `GAIK_MCP_TOKEN`, or with one shorter than 32 characters. Every request needs `Authorization: Bearer <token>`; anything else gets 401. The `Host` header must be `localhost`, `127.0.0.1` or a host given with `--allowed-host`, and requests with an `Origin` header are refused. The token is one shared secret: put TLS in front of the server when it leaves the machine.
 
-**What it does not do.** No tool sends mail, fetches a URL, runs code or lists a folder, and the server keeps no state between calls.
+**What it does not do.** No tool sends mail, fetches a URL, runs code or lists a folder. Between calls the server keeps only the last four parsed documents in memory, so paging a long file with `next_offset` parses it once.
 
 Client configuration for Claude Code, as `.mcp.json` in the project folder:
 

@@ -30,12 +30,7 @@ In code, that maps to:
 - `gaik.software_components.*` – low‑level, reusable primitives
 - `gaik.software_modules.*` – opinionated end‑to‑end pipelines that orchestrate multiple software components
 
-The higher‑level GAIK Solution Wizard (under development) will:
-
-1. Select a template (generic pattern) for a use case
-2. Choose required services
-3. Map them to building blocks / software components from this toolkit
-4. Generate an executable workflow and deployment configuration
+The [GAIK Solution Wizard](solution_wizard/README.md) selects a pattern for a use case, maps it to these components and modules, and generates an executable blueprint, a runnable proof of concept and its documentation.
 
 ---
 
@@ -230,7 +225,7 @@ Software components:
 **Goal:** bring a website's content into the same pipelines as documents.
 
 - `WebScraper` – fetches a page or crawls one site breadth-first and returns each page as clean Markdown with its title, language, date, links and JSON-LD
-- Stays inside `allowed_domains` and public addresses on every redirect hop, obeys robots.txt and spaces requests to one host; optional headless Chromium rendering for JavaScript sites
+- Needs `allowed_domains` (or an explicit `allow_any_domain=True`); every request, redirect hops included, stays inside them and on public addresses. Obeys robots.txt and spaces requests to one host; optional headless Chromium rendering for JavaScript sites
 - `CrawlResult.to_model_text()` puts each page in a marked block with its source URL, ready for the Extractor or a RAG index; `to_markdown()` gives plain Markdown with a `Source:` line per page
 
 ---
@@ -367,7 +362,7 @@ for the capability matrix and component examples.
 
 ## Typical GAIK workflows this toolkit enables
 
-Although the full Solution Wizard and template catalogue live outside this repo, this toolkit is designed to support patterns such as:
+The [Solution Wizard](solution_wizard/README.md) assembles these components and modules into patterns such as:
 
 - **Incident reporting (voice/recording + images → structured extraction → report generation)**
   `Transcriber` + `SchemaGenerator` + `DataExtractor` + `ReportWriter`
@@ -376,13 +371,13 @@ Although the full Solution Wizard and template catalogue live outside this repo,
 - **Construction Diary Creation (voice/recording + images → structured extraction → report generation)**
 `Transcriber` + `SchemaGenerator` + `DataExtractor` + `ReportWriter`
 - **Transcription and Translation of domain-specific videos (Transcription + Translation)**
- `Transcriber` + `PostTranscriptEnhancer`
+ `Transcriber` + `TranscriptEnhancer`
  - **Semantic Video Search (Semantic + keyword based search within videos)**
- `Embedder` + `vectorStore` + `HybridRetriever` + `ReRanker`
+ `Embedder` + `PgVectorStore` / `VectorStore` + `Retriever` (hybrid) + `Ranker`
 - **Construction Site Report Generation (Multiple documents + images + audios + notes + sample report → A structured report)**
  `Transcriber` + `DocumentClassifier` + `VisionRagParser` + `ReportWriter` 
 
-At solution level, a template or SolutionWizardSpec can express these as **services** implemented by GAIK software components and modules.
+At solution level, a Solution Wizard blueprint (`use_case.blueprint.json`) expresses these as **services** implemented by GAIK software components and modules.
 
 ---
 
@@ -399,6 +394,6 @@ Explore the examples included in the repository:
 
 Contributions are welcome — from bug reports and documentation improvements to new software components and modules that fit the GAIK architecture.
 
-Please see [`guidance_layer/CONTRIBUTING.md`](guidance_layer/CONTRIBUTING.md) for contribution guidelines.
+Please see [`guidance_layer/CONTRIBUTING.md`](../guidance_layer/CONTRIBUTING.md) for contribution guidelines.
 
 ---

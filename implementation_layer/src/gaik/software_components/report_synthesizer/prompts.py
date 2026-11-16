@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from gaik.software_components.knowledge_curator.models import SectionSpec
+from gaik.software_components.source_material import SourceMaterial, clean_label
 
 WRITER_SYSTEM_PROMPT = """\
 You are a professional report writer. You write ONE section of a larger report from the \
@@ -78,40 +81,52 @@ def _report_instructions(instructions: str) -> str:
 
 def build_writer_prompt(
     section: SectionSpec,
-    material: str,
+    material: str | Mapping[str, str],
     *,
     title: str,
     language: str,
     instructions: str,
     sample_report: str | None,
+    blocks: SourceMaterial | None = None,
 ) -> str:
     """Return the writer request for one section.
 
-    ``material`` is the section's knowledge JSON, or for a derived section the texts of
-    its prerequisite sections.
+    ``material`` is the section's knowledge JSON, or for a derived section a mapping of
+    block labels (``section <id>: <title>``) to the texts of its prerequisite sections.
+    Each piece of material and the format reference go in their own ``<source_material>``
+    block of ``blocks`` (a new :class:`SourceMaterial` for this call when left out); the
+    task stays outside them.
     """
+    blocks = blocks or SourceMaterial()
     parts = [
         f"Report: {title}\nWrite the section in: {language}",
         _report_instructions(instructions),
     ]
     if sample_report is not None:
         parts.append(
-            "FORMAT REFERENCE (inside <format_reference>): a sample report, most likely "
-            "about a DIFFERENT subject. It governs structure, length and tone and "
-            "contributes ZERO content: take none of its facts, names, numbers or wording.\n"
-            f"<format_reference>\n{sample_report}\n</format_reference>"
+            "FORMAT REFERENCE (in the source_material block labelled format_reference): a "
+            "sample report, most likely about a DIFFERENT subject. It governs structure, "
+            "length and tone and contributes ZERO content: take none of its facts, names, "
+            "numbers or wording.\n" + blocks.wrap(sample_report, label="format_reference")
         )
     if section.derived:
+        if isinstance(material, str):
+            raise TypeError("a derived section takes a mapping of labels to section texts")
+        prerequisites = "\n\n".join(
+            blocks.wrap(text, label=label) for label, text in material.items()
+        )
         parts.append(
-            "The finished sections this section is written from (inside "
-            "<prerequisite_sections>) are the ONLY source of facts. Summarize or build on "
-            "them; do not contradict them.\n"
-            f"<prerequisite_sections>\n{material}\n</prerequisite_sections>"
+            "The finished sections this section is written from (one source_material "
+            "block each, labelled with the section id and title) are the ONLY source of facts. "
+            "Summarize or build on them; do not contradict them.\n" + prerequisites
         )
     else:
+        if not isinstance(material, str):
+            raise TypeError("a section with knowledge takes the knowledge JSON as a string")
         parts.append(
-            "The curated knowledge of this section (inside <knowledge>) is the ONLY source "
-            f"of facts.\n<knowledge>\n{material}\n</knowledge>"
+            "The curated knowledge of this section (in the source_material block labelled "
+            f"knowledge {clean_label(section.id)}) is the ONLY source of facts.\n"
+            + blocks.wrap(material, label=f"knowledge {section.id}")
         )
     parts.append(
         f'<section_to_write id="{section.id}">\nTitle: {section.title}\n'

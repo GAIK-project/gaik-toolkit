@@ -147,11 +147,24 @@ starts once all of its prerequisites are reviewed.
 - Sections are returned in the order of the `sections` list, not the writing order, so a
   summary can come first.
 
+## Source material as data
+
+Every writer call puts the curated knowledge (or, for a derived section, each reviewed
+prerequisite section) and the sample report in their own `<source_material>` blocks,
+with a random id for the call and labels such as `knowledge roof` or
+`section roof: Roof` ([`gaik.software_components.source_material`](../source_material.py)).
+The system message adds the sentence in `SOURCE_MATERIAL_INSTRUCTION`; the report
+instructions and the section to write stay outside the blocks. A quote in the knowledge
+or a sentence in an earlier section cannot close its block or change the task, so text
+from the sources is not carried into the summary sections as instructions. Citations,
+the call and the `Report` are unchanged.
+
 ## Review and strict_review
 
 Each draft goes to a `DraftReviewer` with `reviewer_model`. The `reference` is the
-section's knowledge JSON, or the prerequisite texts for a derived section. The checks
-replace the reviewer's defaults and cover unsupported claims; numbers, dates and
+section's knowledge JSON, or the prerequisite texts for a derived section, one block
+each. The checks stay outside the blocks. They replace the reviewer's defaults and
+cover unsupported claims; numbers, dates and
 attributions; a `(missing: …)` marker for every uncovered required item; hierarchy
 phrasing and citation format per the report instructions; and the section's
 instructions. They tell the reviewer not to rewrite the style.

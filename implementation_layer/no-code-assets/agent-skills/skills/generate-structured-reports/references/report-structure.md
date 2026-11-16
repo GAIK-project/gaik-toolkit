@@ -141,11 +141,11 @@ sections if the report needs one. Keep it short: four to eight sections suit mos
 
 ## Section ids
 
-Ids must match `^[A-Za-z0-9_-]+$`, so `set-sections` makes them from the titles: letters such
-as `ä`, `ö`, `å` lose their accents, `ß`, `æ`, `ø` become `ss`, `ae`, `o`, the result is
-lowercased and words are joined with `_`. A clash gets `_2`, `_3`; a title that gives no id
-(only punctuation or non-Latin letters) gets `section_N`. Titles keep their original wording;
-the ids appear only in the workspace's file names.
+Ids must match `^[A-Za-z0-9_-]+$`, so `propose-spec --structure` and `set-sections` make them
+from the titles: letters such as `ä`, `ö`, `å` lose their accents, `ß`, `æ`, `ø` become `ss`,
+`ae`, `o`, the result is lowercased and words are joined with `_`. A clash gets `_2`, `_3`; a
+title that gives no id (only punctuation or non-Latin letters) gets `section_N`. Titles keep
+their original wording; the ids appear only in the workspace's file names.
 
 | Title | Id |
 |---|---|
@@ -189,7 +189,8 @@ The draft structure from `template_to_spec.py`:
 
 The agent tidies the first prompt, presents both sections, and the user adds one: "Add a
 section called Vesikatto before Talotekniikka, covering the roofing material and its condition,
-and include it in the summary." The accepted structure has three sections; `set-sections` writes
-them into the spec as `vesikatto`, `talotekniikka` and `yhteenveto`, with `yhteenveto`
-depending on the other two. If no source mentions a sewer inspection, the report says
+and include it in the summary." The accepted structure has three sections;
+`propose-spec --structure` gives them the ids `vesikatto`, `talotekniikka` and `yhteenveto`,
+with `yhteenveto` depending on the other two, and `apply-spec` writes them into the spec once
+the whole spec is accepted. If no source mentions a sewer inspection, the report says
 `(missing: latest sewer camera inspection)` in Talotekniikka, where the reader sees the gap.
