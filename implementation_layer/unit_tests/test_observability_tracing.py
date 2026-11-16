@@ -631,6 +631,7 @@ def test_the_google_adapter_s_span_matches_what_it_sends(spans):
     adapter = GoogleProvider.__new__(GoogleProvider)
     adapter.provider, adapter.model, adapter.usage = "google", "gemini-3-flash", UsageCounter()
     adapter.raw = type("Raw", (), {"models": type("Ms", (), {"generate_content": generate})()})()
+    adapter._fallback_location = None  # as for the Gemini API: one endpoint, no location
     config = {"provider": "google", "model": "gemini-3-flash"}
 
     _extract_with(adapter, config)

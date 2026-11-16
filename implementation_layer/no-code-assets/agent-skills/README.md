@@ -56,26 +56,31 @@ Each one receives the user's own content, under that provider's terms.
 | `extracting-structured-data` | The LLM provider the user configures, as above | Document text or page images, and the extraction schema | As above |
 | `searching-documents` | The configured embedding and LLM provider; the user's PostgreSQL database | Document chunks and search queries | As above, and the database URL |
 | `generate-structured-reports` | The configured LLM provider; OpenAI or Azure OpenAI for recordings | Text of the user's source files, transcribed audio and the report draft | As above |
-| `incident-report-writing`, `construction-diary-creation`, `report-writing` | OpenAI or Azure OpenAI (transcription and GPT models) through the local `gaik-transcriber` MCP server | The audio or video file the user names | `OPENAI_API_KEY`, or `AZURE_API_KEY` and `AZURE_ENDPOINT`, which `setup.bat` asks for and writes to `transcription-MCP/.env` beside the server; a key already set in the environment takes precedence |
+| `incident-report-writing`, `construction-diary-creation`, `report-writing` | OpenAI or Azure OpenAI (transcription and GPT models) through the local `gaik-transcriber` MCP server | The audio or video file the user names, and only one inside the folders the user approved in setup (`--folder`); other files are refused before anything is sent | `OPENAI_API_KEY`, or `AZURE_API_KEY` with `AZURE_ENDPOINT`. `setup.bat` saves the key as a Windows user environment variable, not in a file in the skill folder; a `.env` file an older setup wrote beside the server is read only when no key is set |
 | `purchase-order-processing` | Nothing outside the machine; Claude reads the files through the local filesystem MCP server | — | — |
 | `brief-to-slides` | Web pages the user links or the agent researches; the browser fetches Google Fonts when an HTML preview opens | Search queries and page addresses | — |
 
 **Installs.** Skills that run code install packages from public registries: gaik and
-its dependencies from PyPI (`gaik==0.9.0` with the extra the task needs), `mcp`,
+its dependencies from PyPI (`gaik==0.10.0` with the extra the task needs), `mcp`,
 `python-dotenv`, `python-pptx`, `pillow`, `cairosvg`, `lxml` and `playwright` from PyPI,
 Playwright's Chromium build, the font packages and `lucide-static` from npm for
 `brief-to-slides`, and `@modelcontextprotocol/server-filesystem` from npm for the Claude
 Desktop MCP setup. Those commands name exact versions, and the packages' own dependencies
-resolve when the user installs them. `generate-structured-reports` installs `gaik[report-writer]`,
+resolve when the user installs them, except where a lockfile pins them: `report-writing`
+installs the filesystem server with `npm ci` from `filesystem-MCP/package-lock.json`, which
+checks every package's integrity hash. The transcription skills' `setup.bat` installs into a
+virtual environment beside the server, not into the user's own Python. `generate-structured-reports` installs `gaik[report-writer]`,
 and a provider's gaik extra when it is missing, without a version pin. After the user agrees,
-it also downloads Pandoc from its official release through pypandoc. Its `SKILL.md`
+it also downloads one pinned Pandoc release from GitHub, checks its SHA-256 and unpacks it
+with pypandoc. Its `SKILL.md`
 describes both.
 
 **Credentials.** No credential is stored in this plugin. The skills use whatever API key
 the user has set for gaik in their environment or in a local `.env` file, and they send it
 only to the provider it belongs to. The `setup.bat` scripts ask the user for the key and
-write it to a `.env` file on the user's machine. That file stays there and is never part
-of the plugin or the repository.
+save it as a Windows user environment variable with `setx`, so it is not in the skill
+folder; other programs the user runs can read it too, like any environment variable. It
+is never part of the plugin or the repository.
 
 ## Directory review notes
 

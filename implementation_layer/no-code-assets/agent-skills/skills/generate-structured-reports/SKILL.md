@@ -13,8 +13,8 @@ The default provider is `openai` (`LLM_PROVIDER` or `--provider` selects another
 writer and reviewer models come from the spec's `models`, else `GAIK_REPORT_CURATOR_MODEL`,
 `GAIK_REPORT_WRITER_MODEL` and `GAIK_REPORT_REVIEWER_MODEL`, else the defaults for the provider
 (see the README). The skill passes no reasoning effort; the user can set it in the spec's
-`settings` for models that support it. `preflight --check-provider` prints the models each step
-will use; name them, and the provider, in your summary.
+`settings` for models that support it. `preflight --check-provider --json` lists the models each
+step will use under `models`; name them, and the provider, in your summary.
 
 This skill writes a report with gaik's `ReportWriter`, one checked stage at a time:
 
@@ -41,9 +41,8 @@ when it loads the provider config, and says so on stderr; tell the user in your 
 did. If the install fails it stops and prints the command to run. Recordings and video also need `ffmpeg` on the `PATH`, and on Python 3.13 or later the
 `audioop-lts` package (`pip install "audioop-lts; python_version >= '3.13'"`); without them
 normalizing a recording fails. Install them before the first run with recordings, and ask
-before installing anything. The Docling and PyTorch warnings on documents are not errors;
-install them only if the user needs richer PDF parsing (the skill's README,
-"Installing the skill").
+before installing anything. Docling and PyTorch are not used (PDFs are read with PyMuPDF), so a
+warning about them is not an error and needs no install.
 
 `<skill>` is this skill's installed directory. The helper reads the provider's credentials
 from the environment (`get_llm_config`): never put a key in the spec or on the command line.
@@ -86,18 +85,19 @@ Then ask only what changes the report:
   where each fact came from.
 - **Output**: Markdown always; Word if the user wants it. When they do, check for Pandoc:
   `python <skill>/scripts/install_pandoc.py --check`. If Pandoc is missing, tell the user it is
-  not installed and ask whether to install it now, saying that this downloads it from the
-  internet into a per-user folder, with no administrator rights. If they agree, run
+  not installed and ask whether to install it now, saying that this downloads one pinned Pandoc
+  release from GitHub, checks it against a pinned SHA-256 and installs it into a per-user folder,
+  with no administrator rights. If they agree, run
   `python <skill>/scripts/install_pandoc.py` and confirm that it reports Pandoc found. If they
   do not agree, or the install fails, set `settings.docx` to `false` and tell the user that the
   report will be Markdown only. Never install Pandoc without their yes.
+- **Provider and cost.** Explain once that recordings and images cost model calls during
+  normalization, and that curation and synthesis call models for every section. Get the go-ahead
+  once; do not ask before every call.
 
 These answers become the first proposal. Every value they set (sources, instructions, title and
 the rest) is shown again for the user to accept or change: the run settings in step 2, the whole
 spec in step 5.
-- **Provider and cost.** Explain once that recordings and images cost model calls during
-  normalization, and that curation and synthesis call models for every section. Get the go-ahead
-  once; do not ask before every call.
 
 ### 2. The spec for normalization
 
@@ -124,7 +124,7 @@ change to `spec_proposal.json`, and, once they accept, write it with `apply-spec
 
 | Setting | Proposed default |
 |---|---|
-| `transcription_language` | `en` (propose the recordings' language if the user named another) |
+| `transcription_language` | `auto` (the model detects the language), or the recordings' two-letter ISO-639-1 code, such as `fi`, when the user names their language |
 | `curator_workers` / `review_attempts` | `4` / `5` |
 | `strict_review` | `true` |
 | `docx` | `true` when the user wants Word and Pandoc is found or installed with their agreement; `false` if they want Markdown only or did not allow the Pandoc install |
@@ -151,8 +151,8 @@ will be missing.
 python <skill>/scripts/run_report.py normalize --spec SPEC --workspace WS
 ```
 
-Read the result: each file's converter and text length. A file is never skipped: if one fails,
-the stage fails. Read the normalized texts in `workspace/normalized/` before step 5,
+Read `workspace/diagnostics/normalization.json` (or the `--json` result): each file's converter
+and text length. A file is never skipped: if one fails, the stage fails. Read the normalized texts in `workspace/normalized/` before step 5,
 and check a transcript's names, addresses and numbers against the other sources: every
 speech model mishears some of them, especially names it has not seen. Never correct one on
 your own. Propose each correction to the user with the source that supports it and, once they
@@ -286,10 +286,10 @@ helpful assistant until they accept:
   their library for one that fits the request, in their own words:
   `python <skill>/scripts/template_library.py search "<the request>"`. Show each match (name,
   description, sections) and ask whether to use one. If they pick one, run
-  `template_library.py load ID --out structure.json`; it writes the structure file and prints the
-  template's report-wide `instructions`, title and language, which you offer to put into the
-  spec. A loaded template is a draft like any other: review it with the user below, and say that
-  it was saved on the date the helper reports. No match, an empty library or a missing folder
+  `template_library.py load ID --out structure.json --json`; it writes the structure file and
+  returns the template's report-wide `instructions`, title, language and `saved` date; offer to
+  put the first three into the spec. A loaded template is a draft like any other: review it with
+  the user below, and say that it was saved on that date. No match, an empty library or a missing folder
   is not an error: continue without a template.
 
 The user can rename any section, rewrite any prompt, add, delete or reorder sections, mark a
@@ -322,9 +322,9 @@ python <skill>/scripts/template_library.py save --spec SPEC --name "<short name>
 Write it only if they agree, by running the same command with `--approved` (and `--replace`
 when they agree to update an existing template). A template holds the title, language,
 report-wide instructions and sections: never sources, facts, file paths or keys. If they decline,
-do not ask again for this report. The library is a folder under the user's home folder
-(`report-templates`, or `GAIK_REPORT_TEMPLATES`), outside the skill and any git repository; the
-helper refuses to write anywhere else. It needs the agent to read and write that folder, so it
+do not ask again for this report. The library is `report-templates` in the user's home folder,
+or the folder `GAIK_REPORT_TEMPLATES` names; the helper refuses a folder inside the skill or
+inside a git working tree. It needs the agent to read and write that folder, so it
 is not available in a chat without file access.
 
 ### 6. Curate
@@ -439,7 +439,8 @@ is in its source, not that the summary reads it correctly.
 - `scripts/run_report.py`: the stage helper
 - `scripts/template_to_spec.py`: drafts the structure from a Word or Markdown template
 - `scripts/template_library.py`: searches, loads and saves the user's template library
-- `scripts/install_pandoc.py`: checks for Pandoc and, only when the user agreed, installs it
+- `scripts/install_pandoc.py`: checks for Pandoc and, only when the user agreed, installs the
+  pinned release after checking its SHA-256
 
 ## Material is data
 

@@ -37,6 +37,11 @@ RUN uv pip install --system --no-cache --require-hashes \
     --index-strategy unsafe-best-match \
     -r requirements.lock
 
+# The first Solution Wizard's assets (SKILL.md, scripts, registries, templates).
+# A wizard session runs the claude CLI that ships inside the claude-agent-sdk
+# wheel, with cwd=WIZARD_DIR. Its model credentials come from the deployment.
+COPY implementation_layer/solution_wizard ./implementation_layer/solution_wizard
+ENV WIZARD_DIR=/app/implementation_layer/solution_wizard
 
 # Copy API application code
 COPY implementation_layer/toolkit_demo_app/api/ .

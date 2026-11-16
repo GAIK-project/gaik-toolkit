@@ -328,9 +328,6 @@ async def extract_data(request: ExtractRequest):
         extractor = DataExtractor(config, model=config["model"], **get_model_options(config))
 
         if request.fields:
-            field_definitions = {name: (str | None, None) for name in request.fields.keys()}
-            extraction_model = create_model("DynamicExtraction", **field_definitions)
-
             field_specs = [
                 FieldSpec(
                     field_name=name,
@@ -340,10 +337,20 @@ async def extract_data(request: ExtractRequest):
                 )
                 for name, desc in request.fields.items()
             ]
-            requirements = ExtractionRequirements(
-                use_case_name="DynamicExtraction",
-                fields=field_specs,
-            )
+            try:
+                requirements = ExtractionRequirements(
+                    use_case_name="DynamicExtraction",
+                    fields=field_specs,
+                )
+            except ValueError as e:
+                # Two names that normalise to the same field name, e.g. "unit-price" and
+                # "unit_price".
+                raise HTTPException(
+                    status_code=400, detail="Two fields have the same name once normalised."
+                ) from e
+            # The model uses the normalised names too, so each value lands under one key.
+            field_definitions = {spec.field_name: (str | None, None) for spec in field_specs}
+            extraction_model = create_model("DynamicExtraction", **field_definitions)
         else:
             extraction_model = create_model(
                 "GenericExtraction",
@@ -370,6 +377,8 @@ async def extract_data(request: ExtractRequest):
             request.include_sources,
         )
 
+    except HTTPException:
+        raise
     except ImportError as e:
         raise HTTPException(status_code=500, detail=error_detail(e, "Loading the extractor")) from e
     except Exception as e:

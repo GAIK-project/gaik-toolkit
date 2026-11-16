@@ -204,8 +204,20 @@ runs as before.
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
-| `WIZARD_ACCESS_SECRET`                 | Old wizard gate on `/api/wizard`; read until that gate is removed | Secret: `gaik-demo-admin` |
 | `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
+
+`WIZARD_ACCESS_SECRET` is no longer read: `/api/wizard` is gated by the per-user
+wizard grant from `/admin`, not by a shared key. Remove it from both frontend deployments first, then from the secret if it is there
+(the patch fails harmlessly when the key is absent):
+
+```bash
+for d in gaik-demo gaik-demo-staging; do
+  oc set env deployment/$d WIZARD_ACCESS_SECRET- -n gaik
+done
+oc get secret/gaik-demo-admin -n gaik -o jsonpath='{.data}' | grep -q WIZARD_ACCESS_SECRET &&
+  oc patch secret/gaik-demo-admin -n gaik --type=json \
+    -p '[{"op":"remove","path":"/data/WIZARD_ACCESS_SECRET"}]'
+```
 
 ### Backend (gaik-demo-api)
 
@@ -219,8 +231,9 @@ runs as before.
 | `REPORT_RUN_TOKEN`          | Optional. The same value as on the frontend: report runs (Report Writer, v2, Source Normalizer, Knowledge Curator, Knowledge Synthesis) are accepted only with it | Secret: `gaik-demo-report-run` |
 | `ANTHROPIC_FOUNDRY_API_KEY` | Claude server models and the Vision Extractor's Claude path: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
 | `ANTHROPIC_FOUNDRY_RESOURCE`| Claude server models and the Vision Extractor's Claude path: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
-| `CLAUDE_CODE_USE_FOUNDRY`   | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
+| `CLAUDE_CODE_USE_FOUNDRY`   | The first Solution Wizard in the browser: `1` sends its agent to Azure Foundry. With the two Foundry variables above it turns the wizard on | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | The first wizard's model id (`ANTHROPIC_MODEL` wins when set) | Secret: `gaik-demo-api-keys` |
+| `WIZARD_MAX_SESSIONS`, `WIZARD_MAX_MESSAGES` | Optional. First-wizard sessions at once (3) and messages per session (60) | `oc set env` |
 
 ## Route Annotations
 

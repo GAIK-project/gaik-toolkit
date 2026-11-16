@@ -13,8 +13,8 @@ from solution_wizard.schema_designer import (
     build_pydantic_model,
     build_requirements_json,
     build_requirements_text,
-    write_schema_files,
     write_extraction_requirements,
+    write_schema_files,
 )
 
 SPEC_FULL = {
@@ -216,6 +216,125 @@ def test_write_schema_files_output_schema_json(tmp_path):
     if json_path.exists():
         schema = json.loads(json_path.read_text())
         assert "properties" in schema or "title" in schema
+
+
+def test_designed_schema_loads_as_data_without_running_its_python_file(tmp_path):
+    pytest.importorskip("fitz")
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    from gaik.software_modules.documents_to_structured_data.pipeline import (
+        DocumentsToStructuredData,
+    )
+
+    write_schema_files(SPEC_FULL, "MaintenanceTicket", tmp_path, "test_uc")
+    schemas = tmp_path / "schemas"
+    assert (schemas / "output_schema_model.json").exists()
+    expected = json.loads((schemas / "output_schema.json").read_text())
+    marker = tmp_path / "marker.txt"
+    (schemas / "output_schema.py").write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran')\n"
+    )
+
+    pipeline = object.__new__(DocumentsToStructuredData)
+    model, _ = pipeline.load_schema(schemas, "output_schema")
+
+    assert not marker.exists()
+    assert model.__name__ == "MaintenanceTicket"
+    assert model.model_json_schema() == expected
+
+
+def test_an_allowed_value_that_becomes_an_underscore_name_is_saved_as_data(tmp_path):
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    from gaik.software_components.extractor.saved_schema import read_model_file
+
+    spec = {
+        "schema_name": "Test",
+        "fields": ["status"],
+        "required_fields": ["status"],
+        "allowed_values": {"status": ["-", "_x", "-x-", "open"]},
+    }
+    write_schema_files(spec, "Test", tmp_path, "test_uc")
+
+    src = (tmp_path / "schemas" / "output_schema.py").read_text()
+    ast.parse(src)
+    model = read_model_file(tmp_path / "schemas" / "output_schema_model.json")
+    enum_cls = model.model_fields["status"].annotation
+    assert [m.value for m in enum_cls] == ["-", "_x", "-x-", "open"]
+    assert not any(m.name.startswith("_") for m in enum_cls)
+
+
+def test_allowed_values_that_give_the_same_member_name_are_all_kept(tmp_path):
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    from gaik.software_components.extractor.saved_schema import read_model_file
+
+    spec = {
+        "schema_name": "Test",
+        "fields": ["status"],
+        "required_fields": ["status"],
+        "allowed_values": {"status": ["a b", "a-b", "a_b", "a b"]},
+    }
+    write_schema_files(spec, "Test", tmp_path, "test_uc")
+
+    schemas = tmp_path / "schemas"
+    model = read_model_file(schemas / "output_schema_model.json")
+    saved = [(m.name, m.value) for m in model.model_fields["status"].annotation]
+    assert saved == [("A_B", "a b"), ("A_B_2", "a-b"), ("A_B_3", "a_b")]
+    namespace: dict = {}
+    exec(compile((schemas / "output_schema.py").read_text(), "output_schema.py", "exec"), namespace)
+    assert [(m.name, m.value) for m in namespace["StatusEnum"]] == saved
+
+
+def test_fields_that_give_the_same_enum_name_keep_their_own_members(tmp_path):
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    from gaik.software_components.extractor.saved_schema import read_model_file
+
+    spec = {
+        "schema_name": "Test",
+        "fields": ["a_b", "a__b"],
+        "required_fields": ["a_b", "a__b"],
+        "allowed_values": {"a_b": ["x"], "a__b": ["y"]},
+    }
+    write_schema_files(spec, "Test", tmp_path, "test_uc")
+
+    schemas = tmp_path / "schemas"
+    model = read_model_file(schemas / "output_schema_model.json")
+    first = model.model_fields["a_b"].annotation
+    second = model.model_fields["a__b"].annotation
+    assert (first.__name__, [m.value for m in first]) == ("ABEnum", ["x"])
+    assert (second.__name__, [m.value for m in second]) == ("AB2Enum", ["y"])
+    src = (schemas / "output_schema.py").read_text()
+    assert "class ABEnum(str, Enum):" in src and "class AB2Enum(str, Enum):" in src
+
+
+def test_without_the_saved_format_an_earlier_model_file_is_removed(tmp_path, monkeypatch):
+    pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    write_schema_files(SPEC_MINIMAL, "SimpleOutput", tmp_path, "test_uc")
+    model_path = tmp_path / "schemas" / "output_schema_model.json"
+    assert model_path.exists()
+
+    # An older gaik has no saved_schema module: importing it fails.
+    monkeypatch.setitem(sys.modules, "gaik.software_components.extractor.saved_schema", None)
+    written = write_schema_files(SPEC_FULL, "MaintenanceTicket", tmp_path, "test_uc")
+
+    assert not model_path.exists()
+    assert "output_schema_model.json" not in written
+
+
+def test_a_designed_schema_the_saved_format_refuses_leaves_the_folder_as_it_was(
+    tmp_path, monkeypatch
+):
+    saved_schema = pytest.importorskip("gaik.software_components.extractor.saved_schema")
+    write_schema_files(SPEC_MINIMAL, "SimpleOutput", tmp_path, "test_uc")
+    schemas = tmp_path / "schemas"
+    before = {p.name: p.read_bytes() for p in schemas.iterdir()}
+
+    def refuse(model):
+        raise saved_schema.SavedSchemaError("refused for the test")
+
+    monkeypatch.setattr(saved_schema, "describe_model", refuse)
+    with pytest.raises(saved_schema.SavedSchemaError):
+        write_schema_files(SPEC_FULL, "MaintenanceTicket", tmp_path, "test_uc")
+
+    assert {p.name: p.read_bytes() for p in schemas.iterdir()} == before
 
 
 def test_write_extraction_requirements(tmp_path):

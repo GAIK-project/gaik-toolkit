@@ -26,9 +26,11 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model
     from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model
     from api.utils.report_runs import require_report_run_grant
 
 try:
@@ -153,6 +155,7 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
     ids = [s.id for s in sections]
     if len(set(ids)) != len(ids):
         raise HTTPException(400, f"Topic ids must be distinct: {ids}")
+    check_model(parsed.options.model, chat_models())
     sources = _normalized_sources(await _read_files(artifacts, _NORMALIZED))
     config = get_api_config()
     options = parsed.options

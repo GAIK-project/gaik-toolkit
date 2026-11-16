@@ -7,6 +7,8 @@ monkeypatching ``pipeline.create_llm_client``.
 from __future__ import annotations
 
 import inspect
+import json
+from pathlib import Path
 
 import pytest
 from gaik.software_modules.multi_source_report_generator import (
@@ -169,9 +171,10 @@ def test_evidence_pack_includes_source_metadata(tmp_path):
         )
     ]
     pack = gen._assemble_evidence_pack(items, max_evidence_chars=None)
-    assert "Source 1: doc.txt" in pack
-    assert "Type: text" in pack
+    assert "Source 1: doc.txt (text)" in pack
     assert "hello" in pack
+    # The pack names a source by its file name; the path stays in evidence_index.json.
+    assert str(tmp_path) not in pack
 
 
 def test_evidence_truncation_respects_max_chars(tmp_path):
@@ -373,7 +376,11 @@ def test_a_saved_config_loads_the_paths_it_was_given(tmp_path, monkeypatch):
         output_dir="out",
         sample_report_path="materials/sample.md",
     )
-    loaded = msrg.load_report_config(config_path)
+    # The working-directory paths lie beside the config's folder, so they load only with a
+    # root that holds both.
+    with pytest.raises(msrg.SourcePathError, match="outside the folder"):
+        msrg.load_report_config(config_path)
+    loaded = msrg.load_report_config(config_path, root=tmp_path)
 
     assert loaded["input_paths"] == [
         (work / "materials").resolve(),
@@ -381,6 +388,94 @@ def test_a_saved_config_loads_the_paths_it_was_given(tmp_path, monkeypatch):
     ]
     assert loaded["output_dir"] == (work / "out").resolve()
     assert loaded["sample_report_path"] == (work / "materials" / "sample.md").resolve()
-    # A path inside the config's folder stays relative, so the folder can move.
-    assert "inside.txt" in config_path.read_text(encoding="utf-8")
-    assert str(config_path.parent) not in config_path.read_text(encoding="utf-8")
+    # Every path is stored relative to the config's folder, so the folders can move.
+    saved = json.loads(config_path.read_text(encoding="utf-8"))
+    assert saved["input_paths"] == ["../work/materials", "inside.txt"]
+    assert saved["output_dir"] == "../work/out"
+    assert str(tmp_path) not in config_path.read_text(encoding="utf-8")
+
+
+def _config(folder: Path, **paths) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    data = {"input_paths": ["inputs"], "sections": [{"title": "Summary"}], **paths}
+    path = folder / "report.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def test_load_report_config_reads_nested_relative_paths(tmp_path):
+    path = _config(
+        tmp_path,
+        input_paths=["inputs/site/day1", "inputs/notes.txt"],
+        sample_report_path="templates/old/sample.md",
+        output_dir="out/report",
+    )
+
+    loaded = msrg.load_report_config(path)
+
+    root = tmp_path.resolve()
+    assert loaded["input_paths"] == [root / "inputs/site/day1", root / "inputs/notes.txt"]
+    assert loaded["sample_report_path"] == root / "templates/old/sample.md"
+    assert loaded["output_dir"] == root / "out/report"
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        {"input_paths": ["/etc"]},
+        {"input_paths": ["inputs", "../secret.txt"]},
+        {"sample_report_path": "/etc/hosts"},
+        {"sample_report_path": "templates/../../secret.md"},
+        {"output_dir": "/tmp/elsewhere"},
+        {"output_dir": "../elsewhere"},
+    ],
+)
+def test_load_report_config_refuses_a_path_outside_the_config_folder(tmp_path, paths):
+    path = _config(tmp_path / "project", **paths)
+
+    with pytest.raises(msrg.SourcePathError):
+        msrg.load_report_config(path)
+
+
+def test_load_report_config_refuses_an_input_linked_out_of_the_config_folder(tmp_path, symlink):
+    (tmp_path / "elsewhere").mkdir()
+    path = _config(tmp_path / "project")
+    symlink(tmp_path / "project" / "inputs", tmp_path / "elsewhere")
+
+    with pytest.raises(msrg.SourcePathError, match="outside the folder"):
+        msrg.load_report_config(path)
+
+
+def test_load_report_config_refuses_a_file_linked_out_of_an_input_folder(tmp_path, symlink):
+    (tmp_path / "secret.txt").write_text("Outside the folder.", encoding="utf-8")
+    path = _config(tmp_path / "project")
+    (tmp_path / "project" / "inputs").mkdir()
+    (tmp_path / "project" / "inputs" / "a.txt").write_text("alpha", encoding="utf-8")
+    symlink(tmp_path / "project" / "inputs" / "notes.txt", tmp_path / "secret.txt")
+
+    with pytest.raises(msrg.SourcePathError, match="notes.txt"):
+        msrg.load_report_config(path)
+
+
+def test_load_report_config_keeps_links_inside_the_folder_and_ignores_other_files(
+    tmp_path, symlink
+):
+    path = _config(tmp_path / "project")
+    inputs = tmp_path / "project" / "inputs"
+    inputs.mkdir()
+    (inputs / "a.txt").write_text("alpha", encoding="utf-8")
+    symlink(inputs / "b.txt", inputs / "a.txt")
+    symlink(inputs / "skipped.xyz", tmp_path)  # not a source file, so not checked
+
+    assert msrg.load_report_config(path)["input_paths"] == [inputs.resolve()]
+
+
+def test_load_report_config_with_root_takes_an_absolute_path_inside_it(tmp_path):
+    inside = (tmp_path / "shared" / "notes.txt").resolve()
+    path = _config(tmp_path / "project", input_paths=[str(inside)])
+
+    with pytest.raises(msrg.SourcePathError, match="absolute path"):
+        msrg.load_report_config(path)
+    assert msrg.load_report_config(path, root=tmp_path)["input_paths"] == [inside]
+    with pytest.raises(msrg.SourcePathError, match="outside the folder"):
+        msrg.load_report_config(path, root=tmp_path / "project")

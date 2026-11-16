@@ -84,6 +84,21 @@ The same configuration shape works with `VisionPlusParser(vision_config=...)` an
 
 ---
 
+## Source material as data
+
+The parsers that send a document to a model (`VisionParser`, `VisionPlusParser`
+through it, and `MultimodalParser`) treat the document as material, never as
+instructions ([`gaik.software_components.source_material`](../source_material.py)).
+Each call states the rule in `SOURCE_MATERIAL_INSTRUCTION`: in the system message
+of `MultimodalParser` and of the `VisionParser` clean-up call, and at the start of
+the user message of a `VisionParser` page call, since some served vision models
+refuse a system message next to an image. The end of the previous page
+(`VisionParser` with `use_context=True`), the pages given to the clean-up call
+and a PDF's text layer travel in the user message, each inside a
+`<source_material>` block with a random id for each call; the clean-up answer
+loses those tags if the model repeats them. The local parsers (`PyMuPDFParser`,
+`DocxParser`, `DoclingParser`, `SpreadsheetParser`) call no model.
+
 ## Environment Variables
 
 For MultimodalParser (see [multimodal_parser/README.md](multimodal_parser/README.md) for full details):
@@ -128,10 +143,10 @@ See [implementation_layer/examples/software_components/parsers/](../../../../exa
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **Examples**: [implementation_layer/examples/software_components/parsers/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/parsers)
-- **Contributing**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
+- **Contributing**: [CONTRIBUTING.md](../../../../../guidance_layer/CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
-MIT - see [LICENSE](../../LICENSE)
+MIT - see [LICENSE](../../../../../LICENSE)
 

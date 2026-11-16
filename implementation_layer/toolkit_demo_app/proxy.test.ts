@@ -26,7 +26,11 @@ function jwt(sub: string, exp: number): string {
   return `${part({ alg: "HS256", typ: "JWT" })}.${part({ sub, exp, role: "authenticated" })}.sig`;
 }
 
-const user = { id: "u1", aud: "authenticated", role: "authenticated" };
+const user: Record<string, string> = {
+  id: "u1",
+  aud: "authenticated",
+  role: "authenticated",
+};
 
 function session(refreshToken: string, expiresAt: number) {
   return {
@@ -57,6 +61,8 @@ function refreshTokenIn(response: NextResponse): string | null {
 let refreshes: string[] = [];
 let backendCalls = 0;
 let backendHeaders: Headers | null = null;
+// The signed-in user's access_requests row.
+let accessRow = { status: "approved", wizard_access: false };
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = SUPABASE_URL;
@@ -81,7 +87,7 @@ beforeAll(() => {
     if (url.startsWith(`${SUPABASE_URL}/auth/v1/user`))
       return Response.json(user);
     if (url.startsWith(`${SUPABASE_URL}/rest/v1/access_requests`))
-      return Response.json({ status: "approved", wizard_access: false });
+      return Response.json(accessRow);
     backendCalls += 1;
     backendHeaders = new Headers(init?.headers);
     if (url.includes("/unreachable"))
@@ -101,6 +107,8 @@ beforeEach(() => {
   refreshes = [];
   backendCalls = 0;
   backendHeaders = null;
+  delete user.email;
+  accessRow = { status: "approved", wizard_access: false };
 });
 
 const expired = () => Math.floor(Date.now() / 1000) - 60;
@@ -155,17 +163,100 @@ function post(url: string, init: { cookie?: string; ownKey?: boolean } = {}) {
   return proxy(new NextRequest(url, { method: "POST", headers }));
 }
 
-test("an encoded wizard path meets the wizard gate", async () => {
-  // Approved for the demos, but without wizard access.
-  const cookie = sessionCookie("r1", fresh());
-  for (const path of ["/api/wizard/start", "/api/%77izard/start"]) {
-    const response = await post(`https://demo.test${path}`, { cookie });
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({
-      error: "Solution Wizard is not available yet.",
-    });
+// The first Solution Wizard's agent has shell tools, so its API has a gate of
+// its own: the per-user wizard_access grant, for reads as well as writes.
+
+test("a wizard request without the grant is refused before the backend", async () => {
+  // A signed-in, approved user, also holding the old team cookie and key.
+  const savedSecret = process.env.WIZARD_ACCESS_SECRET;
+  process.env.WIZARD_ACCESS_SECRET = "team-key";
+  try {
+    const cookie = `${sessionCookie("r1", fresh())}; wizard_access=team-key`;
+    for (const path of ["/api/wizard/start", "/api/%77izard/start"]) {
+      const response = await post(`https://demo.test${path}`, { cookie });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error:
+          "The first wizard in the browser needs access from the GAIK team.",
+      });
+    }
+    const read = await proxy(
+      new NextRequest("https://demo.test/api/wizard/files/abc", {
+        headers: { cookie },
+      }),
+    );
+    expect(read.status).toBe(403);
+  } finally {
+    if (savedSecret === undefined) delete process.env.WIZARD_ACCESS_SECRET;
+    else process.env.WIZARD_ACCESS_SECRET = savedSecret;
   }
   expect(backendCalls).toBe(0);
+});
+
+test("a wizard request from a visitor who is not signed in is refused", async () => {
+  const start = await post("https://demo.test/api/wizard/start");
+  expect(start.status).toBe(401);
+  const read = await proxy(
+    new NextRequest("https://demo.test/api/wizard/download/abc"),
+  );
+  expect(read.status).toBe(401);
+  expect(backendCalls).toBe(0);
+});
+
+test("a granted user's wizard request is forwarded with the user's id", async () => {
+  accessRow = { status: "approved", wizard_access: true };
+  const cookie = sessionCookie("r1", fresh());
+  const start = await proxy(
+    new NextRequest("https://demo.test/api/wizard/start", {
+      method: "POST",
+      // What the browser claims is not passed on.
+      headers: { cookie, "x-gaik-wizard-user": "someone-else" },
+    }),
+  );
+  expect(start.status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-wizard-user")).toBe("u1");
+
+  const read = await proxy(
+    new NextRequest("https://demo.test/api/wizard/files/abc", {
+      headers: { cookie, "x-gaik-wizard-user": "someone-else" },
+    }),
+  );
+  expect(read.status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-wizard-user")).toBe("u1");
+  expect(backendCalls).toBe(2);
+});
+
+test("the grant alone does not run the wizard for a user who is not approved", async () => {
+  accessRow = { status: "rejected", wizard_access: true };
+  const response = await post("https://demo.test/api/wizard/start", {
+    cookie: sessionCookie("r1", fresh()),
+  });
+  expect(response.status).toBe(403);
+  expect(backendCalls).toBe(0);
+});
+
+test("ending a wizard session spends no trial run", async () => {
+  // A granted user still waiting for approval; the trial is off here (no Redis),
+  // so a request that needed a trial run would be refused.
+  accessRow = { status: "pending", wizard_access: true };
+  const cookie = sessionCookie("r1", fresh());
+  const end = await proxy(
+    new NextRequest("https://demo.test/api/wizard/end/abc", {
+      method: "DELETE",
+      headers: { cookie },
+    }),
+  );
+  expect(end.status).toBe(200);
+  const start = await post("https://demo.test/api/wizard/start", { cookie });
+  expect(start.status).toBe(403);
+  expect(backendCalls).toBe(1);
+});
+
+test("another route does not get the wizard's user header", async () => {
+  accessRow = { status: "approved", wizard_access: true };
+  const response = await post(RUN, { cookie: sessionCookie("r1", fresh()) });
+  expect(response.status).toBe(200);
+  expect(backendHeaders?.has("x-gaik-wizard-user")).toBe(false);
 });
 
 test("a path the rules cannot judge is not forwarded", async () => {
@@ -189,6 +280,35 @@ test("a visitor with their own model key is asked to sign in", async () => {
       error: "Sign in to use this feature.",
     });
   }
+  expect(backendCalls).toBe(0);
+});
+
+test("the API learns the model tier from the session, never from the browser", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const send = () =>
+    proxy(
+      new NextRequest("https://demo.test/api/extract", {
+        method: "POST",
+        headers: { cookie, "x-gaik-model-tier": "staff" },
+      }),
+    );
+
+  // Signed in and approved, but not on the team: the browser's header is dropped.
+  expect((await send()).status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-model-tier")).toBeNull();
+
+  // On the team by address: the proxy says so.
+  user.email = "someone@haaga-helia.fi";
+  expect((await send()).status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-model-tier")).toBe("staff");
+  expect(backendCalls).toBe(2);
+});
+
+test("a path that only begins like the wizard API meets the normal gate", async () => {
+  const response = await proxy(
+    new NextRequest("https://demo.test/api/wizardry/start", { method: "POST" }),
+  );
+  expect(response.status).toBe(401);
   expect(backendCalls).toBe(0);
 });
 

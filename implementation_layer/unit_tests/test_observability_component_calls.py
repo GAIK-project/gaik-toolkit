@@ -633,6 +633,7 @@ def _transcriber(mp, tmp_path, error):
     mp.setattr(module, "_create_audio_client", lambda config: client)
     instance = object.__new__(module.Transcriber)
     instance.api_config = {"provider": "openai", "api_key": "test-key"}
+    instance.language = "auto"  # the constructor's default: no language is sent
     audio = _file(tmp_path, "talk.mp3")
     run = lambda: instance._single_pass_transcription(audio, SECRET, "gpt-4o-transcribe")  # noqa: E731
     return run, {
@@ -697,6 +698,7 @@ def _transcriber_without_prompt(mp, tmp_path, error):
     mp.setattr(module, "_create_audio_client", lambda config: client)
     instance = object.__new__(module.Transcriber)
     instance.api_config = {"provider": "openai", "api_key": "test-key"}
+    instance.language = "auto"  # the constructor's default: no language is sent
     audio = _file(tmp_path, "talk.mp3")
     run = lambda: instance._single_pass_transcription(audio, None, "gpt-4o-transcribe")  # noqa: E731
     return run, {
@@ -1101,7 +1103,8 @@ def _classify_text(kind):
             expected = {
                 "provider": "openai",
                 "calls": fake.calls,
-                "requests": [{"response_format": ANY, "model": "gpt-4.1"}],
+                # The settings go to the ProviderClient, which maps or drops them.
+                "requests": [{"response_format": ANY, "model": "gpt-4.1", "temperature": 0.0}],
             }
         mp.setattr(llm_package, "build_compat_client", lambda c: client)
         settings = operations.OperationSettings(config=config)
@@ -1262,6 +1265,7 @@ def test_a_missing_audio_file_makes_no_span(spans, monkeypatch, tmp_path):
     monkeypatch.setattr(module, "_create_audio_client", lambda config: client)
     instance = object.__new__(module.Transcriber)
     instance.api_config = {"provider": "openai", "api_key": "test-key"}
+    instance.language = "auto"  # the constructor's default: no language is sent
 
     with pytest.raises(FileNotFoundError):
         instance._single_pass_transcription(tmp_path / "missing.mp3", "", "whisper-1")

@@ -96,8 +96,14 @@ export function PrivacyContent() {
         </p>
       </Section>
 
-      <Section icon={Eye} title="Optional Wizard Diagnostics">
+      <Section icon={Eye} title="Solution Wizard Sessions">
         <p>
+          The first Solution Wizard in the browser keeps your conversation and
+          the files it generates only while the session runs: they are removed
+          when you leave the page or restart, or after about 30 minutes without
+          activity.
+        </p>
+        <p className="mt-2">
           Solution Wizard no longer records sessions. The optional diagnostics
           pilot was switched off on 4 November 2026, and the sessions it stored
           are being deleted. Contact the project team below with any questions

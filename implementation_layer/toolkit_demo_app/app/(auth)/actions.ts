@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { isEmailConfirmed } from "@/lib/api-access";
 import { trialEnabled } from "@/lib/trial";
 
 export type AuthResult = {
@@ -108,6 +109,11 @@ export async function signIn(
   });
 
   if (error) {
+    if (error.code === "email_not_confirmed")
+      return {
+        error:
+          "Confirm your e-mail address first: open the link we sent you, then sign in.",
+      };
     return { error: "Invalid email or password." };
   }
 
@@ -128,8 +134,11 @@ export async function signIn(
   }
 
   if (accessRequest.status === "pending") {
-    // On the trial allowance a pending user can start testing at once.
-    redirect(trialEnabled() ? "/" : "/access-pending");
+    // On the trial allowance a pending user with a confirmed e-mail address
+    // can start testing at once.
+    redirect(
+      trialEnabled() && isEmailConfirmed(data.user) ? "/" : "/access-pending",
+    );
   }
 
   if (accessRequest.status === "rejected") {

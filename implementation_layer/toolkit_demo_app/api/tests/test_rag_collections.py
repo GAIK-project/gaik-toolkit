@@ -35,7 +35,7 @@ def _add(collection_id: str, *, last_used: float = 0.0, in_flight: int = 0) -> N
 
 def _index(monkeypatch, collection_id: str | None):
     workflow = SimpleNamespace(api_config={}, index_chunk_documents=len)
-    monkeypatch.setattr(rag, "get_api_config", lambda: {})
+    monkeypatch.setattr(rag, "get_rag_api_config", lambda: {})
     monkeypatch.setattr(rag, "_build_demo_workflow", lambda config, cid: workflow)
     monkeypatch.setattr(
         rag,

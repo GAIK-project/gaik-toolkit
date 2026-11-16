@@ -73,7 +73,7 @@ pg-vector-store = [
 # PostgreSQL text-to-SQL query agent (schema introspection + LLM-generated SQL)
 postgres-agent = [
     "psycopg[binary]>=3.1",
-    "sqlglot>=25.0",
+    "sqlglot>=30.18.0",  # 30.17 drops date_trunc's time zone while parsing
 ]
 
 # Tabular query agent: CSV/Excel/Parquet -> DuckDB -> validated read-only SQL.
@@ -81,7 +81,7 @@ postgres-agent = [
 # and openpyxl reads .xlsx/.xls sheets (DuckDB has no native Excel reader).
 tabular-agent = [
     "duckdb>=1.1",
-    "sqlglot>=25.0",
+    "sqlglot>=30.18.0",  # 30.17 drops date_trunc's time zone while parsing
     "openpyxl>=3.1",
 ]
 
@@ -484,6 +484,7 @@ all-cpu = [
     "gaik[web-scraper]",
     "gaik[fields-to-docx]",
     "gaik[operations]",
+    "gaik[mcp]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")

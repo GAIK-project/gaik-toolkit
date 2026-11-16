@@ -176,7 +176,7 @@ To verify:
 - **Never overwrite a full README or MDX** (i.e. one that already has real content, not just a stub) without the user explicitly confirming they want to replace it.
 - **`meta.json` page key must exactly match the `.mdx` filename** (minus `.mdx`). A mismatch silently breaks sidebar navigation.
 - **Full pages must not use `<Callout type="warn">`** — reserved for Coming Soon stubs only.
-- **Do not commit.** Leave all changes staged-but-uncommitted so the user can review with `git diff`.
+- **Do not commit.** Leave all changes uncommitted so the user can review them with `git diff`.
 - **Script stubs are scaffolds, not implementations.** Never fabricate evaluation logic or invent metric results.
 - **Do not invent results.** If no benchmarking data was provided and the user said N/A, leave the results table as a placeholder, not made-up numbers.
 
