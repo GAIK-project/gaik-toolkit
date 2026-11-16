@@ -1,9 +1,11 @@
 """OpenTelemetry spans for every call of a ``ProviderClient``.
 
 ``create_llm_client()`` returns its client wrapped in ``TracedProviderClient``
-when gaik's tracing is on (the ``gaik[otel]`` extra, see
-``gaik.observability.tracing``), so ``chat``, ``chat_parsed``, ``chat_stream``
-and ``embed`` each make one ``llm_call`` span. Without the extra, or with
+whenever OpenTelemetry can be imported and ``OTEL_SDK_DISABLED`` is not set,
+and ``chat``, ``chat_parsed``, ``chat_stream`` and ``embed`` each make one
+``llm_call`` span while gaik's tracing is on (the ``gaik[otel]`` extra, or an
+application's own tracer provider, set before or after the client was made;
+see ``gaik.observability.tracing``). Without OpenTelemetry, or with
 ``OTEL_SDK_DISABLED=true``, the factory returns the client unwrapped.
 
 The wrapper changes nothing a caller sees: arguments are passed on as given,
@@ -21,19 +23,19 @@ reports them as it sends the request (``record_request``) and reads the
 response (``record_response``); a stream reports neither. A call made inside a
 component's own ``llm_span`` gets no second span.
 
-The factory wraps only when the ``gaik[otel]`` extra is installed; the
-OpenTelemetry API alone, which other packages bring, leaves the client as it
-is. Limits: a stream's span starts at its first read, so a client whose
-``chat_stream`` fails before returning gets none. A call made in a thread
-started inside a component's ``llm_span`` does not see that span (threads do
-not inherit context), so it gets a span of its own.
+Each call decides whether it gets a span: with the OpenTelemetry API alone,
+which other packages bring, a wrapped client makes none until an application
+sets a tracer provider. Limits: a stream's span starts at its first read, so
+a client whose ``chat_stream`` fails before returning gets none. A call made in
+a thread started inside a component's ``llm_span`` does not see that span
+(threads do not inherit context), so it gets a span of its own.
 """
 
 from __future__ import annotations
 
 import copy
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 from gaik.observability.tracing import (
@@ -41,6 +43,8 @@ from gaik.observability.tracing import (
     in_llm_span,
     llm_span,
     start_llm_span,
+    text_length,
+    tracing_available,
     tracing_enabled,
 )
 
@@ -48,8 +52,13 @@ logger = logging.getLogger(__name__)
 
 
 def traced_client(client: Any) -> Any:
-    """``client`` wrapped in ``TracedProviderClient`` when tracing is on, else itself."""
-    if isinstance(client, TracedProviderClient) or not tracing_enabled():
+    """``client`` wrapped in ``TracedProviderClient`` when tracing can be on, else itself.
+
+    Decided once, when the client is made, so it wraps whenever tracing could
+    start later (an application may set its provider after building clients);
+    each call then asks ``tracing_enabled``.
+    """
+    if isinstance(client, TracedProviderClient) or not tracing_available():
         return client
     return TracedProviderClient(client)
 
@@ -175,7 +184,9 @@ class TracedProviderClient:
         except Exception:
             logger.debug("gaik tracing could not prepare a stream span", exc_info=True)
             return stream
-        return _traced_stream(stream, provider, model, messages)
+        return traced_stream(
+            stream, component=None, provider=provider, model=model, messages=messages
+        )
 
     def embed(self, *args: Any, **kwargs: Any) -> Any:
         client = self._gaik_client
@@ -216,10 +227,20 @@ def _identity(client: Any, kwargs: dict[str, Any], operation: str) -> tuple[str,
     return str(getattr(client, "provider", None) or "unknown"), str(model)
 
 
-def _traced_stream(
-    stream: Iterator[str], provider: str, model: str, messages: Any
+def traced_stream(
+    stream: Iterable[str],
+    *,
+    component: str | None,
+    provider: str,
+    model: str,
+    messages: Any,
 ) -> Iterator[str]:
     """``stream`` passed on chunk by chunk inside a span that ends with it.
+
+    For a component that streams an answer: give it a generator that makes
+    the request when first read, so the request's settings and any client
+    call made in it land on this span (a ``ProviderClient``'s ``chat_stream``
+    then makes no second span).
 
     The span starts at the first read and ends when the stream is used up,
     closed early or fails. It is current only while the client produces a
@@ -230,7 +251,7 @@ def _traced_stream(
         yield from stream
         return
     try:
-        call = start_llm_span(None, provider=provider, model=model)
+        call = start_llm_span(component, provider=provider, model=model)
         recording = call.recording
     except Exception:
         logger.debug("gaik tracing could not start a stream span", exc_info=True)
@@ -278,36 +299,18 @@ def _traced_stream(
         call.fail(exc)
         raise
     finally:
-        call.record(None, input_length=_input_length(messages), output_length=length)
+        call.record(None, input_length=text_length(messages), output_length=length)
         call.end()
 
 
 def _record_lengths(call: LLMCallSpan, messages: Any, output_length: Callable[[], int]) -> None:
     """Add the call's lengths to its span, measured only when the span is kept."""
     if call.recording:
-        call.record(None, input_length=_input_length(messages), output_length=_safe(output_length))
+        call.record(None, input_length=text_length(messages), output_length=_safe(output_length))
 
 
 def _messages(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Any:
     return args[0] if args else kwargs.get("messages")
-
-
-def _input_length(messages: Any) -> int | None:
-    """Characters in the messages' text, never the text itself; images are not counted."""
-
-    def count() -> int:
-        total = 0
-        for message in messages:
-            content = message.get("content")
-            if isinstance(content, str):
-                total += len(content)
-            elif isinstance(content, list):
-                for part in content:
-                    if isinstance(part, dict) and isinstance(part.get("text"), str):
-                        total += len(part["text"])
-        return total
-
-    return _safe(count)
 
 
 def _safe(compute: Callable[[], int]) -> int | None:

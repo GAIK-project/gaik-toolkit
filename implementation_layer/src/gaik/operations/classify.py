@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import create_model
 
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
+
 from ._runtime import maybe_quiet, need
 from .models import Classification
 from .settings import OperationSettings
@@ -109,21 +111,26 @@ def _with_llm(
     ]
     model = config["model"]
     client = build_compat_client(config)
-    if isinstance(client, ProviderClient):
-        parsed = client.chat_parsed(messages=messages, response_format=answer, model=model)
-    else:
-        options: dict[str, Any] = {"top_p": 1.0, "timeout": config.get("timeout", 30)}
-        if settings.temperature is not None:
-            options["temperature"] = settings.temperature
-        if settings.reasoning_effort is not None:
-            options["reasoning_effort"] = settings.reasoning_effort
-        response = client.beta.chat.completions.parse(
-            model=model,
-            messages=messages,
-            response_format=answer,
-            **normalize_chat_kwargs(model, options, config=config),
-        )
-        parsed = response.choices[0].message.parsed if response.choices else None
+    with llm_span("classify_text", provider=provider_of(client), model=model) as call:
+        if isinstance(client, ProviderClient):
+            parsed = client.chat_parsed(messages=messages, response_format=answer, model=model)
+        else:
+            options: dict[str, Any] = {"top_p": 1.0, "timeout": config.get("timeout", 30)}
+            if settings.temperature is not None:
+                options["temperature"] = settings.temperature
+            if settings.reasoning_effort is not None:
+                options["reasoning_effort"] = settings.reasoning_effort
+            request = normalize_chat_kwargs(model, options, config=config)
+            record_request(request)
+            response = client.beta.chat.completions.parse(
+                model=model,
+                messages=messages,
+                response_format=answer,
+                **request,
+            )
+            record_response(response)
+            parsed = response.choices[0].message.parsed if response.choices else None
+        call.record_text(messages, parsed)
     if parsed is None:
         raise RuntimeError("the model returned no classification")
 

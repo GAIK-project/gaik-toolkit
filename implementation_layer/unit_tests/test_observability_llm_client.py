@@ -51,6 +51,8 @@ ALLOWED = {
     "gen_ai.usage.input_tokens",
     "gen_ai.usage.output_tokens",
     "gaik.usage.thinking_tokens",
+    "gen_ai.usage.cache_read.input_tokens",
+    "gen_ai.usage.cache_creation.input_tokens",
     "gaik.cost.usd",
     "gaik.cost.estimated",
     "gaik.provider.name",
@@ -669,11 +671,45 @@ def test_putting_a_method_back_gives_the_client_its_own(spans, monkeypatch):
     assert client.chat(MESSAGES) == "ok"
 
 
-def test_with_only_the_opentelemetry_api_the_factory_returns_the_adapter_itself(monkeypatch, off):
-    # chromadb and others bring the API (and SDK) but not the extra's exporter.
+@needs_otel
+def test_with_only_the_opentelemetry_api_a_wrapped_client_makes_no_spans(monkeypatch, spans):
+    # chromadb and others bring the API (and SDK) but not the extra's exporter,
+    # and set no tracer provider. The client is wrapped, since an application
+    # may set one later, but its calls make no spans and pass through.
     monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http", None)
+    tracing_tests.only_the_api(monkeypatch)
+    monkeypatch.setattr(tracing, "_extra", None)  # looked up again, with the exporter gone
     client = create_llm_client({"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"})
-    assert type(client).__name__ == "OpenAIProvider"
+    client.raw = _openai_raw()
+
+    assert client.chat(MESSAGES).text == ANSWER
+    assert not spans()
+
+
+@needs_otel
+def test_a_client_made_before_the_application_sets_its_provider_is_traced_after(monkeypatch, spans):
+    monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http", None)
+    monkeypatch.setattr(tracing, "_extra", None)  # no extra
+    real = trace.get_tracer_provider()  # the application's, set by ``spans``
+    current = [trace.ProxyTracerProvider()]  # not set yet
+    monkeypatch.setattr(trace, "get_tracer_provider", lambda: current[0])
+    client = create_llm_client({"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"})
+    client.raw = _openai_raw()
+    assert client.chat(MESSAGES).text == ANSWER
+    assert not spans()
+
+    current[0] = real  # the application sets its provider
+    assert client.chat(MESSAGES).text == ANSWER
+
+    (span,) = spans()
+    assert span.name == "chat gpt-4.1"
+
+
+def test_without_the_extra_the_factory_wraps_for_the_application_s_provider(monkeypatch, spans):
+    monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http", None)
+    monkeypatch.setattr(tracing, "_extra", None)  # ``spans`` set the application's provider
+    client = create_llm_client({"provider": "openai", "api_key": "test-key", "model": "gpt-4.1"})
+    assert isinstance(client, TracedProviderClient)
 
 
 def test_a_method_stored_under_another_name_is_stored(spans):
@@ -769,8 +805,9 @@ def test_responses_within_one_span_add_up(spans):
     from gaik.observability.tracing import record_response
 
     with llm_span("DataExtractor", provider="openai", model="gpt-4.1"):
-        record_response({"prompt_tokens": 100, "completion_tokens": 10})
-        record_response({"prompt_tokens": 100, "completion_tokens": 20})
+        for completion in (10, 20):
+            usage = SimpleNamespace(prompt_tokens=100, completion_tokens=completion)
+            record_response(SimpleNamespace(usage=usage))
 
     (span,) = spans()
     assert span.attributes["gen_ai.usage.input_tokens"] == 200
@@ -817,3 +854,81 @@ def test_the_extra_is_looked_up_once_not_on_every_call(monkeypatch, spans):
 
     assert calls.count("opentelemetry.exporter.otlp.proto.http") == 1
     assert len(spans()) == 6
+
+
+# -- streams stay lazy -------------------------------------------------------------
+
+
+class _LazyStream:
+    """A stream that counts the chunks produced, and fails if read ahead of its reader."""
+
+    def __init__(self, chunks):
+        self._chunks = list(chunks)
+        self.produced = 0
+        self.taken = 0  # chunks the test has taken so far
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.produced > self.taken:
+            raise AssertionError("the stream was read ahead of its reader")
+        if self.produced == len(self._chunks):
+            raise StopIteration
+        self.produced += 1
+        return self._chunks[self.produced - 1]
+
+
+class _LazyProvider(_FakeProvider):
+    def __init__(self, stream):
+        super().__init__()
+        self.stream = stream
+
+    def chat_stream(self, messages, **kwargs):
+        return self.stream
+
+
+def _read_lazily(stream, lazy):
+    """Read ``stream`` chunk by chunk, checking that ``lazy`` produced only what was read."""
+    assert lazy.produced == 0
+    chunks = []
+    for chunk in stream:
+        assert lazy.produced == len(chunks) + 1
+        chunks.append(chunk)
+        lazy.taken = len(chunks)
+    return chunks
+
+
+@pytest.mark.parametrize("where", ["off", "in-component-span", "traced"])
+def test_a_wrapped_stream_is_read_only_as_its_reader_reads(where, monkeypatch, spans):
+    if where == "off":
+        monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
+        tracing._reset_for_tests()
+    lazy = _LazyStream(["a", "b", "c"])
+    client = TracedProviderClient(_LazyProvider(lazy))
+
+    if where == "in-component-span":
+        with llm_span("AnswerGenerator", provider="openai", model="gpt-4.1"):
+            stream = client.chat_stream(MESSAGES)
+            assert stream is lazy  # handed back as is
+            assert _read_lazily(stream, lazy) == ["a", "b", "c"]
+    else:
+        stream = client.chat_stream(MESSAGES)
+        if where == "off":
+            assert stream is lazy
+        assert _read_lazily(stream, lazy) == ["a", "b", "c"]
+    assert len(spans()) == (0 if where == "off" else 1)
+
+
+@pytest.mark.parametrize("inside", [False, True], ids=["own-span", "in-component-span"])
+def test_traced_stream_reads_only_as_its_reader_reads(inside, spans):
+    lazy = _LazyStream(["a", "b"])
+    stream = traced.traced_stream(
+        lazy, component="AnswerGenerator", provider="openai", model="gpt-4.1", messages=MESSAGES
+    )
+    if inside:
+        with llm_span("AnswerGenerator", provider="openai", model="gpt-4.1"):
+            assert _read_lazily(stream, lazy) == ["a", "b"]
+    else:
+        assert _read_lazily(stream, lazy) == ["a", "b"]
+    assert len(spans()) == 1

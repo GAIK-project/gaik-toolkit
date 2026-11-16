@@ -13,6 +13,7 @@ from typing import Literal
 
 from markdown_it import MarkdownIt
 
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
 from gaik.software_components import _http
 
 from .config import (
@@ -312,16 +313,19 @@ class MultimodalParser:
         if self.model_provider in _ANTHROPIC_PROVIDERS:
             options["timeout"] = self.config.get("timeout") or _ANTHROPIC_TIMEOUT_S
         try:
-            response = client.chat(
-                [
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": build_chat_document_content([pdf_path], user_prompt),
-                    },
-                ],
-                **options,
-            )
+            # The document is read and encoded before the span: the span times the call only.
+            content = build_chat_document_content([pdf_path], user_prompt)
+            with llm_span(
+                "MultimodalParser", provider=provider_of(client), model=self.config["model"]
+            ) as call:
+                response = client.chat(
+                    [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": content},
+                    ],
+                    **options,
+                )
+                call.record_text([system_prompt, user_prompt], response.text)
             return response.text, _extract_shared_usage(response.usage)
         finally:
             close = getattr(client.raw, "close", None)
@@ -333,18 +337,21 @@ class MultimodalParser:
         self, pdf_path: Path, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict[str, int]]:
         client = create_openai_client(self.config)
-        response = client.responses.create(
-            model=self.config["model"],
-            instructions=system_prompt,
-            input=[
-                {
-                    "role": "user",
-                    "content": _build_openai_content(pdf_path, user_prompt),
-                }
-            ],
-            reasoning={"effort": self.reasoning_effort},
-            max_output_tokens=32768,
-        )
+        # The PDF is read and encoded before the span: the span times the call only.
+        content = _build_openai_content(pdf_path, user_prompt)
+        with llm_span(
+            "MultimodalParser", provider=provider_of(client), model=self.config["model"]
+        ) as call:
+            record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})
+            response = client.responses.create(
+                model=self.config["model"],
+                instructions=system_prompt,
+                input=[{"role": "user", "content": content}],
+                reasoning={"effort": self.reasoning_effort},
+                max_output_tokens=32768,
+            )
+            record_response(response)
+            call.record_text([system_prompt, user_prompt], response.output_text)
         text = response.output_text.strip()
         if not text:
             raise ValueError("The OpenAI response did not contain any text output.")
@@ -354,20 +361,25 @@ class MultimodalParser:
         self, pdf_path: Path, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict[str, int]]:
         client = create_claude_client(self.config)
-        with client.messages.stream(
-            model=self.config["model"],
-            max_tokens=32768,
-            system=system_prompt,
-            thinking={"type": "adaptive"},
-            output_config={"effort": self.reasoning_effort},
-            messages=[
-                {
-                    "role": "user",
-                    "content": _build_claude_content(pdf_path, user_prompt),
-                },
-            ],
-        ) as stream:
+        # The PDF is read and encoded before the span: the span times the call only.
+        content = _build_claude_content(pdf_path, user_prompt)
+        with (
+            llm_span(
+                "MultimodalParser", provider=provider_of(client), model=self.config["model"]
+            ) as call,
+            client.messages.stream(
+                model=self.config["model"],
+                max_tokens=32768,
+                system=system_prompt,
+                thinking={"type": "adaptive"},
+                output_config={"effort": self.reasoning_effort},
+                messages=[{"role": "user", "content": content}],
+            ) as stream,
+        ):
+            record_request({"reasoning_effort": self.reasoning_effort, "max_tokens": 32768})
             response = stream.get_final_message()
+            record_response(response)
+            call.record_text([system_prompt, user_prompt], _claude_text(response))
         text_blocks = [
             block.text for block in response.content if getattr(block, "type", None) == "text"
         ]
@@ -402,9 +414,16 @@ class MultimodalParser:
                 "Content-Type": "application/json; charset=utf-8",
             }
 
-        response = _http.post(url, service="Gemini", headers=headers, json=body, timeout=(30, 300))
+        provider = "vertex" if self.config.get("vertex_ai", True) else "google"
+        with llm_span("MultimodalParser", provider=provider, model=self.config["model"]) as call:
+            record_request(_google_settings(body))
+            response = _http.post(
+                url, service="Gemini", headers=headers, json=body, timeout=(30, 300)
+            )
+            payload = response.json()
+            record_response(payload)
+            call.record_text([system_prompt, user_prompt])
 
-        payload = response.json()
         candidates = payload.get("candidates", [])
         if not candidates:
             raise ValueError(
@@ -421,6 +440,34 @@ class MultimodalParser:
             )
 
         return "".join(text_parts).strip() + "\n", _extract_google_usage(payload)
+
+
+# -- trace span helpers (module-level) ------------------------------------------
+
+
+def _google_settings(body: dict) -> dict:
+    """The sampling settings a Gemini REST body carries, by gaik's names, for its span."""
+    config = body.get("generationConfig") if isinstance(body, dict) else None
+    if not isinstance(config, dict):
+        return {}
+    thinking = config.get("thinkingConfig")
+    return {
+        "temperature": config.get("temperature"),
+        "max_tokens": config.get("maxOutputTokens"),
+        "reasoning_effort": thinking.get("thinkingLevel") if isinstance(thinking, dict) else None,
+    }
+
+
+def _claude_text(response) -> str | None:
+    """The text blocks of a Claude message, joined, for its span's output length."""
+    blocks = getattr(response, "content", None)
+    if not isinstance(blocks, list):
+        return None
+    return "".join(
+        block.text
+        for block in blocks
+        if getattr(block, "type", None) == "text" and isinstance(getattr(block, "text", None), str)
+    )
 
 
 # -- usage extraction (module-level helpers) ----------------------------------

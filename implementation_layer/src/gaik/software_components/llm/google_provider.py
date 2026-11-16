@@ -26,26 +26,6 @@ def _usage(response) -> dict[str, int]:
     }
 
 
-def _span_usage(response) -> dict[str, int]:
-    """Token counts for a gaik span, thinking included.
-
-    Gemini bills thinking tokens as output but counts them apart from
-    ``candidates_token_count``, so the span adds them to the output.
-    """
-    try:
-        meta = getattr(response, "usage_metadata", None)
-        if not meta:
-            return {}
-        thoughts = getattr(meta, "thoughts_token_count", None) or 0
-        return {
-            "prompt_tokens": meta.prompt_token_count or 0,
-            "completion_tokens": (meta.candidates_token_count or 0) + thoughts,
-            "reasoning_tokens": thoughts,
-        }
-    except Exception:
-        return {}
-
-
 class GoogleProvider:
     def __init__(self, config: dict):
         self.provider = config.get("provider", "google")
@@ -191,7 +171,7 @@ class GoogleProvider:
         )
         usage = _usage(response)
         self.usage.add(usage)
-        record_response(_span_usage(response))
+        record_response(response)
         return ChatResponse(
             text=response.text or "",
             model=model,
@@ -267,7 +247,7 @@ class GoogleProvider:
         )
         usage = _usage(response)
         self.usage.add(usage)
-        record_response(_span_usage(response))
+        record_response(response)
         if response.parsed is not None:
             if isinstance(response.parsed, response_format):
                 return response.parsed

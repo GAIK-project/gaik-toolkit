@@ -16,6 +16,7 @@ from openai import AzureOpenAI
 from pydub import AudioSegment
 
 from gaik.observability import measure_duration
+from gaik.observability.tracing import llm_span, provider_of, record_response
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
 from gaik.software_components.llm.base import UsageCounter
@@ -430,7 +431,16 @@ class Transcriber:
         """
         audio_client = _create_audio_client(self.api_config)
         try:
-            with file_path.open("rb") as f:
+            # The file is opened first: a missing file is not a model call.
+            with (
+                file_path.open("rb") as f,
+                llm_span(
+                    "Transcriber",
+                    provider=provider_of(audio_client),
+                    model=transcription_model,
+                    operation="transcription",
+                ) as call,
+            ):
                 if prompt is None:
                     response = audio_client.audio.transcriptions.create(
                         model=transcription_model,
@@ -442,6 +452,8 @@ class Transcriber:
                         file=f,
                         prompt=prompt,
                     )
+                record_response(response)
+                call.record_text(prompt, getattr(response, "text", None))
             if usage is not None:
                 usage.add(_transcription_usage(response))
             return response.text
@@ -531,17 +543,26 @@ def split_and_transcribe_with_context(
 
             try:
                 with open(chunk_path, "rb") as chunk_file:
-                    if prompt is None:
-                        transcript_response = audio_client.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                        )
-                    else:
-                        transcript_response = audio_client.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                            prompt=prompt,
-                        )
+                    # The span covers the request only, not the pause between chunks.
+                    with llm_span(
+                        "Transcriber",
+                        provider=provider_of(audio_client),
+                        model=transcription_model,
+                        operation="transcription",
+                    ) as call:
+                        if prompt is None:
+                            transcript_response = audio_client.audio.transcriptions.create(
+                                model=transcription_model,
+                                file=chunk_file,
+                            )
+                        else:
+                            transcript_response = audio_client.audio.transcriptions.create(
+                                model=transcription_model,
+                                file=chunk_file,
+                                prompt=prompt,
+                            )
+                        record_response(transcript_response)
+                        call.record_text(prompt, getattr(transcript_response, "text", None))
 
                     chunk_transcript = transcript_response.text
                     transcripts.append(chunk_header + chunk_transcript)

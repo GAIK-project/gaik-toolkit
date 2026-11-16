@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gaik.observability.tracing import llm_span, provider_of, record_request, record_response
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
@@ -427,6 +428,14 @@ class VisionParser:
         return trimmed
 
     def _chat_content(self, messages: list[dict]) -> str | None:
+        with llm_span(
+            "VisionParser", provider=provider_of(self._client), model=self.config.model
+        ) as call:
+            text = self._chat_content_traced(messages)
+            call.record_text(messages, text)
+        return text
+
+    def _chat_content_traced(self, messages: list[dict]) -> str | None:
         if isinstance(self._client, ProviderClient):
             chat = self._client.chat(
                 messages,
@@ -441,9 +450,11 @@ class VisionParser:
             {"max_completion_tokens": self.max_tokens, **self._sampling_kwargs()},
             config=self._request_config,
         )
+        record_request(options)
         response = self._client.chat.completions.create(
             model=self.config.model, messages=messages, **options
         )
+        record_response(response)
         if response.usage:
             self.usage.add(
                 {k: v for k, v in response.usage.model_dump().items() if isinstance(v, int)}
