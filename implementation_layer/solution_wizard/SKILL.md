@@ -396,7 +396,7 @@ Check whether a single GAIK software module covers the use case end-to-end:
 - audio sources while the text provider is not OpenAI/Azure — `ReportWriter` sends recordings through its single config, whereas the legacy module takes a separate `transcriber_options={'ctor': {'api_config': ...}}`;
 - structured extraction from images (legacy `image_options` with `VisionExtractor`).
 
-- the installed gaik has no `gaik.software_modules.report_writer` (it ships after gaik 0.8.1; check with `python -c "import gaik.software_modules.report_writer"` in the environment the PoC will run in) — a PoC that imports it would fail at startup.
+- the installed gaik has no `gaik.software_modules.report_writer` (it ships after gaik 0.8.1; ask the user to check with `python -c "import gaik.software_modules.report_writer"` in the environment the PoC will run in, or run it yourself after their yes) — a PoC that imports it would fail at startup.
 
 State the reason to the user when choosing the legacy module. Never select both.
 
@@ -656,7 +656,8 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
      the schema-reuse helpers find the approved schema.
    - Write `prompts/extraction_requirements.md` if the pipeline includes extraction (then run
      `generate_schema.py` as in Phase 4).
-   - After wiring, confirm `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
+   - After wiring, and with the user's yes, confirm that
+     `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
 
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to

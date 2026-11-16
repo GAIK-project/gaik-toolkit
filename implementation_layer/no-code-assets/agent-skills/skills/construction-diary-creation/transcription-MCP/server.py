@@ -9,18 +9,22 @@ approved:
   by ``;`` on Windows and ``:`` elsewhere;
 - only when neither names a folder: the folder the server starts in.
 
-A drive root or the home folder as a whole is never approved. A file outside these
+A drive root or the home folder as a whole is never approved, nor a path relative to
+a drive's current folder such as ``C:`` or ``C:recordings``. A file outside these
 folders, with another extension or with content that is not audio or video, is
 refused before anything is sent to the provider.
 
 Credentials come from environment variables (``OPENAI_API_KEY``, or ``AZURE_API_KEY``
-with ``AZURE_ENDPOINT`` and ``AZURE_TRANSCRIPTION_MODEL``). On Windows a value that
+with ``AZURE_ENDPOINT`` and ``AZURE_TRANSCRIPTION_MODEL``). ``OPENAI_API_TYPE``
+(``openai`` or ``azure``, which setup.bat writes into the Claude Desktop configuration)
+names the provider; without it, Azure is used when only an Azure key is set. On Windows a value that
 is missing from the server's environment is read from the user's environment
 variables, where setup.bat saves the key. A ``.env`` file beside this script, which
 older setups wrote, is read only when no key is found that way, with a warning.
 
 ``python server.py --check-folder PATH`` prints the folder as the server would approve
-it (absolute) and exits 1 when it would not; setup.bat uses it.
+it (absolute) and exits 1 when it would not, or when it holds this kit's own folder;
+setup.bat uses it.
 """
 
 from __future__ import annotations
@@ -132,8 +136,12 @@ def _api_config() -> dict:
     """OpenAI or Azure OpenAI settings from the environment."""
     from gaik.software_components.transcriber import get_openai_config
 
-    use_azure = os.getenv("OPENAI_API_TYPE", "").strip().lower() == "azure" or (
-        not os.getenv("OPENAI_API_KEY") and bool(os.getenv("AZURE_API_KEY"))
+    api_type = os.getenv("OPENAI_API_TYPE", "").strip().lower()
+    # The provider named in OPENAI_API_TYPE wins; only without it does the key decide.
+    use_azure = api_type == "azure" or (
+        api_type != "openai"
+        and not os.getenv("OPENAI_API_KEY")
+        and bool(os.getenv("AZURE_API_KEY"))
     )
     config = get_openai_config(use_azure=use_azure)
     if use_azure and not os.getenv("AZURE_TRANSCRIPTION_MODEL") and os.getenv("AZURE_DEPLOYMENT"):
@@ -175,6 +183,15 @@ def approved_folders(
     for text, source in candidates:
         text = text.strip().strip('"')
         if not text:
+            continue
+        if re.match(r"^[A-Za-z]:(?![\\/])", text):
+            # "C:" or "C:folder" means the current folder on that drive, which depends on
+            # where the process starts; a stray quote after "C:\" also ends up here.
+            logger.warning(
+                "Ignoring %s %r: name the folder with its full path, such as C:\\Recordings.",
+                source,
+                text,
+            )
             continue
         try:
             folder = _local_path(text).expanduser().resolve(strict=True)
@@ -350,7 +367,10 @@ def main(argv: list[str] | None = None) -> None:
         checked = (
             approved_folders([args.check_folder], env_value="") if args.check_folder.strip() else []
         )
-        if not checked:
+        kit = Path(__file__).resolve().parent.parent
+        # The folder Claude works in must not hold this kit: its tools could then change
+        # this server and its virtual environment.
+        if not checked or checked[0] == kit or checked[0] in kit.parents:
             sys.exit(1)
         print(checked[0])
         sys.exit(0)

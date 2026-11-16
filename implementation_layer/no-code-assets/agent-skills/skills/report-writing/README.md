@@ -122,6 +122,7 @@ Open `%APPDATA%\Claude\claude_desktop_config.json` and add:
       "command": "C:\\path\\to\\report-writing\\transcription-MCP\\.venv\\Scripts\\python.exe",
       "args": ["C:\\path\\to\\report-writing\\transcription-MCP\\server.py",
                "--folder", "C:\\Users\\you\\Documents\\GAIK"],
+      "env": {"OPENAI_API_TYPE": "openai"},
       "timeout": 600000
     },
     "filesystem": {
@@ -140,6 +141,9 @@ hash pinned in `package-lock.json`.
 **Important:** Replace `C:\\path\\to\\` with the actual path where you saved this folder,
 and `C:\\Users\\you\\Documents\\GAIK` with the folder Claude may work on. Both servers
 work only inside that folder; never give a whole drive such as `C:\\`.
+
+For Azure OpenAI, `env` holds `"OPENAI_API_TYPE": "azure"`, `AZURE_ENDPOINT` and `AZURE_TRANSCRIPTION_MODEL` instead.
+The folder must not be a whole drive, your whole user folder or a folder that holds this one.
 
 **Step 4: Install the Skill**
 

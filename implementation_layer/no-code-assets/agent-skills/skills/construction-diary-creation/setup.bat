@@ -232,13 +232,22 @@ set "WORK_FOLDER=%USERPROFILE%\Documents\GAIK"
 set /p WORK_FOLDER="Folder (Enter for %USERPROFILE%\Documents\GAIK): "
 set "WORK_FOLDER=%WORK_FOLDER:"=%"
 if "%WORK_FOLDER:~-1%"=="\" if not "%WORK_FOLDER:~-2%"==":\" set "WORK_FOLDER=%WORK_FOLDER:~0,-1%"
-if not exist "%WORK_FOLDER%\" mkdir "%WORK_FOLDER%"
 :: An absolute path goes into the configuration; the transcriber then checks the folder
 :: as it will at run time.
 for %%I in ("%WORK_FOLDER%") do set "WORK_FOLDER=%%~fI"
+:: After that only a drive root such as C:\ still ends with a backslash. It is refused
+:: here, because "C:\" would reach the transcriber as C: followed by a quote.
+if "%WORK_FOLDER:~-1%"=="\" (
+    echo [ERROR] "!WORK_FOLDER!" is a whole drive. Choose a folder on it,
+    echo         for example %USERPROFILE%\Documents\GAIK.
+    pause
+    exit /b 1
+)
+if not exist "%WORK_FOLDER%\" mkdir "%WORK_FOLDER%"
 "%VENV_PYTHON%" "%SERVER_PATH%" --check-folder "%WORK_FOLDER%" >nul
 if %errorlevel% neq 0 (
     echo [ERROR] "!WORK_FOLDER!" is not a folder Claude can be limited to.
+    echo         It must not be your whole user folder or hold this setup folder.
     echo         Choose a folder of its own, for example %USERPROFILE%\Documents\GAIK.
     pause
     exit /b 1
@@ -255,6 +264,7 @@ echo     "gaik-transcriber": {
 echo       "command": "!VENV_PYTHON_JSON!",
 echo       "args": ["!SERVER_PATH_JSON!", "--folder", "!WORK_FOLDER_JSON!"],
 if "!API_TYPE!"=="azure" echo       "env": {"OPENAI_API_TYPE": "azure", "AZURE_ENDPOINT": "!AZURE_ENDPOINT!", "AZURE_TRANSCRIPTION_MODEL": "!AZURE_DEPLOYMENT!"},
+if "!API_TYPE!"=="openai" echo       "env": {"OPENAI_API_TYPE": "openai"},
 echo       "timeout": 600000
 echo     }
 echo   }

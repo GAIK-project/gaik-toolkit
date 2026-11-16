@@ -196,6 +196,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
       "command": "C:\\path\\to\\construction-diary-creation\\transcription-MCP\\.venv\\Scripts\\python.exe",
       "args": ["C:\\path\\to\\construction-diary-creation\\transcription-MCP\\server.py",
                "--folder", "C:\\Users\\you\\Documents\\GAIK"],
+      "env": {"OPENAI_API_TYPE": "openai"},
       "timeout": 600000
     }
   }
@@ -203,6 +204,9 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 ```
 
 Replace `C:\\path\\to\\` with where you saved this folder, and `C:\\Users\\you\\Documents\\GAIK` with the folder that holds your recordings.
+
+For Azure OpenAI, `env` holds `"OPENAI_API_TYPE": "azure"`, `AZURE_ENDPOINT` and `AZURE_TRANSCRIPTION_MODEL` instead.
+The folder must not be a whole drive, your whole user folder or a folder that holds this one.
 
 **Install Skill:**
 1. Zip `SKILL.md`

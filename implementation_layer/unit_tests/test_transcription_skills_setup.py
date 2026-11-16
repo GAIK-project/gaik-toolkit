@@ -172,6 +172,63 @@ def test_check_folder_prints_the_absolute_folder_or_exits_1(server, tmp_path, mo
         assert done.value.code == 1 and capsys.readouterr().out == ""
 
 
+def test_a_path_relative_to_a_drive_is_never_approved(server, tmp_path, monkeypatch):
+    monkeypatch.setattr(server.Path, "home", classmethod(lambda cls: tmp_path / "home"))
+    monkeypatch.chdir(tmp_path)
+    # 'C:"' is how the answer C:\ arrives when setup.bat passes it as "C:\".
+    for relative in ("C:", "c:recordings", 'C:"'):
+        assert server.approved_folders([relative], env_value="", start=tmp_path) == []
+        with pytest.raises(SystemExit) as done:
+            server.main(["--check-folder", relative])
+        assert done.value.code == 1
+
+
+def test_check_folder_refuses_a_folder_that_holds_the_setup_folder(server, capsys):
+    kit = Path(server.__file__).resolve().parent.parent
+    for holding in (kit, kit.parent):
+        with pytest.raises(SystemExit) as done:
+            server.main(["--check-folder", str(holding)])
+        assert done.value.code == 1 and capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize(
+    ("settings", "uses_azure"),
+    [
+        ({"OPENAI_API_TYPE": "openai", "AZURE_API_KEY": "az"}, False),
+        ({"OPENAI_API_TYPE": "openai", "OPENAI_API_KEY": "sk", "AZURE_API_KEY": "az"}, False),
+        ({"OPENAI_API_TYPE": "azure", "OPENAI_API_KEY": "sk", "AZURE_API_KEY": "az"}, True),
+        ({"AZURE_API_KEY": "az"}, True),
+        ({"OPENAI_API_KEY": "sk", "AZURE_API_KEY": "az"}, False),
+    ],
+)
+def test_the_provider_named_in_the_configuration_wins(server, monkeypatch, settings, uses_azure):
+    for name in server.SETTING_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    for name, value in settings.items():
+        monkeypatch.setenv(name, value)
+    fake = types.ModuleType("gaik.software_components.transcriber")
+    fake.get_openai_config = lambda use_azure: {"use_azure": use_azure}
+    monkeypatch.setitem(sys.modules, "gaik.software_components.transcriber", fake)
+    assert server._api_config()["use_azure"] is uses_azure
+
+
+def test_an_azure_user_setting_does_not_replace_the_openai_choice(server, tmp_path, monkeypatch):
+    saved = {"OPENAI_API_TYPE": "azure", "AZURE_API_KEY": "az", "AZURE_ENDPOINT": "https://x"}
+    monkeypatch.setattr(server, "__file__", str(tmp_path / "server.py"))
+    monkeypatch.setattr(server, "_user_environment_value", lambda name: saved.get(name, ""))
+    for name in server.SETTING_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    # Claude Desktop passes the choice setup.bat wrote into the configuration.
+    monkeypatch.setenv("OPENAI_API_TYPE", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk")
+    server.load_settings()
+    fake = types.ModuleType("gaik.software_components.transcriber")
+    fake.get_openai_config = lambda use_azure: {"use_azure": use_azure}
+    monkeypatch.setitem(sys.modules, "gaik.software_components.transcriber", fake)
+    assert server.os.environ["OPENAI_API_TYPE"] == "openai"
+    assert server._api_config()["use_azure"] is False
+
+
 @pytest.mark.parametrize(
     ("name", "head"),
     [
@@ -237,6 +294,23 @@ def test_setup_keeps_the_key_out_of_the_skill_folder_and_uses_a_virtual_environm
     assert '"command": "!VENV_PYTHON_JSON!"' in text
     assert '"--folder", "!WORK_FOLDER_JSON!"' in text
     assert '"%VENV_PYTHON%" "%SERVER_PATH%" --check-folder "%WORK_FOLDER%"' in text
+
+
+@pytest.mark.parametrize("name", TRANSCRIBING_SKILLS)
+def test_setup_writes_the_chosen_provider_into_the_configuration(name):
+    text = (SKILLS / name / "setup.bat").read_text(encoding="utf-8")
+    assert 'if "!API_TYPE!"=="openai" echo       "env": {"OPENAI_API_TYPE": "openai"},' in text
+    assert 'if "!API_TYPE!"=="azure" echo       "env": {"OPENAI_API_TYPE": "azure",' in text
+
+
+@pytest.mark.parametrize("name", TRANSCRIBING_SKILLS)
+def test_setup_refuses_a_drive_root_before_checking_the_folder(name):
+    text = (SKILLS / name / "setup.bat").read_text(encoding="utf-8")
+    full_path = text.index('for %%I in ("%WORK_FOLDER%") do set "WORK_FOLDER=%%~fI"')
+    refuse_root = text.index('if "%WORK_FOLDER:~-1%"=="\\" (', full_path)
+    check = text.index('--check-folder "%WORK_FOLDER%"')
+    assert full_path < refuse_root < check
+    assert "exit /b 1" in text[refuse_root:check]
 
 
 def test_the_file_server_is_installed_from_a_lockfile_and_limited_to_the_chosen_folder():
