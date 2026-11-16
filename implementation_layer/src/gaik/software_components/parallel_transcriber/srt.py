@@ -260,11 +260,20 @@ def combine_srt_chunks(
 
 
 def extract_text_from_srt(srt_content: str) -> str:
-    """Extract plain text from SRT content, stripping timestamps and numbers."""
+    """Extract plain text from SRT or WebVTT content.
+
+    A cue number is recognised by its position (the line just before a timing
+    line), so a cue whose text is only digits ("36", "2024") is kept. A leading
+    ``WEBVTT`` header is dropped.
+    """
+    lines = [line.strip() for line in srt_content.split("\n")]
     text_lines: list[str] = []
-    for line in srt_content.split("\n"):
-        stripped = line.strip()
-        if stripped.isdigit() or "-->" in stripped or not stripped:
+    for index, line in enumerate(lines):
+        if not line or "-->" in line:
             continue
-        text_lines.append(stripped)
+        if line.isdigit() and index + 1 < len(lines) and "-->" in lines[index + 1]:
+            continue
+        if line.startswith("WEBVTT") and not any(lines[:index]):
+            continue
+        text_lines.append(line)
     return " ".join(text_lines)
