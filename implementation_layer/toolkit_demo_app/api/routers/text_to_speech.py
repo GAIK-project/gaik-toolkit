@@ -15,6 +15,11 @@ except ImportError:
     from api.utils.ai_marking import mark_audio
     from api.utils.config import get_api_config
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 router = APIRouter()
 
 SUPPORTED_LANGUAGES = {"fi", "en"}
@@ -101,10 +106,10 @@ async def synthesize_text(
         result = await _synthesize_with_retry(tts, normalized_text)
     except ImportError as exc:
         raise HTTPException(
-            status_code=500, detail=f"Text-to-speech component not installed: {exc}"
+            status_code=500, detail=error_detail(exc, "Loading the text-to-speech component")
         ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=error_detail(exc)) from exc
 
     return TextToSpeechResponse(
         filename=result.filename,

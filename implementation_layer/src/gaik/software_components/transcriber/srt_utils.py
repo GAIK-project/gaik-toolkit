@@ -9,22 +9,27 @@ from __future__ import annotations
 import re
 
 
+def _format_time(seconds: float, separator: str) -> str:
+    # Round to whole milliseconds first: 2.3 s is 2300 ms, not 2299.
+    total_ms = round(seconds * 1000)
+    total_s, millis = divmod(total_ms, 1000)
+    hours, rest = divmod(total_s, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}{separator}{millis:03d}"
+
+
 def _format_srt_time(seconds: float) -> str:
     """Format seconds as SRT timestamp (HH:MM:SS,mmm)."""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    millis = int((seconds % 1) * 1000)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+    return _format_time(seconds, ",")
 
 
 def _format_vtt_time(seconds: float) -> str:
     """Format seconds as WebVTT timestamp (HH:MM:SS.mmm)."""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    millis = int((seconds % 1) * 1000)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
+    return _format_time(seconds, ".")
+
+
+def _non_empty(segments: list[dict]) -> list[dict]:
+    return [seg for seg in segments if (seg.get("text") or "").strip()]
 
 
 def segments_to_srt(segments: list[dict]) -> str:
@@ -40,15 +45,14 @@ def segments_to_srt(segments: list[dict]) -> str:
         SRT-formatted string.
     """
     lines: list[str] = []
-    for i, seg in enumerate(segments, 1):
+    # Number only the cues that are written, so an empty segment leaves no gap.
+    for i, seg in enumerate(_non_empty(segments), 1):
         start = _format_srt_time(seg["start"])
         end = _format_srt_time(seg["end"])
-        text = seg.get("text", "").strip()
-        if text:
-            lines.append(f"{i}")
-            lines.append(f"{start} --> {end}")
-            lines.append(text)
-            lines.append("")
+        lines.append(f"{i}")
+        lines.append(f"{start} --> {end}")
+        lines.append(seg["text"].strip())
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -62,15 +66,14 @@ def segments_to_vtt(segments: list[dict]) -> str:
         WebVTT-formatted string.
     """
     lines: list[str] = ["WEBVTT", ""]
-    for i, seg in enumerate(segments, 1):
+    # Number only the cues that are written, so an empty segment leaves no gap.
+    for i, seg in enumerate(_non_empty(segments), 1):
         start = _format_vtt_time(seg["start"])
         end = _format_vtt_time(seg["end"])
-        text = seg.get("text", "").strip()
-        if text:
-            lines.append(f"{i}")
-            lines.append(f"{start} --> {end}")
-            lines.append(text)
-            lines.append("")
+        lines.append(f"{i}")
+        lines.append(f"{start} --> {end}")
+        lines.append(seg["text"].strip())
+        lines.append("")
     return "\n".join(lines)
 
 

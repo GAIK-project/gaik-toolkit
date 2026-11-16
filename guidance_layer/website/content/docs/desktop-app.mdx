@@ -1,0 +1,72 @@
+---
+title: Desktop App
+description: Run the GAIK toolkit on your own files, on your own computer (experimental)
+---
+
+import { Video } from '@/components/mdx/video';
+
+GAIK Desktop is an experimental desktop app for the toolkit. You drop files or a whole
+folder into it and the toolkit runs on your own computer, with your own model key. It
+lives in its own repository:
+[GAIK-project/gaik-toolkit-desktop](https://github.com/GAIK-project/gaik-toolkit-desktop).
+
+<Video
+  src="/desktop-app/gaik-desktop.mp4"
+  poster="/desktop-app/gaik-desktop-poster.jpg"
+  label="GAIK Desktop extracting invoice fields from five PDF files and classifying documents"
+/>
+
+The recording shows the app running real model calls on made-up sample documents. Waits
+for the model are shortened; there is no sound.
+
+## What it does
+
+| Tool | Input | Result |
+| --- | --- | --- |
+| Extract data | Documents and a description of the fields in your own words | One row per file; export to Excel, CSV or JSON, with repeated groups such as invoice lines on their own sheet |
+| Parse to text | PDF, Word, text and image files | Text per file; files with a text layer are read without a model |
+| Classify | Documents and your own classes | A class, a confidence and a reason per file |
+| Transcribe | Audio and video recordings | A transcript, with an optional correction pass |
+
+It uses the same [software components](/toolkit/software-components) as the rest of the
+toolkit (`SchemaGenerator`, `DataExtractor`, the parsers, `DocumentClassifier` and
+`Transcriber`), installed from PyPI.
+
+## How it differs from the hosted demo
+
+| | [Hosted demo](/demo) | Desktop app |
+| --- | --- | --- |
+| Where it runs | In your browser, on a server run by the GAIK project | On your own computer |
+| Access | You register and wait for approval | No account |
+| Model | The demo's models, or your own key on some pages | Your own Azure OpenAI or OpenAI key |
+| Files | Uploaded to the demo server for processing | Read where they are; only their text or page images go to your model provider |
+| Scope | Every component, module and use case | Four batch tools for files and folders |
+
+## Install it
+
+On Windows, download the installer from the
+[latest release](https://github.com/GAIK-project/gaik-toolkit-desktop/releases/latest) and
+run it. Nothing else needs to be installed first.
+
+- The installer is not code-signed, so Windows shows "Windows protected your PC". Choose
+  **More info**, then **Run anyway**.
+- The first start downloads Python and the `gaik` package (about 350 MB) and needs an
+  internet connection.
+- The app opens on **Get started**: it shows the engine installing, asks for your model
+  key, and offers three sample invoices to try.
+
+To run it from source instead (needs [bun](https://bun.sh) and
+[uv](https://docs.astral.sh/uv/)):
+
+```bash
+git clone https://github.com/GAIK-project/gaik-toolkit-desktop.git
+cd gaik-toolkit-desktop
+bun install
+bun start
+```
+
+<Callout type="warn">
+Experimental: tried on Windows 11 only. The installer is not code-signed and the app
+does not update itself. Its limits are listed in the
+[repository README](https://github.com/GAIK-project/gaik-toolkit-desktop#limits).
+</Callout>

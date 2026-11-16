@@ -28,7 +28,7 @@ def test_loading_the_example_indexes_both_documents_into_one_collection():
         return [Document(page_content=f"{document_name} text", metadata={})] * 3, parser_choice
 
     with (
-        patch.object(rag, "get_api_config", return_value={}),
+        patch.object(rag, "get_rag_api_config", return_value={}),
         patch.object(rag, "_build_demo_workflow", return_value=workflow),
         patch.object(rag, "_parse_document_to_chunks", side_effect=parse),
     ):

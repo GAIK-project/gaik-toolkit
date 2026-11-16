@@ -1,12 +1,9 @@
-# Models the GAIK demo app uses, and what Aitta would need
+# Models the GAIK demo app uses, and how it runs on CSC Aitta
 
 The demo app is not one chat model. Each demo calls a different **kind** of model, and
 several demos use more than one kind in a single run. This note lists what the demos
-call today and what a CSC Aitta deployment would have to provide, so each gap can be
-checked against the Aitta catalog.
-
-What Aitta itself serves was not verified here; the "needs" below are what the code
-requires.
+call and what was measured against CSC Aitta on 2026-11-16, through gaik and through the
+demo's own API.
 
 ## Kinds of model
 
@@ -59,42 +56,109 @@ attachments in the Wizard. It does not reach RAG, Table agent, Video search,
 Transcriber, Text to speech, Report Writer (v1 and v2), Source normalizer, Knowledge
 curator / synthesis, Luvata order or the judge panel.
 
-## What Aitta would need
+## CSC Aitta, tested 2026-11-16
 
-| Need | Why | Status in code |
+Aitta's catalog (`GET https://aitta-api.csc.fi/model`) listed 24 models: 20 chat models,
+two speech models (`openai/whisper-large-v3`, `-turbo`) and two embedding models
+(`intfloat/multilingual-e5-large`, `lightonai/modernbert-embed-large`). A model that is
+*offline* starts on its first request; Whisper and E5 started within a few minutes of a
+preload request.
+
+### Chat models through gaik
+
+Each model got the same five calls through gaik's shared client: a chat, a stream, a
+strict JSON schema (an invoice with a line list), `DataExtractor`, and an image with a
+schema.
+
+| Model | Chat, stream | JSON schema | DataExtractor | Image | Speed |
+| --- | --- | --- | --- | --- | --- |
+| `google/gemma-4-31b-it` | yes | yes | yes | yes | 18 tokens/s |
+| `Qwen/Qwen3.8-27B` | yes | yes | yes | yes | 21 tokens/s |
+| `Qwen/Qwen3.6-35B-A3B` | yes | yes | yes | yes | 54 tokens/s, long reasoning |
+| `openai/gpt-oss-120b` | yes | yes | yes | no: answers without reading it | 60 tokens/s |
+| `Qwen/Qwen3-Coder-Next` | yes | yes | yes | no: HTTP 500 | not measured |
+| `Qwen/Qwen-AgentWorld-35B-A3B` | yes | yes | yes | no: HTTP 500 | not measured |
+| `allenai/OLMo-7B-0724-Instruct` | yes | yes | yes | no: HTTP 500 | not measured |
+| `swiss-ai/Apertus-8B-Instruct-2509` | yes | wrong values | yes | no: HTTP 500 | not measured |
+
+Every model reasons before it answers, and Aitta takes no option that turns that off
+(`enable_thinking` is ignored, and `reasoning_effort` accepts only `low`, `medium` and
+`high`). A structured answer therefore takes 8 seconds on gpt-oss 120B and 35 to 47
+seconds on Gemma 4 and Qwen 3.8.
+
+### The demo's own routes, with an Aitta model picked
+
+| Demo route | Model | Result |
 | --- | --- | --- |
-| A structured-output chat model | Almost every demo | Works with an own key. Only Gemma 4 31B has been tested. Smaller models can fail strict JSON schemas |
-| A vision model | Parser, classifier on images, vision extractor, judge validation | Works through the shared chat path. Server vision extractor needs an Aitta branch |
-| A speech-to-text model | Audio demos, transcriber, Report Writer sources | **Blocked in code**: audio classes refuse Aitta configs, even for local Whisper. Aitta config has no transcription model setting |
-| An embedding model | RAG, Video search | `AITTA_EMBEDDING_MODEL` is empty by default. The RAG example index (3072 dimensions) and the Video search table (1536) would need re-embedding |
-| A text-to-speech model | Text to speech | **Blocked in code**, same check |
-| Several models per demo | Report Writer v2 and the judge panel use a different model per step | Aitta can serve several models, but the demo sends every call to the one model the user picks, so steps cannot use different models. That is a demo limit, not an Aitta one |
-| Claude | Solution Wizard conversation | Not available on Aitta |
+| Extraction from plain language (schema generation, then extraction) | gpt-oss 120B | 76 s, correct |
+| | Qwen 3.6 35B | 180 s, one of two invoice lines |
+| | Gemma 4 31B | over 400 s |
+| Classifier | gpt-oss 120B | 5 s, correct |
+| LLM judge, text pair | gpt-oss 120B | 4 s |
+| Parser, vision, one image | Gemma 4 31B | 19 s |
+| | gpt-oss 120B | refused before the call: text only |
+| Transcriber | Whisper large v3 | 93 s of speech in 5 s |
+| Audio to structured data | Whisper large v3, gpt-oss 120B | 62 s; 140 s with the transcript fix |
+| RAG example (38 chunks), then one question | E5 large, gpt-oss 120B | indexed in 3 s, answered with citations in 6 s |
 
-Catalog status also matters: a model that is *Offline* does not answer, and a model
-that is *Loading* can take minutes on the first request.
+Schema generation makes four to six model calls in a row, which is why it is slow on
+Aitta. It also failed on gpt-oss and Qwen until gaik accepted `"enum": []` as "no
+enum" (`FieldSpec`, gaik 0.9.1, which the demo API installs). With gaik 0.9.0 every
+new schema written with gpt-oss failed on the deployed demo after about four minutes;
+the 0.9.1 release smoke run on gpt-oss 120B generated the schema in 17 seconds.
 
-## Code changes in the toolkit demo app (and gaik)
+### What the demo does with an Aitta model
 
-1. Allow Aitta in the audio classes, or at least let `whisper_local` work with an Aitta
-   config; add transcription, embedding and TTS model settings to the Aitta config
-   (gaik library).
-2. Route the demos that bypass the shared config through it: Transcriber, Table agent,
-   Postgres agent (server path), Video search, single LLM judge, Parser multimodal.
-3. Add an Aitta branch to the server vision extractor and add `aitta` to the judge
-   providers.
-4. Make RAG and Video search independent of one embedding model, or ship an index per
-   model.
-5. Add Report Writer v2 and the other multi-step demos to the own-key paths if wanted.
+- The model menu lists Gemma 4 31B (reads images) and gpt-oss 120B (three times
+  faster, text only) when the server has `AITTA_API_KEY`. `DEMO_SERVER_MODELS` can list
+  others, with `:text` for a text-only one.
+- Idle models: Aitta stops a model that has had no requests (Whisper large v3 and E5
+  were offline again about 40 minutes after their last call), and the next request
+  waits minutes for it. `GET /model-settings/server` therefore reports the state of the
+  speech and embedding models, the demo page says when one is idle, and picking an
+  Aitta model in the menu calls `POST /model-settings/aitta/warm`, which asks Aitta to
+  start the idle ones (at most once in five minutes).
+- `openai/whisper-large-v3-turbo`, the newer and faster Whisper, did not start on
+  2026-11-16: Aitta reported its status as `failed` and requests to it did not return.
+  The demo stays on `openai/whisper-large-v3`; `AITTA_TRANSCRIPTION_MODEL` switches it
+  once turbo runs.
+- The audio pages' listening options belong to the HH Whisper server (a set language,
+  speaker detection, timed text). With an Aitta model picked they are shown as not
+  used, since Aitta's Whisper detects the language itself and returns the text alone.
+  Hints and the transcript fix still apply.
+- Speech: `get_transcription_api_config()` sends recordings to Aitta's Whisper on the
+  same key. gaik's `Transcriber` refuses a config with `provider="aitta"`, so the demo
+  addresses Aitta's `/audio/transcriptions` as an OpenAI base URL. The local Whisper
+  server is not tried first, and no other model stands behind it.
+- Embeddings: RAG embeds with `intfloat/multilingual-e5-large` (1024 dimensions), with
+  E5's `query: ` and `passage: ` prefixes. E5 reads 512 tokens, and Aitta answers a
+  longer input with HTTP 500 instead of truncating it, so a passage is cut to 700
+  characters for its vector (350 if Aitta still refuses); the stored chunk keeps its
+  full text. Each example collection is built per model pair, since vectors of one
+  embedding model cannot be searched with another.
+- Images: a text-only model is refused with HTTP 400 on the routes that send page
+  images (vision parsers, Vision Extractor, vision parsing in the document pipeline and
+  RAG), instead of returning an answer that ignored the image.
+- Not on Aitta: text to speech (Aitta has no speech synthesis), Video search (its table
+  holds 1536-dimension vectors), the table agent, Report Writer,
+  Knowledge curator and synthesis, Luvata order, the judge panel and the Solution
+  Wizard. Their pages say that they run on the server's own model.
+- Not tested on Aitta: the Postgres agent, the hallucination and page-validation
+  judges, the Web scraper's extraction step and the incident and diary pages. They take
+  the picked model like the routes above.
+
+### Limits to know
+
+- Terms: research and development use, no personal or sensitive data, no availability
+  guarantee. The pages say so when an Aitta model is picked.
+- The token is bound to one CSC user and one LUMI project and expires after 90 days.
+- Rate limits are per user and minute: about a hundred embedding requests within two
+  minutes brought HTTP 429. With one server token, all demo users share that limit.
+- An own Aitta token in the key dialog runs the same routes as any own key, with
+  Whisper on that token; RAG and the Transcriber take a server model only.
 
 ## Models listed in the UI today
 
-OpenAI/Azure: `gpt-6-sol` (default), `gpt-6.1-sol`, `gpt-6-luna`, `gpt-6-astra`,
-`gpt-5.6-terra`. Aitta: `google/gemma-4-31b-it` (tested, vision),
-`openai/gpt-oss-120b` (text only), `LumiOpen/Llama-Poro-2-70B-Instruct`.
-
-Checked directly against Aitta on 2026-10-02: Gemma 4 31B answered an image request with a
-strict JSON schema in 8 s and gpt-oss 120B a text one in 5 s. `Qwen/Qwen3.6-27B`,
-`google/gemma-4-26B-A4B-it` and `google/gemma-3-27b-it` did not answer within 75 s (the
-model was probably not running), so they are not in the list. Aitta also lists embedding
-models (`intfloat/multilingual-e5-large`, `lightonai/modernbert-embed-large`).
+Server models: see the README. Own key, OpenAI/Azure: `gpt-6-luna` (default),
+`gpt-6-sol`, `gpt-6.1-sol`, `gpt-6-astra`, `gpt-5.6-terra`. Own key, Aitta:
+`google/gemma-4-31b-it`, `openai/gpt-oss-120b` (text only), `Qwen/Qwen3.8-27B`.

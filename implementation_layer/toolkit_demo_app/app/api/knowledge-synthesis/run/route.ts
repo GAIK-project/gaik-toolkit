@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const limits = getReportWriterLimits();
   const gate = await gateReportWriter(request, limits.maxReports);
   if (gate instanceof Response) return gate;
-  const { userId } = gate;
+  const { userId, staff } = gate;
 
   const declaredBytes = Number(request.headers.get("content-length") ?? 0);
   if (declaredBytes > REPORT_REQUEST_MAX_BYTES) {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   const sample = form.get("sample_report");
   if (sample instanceof File) fwd.append("sample_report", sample, sample.name);
 
-  return forwardReportRun("/knowledge-synthesis/run", fwd, async (usage) => {
+  return forwardReportRun("/knowledge-synthesis/run", fwd, staff, async (usage) => {
     if (!userId || !usage.sawResult) return;
     try {
       await recordReportUsage(userId, 1, usage.totalTokens);

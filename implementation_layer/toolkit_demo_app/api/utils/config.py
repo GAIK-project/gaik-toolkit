@@ -6,7 +6,12 @@ import fitz
 from fastapi import HTTPException, UploadFile
 
 from .model_settings import (
+    AITTA_BASE_URL,
+    aitta_embedding_model,
+    aitta_speech_model,
     get_request_api_config,
+    model_name,
+    reads_images,
     request_model_settings,
     request_server_model,
 )
@@ -78,11 +83,78 @@ def get_transcription_api_config():
 
     A server model without speech-to-text (Claude, Gemini) leaves transcription
     to the server's own transcriber; the picked model still does the extraction.
+    An Aitta model transcribes with Aitta's Whisper, on the same key.
     """
     chosen = request_server_model()
     if request_model_settings() is None and chosen is not None and not chosen.audio:
         return server_api_config()
-    return get_api_config()
+    config = get_api_config()
+    return aitta_speech_config(config) if on_aitta(config) else config
+
+
+def on_aitta(config: dict) -> bool:
+    return config.get("provider") == "aitta"
+
+
+def aitta_speech_config(config: dict) -> dict:
+    """Aitta's speech-to-text for gaik's Transcriber, from an Aitta chat config.
+
+    The Transcriber takes OpenAI and Azure configs only, so Aitta's
+    OpenAI-compatible ``/audio/transcriptions`` is addressed as an OpenAI base
+    URL. The chat model stays in the config for the optional transcript fix.
+    """
+    speech = {
+        "provider": "openai",
+        "use_azure": False,
+        "api_key": config["api_key"],
+        "base_url": config.get("base_url") or AITTA_BASE_URL,
+        "model": config["model"],
+        "transcription_model": aitta_speech_model(),
+        "timeout": config.get("timeout") or 600.0,
+        "max_retries": 0,
+    }
+    if config.get("http_client") is not None:
+        speech["http_client"] = config["http_client"]
+    return speech
+
+
+def get_rag_api_config() -> dict:
+    """The config that embeds and answers for a RAG collection.
+
+    A picked server model applies when its provider also serves embeddings
+    (Azure, OpenAI, Aitta). Any other pick leaves RAG on the server default, and
+    so does a team-only model: a collection outlives the request that built it,
+    and its questions arrive without the team check.
+    """
+    chosen = request_server_model()
+    if chosen is not None and chosen.staff:
+        return server_api_config()
+    config = get_api_config()
+    if on_aitta(config):
+        return {**config, "embedding_model": aitta_embedding_model()}
+    if config.get("provider") in {"azure", "openai"}:
+        return config
+    return server_api_config()
+
+
+def require_vision(config: dict) -> dict:
+    """Refuse a text-only model before page images are sent to it.
+
+    Such a model answers an image request with an error, or with text that
+    ignores the image, so the demo stops here and says which kind of model to pick.
+    """
+    chosen = request_server_model()
+    # The deployment can mark a model text-only (DEMO_SERVER_MODELS, ":text").
+    marked_text_only = (
+        chosen is not None and chosen.model == config.get("model") and not chosen.vision
+    )
+    if marked_text_only or not reads_images(config.get("provider"), config.get("model")):
+        raise HTTPException(
+            400,
+            f"{model_name(config.get('model'))} cannot read images or scanned pages. "
+            "Pick a model that reads images in the model menu, such as Gemma 4 31B.",
+        )
+    return config
 
 
 def server_api_config():
