@@ -1,7 +1,7 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.6.15",
+    "version": "0.6.16",
     "marketplace": "GAIK-project/gaik-toolkit",
     "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
   },
@@ -71,7 +71,7 @@
       "group": "no-code",
       "title": "Purchase order processing",
       "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
-      "description": "Process Purchase Orders and Bills of Material to generate priced Sales Orders",
+      "description": "Matches a purchase order and its bills of material (PDFs) against a price list (.xlsx or .csv) and writes a priced sales order and a calculation breakdown, in Claude Desktop with the filesystem MCP server. Use when the user wants to process a purchase order or PO, generate or price a sales order, match BOMs with a PO, or calculate order pricing from a price list.",
       "input": "PO, BOM PDFs and a price list",
       "output": "Word (.docx) and calculation breakdown",
       "needs": [
@@ -93,7 +93,7 @@
         "reference/PRICING_RULES.md"
       ],
       "zip": "/downloads/skills/purchase-order-processing.zip",
-      "zipBytes": 107093,
+      "zipBytes": 108494,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing"
     },
@@ -117,7 +117,7 @@
       ],
       "kit": {
         "zip": "/downloads/skills/report-writing-setup-kit.zip",
-        "zipBytes": 74320
+        "zipBytes": 74341
       },
       "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing) to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [
@@ -127,7 +127,7 @@
         "reference/OUTPUT_SECTIONS.md"
       ],
       "zip": "/downloads/skills/report-writing.zip",
-      "zipBytes": 46962,
+      "zipBytes": 46983,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing"
     },
@@ -173,7 +173,7 @@
         "scripts/setup_env.sh"
       ],
       "zip": "/downloads/skills/brief-to-slides.zip",
-      "zipBytes": 538323,
+      "zipBytes": 538322,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/brief-to-slides",
       "guideUrl": null
     },
@@ -247,7 +247,7 @@
         "references/postgres-without-gaik.md"
       ],
       "zip": "/downloads/skills/searching-documents.zip",
-      "zipBytes": 42379,
+      "zipBytes": 42412,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents",
       "guideUrl": null
     },
@@ -278,7 +278,7 @@
         "scripts/template_to_spec.py"
       ],
       "zip": "/downloads/skills/generate-structured-reports.zip",
-      "zipBytes": 174931,
+      "zipBytes": 175283,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports",
       "guideUrl": null
     }
