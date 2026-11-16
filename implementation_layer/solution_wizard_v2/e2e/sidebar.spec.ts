@@ -35,20 +35,38 @@ test.describe("the sidebar on a desktop", () => {
     await expect(list.getByRole("heading", { name: "Tänään" })).toBeVisible();
     expect(await cards(page).count()).toBeGreaterThan(5);
 
-    // A session waiting at a gate says so; one between gates names its phase.
-    // One short text per row, with the step count for a screen reader.
+    // A session waiting at a gate says so in words. One between gates shows
+    // its gates alone: its phase is their tooltip and is read to a screen
+    // reader, with the step count.
+    const standing = (of: ReturnType<typeof card>) => of.getByTestId("session-standing");
+    const gates = (of: ReturnType<typeof card>) => of.locator("[id^=row-state-] > [aria-hidden]").first();
     const atGate = card(page, "Gate 2 — pending review");
-    await expect(atGate).toContainText("Odottaa hyväksyntää");
+    await expect(standing(atGate)).toHaveText("Odottaa hyväksyntää");
+    await expect(standing(atGate)).toBeVisible();
     await expect(atGate).toContainText("Vaihe 9/13");
     await expect(atGate).not.toContainText("Gate 2: ratkaisun rakenne");
+    await expect(gates(atGate).locator("span")).toHaveCount(4);
     const between = card(page, "UI basics");
-    await expect(between).toContainText("Komponenttivalinta");
+    await expect(standing(between)).toHaveCount(0);
+    await expect(gates(between).locator("span")).toHaveCount(4);
+    await expect(gates(between)).toHaveAttribute("title", /^Vaihe \d+\/13: Komponenttivalinta$/);
+    await expect(between).toHaveAccessibleDescription(/Vaihe \d+\/13.*Komponenttivalinta/);
     await expect(between).not.toContainText("Odottaa hyväksyntää");
     await expect(list).not.toContainText(/blueprint v\d/i);
     // The link is named by the session's title alone; the rest of the row
     // describes it.
     await expect(atGate).toHaveAccessibleName("Gate 2 — pending review (e2e fixture)");
     await expect(atGate).toHaveAccessibleDescription(/Vaihe 9\/13.*Odottaa hyväksyntää/);
+    // The time is the quiet end of the gates' line.
+    const time = between.locator("time");
+    await expect(time).toHaveCSS("font-size", "11px");
+    const [gatesBox, timeBox, rowBox] = await Promise.all([
+      gates(between).boundingBox(),
+      time.boundingBox(),
+      between.boundingBox(),
+    ]);
+    expect(Math.abs(gatesBox!.y + gatesBox!.height / 2 - (timeBox!.y + timeBox!.height / 2))).toBeLessThan(3);
+    expect(rowBox!.x + rowBox!.width - (timeBox!.x + timeBox!.width)).toBeLessThan(16);
 
     // A row is as wide as the list, and its text stays inside it.
     const listBox = (await list.boundingBox())!;
@@ -399,36 +417,16 @@ test.describe("the sidebar on a desktop", () => {
     expect(await noSidewaysScroll(page)).toBeLessThanOrEqual(0);
   });
 
-  test("End session in a row's menu ends it there, and the session stays where it is", async ({ page }) => {
+  test("a row's menu holds rename, download and delete, and nothing about ending the session", async ({ page }) => {
     await loginAsDev(page);
     await page.goto("/sessions/ses_ui_basics");
     await hydrated(page);
-    const title = "UI basics (e2e fixture)";
-    const note = row(page, title).getByTestId("end-session-note");
-
-    // A request that never reaches the server: the row says it was not ended.
-    await page.route("**/*", (route) =>
-      route.request().method() === "POST" && route.request().headers()["next-action"]
-        ? route.abort()
-        : route.continue(),
-    );
-    await row(page, title).getByTestId("session-actions").click();
-    const end = row(page, title).getByTestId("end-session");
-    await expect(end).toHaveAccessibleName(`Lopeta sessio: ${title}`);
-    await end.click();
-    await expect(note).toHaveText("Sessiota ei voitu lopettaa. Yritä hetken kuluttua uudelleen.", AFTER_ACTION);
-    await expect(note).toHaveRole("status");
-
-    // Asked again once the server answers: ended, and nothing else changed.
-    await page.unroute("**/*");
-    await row(page, title).getByTestId("session-actions").click();
-    await end.click();
-    await expect(note).toHaveText("Sessio lopetettu. Voit jatkaa sitä myöhemmin.", AFTER_ACTION);
-    await expect(card(page, title)).toHaveAttribute("aria-current", "page");
-    await expect(page).toHaveURL(/\/sessions\/ses_ui_basics$/);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
-    // That it was ended is said for a moment only.
-    await expect(note).toHaveCount(0, AFTER_ACTION);
+    const one = row(page, "UI basics (e2e fixture)");
+    await one.getByTestId("session-actions").click();
+    const items = page.locator("#session-menu-ses_ui_basics").locator("button, a");
+    await expect(items).toHaveText(["Nimeä uudelleen", "Lataa ZIP", "Poista"]);
+    await expect(one.getByTestId("end-session")).toHaveCount(0);
+    await expect(page.getByText("Lopeta sessio")).toHaveCount(0);
   });
 
   test("a row's menu and the account menu are moved in with the arrow keys", async ({ page }) => {
@@ -441,8 +439,6 @@ test.describe("the sidebar on a desktop", () => {
     await expect(one.getByTestId("rename-session")).toBeFocused();
     await page.keyboard.press("ArrowDown");
     await expect(one.getByTestId("export-session")).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(one.getByTestId("end-session")).toBeFocused();
     await page.keyboard.press("End");
     await expect(one.getByTestId("delete-session-open")).toBeFocused();
     await page.keyboard.press("ArrowDown");

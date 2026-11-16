@@ -257,6 +257,8 @@ export type ApiSessionDetail = {
   }>;
   /** The message the wizard is answering right now; not in `messages` yet. */
   pending_turn?: { user_message: string; started_at: string } | null;
+  /** Whether a wizard process is held for the session, or is starting, right now. */
+  agent_live?: boolean;
   created_at: string;
   updated_at: string;
 };

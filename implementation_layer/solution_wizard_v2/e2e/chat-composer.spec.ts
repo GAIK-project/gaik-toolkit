@@ -186,6 +186,109 @@ test.describe("the chat composer", () => {
     await expect(field(page)).toHaveValue("Ja vielä laskutus");
   });
 
+  test("the waiting line says that the wizard is starting when the answer is late", async ({ page }) => {
+    await newSession(page);
+    // wizard_api answers a message only once the wizard is up: held back
+    // here, as it is while a wizard released after a break starts again.
+    let answer: () => void = () => {};
+    const up = new Promise<void>((resolve) => (answer = resolve));
+    await page.route("**/api/sessions/*/chat", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      await up;
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({ delta: "Selvä." })}\n\ndata: ${JSON.stringify({ done: true })}\n\n`,
+      });
+    });
+    await field(page).fill("Jatketaan");
+    await field(page).press("Enter");
+
+    const line = page.getByTestId("chat-activity");
+    await expect(line).toHaveText("Wizard miettii…");
+    // The same line, with other words: nothing is added beside it.
+    await expect(line).toHaveText("Wizard käynnistyy. Tämä kestää hetken.", { timeout: 10_000 });
+    await expect(line).toHaveCount(1);
+
+    answer();
+    await expect(page.getByRole("log")).toContainText("Selvä.");
+    await expect(line).toHaveCount(0);
+  });
+
+  test("a wizard that is busy is not said to be starting while the message waits to be sent again", async ({ page }) => {
+    await newSession(page);
+    // The first answer is late (the line turns to "starting") and then says
+    // the wizard is answering another message; the page waits and sends again.
+    let posts = 0;
+    let answer: () => void = () => {};
+    const up = new Promise<void>((resolve) => (answer = resolve));
+    await page.route("**/api/sessions/*/chat", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      posts += 1;
+      if (posts === 1) {
+        await new Promise((r) => setTimeout(r, 4000));
+        return route.fulfill({ status: 409, contentType: "application/json", body: "{}" });
+      }
+      await up;
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({ delta: "Selvä." })}
+
+data: ${JSON.stringify({ done: true })}
+
+`,
+      });
+    });
+    // A message from the page waits for a busy wizard (a typed one is refused).
+    await page.evaluate(
+      ([name, detail]) => window.dispatchEvent(new CustomEvent(name, { detail })),
+      [SEND_EVENT, "Jatketaan"] as const,
+    );
+
+    const line = page.getByTestId("chat-activity");
+    await expect(line).toHaveText("Wizard käynnistyy. Tämä kestää hetken.", { timeout: 10_000 });
+    // The 409 is in: the wizard is up and busy, and the wait says no start.
+    await expect(line).toHaveText("Wizard miettii…", { timeout: 5_000 });
+    await expect.poll(() => posts, { timeout: 10_000 }).toBe(2);
+    // The second try has just gone out: nothing says a start yet.
+    await expect(line).toHaveText("Wizard miettii…");
+
+    answer();
+    await expect(page.getByRole("log")).toContainText("Selvä.");
+    await expect(line).toHaveCount(0);
+  });
+
+  test("the waiting line says at once that the wizard is starting when the session has none", async ({ page }) => {
+    // The mock store's session that wizard_api reported without a wizard.
+    await page.goto("/sessions/ses_wizard_released");
+    let answer: () => void = () => {};
+    const up = new Promise<void>((resolve) => (answer = resolve));
+    await page.route("**/api/sessions/*/chat", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      await up;
+      return route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify({ delta: "Selvä." })}
+
+data: ${JSON.stringify({ done: true })}
+
+`,
+      });
+    });
+    await field(page).fill("Jatketaan");
+    await field(page).press("Enter");
+
+    // Well inside the three seconds a late answer takes to say so.
+    const line = page.getByTestId("chat-activity");
+    await expect(line).toHaveText("Wizard käynnistyy. Tämä kestää hetken.", { timeout: 1500 });
+
+    answer();
+    await expect(page.getByRole("log")).toContainText("Selvä.");
+    await expect(line).toHaveCount(0);
+  });
+
   test("a message the page sends as it is still goes out as a chat turn", async ({ page }) => {
     await newSession(page);
     const sent = await fakeChat(page);

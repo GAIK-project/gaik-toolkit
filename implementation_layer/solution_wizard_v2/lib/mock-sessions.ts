@@ -138,6 +138,10 @@ export type WizardSession = {
   /** The message the wizard is answering right now. It is not in `messages`
    *  yet, so a page loaded mid-reply shows it from here and joins the reply. */
   pendingTurn?: PendingTurn | null;
+  /** Whether a wizard is held for the session as it was read. When none is,
+   *  the next message starts one first (lib/wizard-start). Absent in the mock
+   *  store, and null from a wizard_api that does not say. */
+  agentLive?: boolean | null;
   /** The gate reopened for a change that still waits for its new approval. */
   gateReopened?: GateReopened | null;
   /** How far the files the wizard has written reach, as wizard_api reads them
@@ -559,6 +563,28 @@ function buildSeedSessions(): WizardSession[] {
       },
     ),
     pendingTurn: { userMessage: "Lisää tarkastusvaihe.", startedAt: new Date(0).toISOString() },
+  },
+  // e2e/chat-composer.spec.ts: a session whose wizard was released, as
+  // wizard_api reports it (agent_live: false).
+  {
+    ...seedSession(
+      "ses_wizard_released",
+      DEV_OWNER,
+      "Wizard released (e2e fixture)",
+      6,
+      1,
+      0,
+      {
+        name: "Wizard released fixture",
+        description: "",
+        goal: "",
+        steps: [
+          { id: "input", name: "Input", type: "io" },
+          { id: "process", name: "Process", type: "ai", component: "LLM" },
+        ],
+      },
+    ),
+    agentLive: false,
   },
   // The same spec: reopening an approved gate, the done card, the language button.
   seedSession(

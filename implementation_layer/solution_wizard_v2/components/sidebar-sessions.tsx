@@ -3,7 +3,6 @@
 import Link, { useLinkStatus } from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { renameSession } from "@/app/actions";
-import { endSession, type EndSessionResult } from "@/app/end-session";
 import type { DeleteSessionLabels } from "@/components/delete-session-dialog";
 import { GateTrack } from "@/components/gate-track";
 import { Icon } from "@/components/icons";
@@ -54,8 +53,6 @@ export type SessionListLabels = {
   /** The rename field's name, and what it says when the name was not saved. */
   nameLabel: string;
   renameFailed: string;
-  /** What a row says after "End session" in its menu, by how it went. */
-  end: Record<EndSessionResult, string>;
   menu: RowMenuLabels;
   remove: DeleteSessionLabels;
 };
@@ -63,8 +60,6 @@ export type SessionListLabels = {
 const DAYS: SessionDay[] = ["today", "yesterday", "week", "earlier"];
 const QUERY_MAX = 100;
 const NAME_MAX = 80;
-/** How long a row says that its session was ended. */
-const ENDED_NOTE_MS = 6000;
 
 /**
  * Rows and day headings glide to their new place when the list itself changes
@@ -115,18 +110,19 @@ function Opening() {
   );
 }
 
-/** Where the session stands, in one short text: the row is 228 px wide. */
+/** What a row says in words beside its gates: only a standing the user acts
+ *  on (it waits for them) or a final one. A session simply under way shows its
+ *  gates alone; its phase is the gates' tooltip and part of the description. */
 function StandingText({ row, labels }: { row: SessionRow; labels: SessionListLabels }) {
+  if (row.standing === "open") return <span className="sr-only">{row.phase}</span>;
   const [text, tone] =
     row.standing === "done"
-      ? [labels.done, "font-medium text-success-text"]
+      ? [labels.done, "text-success-text"]
       : row.standing === "waiting"
-        ? [labels.waiting, "font-medium text-brand-text"]
-        : row.standing === "rejected"
-          ? [labels.rejected, "font-medium text-danger-text"]
-          : [row.phase, ""];
+        ? [labels.waiting, "text-brand-text"]
+        : [labels.rejected, "text-danger-text"];
   return (
-    <span title={text} className={`min-w-0 flex-1 truncate ${tone}`}>
+    <span data-testid="session-standing" title={text} className={`min-w-0 truncate font-medium ${tone}`}>
       {text}
     </span>
   );
@@ -135,14 +131,15 @@ function StandingText({ row, labels }: { row: SessionRow; labels: SessionListLab
 /** The gates, the standing and the time of a row: its second line. The row's
  *  link is named by the session's title and described by this line. */
 function RowState({ row, labels }: { row: SessionRow; labels: SessionListLabels }) {
+  const step = row.phase ? `${row.stepLabel}: ${row.phase}` : row.stepLabel;
   return (
-    <span id={`row-state-${row.id}`} className="mt-1 flex items-center gap-2 text-xs text-text-muted">
-      <GateTrack marks={row.marks} title={row.stepLabel} />
+    <span id={`row-state-${row.id}`} className="mt-1 flex min-h-4 items-center gap-2 text-xs text-text-muted">
+      <GateTrack marks={row.marks} title={step} />
       <span className="sr-only">{row.stepLabel}</span>
       <StandingText row={row} labels={labels} />
       <span className="ml-auto inline-flex shrink-0 items-center gap-1.5">
         <Opening />
-        <time dateTime={row.updatedIso} title={row.updatedFull} className="tabular-nums">
+        <time dateTime={row.updatedIso} title={row.updatedFull} className="text-[11px] tabular-nums">
           <span className="sr-only">{labels.updated} </span>
           {row.updated}
         </time>
@@ -266,21 +263,6 @@ export function SidebarSessions({
   const [renamed, setRenamed] = useState<{ id: string; from: string; to: string } | null>(null);
   const titleOf = (row: SessionRow) =>
     renamed && renamed.id === row.id && renamed.from === row.title ? renamed.to : row.title;
-  // How "End session" went, said on the row it was asked from. Nothing else
-  // changes: the session stays in the list as it was.
-  const [endNote, setEndNote] = useState<{ id: string; outcome: EndSessionResult } | null>(null);
-  const end = async (id: string) => {
-    setEndNote(null);
-    const outcome = await endSession(id).catch((): EndSessionResult => "failed");
-    setEndNote({ id, outcome });
-  };
-  // That it was ended needs saying only for a moment; why it was not stays
-  // until the next try.
-  useEffect(() => {
-    if (endNote?.outcome !== "ended") return;
-    const timer = setTimeout(() => setEndNote(null), ENDED_NOTE_MS);
-    return () => clearTimeout(timer);
-  }, [endNote]);
 
   const searchShown = showsSearch(rows.length, typed.trim());
   const query = searchShown ? typed.trim() : "";
@@ -411,20 +393,8 @@ export function SidebarSessions({
                               title={title}
                               labels={labels.menu}
                               onRename={() => setRenaming(row.id)}
-                              onEnd={() => void end(row.id)}
                               onDelete={() => onDelete({ id: row.id, title })}
                             />
-                            {endNote?.id === row.id && (
-                              <p
-                                role="status"
-                                data-testid="end-session-note"
-                                className={`px-2.5 pb-1.5 pt-1 text-xs leading-snug ${
-                                  endNote.outcome === "ended" ? "text-text-muted" : "text-warning-text"
-                                }`}
-                              >
-                                {labels.end[endNote.outcome]}
-                              </p>
-                            )}
                           </>
                         )}
                       </li>

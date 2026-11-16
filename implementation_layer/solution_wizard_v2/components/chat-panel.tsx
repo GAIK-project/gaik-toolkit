@@ -36,6 +36,7 @@ import { setLocale } from "@/app/locale-actions";
 import { approve } from "@/app/(app)/sessions/[id]/actions";
 import { withoutStepParams } from "@/lib/step-redirect";
 import { approvedGateIn, referenceMessage } from "@/lib/chat-reference";
+import { STARTING_AFTER_MS, startingLineDelay } from "@/lib/wizard-start";
 import { questionsIn } from "@/lib/chat-questions";
 import { GATE_STEPS } from "@/lib/wizard-state-machine";
 import { GLIDE_EASING, mayAnimate } from "@/lib/motion";
@@ -260,6 +261,8 @@ export function ChatPanel({
   sendLabel,
   streamFailedLabel,
   thinkingLabel,
+  startingLabel,
+  wizardLive,
   inputValue,
   onInputChange,
   autoSend,
@@ -293,6 +296,10 @@ export function ChatPanel({
   sendLabel: string;
   streamFailedLabel: string;
   thinkingLabel: string;
+  /** In its place while the wizard is being started (lib/wizard-start). */
+  startingLabel?: string;
+  /** Whether a wizard is held for the session, as the page read it. */
+  wizardLive?: boolean | null;
   inputValue: string;
   onInputChange: (value: string) => void;
   autoSend?: string;
@@ -350,6 +357,15 @@ export function ChatPanel({
     onReplyingChange?.(streaming);
     window.dispatchEvent(new CustomEvent<boolean>(CHAT_REPLYING_EVENT, { detail: streaming }));
   }, [streaming, onReplyingChange]);
+  // The message sent is waiting for a wizard that is being started: the
+  // waiting line says so until the answer opens (lib/wizard-start). Whether
+  // one is held is what the page read, and true once a message was answered.
+  const [starting, setStarting] = useState(false);
+  const liveRef = useRef(wizardLive);
+  useEffect(() => {
+    liveRef.current = wizardLive;
+  }, [wizardLive]);
+  const waitingLabel = starting && startingLabel ? startingLabel : thinkingLabel;
   // Asked for the other language, the wizard offers the switch as a button
   // under its reply (the reply language follows the interface language, which
   // only the user can set). Pressing it switches the interface and tells the
@@ -693,24 +709,41 @@ export function ChatPanel({
     setTurnSteps([]);
     setStreaming(true);
 
+    // wizard_api answers once the wizard is up: at once when one is held,
+    // and after its start when not, which is when the line says so.
+    // An answer that only says to wait (the loop below) ends the line: the
+    // wizard is busy or has no free slot, which is not a start. The line comes
+    // back if the answer to a later try is late in its turn.
+    let toldToWait = false;
+    const post = async () => {
+      const delay = toldToWait ? STARTING_AFTER_MS : startingLineDelay(liveRef.current);
+      if (delay === 0) setStarting(true);
+      const late = delay === 0 ? undefined : window.setTimeout(() => setStarting(true), delay);
+      try {
+        return await fetch(`/api/sessions/${sessionId}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
+      } finally {
+        window.clearTimeout(late);
+      }
+    };
+
     try {
-      let res = await fetch(`/api/sessions/${sessionId}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
+      let res = await post();
       // 409: the agent is still answering the previous message; 503: no agent
       // slot is free; 429: the user's own agents are all busy, or they are over
       // the per-minute message limit. The gate wake-up waits (up to a minute)
       // so the approval is not lost; a message the user typed is told to wait.
       const waitable = (status: number) => status === 409 || status === 503 || status === 429;
       for (let attempt = 0; waitable(res.status) && retryWhileBusy && attempt < 12; attempt++) {
+        toldToWait = true;
+        // A wizard that is answering another message is up.
+        if (res.status === 409) liveRef.current = true;
+        setStarting(false);
         await new Promise((r) => setTimeout(r, 5000));
-        res = await fetch(`/api/sessions/${sessionId}/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
-        });
+        res = await post();
       }
       if (res.status === 409) {
         if (typed && !fromPage && !retryWhileBusy) {
@@ -741,6 +774,9 @@ export function ChatPanel({
       }
       if (!res.ok || !res.body) throw new Error("stream failed");
       started = true;
+      // The wizard is up and on the message.
+      liveRef.current = true;
+      setStarting(false);
       userHeard.current = true;
       setHeardHere(true);
       // The wizard has a turn of this session: the start view's message, kept
@@ -768,6 +804,7 @@ export function ChatPanel({
       );
       if (!started) notDelivered(streamFailedLabel);
     } finally {
+      setStarting(false);
       turnEnded(asstId);
     }
     return started;
@@ -1090,7 +1127,7 @@ export function ChatPanel({
                     {inProgress && turnSteps.length > 0 && (
                       <div className="mt-1.5">
                         <ThinkingStatus
-                          label={thinkingLabel}
+                          label={waitingLabel}
                           steps={turnSteps}
                           since={stepSince}
                           labels={activityLabels}
@@ -1151,7 +1188,7 @@ export function ChatPanel({
                 )
               ) : streaming ? (
                 <ThinkingStatus
-                  label={thinkingLabel}
+                  label={waitingLabel}
                   steps={turnSteps}
                   since={stepSince}
                   labels={activityLabels}

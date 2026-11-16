@@ -443,6 +443,8 @@ export default async function SessionPage({
           sendLabel={t.chatSend}
           streamFailedLabel={t.streamFailed}
           thinkingLabel={t.chatThinking}
+          startingLabel={t.chatStarting}
+          wizardLive={session.agentLive}
           wide={isGathering}
           lead={chatIsPage}
           leadHeader={

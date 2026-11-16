@@ -13,21 +13,18 @@ export type RowMenuLabels = {
   /** "Lataa ZIP": the short text of the download, and its full name. */
   exportShort: string;
   exportOpen: string;
-  /** "Lopeta sessio", and what it does, as the item's tooltip. */
-  end: string;
-  endHint: string;
   remove: string;
 };
 
 const GAP = 4;
 /** Below this much room under the button the menu opens upward. */
-const ROOM_BELOW = 188;
+const ROOM_BELOW = 152;
 
 /**
- * A session row's actions behind one button: rename, download, end, delete.
+ * A session row's actions behind one button: rename, download, delete.
  * The list is a native popover, so it is drawn above the sidebar's scroll box,
  * and Esc, a press elsewhere and the return of focus to the button come with
- * it. It holds four plain controls in reading order: Tab moves between them,
+ * it. It holds three plain controls in reading order: Tab moves between them,
  * and so do the arrow keys, Home and End.
  */
 export function SessionRowMenu({
@@ -35,15 +32,12 @@ export function SessionRowMenu({
   title,
   labels,
   onRename,
-  onEnd,
   onDelete,
 }: {
   sessionId: string;
   title: string;
   labels: RowMenuLabels;
   onRename: () => void;
-  /** Releases the wizard held for the session; the session itself stays. */
-  onEnd: () => void;
   onDelete: () => void;
 }) {
   const button = useRef<HTMLButtonElement>(null);
@@ -147,20 +141,6 @@ export function SessionRowMenu({
           <Icon name="download" size={14} />
           {labels.exportShort}
         </a>
-        <button
-          type="button"
-          data-testid="end-session"
-          aria-label={`${labels.end}: ${title}`}
-          title={labels.endHint}
-          onClick={() => {
-            hide();
-            onEnd();
-          }}
-          className={ITEM}
-        >
-          <Icon name="power" size={14} />
-          {labels.end}
-        </button>
         <button
           type="button"
           data-testid="delete-session-open"

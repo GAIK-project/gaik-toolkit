@@ -57,6 +57,8 @@ export function ChatDock({
   sendLabel,
   streamFailedLabel,
   thinkingLabel,
+  startingLabel,
+  wizardLive,
   hideChatLabel,
   showChatLabel,
   resizeLabel,
@@ -83,6 +85,10 @@ export function ChatDock({
   sendLabel: string;
   streamFailedLabel: string;
   thinkingLabel: string;
+  /** In its place while the wizard is being started (lib/wizard-start). */
+  startingLabel?: string;
+  /** Whether a wizard is held for the session, as the page read it. */
+  wizardLive?: boolean | null;
   hideChatLabel: string;
   showChatLabel: string;
   /** Accessible name of the drag handle between the workspace and the chat. */
@@ -567,6 +573,8 @@ export function ChatDock({
             sendLabel={sendLabel}
             streamFailedLabel={streamFailedLabel}
             thinkingLabel={thinkingLabel}
+            startingLabel={startingLabel}
+            wizardLive={wizardLive}
             inputValue={chatInput}
             onInputChange={setChatInput}
             autoSend={autoSend}

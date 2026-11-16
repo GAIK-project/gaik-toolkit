@@ -84,18 +84,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             updated: t.updated,
             nameLabel: t.sessionNameLabel,
             renameFailed: t.renameFailed,
-            end: {
-              ended: t.sessionEnded,
-              busy: t.noticeAgentBusy,
-              failed: t.noticeEndFailed,
-            },
             menu: {
               actions: t.sessionActions,
               rename: t.renameSession,
               exportShort: t.exportSessionShort,
               exportOpen: t.exportSessionOpen,
-              end: t.endSession,
-              endHint: t.endSessionHint,
               remove: t.deleteSessionOpen,
             },
             remove: {

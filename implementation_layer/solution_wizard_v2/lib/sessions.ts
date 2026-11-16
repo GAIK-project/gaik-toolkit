@@ -153,6 +153,7 @@ function detailToWizardSession(detail: ApiSessionDetail): WizardSession {
     pendingTurn: detail.pending_turn
       ? { userMessage: detail.pending_turn.user_message, startedAt: detail.pending_turn.started_at }
       : null,
+    agentLive: typeof detail.agent_live === "boolean" ? detail.agent_live : null,
     gateReopened: gateReopenedIn(detail),
     // wizard_api's reading of the wizard's files (artifact_sync.step_reached).
     reachedStep: typeof detail.metadata.agent_step === "number" ? detail.metadata.agent_step : null,
