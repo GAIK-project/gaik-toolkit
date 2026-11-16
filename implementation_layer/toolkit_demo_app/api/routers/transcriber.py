@@ -7,9 +7,11 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 try:
-    from utils import validate_audio_file_size
+    from utils import get_transcription_api_config, validate_audio_file_size
+    from utils.model_settings import request_server_model
 except ImportError:
-    from api.utils import validate_audio_file_size
+    from api.utils import get_transcription_api_config, validate_audio_file_size
+    from api.utils.model_settings import request_server_model
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -89,8 +91,12 @@ async def transcribe_audio(
 
     enhanced = fix_transcription_errors
 
+    # A picked Aitta model transcribes with Aitta's Whisper and nothing else:
+    # no local server first, no other model behind it.
+    chosen = request_server_model()
+    aitta = chosen is not None and chosen.provider == "aitta"
     use_azure = bool(os.getenv("AZURE_API_KEY"))
-    if not use_azure:
+    if not use_azure and not aitta:
         raise HTTPException(
             status_code=500,
             detail="AZURE_API_KEY environment variable must be set",
@@ -114,7 +120,11 @@ async def transcribe_audio(
     try:
         from gaik.software_components.transcriber import Transcriber, get_openai_config
 
-        config = get_openai_config(use_azure=use_azure)
+        if aitta:
+            config = get_transcription_api_config()
+            prefer_local_first = False
+        else:
+            config = get_openai_config(use_azure=use_azure)
         local_api_base = os.getenv("LOCAL_TRANSCRIBER_API_BASE")
         local_api_key = os.getenv("LOCAL_TRANSCRIBER_API_KEY")
 

@@ -6,6 +6,7 @@ import {
   SERVER_MODEL_HEADER,
   encodeModelSettings,
   supportsModelSettings,
+  supportsServerModel,
 } from "./model-settings";
 
 export class RateLimitError extends Error {
@@ -40,16 +41,21 @@ export async function apiFetch(
   } else if (!supported) {
     headers.delete(MODEL_SETTINGS_HEADER);
   }
-  // No own key: run on the server model the user picked, if any.
+  // No own key: run on the server model the user picked, if any. A few routes
+  // take that pick but no own key (supportsServerModel).
   const serverModel = getServerModel();
+  const serverModelRoute =
+    typeof window !== "undefined" &&
+    target?.origin === window.location.origin &&
+    supportsServerModel(target.pathname, options?.method ?? "GET");
   if (
-    supported &&
+    serverModelRoute &&
     !headers.has(MODEL_SETTINGS_HEADER) &&
     serverModel &&
     !headers.has(SERVER_MODEL_HEADER)
   ) {
     headers.set(SERVER_MODEL_HEADER, serverModel);
-  } else if (!supported) {
+  } else if (!serverModelRoute) {
     headers.delete(SERVER_MODEL_HEADER);
   }
   const response = await fetch(url, {

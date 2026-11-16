@@ -18,6 +18,7 @@ try:
     from utils import (
         MODEL,
         get_api_config,
+        require_vision,
         get_model_options,
         load_saved_requirements,
         load_saved_schema,
@@ -28,6 +29,7 @@ except ImportError:
     from api.utils import (
         MODEL,
         get_api_config,
+        require_vision,
         get_model_options,
         load_saved_requirements,
         load_saved_schema,
@@ -517,6 +519,7 @@ async def extract_vision(
     model = model or _server_model()
     request_config = get_request_api_config()
     if request_config is not None:
+        require_vision(request_config)
         model = request_config["model"]
         lib_provider, use_azure, vertex_ai = "openai", request_config["provider"] == "azure", False
     else:

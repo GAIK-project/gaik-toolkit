@@ -14,7 +14,9 @@ export async function SiteNavServer() {
   // so the nav shows it as a link rather than a locked "Beta" tile.
   let isLoggedIn = false;
   try {
-    isLoggedIn = !!(await getUserAccessStatus()).user;
+    // BYPASS_AUTH (local development) runs everything without an account.
+    const access = await getUserAccessStatus();
+    isLoggedIn = !!access.user || access.bypassAuth;
   } catch {
     // ignore auth errors
   }

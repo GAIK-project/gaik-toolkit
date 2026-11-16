@@ -10,6 +10,10 @@ export interface ServerModel {
   label: string;
   /** False when the model has no speech-to-text: GPT transcribes audio first. */
   audio: boolean;
+  /** False for a text-only model: it cannot read page images. */
+  vision: boolean;
+  /** CSC Aitta only: "running", or "offline" for a model that starts on demand. */
+  status: string | null;
   /** A costlier model for the GAIK project team only. */
   staff: boolean;
   /** Whether this user may run it. */
@@ -74,16 +78,28 @@ export function useServerModel(): string | null {
   return useSyncExternalStore(subscribe, getServerModel, () => null);
 }
 
+// The API can be restarting when the page loads (a deploy, a cold start). An
+// empty list would then hide the model menu until a reload, so a failed load
+// is tried again a few times.
+let catalogRetries = 0;
+
 function loadCatalog() {
-  if (catalog || catalogRequest || typeof window === "undefined") return;
+  if (catalogRequest || typeof window === "undefined") return;
+  if (catalog && (catalog.models.length > 0 || catalogRetries === 0)) return;
   catalogRequest = fetch("/api/model-settings/server")
     .then((response) => (response.ok ? response.json() : null))
     .then((data: ServerModels | null) => {
-      if (data && Array.isArray(data.models)) catalog = data;
-      else catalog = { default: null, models: [] };
+      if (data && Array.isArray(data.models)) {
+        catalog = data;
+        catalogRetries = 0;
+        return;
+      }
+      throw new Error("no model list");
     })
     .catch(() => {
       catalog = { default: null, models: [] };
+      catalogRetries = catalogRetries === 0 ? 3 : catalogRetries - 1;
+      if (catalogRetries > 0) window.setTimeout(loadCatalog, 8000);
     })
     .finally(() => {
       catalogRequest = null;
