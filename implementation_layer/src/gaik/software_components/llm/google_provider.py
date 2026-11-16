@@ -34,6 +34,19 @@ LOCATION_RETRY_SECONDS = 600.0
 PREFERRED_LOCATION_TIMEOUT_SECONDS = 120.0
 
 
+def _fallback_location(config: dict) -> str | None:
+    """The location that takes over from the config's own, or None.
+
+    ``location_fallback`` in the config decides, also when it is None. A config
+    with neither key gets the default pair: the EU, then the global endpoint.
+    """
+    if "location_fallback" in config:
+        fallback = config["location_fallback"]
+    else:
+        fallback = None if config.get("location") else "global"
+    return fallback if fallback and fallback != (config.get("location") or "eu") else None
+
+
 def _is_timeout(exc: BaseException) -> bool:
     return "Timeout" in type(exc).__name__ or isinstance(exc, TimeoutError)
 
@@ -59,9 +72,7 @@ class GoogleProvider:
         http_options = {}
         if config.get("timeout") is not None:
             http_options["timeout"] = int(config["timeout"] * 1000)
-        elif self.provider == "vertex" and (
-            "location" not in config or config.get("location_fallback")
-        ):
+        elif self.provider == "vertex" and _fallback_location(config):
             # The SDK waits without a limit. A default location has a fallback,
             # and a request that never returns would never reach it.
             http_options["timeout"] = int(PREFERRED_LOCATION_TIMEOUT_SECONDS * 1000)
@@ -94,8 +105,7 @@ class GoogleProvider:
             # model the EU does not serve or while the EU does not answer (see
             # llm/config.py).
             self.location = config.get("location") or "eu"
-            fallback = config.get("location_fallback") if "location" in config else "global"
-            self._fallback_location = fallback if fallback != self.location else None
+            self._fallback_location = _fallback_location(config)
             self._project = str(config["project_id"])
             self._preferred_location = self.location
             self._clients: dict[str, Any] = {}

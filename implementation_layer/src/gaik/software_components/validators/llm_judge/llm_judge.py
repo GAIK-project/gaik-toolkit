@@ -470,10 +470,22 @@ class LLMJudge:
             # The EU multi-region unless a location is set (llm/config.py). A model
             # the EU does not serve is retried on the global endpoint below.
             location = os.environ.get("GOOGLE_VERTEXAI_LOCATION")
+            # The default location is asked once and for at most two minutes: the
+            # SDK otherwise waits without a limit and would never reach the fallback.
+            bounded = (
+                {}
+                if location
+                else {
+                    "http_options": types.HttpOptions(
+                        timeout=120_000, retry_options=types.HttpRetryOptions(attempts=1)
+                    )
+                }
+            )
             client = genai.Client(
                 vertexai=True,
                 project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
                 location=location or "eu",
+                **bounded,
             )
         else:
             api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")

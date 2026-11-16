@@ -202,3 +202,54 @@ def test_a_default_location_gets_a_request_timeout(monkeypatch):
     assert seen[-1]["http_options"].retry_options.attempts == 3
     _provider(location="europe-west4")
     assert "http_options" not in seen[-1]
+
+
+def test_a_fallback_named_in_the_config_decides(world):
+    """Also without a location: None means no fallback, another location is used."""
+    world["failures"]["eu"] = _error(503)
+    base = {"provider": "vertex", "project_id": "project", "model": "gemini-test"}
+    with pytest.raises(genai_errors.ServerError):
+        google_provider.GoogleProvider({**base, "location_fallback": None}).chat(USER)
+    assert world["log"] == [("eu", "chat")]
+    world["log"].clear()
+    google_provider._UNAVAILABLE_UNTIL.clear()
+    provider = google_provider.GoogleProvider({**base, "location_fallback": "us-central1"})
+    assert provider.chat(USER).text == "from us-central1"
+    assert world["log"] == [("eu", "chat"), ("us-central1", "chat")]
+
+
+def test_the_judge_asks_the_eu_once_within_a_time_limit(monkeypatch):
+    """Its EU request is bounded, so a stalled EU reaches the global endpoint."""
+    from gaik.software_components.validators.llm_judge import llm_judge as judge_module
+    from google import genai
+
+    clients = []
+
+    class Models:
+        def __init__(self, location):
+            self.location = location
+
+        def generate_content(self, **kwargs):
+            if self.location == "eu":
+                raise _error(504)
+            return SimpleNamespace(text="{}", usage_metadata=None)
+
+    def client(**kwargs):
+        clients.append(kwargs)
+        return SimpleNamespace(models=Models(kwargs["location"]))
+
+    monkeypatch.setattr(genai, "Client", client)
+    monkeypatch.setenv("GOOGLE_VERTEXAI_PROJECT", "project")
+    monkeypatch.delenv("GOOGLE_VERTEXAI_LOCATION", raising=False)
+    judge = SimpleNamespace(use_vertexai=True, model="gemini-test", max_tokens=64)
+    text, _, _ = judge_module.LLMJudge._call_google(judge, [], "user", "system")
+    assert text == "{}"
+    assert [c["location"] for c in clients] == ["eu", "global"]
+    assert clients[0]["http_options"].timeout == 120_000
+    assert clients[0]["http_options"].retry_options.attempts == 1
+    # A location from the environment is used as given: no limit added, no fallback.
+    clients.clear()
+    monkeypatch.setenv("GOOGLE_VERTEXAI_LOCATION", "eu")
+    with pytest.raises(genai_errors.ServerError):
+        judge_module.LLMJudge._call_google(judge, [], "user", "system")
+    assert len(clients) == 1 and "http_options" not in clients[0]
