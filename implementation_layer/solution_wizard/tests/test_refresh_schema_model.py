@@ -120,3 +120,25 @@ def test_a_type_correction_in_the_py_file_is_the_type_load_schema_gives(tmp_path
 
     after, _ = pipeline.load_schema(schemas, "output_schema")
     assert after.model_fields["title"].annotation is int
+
+
+def test_with_a_gaik_that_reads_the_py_file_the_command_line_writes_nothing_and_passes(
+    tmp_path, monkeypatch, capsys
+):
+    import builtins
+
+    schemas = _schemas(tmp_path, CORRECTED)
+    before = (schemas / "output_schema_model.json").read_text(encoding="utf-8")
+    real_import = builtins.__import__
+
+    def without_saved_schema(name, *args, **kwargs):
+        if name == "gaik.software_components.extractor.saved_schema":
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", without_saved_schema)
+    monkeypatch.setattr("sys.argv", ["refresh_schema_model.py", "--schemas-dir", str(schemas)])
+
+    assert _script().main() == 0
+    assert "Model file not needed" in capsys.readouterr().out
+    assert (schemas / "output_schema_model.json").read_text(encoding="utf-8") == before
