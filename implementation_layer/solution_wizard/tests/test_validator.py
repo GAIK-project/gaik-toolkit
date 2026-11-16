@@ -474,7 +474,8 @@ def test_rag_workflow_alone_has_no_redundancy_warning():
 
 
 # ---------------------------------------------------------------------------
-# Rule 13: declared hallucination check must receive grounding evidence
+# Rule 14: declared hallucination check must receive grounding evidence
+# (rule 13 is upstream's governance rule, tested in test_governance_and_poc_output.py)
 # ---------------------------------------------------------------------------
 
 
@@ -540,97 +541,26 @@ def _judge_blueprint(judge_inputs, hallucination_check=True) -> Blueprint:
     )
 
 
-def test_rule13_judge_without_grounding_input_is_an_error():
+def test_rule14_judge_without_grounding_input_is_an_error():
     """Dropping the source artifact must not pass silently."""
     result = validate(_judge_blueprint(["extracted"]))
     assert not result.ok
-    assert any(e.rule == 13 and e.step_id == "step_c" for e in result.errors)
+    assert any(e.rule == 14 and e.step_id == "step_c" for e in result.errors)
 
 
-def test_rule13_judge_with_grounding_input_passes():
+def test_rule14_judge_with_grounding_input_passes():
     result = validate(_judge_blueprint(["transcript", "extracted"]))
-    assert not [e for e in result.errors if e.rule == 13]
+    assert not [e for e in result.errors if e.rule == 14]
 
 
-def test_rule13_not_applied_when_hallucination_check_is_off():
+def test_rule14_not_applied_when_hallucination_check_is_off():
     result = validate(_judge_blueprint(["extracted"], hallucination_check=False))
-    assert not [e for e in result.errors if e.rule == 13]
+    assert not [e for e in result.errors if e.rule == 14]
 
 
-def test_rule13_warns_when_check_declared_but_no_validator_step():
+def test_rule14_warns_when_check_declared_but_no_validator_step():
     result = validate(_base_blueprint(validation={"hallucination_check": True}))
-    assert any(w.rule == 13 for w in result.warnings)
-
-
-# ---------------------------------------------------------------------------
-# Rule 14: model providers agree with the governance flags
-# ---------------------------------------------------------------------------
-
-
-def _governed(models: dict, *, external: bool = False, local: bool = False) -> Blueprint:
-    bp = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
-    bp.governance.data_handling.external_model_api_allowed = external
-    bp.governance.data_handling.local_processing_required = local
-    bp.models = models
-    return bp
-
-
-def _rule14(result):
-    return [e for e in result.errors if e.rule == 14], [w for w in result.warnings if w.rule == 14]
-
-
-def test_rule14_default_flags_allow_any_provider():
-    bp = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
-    bp.models = {"provider": "azure"}
-    assert _rule14(validate(bp)) == ([], [])
-
-
-def test_rule14_hosted_provider_contradicts_no_external_api():
-    errors, _ = _rule14(validate(_governed({"provider": "openai"})))
-    assert len(errors) == 1 and "models.provider is 'openai'" in errors[0].message
-
-
-def test_rule14_unset_provider_is_not_left_to_the_hosted_default():
-    errors, _ = _rule14(validate(_governed({}, external=True, local=True)))
-    assert len(errors) == 1 and "not set" in errors[0].message
-
-
-def test_rule14_stage_override_is_checked_too():
-    models = {
-        "provider": "openai_compatible",
-        "base_url": "http://localhost:8000/v1",
-        "judge_config": {"provider": "anthropic"},
-    }
-    errors, warnings = _rule14(validate(_governed(models)))
-    assert len(errors) == 1
-    assert "models.judge_config.provider is 'anthropic'" in errors[0].message
-    assert any("base_url" in w.message for w in warnings)
-
-
-def test_rule14_local_whisper_still_needs_a_self_hosted_provider_for_enhancement():
-    """Transcript enhancement sends the transcript to the stage's chat API."""
-    hosted = {
-        "provider": "openai_compatible",
-        "transcription_config": {"provider": "azure", "transcription_model": "whisper_local"},
-    }
-    errors, _ = _rule14(validate(_governed(hosted)))
-    assert len(errors) == 1
-    assert "models.transcription_config.provider is 'azure'" in errors[0].message
-
-    local = {
-        "provider": "openai_compatible",
-        "transcription_config": {
-            "provider": "openai_compatible",
-            "transcription_model": "whisper_local",
-        },
-    }
-    errors, warnings = _rule14(validate(_governed(local)))
-    assert errors == [] and warnings
-
-
-def test_rule14_blank_provider_counts_as_unset():
-    errors, _ = _rule14(validate(_governed({"provider": "  "})))
-    assert len(errors) == 1 and "not set" in errors[0].message
+    assert any(w.rule == 14 and "hallucination_check" in w.message for w in result.warnings)
 
 
 # ---------------------------------------------------------------------------
