@@ -70,7 +70,6 @@ _SUPPORTED_EXTS = {
     ".docx",
     ".csv",
     ".xlsx",
-    ".xls",
     ".mp3",
     ".wav",
     ".m4a",

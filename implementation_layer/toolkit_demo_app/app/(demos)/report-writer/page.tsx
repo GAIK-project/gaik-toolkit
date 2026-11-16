@@ -242,7 +242,7 @@ function applyConfig(
 // ---------------------------------------------------------------------------
 
 const ACCEPTED_EXTS =
-  ".txt,.md,.markdown,.pdf,.docx,.csv,.xlsx,.xls,.mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4,.mov,.mkv,.avi,.webm,.png,.jpg,.jpeg,.webp,.tiff,.tif,.bmp,.gif";
+  ".txt,.md,.markdown,.pdf,.docx,.csv,.xlsx,.mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4,.mov,.mkv,.avi,.webm,.png,.jpg,.jpeg,.webp,.tiff,.tif,.bmp,.gif";
 
 function MultiFileUpload({
   files,
