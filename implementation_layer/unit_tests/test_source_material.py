@@ -112,6 +112,16 @@ def test_an_echoed_block_is_taken_off_the_answer():
     assert material.strip_echo(other) == other
 
 
+def test_taking_an_echo_off_a_long_run_of_spaces_stays_quick():
+    material = SourceMaterial()
+    run = " \t" * 100_000
+    started = time.perf_counter()
+    assert material.strip_echo(f"answer{run}end") == f"answer{run}end"
+    assert material.strip_echo(f"answer\n{run}{material.closing_tag}{run}") == "answer"
+    assert material.strip_echo(f"answer{run}") == f"answer{run}"
+    assert time.perf_counter() - started < 1
+
+
 def test_material_holding_the_block_id_is_refused():
     material = SourceMaterial(boundary="fixed-test-boundary")
     with pytest.raises(ValueError, match="block id"):
