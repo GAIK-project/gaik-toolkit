@@ -142,8 +142,9 @@ Methods:
 
 ## Limits
 
-- Each host is resolved once per scraper and the answer is kept, so a scraper that
-  runs for a long time keeps using the addresses it first checked.
+- Each host's checked addresses are kept for five minutes
+  (`policy.ADDRESS_TTL_SECONDS`); after that the name is looked up and checked
+  again, so a long-running scraper follows a host that moved.
 - With `render_js`, Chromium resolves names itself: every browser request is still
   checked against the policy, but it is not held to the checked address. The same
   holds for a custom `transport` and for a proxy from `HTTP_PROXY`/`HTTPS_PROXY`:

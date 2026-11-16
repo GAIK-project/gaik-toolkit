@@ -25,9 +25,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
     from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.report_runs import require_report_run_grant
 
 try:
@@ -114,6 +116,14 @@ async def run(manifest: str = Form(...), files: list[UploadFile] = File(...)):
             f"Upload one file per manifest source, in order: expected {len(names)}, "
             f"got {len(files)}",
         )
+
+    options = parsed.options
+    check_model(
+        options.transcription_model,
+        transcription_models(),
+        "transcription model",
+    )
+    check_model(options.vision_model, chat_models(), "vision model")
 
     config = get_api_config()
     tmp = Path(tempfile.mkdtemp(prefix="source_normalizer_"))

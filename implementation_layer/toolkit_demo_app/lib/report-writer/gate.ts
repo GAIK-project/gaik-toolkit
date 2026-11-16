@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { EMAIL_UNCONFIRMED, isEmailConfirmed } from "@/lib/api-access";
 import { clientIp } from "@/lib/client-ip";
+import { ADMIN_COOKIE_NAME, MODEL_TIER_HEADER, isModelStaff } from "@/lib/model-tier";
 import { checkRateLimit, ratelimit } from "@/lib/rate-limit";
 import {
   pickUsageFromEvents,
@@ -55,13 +56,19 @@ export function accessDenial(
 /**
  * Auth + approval (or trial) + quota, then the per-IP burst limit (parity with the proxy;
  * these routes are not proxied). Returns the refusal response, or the user id
- * (null under BYPASS_AUTH).
+ * (null under BYPASS_AUTH) and whether the user may run the team-only models
+ * (lib/model-tier.ts), read from the session like the proxy does.
  */
 export async function gateReportWriter(
   request: NextRequest,
   maxReports: number,
-): Promise<NextResponse | { userId: string | null }> {
-  if (BYPASS_AUTH) return { userId: null };
+): Promise<NextResponse | { userId: string | null; staff: boolean }> {
+  if (BYPASS_AUTH)
+    return {
+      userId: null,
+      // As in the proxy: without a session only the admin cookie counts.
+      staff: isModelStaff(null, request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+    };
 
   const supabase = await createClient();
   const {
@@ -109,7 +116,11 @@ export async function gateReportWriter(
       return NextResponse.json({ error: trial.error }, { status: trial.status });
   }
 
-  return { userId: user.id };
+  const staff = isModelStaff(
+    user.email?.toLowerCase() ?? null,
+    request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+  );
+  return { userId: user.id, staff };
 }
 
 /** Add a run's report count and tokens to the user's access_requests row. */
@@ -153,23 +164,32 @@ export function reportRunHeaders(): Record<string, string> {
 /**
  * POST the form to the backend and stream its SSE back. When the stream ends,
  * onEnd gets the folded result usage; if it throws, the client receives an
- * `error` event with its message instead of a silent miss.
+ * `error` event with its message instead of a silent miss. `staff` (from
+ * gateReportWriter) tells the API the user may run the team-only models.
  */
 export async function forwardReportRun(
   backendPath: string,
   body: FormData,
+  staff: boolean,
   onEnd: (usage: ReportUsageInfo) => Promise<void>,
 ): Promise<Response> {
   let backendRes: Response;
   try {
     backendRes = await fetch(`${BACKEND_URL}${backendPath}`, {
       method: "POST",
-      headers: reportRunHeaders(),
+      // One headers object: the run token and, for the team, the model tier.
+      headers: {
+        ...reportRunHeaders(),
+        ...(staff ? { [MODEL_TIER_HEADER]: "staff" } : {}),
+      },
       body,
     });
   } catch (e) {
+    // The reason names the backend's address; it goes to the log, not the page.
+    const id = crypto.randomUUID().slice(0, 12);
+    console.error(`[report-run] error id ${id}: backend request failed:`, e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Backend error" },
+      { error: `The demo API did not answer (error id ${id}). Try again in a moment.` },
       { status: 502 },
     );
   }
