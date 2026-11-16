@@ -1196,7 +1196,7 @@ class VisionExtractor:
             result_dict = apply_field_policies(result_dict, requirements)
 
         for key, value in list(result_dict.items()):
-            if isinstance(value, list) and value and isinstance(value[0], dict):
+            if _holds_items(key, value, requirements):
                 result_dict[key] = [normalize_extracted_data(item, requirements) for item in value]
         result_dict = normalize_extracted_data(result_dict, requirements)
         return result_dict

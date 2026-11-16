@@ -207,7 +207,7 @@ class DataExtractor:
         # Normalize extracted data (dates, lists, etc.)
         if isinstance(result_dict, dict):
             for key, value in list(result_dict.items()):
-                if isinstance(value, list) and value and isinstance(value[0], dict):
+                if _holds_items(key, value, requirements):
                     result_dict[key] = [
                         normalize_extracted_data(item, requirements) for item in value
                     ]

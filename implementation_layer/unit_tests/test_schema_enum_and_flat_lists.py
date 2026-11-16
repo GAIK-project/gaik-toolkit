@@ -2,11 +2,11 @@
 fields, and a flat record's own ``list[dict]`` field."""
 
 import json
+from decimal import Decimal
 
 import pytest
-from pydantic import ValidationError
-
 from gaik.software_components.extractor import schema
+from gaik.software_components.extractor.extractor import DataExtractor
 from gaik.software_components.extractor.schema import (
     CompositeExtractionRequirements,
     ExtractionRequirements,
@@ -19,6 +19,8 @@ from gaik.software_components.extractor.schema import (
     parse_date,
     parse_nested_requirements,
 )
+from gaik.software_components.vision_extractor.vision_extractor import VisionExtractor
+from pydantic import BaseModel, ValidationError
 
 
 def _requirements(*fields: FieldSpec) -> ExtractionRequirements:
@@ -107,6 +109,31 @@ def test_field_policies_drop_only_values_outside_the_enum():
     }
 
 
+def test_a_decimal_enum_is_read_with_the_decimal_cleaner():
+    price = FieldSpec(
+        field_name="price", field_type="decimal", description="Price", enum=["10.00", "20.00"]
+    )
+    priced = _requirements(price)
+
+    assert apply_field_policies({"price": "10.00 EUR"}, priced) == {"price": "10.00 EUR"}
+    assert create_extraction_model(priced).model_validate({"price": "10.00 EUR"}).price == Decimal(
+        "10.00"
+    )
+    assert apply_field_policies({"price": "30.00 EUR"}, priced) == {"price": None}
+
+
+def test_a_decimal_enum_written_with_a_currency_still_limits_the_value():
+    price = FieldSpec(
+        field_name="price",
+        field_type="decimal",
+        description="Price",
+        enum=["10.00 EUR", "20.00 EUR"],
+    )
+
+    assert apply_field_policies({"price": "99.00"}, _requirements(price)) == {"price": None}
+    assert apply_field_policies({"price": "20.00"}, _requirements(price)) == {"price": "20.00"}
+
+
 # Item 3 --------------------------------------------------------------------
 
 
@@ -127,6 +154,58 @@ def test_a_container_of_items_is_still_recognised():
 
     assert _holds_items("records", [{"product": "Bolt"}], item)
     assert _holds_items("records", [], item)
+
+
+def _dated_invoice():
+    return _requirements(
+        FieldSpec(field_name="date", field_type="date", description="Date", format="%d.%m.%Y"),
+        FieldSpec(field_name="tags", field_type="list[str]", description="Tags"),
+        FieldSpec(field_name="line_items", field_type="list[dict]", description="Rows"),
+    )
+
+
+_DATED_ROWS = [{"date": "2024-07-03", "tags": "a, b"}]
+
+
+class _Client:
+    """A provider client whose model returns ``answer``."""
+
+    provider = "openai"
+    model = "m"
+    raw = None
+
+    def __init__(self, answer: BaseModel):
+        self.answer = answer
+
+    def chat_parsed(self, **_):
+        return self.answer
+
+    def chat(self, *_args, **_kwargs): ...
+
+    def chat_stream(self, *_args, **_kwargs): ...
+
+    def embed(self, *_args, **_kwargs): ...
+
+
+def test_data_extractor_leaves_a_flat_records_own_rows_alone():
+    requirements = _dated_invoice()
+    model = create_extraction_model(requirements)
+    extractor = DataExtractor.__new__(DataExtractor)
+    extractor.config, extractor.model = {}, "m"
+    extractor.temperature, extractor.reasoning_effort = 0, None
+    extractor.client = _Client(model(date="03.07.2024", tags=["x"], line_items=_DATED_ROWS))
+
+    record, _usage = extractor._extract_one("doc", model, requirements, "task")
+
+    assert record == {"date": "03.07.2024", "tags": ["x"], "line_items": _DATED_ROWS}
+
+
+def test_vision_extractor_leaves_a_flat_records_own_rows_alone():
+    raw = {"date": "03.07.2024", "tags": "x, y", "line_items": [dict(_DATED_ROWS[0])]}
+
+    record = VisionExtractor._post_process(None, raw, _dated_invoice())
+
+    assert record == {"date": "03.07.2024", "tags": ["x", "y"], "line_items": _DATED_ROWS}
 
 
 # Item 4 --------------------------------------------------------------------
@@ -170,3 +249,28 @@ def test_flat_parse_with_a_list_of_dicts_becomes_parent_with_children(monkeypatc
     assert [c.container_name for c in requirements.children] == ["line_items"]
     assert 'additionalProperties": true' not in json.dumps(model.model_json_schema())
     assert calls == ["normal", "normal", "repeated_item"]
+
+
+def test_a_collection_without_item_fields_reports_a_flat_structure(monkeypatch):
+    def fake_parse(task, *, parse_mode="normal", **_kwargs):
+        if parse_mode == "repeated_item":
+            return _requirements()
+        title = FieldSpec(field_name="title", field_type="str", description="Title")
+        if task.startswith("From the requirements below, parse only the once-per-document"):
+            return _requirements(title)
+        notes = FieldSpec(field_name="notes", field_type="list[dict]", description="Notes")
+        return _requirements(title, notes)
+
+    monkeypatch.setattr(schema, "detect_structure_type", lambda *a, **k: _analysis("flat"))
+    monkeypatch.setattr(schema, "parse_user_requirements", fake_parse)
+
+    _model, requirements, analysis = parse_nested_requirements(
+        "Title and notes", client=object(), model="stub"
+    )
+
+    assert isinstance(requirements, ExtractionRequirements)
+    assert [(f.field_name, f.field_type) for f in requirements.fields] == [
+        ("title", "str"),
+        ("notes", "list[str]"),
+    ]
+    assert analysis.structure_type == "flat"

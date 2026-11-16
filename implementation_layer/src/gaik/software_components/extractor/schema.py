@@ -866,8 +866,10 @@ def parse_nested_requirements(
 
         if not children:
             # Every repeated collection was underspecified and promoted to a
-            # list[str] field, so the result is effectively a flat object.
+            # list[str] field, so the result is effectively a flat object, and the
+            # returned analysis says so.
             print("No structured child collections remain -> using flat model")
+            analysis.structure_type = "flat"
             extraction_model = create_extraction_model(parent_requirements)
             return extraction_model, parent_requirements, analysis
 
@@ -1947,7 +1949,8 @@ def _enum_numbers(field: FieldSpec) -> list[int | float | Decimal]:
             elif field.field_type == "float":
                 numbers.append(float(raw))
             else:
-                numbers.append(Decimal(str(raw).strip()))
+                # The decimal field's own cleaner reads "10.00 EUR" as 10.00.
+                numbers.append(Decimal(str(_clean_decimal_string(raw)).strip()))
         except (ValueError, ArithmeticError):
             continue
     return numbers
@@ -1958,6 +1961,8 @@ def _enum_allows(field: FieldSpec, value: object) -> bool:
     if field.field_type in NUMERIC_FIELD_TYPES:
         if isinstance(value, bool):
             return False
+        if field.field_type == "decimal":
+            value = _clean_decimal_string(value)
         try:
             number = Decimal(str(value).strip())
         except ArithmeticError:
