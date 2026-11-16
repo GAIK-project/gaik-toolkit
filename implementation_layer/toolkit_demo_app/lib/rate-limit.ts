@@ -2,16 +2,16 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 /**
- * Rate limiter using Upstash Redis
- * Fixed window: 15 POST requests per minute per IP (see proxy.ts)
- * Falls back to no rate limiting if Redis is not configured (dev environment)
- */
-/**
  * One quick retry: the default (five retries, about 4 s of backoff) outlasts
  * Ratelimit's 5 s timeout, which then lets the request through uncounted.
  */
 export const LIMITER_RETRY = { retries: 1, backoff: () => 100 };
 
+/**
+ * Rate limiter using Upstash Redis
+ * Fixed window: 15 POST requests per minute per IP (see proxy.ts)
+ * Falls back to no rate limiting if Redis is not configured (dev environment)
+ */
 function createRateLimiter(): Ratelimit | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
