@@ -39,7 +39,11 @@ def _fallback_location(config: dict) -> str | None:
 
     ``location_fallback`` in the config decides, also when it is None. A config
     with neither key gets the default pair: the EU, then the global endpoint.
+    A location other than the default is used as given, also when it was set on
+    a config that still carries the default's fallback.
     """
+    if (config.get("location") or "eu") != "eu":
+        return None
     if "location_fallback" in config:
         fallback = config["location_fallback"]
     else:
@@ -72,10 +76,6 @@ class GoogleProvider:
         http_options = {}
         if config.get("timeout") is not None:
             http_options["timeout"] = int(config["timeout"] * 1000)
-        elif self.provider == "vertex" and _fallback_location(config):
-            # The SDK waits without a limit. A default location has a fallback,
-            # and a request that never returns would never reach it.
-            http_options["timeout"] = int(PREFERRED_LOCATION_TIMEOUT_SECONDS * 1000)
         if config.get("max_retries") is not None:
             retries = config["max_retries"]
             if not isinstance(retries, int) or retries < 0:
@@ -113,21 +113,18 @@ class GoogleProvider:
             def vertex_client(location: str):
                 if location not in self._clients:
                     client_options = options
-                    if (
-                        self._fallback_location
-                        and location == self._preferred_location
-                        and config.get("max_retries") is None
-                    ):
-                        # The fallback is the retry: the SDK's own retries would
-                        # hold a request for minutes in a location that is down.
-                        client_options = {
-                            "http_options": genai_types.HttpOptions(
-                                **{
-                                    **http_options,
-                                    "retry_options": genai_types.HttpRetryOptions(attempts=1),
-                                }
-                            )
-                        }
+                    if self._fallback_location and location == self._preferred_location:
+                        preferred = dict(http_options)
+                        if config.get("timeout") is None:
+                            # The SDK waits without a limit, and a request that
+                            # never returns would never reach the fallback. The
+                            # fallback itself keeps the SDK's default.
+                            preferred["timeout"] = int(PREFERRED_LOCATION_TIMEOUT_SECONDS * 1000)
+                        if config.get("max_retries") is None:
+                            # The fallback is the retry: the SDK's own retries would
+                            # hold a request for minutes in a location that is down.
+                            preferred["retry_options"] = genai_types.HttpRetryOptions(attempts=1)
+                        client_options = {"http_options": genai_types.HttpOptions(**preferred)}
                     self._clients[location] = genai.Client(
                         vertexai=True,
                         project=config["project_id"],
