@@ -224,6 +224,14 @@ def _collect_input_files(input_paths: list[str | Path]) -> list[Path]:
     return collected
 
 
+def _check_input_folder(folder: Path, root: str | Path) -> None:
+    """Raise ``SourcePathError`` for a supported file in ``folder`` that leads out of
+    ``root``, for example through a symbolic link."""
+    for found in sorted(folder.rglob("*")):
+        if found.suffix.lower() in SUPPORTED_EXTENSIONS and found.is_file():
+            path_inside(found.relative_to(folder), folder, root=root, what="input file")
+
+
 def _csv_to_markdown(path: Path) -> str:
     with open(path, encoding="utf-8-sig", newline="") as fh:
         rows = list(csv.reader(fh))
@@ -537,6 +545,12 @@ class MultiSourceReportGenerator:
             include_source_references = False
 
         source_filenames = [item.metadata.get("filename", "") for item in evidence_items]
+
+        # A reused folder must not keep a previous run's curated briefs. This run's own
+        # are written while its sections are drafted, so the old ones go first.
+        if output_dir is not None:
+            for old in (Path(output_dir) / "evidence" / "curated_sections").glob("*.md"):
+                old.unlink()
 
         # 2. Write the report — either the agentic path or the single LLM call.
         if agentic:
@@ -1187,9 +1201,10 @@ def save_report_config(
 
     Paths (``input_paths``, ``output_dir``, ``sample_report_path``) are stored
     relative to the config file's directory so the config is portable. Each must
-    stay inside that directory, so that ``load_report_config`` reads the config back
-    without a ``root``: a path outside it (also through a symbolic link) or on another
-    drive raises ``SourcePathError``. A link keeps its own name. All keys
+    stay inside that directory, and so must every supported file in an input folder,
+    so that ``load_report_config`` reads the config back without a ``root``: a path
+    outside it (also through a symbolic link) or on another drive raises
+    ``SourcePathError``. A link keeps its own name. All keys
     inside option dicts (``transcriber_options``, ``parser_options``, etc.) are
     stored as-is, except credential-bearing configs are rejected. Keep credentials
     in the environment and persist the provider/model selection instead.
@@ -1246,6 +1261,13 @@ def save_report_config(
         path_inside(rel, base, what="path")
         return rel
 
+    def _input_to_rel(p: str | Path) -> str | None:
+        rel = _to_rel(p)
+        if rel is not None and (base / rel).is_dir():
+            # The files in an input folder are checked as load_report_config checks them.
+            _check_input_folder(base / rel, base)
+        return rel
+
     # Normalise sections: dataclasses → plain dicts, preserve all fields.
     section_dicts: list[dict[str, Any]] = []
     for s in sections:
@@ -1269,7 +1291,7 @@ def save_report_config(
         "additional_instructions": additional_instructions,
         "report_language": report_language,
         "sections": section_dicts,
-        "input_paths": [_to_rel(p) for p in input_paths],
+        "input_paths": [_input_to_rel(p) for p in input_paths],
         "sample_report_path": _to_rel(sample_report_path),
         "output_dir": _to_rel(output_dir),
         "output_docx": output_docx,
@@ -1310,7 +1332,7 @@ def load_report_config(path: str | Path, *, root: str | Path | None = None) -> d
     config_path = Path(path)
     base = config_path.parent
 
-    raw: dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
+    raw: dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8-sig"))
 
     def _to_abs(p: str | None, what: str) -> Path | None:
         if p is None:
@@ -1320,15 +1342,7 @@ def load_report_config(path: str | Path, *, root: str | Path | None = None) -> d
     def _input(p: str) -> Path:
         joined = path_inside(p, base, root=root, what="input path")
         if joined.is_dir():
-            # A file in the folder may be a link; it must stay inside ``root`` too.
-            for found in sorted(joined.rglob("*")):
-                if found.suffix.lower() in SUPPORTED_EXTENSIONS and found.is_file():
-                    path_inside(
-                        found.relative_to(joined),
-                        joined,
-                        root=root if root is not None else base,
-                        what="input file",
-                    )
+            _check_input_folder(joined, root if root is not None else base)
         return joined.resolve()
 
     return {

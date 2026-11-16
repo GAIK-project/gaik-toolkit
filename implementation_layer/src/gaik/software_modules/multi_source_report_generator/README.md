@@ -681,6 +681,10 @@ output_dir/
             findings.md
 ```
 
+A run into an `output_dir` that already holds a report first removes the earlier
+run's section files, curated briefs, `evidence_index.json`, `usage.json` and
+`report.docx`, so the folder holds only this run's output.
+
 The returned `ReportGenerationResult` contains:
 
 | Field | Meaning |
@@ -719,9 +723,10 @@ from gaik.software_modules.multi_source_report_generator import (
 # Save the current use-case configuration to a file.
 # Paths (input_paths, output_dir, sample_report_path) are stored relative to
 # the config file so it is portable. All option dicts are stored as-is.
-# Each path must stay inside the config's folder: save_report_config raises
-# SourcePathError for one outside it, so that load_report_config reads the config
-# back as saved. load_report_config refuses a path that is absolute or leads out of
+# Each path, and each file in an input folder, must stay inside the config's
+# folder: save_report_config raises SourcePathError for one outside it, so that
+# load_report_config reads the config back as saved. load_report_config refuses
+# a path that is absolute or leads out of
 # the config's folder (through ".." or a symbolic link); pass root="<a folder that
 # holds both>" for a config written by hand that names files beside its folder.
 save_report_config(

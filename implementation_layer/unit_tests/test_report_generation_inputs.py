@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from gaik.software_components.knowledge_curator.models import KnowledgeBase, SectionKnowledge
@@ -176,7 +177,7 @@ def test_spec_save_names_a_source_on_another_drive(tmp_path, monkeypatch):
 # -- #145 also seen (c): files saved with a UTF-8 BOM load --------------------
 
 
-def test_spec_knowledge_and_report_files_with_a_bom_load(tmp_path):
+def test_spec_config_knowledge_and_report_files_with_a_bom_load(tmp_path):
     (tmp_path / "notes.txt").write_text("n", encoding="utf-8")
     spec = ReportSpec(
         title="T",
@@ -186,6 +187,10 @@ def test_spec_knowledge_and_report_files_with_a_bom_load(tmp_path):
     path = spec.save(tmp_path / "spec.json")
     path.write_text(path.read_text(encoding="utf-8"), encoding="utf-8-sig")
     assert ReportSpec.load(path).title == "T"
+
+    config = _save(tmp_path / "report.json", input_paths=[tmp_path / "notes.txt"])
+    config.write_text(config.read_text(encoding="utf-8"), encoding="utf-8-sig")
+    assert msrg.load_report_config(config)["input_paths"] == [(tmp_path / "notes.txt").resolve()]
 
     knowledge = tmp_path / "knowledge"
     knowledge.mkdir()
@@ -212,7 +217,7 @@ def test_a_reused_output_dir_keeps_only_this_runs_files(tmp_path):
     gen = _gen()
     out = tmp_path / "out"
 
-    def write(titles, usage):
+    def write(titles, *, usage, index):
         sections = [msrg.GeneratedSection(title=t, content_markdown="Body.") for t in titles]
         gen._write_outputs(
             out,
@@ -222,17 +227,54 @@ def test_a_reused_output_dir_keeps_only_this_runs_files(tmp_path):
             evidence_items=[],
             evidence_pack="",
             usage=usage,
-            include_evidence_index=not usage,
+            include_evidence_index=index,
         )
 
-    write(["Alpha", "Beta", "Gamma"], {})
+    write(["Alpha", "Beta", "Gamma"], usage={"total_tokens": 1}, index=True)
     (out / "report.docx").write_bytes(b"old")
-    write(["Alpha"], {"total_tokens": 1})
+    assert (out / "usage.json").exists() and (out / "evidence_index.json").exists()
+    write(["Alpha"], usage={}, index=False)
 
     assert sorted(p.name for p in (out / "sections").iterdir()) == ["01_alpha.md"]
     assert not (out / "evidence_index.json").exists()
+    assert not (out / "usage.json").exists()
     assert not (out / "report.docx").exists()
-    assert (out / "usage.json").exists()
+
+
+def test_a_reused_output_dir_drops_the_previous_runs_curated_briefs(tmp_path, monkeypatch):
+    (tmp_path / "src.txt").write_text("Fact.", encoding="utf-8")
+    out = tmp_path / "out"
+    curated = out / "evidence" / "curated_sections"
+    curated.mkdir(parents=True)
+    (curated / "beta.md").write_text("old brief", encoding="utf-8")
+    markdown = "# R\n\n## Alpha\n\nBody."
+
+    class _Client:
+        def chat(self, messages, **kwargs):
+            return SimpleNamespace(text=markdown, usage={})
+
+    def agentic(**kwargs):
+        # This run's own brief, written while its section is drafted.
+        (curated / "alpha.md").write_text("new brief", encoding="utf-8")
+        return markdown, [msrg.GeneratedSection(title="Alpha", content_markdown="Body.")], {}
+
+    gen = _gen()
+    monkeypatch.setattr(msrg, "create_llm_client", lambda config: _Client())
+    monkeypatch.setattr(gen, "_run_agentic", agentic)
+
+    def run(**options):
+        gen.run(
+            input_paths=[tmp_path / "src.txt"],
+            sections=[{"title": "Alpha", "instructions": "a"}],
+            output_dir=out,
+            progress_callback=lambda message: None,
+            **options,
+        )
+
+    run(agentic=True, curate_evidence=True)
+    assert sorted(p.name for p in curated.iterdir()) == ["alpha.md"]
+    run()
+    assert not list(curated.iterdir())
 
 
 # -- #199 item 1: save_report_config writes what load_report_config reads -----
@@ -258,7 +300,12 @@ def _link_or_skip(link: Path, target: Path) -> None:
     try:
         link.symlink_to(target, target_is_directory=target.is_dir())
     except OSError:
-        pytest.skip("symbolic links are not available")
+        if os.name != "nt" or not target.is_dir():
+            pytest.skip("symbolic links are not available")
+        # Without the symlink privilege, Windows still allows a junction to a folder.
+        import _winapi
+
+        _winapi.CreateJunction(str(target), str(link))
 
 
 def test_save_report_config_keeps_a_links_name_and_refuses_one_leading_out(tmp_path):
@@ -273,3 +320,21 @@ def test_save_report_config_keeps_a_links_name_and_refuses_one_leading_out(tmp_p
     _link_or_skip(inside / "out_link", tmp_path / "elsewhere")
     with pytest.raises(msrg.SourcePathError, match="outside the folder"):
         _save(inside / "other.json", input_paths=[inside / "out_link"])
+
+
+def test_save_report_config_refuses_an_input_folder_with_a_file_leading_out(tmp_path):
+    inputs = tmp_path / "configs" / "inputs"
+    inputs.mkdir(parents=True)
+    (inputs / "notes.txt").write_text("n", encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "secret.txt").write_text("s", encoding="utf-8")
+    try:
+        (inputs / "secret.txt").symlink_to(elsewhere / "secret.txt")
+    except OSError:
+        # Without the symlink privilege, a link to the folder holding it.
+        _link_or_skip(inputs / "sub", elsewhere)
+    config = tmp_path / "configs" / "report.json"
+    with pytest.raises(msrg.SourcePathError, match="secret.txt"):
+        _save(config, input_paths=[inputs])
+    assert not config.exists()
