@@ -109,14 +109,18 @@ def _with_llm(
     ]
     model = config["model"]
     client = build_compat_client(config)
+    # The providers map or drop what a model does not take.
+    sampling: dict[str, Any] = {}
+    if settings.temperature is not None:
+        sampling["temperature"] = settings.temperature
+    if settings.reasoning_effort is not None:
+        sampling["reasoning_effort"] = settings.reasoning_effort
     if isinstance(client, ProviderClient):
-        parsed = client.chat_parsed(messages=messages, response_format=answer, model=model)
+        parsed = client.chat_parsed(
+            messages=messages, response_format=answer, model=model, **sampling
+        )
     else:
-        options: dict[str, Any] = {"top_p": 1.0, "timeout": config.get("timeout", 30)}
-        if settings.temperature is not None:
-            options["temperature"] = settings.temperature
-        if settings.reasoning_effort is not None:
-            options["reasoning_effort"] = settings.reasoning_effort
+        options: dict[str, Any] = {"top_p": 1.0, "timeout": config.get("timeout", 30), **sampling}
         response = client.beta.chat.completions.parse(
             model=model,
             messages=messages,

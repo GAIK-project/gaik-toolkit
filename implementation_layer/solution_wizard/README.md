@@ -206,7 +206,7 @@ All wizard outputs go to the directory the user specifies. Never written inside 
 ├── poc/
 │   ├── README.md                  # use-case-specific run instructions
 │   ├── run_poc.py                 # runnable pipeline
-│   ├── requirements.txt           # gaik[extras]>=0.8.0 for selected components and providers
+│   ├── requirements.txt           # gaik[extras]>=<validated>,<next minor> (gaik_validated_version.txt)
 │   ├── .env.example               # env vars for the stage providers
 │   ├── config.yaml                # provider/model per stage, language, paths
 │   ├── provider_config.py         # get_stage_config(config, stage) for each model stage
