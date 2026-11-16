@@ -17,12 +17,19 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
     from utils.report_runs import report_writer_limits, require_report_run_grant
     from utils.upload_check import upload_problem
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.report_runs import report_writer_limits, require_report_run_grant
     from api.utils.upload_check import upload_problem
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -249,6 +256,27 @@ async def get_example_sample_report():
 # ---------------------------------------------------------------------------
 
 
+def _check_run_models(run_config: dict) -> None:
+    """The writer, review and transcription models must be ones the demo offers."""
+
+    def named(key: str, field: str):
+        given = run_config.get(key)
+        value = given.get(field) if isinstance(given, dict) else None
+        return value if isinstance(value, str) else None
+
+    offered = chat_models()
+    check_model(named("writer_options", "model"), offered, "writer model")
+    check_model(named("review_options", "model"), offered, "review model")
+    transcriber = run_config.get("transcriber_options")
+    ctor = transcriber.get("ctor") if isinstance(transcriber, dict) else None
+    model = ctor.get("transcription_model") if isinstance(ctor, dict) else None
+    check_model(
+        model if isinstance(model, str) else None,
+        transcription_models(),
+        "transcription model",
+    )
+
+
 @router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def generate_report(
     files: list[UploadFile] = File(...),
@@ -268,6 +296,7 @@ async def generate_report(
         raise HTTPException(status_code=400, detail=f"Invalid config JSON: {exc}") from exc
     if not isinstance(run_config, dict):
         raise HTTPException(status_code=400, detail="Config must be a JSON object")
+    _check_run_models(run_config)
 
     _apply_limits(run_config, [*files, *([sample_report] if sample_report else [])])
 
@@ -307,7 +336,11 @@ async def generate_report(
         raise
     except Exception as exc:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        logger.warning("Cannot store the uploads: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=400,
+            detail="The server cannot store the uploaded files. Rename them and try again.",
+        ) from exc
 
     if not input_paths:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -381,9 +414,9 @@ async def generate_report(
         except Exception as exc:  # noqa: BLE001
             if cancelled.is_set():
                 logger.info("Report generation stopped: the client left")
+                result_holder["error"] = "Report generation stopped: the client left."
             else:
-                logger.exception("Report generation failed")
-            result_holder["error"] = str(exc)
+                result_holder["error"] = error_detail(exc, "Report generation")
         finally:
             try:
                 shutil.rmtree(tmp_dir, ignore_errors=True)

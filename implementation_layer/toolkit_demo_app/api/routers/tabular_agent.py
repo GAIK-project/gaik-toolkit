@@ -28,6 +28,11 @@ except ImportError:
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -210,7 +215,8 @@ async def tabular_agent_status():
     try:
         import gaik.software_components.tabular_agent  # noqa: F401
     except ImportError as exc:
-        available, detail = False, str(exc)
+        logger.warning("tabular_agent is not installed: %s", exc)
+        available, detail = False, "The tabular_agent component is not installed."
 
     return StatusResponse(
         component_available=available,
@@ -269,12 +275,15 @@ async def upload_file(
         shutil.rmtree(session_dir, ignore_errors=True)
         raise HTTPException(
             status_code=503,
-            detail=f"tabular_agent component is not available in this build: {e}",
+            detail=error_detail(e, "Loading the tabular_agent component"),
         ) from e
     except Exception as e:
         shutil.rmtree(session_dir, ignore_errors=True)
-        logger.error("tabular_agent upload failed: %s", e)
-        raise HTTPException(status_code=400, detail=f"Could not read the file: {e}") from e
+        logger.warning("tabular_agent could not read an upload: %s", type(e).__name__)
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read the file as a table. Check its format and try again.",
+        ) from e
 
     session_id = uuid.uuid4().hex
     session = {
@@ -331,8 +340,7 @@ async def ask_question(req: AskRequest):
     try:
         return await asyncio.to_thread(_run_ask, session["agent"], question)
     except Exception as e:
-        logger.error("tabular_agent ask failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e, "The question")) from e
     finally:
         session["busy"] -= 1
         session["last_used"] = time.time()

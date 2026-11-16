@@ -30,13 +30,20 @@ Match price list items using Type/Part Designation:
 
 ```
 MATCH WHERE:
+    PL_Type_Part_Designation = BOM.Type_Part_Designation   (ignoring case and surrounding spaces)
+```
+
+### Secondary Matching (if primary fails)
+Flag any item matched by a fallback for review. First try a containment match:
+
+```
+MATCH WHERE:
     PL_Type_Part_Designation CONTAINS BOM.Type_Part_Designation
     OR
     BOM.Type_Part_Designation CONTAINS PL_Type_Part_Designation
 ```
 
-### Secondary Matching (if primary fails)
-Try matching with Material Grade:
+Then try matching with Material Grade:
 
 ```
 MATCH WHERE:

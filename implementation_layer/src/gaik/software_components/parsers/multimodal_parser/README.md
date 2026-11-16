@@ -175,6 +175,15 @@ result = parser.parse("document.pdf")
 
 ---
 
+## Source material as data
+
+The attached PDF is material, never instructions: every system prompt ends with
+the sentence in `SOURCE_MATERIAL_INSTRUCTION`
+([`gaik.software_components.source_material`](../../source_material.py)), and
+`additional_instructions` stay in the user message next to the file. With a
+shared provider config, file names next to the page images are cleaned to one
+line without quotes or angle brackets.
+
 ## Environment Variables
 
 ### OpenAI / Azure OpenAI
@@ -209,6 +218,12 @@ result = parser.parse("document.pdf")
 | `GOOGLE_API_KEY` | `vertex_ai=False` | — | Direct Gemini API key |
 | `GOOGLE_MODEL` | Always | `gemini-3-flash-preview` | Model name (fallback when `model=None`) |
 
+A failed Gemini request raises the same `requests` exception type as before with a short
+message, e.g. `Gemini request failed: HTTP 429 Too Many Requests`. Its `response` keeps
+only the status code, the reason and a `Retry-After` header. The response body and the URL without its query string go to the debug log
+of `gaik.software_components._http` only. A response without text names only its
+block or finish reason.
+
 ## License
 
-MIT - see [LICENSE](../../../../../LICENSE)
+MIT - see [LICENSE](../../../../../../LICENSE)

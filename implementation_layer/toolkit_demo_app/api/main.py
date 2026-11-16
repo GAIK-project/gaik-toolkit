@@ -6,6 +6,7 @@ FastAPI backend that provides REST endpoints for the GAIK toolkit components.
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -31,11 +32,13 @@ from gaik import __version__ as gaik_version  # noqa: E402
 try:
     from routers import model_settings
     from utils.ai_marking import AIMarkMiddleware
+    from utils.errors import public_error
     from utils.model_settings import ModelSettingsMiddleware
     from utils.ops import OpsMiddleware
 except ImportError:
     from api.routers import model_settings
     from api.utils.ai_marking import AIMarkMiddleware
+    from api.utils.errors import public_error
     from api.utils.model_settings import ModelSettingsMiddleware
     from api.utils.ops import OpsMiddleware
 
@@ -92,6 +95,18 @@ except ImportError:
         web_scraper,
     )
 
+# The first Solution Wizard's router imports the optional `claude_agent_sdk` at
+# module load. Import it defensively, so a load failure turns off only the
+# wizard and not the whole API with every other demo.
+try:
+    try:
+        from routers import solution_wizard
+    except ImportError:
+        from api.routers import solution_wizard
+except Exception as exc:  # noqa: BLE001
+    solution_wizard = None
+    logger.warning("Solution Wizard router unavailable; disabling it (%s)", type(exc).__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -101,14 +116,26 @@ async def lifespan(app: FastAPI):
     pdf_cleanup_task = asyncio.create_task(pipeline.cleanup_old_pdfs())
     rag_cleanup_task = asyncio.create_task(rag.cleanup_idle_collections())
     tabular_cleanup_task = asyncio.create_task(tabular_agent.cleanup_idle_sessions())
+    wizard_cleanup_task = (
+        asyncio.create_task(solution_wizard.cleanup_idle_sessions())
+        if solution_wizard is not None
+        else None
+    )
     yield
     # Shutdown
     cleanup_task.cancel()
     pdf_cleanup_task.cancel()
     rag_cleanup_task.cancel()
     tabular_cleanup_task.cancel()
+    if wizard_cleanup_task is not None:
+        wizard_cleanup_task.cancel()
     logger.info("GAIK Demo API shutting down...")
 
+
+# The interactive docs and the OpenAPI description are for local development. They
+# are off unless DEMO_API_DOCS=true (.env.example sets it for a local run); the
+# container image does not set it.
+API_DOCS = os.getenv("DEMO_API_DOCS", "").strip().lower() in {"1", "true", "yes"}
 
 app = FastAPI(
     title="GAIK Toolkit Demo API",
@@ -116,6 +143,9 @@ app = FastAPI(
     version=gaik_version,
     lifespan=lifespan,
     redirect_slashes=False,
+    docs_url="/docs" if API_DOCS else None,
+    redoc_url="/redoc" if API_DOCS else None,
+    openapi_url="/openapi.json" if API_DOCS else None,
 )
 
 # CORS for Next.js frontend (allowing all origins for cluster-internal usage)
@@ -134,12 +164,8 @@ app.add_middleware(AIMarkMiddleware)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for unhandled errors."""
-    logger.error(f"Unhandled error: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error"},
-    )
+    """Global exception handler for unhandled errors: an error id, never the exception text."""
+    return JSONResponse(status_code=500, content={"detail": public_error(exc)})
 
 
 # Include routers
@@ -184,6 +210,8 @@ app.include_router(
     knowledge_synthesis.router, prefix="/knowledge-synthesis", tags=["Knowledge Synthesis"]
 )
 app.include_router(web_scraper.router, prefix="/web-scraper", tags=["Web Scraper"])
+if solution_wizard is not None:
+    app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
 
 
 @app.get("/health")
@@ -206,7 +234,7 @@ async def root():
     return {
         "name": "GAIK Toolkit Demo API",
         "version": gaik_version,
-        "docs": "/docs",
+        **({"docs": "/docs"} if API_DOCS else {}),
         "endpoints": {
             "parse": "/parse - Document parsing (PDF, DOCX)",
             "classify": "/classify - Document classification",

@@ -20,7 +20,8 @@ from solution_wizard.scaffolder import (
     validate_generated_python,
 )
 
-EXAMPLES = Path(__file__).parent.parent / "examples"
+WIZARD_DIR = Path(__file__).parent.parent
+EXAMPLES = WIZARD_DIR / "examples"
 
 
 def _load_example(filename: str) -> Blueprint:
@@ -168,20 +169,23 @@ def test_requirements_txt_audio_module(tmp_path):
     assert "audio-to-structured-data" in req
 
 
-def test_requirements_txt_needs_the_provider_api_release(tmp_path):
-    """provider_config.py needs gaik 0.8.0, so every gaik line carries that floor."""
+def test_requirements_txt_pins_the_validated_gaik(tmp_path):
+    """Every gaik line installs the validated release or a later patch of it."""
+    version = (WIZARD_DIR / "gaik_validated_version.txt").read_text(encoding="utf-8").strip()
+    major, minor = version.split(".")[:2]
+    spec = f">={version},<{major}.{int(minor) + 1}"
     bp = _load_example("incident_reporting_blueprint.json")
     scaffold_poc(bp, tmp_path)
     req = (tmp_path / "poc" / "requirements.txt").read_text().splitlines()
     gaik = [line for line in req if line.startswith("gaik")]
-    assert "gaik[audio-to-structured-data]>=0.8.0" in gaik
-    assert all(line.endswith(">=0.8.0") for line in gaik)
+    assert f"gaik[audio-to-structured-data]{spec}" in gaik
+    assert gaik and all(line.endswith(spec) for line in gaik)
 
     bp.components.selected_modules = []
     bp.components.selected_building_blocks = []
     _write_requirements_txt(bp, tmp_path)
     req = (tmp_path / "requirements.txt").read_text().splitlines()
-    assert [line for line in req if line.startswith("gaik")] == ["gaik>=0.8.0"]
+    assert [line for line in req if line.startswith("gaik")] == [f"gaik{spec}"]
 
 
 def test_requirements_txt_rag_module(tmp_path):

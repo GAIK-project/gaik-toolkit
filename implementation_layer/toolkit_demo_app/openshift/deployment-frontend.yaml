@@ -15,8 +15,20 @@ spec:
       labels:
         app: gaik-demo
     spec:
+      # Pod hardening, stated for clusters that do not apply it themselves. On Rahti
+      # the project's SCC already sets these, and its own seccomp profile, so this
+      # file names none (see README.md, "Network policy and pod hardening").
+      securityContext:
+        runAsNonRoot: true
       containers:
         - name: gaik-demo
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          # The root filesystem stays writable: Next.js writes its image and fetch
+          # caches under /app/.next/cache at run time.
           image: image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
           ports:
             - containerPort: 3000
@@ -32,15 +44,8 @@ spec:
                 secretKeyRef:
                   name: gaik-demo-admin
                   key: ADMIN_PASSWORD
-            # Still read by the old wizard gate on /api/wizard in proxy.ts until
-            # that gate is removed. The /solution-wizard page itself is open and
-            # links to WIZARD_V2_URL (set with `oc set env`, read at run time).
-            - name: WIZARD_ACCESS_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: gaik-demo-admin
-                  key: WIZARD_ACCESS_SECRET
-                  optional: true
+            # The /solution-wizard page is open and links to WIZARD_V2_URL (set
+            # with `oc set env`, read at run time).
             - name: SUPABASE_SECRET_KEY
               valueFrom:
                 secretKeyRef:

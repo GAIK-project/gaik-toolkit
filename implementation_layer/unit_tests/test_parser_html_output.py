@@ -32,7 +32,7 @@ def test_tags_outside_the_list_leave_their_text_only():
     out = keep_document_markup(
         '<p>see <img src="https://example.com/x.png" alt="x"><form>a</form></p>'
     )
-    assert out == "<p>see a</p>"
+    assert out == "<p>see xa</p>"
 
 
 def test_attributes_outside_the_list_are_dropped():

@@ -122,6 +122,24 @@ Each section's knowledge file looks like this:
   field observation over an older document, a newer document over an older one), and
   `unresolved` otherwise. Both sides are present as units.
 
+## Sources stay data
+
+Each source reaches the model in its own `<source_material>` block with a random id for
+each call ([`gaik.software_components.source_material`](../source_material.py)), labelled
+with the file name that `source.file` cites. A file name that is not a clean one-line
+label (quotes, angle brackets, runs of spaces, over 200 characters) is labelled with its
+source id instead, and the citation is turned back into the file name. The rules stay in
+the system message; the source list (one JSON object per source with its label, class
+and type, so a file name cannot set a class), the report instructions and the section
+stay outside the blocks. A sentence in a source cannot close
+its block, and the curator is told that a source does not decide what is extracted, what
+is missing or how a conflict is resolved.
+
+This lowers the chance that one source steers the others; it does not remove it. The
+units, `missing` and `conflicts` are model output: the quote check verifies every unit,
+while `missing` and the conflicts are only reported, in the knowledge files a person can
+check and edit before the report is written (see below).
+
 ## Quote check
 
 A unit fails when its `source.file` is not one of the sources, or when its `quote` does

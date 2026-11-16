@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from gaik.software_components.source_material import SourceMaterial, clean_label
 from gaik.software_components.source_normalizer.models import NormalizedSources
 
 from .spec import ReportSpec
@@ -69,16 +70,25 @@ def single_call_system_prompt(citations: bool = True) -> str:
 
 
 def build_single_call_prompt(
-    spec: ReportSpec, sources: NormalizedSources, sample_report: str | None
+    spec: ReportSpec,
+    sources: NormalizedSources,
+    sample_report: str | None,
+    blocks: SourceMaterial | None = None,
 ) -> str:
-    """Return the request for the whole report, with every normalized source in full."""
+    """Return the request for the whole report, with every normalized source in full.
+
+    Each source and the format reference go in their own ``<source_material>`` block of
+    ``blocks`` (a new :class:`SourceMaterial` for this call when left out), labelled
+    with the file name the citations use; the task stays outside them.
+    """
+    blocks = blocks or SourceMaterial()
     parts = [f"Report title: {spec.title}\nWrite the report in: {spec.language}"]
     if sample_report is not None:
         parts.append(
-            "FORMAT REFERENCE (inside <format_reference>): a sample report, most likely "
-            "about a DIFFERENT subject. It governs structure, length and tone and "
-            "contributes ZERO content: take none of its facts, names, numbers or wording.\n"
-            f"<format_reference>\n{sample_report}\n</format_reference>"
+            "FORMAT REFERENCE (in the source_material block labelled format_reference): a "
+            "sample report, most likely about a DIFFERENT subject. It governs structure, "
+            "length and tone and contributes ZERO content: take none of its facts, names, "
+            "numbers or wording.\n" + blocks.wrap(sample_report, label="format_reference")
         )
     lines = ["Required sections (write each as `## <title>` in this exact order):"]
     for i, section in enumerate(spec.sections, start=1):
@@ -93,10 +103,14 @@ def build_single_call_prompt(
         f"<report_instructions>\n{spec.instructions.strip() or '(none)'}\n</report_instructions>"
     )
     evidence = "\n\n".join(
-        f'<source file="{s.file}" class="{s.source_class}">\n{s.text}\n</source>'
+        f"Source {clean_label(s.file)} (class: {clean_label(s.source_class or 'none')}):\n"
+        + blocks.wrap(s.text, label=s.file)
         for s in sources.sources
     )
-    parts.append(f"EVIDENCE, the ONLY source of facts and content for the report:\n{evidence}")
+    parts.append(
+        "EVIDENCE, the ONLY source of facts and content for the report (one source_material "
+        f"block per source, labelled with the file name to cite):\n{evidence}"
+    )
     parts.append(
         f"Now write the complete report. Start with `# {spec.title}`, then write every "
         "required section in order using `## <exact heading title>`. Use only the evidence "

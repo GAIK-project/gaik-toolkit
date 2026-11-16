@@ -197,6 +197,21 @@ check the selected model's OpenAI documentation.
 
 ---
 
+### Source material as data
+
+`DataExtractor` sends each document as material, apart from the task: the
+system message holds the extraction rules and the sentence in
+`SOURCE_MATERIAL_INSTRUCTION`, and the user message holds your
+`user_requirements` and the document inside a `<source_material>` block with a
+random id for each call ([`gaik.software_components.source_material`](../source_material.py)). A sentence in the document cannot close
+the block or change the task, the schema or the rules. The call, the schema and
+the return value are unchanged.
+
+To check that the values are written in the document, run the extraction
+through [Source Tracing](../source_tracing/README.md) (`augment`, then
+`check_text`): it compares each value with a quote from the source and needs no
+model call.
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -223,10 +238,10 @@ See [implementation_layer/examples/software_components/extractor/](../../../../e
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **Examples**: [implementation_layer/examples/software_components/extractor/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/extractor)
-- **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
+- **Contributing**: [CONTRIBUTING.md](../../../../../guidance_layer/CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
-MIT - see [LICENSE](../LICENSE)
+MIT - see [LICENSE](../../../../../LICENSE)
 

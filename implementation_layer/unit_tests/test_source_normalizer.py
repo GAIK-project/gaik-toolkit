@@ -6,6 +6,7 @@ by fakes, so no test calls an API.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -19,6 +20,7 @@ from gaik.software_components.source_normalizer import (
     NormalizedSource,
     NormalizedSources,
     SourceNormalizer,
+    SourcePathError,
 )
 from gaik.software_components.source_normalizer.models import source_id
 from openpyxl import Workbook
@@ -323,3 +325,47 @@ def test_source_id_cannot_leave_the_folder(bad_id):
         NormalizedSource(
             id=bad_id, file="a.txt", source_class=None, source_type="text", tool="t", text="x"
         )
+
+
+def _manifest(folder: Path, source_id: str) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "id": source_id,
+        "file": "notes.txt",
+        "source_class": None,
+        "source_type": "text",
+        "tool": "text",
+    }
+    (folder / "sources.json").write_text(json.dumps([entry]), encoding="utf-8")
+
+
+@pytest.mark.parametrize("bad_id", ["../secret", "sub/../../secret", ".hidden", "a/b"])
+def test_load_refuses_a_manifest_id_that_is_not_a_file_name_before_reading(tmp_path, bad_id):
+    # The file each id would name exists, so only a check before the read stops it: a read
+    # first would end in the model's own ValidationError, not SourcePathError.
+    (tmp_path / "secret.md").write_text("Outside the folder.", encoding="utf-8")
+    (tmp_path / "out" / "sub").mkdir(parents=True)
+    (tmp_path / "out" / ".hidden.md").write_text("x", encoding="utf-8")
+    (tmp_path / "out" / "a").mkdir()
+    (tmp_path / "out" / "a" / "b.md").write_text("x", encoding="utf-8")
+    _manifest(tmp_path / "out", bad_id)
+
+    with pytest.raises(SourcePathError, match="not a plain file name"):
+        NormalizedSources.load(tmp_path / "out")
+
+
+def test_load_refuses_a_normalized_file_that_links_out_of_the_folder(tmp_path, symlink):
+    (tmp_path / "secret.txt").write_text("Outside the folder.", encoding="utf-8")
+    _manifest(tmp_path / "out", "01_notes")
+    symlink(tmp_path / "out" / "01_notes.md", tmp_path / "secret.txt")
+
+    with pytest.raises(SourcePathError, match="outside the folder"):
+        NormalizedSources.load(tmp_path / "out")
+
+
+def test_load_reads_a_normalized_file_linked_inside_the_folder(tmp_path, symlink):
+    _manifest(tmp_path / "out", "01_notes")
+    (tmp_path / "out" / "kept.txt").write_text("Notes.", encoding="utf-8")
+    symlink(tmp_path / "out" / "01_notes.md", tmp_path / "out" / "kept.txt")
+
+    assert NormalizedSources.load(tmp_path / "out").get("notes.txt").text == "Notes."

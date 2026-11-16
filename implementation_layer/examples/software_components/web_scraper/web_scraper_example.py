@@ -60,7 +60,11 @@ def single_page_example() -> None:
 
 
 def extraction_example(result: CrawlResult) -> None:
-    """Turn the crawled Markdown into structured records with the extractor."""
+    """Turn the crawled pages into structured records with the extractor.
+
+    ``to_model_text`` hands the pages over as marked data blocks, each with its
+    ``Source:`` line, so the model reads them as content rather than instructions.
+    """
     from gaik.software_components.extractor import DataExtractor, SchemaGenerator
     from gaik.software_components.llm import get_llm_config
 
@@ -75,7 +79,7 @@ def extraction_example(result: CrawlResult) -> None:
         extraction_model=schema,
         requirements=generator.item_requirements,
         user_requirements=requirements,
-        documents=[result.to_markdown(max_chars_per_page=6000)],
+        documents=[result.to_model_text(max_chars_per_page=6000)],
     )
     print(json.dumps(records, indent=2, ensure_ascii=False, default=str))
 

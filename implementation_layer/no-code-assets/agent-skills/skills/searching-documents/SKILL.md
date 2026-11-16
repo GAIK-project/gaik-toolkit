@@ -18,8 +18,8 @@ description: >-
 # Searching documents with gaik
 
 ```bash
-pip install "gaik[pg-vector-store,embedder,ranker]==0.9.0"
-pip install "gaik[finnish-rag]==0.9.0"   # Finnish lemmatization
+pip install "gaik[pg-vector-store,embedder,ranker]==0.9.1"
+pip install "gaik[finnish-rag]==0.9.1"   # Finnish lemmatization
 ```
 
 Hybrid search runs two arms that fail differently. The vector arm finds passages that
@@ -108,8 +108,8 @@ Fuse the two lists yourself instead of calling `store.search_hybrid()`:
   through gaik 0.8.3 `search_hybrid()` returns only RRF scores;
 - `expose_ranks=True` writes `rank_<arm>` (`rank_semantic`, `rank_keyword`) for each arm
   that returned the hit, plus `rrf_score`, so an arm that contributes nothing shows up per
-  result. A hit only one arm found has only that arm's rank: read it with
-  `hit.metadata.get("rank_keyword")`;
+  result. A hit only one arm found has only that arm's rank: for each `doc, score` in
+  `hits`, read it with `doc.metadata.get("rank_keyword")`;
 - through gaik 0.7.2 `search_hybrid()` ignores `tsquery_mode` and always parses in
   `websearch` mode, which ANDs every term, and `search_hybrid_weighted()` fails on every
   call with `column reference "id" is ambiguous`.

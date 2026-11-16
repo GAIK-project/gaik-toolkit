@@ -11,11 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Union, get_args, get_origin
 
-import requests
 from pydantic import BaseModel, Field, create_model
 from pydantic_core import PydanticUndefined
 
 from gaik.observability import UsageRecord, build_usage_record
+from gaik.software_components import _http
 from gaik.software_components.extractor import (
     CompositeExtractionRequirements,
     ExtractionRequirements,
@@ -43,6 +43,7 @@ from gaik.software_components.parsers.multimodal_parser.multimodal_parser import
     _extract_google_usage,
     _extract_openai_usage,
 )
+from gaik.software_components.source_material import with_source_material_instruction
 
 from . import text_layer
 from .prompts import SYSTEM_PROMPTS, USER_PROMPTS, VERIFICATION_PROMPT
@@ -1129,14 +1130,16 @@ class VisionExtractor:
             }
 
         t0 = time.perf_counter()
-        resp = requests.post(url, headers=headers, json=body, timeout=(30, 300))
-        resp.raise_for_status()
+        resp = _http.post(url, service="Gemini", headers=headers, json=body, timeout=(30, 300))
         elapsed = time.perf_counter() - t0
 
         payload = resp.json()
         candidates = payload.get("candidates", [])
         if not candidates:
-            raise ValueError(f"Gemini response had no candidates: {payload}")
+            raise ValueError(
+                "Gemini response had no candidates "
+                f"({_http.describe_empty_gemini_response(payload)})"
+            )
 
         candidate_parts = candidates[0].get("content", {}).get("parts", [])
         # Exclude thought blocks (present when includeThoughts=True) — they are
@@ -1145,7 +1148,10 @@ class VisionExtractor:
             p.get("text", "") for p in candidate_parts if p.get("text") and not p.get("thought")
         ]
         if not text_parts:
-            raise ValueError(f"Gemini response had no text parts: {payload}")
+            raise ValueError(
+                "Gemini response had no text parts "
+                f"({_http.describe_empty_gemini_response(payload)})"
+            )
 
         result_dict = json.loads(text_parts[0])
         usage_dict = _extract_google_usage(payload)
@@ -1239,7 +1245,8 @@ class VisionExtractor:
         prompt = SYSTEM_PROMPTS.get(self.model_provider, SYSTEM_PROMPTS["openai"])
         if self.include_verification:
             prompt += "\n" + VERIFICATION_PROMPT
-        return prompt
+        # The attached files and their text layer are material, never instructions.
+        return with_source_material_instruction(prompt)
 
     def _get_user_prompt(self, user_requirements: str) -> str:
         prompt = USER_PROMPTS.get(self.model_provider, USER_PROMPTS["openai"]).format(
