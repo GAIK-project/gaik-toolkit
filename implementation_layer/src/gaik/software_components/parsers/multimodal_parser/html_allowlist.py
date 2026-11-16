@@ -92,8 +92,22 @@ class _Rebuilder(HTMLParser):
         # tags and the source offset after its start tag. If it is never closed,
         # the rest of the source is rebuilt from there without it.
         self.drop_start: tuple[int, list[str], int] | None = None
+        # Computed once per pass, so each start tag costs one lookup.
+        self.line_starts = [0] + [m.end() for m in re.finditer("\n", source)]
+        lowered = source.lower()
+        self.last_end = {t: lowered.rfind(f"</{t}") for t in DROPPED_WITH_CONTENT}
+        # Set when a text-only start tag was dropped on its own: the parser must
+        # not then read what follows as that element's text.
+        self.skip_text_mode = False
+
+    def set_cdata_mode(self, *args, **kwargs) -> None:
+        if self.skip_text_mode:
+            self.skip_text_mode = False
+            return
+        super().set_cdata_mode(*args, **kwargs)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.skip_text_mode = False
         if tag in _DROPPED_VOID:
             return
         if self.dropping:
@@ -103,13 +117,15 @@ class _Rebuilder(HTMLParser):
                 self.dropping.append(tag)
             return
         if tag in DROPPED_WITH_CONTENT:
-            self.dropping.append(tag)
             line, col = self.getpos()
             # getpos() counts lines by "\n" only.
-            line_start = 0
-            for _ in range(line - 1):
-                line_start = self.source.index("\n", line_start) + 1
-            offset = line_start + col + len(self.get_starttag_text() or "")
+            offset = self.line_starts[line - 1] + col + len(self.get_starttag_text() or "")
+            if self.last_end[tag] < offset:
+                # No end tag follows, so the element can never close: drop only
+                # its start tag now instead of rebuilding the rest in a new pass.
+                self.skip_text_mode = tag in _TEXT_ONLY
+                return
+            self.dropping.append(tag)
             self.drop_start = (len(self.out), list(self.open), offset)
             return
         if tag == "img":

@@ -48,3 +48,20 @@ def test_unclosed_title_in_markdown_keeps_the_next_paragraph_as_markup():
 def test_two_unclosed_dropped_elements_on_later_lines():
     out = keep_document_markup("<p>a</p>\r\n<p>b<select>\n<option>c</p>\n<p>d<textarea>e</p>")
     assert out == "<p>a</p>\r\n<p>b\nc</p>\n<p>de</p>"
+
+
+def test_many_unclosed_dropped_tags_take_linear_time():
+    # Each unclosed tag used to restart the parse on the rest of the source,
+    # so 20,000 of them took seconds; one pass takes milliseconds.
+    import time
+
+    source = "<title>x\n" * 20000
+    started = time.perf_counter()
+    result = keep_document_markup(source)
+    assert time.perf_counter() - started < 1.0
+    assert result == "x\n" * 20000
+
+
+def test_unclosed_script_leaves_its_text_escaped():
+    # Only the start tag is dropped: what follows is escaped text, never code.
+    assert keep_document_markup("<p>a</p><script>alert(1)<b>") == "<p>a</p>alert(1)<b></b>"
