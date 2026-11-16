@@ -88,6 +88,12 @@ set it. A provider without credentials on the server is left out, and
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
 
+Keep model calls in the EU where the deployment can: set `GOOGLE_CLOUD_LOCATION=eu`
+and `GOOGLE_VERTEXAI_LOCATION=eu` for Gemini on Vertex AI (gaik's own default is
+`global`, which is not tied to a region), and give the Vision Extractor's Gemini calls
+an EU `GOOGLE_GENERATE_CONTENT_URL` (see `.env.example`). The deployed demo calls GPT
+and Claude through an Azure resource in Sweden.
+
 `DEMO_SERVER_MODELS_NOTE` is one sentence the menu shows under the server models,
 for where they run (for example the Azure region). It has no default: that depends on
 the cloud resources behind the keys.
