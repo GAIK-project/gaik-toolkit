@@ -1,5 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
-import { getTrialLimits, takeTrialRun } from "./trial";
+import { Redis } from "@upstash/redis";
+import {
+  TRIAL_COUNTER_UNAVAILABLE,
+  getTrialLimits,
+  takeTrialRun,
+} from "./trial";
 
 const KEYS = [
   "TRIAL_RUNS_PER_DAY",
@@ -39,4 +44,19 @@ test("without Redis the trial is off and a pending user waits", async () => {
     status: 403,
     error: "Your access is pending approval.",
   });
+});
+
+test("while the configured Redis does not answer, a trial run is refused", async () => {
+  for (const k of KEYS) delete process.env[k];
+  // Nothing listens on port 9; the request fails at once.
+  const silent = new Redis({
+    url: "http://127.0.0.1:9",
+    token: "test",
+    retry: false,
+  });
+  expect(await takeTrialRun("user-1", silent)).toEqual({
+    ok: false,
+    ...TRIAL_COUNTER_UNAVAILABLE,
+  });
+  expect(TRIAL_COUNTER_UNAVAILABLE.status).toBe(503);
 });
