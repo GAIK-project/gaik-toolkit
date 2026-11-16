@@ -29,6 +29,8 @@ export interface ServerModels {
   models: ServerModel[];
   /** With an Aitta model picked, these transcribe and embed. */
   aitta?: { speech: AittaHelper; embedding: AittaHelper } | null;
+  /** Where the server's own models run, in the deployment's words. */
+  note?: string | null;
 }
 
 // The choice is not a secret: keep it across reloads in this browser.

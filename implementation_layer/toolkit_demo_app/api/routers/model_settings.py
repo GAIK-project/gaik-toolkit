@@ -1,5 +1,7 @@
 """Small authenticated-through-Next connectivity check for model settings."""
 
+import os
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
@@ -47,6 +49,10 @@ async def list_server_models(request: Request):
     )
     has_aitta = any(m.provider == "aitta" for m in models)
     return {
+        # Where this deployment's own models run, in the deployment's words
+        # (DEMO_SERVER_MODELS_NOTE). It depends on the cloud resources behind the
+        # keys, which the code cannot know, so there is no default.
+        "note": (os.getenv("DEMO_SERVER_MODELS_NOTE") or "").strip()[:300] or None,
         # With an Aitta model picked, these transcribe and embed. An idle one
         # starts on its first request, which can take minutes.
         "aitta": {

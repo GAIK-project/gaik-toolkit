@@ -740,6 +740,11 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
                 isDefault={model.id === catalog.default}
               />
             ))}
+            {serverModels.length > 0 && catalog.note && (
+              <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs">
+                {catalog.note}
+              </p>
+            )}
             {aittaModels.length > 0 && (
               <>
                 {serverModels.length > 0 && <DropdownMenuSeparator />}
@@ -755,9 +760,9 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
                   />
                 ))}
                 <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs">
-                  Slower than the server models: a run takes from 20 seconds to
-                  minutes. Speech and embeddings then run on Aitta too. No
-                  personal data.
+                  Runs at CSC in Finland, speech and embeddings included. Slower
+                  than the server models: a run takes from 20 seconds to
+                  minutes. A research service: no personal data.
                 </p>
               </>
             )}
@@ -836,7 +841,7 @@ export function ModelSettingsNotice({
           ...use.details,
           ...(aitta
             ? [
-                "CSC Aitta is a research service: do not send personal data. Its models are slower: a run takes from 20 seconds to minutes.",
+                "CSC Aitta runs at CSC in Finland. It is a research service: do not send personal data. Its models are slower: a run takes from 20 seconds to minutes.",
               ]
             : []),
         ].map((line) => (
