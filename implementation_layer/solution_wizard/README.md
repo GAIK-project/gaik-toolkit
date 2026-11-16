@@ -86,7 +86,9 @@ folder and the wizard's own files, writes only the output folder, never reads or
 `.env` file, and runs in Bash only the wizard's scripts with the options
 `scripts/agent_scripts.json` lists. Other tools are refused with the reason, and the agent
 carries on. Your own MCP servers and Claude Code settings are not loaded. The agent's
-environment holds the system basics plus the names the `.env` file sets; hand on another
+environment holds the system basics plus the names the `.env` file sets (without one, the
+provider names `templates/poc/_common/env.example.tmpl` lists, taken from your shell); the
+runner narrows its own environment to these before the CLI starts. Hand on another
 variable with `--pass-env NAME`.
 
 ### Option 3 — Wizard as a web chat (demo website)

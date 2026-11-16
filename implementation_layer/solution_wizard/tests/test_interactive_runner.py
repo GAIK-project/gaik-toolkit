@@ -307,21 +307,84 @@ def test_the_agent_gets_the_system_basics_and_the_env_files_names() -> None:
     assert passed["MY_SHELL_VAR"] == "x"
 
 
-def test_the_env_files_names_reach_the_agent(tmp_path, monkeypatch) -> None:
+_FOUNDRY_NAMES = ("CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_API_KEY",
+                  "ANTHROPIC_FOUNDRY_RESOURCE")  # fmt: skip
+
+
+@pytest.fixture()
+def shell_env():
+    """Puts the process environment back after a test narrows it."""
+    saved = dict(os.environ)
+    yield
+    os.environ.clear()
+    os.environ.update(saved)
+
+
+class _CLIStartError(Exception):
+    pass
+
+
+def _cli_process_env(options: ClaudeAgentOptions, monkeypatch) -> dict[str, str]:
+    """The environment the SDK starts the CLI with, captured without starting it."""
+    seen: dict[str, str] = {}
+
+    async def open_process(*_args, env=None, **_kwargs):
+        seen.update(env or {})
+        raise _CLIStartError
+
+    monkeypatch.setattr(anyio, "open_process", open_process)
+
+    async def go() -> None:
+        client = ClaudeSDKClient(options=options)
+        try:
+            await client.connect()
+        except Exception:  # noqa: BLE001 - the SDK wraps the stop above in its own error
+            pass
+
+    asyncio.run(go())
+    assert seen, "the SDK did not reach the point where it starts the CLI"
+    return seen
+
+
+def test_the_cli_gets_only_the_env_files_names_and_the_system_basics(
+    tmp_path, output, monkeypatch, shell_env
+) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(
         "CLAUDE_CODE_USE_FOUNDRY=1\nANTHROPIC_FOUNDRY_API_KEY=k\n"
         "ANTHROPIC_FOUNDRY_RESOURCE=r\nDOCLING_API_BASE=https://x\n"
     )
-    monkeypatch.setenv("GITHUB_TOKEN", "secret")
-    for name in ("CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_API_KEY",
-                 "ANTHROPIC_FOUNDRY_RESOURCE", "DOCLING_API_BASE"):  # fmt: skip
-        monkeypatch.delenv(name, raising=False)
+    os.environ["MY_SHELL_VAR"] = "x"
+    for name in (*_FOUNDRY_NAMES, "DOCLING_API_BASE"):
+        os.environ.pop(name, None)
 
     env = runner.load_environment(env_file)
+    runner.use_agent_environment(env)
+    cli = tmp_path / "claude"
+    cli.write_text("")
+    options = runner.build_session_options(output, env, "m", cli_path=str(cli))
+    process_env = _cli_process_env(options, monkeypatch)
 
-    assert env["DOCLING_API_BASE"] == "https://x"
-    assert "GITHUB_TOKEN" not in env
+    assert process_env["DOCLING_API_BASE"] == "https://x"
+    assert process_env["ANTHROPIC_FOUNDRY_API_KEY"] == "k"
+    assert "MY_SHELL_VAR" not in process_env
+    # Besides env, only the names the SDK itself sets for the CLI.
+    added = set(process_env) - set(env)
+    assert all(name == "PWD" or name.startswith("CLAUDE") for name in added), added
+
+
+def test_without_an_env_file_the_provider_names_come_from_the_shell(tmp_path, shell_env) -> None:
+    for name in _FOUNDRY_NAMES:
+        os.environ[name] = "1"
+    os.environ["AZURE_API_KEY"] = "k"
+    os.environ["OPENAI_BASE_URL"] = "https://x"
+    os.environ["MY_SHELL_VAR"] = "x"
+
+    env = runner.load_environment(tmp_path / "missing.env")
+
+    assert env["AZURE_API_KEY"] == "k" and env["OPENAI_BASE_URL"] == "https://x"
+    assert all(env[name] == "1" for name in _FOUNDRY_NAMES)
+    assert "MY_SHELL_VAR" not in env
 
 
 def test_a_relative_output_folder_is_taken_from_where_the_runner_starts(tmp_path) -> None:
@@ -332,6 +395,11 @@ def test_a_relative_output_folder_is_taken_from_where_the_runner_starts(tmp_path
 def test_an_output_folder_inside_the_repository_is_refused(inside) -> None:
     with pytest.raises(ValueError, match="inside the GAIK repository"):
         runner.resolve_output_dir(inside, runner.REPO_ROOT)
+
+
+def test_an_output_folder_that_holds_the_repository_is_refused() -> None:
+    with pytest.raises(ValueError, match="holds the GAIK repository"):
+        runner.resolve_output_dir("..", runner.REPO_ROOT)
 
 
 def test_the_first_prompt_gives_the_output_folder_with_forward_slashes() -> None:

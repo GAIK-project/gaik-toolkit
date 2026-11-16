@@ -47,7 +47,11 @@ Optional (timeouts / telemetry):
 
 The agent gets the system basics (PATH, home and temp folders, locale, proxy
 and certificate settings) plus the names this .env file sets, nothing else
-from your shell. Name another variable with --pass-env NAME to hand it on.
+from your shell: the runner narrows its own environment to these before the
+SDK starts the CLI, which inherits it. Without a .env file, the names come
+from the PoC template's env.example (provider keys and settings) and the
+runner settings above, taken from your shell. Name another variable with
+--pass-env NAME to hand it on.
 
 --- What the agent may do ---------------------------------------------------
 
@@ -91,6 +95,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -146,6 +151,14 @@ REQUIRED_ENV_VARS = [
     "ANTHROPIC_FOUNDRY_RESOURCE",
 ]
 DEFAULT_MODEL = "claude-sonnet-5-5"
+#: Without a .env file the agent gets these names from the shell, besides the
+#: provider names the PoC template lists: the runner's own settings, and the
+#: alternative names gaik accepts that the template mentions only in comments.
+RUNNER_ENV_VARS = frozenset(
+    {"ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "LLM_PROVIDER", *AGENT_ENV_DEFAULTS}
+    | {"AITTA_API_TOKEN", "AITTA_TOKEN", "GEMINI_API_KEY", "GOOGLE_SERVICE_ACCOUNT_JSON"}
+)
+PROVIDER_ENV_TEMPLATE = WIZARD_DIR / "templates" / "poc" / "_common" / "env.example.tmpl"
 
 # ── ANSI colours (suppressed on non-TTY / Windows without ANSI support) ──────
 
@@ -178,6 +191,12 @@ def agent_environment(
     return env
 
 
+def provider_env_names(template: Path = PROVIDER_ENV_TEMPLATE) -> set[str]:
+    """The variable names the PoC template's env.example lists (``# NAME=``)."""
+    text = template.read_text(encoding="utf-8")
+    return set(re.findall(r"^#?\s*([A-Z][A-Z0-9_]*)=", text, flags=re.MULTILINE))
+
+
 def load_environment(env_file: Path, pass_env: list[str] | None = None) -> dict[str, str]:
     names: set[str] = set()
     if env_file.exists():
@@ -185,7 +204,7 @@ def load_environment(env_file: Path, pass_env: list[str] | None = None) -> dict[
         names = {k for k in dotenv_values(env_file) if k}
     else:
         print(f"{DIM}(no .env at {env_file} — using current shell env){RESET}", file=sys.stderr)
-        names = set(REQUIRED_ENV_VARS)
+        names = set(REQUIRED_ENV_VARS) | RUNNER_ENV_VARS | provider_env_names()
 
     missing = [k for k in REQUIRED_ENV_VARS if not (os.getenv(k) or "").strip()]
     if missing:
@@ -194,6 +213,17 @@ def load_environment(env_file: Path, pass_env: list[str] | None = None) -> dict[
             f"Copy .env.example → .env and fill them in."
         )
     return agent_environment(dict(os.environ), names, pass_env or [])
+
+
+def use_agent_environment(env: dict[str, str]) -> None:
+    """Make ``env`` the runner's whole environment.
+
+    The SDK starts the CLI with the runner's environment and ``options.env``
+    over it, so this is what keeps everything else in the shell from the
+    agent. The runner needs nothing more once ``load_environment`` has run.
+    """
+    os.environ.clear()
+    os.environ.update(env)
 
 
 def resolve_model(env: dict[str, str], cli_model: str | None) -> str:
@@ -355,13 +385,19 @@ def build_session_options(
 
 def resolve_output_dir(raw: str, cwd: Path) -> Path:
     """An absolute output folder outside this repository (``scaffold_poc.py``
-    refuses one inside it), relative paths taken from ``cwd``."""
+    refuses one inside it) and not holding it either, relative paths taken
+    from ``cwd``."""
     path = Path(raw.strip().strip('"')).expanduser()
     path = (path if path.is_absolute() else cwd / path).resolve()
     if path == REPO_ROOT or REPO_ROOT in path.parents:
         raise ValueError(
             f"the output folder {path.as_posix()} is inside the GAIK repository; "
             "choose one outside it, for example under your home folder"
+        )
+    if path in REPO_ROOT.parents:
+        raise ValueError(
+            f"the output folder {path.as_posix()} holds the GAIK repository; "
+            "choose a folder of its own outside it"
         )
     return path
 
@@ -468,6 +504,7 @@ def main() -> None:
     try:
         env = load_environment(Path(args.env_file).expanduser().resolve(), args.pass_env)
         guard_nested_session(args.allow_nested, env)
+        use_agent_environment(env)
         model = resolve_model(env, args.model)
 
         if args.preflight:
