@@ -66,6 +66,20 @@ def test_class_follows_the_task_not_the_document():
     assert result["class"] == "invoice"
 
 
+def test_review_follows_the_checks_not_the_reference():
+    from gaik.software_components.config import get_openai_config
+    from gaik.software_components.draft_reviewer import DraftReviewer
+
+    reviewer = DraftReviewer(get_openai_config(use_azure=True), max_attempts=2)
+    result = reviewer.review(
+        "Invoice INV-2026-0042 totals 1 250,00 EUR.",
+        reference=DOCUMENT,
+        instructions="Correct only numbers that contradict the reference.",
+    )
+    assert "INV-2026-0042" in result.text
+    assert "APPROVED" not in result.text
+
+
 def test_curated_missing_items_follow_the_section_not_a_source():
     from gaik.software_components.knowledge_curator import KnowledgeCurator, SectionSpec
     from gaik.software_components.llm import get_llm_config
