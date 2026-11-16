@@ -190,8 +190,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
     // the two catalogues that list the models. The browser's own copy of this
     // header is never forwarded: `headers` starts empty.
     if (
-      (isStateChanging(request.method) &&
-        !pathname.startsWith("/api/wizard")) ||
+      isStateChanging(request.method) ||
       backendPath === "/model-settings/server" ||
       backendPath === "/extract-vision/models"
     ) {

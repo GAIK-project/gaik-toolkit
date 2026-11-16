@@ -182,9 +182,12 @@ export async function forwardReportRun(
   try {
     backendRes = await fetch(`${BACKEND_URL}${backendPath}`, {
       method: "POST",
-      headers: reportRunHeaders(),
+      // One headers object: the run token and, for the team, the model tier.
+      headers: {
+        ...reportRunHeaders(),
+        ...(staff ? { [MODEL_TIER_HEADER]: "staff" } : {}),
+      },
       body,
-      ...(staff ? { headers: { [MODEL_TIER_HEADER]: "staff" } } : {}),
     });
   } catch (e) {
     return NextResponse.json(
