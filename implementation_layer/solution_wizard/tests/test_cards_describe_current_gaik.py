@@ -85,3 +85,8 @@ def test_judge_card_names_the_eu_default_location():
     effect = _option("LLMJudge", "use_vertexai")["effect"]
     assert "default 'global'" not in effect
     assert "'eu'" in effect and "'global'" in effect
+    # A PoC installs the validated release, which still defaults to 'global'.
+    validated = REPO / "implementation_layer/solution_wizard/gaik_validated_version.txt"
+    if validated.exists() and validated.read_text(encoding="utf-8").strip() == "0.9.1":
+        assert "gaik 0.9.1 calls 'global'" in effect
+        assert "after 0.9.1" in effect
