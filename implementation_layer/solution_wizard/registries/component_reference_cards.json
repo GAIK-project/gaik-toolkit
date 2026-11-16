@@ -879,7 +879,7 @@
         "name": "tsquery_mode",
         "type": "str",
         "default": "or",
-        "effect": "How the keyword arm turns query text into a tsquery, for search_keyword and both hybrid searches. The default is 'or' (it was 'websearch' through gaik 0.8.3). 'websearch' is Postgres' own parser and ANDs every term, so a sentence query only matches a passage containing every stem -- on real prose none, and hybrid silently degrades to vector-only. 'or' keeps the same parse (stemming, stop words, quoted phrases) but ORs the terms and lets ts_rank_cd rank; a leading '-' is read as text, not NOT. 'prefix' ORs prefix matches and suits only an UNSTEMMED index.",
+        "effect": "How the keyword arm turns query text into a tsquery, for search_keyword and both hybrid searches. The default is 'or' (it was 'websearch' through gaik 0.8.3). 'websearch' is Postgres' own parser and ANDs every term, so a sentence query only matches a passage containing every stem -- on real prose none, and hybrid silently degrades to vector-only. 'or' keeps the same parse (stemming, stop words, quoted phrases) but ORs the terms and lets ts_rank_cd rank; a leading '-' is read as text, not NOT. 'prefix' ORs prefix matches and suits only an UNSTEMMED index. From the gaik release after 0.10.0, with a text_processor, 'websearch' lemmatizes only the words and keeps quoted phrases, '-word' and 'or'.",
         "selection_relevant": true,
         "infer_from": "users type natural-language questions -> leave at 'or'; short keyword or code lookups where every term must appear -> 'websearch'; 'prefix' only for an unstemmed, suffix-heavy corpus, never lemmatized Finnish"
       },
@@ -911,9 +911,9 @@
         "name": "hnsw_ef_search",
         "type": "int | None",
         "default": null,
-        "effect": "Per-connection hnsw.ef_search for the vector arm. None keeps pgvector's default of 40, which trades recall for latency: on one 1,500-dimension corpus, 100 raised recall@20 against an exact scan from 96.2% to 99.2% for +0.7 ms. On a few thousand rows it changes nothing.",
+        "effect": "Per-connection hnsw.ef_search for the vector arm. None keeps pgvector's default of 40, which trades recall for latency: on one 1,500-dimension corpus, 100 raised recall@20 against an exact scan from 96.2% to 99.2% for +0.7 ms. It also caps the row count: an HNSW index scan returns at most ef_search rows, so at the default a top_k above 40 returns 40 rows, and the vector arm of both hybrid searches (3 x top_k rows) is cut above top_k=13.",
         "selection_relevant": false,
-        "infer_from": "a corpus beyond tens of thousands of chunks, or recall mattering more than a millisecond -> 100; otherwise leave None"
+        "infer_from": "a corpus beyond tens of thousands of chunks, recall mattering more than a millisecond, or a vector search asking for more than 40 rows (top_k above 40, a hybrid top_k above 13) -> 100, or at least the most rows asked for; otherwise leave None"
       },
       {
         "name": "vector_type",
@@ -3071,7 +3071,7 @@
         "infer_from": "several knowledge bases in one persist_path -> one collection_name each"
       }
     ],
-    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed."
+    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. From the gaik release after 0.10.0, a persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored."
   },
   "FieldsToDocx": {
     "import": "from gaik.software_components.fields_to_docx import FieldsToDocx",

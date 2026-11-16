@@ -13,7 +13,7 @@
       "needs": ["gaik-transcriber MCP server"],
       "setup": [
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
@@ -32,7 +32,7 @@
       "needs": ["gaik-transcriber MCP server"],
       "setup": [
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
@@ -67,7 +67,7 @@
       "needs": ["Filesystem MCP server", "gaik-transcriber MCP server"],
       "setup": [
         "Windows only. Needs Python 3.11+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber and the file access server, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment and the file access server from pinned, hash-checked packages, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],

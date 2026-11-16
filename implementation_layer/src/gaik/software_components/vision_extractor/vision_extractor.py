@@ -4,7 +4,6 @@ Single-pass vision extraction: PDF/image → structured data in one LLM call.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import time
 from dataclasses import dataclass
@@ -20,6 +19,10 @@ from gaik.software_components.extractor import (
     CompositeExtractionRequirements,
     ExtractionRequirements,
     SchemaGenerator,
+)
+from gaik.software_components.extractor.saved_schema import (
+    load_saved_model,
+    save_model_file,
 )
 from gaik.software_components.extractor.schema import (
     DECIMAL_PERSISTED_HELPER_SOURCE,
@@ -418,7 +421,9 @@ def _inline_schema_refs(schema: dict) -> dict:
 
 
 def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
-    """Generate and save a Pydantic model as a standalone Python module.
+    """Write a Pydantic model as Python source for people to read.
+
+    Loading never imports this file; it reads SCHEMA_MODEL_FILE instead.
 
     Generates Python source directly from model_fields using repr() for every
     string value, so quotes, umlauts, and other special characters in field
@@ -538,11 +543,9 @@ def _save_requirements(requirements: RequirementsSpec, model_name: str, path: Pa
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def _load_saved_schema(path: Path, model_name: str) -> type[BaseModel]:
-    spec = importlib.util.spec_from_file_location("_vision_saved_schema", path)
-    module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-    spec.loader.exec_module(module)  # type: ignore[union-attr]
-    return getattr(module, model_name)
+# The saved model is read from SCHEMA_MODEL_FILE as data; schema.py is written
+# for people to read and is never imported.
+SCHEMA_MODEL_FILE = "schema_model.json"
 
 
 def _load_saved_requirements(path: Path) -> tuple[str, RequirementsSpec]:
@@ -746,8 +749,9 @@ class VisionExtractor:
             extraction_model: Pre-built Pydantic model (skips schema generation).
             requirements: Pre-built ExtractionRequirements (skips schema generation).
             schema_dir: Directory for schema persistence.
-                        Loads schema.py + requirements.json if present; saves them
-                        after generation if not.
+                        Loads schema_model.json + requirements.json if present
+                        (schema.py is written for reading only and never
+                        imported); saves them after generation if not.
 
         Schema resolution order:
             1. Both extraction_model and requirements passed → use directly.
@@ -1243,12 +1247,14 @@ class VisionExtractor:
     ) -> tuple[type[BaseModel], RequirementsSpec]:
         if schema_dir is not None:
             schema_dir = Path(schema_dir)
-            schema_path = schema_dir / "schema.py"
+            model_path = schema_dir / SCHEMA_MODEL_FILE
             req_path = schema_dir / "requirements.json"
-            if schema_path.exists() and req_path.exists():
+            # A folder from an older gaik has schema.py but no model file; it is
+            # rebuilt from requirements.json where that determines the model.
+            if req_path.exists() and (model_path.exists() or (schema_dir / "schema.py").exists()):
                 print(f"Loading saved schema from {schema_dir}")
                 model_name, requirements = _load_saved_requirements(req_path)
-                extraction_model = _load_saved_schema(schema_path, model_name)
+                extraction_model = load_saved_model(model_path, model_name, requirements)
                 return extraction_model, requirements
 
         schema_config = (
@@ -1264,6 +1270,7 @@ class VisionExtractor:
             schema_dir = Path(schema_dir)
             schema_dir.mkdir(parents=True, exist_ok=True)
             _save_schema_to_python(extraction_model, schema_dir / "schema.py")
+            save_model_file(extraction_model, schema_dir / SCHEMA_MODEL_FILE)
             _save_requirements(
                 requirements, extraction_model.__name__, schema_dir / "requirements.json"
             )

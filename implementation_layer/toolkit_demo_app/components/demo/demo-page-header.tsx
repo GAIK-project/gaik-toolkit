@@ -1,5 +1,6 @@
 "use client";
 
+import { ComponentSource } from "@/components/demo/component-source";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -42,7 +43,11 @@ export function DemoPageHeader({
       {description && (
         <p className="text-muted-foreground mt-2">{description}</p>
       )}
-      {children}
+      {/* The page's own controls share the source line, on the right. */}
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 [&>*]:mt-0">
+        <ComponentSource className="mr-auto" />
+        {children}
+      </div>
     </header>
   );
 }

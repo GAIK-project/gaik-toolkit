@@ -165,7 +165,8 @@ class VisionRagParser:
         This method:
         1. Uses Docling to extract document structure and images
         2. Sends images to vision model for detailed descriptions
-        3. Appends descriptions to chunk text by page
+        3. Appends a page's descriptions to its first chunk (or to a chunk of
+           their own when the page has no text chunk)
         4. Chunks by document structure using HierarchicalChunker
 
         Args:
@@ -200,6 +201,7 @@ class VisionRagParser:
         doc_name = document_name or os.path.splitext(os.path.basename(pdf_path))[0]
         langchain_docs: list[Document] = []
         chunk_id = 0
+        described_pages: set[int] = set()
 
         for chunk in chunker.chunk(doc):
             try:
@@ -231,7 +233,14 @@ class VisionRagParser:
                 ):
                     heading = chunk_dict["meta"]["headings"][0]
 
-                if page_num is not None and page_num in descriptions_by_page:
+                # A page's descriptions go on its first chunk only; on every chunk
+                # they crowded out the chunk text in retrieval and the context.
+                if (
+                    page_num is not None
+                    and page_num in descriptions_by_page
+                    and page_num not in described_pages
+                ):
+                    described_pages.add(page_num)
                     desc_block = "\n\n[IMAGE DESCRIPTIONS]\n" + "\n\n".join(
                         descriptions_by_page[page_num]
                     )
@@ -268,6 +277,23 @@ class VisionRagParser:
                     Document(page_content=getattr(chunk, "text", ""), metadata=fallback_meta)
                 )
                 chunk_id += 1
+
+        # A page with images but no text chunk still gets its descriptions.
+        for page_num in sorted(set(descriptions_by_page) - described_pages):
+            langchain_docs.append(
+                Document(
+                    page_content="[IMAGE DESCRIPTIONS]\n"
+                    + "\n\n".join(descriptions_by_page[page_num]),
+                    metadata={
+                        "source": pdf_path,
+                        "document_name": doc_name,
+                        "page_number": page_num,
+                        "heading": None,
+                        "chunk_id": chunk_id,
+                    },
+                )
+            )
+            chunk_id += 1
 
         if self.verbose:
             print(

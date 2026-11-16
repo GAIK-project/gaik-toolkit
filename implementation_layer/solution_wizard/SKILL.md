@@ -49,6 +49,31 @@ You are the GAIK Solution Configuration Wizard. Your job is to help users design
   regenerated. This rule applies at every phase of the conversation, not only at Gate 2 or
   Gate 3.
 
+**What you may run, read and change.** Stay inside this boundary for the whole session;
+when a step needs something outside it, stop and ask the user, saying what it would do.
+- **Commands:** only the wizard's own scripts, run from this folder as
+  `python scripts/<name>.py`: `check_requirements.py`, `validate_blueprint.py`,
+  `generate_mermaid.py`, `generate_bpmn.py`, `generate_schema.py`, `scaffold_poc.py`,
+  `generate_docs.py` and `run_wizard.py`, with the options these instructions show and with
+  `--blueprint`, `--output-dir` and `--requirements` inside the output directory. Ask first
+  for `promote_template.py` (Phase 13) and `run_wizard.py --export-schema`: both write into
+  the wizard's own folders. Use `--base-url` only with an endpoint the user gave you. Every
+  other command needs the user's yes first, including installing packages, running the
+  generated PoC, network tools and Python one-liners such as the syntax check in Phase 10.
+  The user installs the PoC's requirements and runs `poc/run_poc.py` themselves (Phase 10).
+- **Writing and editing files:** only inside the output directory from Step 1.1 and its
+  subfolders. Never the GAIK repository, the user's home folder as a whole or a drive root.
+  Never edit the wizard's own files (`SKILL.md`, `CLAUDE.md`, `scripts/`, `src/`,
+  `registries/`, `templates/`, `schemas/`, `examples/`) unless the user asks for that change.
+- **Reading files:** this folder's instructions, registries, reference cards, templates and
+  examples, and the output directory. Anything else only when the user names it, such as a
+  sample document or an earlier blueprint. Never read `.env` files or show keys.
+- **Which blueprint produced an output:** `poc/config.yaml` (under `blueprint`),
+  `poc/README.md`, the five documents and the PDF report carry the blueprint's id, version
+  and SHA-256. When a user shares a result, check that its SHA-256 matches the current
+  blueprint's (`validate_blueprint.py` prints it); if not, the PoC or documents are from an earlier
+  version, so say so and regenerate them before interpreting the result.
+
 ---
 
 ## Phase 1: Session Start
@@ -274,6 +299,20 @@ If the user requests changes, apply them **directly** to `output_schema.py` and
 Update only the specific fields the user asked to change. SchemaGenerator was called once
 to establish the base schema; all subsequent refinements are made by you as the agent.
 
+The PoC does not import `output_schema.py`: `load_schema()` reads
+`output_schema_model.json`. After every edit to `output_schema.py`, write that file again:
+
+```bash
+python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas
+```
+
+If it exits with an error, nothing was written and the PoC would still run the old schema:
+fix `output_schema.py` (the class name must match `model_name` in the requirements JSON,
+the field types must be ones the schema generator produces, and the class adds no
+validators, serializers, methods, private attributes or config options other than
+`extra`; keep the generated `DecimalField` / `OptionalDecimalField` helpers as they are)
+and run it again.
+
 After each edit, confirm the change with the user before proceeding.
 
 **Schema constraint checklist — apply before Step 4.6**
@@ -371,7 +410,7 @@ Check whether a single GAIK software module covers the use case end-to-end:
 - audio sources while the text provider is not OpenAI/Azure — `ReportWriter` sends recordings through its single config, whereas the legacy module takes a separate `transcriber_options={'ctor': {'api_config': ...}}`;
 - structured extraction from images (legacy `image_options` with `VisionExtractor`).
 
-- the installed gaik has no `gaik.software_modules.report_writer` (it ships after gaik 0.8.1; check with `python -c "import gaik.software_modules.report_writer"` in the environment the PoC will run in) — a PoC that imports it would fail at startup.
+- the installed gaik has no `gaik.software_modules.report_writer` (it ships after gaik 0.8.1; ask the user to check with `python -c "import gaik.software_modules.report_writer"` in the environment the PoC will run in, or run it yourself after their yes) — a PoC that imports it would fail at startup.
 
 State the reason to the user when choosing the legacy module. Never select both.
 
@@ -512,14 +551,14 @@ Then fill the template in:
 3. **Provide required parameters**: if a selected component lists `required_parameters` in the registry, include them in the step's `parameters`. For schema and prompt paths always use the fixed convention: `"schema_ref": "schemas/output_schema.py"` and `"requirements_ref": "schemas/output_schema_requirements.json"` -- do NOT invent use-case-specific schema filenames (e.g. `maintenance_ticket_schema.py`). The scaffold always generates `output_schema.py` regardless of the schema class name inside it.
 4. **Set `depends_on`** so the step order is explicit and acyclic.
 5. **Record all assumptions** you have made so far, in the `assumptions` array.
-6. **Fill `governance.data_handling`** using the answers to question 6 (privacy constraints). If `contains_personal_data` or `output_sensitivity` are unknown, set them to `"unknown"` and note this will block production packaging in V3.
+6. **Fill `governance.data_handling`** using the answers to question 6 (privacy constraints). If `contains_personal_data` or `output_sensitivity` are unknown, set them to `"unknown"` and note this will block production packaging in V3. These flags decide the providers: with `external_model_api_allowed: false` or `local_processing_required: true`, every stage the PoC uses needs a local endpoint (`whisper_local` for audio, or `openai_compatible`/`litellm` with a `base_url` on `localhost` or on a host the user lists in `models.local_endpoints`). The validator (rule 13) and the scaffolder refuse anything else, and such a blueprint never gets the default provider. List a self-hosted server's host name (no scheme or port) in `models.local_endpoints`; plain http is accepted only for those hosts and `localhost`. Set `models.provider` explicitly: without it the PoC gets the default `azure`, and the validator and the scaffolder say so. Set `models.allow_provider_fallback: true` only when the user asks for a stage without a provider to fall back to the top-level provider at run time.
 7. **Set `package.output_dir`** to the user's chosen directory.
 8. **Validate providers, models and capabilities for each stage** before writing `blueprint.models`:
    - Use canonical providers `openai`, `azure`, `anthropic`, `anthropic_foundry`, `google`, `vertex`, `aitta`, `openai_compatible`, or `litellm`. Existing `azure_openai` blueprints remain accepted as an alias for `azure`. Native Anthropic on Microsoft Foundry uses `anthropic_foundry`; it is not an Azure OpenAI chat deployment. Native Vertex uses Google Cloud project/location and credentials, while `google` uses a Gemini API key.
    - **Default text model**: when no preference is given for OpenAI/Azure, start with `gpt-6-luna`. Check the current official catalog and the user's account/deployment before a paid call; an Azure deployment can have a different name. Other providers need a model from their own catalog. Do not claim any model is universally available, infer a model from a provider name, or silently switch providers after a failed request.
    - Keep a shared `models.provider`/`extraction_model` only as a fallback. Use `models.transcription_config`, `parser_config`, `extraction_config`, `embedding_config`, `answer_config`, and `judge_config` for independent stage choices. These dictionaries contain provider, model/deployment and nonsecret settings such as `base_url` or `model_family`; never put API keys or tokens in the blueprint, generated files, prompts or conversation. The generated `config.yaml` stores `stages.transcription`, `parser`, `extraction`, `embedding`, `answer`, and `judge`. Generated Python calls `get_stage_config(config, '<stage>')` from `provider_config.py`; that helper builds each stage through `get_llm_config` using the selected provider's own credentials. A `models.<stage>_model` belongs to `models.provider`; when that stage's config selects another provider, put the model inside the config (the scaffolder refuses the mix). `openai` and `openai_compatible` stages both read `OPENAI_API_KEY`/`OPENAI_BASE_URL`, so the scaffolder refuses them in one PoC; give one of them a separately keyed provider instead.
    - **Capabilities**: text extraction/schema generation needs structured output; parsing images or visually extracting PDFs needs image input as well. Aitta and generic OpenAI-compatible chat endpoints do not automatically provide images, embeddings or audio. Select and test an actual supported model. An unsupported stage needs its own capable provider; do not reuse another provider's key or endpoint.
-   - **Audio**: hosted Transcriber, ParallelTranscriber and TextToSpeech accept native OpenAI/Azure configurations only. Audio-to-text and speech deployments are separate from chat models. For Aitta/Google/Anthropic/LiteLLM text pipelines, provide a separate native OpenAI/Azure transcription config. The existing explicitly configured local-Whisper modes have their own endpoint and capability rules from Phase 5. For self-hosted Whisper set `transcription_model: whisper_local` in `models.transcription_config` (provider `openai` or `azure`); its stage then needs no cloud credentials unless transcript enhancement is on.
+   - **Audio**: hosted Transcriber, ParallelTranscriber and TextToSpeech accept native OpenAI/Azure configurations only. Audio-to-text and speech deployments are separate from chat models. For Aitta/Google/Anthropic/LiteLLM text pipelines, provide a separate native OpenAI/Azure transcription config. The existing explicitly configured local-Whisper modes have their own endpoint and capability rules from Phase 5. For self-hosted Whisper set `transcription_model: whisper_local` in `models.transcription_config` (provider `openai` or `azure`) and have the user set `LOCAL_TRANSCRIBER_API_BASE` and `LOCAL_TRANSCRIBER_API_KEY` in `.env`; the generated PoC passes them to `Transcriber`. With `external_model_api_allowed: false` or `local_processing_required: true`, transcript enhancement is off, the stage reads no cloud credentials, the endpoint must be on `localhost` or a host in `models.local_endpoints`, and either provider combines with a local `openai_compatible` stage. When external APIs are allowed, enhancement uses the stage's credentials, so an `openai` transcription stage cannot share a PoC with an `openai_compatible` stage; use `azure` for it.
    - **Embeddings**: configure a separate embedding model/deployment, never the chat model. Anthropic/Foundry has no native embedding API; use another embedding provider. Aitta, custom compatible endpoints and LiteLLM require an explicit offered embedding model. Verify vector dimensions, use the same provider/model for ingestion and query embedding, and rebuild the collection when either changes.
    - **Optional backends**: add `gaik[llm-google]` for native Google/Vertex, `gaik[llm-anthropic]` for Anthropic/Foundry, or `gaik[llm-litellm]` for LiteLLM, alongside component extras. LiteLLM is an optional backend with an explicitly routed model ID such as `azure/<deployment>` or `openai/<model>`; do not add such prefixes to native provider model IDs. Generic OpenAI-compatible endpoints need an explicit `base_url` and model. Aitta uses CSC's documented `https://aitta-api.csc.fi/openai/v1` endpoint and may need its 600-second cold-start timeout.
    - **Sampling and reasoning**: omit temperature (`temperature: null` for constructor parameters) for the default GPT-6 setup unless explicitly using a supported `reasoning_effort: none`. Recognized GPT-6/GPT-5.6 paths normalize incompatible sampling controls; do not describe every newer model as rejecting temperature unconditionally. GPT-6 supports `low`, `medium`, `high`, `xhigh`, and `max`; Sol/Luna also support `none`, Astra does not. Set `model_family` for a custom Azure deployment alias. PostgresAgent/TabularAgent drop their `0.0` default for GPT-6/GPT-5.6 automatically; pass `temperature=None` only for other reasoning deployments that reject it. For other model families and native Google/Anthropic, verify their own options rather than applying OpenAI rules globally.
@@ -631,7 +670,8 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
      the schema-reuse helpers find the approved schema.
    - Write `prompts/extraction_requirements.md` if the pipeline includes extraction (then run
      `generate_schema.py` as in Phase 4).
-   - After wiring, confirm `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
+   - After wiring, and with the user's yes, confirm that
+     `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
 
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to
@@ -729,7 +769,8 @@ Repeat until the user is satisfied or chooses to proceed:
 
 2. **Diagnose the cause** -- map each problem to its likely source:
    - Missing or wrong field value → `prompts/extraction_requirements.md` is unclear
-   - Wrong schema type or field name → `schemas/output_schema.py` needs updating
+   - Wrong schema type or field name → `schemas/output_schema.py` needs updating, then
+     `scripts/refresh_schema_model.py` (Step 4.5) so `output_schema_model.json` matches
    - Transcript quality issue → `TranscriptEnhancer` may need `additional_instructions`
    - Empty retrieval → document not in `sample_input/` or indexing failed
    - Model/temperature issue → `config.yaml`

@@ -306,7 +306,7 @@ export default function TextToSpeechPage() {
       <DemoPageHeader
         icon={Volume2}
         title="Text-to-Speech"
-        description="Convert text into downloadable speech audio using OpenAI or Azure OpenAI."
+        description="Turn Finnish or English text into speech you can download"
         className="mb-6"
       />
 
