@@ -199,7 +199,7 @@ async def get_thumbnail_url(video_id: str):
 @router.post("/search", response_model=SearchResponse)
 async def search_videos(
     query: str = Form(...),
-    top_k: int = Form(10),
+    top_k: int = Form(10, ge=1, le=100),
     video_id: str = Form(None),
     search_type: str = Form("hybrid"),
 ):
@@ -207,7 +207,7 @@ async def search_videos(
     Search indexed video segments.
 
     - **query**: Natural language search query
-    - **top_k**: Maximum results (default 10)
+    - **top_k**: Maximum results, 1 to 100 (default 10)
     - **video_id**: Optional filter to search within a specific video
     - **search_type**: hybrid, semantic, or keyword
     """

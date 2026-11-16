@@ -143,8 +143,10 @@ def test_explicit_provider_overrides_legacy_flag_and_schema_reloads(
     # Exercise the same load_schema filename/JSON contract as generated PoCs,
     # without constructing an unrelated live pipeline client.
     pipeline = object.__new__(DocumentsToStructuredData)
+    assert (schema_dir / "output_schema_model.json").exists()
     loaded_schema, loaded_requirements = pipeline.load_schema(schema_dir, "output_schema")
     assert loaded_schema.__name__ == schema.__name__
+    assert loaded_schema.model_json_schema() == schema.model_json_schema()
     assert loaded_schema(title="Saved record").title == "Saved record"
     assert loaded_requirements == requirements
     assert (schema_dir / "output_schema.hash").read_text() == hashlib.sha256(
@@ -227,3 +229,52 @@ def test_cli_does_not_expose_a_secret_flag(cli, monkeypatch, tmp_path, capsys):
     help_text = capsys.readouterr().out
     assert "--provider" in help_text and "--base-url" in help_text
     assert "--api-key" not in help_text and "--token" not in help_text
+
+
+def test_a_schema_the_saved_format_refuses_writes_no_schema_file(
+    cli,
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    from pydantic import BaseModel, Field
+
+    class Refused(BaseModel):
+        count: int = Field(ge=0)
+
+    class FakeGenerator:
+        def __init__(self, *, config):
+            self.item_requirements = ExtractionRequirements(
+                use_case_name="refused",
+                fields=[FieldSpec(field_name="count", field_type="int", description="Count")],
+            )
+
+        def generate_schema(self, *, user_requirements):
+            return Refused
+
+    monkeypatch.setattr(cli, "SchemaGenerator", FakeGenerator)
+    monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
+
+    status, _, schema_dir = invoke(cli, monkeypatch, tmp_path, ["--provider", "openai"])
+
+    assert status == 1
+    assert "cannot be saved as data" in capsys.readouterr().err
+    assert list(schema_dir.iterdir()) == []
+
+
+def test_without_the_saved_format_an_earlier_model_file_is_removed(
+    cli, fake_generator, monkeypatch, tmp_path
+):
+    monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
+    schema_dir = tmp_path / "poc" / "schemas"
+    schema_dir.mkdir(parents=True)
+    model_path = schema_dir / "output_schema_model.json"
+    model_path.write_text("{}", encoding="utf-8")
+
+    # An older gaik has no saved_schema module: importing it fails.
+    monkeypatch.setitem(sys.modules, "gaik.software_components.extractor.saved_schema", None)
+    status, _, _ = invoke(cli, monkeypatch, tmp_path, ["--provider", "openai"])
+
+    assert status == 0
+    assert (schema_dir / "output_schema.py").exists()
+    assert not model_path.exists()

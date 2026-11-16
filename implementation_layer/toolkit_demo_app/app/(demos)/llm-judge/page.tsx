@@ -94,7 +94,7 @@ export default function LlmJudgePage() {
       <DemoPageHeader
         icon={Scale}
         title="LLM-as-Judge"
-        description="Score extractor output, detect hallucinations, compare texts, and run a multi-model judge panel."
+        description="Score extractor output, catch hallucinations, compare texts and run a panel of judge models"
         className="mb-6"
       />
 

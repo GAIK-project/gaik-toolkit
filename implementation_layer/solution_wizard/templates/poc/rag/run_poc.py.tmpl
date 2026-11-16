@@ -25,7 +25,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"
 
 from gaik.software_modules.RAG_workflow import RAGWorkflow  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
-from provider_config import get_stage_config  # noqa: E402
+from provider_config import external_model_forbidden, get_stage_config  # noqa: E402
+import poc_output  # noqa: E402
 
 
 def load_config() -> dict:
@@ -91,7 +92,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="${use_case_name} PoC")
     parser.add_argument("--synthetic", action="store_true", help="Generate synthetic sample documents")
     parser.add_argument("--query", help="Run a single question and exit")
+    poc_output.add_output_flags(parser)
     args = parser.parse_args()
+    poc_output.configure(args)
 
     config = load_config()
     sample_dir = Path(__file__).parent / config.get("paths", {}).get("sample_input", "sample_input")
@@ -129,8 +132,11 @@ def main() -> None:
     if args.query:
         result = workflow.ask(args.query, stream=False)
         answer = getattr(result, "answer", str(result))
-        print(f"\nQ: {args.query}")
-        print(f"A: {answer}")
+        if poc_output.VERBOSE:
+            print(f"\nQ: {args.query}")
+            print(f"A: {answer}")
+        else:
+            print(f"\nAnswer: {len(str(answer))} characters (run with --verbose to print it)")
         output_path = output_dir / "query_result.json"
         output_path.write_text(
             json.dumps({"query": args.query, "answer": answer}, indent=2, ensure_ascii=False),
@@ -139,7 +145,7 @@ def main() -> None:
         print(f"\nResult saved to: {output_path}")
         _pdf_source = {"query": args.query, "answer": answer}
     else:
-        # Interactive mode
+        # Interactive mode: the user asks each question here, so each answer is shown.
         print("\nReady. Type your question (or 'exit' to quit).")
         session_results = []
         while True:
@@ -168,4 +174,4 @@ def main() -> None:
 ${pdf_report_section}
 
 if __name__ == "__main__":
-    main()
+    poc_output.run(main)
