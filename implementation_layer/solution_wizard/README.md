@@ -66,11 +66,11 @@ press Ctrl+D or Ctrl+C.
 # Activate the venv that has claude-agent-sdk installed (pip install gaik[wizard])
 # then, from the solution_wizard directory:
 
-# Wizard asks for the output directory itself:
+# The runner asks for the output folder before the session starts:
 python run_wizard_interactive.py
 
-# Pre-supply the output directory (skips that question):
-python run_wizard_interactive.py --output-dir "C:\projects\my-use-case"
+# Or give it (outside this repository):
+python run_wizard_interactive.py --output-dir C:/projects/my-use-case
 ```
 
 Requires Azure Foundry credentials in `../.env` (one level up from this directory) or the
@@ -78,6 +78,16 @@ current shell environment. See `.env.example` for the required variables
 (`CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE`,
 `ANTHROPIC_DEFAULT_SONNET_MODEL`). Run `python run_wizard_interactive.py --preflight` to
 confirm routing before a full session.
+
+What the agent may do: it runs with `bypassPermissions` and a PreToolUse hook,
+`agent_tool_guard.py`, that decides every tool call before it runs, including the calls the
+CLI would approve by itself, such as `ls` or reading a file. The agent reads only the output
+folder and the wizard's own files, writes only the output folder, never reads or writes a
+`.env` file, and runs in Bash only the wizard's scripts with the options
+`scripts/agent_scripts.json` lists. Other tools are refused with the reason, and the agent
+carries on. Your own MCP servers and Claude Code settings are not loaded. The agent's
+environment holds the system basics plus the names the `.env` file sets; hand on another
+variable with `--pass-env NAME`.
 
 ### Option 3 — Wizard as a web chat (demo website)
 
@@ -320,6 +330,7 @@ solution_wizard/
 ├── SKILL.md                          # orchestration layer (agent instructions)
 ├── README.md                         # this file
 ├── run_wizard_interactive.py         # interactive CLI session (Claude Agent SDK, Azure Foundry)
+├── agent_tool_guard.py               # what the agent's tools may touch (PreToolUse hook)
 ├── schemas/
 │   ├── use_case_blueprint.schema.json  # exported from Pydantic (do not hand-edit)
 │   └── component_registry.schema.json  # registry structure (validated on load)

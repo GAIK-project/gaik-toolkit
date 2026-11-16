@@ -114,7 +114,7 @@ jobs:
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
     - name: Install package
-      run: uv pip install --system ".[all,dev,llm-all]"
+      run: uv pip install --system ".[all,dev,llm-all,wizard]"
 
     # The Word export tests (test_report_writer.py, test_report_synthesizer.py) skip without Pandoc.
     - name: Install Pandoc
@@ -137,6 +137,11 @@ jobs:
       env:
         GAIK_TEST_PG_URL: postgresql://postgres:postgres@localhost:5432/postgres
       run: pytest -m "not llm" --strict-markers
+
+    # The Solution Wizard's own tests, with the wizard extra (claude-agent-sdk), so
+    # the interactive runner's tool guard and its SDK contract are checked too.
+    - name: Run Solution Wizard tests
+      run: pytest implementation_layer/solution_wizard/tests -m "not llm" --strict-markers
 
   # The demo app's API tests, in the demo's own environment with this
   # repository's gaik installed editable. Not in the release gate or the

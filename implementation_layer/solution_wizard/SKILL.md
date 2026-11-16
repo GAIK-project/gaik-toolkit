@@ -631,7 +631,7 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
      the schema-reuse helpers find the approved schema.
    - Write `prompts/extraction_requirements.md` if the pipeline includes extraction (then run
      `generate_schema.py` as in Phase 4).
-   - After wiring, confirm `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
+   - After wiring, confirm `python -c "import ast; ast.parse(open('<output_dir>/poc/run_poc.py').read())"` passes (the full path: Bash starts in the wizard folder).
 
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to
