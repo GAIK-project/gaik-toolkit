@@ -1461,7 +1461,7 @@ def _transaction_status(conn: Any) -> str | None:
     return getattr(status, "name", None)
 
 
-_WEBSEARCH_TOKEN = re.compile(r'(-?)"([^"]*)"?|(\S+)')
+_WEBSEARCH_TOKEN = re.compile(r'(-?)"([^"]*)"?|([^\s"]+)')
 
 
 def _lemmatize_websearch(query: str, lemmatize: Any) -> str:
@@ -1476,7 +1476,10 @@ def _lemmatize_websearch(query: str, lemmatize: Any) -> str:
         negate, phrase, word = match.group(1), match.group(2), match.group(3)
         if word is not None:
             if word.lower() == "or":
-                out.append("or")
+                # Two in a row (a dropped stop word between them) would make
+                # Postgres read the second as the word "or".
+                if out and out[-1] != "or":
+                    out.append("or")
                 continue
             negate = "-" if word.startswith("-") and len(word) > 1 else ""
             word = word[1:] if negate else word
@@ -1491,9 +1494,7 @@ def _lemmatize_websearch(query: str, lemmatize: Any) -> str:
             lemmas = lemmatize(phrase)
             if lemmas:
                 out.append(negate + '"' + " ".join(lemmas) + '"')
-    # An "or" with nothing on one side would be read as the word "or".
-    while out and out[0] == "or":
-        out.pop(0)
+    # An "or" with nothing after it would be read as the word "or".
     while out and out[-1] == "or":
         out.pop()
     return " ".join(out)

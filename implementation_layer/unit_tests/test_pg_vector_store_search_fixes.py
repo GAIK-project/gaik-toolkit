@@ -30,7 +30,9 @@ _LEMMAS["kerrostaloissa"] = ["kerros", "talo"]
 
 class _Processor:
     def lemmatize(self, text):
-        return [lemma for word in text.split() for lemma in _LEMMAS.get(word.lower(), [word])]
+        # Like the real processor: punctuation-only tokens give no lemma.
+        words = [w.strip("()") for w in text.split() if any(c.isalnum() for c in w)]
+        return [lemma for word in words for lemma in _LEMMAS.get(word.lower(), [word])]
 
     def expand_query(self, text):
         return " ".join(self.lemmatize(text))
@@ -51,6 +53,8 @@ def _store(mode):
         ("kissa -kerrostaloissa", 'kissa -"kerros talo"'),
         ("kissa ja koiran", "kissa koira"),
         ("ja or kissa", "kissa"),
+        ("kissa or ja or koiran", "kissa or koira"),
+        ('("mustan kissa")', '"musta kissa"'),
     ],
 )
 def test_websearch_mode_keeps_its_operators_after_lemmatizing(query, expected):
