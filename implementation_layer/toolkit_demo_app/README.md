@@ -88,11 +88,14 @@ set it. A provider without credentials on the server is left out, and
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
 
-Keep model calls in the EU where the deployment can: set `GOOGLE_CLOUD_LOCATION=eu`
-and `GOOGLE_VERTEXAI_LOCATION=eu` for Gemini on Vertex AI (gaik's own default is
-`global`, which is not tied to a region), and give the Vision Extractor's Gemini calls
-an EU `GOOGLE_GENERATE_CONTENT_URL` (see `.env.example`). The deployed demo calls GPT
-and Claude through an Azure resource in Sweden.
+Gemini on Vertex AI: leave `GOOGLE_CLOUD_LOCATION` unset. gaik after 0.9.1 then asks
+the EU multi-region first and uses the global endpoint for a model the EU does not
+serve, or for ten minutes after the EU failed to answer; each switch is a warning in
+the API log. A location you set is used as given, with no fallback: on 2026-11-16 the
+demo ran with `GOOGLE_CLOUD_LOCATION=eu` on gaik 0.9.1 and Gemini 4 Argon timed out on
+every request, so it went back to `global`. The Vision Extractor's own Gemini calls
+take a fixed `GOOGLE_GENERATE_CONTENT_URL` (see `.env.example`) and have no fallback.
+The deployed demo calls GPT and Claude through an Azure resource in Sweden.
 
 `DEMO_SERVER_MODELS_NOTE` is one sentence the menu shows under the server models,
 for where they run (for example the Azure region). It has no default: that depends on
