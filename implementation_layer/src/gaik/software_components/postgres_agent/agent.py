@@ -22,7 +22,7 @@ from openai import APIError, APITimeoutError, RateLimitError
 
 try:
     import psycopg
-    from psycopg.rows import dict_row
+    from psycopg.rows import dict_row, tuple_row
 except ImportError as exc:
     raise ImportError(
         "PostgresAgent requires 'psycopg[binary]'. "
@@ -158,6 +158,26 @@ def _with_retries(call: Any, *, tries: int = 4) -> Any:
     raise RuntimeError("_with_retries: loop terminated without return or raise")
 
 
+def _unique_column_names(names: list[str]) -> list[str]:
+    """Keep the first of each name and number its repeats: count, count_2, count_3.
+
+    A number is never one that another result column already carries.
+    """
+    taken = set(names)
+    used: set[str] = set()
+    unique = []
+    for name in names:
+        candidate, n = name, 1
+        while candidate in used:
+            n += 1
+            candidate = f"{name}_{n}"
+            if candidate in taken:
+                candidate = name  # that name belongs to a real column; try the next number
+        used.add(candidate)
+        unique.append(candidate)
+    return unique
+
+
 def _format_rows_for_prompt(rows: list[dict]) -> str:
     """Render query rows compactly, capping row count and cell length."""
     if not rows:
@@ -246,7 +266,9 @@ class PostgresAgent:
                 "must contain only letters, digits, and underscores."
             )
         self.connection_string = connection_string
-        self.schema_name = schema_name
+        # An unquoted identifier, as in search_path and the validator: fold it once
+        # so introspection looks for the schema PostgreSQL actually created.
+        self.schema_name = schema_name.lower()
         self.max_retries = max(1, max_retries)
         self.max_rows = max(1, max_rows)
         self.statement_timeout_ms = max(0, statement_timeout_ms)
@@ -352,8 +374,9 @@ class PostgresAgent:
 
         Args:
             refresh: Re-introspect even if a cached schema exists.
-            include_samples: Attach up to three sample rows per table. Sample
-                values are sent to the LLM, so this defaults to off.
+            include_samples: Attach up to three sample rows per table to the
+                returned schema. They are for the caller: :meth:`generate_sql`
+                leaves them out of its prompt, so sample values never reach the LLM.
 
         Returns:
             A :class:`~gaik.software_components.postgres_agent.models.SchemaInfo`.
@@ -384,7 +407,11 @@ class PostgresAgent:
             A :class:`~gaik.software_components.postgres_agent.models.GeneratedSQL`.
         """
         client = self._get_llm_client()
+        # Sample rows cached by get_schema(include_samples=True) stay out of the prompt.
         schema = self.get_schema()
+        schema = schema.model_copy(
+            update={"tables": [t.model_copy(update={"sample_rows": []}) for t in schema.tables]}
+        )
         user_prompt = (
             f"Database schema (active schema: {self.schema_name}):\n"
             f"{schema.to_prompt_text()}\n\n"
@@ -447,8 +474,13 @@ class PostgresAgent:
         wrapped = f"SELECT * FROM (\n{validated}\n) AS gaik_query LIMIT {self.max_rows}"
         conn = self._get_conn()
         with conn.transaction(force_rollback=True):
-            rows = conn.execute(wrapped).fetchall()
-        return [dict(row) for row in rows]
+            cursor = conn.execute(wrapped)
+            # Tuples, not dict_row: two result columns with one name (count, count)
+            # would otherwise collapse into one key and lose a value.
+            cursor.row_factory = tuple_row
+            rows = cursor.fetchall()
+            names = _unique_column_names([col.name for col in cursor.description or []])
+        return [dict(zip(names, row)) for row in rows]
 
     def query(self, question: str) -> QueryResult:
         """Answer ``question`` with data: generate SQL, run it, retry on error.

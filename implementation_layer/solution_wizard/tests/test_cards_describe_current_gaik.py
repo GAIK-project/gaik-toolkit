@@ -55,8 +55,7 @@ def test_report_loaders_and_source_path_error_are_described():
     assert "root" in inspect.signature(load_report_config).parameters
 
     writer = CARDS["ReportWriter"]
-    # gaik 0.9.1, the validated release a PoC installs, has no SourcePathError export,
-    # so the import line a PoC copies leaves it out until the pin moves past 0.9.1.
+    # The import line a PoC copies stays the one every supported release has.
     assert "SourcePathError" not in writer["import"]
     assert "root=" in writer["call_from_spec_file"]
     assert "SourcePathError" in writer["call_from_spec_file"]
@@ -85,8 +84,5 @@ def test_judge_card_names_the_eu_default_location():
     effect = _option("LLMJudge", "use_vertexai")["effect"]
     assert "default 'global'" not in effect
     assert "'eu'" in effect and "'global'" in effect
-    # A PoC installs the validated release, which still defaults to 'global'.
-    validated = REPO / "implementation_layer/solution_wizard/gaik_validated_version.txt"
-    if validated.exists() and validated.read_text(encoding="utf-8").strip() == "0.9.1":
-        assert "gaik 0.9.1 calls 'global'" in effect
-        assert "after 0.9.1" in effect
+    # The validated release a PoC installs has the EU default; the card says so.
+    assert "Unset, the judge calls the EU multi-region 'eu'" in effect

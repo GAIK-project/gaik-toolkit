@@ -162,7 +162,7 @@ If you prefer manual configuration:
 
 **Install Dependencies:**
 ```bash
-pip install mcp==1.30.0 "gaik[transcriber]==0.9.1" python-dotenv==1.2.4
+pip install mcp==1.30.0 "gaik[transcriber]==0.10.0" python-dotenv==1.2.4
 ```
 
 **Configure API Key:**
@@ -219,7 +219,7 @@ construction-diary-creation/
 
 ### Dependencies
 
-- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.9.1`, `python-dotenv==1.2.4`
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.10.0`, `python-dotenv==1.2.4`
 - **External APIs:** OpenAI or Azure OpenAI transcription (`gpt-4o-transcribe` by default)
 
 ## Getting Help
