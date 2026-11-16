@@ -47,8 +47,8 @@ class ExtractionSchema:
 def _safe_name(name: str) -> str:
     """ASCII snake_case that starts with a letter: ``Sää ja lämpötila`` -> ``saa_ja_lampotila``.
 
-    gaik's ``FieldSpec`` accepts this shape unchanged. Left alone, it would drop the letters
-    outside ASCII and make ``s`` of ``sää``.
+    ``FieldSpec`` keeps non-ASCII letters; the operations fold to ASCII by choice, so the
+    schema sent to the provider stays plain and the result maps back to the caller's name.
     """
     folded = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
     safe = re.sub(r"[^a-z0-9]+", "_", folded.lower()).strip("_")[:48].rstrip("_")

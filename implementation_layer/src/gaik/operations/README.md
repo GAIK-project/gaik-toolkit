@@ -226,8 +226,7 @@ Dates come back as `YYYY-MM-DD` unless `format` is one of the formats the extrac
 `%d/%m/%Y`, `%d-%m-%Y`, `%d.%m.%Y`, `%m/%d/%Y`, `%m-%d-%Y`, `%Y-%m-%d`, `%Y/%m/%d`,
 `%Y.%m.%d`. A `decimal` value comes back as a string, so no digit is lost in JSON.
 
-gaik's `FieldSpec` accepts ASCII snake_case names only. The operations therefore send each
-field under a safe name (`Sää ja lämpötila` becomes `saa_ja_lampotila`) and map the result
+The operations send each field under an ASCII snake_case name (`Sää ja lämpötila` becomes `saa_ja_lampotila`) and map the result
 back, so `ExtractedField.name` is always the name you gave.
 
 `build_schema` gives you the same schema for use with the components directly:
