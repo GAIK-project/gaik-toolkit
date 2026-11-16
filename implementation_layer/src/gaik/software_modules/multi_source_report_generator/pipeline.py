@@ -133,7 +133,7 @@ when they communicate the same meaning.
 # ---------------------------------------------------------------------------
 
 
-_SECTION_ID = re.compile(r"[A-Za-z0-9_-]+")
+_GRAPH_RESERVED = re.compile(r"[:|]")
 
 
 def _normalize_sections(
@@ -169,11 +169,9 @@ def _normalize_sections(
         # Derive a stable id from the title when not given.
         if not spec.id:
             spec.id = _slug(spec.title)
-        elif not _SECTION_ID.fullmatch(spec.id):
-            # The id names a graph node and a file; ':' is reserved in node names.
-            raise ValueError(
-                f"Section id {spec.id!r} may contain only letters, digits, '_' and '-'."
-            )
+        elif _GRAPH_RESERVED.search(spec.id):
+            # Agentic mode names a graph node after the id; LangGraph reserves these.
+            raise ValueError(f"Section id {spec.id!r} must not contain ':' or '|'.")
         out.append(spec)
 
     # Validate ids and dependencies.

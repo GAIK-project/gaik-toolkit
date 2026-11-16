@@ -122,9 +122,10 @@ def test_table_cells_with_pipes_and_line_breaks_stay_in_place():
 
 
 def test_a_section_id_with_a_colon_is_refused():
-    with pytest.raises(ValueError, match="only letters, digits"):
-        msrg._normalize_sections([{"title": "Risks", "id": "risks:2026"}])
-    assert msrg._normalize_sections([{"title": "Risks", "id": "risks-2026_a"}])[0].id
+    for bad in ("risks:2026", "risks|2026"):
+        with pytest.raises(ValueError, match="must not contain"):
+            msrg._normalize_sections([{"title": "Risks", "id": bad}])
+    assert msrg._normalize_sections([{"title": "Risks", "id": "risks 2026/a"}])[0].id
 
 
 # -- #145 also seen (b): ReportSpec.save with a source on another drive -------
