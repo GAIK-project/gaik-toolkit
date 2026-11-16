@@ -60,6 +60,19 @@ export function resultIsStale(input: ResultStaleInput): boolean {
 }
 
 /**
+ * True when the run in view read other test material than what is listed now:
+ * a file was added or removed after it. The package is the one that ran, so
+ * Gate 3 does not wait on it, but the result is not of the material the user
+ * sees. Unknown material (a run from before its inputs were kept, the page's
+ * own list not read yet) is never held against the result.
+ */
+export function inputsChangedSinceRun(runInputs: readonly string[] | null, inputs: readonly string[] | null): boolean {
+  if (!runInputs || runInputs.length === 0 || !inputs) return false;
+  const ran = new Set(runInputs);
+  return ran.size !== new Set(inputs).size || inputs.some((name) => !ran.has(name));
+}
+
+/**
  * Whether Gate 3's approval waits. The PoC tab's word counts while it holds
  * the api's digests (`packageRead`): it reads the package again after every
  * run and reply, so it knows of a new successful run before the page does.

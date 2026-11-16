@@ -1759,8 +1759,9 @@ def create_poc_run(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
         )
 
     # Before the run is created: a change made while it starts then reads as a
-    # change after the run, never as part of what it tested.
+    # change after the run, never as part of what it tested. So are the inputs.
     package = _approved_package_digest(poc)
+    inputs = [str(entry["name"]) for entry in poc_service.list_sample_inputs(poc)]
     try:
         runner = sandbox_runner.SandboxRunner()
         run_id = runner.create_run(str(session_id), user_id=session.user_id)
@@ -1772,13 +1773,21 @@ def create_poc_run(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
         raise _sandbox_unavailable(exc) from exc
 
     # The agent hears about this run with the next chat message (run_context, #96).
-    # The digest says which package the run tested, for Gate 3 (_check_gate_readiness).
+    # The digest says which package the run tested, for Gate 3 (_check_gate_readiness);
+    # the inputs, which material, for the PoC tab.
     session_service.update_session(
         db,
         session,
-        SessionUpdate(metadata={"latest_run": run_id, session_service.RUN_PACKAGE_KEY: package}),
+        SessionUpdate(
+            metadata={
+                "latest_run": run_id,
+                session_service.RUN_PACKAGE_KEY: package,
+                session_service.RUN_INPUTS_KEY: inputs,
+            }
+        ),
     )
-    return {"run_id": run_id, "session_id": str(session_id), "phase": "pending"}
+    # The inputs as recorded, for the PoC tab: it may not have read the list yet.
+    return {"run_id": run_id, "session_id": str(session_id), "phase": "pending", "inputs": inputs}
 
 
 @router.post("/{session_id}/poc/check", status_code=201)

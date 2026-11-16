@@ -149,6 +149,10 @@ function detailToWizardSession(detail: ApiSessionDetail): WizardSession {
         : null,
     // The digests wizard_api keeps with the runs; null from an api without them.
     latestRunPackage: metadataDigest(detail, "latest_run_package"),
+    // What the latest run read from sample_input/, for the PoC tab.
+    latestRunInputs: Array.isArray(detail.metadata.latest_run_inputs)
+      ? detail.metadata.latest_run_inputs.filter((name): name is string => typeof name === "string")
+      : null,
     lastSuccessfulRunPackage: metadataDigest(detail, "last_successful_run_package"),
     pendingTurn: detail.pending_turn
       ? { userMessage: detail.pending_turn.user_message, startedAt: detail.pending_turn.started_at }

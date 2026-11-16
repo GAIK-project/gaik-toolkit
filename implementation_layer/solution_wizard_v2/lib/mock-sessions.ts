@@ -128,6 +128,9 @@ export type WizardSession = {
   /** Digest of the package the latest run was started on; absent or null where
    *  wizard_api keeps none. */
   latestRunPackage?: string | null;
+  /** The names of the test inputs the latest run was started on; null where
+   *  wizard_api keeps none (a run from before it did). */
+  latestRunInputs?: string[] | null;
   /** That digest for `lastSuccessfulRun`. Gate 3 is refused while the package
    *  that is there now has another digest (lib/poc-result-state). */
   lastSuccessfulRunPackage?: string | null;

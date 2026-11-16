@@ -56,6 +56,7 @@ def test_server_owned_metadata_keys_are_refused():
     assert exc.value.keys == ["last_successful_run", "messages"]
     assert "last_successful_run" in SERVER_OWNED_METADATA_KEYS
     assert "agent_sdk_session_id" in SERVER_OWNED_METADATA_KEYS
+    assert "latest_run_inputs" in SERVER_OWNED_METADATA_KEYS
 
 
 # --- through the API ----------------------------------------------------------

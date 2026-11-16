@@ -404,6 +404,67 @@ test.describe("PoC tab", () => {
     );
   });
 
+  test("with only the wizard's example the material step is not ticked, and the run step says both ways on", async ({
+    page,
+  }) => {
+    const fake = await fakePoc(page, { inputs: false });
+    // Registered last, so it answers first: one file, the wizard's own.
+    await page.route(`${API}/poc/input`, (route) =>
+      route.fulfill({ json: { files: [{ name: "example_invoice.pdf", bytes: 2048, uploaded: false }] } }),
+    );
+    await openCheckedPoc(page);
+
+    await expect(page.getByTestId("poc-input-example")).toBeVisible();
+    await expect(page.getByTestId("poc-inputs").locator("[data-mark]")).toHaveAttribute("data-mark", "number");
+    await expect(page.getByTestId("poc-auto-run")).toHaveText(
+      "Lisää oma testiaineisto, niin testiajo käynnistyy itsestään, tai aja testi wizardin esimerkillä.",
+    );
+    await page.waitForTimeout(1_000);
+    expect(fake.runs).toBe(0);
+  });
+
+  test("a file added or removed after the run: the result says it is of other material and offers the run again", async ({
+    page,
+  }) => {
+    const fake = await fakePoc(page, { record: RECORDS[1] });
+    // An upload and a removal answer as wizard_api does.
+    await page.route(`${API}/poc/input`, (route) =>
+      route.request().method() === "POST"
+        ? route.fulfill({ json: { name: "invoice_002.pdf", bytes: 2048 } })
+        : route.fallback(),
+    );
+    await page.route(`${API}/poc/input/*`, (route) => route.fulfill({ status: 204 }));
+    await openCheckedPoc(page);
+    await expect(page.getByTestId("poc-setup-summary")).toContainText("Ajo onnistui", { timeout: 20_000 });
+    const note = page.getByTestId("poc-result-inputs-changed");
+    await expect(note).toHaveCount(0);
+
+    // A file added: the run and its result stay, said to be of the material it read.
+    await page.getByTestId("poc-setup-toggle").click();
+    await page.getByTestId("poc-input-file").setInputFiles({
+      name: "invoice_002.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.7"),
+    });
+    await expect(note).toContainText("Testiaineisto on muuttunut tämän ajon jälkeen.");
+    await expect(page.getByTestId("poc-setup-summary")).toHaveCount(0);
+    await expect(page.getByTestId("poc-result-from")).toHaveText("Aineisto: invoice_001.pdf");
+    expect(fake.runs).toBe(1);
+
+    // Run again from the note (its one button): the result is of the listed material, and the note goes.
+    await note.getByRole("button").click();
+    await expect.poll(() => fake.runs).toBe(2);
+    await expect(page.getByTestId("poc-setup-summary")).toContainText("Ajo onnistui", { timeout: 20_000 });
+    await expect(note).toHaveCount(0);
+
+    // A file removed: the same. (The steps stay open as they were left.)
+    const remove = page.getByRole("button", { name: "Poista invoice_002.pdf" });
+    if (!(await remove.isVisible())) await page.getByTestId("poc-setup-toggle").click();
+    await remove.click();
+    await expect(note).toContainText("Testiaineisto on muuttunut tämän ajon jälkeen.");
+    expect(fake.runs).toBe(2);
+  });
+
   test("a full sandbox is waited for and asked again, not shown as an error", async ({ page }) => {
     const fake = await fakePoc(page);
     // The sandbox has no room for the first request, and room for the next.

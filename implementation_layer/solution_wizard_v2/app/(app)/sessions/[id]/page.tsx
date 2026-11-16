@@ -372,6 +372,7 @@ export default async function SessionPage({
                 // The banner above offers its two actions exactly then.
                 handoverInBanner={solutionDone && Boolean(session.lastSuccessfulRun)}
                 latestRun={session.latestRun ?? null}
+                latestRunInputs={session.latestRunInputs ?? null}
                 wizardReplying={Boolean(session.pendingTurn)}
                 reopenedAt={reopened ? (reopened.at ?? `gate-${reopened.gate}`) : null}
                 outputFields={fieldSpecsFromTargetOutput(session.targetOutputSpec)}

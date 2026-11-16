@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   gate3Waits,
   handoverState,
+  inputsChangedSinceRun,
   packageChangedSinceRun,
   packageReadFor,
   publishResultStale,
@@ -58,6 +59,25 @@ describe("the api's digests", () => {
     expect(resultIsStale({ ...settled, packageDigest: "d2", testedDigest: "d1" })).toBe(true);
     expect(resultIsStale({ ...settled, packageDigest: "d2", testedDigest: "d2" })).toBe(false);
     expect(resultIsStale({ ...settled, packageDigest: "d2", testedDigest: null })).toBe(false);
+  });
+});
+
+describe("inputsChangedSinceRun", () => {
+  it("is true when a file was added or removed after the run", () => {
+    expect(inputsChangedSinceRun(["a.pdf"], ["a.pdf", "b.pdf"])).toBe(true);
+    expect(inputsChangedSinceRun(["a.pdf", "b.pdf"], ["a.pdf"])).toBe(true);
+    expect(inputsChangedSinceRun(["a.pdf"], [])).toBe(true);
+    expect(inputsChangedSinceRun(["a.pdf"], ["b.pdf"])).toBe(true);
+  });
+
+  it("is false for the same files in any order", () => {
+    expect(inputsChangedSinceRun(["a.pdf", "b.pdf"], ["b.pdf", "a.pdf"])).toBe(false);
+  });
+
+  it("holds nothing against a run whose material is not known, or a list not read yet", () => {
+    expect(inputsChangedSinceRun([], ["a.pdf"])).toBe(false);
+    expect(inputsChangedSinceRun(null, ["a.pdf"])).toBe(false);
+    expect(inputsChangedSinceRun(["a.pdf"], null)).toBe(false);
   });
 });
 

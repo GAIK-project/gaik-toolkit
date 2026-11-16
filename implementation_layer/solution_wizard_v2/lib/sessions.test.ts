@@ -369,6 +369,7 @@ describe("sessions.ts — wizard_api mode (WIZARD_API_URL set)", () => {
           latest_run: "run-2",
           latest_run_package: "d2",
           last_successful_run_package: "d1",
+          latest_run_inputs: ["order.pdf", 3, "scan.png"],
         },
       }),
     );
@@ -377,6 +378,7 @@ describe("sessions.ts — wizard_api mode (WIZARD_API_URL set)", () => {
       latestRun: "run-2",
       latestRunPackage: "d2",
       lastSuccessfulRunPackage: "d1",
+      latestRunInputs: ["order.pdf", "scan.png"],
     });
 
     // wizard_api clears them with the runs when a gate is reopened (null), and
@@ -386,7 +388,11 @@ describe("sessions.ts — wizard_api mode (WIZARD_API_URL set)", () => {
     );
     expect(await getSession("s1")).toMatchObject({ latestRunPackage: null, lastSuccessfulRunPackage: null });
     apiFns.apiGetSession.mockResolvedValue(apiDetail());
-    expect(await getSession("s1")).toMatchObject({ latestRunPackage: null, lastSuccessfulRunPackage: null });
+    expect(await getSession("s1")).toMatchObject({
+      latestRunPackage: null,
+      lastSuccessfulRunPackage: null,
+      latestRunInputs: null,
+    });
   });
 
   it("getPackageDigest reads the package's digest from its file list, and is null without one", async () => {
