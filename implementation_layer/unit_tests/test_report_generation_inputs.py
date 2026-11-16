@@ -68,6 +68,22 @@ def test_a_loose_edit_keeps_the_space_at_its_end():
     assert new == "Pear pie." and not failed
 
 
+_TYPO = _PASSAGE.replace("membrane", "membrame")
+
+
+@pytest.mark.parametrize(
+    ("text", "search", "found"),
+    [
+        (_PASSAGE + " Outro.", "\n\n" + _PASSAGE, _PASSAGE),  # the passage starts the text
+        (_PASSAGE + " Outro.", "\n\n" + _TYPO, _PASSAGE),
+        ("Intro. " + _PASSAGE, _TYPO + "\n\n", _PASSAGE),  # the passage ends the text
+        ("Intro. " + _PASSAGE + " Outro.", _TYPO + " ", _PASSAGE + " "),  # its own space
+    ],
+)
+def test_a_loose_edit_takes_edge_whitespace_only_where_the_text_has_it(text, search, found):
+    assert _find_search_string(text, search) == found
+
+
 def test_a_loose_edit_ignores_quote_and_dash_styles():
     text = "He said “yes” — then left the building."
     new, done, _ = _apply_corrections(

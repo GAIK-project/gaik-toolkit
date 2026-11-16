@@ -98,23 +98,42 @@ def _find_search_string(text: str, search: str, threshold: float = FUZZY_THRESHO
     ``threshold`` checked at every offset, for spans as long as ``search`` and one
     character shorter or longer. A loose match is taken only when exactly one span of
     ``text`` fits best, so an edit never lands on a shifted or a second span;
-    anything else returns None and the edit stays unresolved.
+    anything else returns None and the edit stays unresolved. Whitespace at either
+    end of ``search`` is matched only where the text has whitespace beside the passage.
     """
     if search in text:
         return search
 
     folded_text, where = _folded(text)
-    # Not stripped: a space at either end belongs to the passage the edit replaces.
     folded_search = _folded(search)[0]
+    # A space at either end belongs to the passage the edit replaces. It is dropped only
+    # when the text does not hold it there, as before a passage that starts the text.
+    if folded_search not in folded_text:
+        folded_search = folded_search.strip()
     if folded_search:
         pos = _unique_find(folded_text, folded_search)
         if pos is not None:
             return text[where[pos] : where[pos + len(folded_search) - 1] + 1]
 
     # Too short to fuzzy-match reliably.
-    if len(search) < 10:
+    core = search.strip()
+    if len(core) < 10:
         return None
+    span = _fuzzy_span(text, core, threshold)
+    if span is None:
+        return None
+    start, end = span
+    # The search's own whitespace at an end takes the whitespace character beside the
+    # passage, so a replacement that carries it does not leave a doubled space.
+    if search[0].isspace() and start > 0 and text[start - 1].isspace():
+        start -= 1
+    if search[-1].isspace() and end < len(text) and text[end].isspace():
+        end += 1
+    return text[start:end]
 
+
+def _fuzzy_span(text: str, search: str, threshold: float) -> tuple[int, int] | None:
+    """The ``(start, end)`` of the one span of ``text`` that fits ``search`` best, or None."""
     n = len(search)
     matcher = SequenceMatcher(None, autojunk=False)
     matcher.set_seq2(search.lower())
@@ -160,7 +179,7 @@ def _find_search_string(text: str, search: str, threshold: float = FUZZY_THRESHO
     # A second fitting span that does not overlap the best one makes it ambiguous.
     if any(s >= end or e <= start for s, e in fits):
         return None
-    return text[start:end]
+    return start, end
 
 
 def _apply_corrections(
