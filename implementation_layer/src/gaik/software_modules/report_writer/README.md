@@ -109,7 +109,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
     "docx": true,
     "citations": true,
     "curator": {"reasoning_effort": null, "temperature": null},
-    "writer": {"reasoning_effort": "medium", "temperature": null},
+    "writer": {"reasoning_effort": null, "temperature": null},
     "reviewer": {"reasoning_effort": null, "temperature": null}
   }
 }

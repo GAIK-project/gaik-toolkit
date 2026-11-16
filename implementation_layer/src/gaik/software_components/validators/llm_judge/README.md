@@ -19,7 +19,7 @@ you which fields look broken before you act on them downstream.
   (each is one atomic criterion the judge should consider separately).
 - **Bias-mitigation guidance** in the system prompt: anti-verbosity,
   anti-formatting-bias, evaluation-before-judgement order.
-- **Panel/jury aggregation** via `LLMJudgePanel` (3+ judges, majority vote,
+- **Panel/jury aggregation** via `LLMJudgePanel` (two or more judges, three or more recommended; majority vote,
   agreement metric — mitigates single-model self-preference bias).
 - **Calibration utility** `calibrate_against_human_labels` returning Pearson
   r vs. human raters and severity-agreement rate.
@@ -95,7 +95,7 @@ a human reviewer would. The same code path works for any source
 document — PDF, scanned image, screenshot — as long as you can render
 it to PNG bytes.
 
-See the [examples folder](../../../../examples/software_components/validators/)
+See the [examples folder](../../../../../examples/software_components/validators/)
 for working scripts:
 
 - `demo_llm_judge.py` — single-judge basic usage with Likert scoring.
@@ -233,17 +233,18 @@ def calibrate_against_human_labels(
 ) -> CalibrationReport: ...
 ```
 
-The judge reuses provider configuration helpers from
+The OpenAI/Azure and Anthropic routes reuse the helpers in
 `gaik.software_components.parsers.multimodal_parser.config`, so the same
-env-vars work for both:
+variables work for both; the Google route reads its own:
 
 | Variable | Used by |
 |---|---|
-| `AZURE_API_KEY`, `AZURE_RESOURCE_NAME`, `AZURE_API_VERSION`, `AZURE_DEPLOYMENT` | Azure OpenAI |
+| `AZURE_API_KEY`, `AZURE_ENDPOINT`, `AZURE_API_VERSION`, `AZURE_DEPLOYMENT` | Azure OpenAI (`use_azure=True`) |
 | `OPENAI_API_KEY` | OpenAI |
 | `ANTHROPIC_API_KEY` | Anthropic direct |
-| `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE` | Anthropic on Azure AI Foundry (auto-detected) |
+| `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` | Anthropic on Microsoft Foundry (`use_azure=True`) |
 | `GOOGLE_VERTEXAI_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS` | Vertex AI (preferred) |
+| `GOOGLE_VERTEXAI_LOCATION` | Vertex AI location; used as given when set. Unset, the judge asks the EU multi-region and falls back to `global` when the EU does not serve the model or does not answer |
 | `GOOGLE_GEMINI_API_KEY` | Generative Language API (alternative) |
 
 ## Research references

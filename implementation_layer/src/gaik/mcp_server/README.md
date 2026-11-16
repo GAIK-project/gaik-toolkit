@@ -254,9 +254,10 @@ gated app; its lifespan starts the session manager.
 ## What the server does not do
 
 No tool sends mail or messages, fetches a URL, runs code, loads a schema file or lists a
-folder. The server keeps no state between calls and stores nothing but the Word file a
-client asks it to write. Model calls go to the provider gaik is configured for, and to the
-Jev service only when a client asks for `backend: "jev"`.
+folder. Between calls the server keeps only the last four parsed files in memory, so a later
+window is not parsed again. It stores nothing but the Word file a client asks it to write.
+Model calls go to the provider gaik is configured for, and to the Jev service only when a
+client asks for `backend: "jev"`.
 
 ## License
 
