@@ -1,7 +1,24 @@
 """Load independent provider credentials and settings for each PoC stage."""
 
+from urllib.parse import urlsplit
+
 from gaik.software_components.llm import get_llm_config
 from gaik.software_components.llm.providers import resolve_provider
+
+# Settings in this PoC's own config that name a provider address. gaik sends keys
+# only to https hosts the provider config names; an address set here is this
+# deployment's choice, so its host is allowed for the stage.
+_ADDRESS_SETTINGS = ("base_url", "azure_endpoint", "azure_audio_endpoint")
+
+
+def _config_hosts(settings: dict) -> list[str]:
+    listed = settings.get("allowed_endpoint_hosts") or []
+    hosts = listed.split(",") if isinstance(listed, str) else list(listed)
+    for key in _ADDRESS_SETTINGS:
+        parts = urlsplit(str(settings.get(key) or ""))
+        if parts.hostname:
+            hosts.append(f"http://{parts.hostname}" if parts.scheme == "http" else parts.hostname)
+    return hosts
 
 
 def get_stage_config(config: dict, stage: str) -> dict:
@@ -28,6 +45,9 @@ def get_stage_config(config: dict, stage: str) -> dict:
         else:
             settings["model"] = models.get(stage) or models.get("extraction")
     settings = {key: value for key, value in settings.items() if value is not None}
+    hosts = _config_hosts(settings)
+    if hosts:
+        settings["allowed_endpoint_hosts"] = hosts
     try:
         result = get_llm_config(provider, **settings)
     except ValueError:
