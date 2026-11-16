@@ -317,6 +317,17 @@ async def test_without_aitta_the_list_says_so(server_env):
     assert listed["aitta"] is None
 
 
+@pytest.mark.asyncio
+async def test_the_deployment_says_where_its_models_run(server_env, monkeypatch):
+    monkeypatch.delenv("DEMO_SERVER_MODELS_NOTE", raising=False)
+    listed = (await _call(_app([]), "GET", "/model-settings/server", {})).json()
+    # The code cannot know the region of the resources behind the keys.
+    assert listed["note"] is None
+    monkeypatch.setenv("DEMO_SERVER_MODELS_NOTE", "  GPT runs on Azure in Sweden (EU).  ")
+    listed = (await _call(_app([]), "GET", "/model-settings/server", {})).json()
+    assert listed["note"] == "GPT runs on Azure in Sweden (EU)."
+
+
 def test_warming_asks_only_for_idle_models_and_not_twice(aitta_env, monkeypatch):
     posted = []
 
