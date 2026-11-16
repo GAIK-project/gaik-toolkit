@@ -111,6 +111,18 @@ set it. A provider without credentials on the server is left out, and
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
 
+A route that takes a model name in the request runs only the models it offers, and a
+team-only model only for the team, decided from the session as above. Which models are
+team-only follows the list above (a `DEMO_SERVER_MODELS` entry decides for the model it
+names), whatever credentials the server has. The LLM Judge and the Vision Extractor
+offer the Vision Extractor's model list; the Report Writer, Report Writer v2, Source
+Normalizer, Knowledge Curator and Knowledge Synthesis offer the server's model, the
+listed models on the same provider and `DEMO_EXTRA_CHAT_MODELS` (default
+`gpt-6-luna,gpt-5.5-deployment`, the Report Writer page's defaults), and for
+transcription `DEMO_TRANSCRIPTION_MODELS` (default
+`gpt-4o-transcribe,gpt-4o-mini-transcribe,whisper-1,whisper`).
+Another name is refused with a 422, which lists the names that work, before any model call.
+
 Gemini on Vertex AI: leave `GOOGLE_CLOUD_LOCATION` unset. gaik after 0.9.1 then asks
 the EU multi-region first and uses the global endpoint for a model the EU does not
 serve, or for ten minutes after the EU failed to answer; each switch is a warning in

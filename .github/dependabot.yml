@@ -27,6 +27,13 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
+    # A new Python minor needs a new hashed lock (lock_api_requirements.sh), and Node
+    # moves between LTS lines by hand, so Dependabot only proposes patches within them.
+    ignore:
+      - dependency-name: python
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
     groups:
       demo-images:
         patterns:
