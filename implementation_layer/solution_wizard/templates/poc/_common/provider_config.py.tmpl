@@ -5,19 +5,29 @@ from urllib.parse import urlsplit
 from gaik.software_components.llm import get_llm_config
 from gaik.software_components.llm.providers import resolve_provider
 
-# Settings in this PoC's own config that name a provider address. gaik sends keys
-# only to https hosts the provider config names; an address set here is this
-# deployment's choice, so its host is allowed for the stage.
+# Settings in this PoC's own config that name a provider address.
 _ADDRESS_SETTINGS = ("base_url", "azure_endpoint", "azure_audio_endpoint")
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
-def _config_hosts(settings: dict) -> list[str]:
+def _is_local(host: str) -> bool:
+    return host.lower() in _LOCAL_HOSTS
+
+
+def _allowed_hosts(config: dict, settings: dict) -> list[str]:
+    """Hosts gaik may send this stage's key to beyond its own provider hosts.
+
+    These are a stage address on this machine and the hosts the approved blueprint
+    lists in models.local_endpoints. Any other address goes through gaik's own
+    check: name it in GAIK_ALLOWED_ENDPOINT_HOSTS.
+    """
     listed = settings.get("allowed_endpoint_hosts") or []
     hosts = listed.split(",") if isinstance(listed, str) else list(listed)
+    hosts.extend(str(entry) for entry in config.get("local_endpoints") or [])
     for key in _ADDRESS_SETTINGS:
-        parts = urlsplit(str(settings.get(key) or ""))
-        if parts.hostname:
-            hosts.append(f"http://{parts.hostname}" if parts.scheme == "http" else parts.hostname)
+        host = urlsplit(str(settings.get(key) or "")).hostname or ""
+        if host and _is_local(host):
+            hosts.append(host)
     return hosts
 
 
@@ -45,7 +55,7 @@ def get_stage_config(config: dict, stage: str) -> dict:
         else:
             settings["model"] = models.get(stage) or models.get("extraction")
     settings = {key: value for key, value in settings.items() if value is not None}
-    hosts = _config_hosts(settings)
+    hosts = _allowed_hosts(config, settings)
     if hosts:
         settings["allowed_endpoint_hosts"] = hosts
     try:

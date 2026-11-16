@@ -193,6 +193,28 @@ def _setting_problems(settings: dict[str, Any], where: str) -> list[str]:
     return problems
 
 
+_LOCAL_ENDPOINT_RE = re.compile(r"(?:http://)?[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?")
+
+
+def _local_endpoints(models: dict[str, Any]) -> list[str]:
+    """The hosts ``models.local_endpoints`` lists, which the PoC lets gaik send keys to.
+
+    An entry is a host name, or ``http://host`` for a server on a private network.
+    """
+    entries = models.get("local_endpoints") or []
+    if not isinstance(entries, list):
+        raise ValueError("models.local_endpoints must be a list of host names")
+    hosts = []
+    for entry in entries:
+        text = str(entry).strip().lower()
+        if not _LOCAL_ENDPOINT_RE.fullmatch(text):
+            raise ValueError(
+                f"models.local_endpoints entry {entry!r} must be a host name or http://host"
+            )
+        hosts.append(text)
+    return hosts
+
+
 def _provider_name(value: str) -> str:
     provider = str(value).strip().lower()
     provider = "azure" if provider == "azure_openai" else provider
@@ -1005,6 +1027,7 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         "extraction_model": extraction_model,
         "temperature": temperature,
         "stage_settings": stages,
+        "local_endpoints": _local_endpoints(models),
         "language": language,
         "llm_judge_section": llm_judge_section,
         "source_tracing_setup": _build_source_tracing_setup(has_source_tracing),
@@ -1138,6 +1161,7 @@ def _write_config_yaml(variables: dict[str, Any], poc_dir: Path) -> None:
             "temperature": variables["temperature"],
         },
         "stages": variables["stage_settings"],
+        "local_endpoints": variables.get("local_endpoints") or [],
         "language": variables["language"],
         "paths": {
             "sample_input": "sample_input/",
