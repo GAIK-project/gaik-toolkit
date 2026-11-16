@@ -22,7 +22,7 @@ import re
 import time
 import types
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -1337,6 +1337,21 @@ def _heads_own_line(line: str, start: int, end: int) -> bool:
     return not rest or rest[0] in _OWN_LINE_SEPARATORS
 
 
+def _field_name_re(field: FieldSpec) -> re.Pattern[str]:
+    """How the task text names ``field``.
+
+    The task may name the field as prose ("delivery date"), as the identifier
+    itself ("delivery_date", often in backticks), or run together as the
+    camelCase it was written in ("deliveryDate").
+    """
+    label = field.field_name.replace("_", " ")
+    alternatives = {label, field.field_name, field.field_name.replace("_", "")}
+    return re.compile(
+        rf"\b(?:{'|'.join(re.escape(a) for a in sorted(alternatives, key=len, reverse=True))})\b",
+        re.IGNORECASE,
+    )
+
+
 def _field_specific_context(field: FieldSpec, original_text: str) -> str:
     """Return task text scoped to ``field`` instead of the whole task.
 
@@ -1346,17 +1361,16 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
     field's format. This prevents ``Delivery Date (DD/MM/YYYY)`` from silently
     changing ``Order Date`` as well.
     """
-    pieces: list[str] = []
-    label = field.field_name.replace("_", " ")
-    # The task may name the field as prose ("delivery date"), as the identifier
-    # itself ("delivery_date", often in backticks), or run together as the
-    # camelCase it was written in ("deliveryDate").
-    alternatives = {label, field.field_name, field.field_name.replace("_", "")}
-    label_re = re.compile(
-        rf"\b(?:{'|'.join(re.escape(a) for a in sorted(alternatives, key=len, reverse=True))})\b",
-        re.IGNORECASE,
-    )
     lines = original_text.splitlines()
+    return "\n".join(
+        lines[index][start:end] for index, start, end in _field_context_spans(field, lines)
+    )
+
+
+def _field_context_spans(field: FieldSpec, lines: list[str]) -> list[tuple[int, int, int]]:
+    """Where :func:`_field_specific_context` finds ``field``: (line, start, end)."""
+    spans: list[tuple[int, int, int]] = []
+    label_re = _field_name_re(field)
 
     for index, line in enumerate(lines):
         match = label_re.search(line)
@@ -1367,33 +1381,34 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
             # The field heads its own bullet, numbered item or heading
             # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
             # line is about this field, commas included.
-            pieces.append(line[match.start() :])
+            spans.append((index, match.start(), len(line)))
         else:
             # A prose line often lists several fields. Keep only this field's
             # comma/semicolon/period-delimited clause so one field's
             # parenthesized format cannot leak into another field on the same
             # line.
-            clause_chars: list[str] = []
+            end = match.start()
             depth = 0
             for char in line[match.start() :]:
                 if char in "([":
                     depth += 1
                 elif char in ")]" and depth:
                     depth -= 1
-                if depth == 0 and char in ",;." and clause_chars:
+                if depth == 0 and char in ",;." and end > match.start():
                     break
-                clause_chars.append(char)
-            pieces.append("".join(clause_chars))
+                end += 1
+            spans.append((index, match.start(), end))
 
         # Support a bullet or heading whose following lines carry the detailed
         # representation instruction.
         if _ITEM_START_RE.match(line):
-            for following in lines[index + 1 :]:
+            for following_index in range(index + 1, len(lines)):
+                following = lines[following_index]
                 if not following.strip() or _ITEM_START_RE.match(following):
                     break
-                pieces.append(following)
+                spans.append((following_index, 0, len(following)))
 
-    return "\n".join(piece for piece in pieces if piece)
+    return [span for span in spans if span[2] > span[1]]
 
 
 def _detect_global_date_format(text: str) -> str | None:
@@ -1413,23 +1428,62 @@ _KEEP_AS_WRITTEN_RE = re.compile(
     re.IGNORECASE,
 )
 _CONVERT_RE = re.compile(r"\b(?:convert\w*|normali[sz]\w*|iso)\b", re.IGNORECASE)
+# A negated instruction, up to the end of its clause: "do not convert to ISO".
+_NEGATED_RE = re.compile(r"\b(?:do\s+not|don['\u2019]t|never|not|without|no)\b[^,;.\n]*", re.I)
+# A clause about all dates is task-wide even when a field is called "date".
+_ALL_DATES_RE = re.compile(r"\b(?:all|every|each)\s+(?:(?:the|output)\s+)?dates?\b", re.I)
+_CLAUSE_SPLIT_RE = re.compile(r"(?<=[.!?;])\s+|\n")
 
 
-def _keeps_dates_as_written(text: str) -> bool:
+def _asks_to_keep_as_written(text: str) -> bool:
+    """Whether ``text`` asks to keep a value as written, naming no format or conversion.
+
+    A negated part counts for neither side: "Preserve dates as written, do not
+    convert to ISO" keeps the dates, and "Do not keep dates as written" does not.
+    """
+    affirmed = _NEGATED_RE.sub(" ", text)
+    if not _KEEP_AS_WRITTEN_RE.search(affirmed):
+        return False
+    return not (_detect_date_format(affirmed) or _CONVERT_RE.search(affirmed))
+
+
+def _keeps_dates_as_written(text: str, fields: Sequence[FieldSpec] = ()) -> bool:
     """Whether a task-level rule asks to keep dates as written.
 
     "Preserve original wording, dimensions, dates, and labels." and "Preserve
     dates exactly if the required format cannot be inferred." both count. A
     clause that names a format or a conversion does not, so "Keep dates in
     DD.MM.YYYY" is left to the format detection.
+
+    A rule in one field's own text is that field's rule, not the task's:
+    "- Drawing date (preserve format in string)" must not turn every other date
+    field into text. So the text of each of ``fields`` is taken out first, unless
+    the clause speaks of all or every date.
     """
-    for clause in re.split(r"(?<=[.!?;])\s+|\n", text or ""):
-        if not _DATES_WORD_RE.search(clause) or not _KEEP_AS_WRITTEN_RE.search(clause):
-            continue
-        if _detect_date_format(clause) or _CONVERT_RE.search(clause):
-            continue
+    text = text or ""
+    lines = text.splitlines()
+    task_lines = list(lines)
+    for field in fields:
+        for index, start, end in _field_context_spans(field, lines):
+            line = task_lines[index]
+            task_lines[index] = line[:start] + " " * (end - start) + line[end:]
+    if any(
+        _DATES_WORD_RE.search(clause) and _asks_to_keep_as_written(clause)
+        for clause in _CLAUSE_SPLIT_RE.split("\n".join(task_lines))
+    ):
         return True
-    return False
+    return any(
+        _ALL_DATES_RE.search(clause) and _asks_to_keep_as_written(clause)
+        for clause in _CLAUSE_SPLIT_RE.split(text)
+    )
+
+
+def _keeps_field_as_written(field: FieldSpec, field_context: str) -> bool:
+    """Whether the field's own text asks to keep its value as written.
+
+    The field's own name is left out, so "Preservation date" is not a rule.
+    """
+    return _asks_to_keep_as_written(_field_name_re(field).sub(" ", field_context))
 
 
 def _requests_text_representation(text: str) -> bool:
@@ -1545,7 +1599,7 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
     Supports multiple languages for date detection.
     """
     global_date_format = _detect_global_date_format(original_text)
-    keeps_dates_as_written = _keeps_dates_as_written(original_text)
+    keeps_dates_as_written = _keeps_dates_as_written(original_text, requirements.fields)
 
     for field in requirements.fields:
         field_context = _field_specific_context(field, original_text)
@@ -1573,7 +1627,9 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
             and not is_integer_count
             and _is_date_field(field.field_name, field.description)
         ):
-            if _requests_text_representation(field_context):
+            if _requests_text_representation(field_context) or _keeps_field_as_written(
+                field, field_context
+            ):
                 field.field_type = "str"
                 field.format = None
                 continue
