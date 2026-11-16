@@ -95,15 +95,17 @@ def _find_search_string(text: str, search: str, threshold: float = FUZZY_THRESHO
 
     Tries an exact match, then one that ignores case, quote and dash styles and
     whitespace runs, then (for longer strings) a fuzzy match of at least
-    ``threshold`` checked at every offset. A loose match is taken only when exactly
-    one span of ``text`` fits, so an edit never lands on a shifted or a second span;
+    ``threshold`` checked at every offset, for spans as long as ``search`` and one
+    character shorter or longer. A loose match is taken only when exactly one span of
+    ``text`` fits best, so an edit never lands on a shifted or a second span;
     anything else returns None and the edit stays unresolved.
     """
     if search in text:
         return search
 
     folded_text, where = _folded(text)
-    folded_search = _folded(search)[0].strip()
+    # Not stripped: a space at either end belongs to the passage the edit replaces.
+    folded_search = _folded(search)[0]
     if folded_search:
         pos = _unique_find(folded_text, folded_search)
         if pos is not None:
@@ -114,25 +116,51 @@ def _find_search_string(text: str, search: str, threshold: float = FUZZY_THRESHO
         return None
 
     n = len(search)
-    low = search.lower()
-    fits: list[tuple[float, int]] = []
     matcher = SequenceMatcher(None, autojunk=False)
-    matcher.set_seq2(low)
-    for i in range(0, max(1, len(text) - n + 1)):
-        matcher.set_seq1(text[i : i + n].lower())
-        if matcher.real_quick_ratio() < threshold or matcher.quick_ratio() < threshold:
-            continue
+    matcher.set_seq2(search.lower())
+    fits: dict[tuple[int, int], tuple[int, int]] = {}
+
+    def ratio_at(start: int, width: int, floor: float) -> float:
+        """Score ``text[start:start + width]``; a span that fits goes into ``fits``."""
+        end = min(start + width, len(text))
+        matcher.set_seq1(text[start:end].lower())
+        if matcher.real_quick_ratio() < floor or matcher.quick_ratio() < floor:
+            return 0.0
         ratio = matcher.ratio()
         if ratio >= threshold:
-            fits.append((ratio, i))
+            edits = sum(
+                max(i2 - i1, j2 - j1)
+                for tag, i1, i2, j1, j2 in matcher.get_opcodes()
+                if tag != "equal"
+            )
+            matched = sum(block.size for block in matcher.get_matching_blocks())
+            # Fewest edits first, then most characters kept.
+            fits[(start, end)] = (edits, -matched)
+        return ratio
+
+    # Spans one character shorter and longer than ``search`` are tried too: after a
+    # one-character insertion or deletion only the passage itself needs a single edit,
+    # while two spans of the search's own length, shifted by one, would tie. Such a span
+    # that fits keeps the span of the search's length at the same start above ``near``,
+    # so only those starts are tried with the other two lengths.
+    near = threshold - (2 - threshold) / (2 * n)
+    for start in range(0, max(1, len(text) - n + 2)):
+        if ratio_at(start, n, near) >= near:
+            ratio_at(start, n - 1, threshold)
+            ratio_at(start, n + 1, threshold)
     if not fits:
         return None
-    best_ratio = max(r for r, _ in fits)
-    best = [i for r, i in fits if r == best_ratio]
-    # A second fitting span that does not overlap the best one makes it ambiguous.
-    if len(best) != 1 or any(abs(i - best[0]) >= n for _, i in fits):
+    rank = min(fits.values())
+    best = [span for span, r in fits.items() if r == rank]
+    # Two spans that fit equally well, such as a passage with or without the character
+    # next to it, leave the edit unresolved.
+    if len(best) != 1:
         return None
-    return text[best[0] : best[0] + n]
+    start, end = best[0]
+    # A second fitting span that does not overlap the best one makes it ambiguous.
+    if any(s >= end or e <= start for s, e in fits):
+        return None
+    return text[start:end]
 
 
 def _apply_corrections(

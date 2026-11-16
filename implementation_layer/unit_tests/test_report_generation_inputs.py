@@ -35,6 +35,9 @@ def _gen() -> msrg.MultiSourceReportGenerator:
     [
         _PASSAGE.replace("roof ", "roof  "),  # a double space
         _PASSAGE.replace("membrane", "membrame"),  # a one-letter typo
+        _PASSAGE.replace("membrane", "membrne"),  # a letter left out
+        _PASSAGE.replace("membrane", "membrrane"),  # a letter added
+        _PASSAGE.replace("stairwell", "stairwel"),  # one of a double letter left out
         _PASSAGE.upper(),
     ],
 )
@@ -46,6 +49,22 @@ def test_a_loose_edit_replaces_exactly_its_passage(offset, search):
     assert not failed
     assert done[0]["search"] == _PASSAGE
     assert new == "x" * offset + "Intro. REPLACED. Outro sentence follows here."
+
+
+@pytest.mark.parametrize("search", ["X" + _PASSAGE[1:], _PASSAGE[:-1] + "!", _PASSAGE + "!"])
+def test_a_fuzzy_edit_never_lands_beside_its_passage(search):
+    # A difference in the first or last character fits the passage with or without the
+    # character next to it equally well.
+    text = "Intro. " + _PASSAGE + " Outro."
+    assert _find_search_string(text, search) in (None, _PASSAGE)
+
+
+def test_a_loose_edit_keeps_the_space_at_its_end():
+    assert _find_search_string("Apple pie. Pineapple.", "apple ") == "Apple "
+    new, _, failed = _apply_corrections(
+        "Apple pie.", [Correction(search="apple ", replace="Pear ", reason="r")]
+    )
+    assert new == "Pear pie." and not failed
 
 
 def test_a_loose_edit_ignores_quote_and_dash_styles():
