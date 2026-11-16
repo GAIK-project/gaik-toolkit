@@ -127,12 +127,22 @@ def _native(path: str) -> str:
     return path
 
 
-def is_env_file(path: str) -> bool:
-    """A ``.env`` file, which holds keys: ``.env``, ``.env.local``, ``x.env``."""
-    name = re.split(r"[\\/]", path.rstrip("\\/"))[-1].lower()
+def _is_env_name(name: str) -> bool:
     if name in {".env.example", ".env.template", ".env.sample"}:
         return False
     return name == ".env" or name.startswith(".env.") or name.endswith(".env")
+
+
+def is_env_file(path: str) -> bool:
+    """A ``.env`` file, which holds keys: ``.env``, ``.env.local``, ``x.env``.
+
+    The last part of the path is judged in each of the forms Windows also opens
+    a file under: any part between colons (a drive prefix such as ``C:.env`` or
+    a stream suffix such as ``.env::$DATA``), with trailing dots and spaces
+    dropped, as Windows drops them. Elsewhere these forms are only stricter.
+    """
+    name = re.split(r"[\\/]", path.rstrip("\\/"))[-1].lower()
+    return any(_is_env_name(part.rstrip(". ")) for part in [name, *name.split(":")])
 
 
 #: Entries a folder search may look through for .env files before it is refused.
@@ -152,12 +162,17 @@ def _has_env_file(folder: Path) -> bool:
     return False
 
 
+def _real(path: str, cwd: Path) -> Path:
+    """The file ``path`` opens, links and Windows short names resolved."""
+    path = _native(path)
+    target = Path(path) if os.path.isabs(path) else cwd / path
+    return Path(os.path.realpath(target))
+
+
 def _inside(path: str, roots: list[Path], cwd: Path) -> bool:
     if _expands(path):
         return False
-    path = _native(path)
-    target = Path(path) if os.path.isabs(path) else cwd / path
-    real = Path(os.path.realpath(target))
+    real = _real(path, cwd)
     return any(real == root or root in real.parents for root in roots)
 
 
@@ -193,15 +208,26 @@ class ToolGuard:
             reason = "The wizard could not check this tool call, so it was not run."
         return _deny(reason) if reason else {}
 
+    def _env_file(self, path: str) -> bool:
+        """A .env file by the name as written or by the name of the file it opens."""
+        if is_env_file(path):
+            return True
+        return not _expands(path) and is_env_file(str(_real(path, self.cwd)))
+
+    def _writable(self, path: str) -> bool:
+        """In the output folder, and not in the wizard's own files even when the
+        output folder holds them."""
+        return _inside(path, self.writable, self.cwd) and not _inside(path, [self.cwd], self.cwd)
+
     def check(self, tool: str, tool_input: dict[str, Any]) -> str | None:
         """Why the call is refused, or None when it may run."""
         if tool in _HARMLESS_TOOLS or tool in self.extra_tools:
             return None
         if tool in _WRITE_TOOLS:
             path = tool_input.get(_WRITE_TOOLS[tool]) or ""
-            if is_env_file(path):
+            if path and self._env_file(path):
                 return "The wizard does not write .env files; write .env.example instead."
-            if not path or not _inside(path, self.writable, self.cwd):
+            if not path or not self._writable(path):
                 return f"Files can be written only in the output folder {self.output.as_posix()}."
             return None
         if tool in _READ_TOOLS:
@@ -219,8 +245,13 @@ class ToolGuard:
             if tool in {"Grep", "Glob"} and isinstance(tool_input.get("glob"), str):
                 if is_env_file(tool_input["glob"]):
                     return "The wizard does not read .env files; they hold keys."
-            if any(is_env_file(p) for p in paths):
+            if any(self._env_file(p) for p in paths):
                 return "The wizard does not read .env files; they hold keys."
+            if not all(_inside(p, self.readable, self.cwd) for p in paths):
+                return (
+                    f"Files can be read only in the output folder {self.output.as_posix()} "
+                    "and in the wizard's own files."
+                )
             if tool == "Grep":
                 folder = _native(paths[0])
                 folder_path = Path(folder) if os.path.isabs(folder) else self.cwd / folder
@@ -229,11 +260,6 @@ class ToolGuard:
                         "This folder has a .env file, which holds keys, and Grep would read "
                         "it: search a file, or a folder without one (for example poc/schemas)."
                     )
-            if not all(_inside(p, self.readable, self.cwd) for p in paths):
-                return (
-                    f"Files can be read only in the output folder {self.output.as_posix()} "
-                    "and in the wizard's own files."
-                )
             return None
         if tool == "Bash":
             return self._check_bash(str(tool_input.get("command") or ""))
@@ -267,9 +293,7 @@ class ToolGuard:
             return f"{given} {Path(script).name} takes {', '.join(options)}. " + allowed
         for option, value in given.items():
             kind = options[option]
-            if kind == _PATH and (
-                is_env_file(value) or not _inside(value, self.writable, self.cwd)
-            ):
+            if kind == _PATH and (self._env_file(value) or not self._writable(value)):
                 return f"{option} must be in the output folder {self.output.as_posix()}. " + allowed
             if kind == _URL and not endpoint_ok(value):
                 return (
@@ -312,7 +336,7 @@ class ToolGuard:
             match = one_liner.match(code)
             if match:
                 if one_liner is _ONE_LINERS[0] and (
-                    is_env_file(match.group(1))
+                    self._env_file(match.group(1))
                     or not _inside(match.group(1), self.readable, self.cwd)
                 ):
                     return allowed
@@ -336,7 +360,7 @@ class ToolGuard:
             # Without --output-dir the scaffolder writes where the blueprint says.
             package = blueprint.get("package")
             output_dir = package.get("output_dir") if isinstance(package, dict) else None
-            if output_dir and not _inside(str(output_dir), self.writable, self.cwd):
+            if output_dir and not self._writable(str(output_dir)):
                 return (
                     "The blueprint's package.output_dir is outside the output folder; pass "
                     f"--output-dir {self.output.as_posix()} or fix package.output_dir."

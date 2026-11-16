@@ -173,18 +173,19 @@ def test_bash_runs_nothing_but_the_wizards_scripts(guard, command) -> None:
 
 
 def test_the_skills_own_commands_are_allowed(guard) -> None:
-    bp = _blueprint(guard.session / "use_case.blueprint.json")
+    bp = _blueprint(guard.session / "use_case.blueprint.json").as_posix()
+    s = guard.session.as_posix()
     for command in (
         f"python scripts/validate_blueprint.py --blueprint {bp}",
         f"python3 scripts/scaffold_poc.py --blueprint {bp} --synthetic",
-        f"python -c \"import ast; ast.parse(open('{guard.session}/poc/run_poc.py').read())\"",
+        f"python -c \"import ast; ast.parse(open('{s}/poc/run_poc.py').read())\"",
         'python -c "import gaik.software_modules.report_writer"',
     ):
         assert guard.check("Bash", {"command": command}) is None, command
 
 
 def test_model_ids_endpoints_and_continued_lines_are_allowed(guard) -> None:
-    s = guard.session
+    s = guard.session.as_posix()
     command = (
         f"python scripts/generate_schema.py \\\n"
         f"    --requirements {s}/poc/prompts/extraction_requirements.md \\\n"
@@ -202,9 +203,15 @@ def test_scaffolding_follows_the_blueprints_output_dir(guard) -> None:
     data = json.loads(_blueprint(bp).read_text())
     data["package"] = {"output_dir": "/srv/elsewhere"}
     bp.write_text(json.dumps(data))
+    blueprint = bp.as_posix()
 
-    assert guard.check("Bash", {"command": f"python scripts/scaffold_poc.py --blueprint {bp}"})
-    ok = f"python scripts/scaffold_poc.py --blueprint {bp} --output-dir {guard.session}"
+    command = f"python scripts/scaffold_poc.py --blueprint {blueprint}"
+    reason = guard.check("Bash", {"command": command})
+    assert reason and "package.output_dir" in reason
+    ok = (
+        f"python scripts/scaffold_poc.py --blueprint {blueprint} "
+        f"--output-dir {guard.session.as_posix()}"
+    )
     assert guard.check("Bash", {"command": ok}) is None
 
 
@@ -266,6 +273,92 @@ def test_an_env_template_can_be_written_and_read(guard):
     path = str(guard.session / "poc" / ".env.example")
     assert guard.check("Write", {"file_path": path}) is None
     assert guard.check("Read", {"file_path": path}) is None
+
+
+@pytest.mark.parametrize(
+    "name", [".env.", ".env ", ".env. .", ".env::$DATA", ".env:notes", "C:.env", "prod.env."]
+)
+def test_the_names_windows_also_opens_an_env_file_under_count_as_env_files(guard, name):
+    assert agent_tool_guard.is_env_file(name)
+    assert agent_tool_guard.is_env_file(f"poc\\{name}")
+    path = f"{guard.session.as_posix()}/poc/{name}"
+    assert ".env" in guard.check("Read", {"file_path": path})
+    assert ".env" in guard.check("Write", {"file_path": path})
+    assert ".env" in guard.check("Grep", {"pattern": "KEY", "path": path})
+    one_liner = f"python -c \"import ast; ast.parse(open('{path}').read())\""
+    assert guard.check("Bash", {"command": one_liner})
+
+
+@pytest.mark.parametrize("name", [".env.example", "env.py", "run_poc.py", "notes:draft.txt"])
+def test_other_names_are_not_env_files(name):
+    assert not agent_tool_guard.is_env_file(name)
+
+
+def test_a_link_to_an_env_file_is_judged_by_the_file_it_opens(guard):
+    (guard.session / "poc" / ".env").write_text("KEY=x")
+    link = guard.session / "poc" / "notes.txt"
+    try:
+        link.symlink_to(guard.session / "poc" / ".env")
+    except OSError:
+        pytest.skip("this system cannot create the link")
+
+    assert ".env" in guard.check("Read", {"file_path": str(link)})
+    assert ".env" in guard.check("Write", {"file_path": str(link)})
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows short (8.3) names")
+def test_a_windows_short_name_of_an_env_file_is_judged_by_its_long_name(guard):
+    import ctypes
+
+    env_file = guard.session / "poc" / ".env.local"
+    env_file.write_text("KEY=x")
+    buffer = ctypes.create_unicode_buffer(1024)
+    ctypes.windll.kernel32.GetShortPathNameW(str(env_file), buffer, len(buffer))  # type: ignore[attr-defined]
+    short = buffer.value
+    if not short or Path(short).name.lower() == env_file.name:
+        pytest.skip("short names are off on this volume")
+
+    assert not agent_tool_guard.is_env_file(short)
+    assert ".env" in guard.check("Read", {"file_path": short})
+    assert ".env" in guard.check("Read", {"file_path": Path(short).as_posix()})
+
+
+def test_a_folder_search_outside_the_allowed_folders_is_refused_before_it_is_walked(
+    guard, monkeypatch
+):
+    (guard.other / ".env").write_text("KEY=x")
+
+    def walked(_folder):
+        raise AssertionError("the folder was looked through")
+
+    monkeypatch.setattr(agent_tool_guard, "_has_env_file", walked)
+    reason = guard.check("Grep", {"pattern": "KEY", "path": str(guard.other)})
+
+    assert reason and "output folder" in reason and ".env file" not in reason
+
+
+# ------------------------------------------- an output folder holding the wizard
+
+
+def test_the_wizards_own_files_stay_read_only_when_the_output_folder_holds_them(tmp_path):
+    wizard = tmp_path / "solution_wizard"
+    (wizard / "scripts").mkdir(parents=True)
+    (wizard / "scripts" / "validate_blueprint.py").write_text("")
+    (wizard / "scripts" / "scaffold_poc.py").write_text("")
+    (wizard / "SKILL.md").write_text("")
+    g = agent_tool_guard.ToolGuard(wizard, tmp_path)
+    bp = _blueprint(tmp_path / "use_case.blueprint.json").as_posix()
+
+    assert g.check("Write", {"file_path": str(wizard / "SKILL.md")})
+    assert g.check("Edit", {"file_path": str(wizard / "scripts" / "scaffold_poc.py")})
+    into_wizard = (
+        f"python scripts/scaffold_poc.py --blueprint {bp} --output-dir {wizard.as_posix()}/poc"
+    )
+    assert g.check("Bash", {"command": into_wizard})
+    assert g.check("Read", {"file_path": str(wizard / "SKILL.md")}) is None
+    assert g.check("Write", {"file_path": str(tmp_path / "case" / "notes.md")}) is None
+    own = f"python scripts/scaffold_poc.py --blueprint {bp} --output-dir {tmp_path.as_posix()}/poc"
+    assert g.check("Bash", {"command": own}) is None
 
 
 # ---------------------------------------------------------------- Windows paths
