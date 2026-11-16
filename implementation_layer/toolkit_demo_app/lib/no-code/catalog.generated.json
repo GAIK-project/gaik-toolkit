@@ -1,7 +1,7 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.6.17",
+    "version": "0.6.18",
     "marketplace": "GAIK-project/gaik-toolkit",
     "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
   },
@@ -197,7 +197,7 @@
         "references/parser-selection.md"
       ],
       "zip": "/downloads/skills/parsing-documents.zip",
-      "zipBytes": 19346,
+      "zipBytes": 20084,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/parsing-documents",
       "guideUrl": null
     },
@@ -221,7 +221,7 @@
         "references/measuring-extraction.md"
       ],
       "zip": "/downloads/skills/extracting-structured-data.zip",
-      "zipBytes": 22943,
+      "zipBytes": 23441,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/extracting-structured-data",
       "guideUrl": null
     },

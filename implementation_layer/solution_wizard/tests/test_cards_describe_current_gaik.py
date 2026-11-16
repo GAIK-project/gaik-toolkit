@@ -86,3 +86,35 @@ def test_judge_card_names_the_eu_default_location():
     assert "'eu'" in effect and "'global'" in effect
     # The validated release a PoC installs has the EU default; the card says so.
     assert "Unset, the judge calls the EU multi-region 'eu'" in effect
+
+
+def _card_class(name: str):
+    """The class a card's import line names, or None when its extra is not installed."""
+    module, names = CARDS[name]["import"].removeprefix("from ").split(" import ", 1)
+    if name not in [part.strip() for part in names.split(",")]:
+        return None
+    try:
+        return getattr(importlib.import_module(module), name, None)
+    except ImportError:
+        return None
+
+
+def test_every_component_that_takes_input_limits_says_so_on_its_card_and_entry():
+    takes_limits = []
+    for name in CARDS:
+        cls = _card_class(name)
+        if cls is not None and "limits" in inspect.signature(cls.__init__).parameters:
+            takes_limits.append(name)
+    assert {"PyMuPDFParser", "VisionExtractor", "ParallelTranscriber"} <= set(takes_limits)
+
+    for name in takes_limits:
+        effect = _option(name, "limits")["effect"]
+        assert "InputLimitError" in effect and "limits=" in effect, name
+        assert "InputLimitError" in _limitations(name), name
+        assert "limits" in get_registry().lookup_by_name(name)["optional_parameters"], name
+
+
+def test_whisper_local_cap_card_says_the_six_hour_input_limit_applies_too():
+    cap = _option("ParallelTranscriber", "whisper_local_max_audio_minutes")
+    assert "max_media_seconds" in cap["effect"]
+    assert "max_media_seconds" in cap["infer_from"]
