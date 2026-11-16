@@ -21,7 +21,7 @@ Most chat-based components (Extractor and SchemaGenerator, Classifier, Transcrip
 
 ### Transcriber
 
-The Transcriber converts spoken audio or video recordings into written text. It uses OpenAI's Whisper model for accurate speech-to-text transcription and optionally applies a GPT-based post-processing step (the Transcript Enhancer below) to fix transcription errors in the raw output — misspellings, inconsistent terms, and split or merged words — without rewriting it. It handles long recordings automatically through chunked processing, making it suitable for real-world audio captured in noisy or uncontrolled environments.
+The Transcriber converts spoken audio or video recordings into written text. It uses an OpenAI or Azure OpenAI speech-to-text model (`gpt-4o-transcribe` by default, or `whisper-1`) or a local Whisper server (`whisper_local`) and optionally applies a GPT-based post-processing step (the Transcript Enhancer below) to fix transcription errors in the raw output — misspellings, inconsistent terms, and split or merged words — without rewriting it. It handles long recordings automatically through chunked processing, making it suitable for real-world audio captured in noisy or uncontrolled environments.
 
 <Mermaid chart={`
 flowchart LR
@@ -44,7 +44,7 @@ flowchart LR
 `} />
 
 **Key features:**
-- Whisper-based transcription with high accuracy across languages
+- `gpt-4o-transcribe` by default; Whisper (`whisper-1`) or a local Whisper server on request
 - Optional GPT enhancement that repairs ASR errors without rewriting the transcript
 - Automatic chunking for recordings of any length
 - Supports MP3, WAV, M4A, OGG, and video formats
@@ -860,8 +860,8 @@ flowchart LR
 
 **Key features:**
 - `WebScraper(allowed_domains=["gaik.ai"])`, then `scrape(url)` for one page or `crawl(start_url, max_pages=10, max_depth=2)` for a site. `iter_crawl(...)` yields each page as it arrives, so a crawl can be shown live or stopped
-- Crawl scope: the start page's host, `include_patterns` and `exclude_patterns` on the URL path (`"/fi/news/*"`), and links to files such as PDFs and images are not followed
-- Safe by default: `allowed_domains` is required (or an explicit `allow_any_domain=True` for scripts whose URLs you choose yourself), http(s) only, each redirect hop checked, no private, loopback or link-local addresses, and the connection goes to the address that was checked; a size limit per page
+- Crawl scope: the start page's host, `include_patterns` and `exclude_patterns` on the URL path with its query (`"/fi/news/*"`), and links to files such as PDFs and images are not followed
+- Safe by default: `allowed_domains` is required (or an explicit `allow_any_domain=True` for scripts whose URLs you choose yourself), http(s) only, each redirect hop checked, no private, loopback or link-local addresses, and the connection goes to the address that was checked (with `render_js`, a custom `transport` or a proxy from `HTTP_PROXY`/`HTTPS_PROXY`, the browser, the transport or the proxy looks the name up itself); a size limit per page
 - Polite: robots.txt with wildcards and `Crawl-delay`, `delay_seconds` between requests to one host, and a `User-Agent` that names the toolkit
 - `render_js=True` renders pages in headless Chromium, and `render_js="auto"` only pages whose HTML holds almost no text
 - `CrawlResult.to_model_text()` joins the pages into one document for the Extractor, each page in a `<web_page source="...">` block marked as data, not instructions, with its `Source:` line; `to_markdown()` gives the same pages unmarked, and `save(directory)` writes one Markdown file per page and `crawl.json`
@@ -913,7 +913,7 @@ flowchart TD
 - Editable output: `save()` writes one JSON file per section. `KnowledgeBase.load()` validates edited files and `verify_quotes(sources)` checks the quotes again
 - Texts that already exist can be wrapped with `NormalizedSources.from_texts(...)`, so the Source Normalizer is optional
 - Install: `pip install "gaik[knowledge-curator]"` (core dependencies only). Works with any provider supported by `get_llm_config`
-- The curator's calls are not counted in any token usage total
+- `KnowledgeBase.usage` holds the token usage of the curator calls; it is not saved, so it is empty after `load()`
 
 **Potential applications:**
 - Audit evidence collection, with a quote and a location for every finding
@@ -961,7 +961,7 @@ flowchart LR
 - Bounded retries: at most `max_attempts` requests, the first one included. Edits that still fail are returned in `unresolved`, not raised, so the caller decides whether they are fatal
 - An empty draft or reference raises `ValueError`
 - Install: `pip install "gaik[draft-reviewer]"` (core dependencies only). Works with any provider supported by `get_llm_config`
-- The reviewer's calls are not counted in any token usage total
+- The token usage of every review so far is on `reviewer.client.usage.snapshot()`; in the Report Synthesizer it is part of `report.usage`
 
 **Potential applications:**
 - Checking an LLM summary against the source document
