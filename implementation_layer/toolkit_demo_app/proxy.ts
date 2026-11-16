@@ -123,7 +123,10 @@ async function route(request: NextRequest): Promise<NextResponse> {
       supportsModelSettings(pathname, request.method);
     if (needsApprovedUser(request.method)) {
       const state = await accessState();
-      const refusal = await accessRefusal(state, takeTrialRun, ownModelKey);
+      // Starting Aitta's idle models is no demo run: it spends no trial run.
+      const noTrialRun =
+        ownModelKey || pathname === "/api/model-settings/aitta/warm";
+      const refusal = await accessRefusal(state, takeTrialRun, noTrialRun);
       if (refusal) {
         // Why a run was refused, without who: the page shows the same text.
         console.warn(

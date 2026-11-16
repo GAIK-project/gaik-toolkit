@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { supportsModelSettings, supportsServerModel } from "./model-settings";
-import { aittaReadsImages, modelUse, type ActiveModel } from "./model-use";
+import {
+  aittaName,
+  aittaReadsImages,
+  modelUse,
+  type ActiveModel,
+} from "./model-use";
 
 const luna: ActiveModel = {
   own: false,
@@ -46,6 +51,26 @@ describe("modelUse", () => {
     ]);
     expect(modelUse("/transcriber", gemma).summary).toBe(
       "Whisper large v3 on CSC Aitta transcribes here.",
+    );
+  });
+
+  test("an idle Aitta helper model is announced", () => {
+    const idle = {
+      ...gemma,
+      aittaSpeech: { model: "openai/whisper-large-v3-turbo", idle: true },
+      aittaEmbedding: { model: "intfloat/multilingual-e5-large", idle: false },
+    };
+    expect(modelUse("/audio-structured", idle).details).toEqual([
+      "Recordings are transcribed by Whisper large v3 turbo on CSC Aitta. It is idle now: the first recording starts it, which can take minutes.",
+    ]);
+    expect(modelUse("/transcriber", idle).details).toEqual([
+      "It is idle now: the first recording starts it, which can take minutes.",
+    ]);
+    expect(modelUse("/rag", idle).details[0]).toBe(
+      "Embeddings come from multilingual-e5-large on CSC Aitta.",
+    );
+    expect(aittaName("some/new-speech-model")).toBe(
+      "New Speech Model on CSC Aitta",
     );
   });
 

@@ -43,6 +43,7 @@ import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { ResultView } from "../extractor/result-view";
 import { modelLabel } from "@/lib/model-labels";
+import { useAittaSpeech } from "@/components/model-settings";
 import {
   TranscriptView,
   type TranscribeResult,
@@ -153,6 +154,9 @@ export default function AudioStructuredPage() {
     setOptions((previous) => ({ ...previous, ...patch }));
   const language =
     LANGUAGES.find((entry) => entry.id === options.language) ?? LANGUAGES[0];
+  // With an Aitta model picked, Aitta's Whisper transcribes: it detects the
+  // language itself and returns the text without speakers.
+  const aittaSpeech = useAittaSpeech();
   const reusable = reusableSchemaId(madeSchema, task) !== null;
   // The text differs from the one the schema in hand was made from: the example's own
   // (ready-made) task, or the task of the last run. A new schema is made for it.
@@ -470,8 +474,9 @@ export default function AudioStructuredPage() {
               <CardHeader>
                 <CardTitle>3. How to listen</CardTitle>
                 <CardDescription>
-                  The same options as in the Transcriber. The ready-made
-                  recordings set them for you.
+                  {aittaSpeech
+                    ? `${aittaSpeech} transcribes. It detects the language itself and returns the text without speakers; hints and error fixing still apply.`
+                    : "The same options as in the Transcriber. The ready-made recordings set them for you."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -488,7 +493,7 @@ export default function AudioStructuredPage() {
                         type="button"
                         role="radio"
                         aria-checked={options.language === entry.id}
-                        disabled={busy}
+                        disabled={busy || !!aittaSpeech}
                         onClick={() => set({ language: entry.id })}
                         className={cn(
                           "rounded-lg border px-3 py-2 text-sm transition-colors",
@@ -502,7 +507,9 @@ export default function AudioStructuredPage() {
                     ))}
                   </div>
                   <p className="text-muted-foreground text-xs">
-                    {language.hint}
+                    {aittaSpeech
+                      ? "Not used: the language is recognised from the speech."
+                      : language.hint}
                   </p>
                 </div>
 
@@ -510,17 +517,21 @@ export default function AudioStructuredPage() {
                   <Option
                     title="Speaker detection"
                     htmlFor="diarization"
-                    description="Tells who speaks when, so that the transcript names the speakers. It works with the HH server only."
+                    description={
+                      aittaSpeech
+                        ? "Not available with CSC Aitta: it works with the HH server only."
+                        : "Tells who speaks when, so that the transcript names the speakers. It works with the HH server only."
+                    }
                     control={
                       <Switch
                         id="diarization"
-                        checked={options.diarization}
+                        checked={options.diarization && !aittaSpeech}
                         onCheckedChange={(value) => set({ diarization: value })}
-                        disabled={busy}
+                        disabled={busy || !!aittaSpeech}
                       />
                     }
                   />
-                  {options.diarization && (
+                  {options.diarization && !aittaSpeech && (
                     <div className="space-y-1">
                       <Label htmlFor="speakers" className="text-xs">
                         Number of speakers (optional)

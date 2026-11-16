@@ -65,10 +65,12 @@ import {
 } from "@/lib/server-model-store";
 import {
   AITTA_SPEECH_MODEL,
+  aittaName,
   aittaReadsImages,
   modelUse,
   type ActiveModel,
 } from "@/lib/model-use";
+import { useRunAccess } from "@/components/run-access";
 
 const LABELS = { openai: "OpenAI", azure: "Azure OpenAI", aitta: "CSC Aitta" };
 const CUSTOM = "__custom__";
@@ -539,7 +541,37 @@ function useActiveModel(loggedIn: boolean): ActiveModel | null {
     audio: model.audio,
     isDefault: model.id === catalog.default,
     teamOnly: model.staff,
+    ...(model.provider === "aitta" && catalog.aitta
+      ? {
+          aittaSpeech: helperState(catalog.aitta.speech),
+          aittaEmbedding: helperState(catalog.aitta.embedding),
+        }
+      : {}),
   };
+}
+
+function helperState(helper: { model: string; status: string | null }) {
+  // No status means the catalog did not answer: say nothing rather than guess.
+  return {
+    model: helper.model,
+    idle: helper.status !== null && helper.status !== "running",
+  };
+}
+
+/**
+ * Set when Aitta's Whisper transcribes the recordings of this page: its name,
+ * such as "Whisper large v3 on CSC Aitta". The audio pages use it to say which
+ * of their options then apply, since those belong to the HH Whisper server.
+ */
+export function useAittaSpeech(): string | null {
+  const pathname = usePathname();
+  const { loggedIn } = useRunAccess();
+  const active = useActiveModel(loggedIn);
+  if (!active || active.provider !== "aitta") return null;
+  if (!modelUse(pathname, active).runsHere) return null;
+  return active.aittaSpeech
+    ? aittaName(active.aittaSpeech.model)
+    : `${AITTA_SPEECH_MODEL} on CSC Aitta`;
 }
 
 function ModelRow({
@@ -553,7 +585,8 @@ function ModelRow({
   if (isDefault) tags.push("default");
   if (!model.vision) tags.push("text only");
   // Aitta starts an idle model on its first request.
-  if (model.status && model.status !== "running") tags.push("idle");
+  if (model.status === "failed") tags.push("unavailable");
+  else if (model.status && model.status !== "running") tags.push("idle");
   return (
     <DropdownMenuRadioItem
       value={model.id}
@@ -561,9 +594,11 @@ function ModelRow({
       title={
         !model.allowed
           ? "For the GAIK project team"
-          : tags.includes("idle")
-            ? "Idle on Aitta: the first request starts it, which can take minutes"
-            : undefined
+          : tags.includes("unavailable")
+            ? "Aitta reports that this model failed to start"
+            : tags.includes("idle")
+              ? "Idle on Aitta: the first request starts it, which can take minutes"
+              : undefined
       }
     >
       <ProviderIcon
@@ -685,6 +720,12 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
             onValueChange={(id) => {
               setModelSettings(null);
               setServerModel(id === catalog.default ? null : id);
+              // Aitta stops idle models: start its speech and embedding models
+              // now, so that they are up when a recording or document arrives.
+              if (id.startsWith("aitta:"))
+                void apiFetch("/api/model-settings/aitta/warm", {
+                  method: "POST",
+                }).catch(() => {});
             }}
           >
             {serverModels.length > 0 && (

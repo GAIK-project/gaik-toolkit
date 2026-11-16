@@ -10,6 +10,7 @@ const NAMES: Record<string, string> = {
   "openai/whisper-large-v3": "Whisper large v3 on CSC Aitta",
   "openai/whisper-large-v3-turbo": "Whisper large v3 turbo on CSC Aitta",
   "intfloat/multilingual-e5-large": "multilingual-e5-large on CSC Aitta",
+  "lightonai/modernbert-embed-large": "ModernBERT embed large on CSC Aitta",
   "google/gemma-4-31b-it": "Gemma 4 31B",
   "Qwen/Qwen3.8-27B": "Qwen 3.8 27B",
   "Qwen/Qwen3.6-35B-A3B": "Qwen 3.6 35B",

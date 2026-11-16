@@ -19,9 +19,16 @@ export interface ServerModel {
   /** Whether this user may run it. */
   allowed: boolean;
 }
+/** One of Aitta's helper models and its state ("running", "offline", …). */
+export interface AittaHelper {
+  model: string;
+  status: string | null;
+}
 export interface ServerModels {
   default: string | null;
   models: ServerModel[];
+  /** With an Aitta model picked, these transcribe and embed. */
+  aitta?: { speech: AittaHelper; embedding: AittaHelper } | null;
 }
 
 // The choice is not a secret: keep it across reloads in this browser.

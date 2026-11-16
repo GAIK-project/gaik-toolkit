@@ -285,6 +285,57 @@ def supports_server_model(path: str, method: str) -> bool:
     )
 
 
+def aitta_speech_model() -> str:
+    import os
+
+    return os.getenv("AITTA_TRANSCRIPTION_MODEL", "openai/whisper-large-v3")
+
+
+def aitta_embedding_model() -> str:
+    import os
+
+    return os.getenv("AITTA_EMBEDDING_MODEL", "intfloat/multilingual-e5-large")
+
+
+_aitta_warmed = 0.0
+
+
+def warm_aitta_models() -> list[str]:
+    """Ask Aitta to start its idle speech and embedding models; returns those asked.
+
+    Aitta stops a model that has been idle, and the next request then waits
+    minutes for it. Called when a user picks an Aitta model, so that the models
+    are up by the time a recording or a document arrives. At most once in five
+    minutes, whoever asks.
+    """
+    import time
+
+    global _aitta_warmed, _aitta_status
+    token = _aitta_token()
+    if not token or (_aitta_warmed and time.monotonic() - _aitta_warmed < 300):
+        return []
+    _aitta_warmed = time.monotonic()
+    statuses = aitta_model_status()
+    asked = []
+    for model in (aitta_speech_model(), aitta_embedding_model()):
+        if statuses.get(model) in {None, "running", "starting", "requested"}:
+            continue
+        try:
+            httpx.post(
+                f"https://aitta-api.csc.fi/model/{model.replace('/', '~')}/preload",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10.0,
+            ).raise_for_status()
+            asked.append(model)
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Aitta preload failed for %s (%s)", model, type(exc).__name__
+            )
+    if asked:
+        _aitta_status = (0.0, {})  # The next list shows them starting.
+    return asked
+
+
 _aitta_status: tuple[float, dict[str, str]] = (0.0, {})
 
 

@@ -7,6 +7,8 @@ from fastapi import HTTPException, UploadFile
 
 from .model_settings import (
     AITTA_BASE_URL,
+    aitta_embedding_model,
+    aitta_speech_model,
     get_request_api_config,
     model_name,
     reads_images,
@@ -107,17 +109,13 @@ def aitta_speech_config(config: dict) -> dict:
         "api_key": config["api_key"],
         "base_url": config.get("base_url") or AITTA_BASE_URL,
         "model": config["model"],
-        "transcription_model": os.getenv("AITTA_TRANSCRIPTION_MODEL", "openai/whisper-large-v3"),
+        "transcription_model": aitta_speech_model(),
         "timeout": config.get("timeout") or 600.0,
         "max_retries": 0,
     }
     if config.get("http_client") is not None:
         speech["http_client"] = config["http_client"]
     return speech
-
-
-def aitta_embedding_model() -> str:
-    return os.getenv("AITTA_EMBEDDING_MODEL", "intfloat/multilingual-e5-large")
 
 
 def get_rag_api_config() -> dict:
