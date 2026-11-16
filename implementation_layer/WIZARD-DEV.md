@@ -34,7 +34,7 @@ cd implementation_layer/wizard_api
 ```
 
 Varmista:
-- http://localhost:8100/health → `{"status":"ok"}`
+- http://localhost:8100/health → `{"status":"ok","version":"…"}`
 - http://localhost:3000/login → kirjautumissivu
 
 ### 2. Kirjautuminen
@@ -121,8 +121,8 @@ cd implementation_layer/wizard_api
 # 2. Frontend (new terminal)
 cd implementation_layer/solution_wizard_v2
 ./scripts/setup.sh          # once (npm + .venv/pydantic for BPMN scripts)
-cp .env.local.example .env.local
-# Edit .env.local: WIZARD_API_URL=http://localhost:8100
+cp .env.example .env.local
+# Edit .env.local: NEXT_PUBLIC_DEV_AUTH=true and WIZARD_API_URL=http://localhost:8100
 npm run dev                 # http://localhost:3000
 ```
 
@@ -140,8 +140,8 @@ Jos silti tarvitset UI-onlyn paikalliseen UI-kokeiluun:
 ```bash
 cd implementation_layer/solution_wizard_v2
 ./scripts/setup.sh          # npm ci + .venv + pip install -r requirements-bpmn.txt
-cp .env.local.example .env.local
-# Leave WIZARD_API_URL commented out
+cp .env.example .env.local
+# Edit .env.local: NEXT_PUBLIC_DEV_AUTH=true; leave WIZARD_API_URL commented out
 npm run dev
 ```
 

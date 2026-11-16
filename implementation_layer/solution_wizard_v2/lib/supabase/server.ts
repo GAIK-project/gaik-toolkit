@@ -8,7 +8,7 @@ export async function createClient() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY. For local UI set NEXT_PUBLIC_DEV_AUTH=true in .env.local (see .env.local.example).",
+      "Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY. For local UI set NEXT_PUBLIC_DEV_AUTH=true in .env.local (see .env.example).",
     );
   }
 

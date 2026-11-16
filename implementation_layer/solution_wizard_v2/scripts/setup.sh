@@ -15,7 +15,7 @@ python -c "import pydantic; print(\"BPMN Python OK (pydantic\", pydantic.__versi
 
 echo ""
 echo "UI ready."
-echo "  cp .env.local.example .env.local   # if needed"
+echo "  cp .env.example .env.local   # if needed"
 echo "  npm run dev"
 echo ""
 echo "BPMN without wizard_api: scripts use .venv/bin/python3 (pydantic installed)."

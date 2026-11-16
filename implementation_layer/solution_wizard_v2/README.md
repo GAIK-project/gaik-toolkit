@@ -22,7 +22,7 @@ Tämä on prototyyppi näytille, ei vielä toiminnallinen wizard (chat, BPMN ja 
 2. Luo Supabase-projekti (https://supabase.com) tai käytä olemassa olevaa. Ota talteen Project URL ja anon/publishable key (Project Settings → API).
 3. Kopioi ympäristömuuttujat:
    ```
-   cp .env.local.example .env.local
+   cp .env.example .env.local
    ```
    ja täytä `NEXT_PUBLIC_SUPABASE_URL` ja `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
    Lisää `WIZARD_ALLOWED_EMAILS` (pilkuin eroteltu lista): Supabase-tilassa sisään
@@ -149,8 +149,7 @@ samalla avaimella laskettu omistajatunniste (`o_` + 32 heksamerkkiä,
 `lib/owner-id.ts`), ei osoite. Avainta ei saa vaihtaa käytössä olevassa
 ympäristössä: uusi avain antaa jokaiselle uuden tunnisteen, eivätkä vanhat
 sessiot enää näy omistajalleen. Ei salasanoja, tokeneita,
-evästeitä tai koko blueprint-/chat-sisältöä lokeissa. Tausta:
-[`docs/2026-08-logging/technical-task-logging.md`](docs/2026-08-logging/technical-task-logging.md).
+evästeitä tai koko blueprint-/chat-sisältöä lokeissa.
 
 Lokien lukeminen kehityksessä:
 
