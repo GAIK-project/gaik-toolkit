@@ -13,6 +13,7 @@ from gaik.software_modules.multi_source_report_generator import pipeline as msrg
 from gaik.software_modules.multi_source_report_generator.agentic.reviewer import (
     Correction,
     _apply_corrections,
+    _find_search_string,
 )
 from gaik.software_modules.report_writer.spec import ReportSpec
 
@@ -62,6 +63,13 @@ def test_a_loose_edit_that_fits_two_spans_is_left_unresolved():
         text, [Correction(search=search, replace="X", reason="r")]
     )
     assert new == text and not done and len(failed) == 1
+
+
+def test_a_fuzzy_edit_is_refused_when_a_second_span_also_fits():
+    first = "The roof membrane was replaced in 2019 after a leak."
+    text = f"{first} Later: The roof membrane was replaced in 2018 after a leaks."
+    search = "The roof membrane was replaced in 2017 after a leak."
+    assert _find_search_string(text, search) is None
 
 
 # -- #145 item 2: .xls is refused before any source is read -------------------

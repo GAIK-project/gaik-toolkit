@@ -115,20 +115,22 @@ def _find_search_string(text: str, search: str, threshold: float = FUZZY_THRESHO
 
     n = len(search)
     low = search.lower()
-    best_ratio = threshold
-    best: list[int] = []
+    fits: list[tuple[float, int]] = []
     matcher = SequenceMatcher(None, autojunk=False)
     matcher.set_seq2(low)
     for i in range(0, max(1, len(text) - n + 1)):
         matcher.set_seq1(text[i : i + n].lower())
-        if matcher.real_quick_ratio() < best_ratio or matcher.quick_ratio() < best_ratio:
+        if matcher.real_quick_ratio() < threshold or matcher.quick_ratio() < threshold:
             continue
         ratio = matcher.ratio()
-        if ratio > best_ratio:
-            best_ratio, best = ratio, [i]
-        elif ratio == best_ratio:
-            best.append(i)
-    if len(best) != 1:
+        if ratio >= threshold:
+            fits.append((ratio, i))
+    if not fits:
+        return None
+    best_ratio = max(r for r, _ in fits)
+    best = [i for r, i in fits if r == best_ratio]
+    # A second fitting span that does not overlap the best one makes it ambiguous.
+    if len(best) != 1 or any(abs(i - best[0]) >= n for _, i in fits):
         return None
     return text[best[0] : best[0] + n]
 

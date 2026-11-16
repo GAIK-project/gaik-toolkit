@@ -396,7 +396,7 @@ the credential-bearing stage configs when running the report.
 | Text | `.txt` | Read directly |
 | Markdown | `.md`, `.markdown` | Read directly |
 | CSV | `.csv` | Converted to Markdown table with Python stdlib `csv` |
-| Excel | `.xlsx` (an old `.xls` is refused before any source is read; save it as `.xlsx`) | Converted to Markdown table with `openpyxl` |
+| Excel | `.xlsx` (an old `.xls` is refused before any source is read, also inside a folder passed as a whole; save it as `.xlsx`) | Converted to Markdown table with `openpyxl` |
 | PDF | `.pdf` | Parsed by `parser_choice` |
 | Word | `.docx` | Parsed by `DocxParser` |
 | Audio | `.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.ogg` | Transcribed by `Transcriber` |
