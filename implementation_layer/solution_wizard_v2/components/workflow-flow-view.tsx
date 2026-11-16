@@ -912,7 +912,11 @@ export function WorkflowFlowView({
       {!locked && onLock && (
         <FlowEditingNote
           help={t.flowEditHelp}
-          onLock={onLock}
+          // "Kumoa" after a removal is an edit too: it goes with the lock.
+          onLock={() => {
+            setStatus({ kind: "idle" });
+            onLock();
+          }}
           lockWaits={status.kind === "saving"}
           testId="simple-flow"
           t={t}

@@ -735,6 +735,18 @@ test.describe("Workflow tab", () => {
     await page.getByTestId("bpmn-discard").click();
     await expect(done).toBeEnabled();
 
+    // An emptied name cannot be saved: Hylkää muutokset is the way back, and the field has the name again.
+    await page.getByTestId("flow-step-list").locator("li").nth(2).getByRole("button").first().click();
+    const name = page.getByTestId("bpmn-property-name");
+    await expect(name).toHaveValue("Classification");
+    await name.fill("");
+    await expect(page.getByTestId("bpmn-status")).toContainText("Anna tehtävälle nimi ennen tallennusta.");
+    await expect(done).toBeDisabled();
+    await page.getByTestId("bpmn-discard").click();
+    await expect(name).toHaveValue("Classification");
+    await expect(page.locator('.bpmn-editable [data-element-id="Activity_classify"]')).toContainText("Classification");
+    await expect(done).toBeEnabled();
+
     await done.click();
     await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-locked", "true");
     await expect(page.getByTestId("bpmn-locked")).toBeVisible();
@@ -746,8 +758,13 @@ test.describe("Workflow tab", () => {
     await expect(page.getByTestId("simple-flow-locked")).toBeVisible();
     await page.getByTestId("simple-flow-locked").getByRole("button", { name: "Muokkaa kaaviota" }).click();
     await expect(page.getByTestId("simple-flow-editing")).toContainText("Jokainen muutos tallentuu heti");
+    // A removal leaves "Kumoa"; closing the flow takes it away, so nothing saves into a locked flow.
+    await page.getByTestId("simple-flow-node-3").click();
+    await page.getByTestId("simple-flow-remove").click();
+    await expect(page.getByTestId("simple-flow-undo")).toBeVisible();
     await page.getByTestId("simple-flow-editing").getByRole("button", { name: "Lopeta muokkaus" }).click();
     await expect(page.getByTestId("simple-flow-locked")).toBeVisible();
+    await expect(page.getByTestId("simple-flow-undo")).toHaveCount(0);
   });
 
   test("Yhdistä draws the order of the steps, and no line to or from a data object", async ({ page }) => {

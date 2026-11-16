@@ -155,6 +155,8 @@ export function BpmnDiagramPanel({
   const reloadingRef = useRef(reloading);
   reloadingRef.current = reloading;
   const pendingFocus = useRef<string | null>(null);
+  // Set when the canvas is put back to a server diagram; the next selection gives the name field its name.
+  const nameFromCanvas = useRef(false);
 
   /** Whether the canvas holds something an import would throw away. */
   function hasOwnEdits() {
@@ -167,6 +169,7 @@ export function BpmnDiagramPanel({
   }
 
   function showServerDiagram(next: string) {
+    nameFromCanvas.current = true;
     canvasBlueprint.current = blueprintRef.current;
     newerXml.current = null;
     newerBlueprint.current = null;
@@ -241,6 +244,15 @@ export function BpmnDiagramPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  // The canvas was put back to a server diagram (Hylkää muutokset, Ota uudempi
+  // versio, a version from the chat): the element stays selected, and the
+  // field takes its name from that diagram instead of keeping what was typed.
+  useEffect(() => {
+    if (!nameFromCanvas.current) return;
+    nameFromCanvas.current = false;
+    setEditName(selection?.name ?? "");
+  }, [selection]);
+
   const stepId = step?.id ?? null;
   const onSelectedStep = useRef(onSelectedStepChange);
   onSelectedStep.current = onSelectedStepChange;
@@ -295,7 +307,13 @@ export function BpmnDiagramPanel({
     const base = propXml.current;
     modelerRef.current
       ?.saveXml()
-      .then((draftXml) => drafts.set(sessionId, { base, xml: draftXml }))
+      .then((draftXml) => {
+        // Not when the edits went meanwhile (Hylkää muutokset, a save): the
+        // draft would come back on the next visit to the tab.
+        if (editRef.current.kind !== "none" && propXml.current === base) {
+          drafts.set(sessionId, { base, xml: draftXml });
+        }
+      })
       .catch(() => {});
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", warn);
@@ -620,29 +638,30 @@ export function BpmnDiagramPanel({
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" role="status">
                 {status}
                 {edit.kind === "structure" && !choosing && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn-brand px-3 py-1 text-xs"
-                      onClick={() => void save()}
-                      disabled={blocked || reloading || saveState === "saving"}
-                      data-testid="bpmn-save"
-                    >
-                      {t.wsBpmnSave}
-                    </button>
-                    {/* The way back from an edit that cannot or should not be saved
-                        (a task dropped beside the process): without it the only way
-                        out was to undo each step or leave the page. */}
-                    <button
-                      type="button"
-                      className="btn-secondary px-3 py-1 text-xs"
-                      onClick={discard}
-                      disabled={saveState === "saving"}
-                      data-testid="bpmn-discard"
-                    >
-                      {t.bpmnDiscard}
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    className="btn-brand px-3 py-1 text-xs"
+                    onClick={() => void save()}
+                    disabled={blocked || reloading || saveState === "saving"}
+                    data-testid="bpmn-save"
+                  >
+                    {t.wsBpmnSave}
+                  </button>
+                )}
+                {/* The way back from an edit that cannot or should not be saved: a
+                    task dropped beside the process, an emptied name, a rename the
+                    validation refused. Without it the only way out was to undo each
+                    step or leave the page. Not beside a rename saving itself. */}
+                {edit.kind !== "none" && !choosing && (edit.kind === "structure" || saveState !== "saving") && (
+                  <button
+                    type="button"
+                    className="btn-secondary px-3 py-1 text-xs"
+                    onClick={discard}
+                    disabled={saveState === "saving"}
+                    data-testid="bpmn-discard"
+                  >
+                    {t.bpmnDiscard}
+                  </button>
                 )}
               </div>
             )}
