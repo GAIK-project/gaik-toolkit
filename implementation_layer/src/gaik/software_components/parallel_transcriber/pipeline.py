@@ -104,8 +104,9 @@ class ParallelTranscriber:
             provider = resolve_provider(config={"use_azure": False, **api_config})
             assert_openai_or_azure({"provider": provider}, component="ParallelTranscriber")
             # The GPT-4o diarize path posts the audio and key to this endpoint directly.
+            # Whisper goes through create_openai_client, which checks its own address.
             endpoint = api_config.get("azure_audio_endpoint") or api_config.get("azure_endpoint")
-            if endpoint:
+            if endpoint and cfg.model == TranscriptionModel.GPT4O_DIARIZE:
                 check_endpoint(
                     endpoint,
                     provider="azure",

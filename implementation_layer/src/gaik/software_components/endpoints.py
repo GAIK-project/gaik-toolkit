@@ -7,7 +7,8 @@ must be one of:
 - the provider's own hosts (for example ``api.openai.com`` or
   ``*.openai.azure.com``);
 - the host of an address set in the deployment's own environment for that
-  provider (for example ``AZURE_ENDPOINT`` or ``OPENAI_BASE_URL``);
+  provider (for example ``AZURE_ENDPOINT``, ``OPENAI_BASE_URL`` or
+  ``DOCLING_API_BASE``), over ``http://`` too when the address is set that way;
 - a host listed in ``GAIK_ALLOWED_ENDPOINT_HOSTS`` (comma-separated), or in the
   ``allowed_endpoint_hosts`` setting the application passes in code;
 - the local machine (``localhost``, ``127.0.0.1``, ``::1``), over ``http://`` too,
@@ -21,7 +22,10 @@ or pattern with its scheme (``http://docling.internal``). Anything else raises
 :class:`EndpointNotAllowedError` before a request is made.
 
 An application that forwards user settings to gaik should not forward
-``allowed_endpoint_hosts``: the list is the deployment's decision.
+``allowed_endpoint_hosts``: the list is the deployment's decision. Hosts such as
+Azure in a sovereign cloud, Azure API Management (``*.azure-api.net``) or a local
+server reached by a service name (``host.docker.internal``) are not known to gaik
+and must be listed.
 """
 
 from __future__ import annotations
@@ -66,7 +70,8 @@ PROVIDER_HOSTS: dict[str, tuple[str, ...]] = {
 
 # Environment variables through which a deployment sets a provider's address.
 # The host of an address set there is trusted for that provider. DOCLING_API_BASE and
-# LOCAL_TRANSCRIBER_API_BASE are the names the demo app and generated PoCs read.
+# LOCAL_TRANSCRIBER_API_BASE are the names the demo app and generated PoCs read;
+# API_BASE is the older Docling name some examples still read.
 PROVIDER_ENDPOINT_ENVS: dict[str, tuple[str, ...]] = {
     "openai": ("OPENAI_BASE_URL",),
     "openai_compatible": ("OPENAI_BASE_URL",),
@@ -75,7 +80,7 @@ PROVIDER_ENDPOINT_ENVS: dict[str, tuple[str, ...]] = {
     "vertex": ("GOOGLE_GENERATE_CONTENT_URL",),
     "litellm": ("LITELLM_BASE_URL",),
     "jev": ("GAIK_DECIDE_URL", "TYPESAFE_BASE_URL"),
-    "docling": ("DOCLING_API_BASE",),
+    "docling": ("DOCLING_API_BASE", "API_BASE"),
     "whisper_local": ("LOCAL_TRANSCRIBER_API_BASE",),
 }
 
@@ -169,17 +174,21 @@ def _allowed_entries(allowed_hosts: str | Iterable[str] | None) -> tuple[list[st
     return names, http_names
 
 
-def _env_hosts(provider: str) -> list[str]:
-    hosts = []
+def _env_hosts(provider: str) -> tuple[list[str], list[str]]:
+    """Hosts of the provider's addresses set in the environment, and those set with http://."""
+    hosts, http_hosts = [], []
     for name in PROVIDER_ENDPOINT_ENVS.get(provider, ()):
         value = os.getenv(name, "").strip()
         if not value:
             continue
         try:
-            hosts.append(_parse(value, name)[1])
+            scheme, host = _parse(value, name)
         except EndpointNotAllowedError:
             continue
-    return hosts
+        hosts.append(host)
+        if scheme == "http":
+            http_hosts.append(host)
+    return hosts, http_hosts
 
 
 def check_endpoint(
@@ -204,7 +213,10 @@ def check_endpoint(
     """
     scheme, host = _parse(url, what)
     names, http_names = _allowed_entries(allowed_hosts)
-    deployment = [*_env_hosts(provider), *names]
+    env_names, env_http_names = _env_hosts(provider)
+    deployment = [*env_names, *names]
+    # An address the deployment set with http:// in its environment is used as set.
+    http_names = [*env_http_names, *http_names]
     if _is_loopback(host):
         if provider in LOCAL_SERVICE_PROVIDERS or any(
             _host_matches(host, pattern) for pattern in deployment

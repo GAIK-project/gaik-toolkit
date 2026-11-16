@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 
 import pytest
 from gaik.software_components import endpoints
@@ -91,6 +92,33 @@ def test_an_http_entry_accepts_plain_http_for_that_host_only(monkeypatch):
     assert check_endpoint("http://docling.internal:8080", provider="docling") == "docling.internal"
     with pytest.raises(EndpointNotAllowedError):
         check_endpoint("http://other.internal", provider="docling")
+
+
+@pytest.mark.parametrize(
+    ("env", "url", "provider"),
+    [
+        ("DOCLING_API_BASE", "http://docling.example.test:5001", "docling"),
+        ("LOCAL_TRANSCRIBER_API_BASE", "http://whisper.example.test:8080", "whisper_local"),
+        ("OPENAI_BASE_URL", "http://llm.example.test/v1", "openai_compatible"),
+    ],
+)
+def test_an_http_address_set_in_the_provider_env_is_used_as_set(monkeypatch, env, url, provider):
+    monkeypatch.setenv(env, url)
+    assert check_endpoint(url, provider=provider) == urlsplit(url).hostname
+    with pytest.raises(EndpointNotAllowedError):
+        check_endpoint("http://other.example.test", provider=provider)
+
+
+def test_an_http_address_in_one_provider_env_is_not_used_for_another(monkeypatch):
+    monkeypatch.setenv("DOCLING_API_BASE", "http://docling.example.test")
+    with pytest.raises(EndpointNotAllowedError):
+        check_endpoint("http://docling.example.test", provider="openai_compatible")
+
+
+def test_openai_base_url_set_with_http_reaches_the_openai_client(monkeypatch):
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://llm.example.test/v1")
+    client = create_openai_client({"provider": "openai", "api_key": "k", "model": "m"})
+    assert str(client.base_url).startswith("http://llm.example.test")
 
 
 def test_application_allow_list_is_accepted_beside_the_env():
@@ -240,8 +268,12 @@ def test_whisper_local_function_refuses_before_reading_the_file(tmp_path):
         whisper_local.transcribe(tmp_path / "missing.wav", api_base="http://w.test", key="k")
 
 
-def test_parallel_transcriber_refuses_an_audio_endpoint_outside_azure():
-    from gaik.software_components.parallel_transcriber import ParallelTranscriber
+def test_parallel_transcriber_diarize_refuses_an_audio_endpoint_outside_azure():
+    from gaik.software_components.parallel_transcriber import (
+        ParallelTranscriber,
+        TranscriptionConfig,
+        TranscriptionModel,
+    )
 
     with pytest.raises(EndpointNotAllowedError):
         ParallelTranscriber(
@@ -250,8 +282,38 @@ def test_parallel_transcriber_refuses_an_audio_endpoint_outside_azure():
                 "api_key": "k",
                 "azure_endpoint": "https://res.openai.azure.com",
                 "azure_audio_endpoint": "https://audio.example.test",
-            }
+            },
+            TranscriptionConfig(model=TranscriptionModel.GPT4O_DIARIZE),
         )
+
+
+def test_parallel_transcriber_whisper_checks_the_address_its_client_uses():
+    from gaik.software_components.parallel_transcriber import ParallelTranscriber
+
+    # With a base_url the SDK ignores azure_endpoint, so a leftover one does not matter.
+    transcriber = ParallelTranscriber(
+        {
+            "provider": "azure",
+            "use_azure": True,
+            "api_key": "k",
+            "api_version": "2025-03-01-preview",
+            "base_url": "https://res.openai.azure.com/openai/v1",
+            "azure_endpoint": "https://old.example.test",
+        }
+    )
+    assert transcriber._make_whisper_client()
+    other = ParallelTranscriber(
+        {
+            "provider": "azure",
+            "use_azure": True,
+            "api_key": "k",
+            "api_version": "2025-03-01-preview",
+            "azure_endpoint": "https://res.openai.azure.com",
+            "azure_audio_endpoint": "https://audio.example.test",
+        }
+    )
+    with pytest.raises(EndpointNotAllowedError):
+        other._make_whisper_client()
 
 
 def test_parallel_transcriber_refuses_a_whisper_server_over_plain_http():
@@ -334,6 +396,13 @@ def test_an_http_pattern_entry_accepts_plain_http_for_matching_hosts():
 def test_the_docling_address_set_in_the_environment_is_trusted(monkeypatch):
     monkeypatch.setenv("DOCLING_API_BASE", "https://docling.example.test")
     assert check_endpoint("https://docling.example.test", provider="docling")
+
+
+def test_the_older_docling_api_base_name_is_trusted_for_docling_only(monkeypatch):
+    monkeypatch.setenv("API_BASE", "http://docling.example.test:8080")
+    assert check_endpoint("http://docling.example.test:8080", provider="docling")
+    with pytest.raises(EndpointNotAllowedError):
+        check_endpoint("http://docling.example.test:8080", provider="openai_compatible")
 
 
 def test_azure_speech_from_the_environment_keeps_the_environment_key(monkeypatch):
