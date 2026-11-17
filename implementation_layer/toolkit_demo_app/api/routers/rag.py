@@ -25,9 +25,21 @@ from langchain_core.documents import Document
 from pydantic import BaseModel
 
 try:
-    from utils.result_owner import current_user, forget_owner, owned_by, remember_owner
+    from utils.result_owner import (
+        current_user,
+        forget_owner,
+        owned_by,
+        remember_owner,
+        touch_owner,
+    )
 except ImportError:
-    from api.utils.result_owner import current_user, forget_owner, owned_by, remember_owner
+    from api.utils.result_owner import (
+        current_user,
+        forget_owner,
+        owned_by,
+        remember_owner,
+        touch_owner,
+    )
 
 try:
     from utils.upload_check import upload_problem
@@ -216,7 +228,12 @@ def _reachable(collection_id: str, user: str) -> bool:
     Another user's collection is treated as one that does not exist, so its id tells
     nothing; the user is the one the proxy names in X-GAIK-User.
     """
-    return _is_shared_example(collection_id) or owned_by(collection_id, user)
+    if _is_shared_example(collection_id):
+        return True
+    if owned_by(collection_id, user):
+        touch_owner(collection_id)  # a collection in use keeps its owner
+        return True
+    return False
 
 
 def _is_shared_example(collection_id: str) -> bool:
@@ -656,6 +673,11 @@ async def index_documents(
                 if workflow is None:
                     workflow = _build_demo_workflow(get_rag_api_config(), coll_id)
                     RAG_INSTANCES[coll_id] = workflow
+                    # Also when a clear or an eviction dropped it while this upload
+                    # waited for the lock: the collection is made again for its user.
+                    remember_owner(coll_id, user)
+                else:
+                    touch_owner(coll_id)
                 if parser_choice == "vision_plus":
                     require_vision(workflow.api_config)
                 indexed_docs: list[IndexedDocument] = []

@@ -20,6 +20,9 @@ def empty_store(monkeypatch) -> None:
     monkeypatch.setattr(rag, "RAG_INSTANCES", {})
     monkeypatch.setattr(rag, "_USAGE", {})
     monkeypatch.setattr(rag, "_collection_locks", {})
+    from api.utils import result_owner
+
+    monkeypatch.setattr(result_owner, "_owners", {})
 
 
 @pytest.fixture
@@ -239,6 +242,7 @@ def test_indexing_into_another_users_collection_starts_a_new_one(monkeypatch) ->
 
 def test_another_user_cannot_query_see_or_clear_a_collection(client) -> None:
     _add("theirs", owner="u1")
+    rag.RAG_INSTANCES["theirs"] = SimpleNamespace(vector_store=SimpleNamespace(count=lambda: 2))
     other = {USER_HEADER: "u2"}
 
     queried = client.post(
@@ -253,7 +257,9 @@ def test_another_user_cannot_query_see_or_clear_a_collection(client) -> None:
 
     assert queried.status_code == 404 and streamed.status_code == 404
     assert status["collection_id"] is None and status["is_ready"] is False
-    assert "theirs" in rag.RAG_INSTANCES  # still there for its owner
+    assert "theirs" in rag.RAG_INSTANCES and owned_by("theirs", "u1")  # kept for its owner
+    owner_status = client.get("/rag/status/theirs", headers={USER_HEADER: "u1"}).json()
+    assert owner_status["collection_id"] == "theirs" and owner_status["is_ready"] is True
 
 
 def test_the_shared_example_answers_every_visitor(client) -> None:
@@ -272,3 +278,34 @@ def test_clearing_a_collection_forgets_its_owner(client) -> None:
     client.delete("/rag/clear/mine", headers={USER_HEADER: "u1"})
 
     assert "mine" not in rag.RAG_INSTANCES and not owned_by("mine", "u1")
+
+
+def test_a_collection_dropped_while_an_upload_waits_comes_back_for_its_user(monkeypatch) -> None:
+    mine = _index(monkeypatch, None, user="u1").collection_id
+    real_lock = rag._get_collection_lock
+
+    async def lock_after_a_clear(collection_id):
+        rag._drop_collection(collection_id)  # a Clear lands while this upload waits
+        return await real_lock(collection_id)
+
+    monkeypatch.setattr(rag, "_get_collection_lock", lock_after_a_clear)
+
+    again = _index(monkeypatch, mine, user="u1").collection_id
+
+    assert again == mine and mine in rag.RAG_INSTANCES and owned_by(mine, "u1")
+
+
+def test_a_collection_in_use_keeps_its_owner_past_the_expiry(monkeypatch, client) -> None:
+    from api.utils import result_owner
+
+    _add("mine", owner="u1")
+    start = 1_000_000.0
+    monkeypatch.setattr(result_owner.time, "time", lambda: start)
+    result_owner.remember_owner("mine", "u1")
+    later = start + result_owner.TTL_SECONDS - 60
+    monkeypatch.setattr(result_owner.time, "time", lambda: later)
+    assert rag._reachable("mine", "u1")  # used: the expiry starts again
+    monkeypatch.setattr(result_owner.time, "time", lambda: later + 120)
+    result_owner.remember_owner("other-job", "u2")  # any run prunes old entries
+
+    assert owned_by("mine", "u1")

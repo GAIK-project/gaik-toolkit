@@ -13,7 +13,9 @@ A run that reached the API without the header (a call from inside the pod, such 
 one either. Through the proxy every run is signed in, so this never opens a user's
 result to a visitor.
 
-Entries go after ``TTL_SECONDS``, longer than any route keeps its result.
+Entries go after ``TTL_SECONDS``, longer than any route keeps its result; a result
+that lives as long as it is used (a RAG collection) restarts its entry's expiry on each
+use with :func:`touch_owner`.
 """
 
 from __future__ import annotations
@@ -42,6 +44,14 @@ def remember_owner(result_id: str, user: str) -> None:
         for rid in [r for r, (_, t) in _owners.items() if now - t > TTL_SECONDS]:
             del _owners[rid]
         _owners[result_id] = (user, now)
+
+
+def touch_owner(result_id: str) -> None:
+    """Restart the expiry of an entry still in use, such as a RAG collection being queried."""
+    with _lock:
+        entry = _owners.get(result_id)
+        if entry is not None:
+            _owners[result_id] = (entry[0], time.time())
 
 
 def owned_by(result_id: str, user: str) -> bool:
