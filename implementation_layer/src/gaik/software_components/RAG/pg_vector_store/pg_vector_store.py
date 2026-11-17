@@ -26,6 +26,8 @@ except ImportError as exc:
         "Install extras with 'pip install gaik[pg-vector-store]'"
     ) from exc
 
+from gaik.software_components.RAG._chunk_ids import chunk_ids, with_document_id
+
 if TYPE_CHECKING:
     from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
 
@@ -304,6 +306,7 @@ class PgVectorStore:
         self.vector_type = vector_type
         self.hnsw_iterative_scan = hnsw_iterative_scan
         self._conn: psycopg.Connection | None = None
+        self._has_chunk_key: bool | None = None
 
     @property
     def _vec(self) -> str:
@@ -428,6 +431,7 @@ class PgVectorStore:
                     content_lemmatized TEXT,
                     metadata JSONB DEFAULT '{{}}'::JSONB,
                     embedding {vec},
+                    chunk_key TEXT,
                     text_search tsvector GENERATED ALWAYS AS (
                         to_tsvector(
                             '{lang}',
@@ -445,6 +449,7 @@ class PgVectorStore:
                     content TEXT NOT NULL,
                     metadata JSONB DEFAULT '{{}}'::JSONB,
                     embedding {vec},
+                    chunk_key TEXT,
                     text_search tsvector GENERATED ALWAYS AS (
                         to_tsvector('{lang}', COALESCE(content, ''))
                     ) STORED,
@@ -452,7 +457,15 @@ class PgVectorStore:
                 )
             """)
 
+        # A table made by an older gaik has no chunk_key; its rows keep NULL,
+        # which the unique index allows any number of.
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS chunk_key TEXT")
+
         # 3. Indexes
+        conn.execute(f"""
+            CREATE UNIQUE INDEX IF NOT EXISTS {table}_chunk_key_idx
+            ON {table} (chunk_key)
+        """)
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS {table}_embedding_hnsw_idx
             ON {table} USING hnsw (embedding {self.vector_type}_cosine_ops)
@@ -497,6 +510,7 @@ class PgVectorStore:
         self._create_hybrid_weighted_function(conn)
 
         conn.commit()
+        self._has_chunk_key = True
         logger.info("PgVectorStore setup complete for table '%s'", table)
 
     def _create_match_function(self, conn: psycopg.Connection) -> None:
@@ -800,17 +814,32 @@ class PgVectorStore:
         self,
         documents: list[Document],
         embeddings: list[list[float]],
+        *,
+        replace: bool = False,
     ) -> list[int]:
         """Insert documents with their embeddings.
 
         The ``title`` field is taken from ``Document.metadata["title"]`` if present.
 
+        Each row gets a ``chunk_key`` from its document and its text: the
+        document is ``metadata["document_id"]``, else ``source``, else
+        ``document_name``, and is stored in the metadata as ``document_id``.
+        Adding a chunk that is already stored updates its row instead of
+        inserting a second one. A chunk whose metadata names no document gets no
+        ``chunk_key`` and is inserted each time, as before. A table made by an older gaik gets the
+        ``chunk_key`` column from ``setup()``; until then rows are inserted as
+        before, one per call.
+
         Args:
             documents: List of langchain Documents to store.
             embeddings: Corresponding embedding vectors (same length as documents).
+            replace: First delete every stored row of each document in
+                ``documents``, in the same transaction, so chunks the document
+                no longer has do not stay behind. Pass all of a document's
+                chunks in one call.
 
         Returns:
-            List of inserted row IDs.
+            List of row IDs, inserted or updated.
 
         Raises:
             ValueError: If documents and embeddings have different lengths.
@@ -822,48 +851,79 @@ class PgVectorStore:
             return []
 
         conn = self._get_conn()
+        has_chunk_key = self._chunk_key_column(conn)
+        keyed = chunk_ids(documents)
+        metadatas = [
+            with_document_id(doc.metadata, doc_id) for doc, (doc_id, _) in zip(documents, keyed)
+        ]
         ids: list[int] = []
 
         with conn.cursor() as cur:
-            for doc, emb in zip(documents, embeddings):
-                title = doc.metadata.get("title", "") if doc.metadata else ""
-                metadata = doc.metadata or {}
+            if replace:
+                for doc_id in dict.fromkeys(
+                    meta["document_id"] for meta in metadatas if "document_id" in meta
+                ):
+                    cur.execute(
+                        f"DELETE FROM {self.table_name} WHERE metadata @> %s::jsonb",
+                        (json.dumps({"document_id": doc_id}),),
+                    )
+            for doc, emb, metadata, (_, chunk_key) in zip(documents, embeddings, metadatas, keyed):
+                title = metadata.get("title", "")
                 vec_str = _format_vector(emb)
-
+                columns = ["title", "content", "metadata", "embedding"]
+                values = ["%s", "%s", "%s::jsonb", f"%s::{self._vec}"]
+                params: list[Any] = [title, doc.page_content, json.dumps(metadata), vec_str]
                 if self.text_processor is not None:
-                    lemmatized = self.text_processor.to_tsvector_text(doc.page_content)
-                    cur.execute(
-                        f"""
-                        INSERT INTO {self.table_name}
-                            (title, content, content_lemmatized, metadata, embedding)
-                        VALUES (
-                            %s, %s, %s, %s::jsonb, %s::{self._vec}
-                        )
-                        RETURNING id
-                        """,
-                        (
-                            title,
-                            doc.page_content,
-                            lemmatized,
-                            json.dumps(metadata),
-                            vec_str,
-                        ),
+                    columns.insert(2, "content_lemmatized")
+                    values.insert(2, "%s")
+                    params.insert(2, self.text_processor.to_tsvector_text(doc.page_content))
+                upsert = ""
+                if has_chunk_key:
+                    columns.append("chunk_key")
+                    values.append("%s")
+                    params.append(chunk_key)
+                    updates = ", ".join(
+                        f"{column} = EXCLUDED.{column}"
+                        for column in columns
+                        if column != "chunk_key"
                     )
-                else:
-                    cur.execute(
-                        f"""
-                        INSERT INTO {self.table_name} (title, content, metadata, embedding)
-                        VALUES (%s, %s, %s::jsonb, %s::{self._vec})
-                        RETURNING id
-                        """,
-                        (title, doc.page_content, json.dumps(metadata), vec_str),
-                    )
+                    upsert = f"ON CONFLICT (chunk_key) DO UPDATE SET {updates}"
+                cur.execute(
+                    f"""
+                    INSERT INTO {self.table_name} ({", ".join(columns)})
+                    VALUES ({", ".join(values)})
+                    {upsert}
+                    RETURNING id
+                    """,
+                    tuple(params),
+                )
                 row = cur.fetchone()
                 ids.append(row["id"])
 
         conn.commit()
-        logger.info("Inserted %d documents into '%s'", len(ids), self.table_name)
+        logger.info("Stored %d documents in '%s'", len(ids), self.table_name)
         return ids
+
+    def _chunk_key_column(self, conn: psycopg.Connection) -> bool:
+        """Whether the table has the ``chunk_key`` column ``setup()`` adds."""
+        if self._has_chunk_key is None:
+            row = conn.execute(
+                """
+                SELECT 1 FROM pg_attribute
+                WHERE attrelid = to_regclass(%s)
+                  AND attname = 'chunk_key'
+                  AND NOT attisdropped
+                """,
+                (self.table_name,),
+            ).fetchone()
+            self._has_chunk_key = bool(row)
+            if not self._has_chunk_key:
+                logger.warning(
+                    "Table '%s' has no chunk_key column: adding a document again "
+                    "inserts its chunks again. Run setup() to add the column.",
+                    self.table_name,
+                )
+        return self._has_chunk_key
 
     @_rolls_back_on_error
     def count(self) -> int:
@@ -886,6 +946,26 @@ class PgVectorStore:
         result = conn.execute(
             f"DELETE FROM {self.table_name} WHERE id = ANY(%s)",
             (document_ids,),
+        )
+        conn.commit()
+        return result.rowcount
+
+    @_rolls_back_on_error
+    def delete_document(self, document_id: Any) -> int:
+        """Delete every row whose metadata ``document_id`` is ``document_id``.
+
+        ``add()`` stores ``document_id`` in each row's metadata (the chunk's own
+        ``document_id``, else its ``source``, else its ``document_name``). Rows
+        added by a gaik release before that have none and are not found:
+        index them again into a new table.
+
+        Returns:
+            Number of rows deleted.
+        """
+        conn = self._get_conn()
+        result = conn.execute(
+            f"DELETE FROM {self.table_name} WHERE metadata @> %s::jsonb",
+            (json.dumps({"document_id": document_id}),),
         )
         conn.commit()
         return result.rowcount

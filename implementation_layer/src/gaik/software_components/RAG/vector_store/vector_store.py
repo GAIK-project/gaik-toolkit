@@ -6,6 +6,8 @@ import math
 import uuid
 import warnings
 
+from gaik.software_components.RAG._chunk_ids import chunk_ids, with_document_id
+
 try:
     from langchain_core.documents import Document
 except ImportError as exc:
@@ -40,6 +42,7 @@ class VectorStore:
 
         self._embeddings: list[list[float]] = []
         self._documents: list[Document] = []
+        self._ids: list[str] = []
 
         self._collection = None
         self._client = None
@@ -70,33 +73,108 @@ class VectorStore:
                     stacklevel=2,
                 )
 
-    def add(self, documents: list[Document], embeddings: list[list[float]]) -> None:
+    def add(
+        self,
+        documents: list[Document],
+        embeddings: list[list[float]],
+        *,
+        replace: bool = False,
+    ) -> None:
+        """Store chunks with their embeddings.
+
+        Each chunk's id comes from its document and its text (see
+        ``_chunk_ids``): the document is ``metadata["document_id"]``, else
+        ``source``, else ``document_name``, and is stored as ``document_id``.
+        Adding a chunk that is already stored updates it instead of storing a
+        second copy. A chunk whose metadata names no document is stored as a new
+        one each time.
+
+        Args:
+            documents: The chunks.
+            embeddings: Their embeddings, in the same order.
+            replace: First delete every stored chunk of each document in
+                ``documents``, so chunks the document no longer has do not stay
+                behind. Pass all of a document's chunks in one call. For a
+                persisted store, a failure after the delete leaves the document
+                out until it is added again.
+        """
         if len(documents) != len(embeddings):
             raise ValueError("documents and embeddings must have the same length")
-
-        if not self.persist:
-            self._documents.extend(documents)
-            self._embeddings.extend(embeddings)
-            return
-
         if not documents:
             return
-        # A new id for every document: ids counted from zero on each call collided
-        # with the ones already stored, and Chroma drops such a document silently.
-        ids = [f"{self.collection_name}_{uuid.uuid4().hex}" for _ in documents]
-        texts = [doc.page_content for doc in documents]
-        metadatas = [_chroma_metadata(doc.metadata) for doc in documents]
-        # Chroma rejects a single add above its maximum batch size, so send
+
+        # A chunk that names no document gets a new id, as before.
+        keyed = [
+            (doc_id, chunk_id or uuid.uuid4().hex) for doc_id, chunk_id in chunk_ids(documents)
+        ]
+        stored = [
+            Document(page_content=doc.page_content, metadata=with_document_id(doc.metadata, doc_id))
+            for doc, (doc_id, _) in zip(documents, keyed)
+        ]
+        if replace:
+            for doc_id in dict.fromkeys(
+                doc.metadata["document_id"] for doc in stored if "document_id" in doc.metadata
+            ):
+                self.delete_document(doc_id)
+
+        if not self.persist:
+            position = {chunk_id: index for index, chunk_id in enumerate(self._ids)}
+            for doc, embedding, (_, chunk_id) in zip(stored, embeddings, keyed):
+                if chunk_id in position:
+                    self._documents[position[chunk_id]] = doc
+                    self._embeddings[position[chunk_id]] = embedding
+                else:
+                    position[chunk_id] = len(self._ids)
+                    self._ids.append(chunk_id)
+                    self._documents.append(doc)
+                    self._embeddings.append(embedding)
+            return
+
+        ids = [f"{self.collection_name}_{chunk_id}" for _, chunk_id in keyed]
+        texts = [doc.page_content for doc in stored]
+        metadatas = [_chroma_metadata(doc.metadata) for doc in stored]
+        # Chroma rejects a single call above its maximum batch size, so send
         # slices. If one fails, the slices before it stay stored.
         batch = _max_batch_size(self._client) or len(ids)
         for start in range(0, len(ids), batch):
             end = start + batch
-            self._collection.add(  # type: ignore[union-attr]
+            self._collection.upsert(  # type: ignore[union-attr]
                 ids=ids[start:end],
                 embeddings=embeddings[start:end],
                 documents=texts[start:end],
                 metadatas=metadatas[start:end],
             )
+
+    def delete_document(self, document_id) -> int:
+        """Delete every chunk whose ``document_id`` is ``document_id``.
+
+        ``add()`` stores ``document_id`` with each chunk (the chunk's own
+        ``document_id``, else its ``source``, else its ``document_name``).
+        Chunks stored by a gaik release before that have none and are not
+        found: index them again into a new collection.
+
+        Returns:
+            The number of chunks deleted.
+        """
+        if not self.persist:
+            keep = [
+                index
+                for index, doc in enumerate(self._documents)
+                if doc.metadata.get("document_id") != document_id
+            ]
+            deleted = len(self._documents) - len(keep)
+            if deleted:
+                self._documents = [self._documents[i] for i in keep]
+                self._embeddings = [self._embeddings[i] for i in keep]
+                self._ids = [self._ids[i] for i in keep]
+            return deleted
+
+        where = {"document_id": document_id}
+        found = self._collection.get(where=where, include=[])  # type: ignore[union-attr]
+        ids = list(found.get("ids") or [])
+        if ids:
+            self._collection.delete(where=where)  # type: ignore[union-attr]
+        return len(ids)
 
     def count(self) -> int:
         """Return the number of documents in the vector store."""

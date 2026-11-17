@@ -167,6 +167,11 @@ class RAGWorkflow:
     ) -> IndexResult:
         """Parse and index documents into the vector store.
 
+        Each file is one document, with ``document_id`` its name from
+        ``filenames`` or else its path. Indexing a document again replaces its
+        chunks: the ones it no longer has are deleted, and unchanged ones are
+        not stored twice.
+
         Args:
             file_paths: Paths to the files to index: PDFs, or with ``parser="text"``
                 also Word (.docx), text and Markdown files.
@@ -174,6 +179,7 @@ class RAGWorkflow:
                        If provided, these names are used instead of extracting from paths.
         """
         all_chunks: list[Document] = []
+        document_ids: list[str] = []
 
         for i, file_path in enumerate(file_paths):
             doc_name = filenames[i] if filenames and i < len(filenames) else None
@@ -183,9 +189,19 @@ class RAGWorkflow:
                 chunks = self.parser.convert_doc_to_chunks_with_vision(
                     str(file_path), document_name=doc_name
                 )
+            document_id = doc_name or str(file_path)
+            document_ids.append(document_id)
+            for chunk in chunks:
+                chunk.metadata = {**(chunk.metadata or {}), "document_id": document_id}
             all_chunks.extend(chunks)
 
         embeddings, documents = self.embedder.embed(all_chunks)
+        # After the embedding succeeds, so a failed call leaves the old chunks.
+        # A replacement store without delete_document only gets add().
+        delete_document = getattr(self.vector_store, "delete_document", None)
+        if delete_document is not None:
+            for document_id in dict.fromkeys(document_ids):
+                delete_document(document_id)
         self.vector_store.add(documents, embeddings)
 
         return IndexResult(
@@ -193,6 +209,18 @@ class RAGWorkflow:
             num_chunks=len(all_chunks),
             vector_store_path=self.vector_store.persist_path if self.vector_store.persist else None,
         )
+
+    def delete_document(self, document_id: str) -> int:
+        """Delete one document's chunks from the vector store.
+
+        Args:
+            document_id: The name the document was indexed under: its entry in
+                ``filenames``, or else its path as passed to ``index_documents``.
+
+        Returns:
+            The number of chunks deleted.
+        """
+        return self.vector_store.delete_document(document_id)
 
     def ask(
         self,

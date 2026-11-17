@@ -56,7 +56,8 @@ store = VectorStore(
 ### Methods
 
 ```python
-store.add(documents: list[Document], embeddings: list[list[float]]) -> None
+store.add(documents: list[Document], embeddings: list[list[float]], *, replace: bool = False) -> None
+store.delete_document(document_id) -> int  # chunks deleted
 
 results = store.search(
     query_embedding: list[float],
@@ -64,6 +65,25 @@ results = store.search(
     filters: dict | None = None
 )  # -> list[tuple[Document, float]]
 ```
+
+#### Chunk ids and re-indexing
+
+A chunk's id comes from its document and its text. The document is
+`metadata["document_id"]`, else `source`, else `document_name` (the RAG parsers set
+the last two), and `add()` stores it with the chunk as `document_id`.
+
+- Adding a document's chunks again updates them instead of storing a second copy.
+  A text repeated inside one document keeps one chunk per occurrence.
+- `add(..., replace=True)` first deletes every stored chunk of each document in the
+  call, so the chunks a changed document no longer has do not stay behind. Pass all
+  of a document's chunks in one call.
+- `delete_document(document_id)` deletes one document's chunks and returns how many.
+- A chunk whose metadata names no document is stored as a new one each time.
+
+A Chroma collection built by an earlier gaik release still loads and searches, but
+its chunks have random ids and no `document_id`: `delete_document` and `replace=True`
+do not find them, and adding a document again stores it next to its old copy. Index
+the documents again into a new `collection_name` (or a new `persist_path`).
 
 ---
 

@@ -83,8 +83,15 @@ workflow = RAGWorkflow(
 
 ```python
 index_result = workflow.index_documents(
-    file_paths: list[str | Path]
+    file_paths: list[str | Path],
+    filenames: list[str] | None = None,
 )
+# Each file is one document, named by its entry in filenames or else its path.
+# Indexing a document again replaces its chunks.
+
+deleted = workflow.delete_document(document_id: str)  # chunks deleted
+# A persisted collection from an earlier gaik release still answers, but its
+# chunks are not replaced or deleted this way: index into a new collection_name.
 
 result = workflow.ask(
     query: str,
