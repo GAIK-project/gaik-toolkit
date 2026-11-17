@@ -389,10 +389,12 @@ def test_a_changed_test_page_is_a_problem_of_the_package(tmp_path):
     page.write_bytes(page.read_bytes().replace(b"<body", b"<body data-changed", 1))
 
     assert package_problems(str(poc)) == [
-        "app.py is not the test page the wizard wrote: it was changed after the package "
-        "was generated. Generate the package again to put it back",
-        "ui/index.html is not the test page the wizard wrote: it was changed after the "
-        "package was generated. Generate the package again to put it back",
+        "app.py is not the wizard's current test page: the package was generated with an "
+        "earlier version of it, or the file was changed afterwards. Generate the package "
+        "again to update it",
+        "ui/index.html is not the wizard's current test page: the package was generated "
+        "with an earlier version of it, or the file was changed afterwards. Generate the "
+        "package again to update it",
     ]
 
 
@@ -429,6 +431,7 @@ def test_a_manifest_hash_does_not_make_a_changed_test_page_pass(tmp_path):
     )
 
     assert package_problems(str(poc)) == [
-        "app.py is not the test page the wizard wrote: it was changed after the package "
-        "was generated. Generate the package again to put it back",
+        "app.py is not the wizard's current test page: the package was generated with an "
+        "earlier version of it, or the file was changed afterwards. Generate the package "
+        "again to update it",
     ]
