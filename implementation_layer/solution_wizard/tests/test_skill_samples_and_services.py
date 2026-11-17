@@ -1,6 +1,9 @@
 """The wizard skill keeps customer content out of what it writes, asks for a real sample
 before generating test data, and handles needs outside GAIK as external services."""
 
+import re
+import sys
+import types
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1] / "SKILL.md"
@@ -91,3 +94,32 @@ def test_the_poc_skips_an_external_service_it_cannot_reach() -> None:
     assert "never with an `import` statement of your own" in phase_10
     assert "fallback" in phase_10
     assert "SKIPPED <service>" in _section("## Phase 11", "## Phase 12")
+
+
+def test_the_phase_10_service_example_runs_as_written(monkeypatch) -> None:
+    """The example the agent copies into run_poc.py reads the service's key and calls
+    it; a name it forgot to import would end in its own except and skip the service."""
+    phase_10 = _section("## Phase 10", "## Phase 11")
+    blocks = re.findall(r"```python\n(.*?)```", phase_10, re.DOTALL)
+    code = next(block for block in blocks if "external_service(" in block)
+    keys: list[str] = []
+
+    class Client:
+        def __init__(self, api_key: str) -> None:
+            keys.append(api_key)
+
+        def search(self, query: str) -> dict:
+            return {"results": [query]}
+
+    stub = types.ModuleType("provider_config")
+    stub.external_service = lambda name, module, env_vars: types.SimpleNamespace(
+        TavilyClient=Client
+    )
+    monkeypatch.setitem(sys.modules, "provider_config", stub)
+    monkeypatch.setenv("TAVILY_API_KEY", "not-a-real-key")
+    namespace = {"supplier_name": "Example Supplier Oy"}
+
+    exec(compile(code, "SKILL.md Phase 10", "exec"), namespace)
+
+    assert keys == ["not-a-real-key"]
+    assert namespace["supplier_news"] == ["Example Supplier Oy"]

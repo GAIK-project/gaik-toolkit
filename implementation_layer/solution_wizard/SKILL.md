@@ -925,6 +925,8 @@ write, in the service's own step, and it must not stop the run:
   generated `run_poc.py` after the module's run.
 
 ```python
+import os
+
 from provider_config import external_service
 
 search = external_service("Tavily web search", "tavily", ("TAVILY_API_KEY",))
