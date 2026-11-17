@@ -1797,7 +1797,6 @@
     "type": "software_component",
     "input_artifact_types": [
       "structured_json",
-      "text",
       "pdf",
       "image"
     ],

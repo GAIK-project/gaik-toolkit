@@ -698,3 +698,15 @@ def test_rule14_a_judge_named_by_its_registry_id_is_checked_too(judge):
     result = validate(_source_and_judge("none", judge))
 
     assert any(e.rule == 14 and e.step_id == "judge" for e in result.errors)
+
+
+def test_rule14_a_panel_cannot_check_against_text():
+    """LLMJudgePanel.validate reads page images only; a text source is refused (rule 4)
+    and does not satisfy the declared check (rule 14)."""
+    bp = _judge_blueprint(["transcript", "extracted"])
+    bp.workflow.steps[2].component = "LLMJudgePanel"
+
+    result = validate(bp)
+
+    assert any(e.rule == 4 and e.step_id == "step_c" for e in result.errors)
+    assert any(e.rule == 14 and e.step_id == "step_c" for e in result.errors)
