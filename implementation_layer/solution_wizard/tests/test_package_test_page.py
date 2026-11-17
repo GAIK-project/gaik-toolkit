@@ -923,7 +923,36 @@ def _wait_until_busy(served: Page) -> None:
 
 
 def test_a_busy_server_refuses_a_second_run_before_it_reads_the_body(page, monkeypatch):
-    """Parallel posts each held up to the upload limit in memory before the busy refusal."""
+    """Parallel posts each held up to the upload limit in memory before the busy refusal.
+
+    Every read of a request's body is recorded: the refused request's body is read
+    away a piece at a time and dropped, never held whole and never parsed.
+    """
+    reads: list[list[int]] = []
+    handler_class = page.app.Handler
+    setup = handler_class.setup
+
+    class Recording:
+        """The request's rfile, with the size of every read() kept in ``log``."""
+
+        def __init__(self, raw, log):
+            self._raw, self._log = raw, log
+
+        def read(self, size=-1):
+            data = self._raw.read(size)
+            self._log.append(len(data))
+            return data
+
+        def __getattr__(self, name):
+            return getattr(self._raw, name)
+
+    def recording_setup(handler):
+        setup(handler)
+        log: list[int] = []
+        reads.append(log)
+        handler.rfile = Recording(handler.rfile, log)
+
+    monkeypatch.setattr(handler_class, "setup", recording_setup)
     parsed = []
     parse = page.app.parse_multipart
 
@@ -939,7 +968,8 @@ def test_a_busy_server_refuses_a_second_run_before_it_reads_the_body(page, monke
     thread.start()
     _wait_until_busy(page)
 
-    status, answer = page.run(files=[("order.pdf", b"x" * 200_000)])
+    refused = 3 * 1024 * 1024
+    status, answer = page.run(files=[("order.pdf", b"x" * refused)])
     thread.join(timeout=60)
 
     assert status == 409
@@ -947,7 +977,12 @@ def test_a_busy_server_refuses_a_second_run_before_it_reads_the_body(page, monke
         "code": "busy",
         "message": "A run is already going. Wait for it to finish.",
     }
-    # Only the first request's body was read and parsed.
+    # The refused body was read away in pieces of at most 1 MiB, all of it, so the
+    # answer reaches the browser; no read held more than one piece.
+    (pieces,) = [log for log in reads if sum(log) > refused]
+    assert max(pieces) <= 1024 * 1024
+    assert len(pieces) >= 3
+    # Only the first request's body was read whole and parsed.
     assert len(parsed) == 1
     assert first["answer"][0] == 200 and first["answer"][1]["ok"] is True
     # A refused request gives the run back: the next one runs.
@@ -999,6 +1034,9 @@ def test_listening_on_every_address_takes_this_computers_names_and_addresses(pag
     # Only a site's own name can be put there by its page, and that is refused.
     for host in ("attacker.example", "192.168.1.20.nip.io", ""):
         assert not app._host_allowed(host, every, True), host
+    # The unspecified and group addresses are no address of this computer's.
+    for host in ("0.0.0.0", "::", "224.0.0.1", "239.255.255.250", "ff02::1"):
+        assert not app._host_allowed(host, every, True), host
 
     # Listening on one address, another address is not this server's.
     one = app._host_names("192.168.1.20", "192.168.1.20")
@@ -1008,8 +1046,61 @@ def test_listening_on_every_address_takes_this_computers_names_and_addresses(pag
     assert not app._host_allowed("attacker.example", one, False)
 
 
-#: The signals that stop the server, with what this platform can send to test them.
-_STOP_SIGNALS = ["CTRL_BREAK_EVENT"] if os.name == "nt" else ["SIGTERM", "SIGHUP"]
+@pytest.mark.parametrize(
+    "header",
+    [
+        # Read as a URL's authority, each of these is 127.0.0.1 or localhost.
+        "attacker.example@127.0.0.1:{port}",
+        "attacker.example:x@localhost:{port}",
+        "127.0.0.1:{port}/attacker.example",
+        "127.0.0.1:{port}?attacker.example",
+        "127.0.0.1:{port}#attacker.example",
+        "127.0.0.1\\attacker.example:{port}",
+        # More than one port, a port that is not a number, white space.
+        "127.0.0.1:{port}:{port}",
+        "localhost:http",
+        "127.0.0.1 :{port}",
+        "127.0.0.1\t:{port}",
+        # A bracketed address that does not end, or with more after it.
+        "[::1",
+        "[::1]{port}",
+        "[::1]:{port}:1",
+    ],
+)
+def test_a_host_header_that_is_more_than_a_name_and_a_port_is_refused(page, header):
+    status, _, body = page.request(
+        "GET", "/api/solution", headers={"Host": header.format(port=page.port)}
+    )
+
+    assert status == 403, header
+    assert json.loads(body)["error"]["code"] == "forbidden"
+
+
+def test_a_host_header_with_a_name_and_a_port_is_read_as_that_name(page):
+    app = page.app
+    assert app._host_name("LocalHost:8000") == "localhost"
+    assert app._host_name("127.0.0.1") == "127.0.0.1"
+    assert app._host_name("[::1]:8000") == "::1"
+    assert app._host_name("[fe80::1%25eth0]") == "fe80::1%25eth0"
+    assert app._host_name("attacker.example@127.0.0.1:8000") == ""
+    assert app._host_name("") == ""
+    for own in (f"[::1]:{page.port}", f"LOCALHOST:{page.port}", "127.0.0.1"):
+        assert page.request("GET", "/api/solution", headers={"Host": own})[0] == 200, own
+
+
+#: The signals that stop the server, with what this platform can send to test them,
+#: and whether the same signal keeps coming while the server cleans up.
+_STOP_SIGNALS = (
+    [("CTRL_BREAK_EVENT", False), ("CTRL_BREAK_EVENT", True)]
+    if os.name == "nt"
+    else [
+        ("SIGINT", False),
+        ("SIGTERM", False),
+        ("SIGHUP", False),
+        ("SIGINT", True),
+        ("SIGTERM", True),
+    ]
+)
 
 
 def _post_and_ignore(port):
@@ -1019,10 +1110,15 @@ def _post_and_ignore(port):
         pass  # the server stops during the run
 
 
-@pytest.mark.parametrize("sent", _STOP_SIGNALS)
-def test_a_stop_signal_stops_the_run_and_removes_its_working_folder(tmp_path, sent):
+@pytest.mark.parametrize(("sent", "again"), _STOP_SIGNALS)
+def test_a_stop_signal_stops_the_run_and_removes_its_working_folder(tmp_path, sent, again):
     """SIGTERM or SIGHUP ended Python at once: the run's copy of .env stayed in the
-    temporary folder and run_poc.py, in a session of its own, went on."""
+    temporary folder and run_poc.py, in a session of its own, went on.
+
+    ``again``: the signal is sent every few milliseconds until the server has gone.
+    A second Ctrl+C during the cleanup raised KeyboardInterrupt inside it and left
+    the run's process and folder behind (second review of #220).
+    """
     poc = _scaffold(tmp_path / "package")
     (poc / "run_poc.py").write_text(FAKE_RUN_POC, encoding="utf-8")
     (poc / ".env").write_text("EXAMPLE_SETTING=1\n", encoding="utf-8")
@@ -1064,7 +1160,15 @@ def test_a_stop_signal_stops_the_run_and_removes_its_working_folder(tmp_path, se
         assert list(temp.glob("poc-test-page-*/*/.env")), "the run has its copy of the keys"
 
         server.send_signal(getattr(signal, sent))
+        deadline = time.monotonic() + 30
+        while again and server.poll() is None and time.monotonic() < deadline:
+            try:
+                server.send_signal(getattr(signal, sent))
+            except OSError:
+                break  # it has just gone
+            time.sleep(0.005)
         server.wait(timeout=30)
+        log = server.stdout.read()
     finally:
         if server.poll() is None:
             server.kill()
@@ -1076,3 +1180,6 @@ def test_a_stop_signal_stops_the_run_and_removes_its_working_folder(tmp_path, se
         time.sleep(0.2)
     assert not _is_running(child), "the entrypoint's own process outlived the server"
     assert list(temp.iterdir()) == []
+    # It stopped on its own, through its cleanup, with nothing raised in it.
+    assert server.returncode == 0, log
+    assert "Stopped." in log and "Traceback" not in log

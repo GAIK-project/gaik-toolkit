@@ -120,9 +120,11 @@ _RUN_ID_RE = re.compile(r"[0-9a-f]{16}")
 _LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
 #: ``--host`` values that listen on every address of this computer.
 _EVERY_ADDRESS = {"", "0.0.0.0", "::"}
-#: Signals that stop the server as Ctrl+C does; SIGHUP is the terminal closing.
-#: Windows has no SIGHUP, and SIGBREAK is its Ctrl+Break.
-_STOP_SIGNALS = ("SIGTERM", "SIGHUP", "SIGBREAK")
+#: A Host header: a name or a bracketed IPv6 address, and at most one port.
+_HOST_HEADER = re.compile(r"(?:\[([0-9A-Za-z:.%]+)\]|([^\[\]:]+))(?::[0-9]{1,5})?")
+#: Signals that stop the server: Ctrl+C (SIGINT), SIGTERM and SIGHUP, the terminal
+#: closing. Windows has no SIGHUP, and SIGBREAK is its Ctrl+Break.
+_STOP_SIGNALS = ("SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK")
 _BUSY_MESSAGE = "A run is already going. Wait for it to finish."
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -274,6 +276,8 @@ def _kill_tree(process: subprocess.Popen) -> None:
     """
     try:
         if os.name == "nt":
+            # Without a console of ours: a second Ctrl+C or Ctrl+Break while the
+            # server stops would end taskkill too, before it ends the run.
             subprocess.run(
                 ["taskkill", "/T", "/F", "/PID", str(process.pid)],
                 stdin=subprocess.DEVNULL,
@@ -281,6 +285,7 @@ def _kill_tree(process: subprocess.Popen) -> None:
                 stderr=subprocess.DEVNULL,
                 timeout=20,
                 check=False,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
         else:
             os.killpg(process.pid, signal.SIGKILL)
@@ -745,10 +750,7 @@ class Handler(BaseHTTPRequestHandler):
         at this computer. A request a page sends carries that page's origin, which
         must be this server.
         """
-        try:
-            host = urlsplit("//" + (self.headers.get("Host") or "")).hostname or ""
-        except ValueError:
-            host = ""
+        host = _host_name(self.headers.get("Host") or "")
         server = self.server
         if not _host_allowed(host, server.host_names, server.every_address):  # type: ignore[attr-defined]
             raise RefusalError(403, "forbidden", "This address is not the test page's own.")
@@ -877,10 +879,26 @@ def _host_allowed(host: str, names: frozenset[str], every_address: bool) -> bool
     if not every_address:
         return False
     try:
-        ipaddress.ip_address(host.split("%", 1)[0])
+        address = ipaddress.ip_address(host.split("%", 1)[0])
     except ValueError:
         return False
-    return True
+    # 0.0.0.0, :: and group addresses are no address of this computer's.
+    return not (address.is_unspecified or address.is_multicast)
+
+
+def _host_name(header: str) -> str:
+    """The name in a Host header, lowercased; '' when the header is not ``name[:port]``.
+
+    Parsed as the authority of a URL, ``attacker.example@127.0.0.1:8000`` would be
+    127.0.0.1, so a header with userinfo, a path, a query, a fragment, white space
+    or a second port is no name of this server's.
+    """
+    if any(ch in header for ch in "@/?#\\") or any(ch.isspace() for ch in header):
+        return ""
+    match = _HOST_HEADER.fullmatch(header)
+    if match is None:
+        return ""
+    return (match.group(1) or match.group(2)).lower()
 
 
 def create_server(
@@ -896,19 +914,25 @@ def create_server(
 
 
 def _stop_on_signals() -> None:
-    """Make SIGTERM and SIGHUP stop the server as Ctrl+C does.
+    """Make SIGTERM and SIGHUP stop the server as Ctrl+C does, and the stop run to its end.
 
     Left as they are, either signal ends Python at once, with no ``finally`` and no
     atexit: the run's working folder, with its copy of ``.env`` and the user's
     files, stayed in the temporary folder, and ``run_poc.py``, which runs in a
-    session of its own, went on without its time limit.
+    session of its own, went on without its time limit. The first of these signals,
+    Ctrl+C (SIGINT) among them, stops the server; every one after it is ignored, so
+    a second Ctrl+C during the cleanup does not cut it short.
     """
+    stopping = []
 
     def stop(signum, frame):
-        # A second signal must not cut the cleanup short.
         for name in _STOP_SIGNALS:
             if hasattr(signal, name):
                 signal.signal(getattr(signal, name), signal.SIG_IGN)
+        # One that arrived before the line above took effect is ignored here.
+        if stopping:
+            return
+        stopping.append(signum)
         raise KeyboardInterrupt
 
     for name in _STOP_SIGNALS:
