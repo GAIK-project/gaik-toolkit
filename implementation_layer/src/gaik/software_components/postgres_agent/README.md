@@ -114,6 +114,12 @@ with PostgresAgent(
 
 A query that touches any table outside the allowlist is rejected before it runs.
 
+Table and column names, a database error and the query rows come from the
+database, so each reaches the model in its own `<source_material>` data block,
+apart from the rules in the system message
+([`source_material`](../source_material.py)). A value in a table can still try to
+steer the answer; the read-only checks above bound what it can do.
+
 Allowlist entries are table names as PostgreSQL stores them, so they are
 case-sensitive: write `customers` for a table created as `customers` or
 `Customers`, and `Users` only for one created as `"Users"`.

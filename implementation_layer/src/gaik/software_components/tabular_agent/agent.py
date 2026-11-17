@@ -34,6 +34,11 @@ from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    clean_label,
+    source_material_messages,
+)
 
 from ..input_limits import InputLimits
 from .loader import load_sources, lock_down, normalize_sources
@@ -322,10 +327,13 @@ class TabularAgent:
 
     def _infer_layout(self, sheet_label: str, grid: str) -> SheetLayout:
         """Ask the LLM where the real table sits inside a messy sheet."""
-        messages = [
-            {"role": "system", "content": _LAYOUT_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Sheet: {sheet_label}\n\n{grid}"},
-        ]
+        # The grid is the file's own content: it goes in a data block, apart from the rules.
+        material = SourceMaterial()
+        messages = source_material_messages(
+            _LAYOUT_SYSTEM_PROMPT,
+            f"Sheet: {clean_label(sheet_label)}\n\n"
+            + material.wrap(grid, label=f"sheet {sheet_label}"),
+        )
         parsed = self._parse_structured(messages, SheetLayout)
         if not isinstance(parsed, SheetLayout):
             raise RuntimeError("LLM did not return a sheet layout.")
@@ -367,18 +375,24 @@ class TabularAgent:
             A :class:`~gaik.software_components.tabular_agent.models.GeneratedSQL`.
         """
         schema = self.get_schema()
-        user_prompt = f"Loaded tables:\n{schema.to_prompt_text()}\n\nQuestion: {question}"
+        # Table and column names and the example values come from the files, and a
+        # database error can quote them: each goes in a data block. The question and the
+        # caller's extra instructions stay outside the blocks.
+        material = SourceMaterial()
+        user_prompt = (
+            "Loaded tables:\n"
+            + material.wrap(schema.to_prompt_text(), label="loaded tables")
+            + f"\n\nQuestion: {question}"
+        )
         if self.extra_instructions:
             user_prompt += f"\n\nAdditional context:\n{self.extra_instructions}"
         if error_context:
-            user_prompt += f"\n\nThe previous attempt failed -- fix it.\n{error_context}"
+            user_prompt += "\n\nThe previous attempt failed -- fix it.\n" + material.wrap(
+                error_context, label="previous attempt"
+            )
 
         parsed = self._parse_structured(
-            [
-                {"role": "system", "content": _SQL_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            GeneratedSQL,
+            source_material_messages(_SQL_SYSTEM_PROMPT, user_prompt), GeneratedSQL
         )
         if not isinstance(parsed, GeneratedSQL):
             raise RuntimeError("LLM did not return a SQL query.")
@@ -507,16 +521,15 @@ class TabularAgent:
         if self.answer_language != "en":
             language = _LANGUAGE_NAMES.get(self.answer_language, self.answer_language)
             system_prompt += f" Reply in {language}."
+        # The rows are the files' content: a cell cannot add to the rules for the answer.
+        material = SourceMaterial()
         user_prompt = (
             f"Question: {question}\n\n"
             f"SQL query used:\n{query_result.sql}\n\n"
             f"Query result ({query_result.row_count} row(s)):\n"
-            f"{_format_rows_for_prompt(query_result.rows)}"
+            + material.wrap(_format_rows_for_prompt(query_result.rows), label="query result")
         )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = source_material_messages(system_prompt, user_prompt)
 
         if isinstance(client, ProviderClient):
             response = _with_retries(

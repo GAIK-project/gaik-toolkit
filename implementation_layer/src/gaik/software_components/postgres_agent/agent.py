@@ -33,6 +33,7 @@ from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 from .introspection import introspect_schema
 from .models import AnswerResult, GeneratedSQL, QueryResult, SchemaInfo
@@ -412,19 +413,22 @@ class PostgresAgent:
         schema = schema.model_copy(
             update={"tables": [t.model_copy(update={"sample_rows": []}) for t in schema.tables]}
         )
+        # Names and comments come from the database, and a database error can quote its
+        # data: each goes in a data block. The question and the caller's extra
+        # instructions stay outside the blocks.
+        material = SourceMaterial()
         user_prompt = (
             f"Database schema (active schema: {self.schema_name}):\n"
-            f"{schema.to_prompt_text()}\n\n"
-            f"Question: {question}"
+            + material.wrap(schema.to_prompt_text(), label="database schema")
+            + f"\n\nQuestion: {question}"
         )
         if self.extra_instructions:
             user_prompt += f"\n\nAdditional context:\n{self.extra_instructions}"
         if error_context:
-            user_prompt += f"\n\nThe previous attempt failed -- fix it.\n{error_context}"
-        messages = [
-            {"role": "system", "content": _SQL_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
+            user_prompt += "\n\nThe previous attempt failed -- fix it.\n" + material.wrap(
+                error_context, label="previous attempt"
+            )
+        messages = source_material_messages(_SQL_SYSTEM_PROMPT, user_prompt)
 
         if isinstance(client, ProviderClient):
             parsed = _with_retries(
@@ -592,16 +596,15 @@ class PostgresAgent:
         if self.answer_language != "en":
             language = _LANGUAGE_NAMES.get(self.answer_language, self.answer_language)
             system_prompt += f" Reply in {language}."
+        # The rows are the database's content: a value cannot add to the rules for the answer.
+        material = SourceMaterial()
         user_prompt = (
             f"Question: {question}\n\n"
             f"SQL query used:\n{query_result.sql}\n\n"
             f"Query result ({query_result.row_count} row(s)):\n"
-            f"{_format_rows_for_prompt(query_result.rows)}"
+            + material.wrap(_format_rows_for_prompt(query_result.rows), label="query result")
         )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = source_material_messages(system_prompt, user_prompt)
 
         if isinstance(client, ProviderClient):
             response = _with_retries(
