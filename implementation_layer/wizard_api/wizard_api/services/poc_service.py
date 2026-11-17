@@ -945,10 +945,42 @@ _VERSION_FILES = (
 )
 
 
+#: Folders of a package that hold a run's inputs and outputs, not the package.
+_RUN_FOLDERS = frozenset({"sample_input", "output"})
+
+
+def _version_files(poc_dir: str) -> list[str]:
+    """``_VERSION_FILES``, every Python file of the package and every file in ``schemas/``.
+
+    run_poc.py imports the helpers the scaffolder copies in (``poc_output.py``,
+    ``document_manifest.py``, ``input_bundle.py``) and any module the agent adds, and
+    from the gaik release after 0.10.0 the PoC loads ``schemas/output_schema_model.json``
+    rather than the .py file, so a change to any of them changes what runs.
+    """
+    names = set(_VERSION_FILES)
+    for folder, dirs, files in os.walk(poc_dir):
+        rel = os.path.relpath(folder, poc_dir)
+        dirs[:] = sorted(
+            d
+            for d in dirs
+            if not os.path.islink(os.path.join(folder, d))
+            and not d.startswith(".")
+            and d != "__pycache__"
+            and not (rel == "." and d in _RUN_FOLDERS)
+        )
+        for name in files:
+            path = os.path.join(folder, name)
+            relpath = os.path.normpath(os.path.join(rel, name))
+            in_schemas = relpath.split(os.sep, 1)[0] == "schemas"
+            if (name.endswith(".py") or in_schemas) and regular_file(path, poc_dir):
+                names.add(relpath)
+    return sorted(names)
+
+
 def package_version(poc_dir: str) -> str:
-    """A short digest of the files a preflight reads; changes when any of them does."""
+    """A short digest of the files that decide what a run does; changes when any of them does."""
     digest = hashlib.sha256()
-    for name in _VERSION_FILES:
+    for name in _version_files(poc_dir):
         path = os.path.join(poc_dir, name)
         digest.update(name.encode())
         if regular_file(path, poc_dir):
