@@ -17,6 +17,10 @@ from wizard_api.services.case_service import CaseNotFoundError
 
 logger = logging.getLogger(__name__)
 
+# Uvicorn has configured its own logging by the time it imports the app; the
+# API's loggers get their level and a handler here (WIZARD_LOG_LEVEL).
+telemetry.configure_logging()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
