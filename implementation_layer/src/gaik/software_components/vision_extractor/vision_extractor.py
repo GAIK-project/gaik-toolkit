@@ -177,14 +177,17 @@ def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
 
 
 def _within_schema_name_limit(model: type[BaseModel]) -> type[BaseModel]:
-    """The model under a name of at most 64 characters, which OpenAI and Azure require.
+    """The model under a name OpenAI and Azure accept as a schema name.
 
-    The SDK sends the class name as ``response_format.json_schema.name``; a longer one
-    is refused with a 400. The subclass keeps every field and setting of ``model``.
+    The SDK sends the class name as ``response_format.json_schema.name``, which must be
+    letters, digits, underscores or hyphens, at most 64 characters; anything else is
+    refused with a 400. A Python class name may hold letters such as "ä". The subclass
+    keeps every field and setting of ``model``.
     """
-    if len(model.__name__) <= 64:
+    name = sanitize_model_name(model.__name__)
+    if name == model.__name__:
         return model
-    return create_model(sanitize_model_name(model.__name__), __base__=model)
+    return create_model(name, __base__=model)
 
 
 def _unwrap_verification(result_dict: dict) -> tuple[dict, dict]:
@@ -1089,7 +1092,7 @@ class VisionExtractor:
             request["reasoning"] = {"effort": self.reasoning_effort}
         response_format = {
             "type": "json_schema",
-            "name": extraction_model.__name__[:64],
+            "name": sanitize_model_name(extraction_model.__name__),
             "schema": _make_schema_strict(extraction_model.model_json_schema()),
             "strict": True,
         }

@@ -40,6 +40,15 @@ def test_a_long_model_name_is_shortened_and_the_model_still_validates():
     assert ve._within_schema_name_limit(short) is short
 
 
+def test_a_name_with_letters_outside_ascii_is_made_acceptable():
+    model = _model("Päätös_Extraction")
+
+    bounded = ve._within_schema_name_limit(model)
+
+    assert bounded.__name__.isascii()
+    assert bounded.model_validate({"order_number": "PO-1"}).order_number == "PO-1"
+
+
 def test_the_shared_provider_path_sends_a_name_within_64_characters(monkeypatch, tmp_path):
     sent = {}
 

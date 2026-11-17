@@ -171,7 +171,8 @@ def test_unset_env_placeholder_is_dropped_with_a_warning(
 
     # the literal text must never reach the model API as a deployment name
     assert "model" not in result
-    assert "ANSWER_DEPLOYMENT" in capsys.readouterr().out
+    # provider_config prints its warnings on stderr.
+    assert "ANSWER_DEPLOYMENT" in capsys.readouterr().err
 
 
 def test_env_placeholder_in_the_models_block_is_handled_too(provider_config, monkeypatch):

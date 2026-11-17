@@ -63,7 +63,7 @@ class InputBundle:
         self.files: dict[str, Path] = {}
         self.dirs: dict[str, Path] = {}
         for key, value in _walk(data):
-            text = value.strip()
+            text = value.strip().replace("\\", "/")
             if not text or "\n" in text or len(text) > 400:
                 continue
             for root in roots:
@@ -103,16 +103,25 @@ class InputBundle:
 def load_bundle(sample_dir) -> InputBundle | None:
     """The case's bundle under ``sample_dir`` (searched in subfolders too), or None.
 
-    Paths in it resolve against the bundle's folder first, then ``sample_dir``.
+    Paths in it resolve against the bundle's folder first, then ``sample_dir``. A file
+    with a bundle's name that is not JSON is an input like any other, not a bundle, and so
+    is one of the shorter names (``bundle.json``) that names no file or folder there.
     """
     sample_dir = Path(sample_dir)
+    root = sample_dir.resolve()
     for name in BUNDLE_NAMES:
-        found = sorted(sample_dir.rglob(name), key=lambda p: len(p.parts))
-        if found:
-            path = found[0]
-            data = json.loads(path.read_text(encoding="utf-8"))
-            root = sample_dir.resolve()
-            return InputBundle(path, data, [path.parent.resolve(), root], within=root)
+        found = sorted(
+            (p for p in sample_dir.rglob(name) if p.is_file() and p.resolve().is_relative_to(root)),
+            key=lambda p: len(p.parts),
+        )
+        for path in found:
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            bundle = InputBundle(path, data, [path.parent.resolve(), root], within=root)
+            if bundle.files or bundle.dirs or name == BUNDLE_NAMES[0]:
+                return bundle
     return None
 
 
@@ -123,8 +132,11 @@ def uploaded_names(sample_dir) -> set[str]:
     first file in sorted order reads ``delivery_note_sample.txt`` and never
     ``lahete.txt``, and its result is for a document nobody asked about.
     """
+    path = Path(sample_dir) / UPLOADED_NAMES_FILE
     try:
-        text = (Path(sample_dir) / UPLOADED_NAMES_FILE).read_text(encoding="utf-8")
+        if not path.resolve().is_relative_to(Path(sample_dir).resolve()):
+            return set()
+        text = path.read_text(encoding="utf-8")
     except OSError:
         return set()
     return {line.strip() for line in text.splitlines() if line.strip()}

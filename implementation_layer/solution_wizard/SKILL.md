@@ -220,11 +220,12 @@ describe one row under `nested`:
 }
 ```
 
-A nested block generates a named sub-model (`line_items` → `LineItem`) and the
-nested extraction requirements. Without it the row fields end up flattened into
-the parent as single values, and the output cannot represent more than one row —
-which is usually the whole point of the case. Ask how many rows a document can
-have if it is not obvious; the answer is almost never "one".
+A nested block generates a named row model (`line_items` → `LineItem`) and the
+nested extraction requirements (`parent_with_nested_list`). Without it the row
+fields end up flattened into the parent as single values, and the output cannot
+represent more than one row — which is usually the whole point of the case. Ask
+how many rows a document can have if it is not obvious; the answer is almost never
+"one". Rows are one level deep: a row cannot hold rows of its own.
 
 For any genuinely-unknown item, set the value to `"unknown"` (or `[]` for a list "none") and record an `assumptions[]` entry. Write these specs into a **draft blueprint** (`use_case` + the three specs + `governance`) at `<output_dir>/use_case.blueprint.json` so the completeness checker can read it. Present the spec summary and ask the user to confirm.
 
@@ -398,8 +399,10 @@ The PoC does not import `output_schema.py`: `load_schema()` reads
 python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas
 ```
 
-If it exits with an error, nothing was written and the PoC would still run the old schema:
-fix `output_schema.py` (the class name must match `model_name` in the requirements JSON,
+The audio and document PoCs do the same themselves when `output_schema.py` is newer than
+the model file, and stop with the reason when it cannot be done; the script tells you now
+instead of at the next run. If it exits with an error, nothing was written: fix
+`output_schema.py` (the class name must match `model_name` in the requirements JSON,
 the field types must be ones the schema generator produces, and the class adds no
 validators, serializers, methods, private attributes or config options other than
 `extra`; keep the generated `DecimalField` / `OptionalDecimalField` helpers as they are)
@@ -413,7 +416,7 @@ Two constraints must be satisfied before approving any schema. Check both every 
 
 1. **ExtractionRequirements `field_type` enum** — when editing `output_schema_requirements.json` directly (e.g. adding a field manually), `field_type` must be one of: `str`, `int`, `float`, `bool`, `list[str]`, `date`, `decimal`, `list[dict]`. The value `"dict"` is **not** in this enum and will cause a `ValidationError` at runtime. For a nested object field, write `"field_type": "str"`; for an array of objects write `"field_type": "list[dict]"`.
 
-1b. **`default` is a string or null** — in `output_schema_requirements.json`, a field's `default` must be a string or `null`, never a list, number or object (for a `list[str]` field write `null`, not `[]`). The generated `run_poc.py` resets other values to `null` with a warning, but do not rely on that: validate the file after any hand edit.
+1b. **`default` is a string or null** — in `output_schema_requirements.json`, a field's `default` must be a string or `null`, never a list, number or object (for a `list[str]` field write `null`, not `[]`). The audio and document templates' `run_poc.py` resets other values to `null` with a warning, but do not rely on that: validate the file after any hand edit.
 
 2. **Azure OpenAI structured output — no bare `dict` types** — when `provider: azure` (including the legacy `azure_openai` alias, or Azure routed through LiteLLM), the Pydantic schema in `output_schema.py` must **never** contain `dict | None` or `list[dict]` as field types. Azure OpenAI's structured output API requires `additionalProperties: false` on every JSON object, which bare Python `dict` does not satisfy. For every nested-object field, define a named sub-model:
 
@@ -570,7 +573,7 @@ Choose them like this:
 2. **Do not ask** when the user has already said what they want: use that. When the requirements ask for evidence — for example "cite the source", "show where each value came from", "audit trail", "traceable to the document", a regulated or audited domain — add `SourceTracing`.
 3. **No user to answer** (the wizard runs unattended): add `LLMJudge` when `human_review == yes` (what this step has always done), and add `SourceTracing` as well when the requirements ask for evidence. When `human_review` is no, add `LLMJudge` only if the user explicitly wants output quality checking.
 
-Order in the workflow: extraction → `SourceTracing` → `LLMJudge` → the `human_review` step. Tracing comes first because it is cheap and needs no model, and the reviewer sees both sets of flags. Record the choice by the steps the blueprint contains; a `SourceTracing` step takes `source_text` and `structured_json` and produces a `validation_report`, with `source = "text"` or `"files"` in its `parameters` (see its card). `SourceTracing` composes around the extraction step or module — keep that step, never replace it — and for `AudioToStructuredData` and `DocumentsToStructuredData` the PoC must pass the schema and requirements itself (see the card).
+Order in the workflow: extraction → `SourceTracing` → `LLMJudge` → the `human_review` step. Tracing comes first because it is cheap and needs no model, and the reviewer sees both sets of flags. Record the choice by the steps the blueprint contains; a `SourceTracing` step takes `source_text` and `structured_json` and produces a `validation_report`, with `source = "text"` or `"files"` in its `parameters` (see its card). `SourceTracing` composes around the extraction step or module — keep that step, never replace it — and for `AudioToStructuredData` and `DocumentsToStructuredData` the PoC must pass the schema and requirements itself (see the card). A judge step takes the source it checks against as well as the `structured_json`: for `LLMJudge` the `transcript`, `enhanced_transcript` or `parsed_text` (`AudioToStructuredData` and `DocumentsToStructuredData` list theirs among their outputs), or the `pdf` or `image` itself for its `validate(source_pages=...)`, which is all `LLMJudgePanel` has. With `validation.hallucination_check: true` the validator refuses a judge step without one (rule 14).
 
 The fixed PoC templates for audio and document extraction inject `SourceTracing` (like `LLMJudge`): the generated `run_poc.py` asks the extractor for the quotes before the run, checks the values against the text it read afterwards, writes `output/<input>_source_trace.json` and prints what a reviewer should look at. The schema must exist for that, so on the first run, when the pipeline generates the schema, tracing is skipped with a note; the next run traces. The RAG template has no extraction step and does not inject it. Any other block the fixed template does not cover (for example `DocumentClassifier` or `DraftReviewer`) still makes the scaffolder use the `_generic` template: the generated `run_poc.py` then has a labelled block per step with the card's reference calls, and you wire the evidence request on the extractor call and the check yourself from the card's recipe. Tell the user when that happens.
 

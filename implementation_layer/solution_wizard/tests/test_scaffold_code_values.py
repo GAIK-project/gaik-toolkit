@@ -197,7 +197,7 @@ def test_a_name_the_schema_source_cannot_carry_is_refused(spec, what) -> None:
         build_pydantic_model(spec)
 
 
-# --------------------------------------------------------------------------- nested rows (fork)
+# --------------------------------------------------------------------------- nested rows
 
 NESTED_SPEC = {
     "schema_name": "PurchaseOrder",
@@ -236,3 +236,27 @@ def test_a_keyword_as_a_nested_row_field_stops_the_scaffolding(tmp_path) -> None
     bp.target_output_spec["nested"] = {"line_items": {"fields": ["article_code", "from"]}}
     with pytest.raises(ValueError, match="'from' of the 'line_items' rows"):
         scaffold_poc(bp, tmp_path)
+    assert not any((tmp_path / "poc").iterdir())
+
+
+def test_rows_inside_rows_stop_the_scaffolding_before_any_file_is_written(tmp_path) -> None:
+    bp = _blueprint()
+    bp.target_output_spec["nested"] = {
+        "line_items": {"fields": ["sub"], "nested": {"sub": {"fields": ["z"]}}}
+    }
+    with pytest.raises(ValueError, match="one level of nested rows"):
+        scaffold_poc(bp, tmp_path)
+    assert not any((tmp_path / "poc").iterdir())
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [{"fields": [123]}, {"fields": [{"id": "sub"}], "nested": {"sub": {"fields": ["z"]}}}],
+    ids=["number", "section-with-rows"],
+)
+def test_rows_the_schema_cannot_carry_stop_the_scaffolding_first(tmp_path, rows) -> None:
+    bp = _blueprint()
+    bp.target_output_spec["nested"] = {"line_items": rows}
+    with pytest.raises(ValueError, match="target_output_spec.nested"):
+        scaffold_poc(bp, tmp_path)
+    assert not any((tmp_path / "poc").iterdir())
