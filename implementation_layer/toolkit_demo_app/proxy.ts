@@ -265,7 +265,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
     try {
       // Buffer the body to preserve binary integrity for large multipart
       // uploads (streaming truncates data in Bun/standalone), but only within
-      // the route's limit: reading stops at the first chunk past it.
+      // the route's limit: this copy stops at the first chunk past it.
       let body: ArrayBuffer | null = null;
       if (hasBody(request.method)) {
         body = await readBodyWithin(request, bodyLimit.maxBytes);

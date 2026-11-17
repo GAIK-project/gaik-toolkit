@@ -2,9 +2,11 @@
 //
 // The limits are the API's own (api/upload_limits.json, read by the API's
 // UploadLimitMiddleware too): a whole-request size and a number of file parts
-// per route. A body is refused by its declared Content-Length before any of it
-// is read, and otherwise as soon as the bytes read pass the limit; the rest of
-// the stream is cancelled, not read.
+// per route. A body is refused by its declared Content-Length before this code
+// reads any of it, and otherwise as soon as the bytes it reads pass the limit,
+// when it cancels its reader. Next.js itself buffers each request for the proxy,
+// up to proxyClientMaxBodySize in next.config.ts, so these limits bound what is
+// copied and parsed here, not what the server receives.
 import table from "@/api/upload_limits.json";
 
 const MIB = 1024 * 1024;
@@ -70,8 +72,8 @@ export function declaresMoreThan(request: Request, maxBytes: number): boolean {
 
 /**
  * The request body, read while it stays within `maxBytes`, or null when it
- * declares or carries more. Reading stops at the first chunk past the limit
- * and the rest of the stream is cancelled.
+ * declares or carries more. This copy stops at the first chunk past the limit
+ * and cancels its reader; what Next.js has buffered already stays buffered.
  */
 export async function readBodyWithin(
   request: Request,

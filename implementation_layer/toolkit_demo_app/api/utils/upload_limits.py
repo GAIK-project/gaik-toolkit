@@ -18,6 +18,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
+from python_multipart.multipart import parse_options_header
 
 MIB = 1024 * 1024
 LIMITS_FILE = Path(__file__).resolve().parent.parent / "upload_limits.json"
@@ -66,13 +67,16 @@ def limit_for(path: str) -> BodyLimit:
 
 
 def multipart_boundary(content_type: str | None) -> bytes | None:
-    """The boundary of a multipart/form-data body, or None for any other body."""
-    if not content_type or not content_type.lower().startswith("multipart/form-data"):
+    """The boundary of a multipart/form-data body, or None for any other body.
+
+    The header is parsed with the same function Starlette's form parser uses,
+    so the counter splits the body on the delimiter the parser will use."""
+    if not content_type:
         return None
-    match = re.search(r'boundary\s*=\s*(?:"([^"]+)"|([^;\s]+))', content_type, re.IGNORECASE)
-    if not match:
+    media_type, params = parse_options_header(content_type)
+    if media_type != b"multipart/form-data":
         return None
-    return (match.group(1) or match.group(2)).encode("latin-1")
+    return params.get(b"boundary") or None
 
 
 class FilePartCounter:

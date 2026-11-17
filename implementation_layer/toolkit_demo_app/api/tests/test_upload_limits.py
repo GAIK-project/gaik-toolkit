@@ -177,6 +177,27 @@ def test_boundary_is_read_from_quoted_and_plain_content_types():
     assert multipart_boundary("application/json") is None
 
 
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        f"multipart/form-data; xboundary=other; boundary={BOUNDARY}",
+        f'multipart/form-data; my-boundary="other"; boundary="{BOUNDARY}"',
+        f"Multipart/Form-Data; Boundary={BOUNDARY}",
+    ],
+)
+def test_counter_splits_the_body_on_the_boundary_the_form_parser_uses(content_type):
+    # Within the limits, the route's form parser sees both files...
+    body = _multipart(files=2, size=10)
+    status, payload, _ = _run(_chunks(body), declared=len(body), content_type=content_type)
+    assert status == 200
+    assert payload == {"files": 2, "bytes": 20}
+    # ...and the counter sees the same parts, so one file more is refused.
+    body = _multipart(files=3, size=10)
+    status, payload, _ = _run(_chunks(body), declared=len(body), content_type=content_type)
+    assert status == 400
+    assert payload == {"detail": "Too many files: at most 2 files per request."}
+
+
 def test_route_limits_are_looked_up_by_path_and_prefix():
     assert limit_for("/parse").max_bytes == 22 * MIB
     assert limit_for("/transcribe").max_files == 1
@@ -211,7 +232,10 @@ def test_every_upload_route_of_the_demo_api_has_a_limit_that_takes_its_files():
         upload_paths.add(path)
         limit = limit_for(path)
         assert limit is not DEFAULT_LIMIT, f"{path} takes files but has no entry"
-        assert limit.max_files >= len(uploads), path
+        # A list[UploadFile] parameter takes several files, so it needs room for
+        # more than one; a single UploadFile needs room for one.
+        needed = sum(2 if "list[" in str(p.annotation) else 1 for p in uploads)
+        assert limit.max_files >= needed, path
     named = {p for p in ROUTE_LIMITS if not p.endswith("/")}
     paths = {path for path, _ in routes}
     assert named <= paths, f"entries for routes the API lacks: {named - paths}"

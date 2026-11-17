@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { bodyLimitFor, readFormWithin } from "@/lib/upload-limits";
+import {
+  bodyLimitFor,
+  declaresMoreThan,
+  readFormWithin,
+} from "@/lib/upload-limits";
 import {
   forwardReportRun,
   gateReportWriter,
@@ -19,21 +23,32 @@ import {
 export async function POST(request: NextRequest) {
   const limits = getReportWriterLimits();
 
+  const bodyLimit = bodyLimitFor("/report-writer/run");
+  const tooLarge = () =>
+    NextResponse.json(
+      { error: `Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. ${COMPRESS_HINT}` },
+      { status: 413 },
+    );
+  // A body that declares more than the run takes is refused before the gate
+  // below takes a trial run. A body sent without a Content-Length is measured
+  // only after the gate, so its body is not parsed before sign-in.
+  if (declaresMoreThan(request, bodyLimit.maxBytes)) {
+    await request.body?.cancel().catch(() => {});
+    return tooLarge();
+  }
+
   // 1) Auth + approval + quota, 2) per-IP burst limit
   const gate = await gateReportWriter(request, limits.maxReports);
   if (gate instanceof Response) return gate;
   const { userId, staff } = gate;
 
   // Parse the multipart body within the route's limits (lib/upload-limits.ts):
-  // reading stops at the first chunk past the size, and a form with more files
-  // than the run takes is refused.
-  const read = await readFormWithin(request, bodyLimitFor("/report-writer/run"));
+  // this copy stops at the first chunk past the size, and a form with more files
+  // than the run takes is refused. Next.js has already buffered the request (up
+  // to proxyClientMaxBodySize), so this bounds what is parsed, not what arrived.
+  const read = await readFormWithin(request, bodyLimit);
   if (!read.ok) {
-    if (read.status === 413)
-      return NextResponse.json(
-        { error: `Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. ${COMPRESS_HINT}` },
-        { status: 413 },
-      );
+    if (read.status === 413) return tooLarge();
     return NextResponse.json({ error: read.error }, { status: 400 });
   }
   const form = read.form;
