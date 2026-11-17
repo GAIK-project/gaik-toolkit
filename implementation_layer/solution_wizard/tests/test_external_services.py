@@ -28,6 +28,8 @@ WIZARD = Path(__file__).parent.parent
 EXAMPLE = WIZARD / "examples" / "document_extraction_blueprint.json"
 SCHEMA_FILE = WIZARD / "schemas" / "use_case_blueprint.schema.json"
 TEMPLATES = WIZARD / "templates" / "poc"
+#: gaik's source in this repository, read as text: the tests here run without gaik.
+GAIK_SOURCE = WIZARD.parent / "src" / "gaik"
 
 SEARCH = {
     "name": "Tavily web search",
@@ -203,6 +205,11 @@ def test_a_variable_name_that_is_not_upper_case_is_refused(name) -> None:
         "LITELLM_API_KEY",
         "WIZARD_API_TOKEN",
         "GAIK_ALLOWED_ENDPOINT_HOSTS",
+        "LLM_PROVIDER",
+        "TTS_ENDPOINT",
+        "TYPESAFE_BASE_URL",
+        "TYPESAFE_API_KEY",
+        "API_BASE",
         "PYTHONPATH",
         "PATH",
     ],
@@ -257,6 +264,80 @@ def test_every_variable_the_env_template_names_is_reserved() -> None:
     assert len(names) > 20
     for name in sorted(names):
         assert bp_module.env_name_problem(name), name
+
+
+#: gaik's helpers that read a variable by the name passed to them.
+_ENV_READERS = {
+    "getenv",
+    "_env",
+    "_first_env",
+    "require_env",
+    "_int",
+    "_float",
+    "_str",
+    "_text",
+    "_number",
+}
+_ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]+")
+
+
+def _is_environ(node: ast.AST) -> bool:
+    return (isinstance(node, ast.Attribute) and node.attr == "environ") or (
+        isinstance(node, ast.Name) and node.id == "environ"
+    )
+
+
+def _variables_gaik_reads() -> set[str]:
+    """The variable names gaik's source reads, found without importing gaik: the names
+    passed to os.getenv, os.environ and gaik's own env helpers, and the addresses
+    endpoints.PROVIDER_ENDPOINT_ENVS trusts with a provider's key."""
+    names: set[str] = set()
+    for path in sorted(GAIK_SOURCE.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        constants: dict[str, str] = {}
+        for node in tree.body:
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            for target in node.targets if isinstance(node, ast.Assign) else [node.target]:
+                if not isinstance(target, ast.Name):
+                    continue
+                if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                    constants[target.id] = node.value.value
+                if target.id == "PROVIDER_ENDPOINT_ENVS":
+                    names |= {
+                        c.value
+                        for c in ast.walk(node.value)
+                        if isinstance(c, ast.Constant) and isinstance(c.value, str)
+                    }
+        for node in ast.walk(tree):
+            args: list[ast.AST] = []
+            if isinstance(node, ast.Call):
+                func = node.func
+                called = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+                if called in _ENV_READERS or (
+                    called == "get" and isinstance(func, ast.Attribute) and _is_environ(func.value)
+                ):
+                    args = node.args
+            elif isinstance(node, ast.Subscript) and _is_environ(node.value):
+                args = [node.slice]
+            for arg in args:
+                if isinstance(arg, ast.Constant):
+                    value = arg.value
+                else:
+                    value = constants.get(arg.id) if isinstance(arg, ast.Name) else None
+                if isinstance(value, str):
+                    names.add(value)
+    return {name for name in names if _ENV_NAME.fullmatch(name)}
+
+
+def test_every_variable_gaik_reads_is_reserved() -> None:
+    """A service that named one would choose gaik's provider (LLM_PROVIDER), an address
+    gaik sends a key to (TTS_ENDPOINT, TYPESAFE_BASE_URL) or a component's setting."""
+    names = _variables_gaik_reads()
+
+    assert {"LLM_PROVIDER", "TTS_ENDPOINT", "TYPESAFE_BASE_URL", "AZURE_API_KEY"} <= names
+    assert len(names) > 60
+    assert [name for name in sorted(names) if not bp_module.env_name_problem(name)] == []
 
 
 @pytest.mark.parametrize(

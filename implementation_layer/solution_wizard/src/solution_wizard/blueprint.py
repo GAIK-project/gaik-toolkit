@@ -234,6 +234,10 @@ _ONE_LINE_PATTERN = r"^[^\x00-\x1f\x7f\x85\u2028\u2029]+$"
 #: service that named one would have the PoC send that key to a third party (the
 #: sandbox holds the provider's key under these names), or route the model calls,
 #: provider key included, through a proxy or a certificate the service chose.
+#: gaik's own include the provider it picks (LLM_PROVIDER), the addresses it trusts
+#: with a key (TTS_ENDPOINT, TYPESAFE_BASE_URL, API_BASE for Docling) and the
+#: transcriber's settings (TranscriptionConfig.from_env); a test reads gaik's source
+#: and fails on a variable gaik reads that is missing here.
 RESERVED_ENV_PREFIXES = (
     "GAIK_",
     "AZURE_",
@@ -246,6 +250,11 @@ RESERVED_ENV_PREFIXES = (
     "LITELLM_",
     "LOCAL_TRANSCRIBER_",
     "DOCLING_",
+    "TYPESAFE_",
+    "TRANSCRIPTION_",
+    "WHISPER_",
+    "GPT4O_",
+    "FFMPEG_",
     "WIZARD_",
     "PYTHON",
     "PIP_",
@@ -257,6 +266,20 @@ RESERVED_ENV_PREFIXES = (
 RESERVED_ENV_NAMES = frozenset(
     {
         "EMBEDDING_MODEL",
+        "LLM_PROVIDER",
+        "TTS_ENDPOINT",
+        "API_BASE",
+        "API_TIMEOUT_SECONDS",
+        "AUDIO_BITRATE",
+        "AUDIO_CHANNELS",
+        "AUDIO_SAMPLE_RATE",
+        "CHUNK_DURATION_MINUTES",
+        "CHUNK_OVERLAP_SECONDS",
+        "MAX_429_RETRIES",
+        "MAX_RETRIES",
+        "MAX_SINGLE_FILE_MB",
+        "RESPONSE_FORMAT",
+        "RETRY_BASE_DELAY_SECONDS",
         "HOME",
         "PATH",
         "HTTP_PROXY",
