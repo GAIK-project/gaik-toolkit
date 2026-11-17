@@ -4,6 +4,7 @@ Reusable pipeline to parse documents (PDF/images/DOCX) and extract structured da
 
 from __future__ import annotations
 
+import inspect
 import io
 import json
 from contextlib import redirect_stdout
@@ -23,6 +24,7 @@ from gaik.software_components.extractor.saved_schema import (
     save_model_file,
 )
 from gaik.software_components.extractor.schema import print_pydantic_schema
+from gaik.software_modules._options import checked_options
 
 # Optional parsers
 try:
@@ -34,6 +36,15 @@ try:
     )
 except ImportError:  # pragma: no cover - optional deps
     VisionParser = DoclingParser = PyMuPDFParser = DocxParser = None  # type: ignore
+
+
+# The method each parser_choice reads the document with.
+_PARSE_METHOD = {
+    "vision_parser": "convert_pdf",
+    "docling": "parse_document",
+    "pymupdf": "parse_pdf",
+    "docx": "parse_document",
+}
 
 
 @dataclass
@@ -120,15 +131,38 @@ class DocumentsToStructuredData:
             extractor_ctor: Constructor kwargs for DataExtractor (e.g., model override).
             extract_options: Call-time kwargs for DataExtractor.extract().
             schema/requirements: Optional prebuilt schema and requirements to reuse.
+
+        Every option name must be a parameter of the component it goes to.
+        Stage configs (``config``, ``api_config``, ``openai_config``) come from
+        the constructor and are refused here; a :class:`ValueError` is raised
+        before anything is parsed.
         """
-        parser_ctor = parser_ctor or {}
-        parse_options = parse_options or {}
+        parser_class = self._parser_class(parser_choice)
+        parser_ctor = checked_options(parser_ctor, parser_class, what="parser_ctor")
+        parse_method = getattr(parser_class, _PARSE_METHOD[parser_choice.lower()], None)
+        path_parameter = (
+            next(name for name in inspect.signature(parse_method).parameters if name != "self")
+            if parse_method is not None
+            else None
+        )
+        parse_options = checked_options(
+            parse_options,
+            parse_method,
+            what="parse_options",
+            set_by_module=(path_parameter,) if path_parameter else (),
+        )
+        extractor_ctor = checked_options(extractor_ctor, DataExtractor, what="extractor_ctor")
+        extract_options = checked_options(
+            extract_options,
+            getattr(DataExtractor, "extract", None),
+            what="extract_options",
+            set_by_module=("extraction_model", "requirements", "user_requirements", "documents"),
+        )
 
         parser = self._build_parser(parser_choice, parser_ctor)
         parsed_documents = self._parse_document(parser_choice, parser, file_path, parse_options)
 
-        extractor_ctor = dict(extractor_ctor or {})
-        extractor_cfg = dict(extractor_ctor.pop("config", self.extraction_config))
+        extractor_cfg = dict(self.extraction_config)
         model_override = extractor_ctor.get("model")
         if model_override:
             extractor_cfg["model"] = model_override
@@ -165,13 +199,27 @@ class DocumentsToStructuredData:
     # ------------------------------------------------------------------
     # Parser helpers
     # ------------------------------------------------------------------
+    @staticmethod
+    def _parser_class(parser_choice: str):
+        choice = parser_choice.lower()
+        if choice not in _PARSE_METHOD:
+            raise ValueError(f"Unsupported parser_choice: {parser_choice}")
+        parser_class = {
+            "vision_parser": VisionParser,
+            "docling": DoclingParser,
+            "pymupdf": PyMuPDFParser,
+            "docx": DocxParser,
+        }[choice]
+        if parser_class is None:
+            raise ImportError(f"{choice} is not available. Install its parser extras.")
+        return parser_class
+
     def _build_parser(self, parser_choice: str, ctor: dict):
         choice = parser_choice.lower()
         if choice == "vision_parser":
             if VisionParser is None:
                 raise ImportError("VisionParser not available. Install vision parser extras.")
-            options = {"openai_config": self.parser_config, **ctor}
-            return VisionParser(**options)
+            return VisionParser(openai_config=self.parser_config, **ctor)
         if choice == "docling":
             if DoclingParser is None:
                 raise ImportError("DoclingParser not available. Install docling extras.")
