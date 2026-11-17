@@ -595,10 +595,12 @@ When the registry and the reference cards have no component for a need (no entry
    ]
    ```
 
-   `python_package` is one plain PyPI requirement (a name, optional `[extras]` and version specifiers, no spaces): users install the file with `pip install -r`, so the blueprint refuses a URL, a path, a pip option or an environment marker. `env_vars` are the service's own UPPER_CASE names, never a model provider's (`AZURE_*`, `OPENAI_*` and the rest are refused). `data_sent` is `"none"` for a local library. `fallback` is what the PoC does without the service, as in the sandbox, which has no key for it.
+   `python_package` is one plain PyPI requirement (a name, optional `[extras]` and version specifiers, no spaces): users install the file with `pip install -r`, so the blueprint refuses a URL, a path, a pip option or an environment marker. `env_vars` are the service's own UPPER_CASE names: the blueprint refuses a model provider's (`AZURE_*`, `OPENAI_*` and the rest) and the network and installer settings (`HTTPS_PROXY`, `SSL_CERT_FILE`, `PIP_*` and the like), which would route the model calls through the service. `data_sent` says what leaves; for a library that runs locally write `"none"` (a wording that starts with "none", "nothing" or "no data" and names no exception counts the same). `fallback` is what the PoC does without the service, as in the sandbox, which has no key for it.
 5. **A need the user cannot meet** keeps its entry with `user_can_provide: false` and goes to `assumptions` as an open item ("Web search is not available yet; the supplier news field stays empty", `impact: component_selection`). Tell the user what the PoC will do without it.
 
 Give the service its own workflow step with `component: "custom"`, listed in `components.custom_components`, so that the diagrams and the documents show it. `technical_spec.integration_targets` is something else: where the approved result is sent, which the PoC does not call.
+
+**A service added or changed after Gate 2 is approved** (a new entry, another `data_sent`, another package or key) changes what the user approved: a new third party gets data. In the web app, call the `reopen_gate` tool for Gate 2 before you make the change, then present the change at Gate 2 again; elsewhere, show the change and ask the user to confirm it before you go on. The server notices such a change on its own only after Gate 3 is approved.
 
 **Step 3 -- Add review aids when appropriate (`SourceTracing`, `LLMJudge`)**
 

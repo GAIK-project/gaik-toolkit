@@ -73,6 +73,15 @@ def test_a_need_outside_gaik_is_named_explained_asked_and_recorded() -> None:
     assert "**Ask whether they can provide it**" in step
     assert "technical_spec.external_services" in step
     assert "user_can_provide: false" in step and "open item" in step
+    assert 'write `"none"`' in step
+
+
+def test_a_service_added_after_gate_2_reopens_it() -> None:
+    step = _flat(_section("**Step 2b -- Needs outside GAIK", "**Step 3 --"))
+
+    assert "**A service added or changed after Gate 2 is approved**" in step
+    assert "call the `reopen_gate` tool for Gate 2 before you make the change" in step
+    assert "ask the user to confirm it" in step
 
 
 def test_the_poc_skips_an_external_service_it_cannot_reach() -> None:
