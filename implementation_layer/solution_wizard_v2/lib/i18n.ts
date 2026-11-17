@@ -36,6 +36,8 @@ export type Dict = {
    * "{approve}" and "{request}" are the decision bar's two buttons.
    */
   nowGate3Run: string;
+  /** Gate 3 when the package changed after the run that succeeded: a new run comes first. */
+  nowGate3Changed: string;
   /** The last step once Gate 4 is approved, and the same before any test run has succeeded. */
   nowDone: string;
   nowDoneNoRun: string;
@@ -781,6 +783,7 @@ const fi: Dict = {
     "Lataa käyttöönottopaketti {poc}-välilehdeltä ja tarkista sen dokumentaatio.",
   ],
   nowGate3Run: "Testi onnistui. Tarkista tulos {poc}-välilehdellä ja valitse sitten alareunasta {approve} tai {request}.",
+  nowGate3Changed: "PoC-paketti muuttui onnistuneen testiajon jälkeen. Aja testi uudelleen {poc}-välilehdellä, niin testiajon voi hyväksyä.",
   nowDone: "Kaikki gatet on hyväksytty. Lataa käyttöönottopaketti tai kokeile ratkaisua omilla tapauksillasi.",
   nowDoneNoRun: "Kaikki gatet on hyväksytty. Aja vielä testi {poc}-välilehdellä, niin käyttöönottopaketin voi ladata.",
   nowGateApproved: "Gate {n} on jo hyväksytty. Jatka seuraavaan vaiheeseen.",
@@ -1552,6 +1555,7 @@ const en: Dict = {
     "Download the deployment package from the {poc} tab and check its documentation.",
   ],
   nowGate3Run: "The test succeeded. Check the result on the {poc} tab, then choose {approve} or {request} at the bottom.",
+  nowGate3Changed: "The PoC package changed after the test that succeeded. Run the test again on the {poc} tab, and the test run can be approved.",
   nowDone: "Every gate is approved. Download the deployment package, or try the solution on your own cases.",
   nowDoneNoRun: "Every gate is approved. Run a test on the {poc} tab, and the deployment package can be downloaded.",
   nowGateApproved: "Gate {n} is already approved. Move on to the next step.",

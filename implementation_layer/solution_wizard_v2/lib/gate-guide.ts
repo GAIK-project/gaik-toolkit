@@ -12,7 +12,9 @@ export const MISSING_ANSWER_MAX = 2000;
  * Gate 3, and on the PoC step before it, it follows the test run, which is the
  * real task until one has succeeded. After that the decision is all that is
  * left, and on a wide screen the bar that holds it sits far from the result,
- * at the bottom right: the line names its two buttons by their labels. Once
+ * at the bottom right: the line names its two buttons by their labels. Unless
+ * the package changed after that run: the approval then waits for a run of the
+ * package that is there, and the line asks for that run instead. Once
  * Gate 4 is approved there is only the package left to take.
  * On an earlier gate that is already approved (the step came back onto it)
  * there is nothing to check again, only the way on.
@@ -22,6 +24,8 @@ export function nowLine(
   step: number,
   gateStatus: Record<number, GateStatus>,
   hasSuccessfulRun: boolean,
+  /** The package changed after the run that succeeded (Gate 3 waits for a new run). */
+  packageChanged = false,
 ): string {
   // The lines name the workspace tabs by their labels, so a renamed tab stays right.
   const tabs = (line: string) =>
@@ -40,6 +44,7 @@ export function nowLine(
     // The package can be taken only after a run has succeeded.
     return hasSuccessfulRun ? t.nowDone : tabs(t.nowDoneNoRun);
   }
+  if (runWaits && packageChanged) return tabs(t.nowGate3Changed);
   return tabs(runWaits ? t.nowGate3Run : (t.nowSteps[step - 1] ?? ""));
 }
 

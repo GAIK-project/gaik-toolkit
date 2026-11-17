@@ -176,6 +176,12 @@ test.describe("Gate 3 and a package changed after the test run", () => {
     await expect(page.getByTestId("gate-stale-result")).toHaveText(STALE);
     await expect(approve(page)).toBeDisabled();
     await expect(approve(page)).toHaveAccessibleDescription(STALE);
+    // The line under the title asks for the run too, and points at no approval.
+    const nowLine = page.getByTestId("now-line");
+    await expect(nowLine).toHaveText(
+      "PoC-paketti muuttui onnistuneen testiajon jälkeen. Aja testi uudelleen PoC-välilehdellä, niin testiajon voi hyväksyä.",
+    );
+    await expect(nowLine.getByRole("button")).toHaveCount(0);
 
     await page.reload();
     await expect(page.getByTestId("gate-stale-result")).toHaveText(STALE);
@@ -186,6 +192,8 @@ test.describe("Gate 3 and a package changed after the test run", () => {
     await page.reload();
     await expect(page.getByTestId("gate-stale-result")).toHaveCount(0);
     await expect(approve(page)).toBeEnabled();
+    await expect(nowLine).toContainText("valitse sitten alareunasta Hyväksy testiajo tai Pyydä muutoksia.");
+    await expect(nowLine.getByRole("button", { name: "Näytä hyväksyntä sivulla" })).toBeVisible();
   });
 
   test("a session whose run has no digest is approved as before", async ({ page, request, baseURL }) => {

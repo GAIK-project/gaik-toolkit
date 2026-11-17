@@ -63,6 +63,23 @@ describe("nowLine", () => {
     );
   });
 
+  it("after a run of a package that changed since asks for a new run and names no approval", () => {
+    for (const loc of LOCALES) {
+      const t = dictionary(loc);
+      const line = nowLine(t, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true, true);
+      expect(line).toContain(t.wsTabPoc);
+      expect(line).not.toContain(t.gateDecisions[2]);
+      expect(line).not.toContain(t.gateRequestChanges);
+      expect(line).not.toMatch(/\{\w+\}/);
+    }
+    expect(nowLine(fi, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true, true)).toBe(
+      "PoC-paketti muuttui onnistuneen testiajon jälkeen. Aja testi uudelleen PoC-välilehdellä, niin testiajon voi hyväksyä.",
+    );
+    // Only Gate 3 waits for the run: an approved last gate is still done.
+    const done = { ...buildGateStatus(STEP_COUNT), [STEP_COUNT]: "approved" as const };
+    expect(nowLine(fi, STEP_COUNT, done, true, true)).toBe(fi.nowDone);
+  });
+
   it("on an approved gate before the last points onwards instead of asking to check again", () => {
     const approved = { ...buildGateStatus(9), 9: "approved" as const };
     expect(nowLine(fi, 9, approved, false)).toBe("Gate 2 on jo hyväksytty. Jatka seuraavaan vaiheeseen.");

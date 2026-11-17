@@ -111,6 +111,7 @@ export default async function SessionPage({
         : session.step,
     session.gateStatus,
     Boolean(session.lastSuccessfulRun),
+    packageChanged,
   );
 
   // The requirement questions come from the backend (session.requirements) and
@@ -295,8 +296,9 @@ export default async function SessionPage({
                   {/* At Gate 3 with a run that passed, the line names the
                       decision; on a wide screen its bar is far off at the
                       bottom right, and this points at it as the chat's
-                      "Näytä sivulla" does. */}
-                  {decisionGate === 3 && session.lastSuccessfulRun && (
+                      "Näytä sivulla" does. Not while the approval waits for
+                      a run of a package changed since. */}
+                  {decisionGate === 3 && session.lastSuccessfulRun && !packageChanged && (
                     <>
                       {" "}
                       <ShowGateButton label={t.gateShowMe} name={t.gateShowMeName} />
