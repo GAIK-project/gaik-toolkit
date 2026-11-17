@@ -826,6 +826,9 @@ test.describe("PoC tab", () => {
       "Lataa käyttöönottopaketti",
       "Aja testi uudelleen",
     ]);
+    // Where the package is taken, the way to try it on one's own computer.
+    await expect(done.getByTestId("poc-test-page-hint")).toContainText("python app.py");
+    await expect(page.getByTestId("poc-test-page-hint")).toHaveCount(1);
     await expect(page.getByTestId("poc-package-status")).toHaveCount(0);
     await expect(page.getByTestId("poc-inputs")).toHaveCount(0);
     await expect(page.getByTestId("poc-refine-hint")).toHaveCount(0);
