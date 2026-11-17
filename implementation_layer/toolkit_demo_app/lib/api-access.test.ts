@@ -237,6 +237,7 @@ test("only runs and result downloads name their user", () => {
   expect(namesItsUser("GET", "/api/luvata-order/pdf/abc")).toBe(true);
   expect(namesItsUser("GET", "/api/dental-transcribe/srt/abc")).toBe(true);
   expect(namesItsUser("GET", "/api/dental-transcribe/vtt/abc")).toBe(true);
+  expect(namesItsUser("GET", "/api/rag/status/abc")).toBe(true);
   expect(namesItsUser("GET", "/api/video-search/videos/abc/thumbnail")).toBe(false);
   expect(namesItsUser("GET", "/api/tabular-agent/status")).toBe(false);
   expect(namesItsUser("GET", "/api/pipeline/pdf/abc/extra")).toBe(false);

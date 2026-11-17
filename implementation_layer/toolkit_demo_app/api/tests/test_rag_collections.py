@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 from api.routers import rag
+from api.utils.result_owner import USER_HEADER, owned_by, remember_owner
 from fastapi import FastAPI, UploadFile
 from fastapi.testclient import TestClient
 from langchain_core.documents import Document
@@ -28,12 +29,16 @@ def client() -> TestClient:
     return TestClient(app)
 
 
-def _add(collection_id: str, *, last_used: float = 0.0, in_flight: int = 0) -> None:
+def _add(
+    collection_id: str, *, last_used: float = 0.0, in_flight: int = 0, owner: str = ""
+) -> None:
+    """A collection; by default owned by "", the user of a test client that sends none."""
     rag.RAG_INSTANCES[collection_id] = SimpleNamespace()
     rag._USAGE[collection_id] = [last_used, in_flight]
+    remember_owner(collection_id, owner)
 
 
-def _index(monkeypatch, collection_id: str | None):
+def _index(monkeypatch, collection_id: str | None, user: str = "u1"):
     workflow = SimpleNamespace(api_config={}, index_chunk_documents=len)
     monkeypatch.setattr(rag, "get_rag_api_config", lambda: {})
     monkeypatch.setattr(rag, "_build_demo_workflow", lambda config, cid: workflow)
@@ -48,6 +53,7 @@ def _index(monkeypatch, collection_id: str | None):
             files=[UploadFile(io.BytesIO(pdf), filename="a.pdf")],
             collection_id=collection_id,
             parser_choice="pymupdf",
+            user=user,
         )
     )
 
@@ -187,7 +193,7 @@ def test_the_api_starts_the_collection_and_session_sweeps(monkeypatch) -> None:
 def test_clear_removes_only_the_collections_the_caller_names(client) -> None:
     _add("mine")
     _add("also-mine")
-    _add("someone-elses")
+    _add("someone-elses", owner="other")
 
     response = client.delete(
         "/rag/clear", params={"collection_ids": ["mine", "also-mine", "unknown"]}
@@ -199,7 +205,7 @@ def test_clear_removes_only_the_collections_the_caller_names(client) -> None:
 
 
 def test_clear_without_ids_clears_nothing(client) -> None:
-    _add("someone-elses")
+    _add("someone-elses", owner="other")
 
     assert client.delete("/rag/clear").status_code == 422
     assert list(rag.RAG_INSTANCES) == ["someone-elses"]
@@ -215,3 +221,54 @@ def test_the_shared_example_is_not_cleared_by_one_visitor(client) -> None:
     client.delete("/rag/clear", params={"collection_ids": [example]})
 
     assert list(rag.RAG_INSTANCES) == [example]
+
+
+def test_a_new_collection_belongs_to_the_user_who_indexed_it(monkeypatch) -> None:
+    collection = _index(monkeypatch, None, user="u1").collection_id
+
+    assert owned_by(collection, "u1") and not owned_by(collection, "u2")
+
+
+def test_indexing_into_another_users_collection_starts_a_new_one(monkeypatch) -> None:
+    theirs = _index(monkeypatch, None, user="u1").collection_id
+
+    mine = _index(monkeypatch, theirs, user="u2").collection_id
+
+    assert mine != theirs and owned_by(mine, "u2")
+
+
+def test_another_user_cannot_query_see_or_clear_a_collection(client) -> None:
+    _add("theirs", owner="u1")
+    other = {USER_HEADER: "u2"}
+
+    queried = client.post(
+        "/rag/query", data={"question": "What?", "collection_id": "theirs"}, headers=other
+    )
+    streamed = client.post(
+        "/rag/query/stream", data={"question": "What?", "collection_id": "theirs"}, headers=other
+    )
+    status = client.get("/rag/status/theirs", headers=other).json()
+    client.delete("/rag/clear/theirs", headers=other)
+    client.delete("/rag/clear", params={"collection_ids": ["theirs"]}, headers=other)
+
+    assert queried.status_code == 404 and streamed.status_code == 404
+    assert status["collection_id"] is None and status["is_ready"] is False
+    assert "theirs" in rag.RAG_INSTANCES  # still there for its owner
+
+
+def test_the_shared_example_answers_every_visitor(client) -> None:
+    example = f"{rag.EXAMPLE_COLLECTION_PREFIX}-pymupdf"
+    rag.RAG_INSTANCES[example] = SimpleNamespace(vector_store=SimpleNamespace(count=lambda: 3))
+    rag._USAGE[example] = [0.0, 0]
+
+    status = client.get(f"/rag/status/{example}", headers={USER_HEADER: "anyone"}).json()
+
+    assert status["collection_id"] == example and status["is_ready"] is True
+
+
+def test_clearing_a_collection_forgets_its_owner(client) -> None:
+    _add("mine", owner="u1")
+
+    client.delete("/rag/clear/mine", headers={USER_HEADER: "u1"})
+
+    assert "mine" not in rag.RAG_INSTANCES and not owned_by("mine", "u1")

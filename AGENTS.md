@@ -152,7 +152,8 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   serves no route that writes the shared video-search index.
   A generated result (PDF, subtitles, tabular session) belongs to the user whose run
   made it: the proxy sends the signed-in user in `X-GAIK-User`, and the API serves the
-  result by id only to that user (`api/utils/result_owner.py`).
+  result by id only to that user (`api/utils/result_owner.py`). A RAG collection belongs
+  to the user who indexed it the same way; the shared example collections serve everyone.
 
 ## docs site (GitHub Pages)
 
