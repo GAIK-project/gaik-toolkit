@@ -47,7 +47,7 @@ class TestSplitIntoChunksPreflight:
             return_value=True,
         ):
             # Will fail at Popen (file doesn't exist), but preflight passes
-            with pytest.raises(RuntimeError, match="No chunks created"):
+            with pytest.raises(RuntimeError, match="could not be created"):
                 split_into_chunks("nonexistent.mp3", specs)
 
 
@@ -164,3 +164,41 @@ class TestSplitIntoChunksRetry:
         assert len(results) == 2
         assert results[0]["metadata"]["index"] == 0
         assert results[1]["metadata"]["index"] == 1
+
+
+class TestSplitIntoChunksNoGaps:
+    """A chunk that cannot be created stops the split instead of leaving a gap."""
+
+    @patch(
+        "gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available",
+        return_value=True,
+    )
+    def test_a_chunk_that_fails_on_retry_raises_with_its_time_range(
+        self, _mock_ffmpeg, tmp_path: Path
+    ):
+        specs = [_make_spec(0, tmp_path), _make_spec(1, tmp_path), _make_spec(2, tmp_path)]
+        specs[2].is_last = True
+        attempts: list[str] = []
+
+        def fake_popen(cmd, **kwargs):
+            chunk_path = Path(cmd[-1])
+            attempts.append(chunk_path.name)
+            mock = MagicMock()
+            if chunk_path.name == "chunk_01.mp3":
+                mock.returncode = 1
+                mock.communicate.return_value = ("", "decode error")
+            else:
+                chunk_path.write_bytes(b"\x00" * 200_000)
+                mock.returncode = 0
+                mock.communicate.return_value = ("", "")
+            return mock
+
+        with patch("subprocess.Popen", side_effect=fake_popen):
+            with pytest.raises(RuntimeError) as raised:
+                split_into_chunks(str(tmp_path / "input.mp3"), specs)
+
+        message = str(raised.value)
+        assert "1 of 3 chunks could not be created" in message
+        assert "(0:00:55-0:02:00)" in message
+        assert "decode error" in message
+        assert attempts.count("chunk_01.mp3") == 2  # the parallel pass and the retry

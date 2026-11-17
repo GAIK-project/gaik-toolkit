@@ -33,6 +33,12 @@ FFPROBE_TIMEOUT_SECONDS = PROBE_TIMEOUT_SECONDS
 DECODE_TIMEOUT_SECONDS = 600
 
 
+def _clock(seconds: float) -> str:
+    """``seconds`` as ``H:MM:SS``, for naming a stretch of a recording."""
+    whole = int(seconds)
+    return f"{whole // 3600}:{whole % 3600 // 60:02d}:{whole % 60:02d}"
+
+
 # ---------------------------------------------------------------------------
 # Availability check
 # ---------------------------------------------------------------------------
@@ -358,7 +364,9 @@ def split_into_chunks(
 ) -> list[dict]:
     """Split an audio file into chunks using parallel FFmpeg processes.
 
-    Failed chunks are retried sequentially before giving up.
+    Failed chunks are retried sequentially before giving up. A chunk that still
+    fails stops the split, so a transcript never comes back with a stretch of
+    the recording silently missing.
 
     Args:
         audio_file_path: Source audio (or video when *strip_video* is True).
@@ -372,7 +380,8 @@ def split_into_chunks(
         sorted by chunk index.
 
     Raises:
-        RuntimeError: If ffmpeg is not available or no chunks are created.
+        RuntimeError: If ffmpeg is not available, or a chunk cannot be created
+            even on retry; the message names the missing time ranges.
     """
     if not check_ffmpeg_available():
         raise RuntimeError("ffmpeg/ffprobe not found on PATH")
@@ -537,10 +546,16 @@ def split_into_chunks(
         len(failed),
     )
 
-    if not successful:
-        error_msgs = [r["error"] for r in failed]
-        detail = "; ".join(error_msgs[:5]) if error_msgs else "unknown"
-        raise RuntimeError(f"No chunks created. Errors: {detail}")
+    if failed:
+        missing = ", ".join(
+            f"{_clock(spec.actual_start)}-{_clock(spec.actual_start + spec.duration)}"
+            for spec in sorted((specs[r["index"]] for r in failed), key=lambda s: s.index)
+        )
+        detail = "; ".join(r["error"] for r in failed[:5])
+        raise RuntimeError(
+            f"{len(failed)} of {total_specs} chunks could not be created, so the "
+            f"recording would be transcribed with gaps ({missing}). Errors: {detail}"
+        )
 
     # Save metadata for overlap deduplication
     metadata_path = output_dir / "chunk_metadata.json"

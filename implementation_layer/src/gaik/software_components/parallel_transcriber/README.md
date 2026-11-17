@@ -113,6 +113,11 @@ holds no length (a WebM a browser wrote while recording) is measured by decoding
 audio, and a recording whose length cannot be read at all is refused. Every ffprobe
 call has a 60-second timeout, decoding a 10-minute one.
 
+A chunk that FFmpeg cannot create, even on its sequential retry, stops the run with a
+`RuntimeError` that names the missing time ranges, so a transcript never comes back with
+a stretch of the recording silently left out. A chunk whose transcription fails after its
+retries stops the run too.
+
 ### TranscriptionConfig
 
 All parameters with sensible defaults. Key fields:

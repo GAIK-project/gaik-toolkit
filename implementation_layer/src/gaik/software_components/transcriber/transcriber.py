@@ -158,6 +158,12 @@ class Transcriber:
     first call. The duration is read with ffprobe (with a timeout) or, when
     ffprobe cannot read it, from the decoded audio. ``max_size_mb`` and
     ``max_duration_seconds`` only decide when a file is split into chunks.
+
+    When a chunk of a split recording cannot be transcribed, ``transcribe``
+    raises a :class:`RuntimeError` naming its time range, and the remaining
+    chunks are not sent. With ``allow_partial=True`` the transcript comes back
+    with a ``[Transcription failed for segment N]`` line under that chunk's
+    timestamp instead.
     """
 
     def __init__(
@@ -181,6 +187,7 @@ class Transcriber:
         local_api_base: str | None = None,
         local_api_key: str | None = None,
         limits: InputLimits | None = None,
+        allow_partial: bool = False,
     ) -> None:
         _audio_provider(api_config)
         if transcription_model == "whisper_local" and local_api_base:
@@ -191,6 +198,7 @@ class Transcriber:
                 what="local_api_base",
             )
         self.limits = limits or InputLimits()
+        self.allow_partial = allow_partial
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
@@ -426,6 +434,7 @@ class Transcriber:
                 transcription_model=transcription_model,
                 usage=usage,
                 language=self.language,
+                allow_partial=self.allow_partial,
             )
 
         print("Transcribing in a single request (original file)...")
@@ -521,12 +530,19 @@ def split_and_transcribe_with_context(
     transcription_model: str | None = None,
     usage: UsageCounter | None = None,
     language: str | None = None,
+    allow_partial: bool = False,
 ):
     """Split audio into chunks and transcribe with rolling context.
 
     ``usage``, if given, gets the usage of every chunk request added to it.
     ``language``, a two-letter ISO-639-1 code, goes with every chunk request;
     ``None`` or ``"auto"`` sends none, so the provider detects the language.
+
+    A chunk that cannot be transcribed raises a :class:`RuntimeError` naming its
+    time range, and the remaining chunks are not sent. With
+    ``allow_partial=True`` the chunk is marked
+    ``[Transcription failed for segment N]`` under its timestamp and the rest
+    are transcribed.
     """
 
     _audio_provider(api_config)
@@ -587,6 +603,12 @@ def split_and_transcribe_with_context(
                     time.sleep(1)
             except Exception as exc:
                 print(f"Error transcribing chunk {i + 1}: {type(exc).__name__}")
+                if not allow_partial:
+                    raise RuntimeError(
+                        f"Segment {i + 1} of {num_chunks} ({start_time} - {end_time}) could "
+                        f"not be transcribed ({type(exc).__name__}); pass allow_partial=True "
+                        "to get the transcript with this segment marked as failed."
+                    ) from exc
                 transcripts.append(f"{chunk_header}[Transcription failed for segment {i + 1}]")
                 time.sleep(5)
             else:

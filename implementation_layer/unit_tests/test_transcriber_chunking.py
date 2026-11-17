@@ -260,7 +260,11 @@ class _SliceableFakeAudio(_FakeAudio):
 
 
 def _chunk_requests(
-    tmp_path: Path, base_prompt: str | None, transcripts: list[str | Exception]
+    tmp_path: Path,
+    base_prompt: str | None,
+    transcripts: list[str | Exception],
+    *,
+    allow_partial: bool = False,
 ) -> list[dict[str, object]]:
     """Transcribe three chunks; each request returns (or raises) the next item."""
     audio_path = tmp_path / "long.mp3"
@@ -287,9 +291,90 @@ def _chunk_requests(
             audio=_SliceableFakeAudio(duration_ms=120_000),
             base_prompt=base_prompt,
             transcription_model="gpt-4o-transcribe",
+            allow_partial=allow_partial,
         )
     assert len(requests) == 3
     return requests
+
+
+def _three_chunks(tmp_path: Path, replies: list[str | Exception], **options: object):
+    """Run three chunks; returns (requests, transcript), or (requests, raised error)."""
+    audio_path = tmp_path / "long.mp3"
+    audio_path.write_bytes(b"tiny")
+    requests: list[dict[str, object]] = []
+
+    def create_request(**kwargs: object) -> SimpleNamespace:
+        requests.append({key: value for key, value in kwargs.items() if key != "file"})
+        outcome = replies[len(requests) - 1]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return SimpleNamespace(text=outcome, usage=None)
+
+    with (
+        patch("gaik.software_components.transcriber.transcriber.create_openai_client") as factory,
+        patch("gaik.software_components.transcriber.transcriber.time.sleep"),
+    ):
+        factory.return_value.audio.transcriptions.create.side_effect = create_request
+        try:
+            outcome = split_and_transcribe_with_context(
+                str(audio_path),
+                {"use_azure": False, "api_key": "test-key"},
+                max_size_mb=100,
+                max_duration_seconds=60,
+                audio=_SliceableFakeAudio(duration_ms=120_000),
+                transcription_model="gpt-4o-transcribe",
+                **options,
+            )
+        except RuntimeError as error:
+            outcome = error
+    return requests, outcome
+
+
+def test_a_failed_chunk_raises_with_its_time_range_and_the_rest_are_not_sent(tmp_path: Path):
+    requests, outcome = _three_chunks(tmp_path, ["One", RuntimeError("provider error"), "Three"])
+
+    assert isinstance(outcome, RuntimeError)
+    assert "Segment 2 of 3 (00:40 - 01:20)" in str(outcome)
+    assert "provider error" not in str(outcome)
+    assert isinstance(outcome.__cause__, RuntimeError)
+    assert len(requests) == 2
+
+
+def test_allow_partial_marks_the_failed_chunk_and_transcribes_the_rest(tmp_path: Path):
+    requests, outcome = _three_chunks(
+        tmp_path, ["One", RuntimeError("provider error"), "Three"], allow_partial=True
+    )
+
+    assert len(requests) == 3
+    assert "[Timestamp: 00:40 - 01:20]\n[Transcription failed for segment 2]" in outcome
+    assert "One" in outcome and "Three" in outcome
+
+
+@pytest.mark.parametrize("allow_partial", [False, True])
+def test_the_transcriber_passes_allow_partial_to_the_chunked_path(
+    tmp_path: Path, allow_partial: bool
+):
+    audio = tmp_path / "long.mp3"
+    audio.write_bytes(b"tiny")
+    transcriber = Transcriber(
+        {"use_azure": False, "api_key": "test-key"},
+        output_dir=tmp_path / "w",
+        allow_partial=allow_partial,
+    )
+    with (
+        patch.object(transcriber, "_needs_chunking", return_value=True),
+        patch(
+            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            return_value=_SliceableFakeAudio(duration_ms=1_000),
+        ),
+        patch(
+            "gaik.software_components.transcriber.transcriber.split_and_transcribe_with_context",
+            return_value="text",
+        ) as split,
+    ):
+        transcriber._transcribe_input_remote(audio, None, "gpt-4o-transcribe")
+
+    assert split.call_args.kwargs["allow_partial"] is allow_partial
 
 
 _CONTEXT = "Matti Virtanen, pumppu P-17"
@@ -307,7 +392,8 @@ _CONTEXT = "Matti Virtanen, pumppu P-17"
             "Transcript 1",
             [_CONTEXT, f"{_CONTEXT}\nTranscript 1", f"{_CONTEXT}\nTranscript 2"],
         ),
-        # After a failed first chunk there is no transcript to continue from.
+        # With allow_partial, after a failed first chunk there is no transcript to
+        # continue from.
         (None, RuntimeError("first chunk failed"), [None, None, "Transcript 2"]),
         (
             _CONTEXT,
@@ -322,7 +408,12 @@ def test_every_chunk_gets_the_caller_context_before_the_previous_transcript(
     first_chunk: str | Exception,
     expected_prompts: list[str | None],
 ):
-    requests = _chunk_requests(tmp_path, base_prompt, [first_chunk, "Transcript 2", "Transcript 3"])
+    requests = _chunk_requests(
+        tmp_path,
+        base_prompt,
+        [first_chunk, "Transcript 2", "Transcript 3"],
+        allow_partial=isinstance(first_chunk, Exception),
+    )
 
     # None means the request carries no prompt at all, not an empty one.
     assert [request.get("prompt", None) for request in requests] == expected_prompts
