@@ -11,8 +11,11 @@ A service that passes its configuration explicitly, or that does not want a stra
 environment it was given.
 
 The file is looked up as python-dotenv's ``load_dotenv()`` does from gaik's own
-modules, walking up from the installed package: for a virtual environment inside a
-project, that finds the project's ``.env``.
+modules: walking up from the installed package (for a virtual environment inside a
+project, that finds the project's ``.env``), or, in a notebook, ``python -c``, a
+debugger or a coverage run, walking up from the working directory at the first call.
+A file found there can set provider keys and endpoints; a service sets
+``GAIK_NO_DOTENV=1``.
 """
 
 from __future__ import annotations

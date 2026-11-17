@@ -25,8 +25,6 @@ import os
 import httpcore
 import httpx
 
-from gaik.software_components.env_file import load_env_file
-
 from .policy import UrlPolicy
 
 
@@ -66,7 +64,6 @@ def environment_proxy_mounts() -> dict[str, httpx.BaseTransport | None]:
     A ``NO_PROXY`` host maps to ``None``: the client's own transport, the vetted
     one, handles it.
     """
-    load_env_file()
     try:
         from httpx._utils import get_environment_proxies
     except ImportError as exc:  # an httpx that moved the helper

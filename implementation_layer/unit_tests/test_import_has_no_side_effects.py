@@ -166,3 +166,26 @@ def test_the_report_skill_reads_llm_provider_from_dotenv():
     )
 
     assert result["provider"] == "anthropic"
+
+
+def test_the_scraper_and_the_jev_classifier_read_no_dotenv():
+    # Neither read a .env before; a planted file must not set their proxy or endpoint.
+    result = _run(
+        """
+        try:
+            from gaik.software_components.web_scraper.connect import environment_proxy_mounts
+            environment_proxy_mounts()
+        except ImportError:
+            pass
+        try:
+            from gaik.software_components.jev_classifier import JevClassifier
+            JevClassifier(api_key="k", base_url="https://example.test")
+        except ImportError:
+            pass
+        except Exception:
+            pass
+        print(json.dumps({"loads": len(loads)}))
+        """
+    )
+
+    assert result["loads"] == 0

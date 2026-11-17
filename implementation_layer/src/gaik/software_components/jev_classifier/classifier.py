@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from gaik.software_components.endpoints import check_endpoint, log_endpoint
-from gaik.software_components.env_file import load_env_file
 
 from ..input_limits import InputLimits
 
@@ -108,7 +107,6 @@ class JevClassifier:
             ...     base_url="https://gaik-decide.2.rahtiapp.fi",
             ... )
         """
-        load_env_file()
         self.model = model
         self.limits = limits
         if client is not None:
