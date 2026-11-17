@@ -1,4 +1,5 @@
 import type { NextRequest, NextResponse } from "next/server";
+import { isAnalyticsPath } from "./analytics-path";
 import { isApiPath } from "./backend-target";
 import { routedPath } from "./request-path";
 
@@ -109,7 +110,7 @@ export function buildCsp({
  */
 export function isPagePath(pathname: string): boolean {
   const path = routedPath(pathname) ?? pathname;
-  return !isApiPath(path) && path !== "/a" && !path.startsWith("/a/");
+  return !isApiPath(path) && !isAnalyticsPath(path);
 }
 
 /**

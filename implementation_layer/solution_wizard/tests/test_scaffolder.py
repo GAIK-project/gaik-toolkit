@@ -302,6 +302,7 @@ def test_pip_requirements_audio_components():
 @pytest.mark.parametrize(
     "template",
     sorted((Path(__file__).parent.parent / "templates" / "poc").glob("*/run_poc.py.tmpl")),
+    ids=lambda path: path.parent.name,
 )
 def test_run_poc_templates_read_only_their_own_env_file(template):
     """The PoC loads the .env beside run_poc.py, never one found in a parent folder,

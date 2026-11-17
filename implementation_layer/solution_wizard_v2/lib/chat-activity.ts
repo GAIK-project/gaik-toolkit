@@ -62,6 +62,12 @@ export type ChatPanelLabels = {
   gatePlaceholder: string;
   /** Accessible name of the button that removes the reference chip. */
   referenceRemove: string;
+  /** In place of the send button while a reply is being written. */
+  stop: string;
+  /** The same button once it is pressed, until the reply has ended. */
+  stopping: string;
+  /** Under a reply the user stopped. */
+  stopped: string;
   /** Group name of the background choice. */
   background: string;
   nonTechnical: string;

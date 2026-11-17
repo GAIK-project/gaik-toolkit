@@ -44,9 +44,9 @@ _TYPE_MAP: dict[str, str] = {
     # "dict"/"object" intentionally omitted: bare Python dict produces
     # Optional[dict] which Azure OpenAI's structured-output API rejects
     # (requires additionalProperties:false on every object).
-    # The wizard must define a named Pydantic sub-model with
-    # model_config = ConfigDict(extra='forbid') for each nested object field.
-    # Until then the field is typed as str so the PoC at least parses.
+    # A list of records is described under the spec's `nested` key instead,
+    # which gives a named row model (see NESTED_KEY). A field typed object or
+    # dict without one is typed as str so the PoC at least parses.
     "object": "str",
     "dict": "str",
     "enum": "str",
@@ -172,10 +172,7 @@ def build_requirements_text(target_output_spec: dict[str, Any]) -> str:
     """
     target_output_spec = _normalize_spec(target_output_spec)
     fields: list[str] = target_output_spec.get("fields", [])
-    field_types: dict[str, str] = target_output_spec.get("field_types", {})
     required_fields: list[str] = target_output_spec.get("required_fields", [])
-    field_descriptions: dict[str, str] = target_output_spec.get("field_descriptions", {})
-    allowed_values: dict[str, list[str]] = target_output_spec.get("allowed_values", {})
     missing_value_policy: str = target_output_spec.get(
         "missing_value_policy", 'Return an empty string ("") if the value is not present.'
     )
@@ -185,24 +182,50 @@ def build_requirements_text(target_output_spec: dict[str, Any]) -> str:
         f"If a field cannot be determined, apply this policy: {missing_value_policy}\n",
     ]
 
+    nested = _nested_specs(target_output_spec)
     for i, field in enumerate(fields, 1):
+        req_marker = "REQUIRED" if field in required_fields else "OPTIONAL"
+        if field in nested:
+            # A list of rows: its type is the rows', and each row field is listed.
+            row = _normalize_spec(nested[field])
+            desc = _container_description(target_output_spec, field).rstrip(". ")
+            line = f"{i}. {field} (list of rows, {req_marker})"
+            lines.append(line + (f": {desc}" if desc else "") + ". Each row has:")
+            lines += [f"   {item}" for item in _field_lines(row, "-")]
+            continue
+        lines += [f"{i}. {item}" for item in _field_lines(target_output_spec, None, [field])]
+
+    return "\n".join(lines)
+
+
+def _field_lines(
+    spec: dict[str, Any], marker: str | None, only: list[str] | None = None
+) -> list[str]:
+    """One requirements line per field: name, type, REQUIRED or OPTIONAL, description,
+    allowed values. ``marker`` starts each line (a list bullet), ``only`` picks fields."""
+    field_types: dict[str, str] = spec.get("field_types", {})
+    required_fields: list[str] = spec.get("required_fields", [])
+    field_descriptions: dict[str, str] = spec.get("field_descriptions", {})
+    allowed_values: dict[str, list[str]] = spec.get("allowed_values", {})
+    lines = []
+    for field in only if only is not None else spec.get("fields", []):
         req_marker = "REQUIRED" if field in required_fields else "OPTIONAL"
         type_str = field_types.get(field, "string")
         desc = field_descriptions.get(field, "")
         allowed = allowed_values.get(field, [])
 
-        line = f"{i}. {field} ({type_str}, {req_marker})"
+        line = f"{marker} " if marker else ""
+        line += f"{field} ({type_str}, {req_marker})"
         if desc:
             line += f": {desc}"
         if allowed:
             line += f" -- allowed values: {', '.join(str(v) for v in allowed)}"
         lines.append(line)
+    return lines
 
-    return "\n".join(lines)
 
-
-#: Key under which a spec describes the shape of a repeated child collection.
-#: The rest of the spec is flat — `fields` is a list of names — so a field whose
+#: Key under which a spec describes the rows of a repeated child collection.
+#: The rest of the spec is flat -- `fields` is a list of names -- so a field whose
 #: value is a list of records had nowhere to say what a record contains, and
 #: `_TYPE_MAP` typed it `str` "so the PoC at least parses". That is what turned
 #: a purchase order's line items into one text field.
@@ -227,6 +250,13 @@ def _nested_specs(target_output_spec: dict[str, Any]) -> dict[str, dict[str, Any
     }
 
 
+def _container_description(target_output_spec: dict[str, Any], container: str) -> str:
+    """What one list of rows holds: the field's description, else the row block's own."""
+    descriptions = target_output_spec.get("field_descriptions") or {}
+    row = _nested_specs(target_output_spec).get(container) or {}
+    return str(descriptions.get(container) or row.get("description") or "")
+
+
 def nested_row_fields(target_output_spec: dict[str, Any]) -> dict[str, list[str]]:
     """The field names of each nested collection's rows, keyed by container field.
 
@@ -239,16 +269,105 @@ def nested_row_fields(target_output_spec: dict[str, Any]) -> dict[str, list[str]
     }
 
 
+#: Words that end like a plural but are not one, or whose singular is themselves.
+_NOT_PLURAL_ENDINGS = ("ss", "us", "is")
+_SAME_SINGULAR = {"series", "species", "news", "data"}
+
+
 def _child_model_name(container: str) -> str:
     """``line_items`` -> ``LineItem``. Singular, because the class is one row."""
     words = [w for w in container.split("_") if w]
     if words:
         last = words[-1]
-        if len(last) > 3 and last.endswith("ies"):
+        if last.lower() in _SAME_SINGULAR or last.lower().endswith(_NOT_PLURAL_ENDINGS):
+            pass  # status, analysis, address and series stay as they are
+        elif len(last) > 3 and last.endswith("ies"):
             words[-1] = last[:-3] + "y"  # entries -> entry
-        elif len(last) > 2 and last.endswith("s") and not last.endswith("ss"):
-            words[-1] = last[:-1]  # items -> item, but address stays
+        elif len(last) > 2 and last.endswith("s"):
+            words[-1] = last[:-1]  # items -> item
     return "".join(w.title() for w in words) or "Item"
+
+
+#: Names the generated module imports or defines besides its models and Enums,
+#: and the capitalised keywords: a generated class takes none of them.
+_MODULE_NAMES = frozenset(
+    {
+        "Annotated",
+        "BaseModel",
+        "BeforeValidator",
+        "ConfigDict",
+        "Decimal",
+        "DecimalField",
+        "Enum",
+        "False",
+        "Field",
+        "List",
+        "None",
+        "Optional",
+        "OptionalDecimalField",
+        "True",
+        "WithJsonSchema",
+    }
+)
+
+
+def _claim(base: str, taken: set[str]) -> str:
+    """``base``, or ``base`` with a number when the module already has that name."""
+    name, n = base, 2
+    while name in taken:
+        name, n = f"{base}{n}", n + 1
+    taken.add(name)
+    return name
+
+
+def _model_plan(target_output_spec: dict[str, Any], name: str) -> list[dict[str, Any]]:
+    """Every model class the spec defines and its class names, row models first.
+
+    One walk names all classes of the generated module, so the source
+    (build_pydantic_model) and the model built from data (_model_from_spec) use
+    the same names, and no two classes share one: a parent field and a row field
+    both called ``status`` get ``StatusEnum`` and ``LineItemStatusEnum``. Rows
+    are one level deep, as gaik's CompositeExtractionRequirements are.
+    """
+    taken = set(_MODULE_NAMES) | {name}
+    plans: list[dict[str, Any]] = []
+
+    def walk(spec: dict[str, Any], model_name: str, prefix: str, row: bool) -> None:
+        spec = _normalize_spec(spec)
+        fields: list[str] = spec.get("fields", [])
+        # Names go into the source as written; descriptions and allowed values go in
+        # as string literals (repr), so no text from the spec can end one.
+        _source_name(model_name, "class name")
+        for field in fields:
+            _source_name(field, "field name")
+        nested = _nested_specs(spec)
+        # A container is a list of rows: allowed values on it name no Enum.
+        enums = _enum_names(
+            [f for f in fields if f not in nested], spec.get("allowed_values", {}), prefix, taken
+        )
+        if nested and row:
+            raise ValueError(
+                f"the rows of {model_name} have rows of their own ({', '.join(nested)}); "
+                "only one level of nested rows is supported"
+            )
+        children: dict[str, str] = {}
+        for container, child_spec in nested.items():
+            child = _claim(_child_model_name(container), taken)
+            walk(child_spec, child, child, True)
+            children[container] = child
+        plans.append(
+            {"name": model_name, "spec": spec, "enums": enums, "children": children, "row": row}
+        )
+
+    walk(target_output_spec, name, "", False)
+    return plans
+
+
+def check_schema_names(target_output_spec: dict[str, Any], name: str) -> None:
+    """Raise ValueError when the spec cannot become a schema module: a class or field
+    name the source cannot carry, or rows inside rows. The scaffolder runs it before it
+    writes any file."""
+    _model_plan(target_output_spec, name)
 
 
 def _safe_enum_member(v: str) -> str:
@@ -284,22 +403,31 @@ def _enum_name(field: str) -> str:
     return "".join(w.title() for w in field.split("_")) + "Enum"
 
 
-def _enum_names(fields: list[str], allowed_values: dict[str, Any]) -> dict[str, str]:
+def _enum_names(
+    fields: list[str],
+    allowed_values: dict[str, Any],
+    prefix: str = "",
+    taken: set[str] | None = None,
+) -> dict[str, str]:
     """The Enum class name per field with allowed values, each name used once.
 
     Two fields can give the same name ("a_b" and "a__b" both give ABEnum); the
-    later one gets a number, so neither Enum replaces the other.
+    later one gets a number, so neither Enum replaces the other. ``taken`` holds
+    the module's other class names, and gets these added; ``prefix`` is a row
+    model's name, so its Enums say whose they are.
     """
+    used = taken if taken is not None else set()
     names: dict[str, str] = {}
     for field in fields:
         vals = allowed_values.get(field, [])
         if not (vals and all(isinstance(v, str) for v in vals)):
             continue
-        base = _enum_name(field)
+        base = prefix + _enum_name(field)
         name, n = base, 2
-        while name in names.values():
+        while name in names.values() or name in used:
             name, n = f"{base[: -len('Enum')]}{n}Enum", n + 1
         names[field] = name
+        used.add(name)
     return names
 
 
@@ -310,95 +438,48 @@ def _source_name(value: Any, what: str) -> str:
     return value
 
 
-def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | None = None) -> str:
-    """Generate output_schema.py content -- a typed Pydantic model.
+def _model_source(plan: dict[str, Any]) -> tuple[list[str], bool]:
+    """The Enum classes and the model class of one planned model, and whether the
+    model needs the Decimal helper."""
+    spec = plan["spec"]
+    fields: list[str] = spec.get("fields", [])
+    field_types: dict[str, str] = spec.get("field_types", {})
+    required_fields: list[str] = spec.get("required_fields", [])
+    field_descriptions: dict[str, str] = spec.get("field_descriptions", {})
+    allowed_values: dict[str, Any] = spec.get("allowed_values", {})
+    enum_names: dict[str, str] = plan["enums"]
+    children: dict[str, str] = plan["children"]
 
-    This is a documentation/reference artefact.  The runtime uses it as a
-    schema hint; the GAIK module generates its own internal schema from the
-    user_requirements string.
-    """
-    target_output_spec = _normalize_spec(target_output_spec)
-    fields: list[str] = target_output_spec.get("fields", [])
-    field_types: dict[str, str] = target_output_spec.get("field_types", {})
-    required_fields: list[str] = target_output_spec.get("required_fields", [])
-    field_descriptions: dict[str, str] = target_output_spec.get("field_descriptions", {})
-    allowed_values: dict[str, Any] = target_output_spec.get("allowed_values", {})
-    name = schema_name or target_output_spec.get("schema_name") or "OutputSchema"
-    # Names go into the source as written; descriptions and allowed values go in
-    # as string literals (repr), so no text from the spec can end one.
-    _source_name(name, "class name")
-    for field in fields:
-        _source_name(field, "field name")
-
-    # Do NOT include `from __future__ import annotations` (PEP 563).
-    # That import defers all annotation evaluation, turning Optional[str] into
-    # the string "Optional[str]". Pydantic v2 cannot resolve deferred strings
-    # back to real types and raises "not fully defined". Eager evaluation (the
-    # default without that import) is required for Pydantic v2 to build the
-    # model correctly.
-    nested = _nested_specs(target_output_spec)
-
-    imports = ["from pydantic import BaseModel, ConfigDict, Field"]
-    has_optional = any(f not in required_fields for f in fields)
-    has_enum = any(f in allowed_values for f in fields)
-    typing_names = []
-    if has_optional:
-        typing_names.append("Optional")
-    if nested:
-        typing_names.append("List")
-    if typing_names:
-        imports.append(f"from typing import {', '.join(sorted(typing_names))}")
-    if has_enum:
-        imports.append("from enum import Enum")
-
-    # Each child collection becomes its own named model. Azure OpenAI's
-    # structured output rejects a bare dict — it requires additionalProperties
-    # false on every object — which is why a named model with extra='forbid' is
-    # the shape that works, and why typing the field `str` was the stand-in.
-    child_blocks: list[str] = []
-    child_needs_decimal = False
-    for container, child_spec in nested.items():
-        child_source = build_pydantic_model(child_spec, _child_model_name(container))
-        # Keep only the class definitions from the child's own module source:
-        # its imports, docstring and the shared Decimal helper belong to the
-        # parent file, which emits them once for everyone.
-        if "DecimalField" in child_source:
-            child_needs_decimal = True
-        lines = child_source.splitlines()
-        start = next(i for i, ln in enumerate(lines) if ln.startswith("class "))
-        child_blocks.append("\n".join(lines[start:]).rstrip() + "\n")
-
-    enum_names = _enum_names(fields, allowed_values)
-    enum_blocks = []
+    blocks = []
     for field in fields:
         vals = allowed_values.get(field, [])
         if field in enum_names:
             enum_name = enum_names[field]
             members = "\n".join(f"    {m} = {v!r}" for m, v in _enum_members(vals))
-            enum_blocks.append(f"class {enum_name}(str, Enum):\n{members}\n")
+            blocks.append(f"class {enum_name}(str, Enum):\n{members}\n")
 
     field_lines = []
     needs_decimal_helper = False
     for field in fields:
-        if field in nested:
-            child = _child_model_name(field)
-            desc = str(field_descriptions.get(field) or "")
-            arg = f"Field(description={desc!r})" if desc else "..."
+        desc = str(field_descriptions.get(field) or "")
+        if field in children:
+            # A list of rows, never None: an output without rows has an empty list.
+            child = children[field]
+            desc = _container_description(spec, field)
             if field in required_fields:
-                field_lines.append(f"    {field}: List[{child}] = {arg}")
+                arg = f"Field(description={desc!r})" if desc else "..."
             else:
-                default = (
+                arg = (
                     f"Field(default_factory=list, description={desc!r})"
                     if desc
                     else "Field(default_factory=list)"
                 )
-                field_lines.append(f"    {field}: List[{child}] = {default}")
+            field_lines.append(f"    {field}: List[{child}] = {arg}")
             continue
         py_type = _py_type(field_types.get(field, "string"))
         if field in enum_names:
             py_type = enum_names[field]
 
-        desc = str(field_descriptions.get(field) or "")
         # Use Field(description=...) so the description propagates into JSON Schema
         field_arg = f"Field(description={desc!r})" if desc else "..."
         is_decimal = py_type == "Decimal"
@@ -422,11 +503,64 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
             default_arg = f"Field(default=None, description={desc!r})" if desc else "None"
             field_lines.append(f"    {field}: Optional[{py_type}] = {default_arg}")
 
-    if child_needs_decimal:
-        needs_decimal_helper = True
-
     body = "\n".join(field_lines) if field_lines else "    pass"
+    lines = [f"class {plan['name']}(BaseModel):"]
+    if plan["row"]:
+        # A row is a named model that forbids other keys, as SKILL.md asks for every
+        # nested object (a bare dict is rejected by Azure's structured output).
+        lines += ["    model_config = ConfigDict(extra='forbid')", ""]
+    lines.append(body)
+    blocks.append("\n".join(lines) + "\n")
+    # Pydantic v2 requires model_rebuild() when the model references
+    # types (e.g. Enums, or the Decimal safety aliases) defined in the same
+    # module -- a caller that runs this source into a bare dict namespace
+    # otherwise gets "class is not fully defined" for DecimalField /
+    # OptionalDecimalField.
+    if enum_names or needs_decimal_helper or children:
+        blocks.append(f"{plan['name']}.model_rebuild()\n")
+    return blocks, needs_decimal_helper
 
+
+def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | None = None) -> str:
+    """Generate output_schema.py content -- a typed Pydantic model.
+
+    This is a documentation/reference artefact.  The runtime uses it as a
+    schema hint; the GAIK module generates its own internal schema from the
+    user_requirements string. A spec with a ``nested`` block also gets one row
+    model per repeated collection, defined before the model that lists it.
+    """
+    target_output_spec = _normalize_spec(target_output_spec)
+    name = schema_name or target_output_spec.get("schema_name") or "OutputSchema"
+    plans = _model_plan(target_output_spec, name)
+    rows = [plan for plan in plans if plan["row"]]
+
+    # Do NOT include `from __future__ import annotations` (PEP 563).
+    # That import defers all annotation evaluation, turning Optional[str] into
+    # the string "Optional[str]". Pydantic v2 cannot resolve deferred strings
+    # back to real types and raises "not fully defined". Eager evaluation (the
+    # default without that import) is required for Pydantic v2 to build the
+    # model correctly. The imports cover every model in the file, rows included.
+    imports = [f"from pydantic import BaseModel, {'ConfigDict, ' if rows else ''}Field"]
+    typing_names = []
+    if rows:
+        typing_names.append("List")
+    if any(
+        f not in plan["spec"].get("required_fields", [])
+        for plan in plans
+        for f in plan["spec"].get("fields", [])
+    ):
+        typing_names.append("Optional")
+    if typing_names:
+        imports.append(f"from typing import {', '.join(typing_names)}")
+    if any(
+        f in plan["spec"].get("allowed_values", {})
+        for plan in plans
+        for f in plan["spec"].get("fields", [])
+    ):
+        imports.append("from enum import Enum")
+
+    sources = [_model_source(plan) for plan in plans]
+    root_blocks, _ = sources[-1]
     parts = [
         (
             '"""Generated output schema.\n\nGenerated by GAIK Solution Configuration Wizard V2.'
@@ -436,31 +570,17 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
         "\n".join(imports),
         "",
     ]
-    if needs_decimal_helper:
+    if any(needs for _, needs in sources):
         parts += ["", _DECIMAL_HELPER_SOURCE.strip(), ""]
-    # Enum definitions must come before the model class so Pydantic can resolve them
-    if enum_blocks:
-        parts += [""] + enum_blocks
-    if child_blocks:
-        parts += [""] + child_blocks
-    parts += [
-        "",
-        f"class {name}(BaseModel):",
-        # Azure's structured output requires additionalProperties:false on every
-        # object in the schema, which is what extra='forbid' emits.
-        "    model_config = ConfigDict(extra='forbid')",
-        "",
-        body,
-        "",
-    ]
-    # Pydantic v2 requires model_rebuild() when the model references
-    # types (e.g. Enums, or the Decimal safety aliases) defined in the same
-    # module -- a caller that runs this source into a bare dict namespace
-    # otherwise gets "class is not fully defined" for DecimalField /
-    # OptionalDecimalField.
-    if enum_blocks or needs_decimal_helper or child_blocks:
-        parts += [f"{name}.model_rebuild()", ""]
-    return "\n".join(parts)
+    # Enum definitions must come before the model class so Pydantic can resolve them,
+    # and a row model before the model that lists it.
+    root_enums = root_blocks[: len(plans[-1]["enums"])]
+    if root_enums:
+        parts += [""] + root_enums
+    for blocks, _ in sources[:-1]:
+        parts += [""] + blocks
+    parts += ["", *root_blocks[len(root_enums) :]]
+    return "\n".join(parts).rstrip("\n") + "\n"
 
 
 # Maps our field_types vocabulary to the AllowedTypes Literal expected by
@@ -560,20 +680,22 @@ def build_requirements_json(
 
     # CompositeExtractionRequirements: the parent record plus one entry per
     # repeated child collection. gaik's load_schema() already recognises this
-    # shape — it switches on structure_type — so the only thing missing was the
-    # wizard writing it. The container itself is not a parent field: it is the
-    # list the children go into.
-    containers = set(nested)
-    parent_specs = [fs for fs in field_specs if fs["field_name"] not in containers]
+    # shape -- it switches on structure_type. The container itself is not a
+    # parent field: it is the list the children go into.
+    parent_specs = [fs for fs in field_specs if fs["field_name"] not in nested]
     children = []
     for container, child_spec in nested.items():
+        if _nested_specs(_normalize_spec(child_spec)):
+            raise ValueError(
+                f"the {container} rows have rows of their own; only one level of nested "
+                "rows is supported"
+            )
         child = build_requirements_json(child_spec, use_case_name=container)
         children.append(
             {
                 "container_name": container,
                 "container_description": (
-                    child_spec.get("description")
-                    or field_descriptions.get(container)
+                    _container_description(target_output_spec, container)
                     or f"One entry per {container.replace('_', ' ').rstrip('s')}"
                 ),
                 "requirements": child["requirements"],
@@ -625,46 +747,51 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
     ]
     simple = {"str": str, "int": int, "float": float, "bool": bool, "list[str]": list[str]}
 
-    spec = _normalize_spec(target_output_spec)
-    fields: list[str] = spec.get("fields", [])
-    field_types: dict[str, str] = spec.get("field_types", {})
-    required_fields: list[str] = spec.get("required_fields", [])
-    descriptions: dict[str, str] = spec.get("field_descriptions", {})
-    allowed_values: dict[str, Any] = spec.get("allowed_values", {})
-    nested = _nested_specs(spec)
+    models: dict[str, Any] = {}
+    for plan in _model_plan(target_output_spec, name):
+        spec = plan["spec"]
+        fields: list[str] = spec.get("fields", [])
+        field_types: dict[str, str] = spec.get("field_types", {})
+        required_fields: list[str] = spec.get("required_fields", [])
+        descriptions: dict[str, str] = spec.get("field_descriptions", {})
+        allowed_values: dict[str, Any] = spec.get("allowed_values", {})
+        enum_names: dict[str, str] = plan["enums"]
 
-    enum_names = _enum_names(fields, allowed_values)
-    definitions: dict[str, Any] = {}
-    for field in fields:
-        desc = descriptions.get(field, "")
-        required = field in required_fields
-        described = {"description": desc} if desc else {}
-        if field in nested:
-            child = _model_from_spec(nested[field], _child_model_name(field))
-            if required:
-                definitions[field] = (list[child], Field(**described) if desc else ...)
+        definitions: dict[str, Any] = {}
+        for field in fields:
+            desc = descriptions.get(field, "")
+            if field in plan["children"]:
+                desc = _container_description(spec, field)
+            required = field in required_fields
+            described = {"description": desc} if desc else {}
+            if field in plan["children"]:
+                row = models[plan["children"][field]]
+                if required:
+                    definitions[field] = (list[row], Field(**described) if desc else ...)
+                else:
+                    definitions[field] = (list[row], Field(default_factory=list, **described))
+                continue
+            py_type = _py_type(field_types.get(field, "string"))
+            vals = allowed_values.get(field, [])
+            if field in enum_names:
+                kind: Any = Enum(enum_names[field], _enum_members(vals), type=str)
+            elif py_type == "Decimal":
+                kind = decimal_field if required else optional_decimal_field
             else:
-                definitions[field] = (list[child], Field(default_factory=list, **described))
-            continue
-        py_type = _py_type(field_types.get(field, "string"))
-        vals = allowed_values.get(field, [])
-        if field in enum_names:
-            kind: Any = Enum(enum_names[field], _enum_members(vals), type=str)
-        elif py_type == "Decimal":
-            kind = decimal_field if required else optional_decimal_field
-        else:
-            kind = simple.get(py_type, str)
-        if required:
-            definitions[field] = (kind, Field(**described) if desc else ...)
-        elif py_type == "Decimal" and kind is optional_decimal_field:
-            definitions[field] = (kind, Field(default=None, **described) if desc else None)
-        else:
-            definitions[field] = (
-                kind | None,
-                Field(default=None, **described) if desc else None,
-            )
+                kind = simple.get(py_type, str)
+            if required:
+                definitions[field] = (kind, Field(**described) if desc else ...)
+            elif py_type == "Decimal" and kind is optional_decimal_field:
+                definitions[field] = (kind, Field(default=None, **described) if desc else None)
+            else:
+                definitions[field] = (
+                    kind | None,
+                    Field(default=None, **described) if desc else None,
+                )
 
-    return create_model(name, __config__=ConfigDict(extra="forbid"), **definitions)
+        config = {"__config__": ConfigDict(extra="forbid")} if plan["row"] else {}
+        models[plan["name"]] = create_model(plan["name"], **config, **definitions)
+    return models[name]
 
 
 def write_schema_files(

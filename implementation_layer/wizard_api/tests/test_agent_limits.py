@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from wizard_api import config
 from wizard_api.routers.sessions import ChatRequest
 from wizard_api.services import agent_service
+from wizard_api.services.agent_tool_guard import ToolGuard
 
 
 def test_a_chat_message_has_a_maximum_length() -> None:
@@ -76,7 +77,12 @@ def test_the_agent_has_a_turn_limit(tmp_path, monkeypatch) -> None:
         pytest.skip("claude_agent_sdk is not installed")
     monkeypatch.setenv("WIZARD_AGENT_MAX_TURNS", "42")
 
-    assert agent_service._build_options(tmp_path, tmp_path / "out").max_turns == 42
+    assert (
+        agent_service._build_options(
+            tmp_path, tmp_path / "out", guard=ToolGuard(tmp_path, tmp_path / "out")
+        ).max_turns
+        == 42
+    )
 
 
 def test_an_agent_just_handed_to_a_request_is_not_ended(monkeypatch) -> None:

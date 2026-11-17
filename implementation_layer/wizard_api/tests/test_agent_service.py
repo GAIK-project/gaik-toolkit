@@ -11,6 +11,7 @@ import json
 
 import pytest
 from wizard_api.services import agent_service
+from wizard_api.services.agent_tool_guard import ToolGuard
 
 
 def test_sse_frames_match_ui_contract():
@@ -440,9 +441,10 @@ def test_the_notice_exists_in_both_ui_languages():
 
 def test_build_options_pass_the_session_to_resume(tmp_path):
     pytest.importorskip("claude_agent_sdk")
-    options = agent_service._build_options(tmp_path, tmp_path, resume="sdk-123")
+    guard = ToolGuard(tmp_path, tmp_path)
+    options = agent_service._build_options(tmp_path, tmp_path, resume="sdk-123", guard=guard)
     assert options.resume == "sdk-123"
-    assert agent_service._build_options(tmp_path, tmp_path).resume is None
+    assert agent_service._build_options(tmp_path, tmp_path, guard=guard).resume is None
 
 
 def test_the_stream_remembers_the_cli_session_id():
