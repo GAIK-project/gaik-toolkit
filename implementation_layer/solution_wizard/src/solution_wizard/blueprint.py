@@ -218,6 +218,12 @@ PIP_REQUIREMENT_PATTERN = (
     rf"^{_PIP_NAME}(?:\[{_PIP_NAME}(?:,{_PIP_NAME})*\])?"
     rf"(?:{_PIP_SPECIFIER}(?:,{_PIP_SPECIFIER})*)?$"
 )
+#: Projects the PoC installs for itself: gaik, and what the scaffolder writes beside it
+#: in requirements.txt (pydantic, python-dotenv, pyyaml, and reportlab for a PDF
+#: report). A service that named one would pin it against the PoC (``gaik<0.5``,
+#: ``pydantic==1.0``), and pip would then fail or install a version the PoC cannot
+#: run on. Compared as pip compares names (PEP 503).
+POC_OWN_PROJECTS = frozenset({"gaik", "pydantic", "python-dotenv", "pyyaml", "reportlab"})
 ENV_VAR_PATTERN = r"^[A-Z][A-Z0-9_]*$"
 _HTTPS_URL_PATTERN = r"^https://[^\s]+$"
 #: One line of text: no line break or other control character.
@@ -279,6 +285,12 @@ def sends_nothing(data_sent: str) -> bool:
     return text.removesuffix(".").rstrip() in _NOTHING_SENT_WORDINGS
 
 
+def project_name(requirement: str) -> str:
+    """A plain requirement's project name as pip compares it (PEP 503)."""
+    match = re.match(_PIP_NAME, requirement)
+    return re.sub(r"[-_.]+", "-", match.group(0) if match else requirement).lower()
+
+
 def env_name_problem(name: Any) -> str | None:
     """Why ``name`` cannot be an external service's variable, or None when it can."""
     if not isinstance(name, str) or len(name) > 64 or not re.fullmatch(ENV_VAR_PATTERN, name):
@@ -309,8 +321,9 @@ class ExternalService(BaseModel):
         max_length=100,
         description=(
             "The pip requirement the PoC installs, e.g. 'tavily-python>=0.5'. A plain "
-            "PyPI name with optional [extras] and version specifiers; omit it when the "
-            "service is called with what the PoC already has."
+            "PyPI name with optional [extras] and version specifiers, and not one the "
+            "PoC installs for itself (gaik, pydantic, python-dotenv, pyyaml, reportlab); "
+            "omit it when the service is called with what the PoC already has."
         ),
         json_schema_extra={"pattern": PIP_REQUIREMENT_PATTERN},
     )
@@ -367,6 +380,13 @@ class ExternalService(BaseModel):
                 "'tavily-python>=0.5': a name, optional [extras] and optional version "
                 "specifiers, with no spaces; no URL, path, pip option, environment "
                 "marker or line break"
+            )
+        if value is not None and project_name(value) in POC_OWN_PROJECTS:
+            raise ValueError(
+                f"python_package {value!r} names {project_name(value)}, which the PoC "
+                f"installs for itself ({', '.join(sorted(POC_OWN_PROJECTS))}); a service's "
+                "package would pin it against the PoC. Name the service's own package, or "
+                "omit python_package"
             )
         return value
 

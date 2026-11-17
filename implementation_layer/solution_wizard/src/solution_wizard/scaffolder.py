@@ -1391,8 +1391,10 @@ def _requirement_parts(line: str) -> tuple[str, set[str], set[str]]:
 def _external_requirements(blueprint: Blueprint, lines: list[str]) -> list[str]:
     """The external services' packages, each as written, unless it adds nothing.
 
-    pip combines every line of one project: ``pydantic[email]>=2.6`` beside
-    ``pydantic>=2`` adds an extra and a stricter version, so it is kept. A line is
+    The blueprint refuses a service package that names gaik or another project
+    written above (``POC_OWN_PROJECTS``), so no line here pins one of them. pip
+    combines every line of one project: ``requests[socks]>=2.31`` beside
+    ``requests>=2`` adds an extra and a stricter version, so it is kept. A line is
     left out only when the lines already there ask for all its extras and
     specifiers, as an exact duplicate or a bare name does.
     """

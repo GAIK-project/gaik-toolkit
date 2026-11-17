@@ -872,7 +872,7 @@
                   }
                 ],
                 "default": null,
-                "description": "The pip requirement the PoC installs, e.g. 'tavily-python>=0.5'. A plain PyPI name with optional [extras] and version specifiers; omit it when the service is called with what the PoC already has.",
+                "description": "The pip requirement the PoC installs, e.g. 'tavily-python>=0.5'. A plain PyPI name with optional [extras] and version specifiers, and not one the PoC installs for itself (gaik, pydantic, python-dotenv, pyyaml, reportlab); omit it when the service is called with what the PoC already has.",
                 "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?(?:\\[[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?(?:,[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)*\\])?(?:(?:~=|==|!=|<=|>=|<|>)[0-9][0-9A-Za-z.!+*]*(?:,(?:~=|==|!=|<=|>=|<|>)[0-9][0-9A-Za-z.!+*]*)*)?$",
                 "title": "Python Package"
               },

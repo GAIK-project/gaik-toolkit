@@ -122,6 +122,59 @@ def test_a_requirement_that_is_not_plain_is_refused(package) -> None:
 
 
 @pytest.mark.parametrize(
+    "package",
+    [
+        "gaik<0.5",
+        "gaik[extractor]==0.1.0",
+        "GAIK",
+        "pyyaml==5.1",
+        "PyYAML",
+        "pydantic==1.0",
+        "pydantic[email]>=2.6",
+        "python_dotenv",
+        "Python.Dotenv==0.1",
+        "reportlab<4",
+    ],
+)
+def test_a_project_the_poc_installs_for_itself_is_not_a_service_package(package) -> None:
+    """pip would combine the service's line with the PoC's own (gaik<0.5 beside
+    gaik>=0.11.0) and fail, or install a version the PoC cannot run on."""
+    message = _refused(python_package=package)
+
+    assert "which the PoC installs for itself" in message
+    assert "external_services[0].python_package" in message
+
+
+def test_a_package_that_only_starts_like_one_of_the_poc_s_own_is_accepted() -> None:
+    for package in ("gaik-extras-for-x", "pydantic-settings>=2", "pyyaml-include"):
+        services = _blueprint({**SEARCH, "python_package": package}).technical_spec
+        assert services["external_services"][0]["python_package"] == package
+
+
+def test_every_project_the_scaffolder_writes_is_one_a_service_cannot_name(tmp_path) -> None:
+    """The scaffolder's requirements.txt, with the PDF report and every provider extra
+    the example uses: a project added there must be added to POC_OWN_PROJECTS too."""
+    data = _data()
+    data["technical_spec"]["output_types"] = ["json", "pdf"]
+    poc = scaffold_poc(Blueprint.model_validate(data), tmp_path)["poc_dir"]
+    lines = [line for line in _requirements(poc) if line and not line.startswith("#")]
+
+    assert any(line.startswith("reportlab") for line in lines)
+    assert {bp_module.project_name(line) for line in lines} <= bp_module.POC_OWN_PROJECTS
+
+
+def test_a_service_pinning_gaik_after_loading_writes_no_requirements(tmp_path) -> None:
+    bp = _blueprint(SEARCH)
+    bp.technical_spec["external_services"][0]["python_package"] = "gaik<0.5"
+
+    errors, _ = _rule_15(validate(bp))
+    assert errors and "which the PoC installs for itself" in errors[0]
+    with pytest.raises(ValueError, match="which the PoC installs for itself"):
+        scaffold_poc(bp, tmp_path)
+    assert not (tmp_path / "poc" / "requirements.txt").exists()
+
+
+@pytest.mark.parametrize(
     "name",
     [
         "tavily_api_key",
@@ -411,8 +464,8 @@ def test_packages_follow_the_gaik_lines_and_an_exact_duplicate_is_left_out(tmp_p
     services = (
         SEARCH,
         {**SEARCH, "name": "Tavily again", "python_package": "Tavily_Python>=0.5"},
-        {**SEARCH, "name": "YAML", "python_package": "PyYAML"},
         {**SEARCH, "name": "Register lookup", "python_package": "requests[socks]>=2.31"},
+        {**SEARCH, "name": "Register again", "python_package": "requests[SOCKS]"},
         {**SEARCH, "name": "No package", "python_package": None},
     )
 
@@ -428,17 +481,17 @@ def test_a_package_with_extras_or_a_stricter_version_is_kept(tmp_path) -> None:
     services = (
         SEARCH,
         {**SEARCH, "name": "Stricter", "python_package": "tavily-python>=0.6"},
-        {**SEARCH, "name": "E-mail check", "python_package": "pydantic[email]>=2.6"},
-        {**SEARCH, "name": "YAML", "python_package": "PyYAML>=6"},
-        {**SEARCH, "name": "Same again", "python_package": "pydantic[email]>=2.6"},
+        {**SEARCH, "name": "Register lookup", "python_package": "requests>=2.31"},
+        {**SEARCH, "name": "Over a proxy", "python_package": "requests[socks]>=2.31"},
+        {**SEARCH, "name": "Same again", "python_package": "requests[socks]>=2.31"},
     )
 
     assert _added_requirements(tmp_path, *services) == [
         "# Packages of the external services (README, External services)",
         "tavily-python>=0.5",
         "tavily-python>=0.6",
-        "pydantic[email]>=2.6",
-        "PyYAML>=6",
+        "requests>=2.31",
+        "requests[socks]>=2.31",
     ]
 
 
