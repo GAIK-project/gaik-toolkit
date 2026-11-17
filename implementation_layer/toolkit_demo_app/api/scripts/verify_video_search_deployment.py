@@ -71,7 +71,9 @@ def probe_media(video_id: str, kind: str) -> tuple[bool, str]:
     """Ask for a media link without signing in.
 
     The links go to signed-in users only, so the expected answer is 401; the
-    files themselves are checked in Allas above.
+    files themselves are checked in Allas above. A 401 does not show that the API
+    pod can sign a link with its own storage keys: play one video while signed in
+    to check that.
     """
     path = f"/api/video-search/videos/{quote(video_id)}/{kind}"
     url = f"{BASE_URL}{path}"
