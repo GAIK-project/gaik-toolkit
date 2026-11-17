@@ -52,6 +52,7 @@ export async function MainLayout({
           <AccessNotice
             loggedIn={!!access.user}
             unlocked={access.isUnlocked}
+            ownKeyRuns={access.ownKeyRuns}
             trialRunsPerDay={
               access.isTrial ? getTrialLimits().runsPerDay : null
             }
@@ -68,6 +69,7 @@ export async function MainLayout({
             value={{
               loggedIn: !!access.user,
               canRun: access.isUnlocked || access.isTrial,
+              ownKeyRuns: access.ownKeyRuns,
             }}
           >
             {content}

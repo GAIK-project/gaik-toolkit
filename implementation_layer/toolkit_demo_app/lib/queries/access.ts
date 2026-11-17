@@ -12,6 +12,11 @@ export interface AccessStatus {
    * trial allowance (lib/trial.ts).
    */
   isTrial: boolean;
+  /**
+   * May run a demo on their own model key: approved, or pending with a
+   * confirmed e-mail address (lib/api-access.ts, accessRefusal).
+   */
+  ownKeyRuns: boolean;
   /** The per-user grant that runs the first Solution Wizard in the browser (`wizard_access`). */
   wizardAccess: boolean;
   bypassAuth: boolean;
@@ -25,6 +30,7 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
       user: null,
       isUnlocked: true,
       isTrial: false,
+      ownKeyRuns: true,
       wizardAccess: true,
       bypassAuth: true,
     };
@@ -40,6 +46,7 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
       user: null,
       isUnlocked: false,
       isTrial: false,
+      ownKeyRuns: false,
       wizardAccess: false,
       bypassAuth: false,
     };
@@ -51,11 +58,12 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
     .eq("user_id", user.id)
     .single();
 
+  const pendingConfirmed = data?.status === "pending" && isEmailConfirmed(user);
   return {
     user,
     isUnlocked: data?.status === "approved",
-    isTrial:
-      data?.status === "pending" && isEmailConfirmed(user) && trialEnabled(),
+    isTrial: pendingConfirmed && trialEnabled(),
+    ownKeyRuns: data?.status === "approved" || pendingConfirmed,
     wizardAccess: data?.wizard_access === true,
     bypassAuth: false,
   };

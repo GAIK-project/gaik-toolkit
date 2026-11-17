@@ -871,18 +871,22 @@ export function ModelSettingsNotice({
 export function AccessNotice({
   loggedIn,
   unlocked,
+  ownKeyRuns = false,
   trialRunsPerDay = null,
 }: {
   loggedIn: boolean;
   unlocked: boolean;
+  /** Signed in, and approved or pending with a confirmed e-mail address. */
+  ownKeyRuns?: boolean;
   /** Set when the user is pending approval and on the trial allowance. */
   trialRunsPerDay?: number | null;
 }) {
   const settings = useModelSettings();
   const pathname = usePathname();
   if (unlocked) return null;
-  // An own key runs a demo for a signed-in user (lib/api-access.ts).
-  const ownKeyWorks = loggedIn && pageUsesModelSettings(pathname);
+  // An own key runs a demo for a signed-in user who is approved, or pending
+  // with a confirmed e-mail address (lib/api-access.ts).
+  const ownKeyWorks = loggedIn && ownKeyRuns && pageUsesModelSettings(pathname);
   if (ownKeyWorks && settings) return null;
   if (trialRunsPerDay)
     return (

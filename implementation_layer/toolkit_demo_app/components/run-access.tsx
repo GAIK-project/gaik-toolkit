@@ -12,6 +12,8 @@ interface RunAccess {
   loggedIn: boolean;
   /** Approved, or pending on the daily trial allowance. */
   canRun: boolean;
+  /** May run on their own model key: approved, or pending and confirmed. */
+  ownKeyRuns: boolean;
 }
 
 // Without a provider (state unknown) nothing is blocked: the proxy still refuses
@@ -35,7 +37,9 @@ export function RunAccessProvider({
 /**
  * Whether this visitor can run the demo now, and if not, why. Runs need an
  * approved account or the trial allowance; on a demo that takes the user's own
- * model key, a saved key is enough (lib/api-access.ts).
+ * model key, a saved key also opens it for a signed-in user waiting for
+ * approval whose e-mail address is confirmed (lib/api-access.ts). A saved key
+ * opens nothing for a visitor who is not signed in.
  */
 export function useRunAccess(): {
   blocked: boolean;
@@ -45,7 +49,8 @@ export function useRunAccess(): {
   const settings = useModelSettings();
   const pathname = usePathname();
   if (!access || access.canRun) return { blocked: false, loggedIn: true };
-  const ownKey = !!settings && pageUsesModelSettings(pathname);
+  const ownKey =
+    access.ownKeyRuns && !!settings && pageUsesModelSettings(pathname);
   return { blocked: !ownKey, loggedIn: access.loggedIn };
 }
 
