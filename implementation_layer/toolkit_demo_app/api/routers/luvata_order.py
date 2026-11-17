@@ -51,9 +51,9 @@ try:
 except ImportError:
     from api.utils.model_settings import provider_error_detail
 try:
-    from utils.log_names import file_tag
+    from utils.log_names import error_kind, file_tag
 except ImportError:
-    from api.utils.log_names import file_tag
+    from api.utils.log_names import error_kind, file_tag
 try:
     from utils.upload_check import upload_problem
 except ImportError:
@@ -228,7 +228,7 @@ def _parse_document_markdown(file_path: str, original_filename: str | None, pref
             logger.warning(
                 "Docling API client unavailable for %s; falling back to PyMuPDFParser: %s",
                 file_tag(original_filename or file_path),
-                type(exc).__name__,
+                error_kind(exc),
             )
     local_parser = PyMuPDFParser()
     markdown = local_parser.parse_pdf(file_path, use_markdown=True)
@@ -490,7 +490,7 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
                 header_row_idx = idx
                 header_map = row_map
                 logger.info(f"Detected pricing header row at Excel row {idx + 1}")
-                logger.info(f"Excel columns: {[str(v) for v in row]}")
+                logger.info("Excel header row has %d columns", len(row))
                 break
         if header_row_idx is None:
             logger.error("Could not find required columns in Excel file")
@@ -586,7 +586,8 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
                     )
                 )
             except (ValueError, TypeError) as e:
-                logger.warning(f"Skipping row due to parsing error: {e}")
+                # The message quotes the cell; the type is enough to see the row was skipped.
+                logger.warning("Skipping a pricing row: %s", type(e).__name__)
                 continue
         logger.info(
             "Parsed %d pricing rows from %s", len(pricing_rows), file_tag(pricing_file.filename)
@@ -871,10 +872,7 @@ async def process_order(
                 )
             )
             logger.info(
-                "Extracted PO %s: %d lines, %d fee entries",
-                parts.po_number,
-                len(parts.lines),
-                len(parts.fees),
+                "Extracted the PO: %d lines, %d fee entries", len(parts.lines), len(parts.fees)
             )
             # 3. Read the price list, price the lines and write the order draft
             yield sse_event("status", {"message": "Preparing results..."})

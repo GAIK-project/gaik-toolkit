@@ -18,6 +18,9 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+# gaik's tabular loader names the uploaded file (and the table made from it) in its INFO
+# lines; the demo keeps the file under the user's name, so those lines stay out.
+logging.getLogger("gaik.software_components.tabular_agent").setLevel(logging.WARNING)
 
 # Load .env.local from toolkit_demo_app folder - must be before other imports
 env_path = Path(__file__).parent.parent / ".env.local"

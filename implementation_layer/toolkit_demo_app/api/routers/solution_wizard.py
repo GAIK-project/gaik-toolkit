@@ -68,9 +68,9 @@ except ImportError:
     from api.utils.model_settings import provider_error_detail
     from api.utils.upload_check import upload_problem
 try:
-    from utils.log_names import file_tag
+    from utils.log_names import error_kind, file_tag
 except ImportError:
-    from api.utils.log_names import file_tag
+    from api.utils.log_names import error_kind, file_tag
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -264,7 +264,7 @@ def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
         logger.warning(
             "Docling API fallback failed for wizard attachment %s: %s",
             file_tag(original_name),
-            type(exc).__name__,
+            error_kind(exc),
         )
     return ""
 

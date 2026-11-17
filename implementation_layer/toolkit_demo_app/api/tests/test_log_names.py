@@ -26,13 +26,39 @@ def test_no_name_is_just_upload(name):
     assert file_tag(name) == "upload"
 
 
-@pytest.mark.parametrize("name", ["notes", "x.tar.gz;rm -rf", "evil.<script>"])
-def test_an_odd_extension_is_left_out(name):
+@pytest.mark.parametrize(
+    "name", ["notes", "x.tar.gz;rm -rf", "evil.<script>", "Virtanen.Matti", "J.Doe", "a.äöå"]
+)
+def test_only_a_known_file_type_is_kept_as_the_extension(name):
     tag = file_tag(name)
-    assert tag.count(".") <= 1 and ";" not in tag and "<" not in tag
+
+    assert "." not in tag  # the part after the last dot may be part of the name
 
 
-def test_the_tabular_upload_log_line_names_no_file(monkeypatch, tmp_path, caplog):
+def test_error_kind_keeps_the_http_status_and_drops_the_message():
+    from types import SimpleNamespace
+
+    from api.utils.log_names import error_kind
+
+    class HTTPError(Exception):
+        pass
+
+    failed = HTTPError("401 for Matti_Virtanen.pdf")
+    failed.response = SimpleNamespace(status_code=401)
+
+    assert error_kind(failed) == "HTTPError (HTTP 401)"
+    assert error_kind(ValueError("could not convert 'Matti'")) == "ValueError"
+
+
+def test_gaiks_tabular_loader_does_not_log_at_info_in_the_api():
+    import api.main  # noqa: F401 - sets the logger levels
+
+    loader = logging.getLogger("gaik.software_components.tabular_agent.loader")
+    assert not loader.isEnabledFor(logging.INFO)
+
+
+def test_the_tabular_route_logs_its_upload_by_tag(monkeypatch, tmp_path, caplog):
+    # The component's own loader is replaced here; its log level is checked above.
     import asyncio
 
     from api.routers import tabular_agent as route
