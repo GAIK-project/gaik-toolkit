@@ -30,6 +30,9 @@ for field in understander.describe_labels(fields, language_hint="fi"):
     shown = f"{field.label} (page: {field.original})" if field.changed else field.label
 ```
 
-A field the model returned no label for keeps its page label. The page's labels and
+`label` is at most 60 characters, like `clean_labels()`; a page label that was only cut
+to that length does not count as changed. Field ids must be unique (a repeated id raises
+`ValueError`, since the model answers per id), and `language_hint` is `"fi"`, `"en"` or
+`None`. A field the model returned no label for keeps its page label. The page's labels and
 HTML reach the model in a `<source_material>` block, apart from the rules, so a label
 that reads like an instruction stays data.

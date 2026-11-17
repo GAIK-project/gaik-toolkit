@@ -2428,7 +2428,7 @@
       ]
     },
     "known_limitations": [
-      "No README available -- sourced from module docstring and source inspection",
+      "Sourced from the component README and source inspection",
       "No example script available",
       "LLM-based labelling; ambiguous field IDs may need parent HTML snippet for context",
       "No extra pip install needed; bundled with base gaik install",
@@ -2454,7 +2454,7 @@
     "source_path": "implementation_layer/src/gaik/software_components/form_understander/",
     "import_path": "gaik.software_components.form_understander",
     "example_script_path": "",
-    "readme_path": "",
+    "readme_path": "implementation_layer/src/gaik/software_components/form_understander/README.md",
     "install_extra": ""
   },
   {

@@ -1416,8 +1416,9 @@
   "FormUnderstander": {
     "import": "from gaik.software_components.form_understander import FormUnderstander",
     "construct": "understander = FormUnderstander(config=get_stage_config(config, 'extraction'))",
-    "call": "labels = understander.clean_labels(field_ids)\n    # or, to show the page's own label beside a rewritten one:\n    described = understander.describe_labels(field_ids)",
-    "returns": "clean_labels: mapping of cryptic form-field ids -> human-readable labels. describe_labels: [CleanedLabel(.id, .label, .original, .changed)] in input order; show .original beside .label where .changed",
+    "call": "labels = understander.clean_labels(field_ids)",
+    "call_page_labels": "described = understander.describe_labels(field_ids)  # [CleanedLabel(.id, .label, .original, .changed)]; ids must be unique",
+    "returns": "clean_labels: mapping of cryptic form-field ids -> human-readable labels (max 60 chars). describe_labels: [CleanedLabel(.id, .label, .original, .changed)] in input order; show .original beside .label where .changed",
     "install_extra": "",
     "options": [
       {

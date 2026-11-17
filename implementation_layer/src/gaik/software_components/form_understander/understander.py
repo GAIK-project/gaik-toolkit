@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import time
+import unicodedata
 from typing import Literal
 
 from openai import APIError, APITimeoutError, RateLimitError
@@ -67,20 +68,34 @@ class CleanedLabel(BaseModel):
 
     id: str
     label: str
-    """The cleaned label; the page's own label when the model returned none for the id."""
+    """The cleaned label, at most 60 characters; the page's own label, cut to 60, when
+    the model returned none for the id."""
     original: str
     """The raw label as the page gave it, trimmed."""
     changed: bool
     """True when ``label`` has other words than ``original`` (case, spacing and
-    punctuation aside)."""
+    sentence punctuation aside). A page label only cut to 60 characters is not a
+    change."""
+
+
+MAX_LABEL_CHARS = 60
+_SENTENCE_PUNCTUATION = re.compile(r"[:.,;!?*]")
 
 
 def _words(text: str) -> str:
-    return re.sub(r"[\W_]+", " ", text).strip().casefold()
+    """``text`` without what a cleanup may change: case, spacing, sentence punctuation.
+
+    Unicode is normalised (NFKC) and invisible format characters such as a soft hyphen
+    are dropped, so the same word typed differently compares equal. Symbols that carry
+    meaning (``+ - % € $ < ≥``) are kept, so "-5" and "5" differ.
+    """
+    text = unicodedata.normalize("NFKC", text)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    return " ".join(_SENTENCE_PUNCTUATION.sub(" ", text).split()).casefold()
 
 
 def _same_words(a: str, b: str) -> bool:
-    """The same words, case, spacing and punctuation aside ("Name:" and "name")."""
+    """The same words, case, spacing and sentence punctuation aside ("Name:", "name")."""
     return _words(a) == _words(b)
 
 
@@ -146,17 +161,25 @@ class FormUnderstander:
         keeps its page label (``changed`` false).
         """
         safe_fields = [f if isinstance(f, InputField) else InputField(**f) for f in fields]
+        ids = [f.id for f in safe_fields]
+        repeated = sorted({i for i in ids if ids.count(i) > 1})
+        if repeated:
+            # The model answers per id, so two fields with one id would get one label.
+            raise ValueError(f"field ids must be unique; repeated: {repeated}")
         cleaned = self._clean(safe_fields, language_hint)
         described = []
         for f in safe_fields:
             original = f.raw.strip()
-            label = cleaned.get(f.id, original)
+            label = cleaned.get(f.id, original[:MAX_LABEL_CHARS])
             described.append(
                 CleanedLabel(
                     id=f.id,
                     label=label,
                     original=original,
-                    changed=not _same_words(label, original),
+                    changed=not (
+                        _same_words(label, original)
+                        or _same_words(label, original[:MAX_LABEL_CHARS])
+                    ),
                 )
             )
         return described
@@ -174,6 +197,8 @@ class FormUnderstander:
                 safe_fields.append(InputField(**f))
         if not safe_fields:
             return {}
+        if language_hint not in (None, "fi", "en"):
+            raise ValueError(f"language_hint must be 'fi', 'en' or None, not {language_hint!r}")
 
         # The labels and HTML come from the page, so the listing goes in a data block,
         # apart from the rules; the language hint is the caller's and stays outside.
@@ -181,9 +206,9 @@ class FormUnderstander:
         for f in safe_fields:
             chunks = [f"- id={f.id!r}", f"label={f.raw!r}"]
             if f.type:
-                chunks.append(f"type={f.type}")
+                chunks.append(f"type={f.type!r}")
             if f.htmlType:
-                chunks.append(f"htmlType={f.htmlType}")
+                chunks.append(f"htmlType={f.htmlType!r}")
             if f.parent:
                 # Cap parent snippet so the prompt stays small on huge forms.
                 snippet = f.parent if len(f.parent) <= 200 else f.parent[:200]
@@ -225,5 +250,5 @@ class FormUnderstander:
             label = entry.label.strip()
             if not label:
                 continue
-            result[entry.id] = label[:60]
+            result[entry.id] = label[:MAX_LABEL_CHARS]
         return result
