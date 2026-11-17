@@ -168,6 +168,8 @@ every chat message is a billed model call. Limits on them:
 | `WIZARD_AGENT_MAX_TURNS` | `100` | model calls the agent may make for one message |
 | `WIZARD_MAX_METERED_CALLS_PER_TURN` | `10` | metered tool calls (below) the agent may make for one message |
 | `WIZARD_MAX_METERED_CALLS_PER_USER_PER_HOUR` | `60` (`0` turns it off) | metered tool calls one user's agents may make in a sliding hour, across all their sessions |
+| `WIZARD_AGENT_MAX_BUDGET_USD` | off (unset or `0`) | estimated USD one agent may spend from its start or resume (below) |
+| `WIZARD_AGENT_FALLBACK_MODEL` | off (unset) | the model the agent switches to when its own fails or is unavailable |
 | `WIZARD_POC_MODEL_TIMEOUT_SECONDS` | `120` | seconds a PoC waits for one model call in its extraction and judge stages, unless the package names its own limit |
 
 A user is the session's owner (the user named in `X-Wizard-User-Id`).
@@ -203,6 +205,30 @@ logged and `wizard.agent.tool_calls` counts it with reason `turn_limit` or
 calls inside it (two for a flat schema, one more for each kind of repeated
 record in a nested one, each tried at most four times) are bounded by gaik's own
 code, which has no setting for them.
+
+**Cost limit.** `WIZARD_AGENT_MAX_BUDGET_USD` is the agent SDK's `max_budget_usd`.
+Its CLI counts the cost for the whole agent process, across messages, from its
+start or its resume, not for one message: the wizard keeps one agent per session
+for many messages, and the CLI has no way to start the count again per message.
+The cost is the CLI's estimate from its own price table, not what the provider
+bills (Foundry prices need not match), and it is checked between steps, so the
+step that crosses the limit is still paid. When the agent reaches it, the CLI
+stops the message; the chat says so in the session's language ("stopped because it
+reached its cost limit … send a message and it goes on"), with no "Please
+continue." after it. The agent is then ended: the next message resumes it from
+its transcript with its context, and the count starts from zero there. A warning
+is logged and `wizard.agent.budget_stops` counts it. It is off by default:
+`WIZARD_AGENT_MAX_TURNS` and the metered-call limits already bound one message,
+and a default would stop ordinary long sessions at whatever point their spend
+reached it. Set it as a ceiling for a runaway agent, a few times what a whole
+session costs (the `gaik.cost.usd` of the `wizard.turn` spans shows that).
+
+**Fallback model.** With `WIZARD_AGENT_FALLBACK_MODEL` set to a model other than
+the agent's own (see Model below), the SDK's `fallback_model` lets the CLI
+switch to it when the agent's model is not found, not permitted, overloaded or
+failing. The CLI reports the switch, and it is logged at `INFO` with both models
+and the trigger. The deployment must offer that model (on Foundry, a deployment
+of that name).
 
 Every tool call the guard decides is one line on the logger
 `wizard_api.services.agent_tool_guard`, for example
