@@ -144,6 +144,20 @@ _USER_CALLS: dict[str, deque[float]] = {}
 _USER_WINDOW_SECONDS = 3600
 
 
+def _forget_old_calls(now: float) -> None:
+    """Drop the calls older than the window, and every user left with none.
+
+    Run on each metered call, over every user: a user who stops working does not
+    stay in memory, and the table holds no more than the last hour's callers.
+    """
+    cutoff = now - _USER_WINDOW_SECONDS
+    for user_id, calls in list(_USER_CALLS.items()):
+        while calls and calls[0] <= cutoff:
+            calls.popleft()
+        if not calls:
+            del _USER_CALLS[user_id]
+
+
 class Decision(NamedTuple):
     """What the guard decided for one call, and what of it may be logged."""
 
@@ -325,13 +339,12 @@ class ToolGuard:
             return "turn_limit", _TURN_LIMIT.format(limit=turn_limit)
         user_limit = config.max_metered_calls_per_user_per_hour()
         if self.user_id and user_limit > 0:
-            calls = _USER_CALLS.setdefault(self.user_id, deque())
-            while calls and calls[0] <= now - _USER_WINDOW_SECONDS:
-                calls.popleft()
-            if len(calls) >= user_limit:
+            _forget_old_calls(now)
+            calls = _USER_CALLS.get(self.user_id)
+            if calls is not None and len(calls) >= user_limit:
                 minutes = max(1, math.ceil((calls[0] + _USER_WINDOW_SECONDS - now) / 60))
                 return "user_limit", _USER_LIMIT.format(limit=user_limit, minutes=minutes)
-            calls.append(now)
+            _USER_CALLS.setdefault(self.user_id, deque()).append(now)
         self.turn_calls += 1
         return None
 
