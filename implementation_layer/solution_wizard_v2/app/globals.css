@@ -623,6 +623,15 @@ body {
 .chat-md-body li {
   margin: 0.12em 0;
 }
+/* A list under an item (the options under a question) sits close to it. */
+.chat-md-body li > ul,
+.chat-md-body li > ol {
+  margin: 0.2em 0 0.1em;
+}
+.chat-md-body li > ul > li + li,
+.chat-md-body li > ol > li + li {
+  margin-top: 0.15em;
+}
 .chat-md-body li + li {
   margin-top: 0.45em;
 }
