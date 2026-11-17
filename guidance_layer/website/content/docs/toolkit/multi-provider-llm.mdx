@@ -97,7 +97,7 @@ LiteLLM is opt-in: `get_llm_config("litellm", model="azure/gpt-6-luna", api_key=
 
 ### Environment variables and `.env`
 
-The configuration helpers (`get_llm_config`, `get_openai_config` and the parsers' own) read keys and endpoints from environment variables, and also take them from a `.env` file. Importing gaik reads no file: the file is loaded once, the first time a helper runs, and never overrides a variable that is already set. Importing gaik also leaves your application's logging as it is. To pass every setting explicitly and have gaik ignore any `.env` file, set `GAIK_NO_DOTENV=1`.
+The configuration helpers (`get_llm_config`, `get_openai_config` and the parsers' own) read keys and endpoints from environment variables, and also take them from a `.env` file. Importing gaik reads no file: the file is loaded once, the first time a helper runs, and never overrides a variable that is already set. Importing gaik also leaves your application's logging as it is. To pass every setting explicitly and have gaik ignore any `.env` file, set `GAIK_NO_DOTENV=1`. In a notebook or `python -c`, the file is looked up from the working directory at that first call, so change directory before it if you rely on a project's `.env`.
 
 ### Timeouts and retries
 

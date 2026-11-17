@@ -225,7 +225,10 @@ def install_provider_extra(provider: str, module: str, extra: str) -> None:
     commands = [[sys.executable, "-m", "pip", "install", requirement]]
     if shutil.which("uv"):
         commands.append(["uv", "pip", "install", "--python", sys.executable, requirement])
-    print(f"The {provider} provider needs the {module} package; installing {requirement}", file=sys.stderr)
+    print(
+        f"The {provider} provider needs the {module} package; installing {requirement}",
+        file=sys.stderr,
+    )
     for command in commands:
         code = subprocess.call(command, stdout=sys.stderr, stderr=sys.stderr)
         if code == 0:
@@ -242,10 +245,25 @@ def install_provider_extra(provider: str, module: str, extra: str) -> None:
     )
 
 
+def load_env_file() -> None:
+    """Load the ``.env`` file the way gaik does, before this script reads the environment.
+
+    A gaik newer than 0.11.0 reads ``.env`` on its first configuration call, not on
+    import, so ``LLM_PROVIDER`` read here would miss it; an older gaik loaded it on
+    import already.
+    """
+    try:
+        from gaik.software_components.env_file import load_env_file as load
+    except ImportError:
+        return
+    load()
+
+
 def load_config(provider: str | None) -> dict:
     """The runtime LLM config. Credentials come from the environment, never from the spec."""
     from gaik.software_components.llm import get_llm_config
 
+    load_env_file()
     name = provider or os.environ.get("LLM_PROVIDER", "").strip() or DEFAULT_PROVIDER
     try:
         config = get_llm_config(name)
@@ -1273,6 +1291,7 @@ SECTION_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
 def provider_name(provider: str | None) -> str:
     """The provider a proposal is for. Only its name is used: no config, no credentials."""
+    load_env_file()
     return (provider or os.environ.get("LLM_PROVIDER", "").strip() or DEFAULT_PROVIDER).lower()
 
 
@@ -1399,7 +1418,9 @@ def proposal_problems(raw: dict) -> tuple[list[str], list[str]]:
             if dep == s.get("id"):
                 errors.append(f"sections[{n}] ({s.get('title')!r}) cannot depend on itself")
             elif dep not in ids:
-                errors.append(f"sections[{n}] ({s.get('title')!r}) depends on {dep!r}, not a section")
+                errors.append(
+                    f"sections[{n}] ({s.get('title')!r}) depends on {dep!r}, not a section"
+                )
     names = [Path(p).name for paths in (raw.get("sources") or {}).values() for p in paths or []]
     sample = raw.get("sample_report")
     if sample and Path(sample).name in names:
@@ -1410,7 +1431,10 @@ def proposal_problems(raw: dict) -> tuple[list[str], list[str]]:
     if all(isinstance(s, dict) and s.get("id") == "draft" for s in sections):
         return errors, warnings  # step 2: the instructions are written with the sections
     settings = raw.get("settings") or {}
-    if settings.get("citations") is False and "cite each fact" in str(raw.get("instructions", "")).lower():
+    if (
+        settings.get("citations") is False
+        and "cite each fact" in str(raw.get("instructions", "")).lower()
+    ):
         warnings.append(
             "Citations are off but the instructions still ask to cite each fact; remove that sentence"
         )
@@ -1553,7 +1577,9 @@ def cmd_apply_spec(args) -> dict:
     try:
         new = json.loads(proposal_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise HelperError(EXIT_INPUT, "proposal", f"{proposal_path.name}: not valid JSON ({exc})") from exc
+        raise HelperError(
+            EXIT_INPUT, "proposal", f"{proposal_path.name}: not valid JSON ({exc})"
+        ) from exc
     provider = provider_name(args.provider)
     old = read_json(path, {}) if path.is_file() else {}
     errors, warnings = proposal_problems(new)

@@ -31,14 +31,18 @@ def load_env_file() -> None:
     global _loaded
     if _loaded:
         return
+    # A second thread waits here until the first has read the file, so it never reads
+    # the environment half loaded.
     with _lock:
         if _loaded:
             return
-        _loaded = True
-        if os.getenv(NO_DOTENV_ENV, "").strip().lower() in {"1", "true", "yes"}:
-            return
         try:
-            from dotenv import load_dotenv
-        except ImportError:
-            return
-        load_dotenv()
+            if os.getenv(NO_DOTENV_ENV, "").strip().lower() in {"1", "true", "yes"}:
+                return
+            try:
+                from dotenv import load_dotenv
+            except ImportError:
+                return
+            load_dotenv()
+        finally:
+            _loaded = True

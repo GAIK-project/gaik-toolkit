@@ -69,7 +69,14 @@ def test_importing_the_components_loads_no_dotenv_and_keeps_logging():
         """
     )
 
-    assert len(result["imported"]) >= 3
+    # the modules that used to configure logging must really have been imported
+    for name in (
+        "gaik.software_components.parsers.docx_parser",
+        "gaik.software_components.parsers.pymypdf",
+        "gaik.software_components.doc_classifier.classifier",
+        "gaik.software_components.llm.config",
+    ):
+        assert name in result["imported"]
     assert result["loads"] == 0
     assert result["logging_kept"] is True
 
@@ -85,11 +92,14 @@ def test_the_first_config_read_loads_dotenv_once():
             except Exception:
                 pass
             get_openai_config(use_azure=True)
-        print(json.dumps({"loads": len(loads)}))
+        print(json.dumps({
+            "loads": len(loads), "value": os.environ.get("GAIK_TEST_FROM_DOTENV")
+        }))
         """
     )
 
     assert result["loads"] == 1
+    assert result["value"] == "yes"  # what the file set is there for the config
 
 
 def test_gaik_no_dotenv_skips_the_file():
@@ -103,3 +113,56 @@ def test_gaik_no_dotenv_skips_the_file():
     )
 
     assert result["loads"] == 0
+
+
+def test_a_second_thread_waits_until_the_file_is_read():
+    result = _run(
+        """
+        import threading, time
+        def slow(*args, **kwargs):
+            time.sleep(0.3)
+            os.environ["GAIK_TEST_FROM_DOTENV"] = "yes"
+            loads.append(1)
+            return True
+        dotenv.load_dotenv = slow
+        from gaik.software_components.env_file import load_env_file
+        seen = []
+        def read():
+            load_env_file()
+            seen.append(os.environ.get("GAIK_TEST_FROM_DOTENV"))
+        threads = [threading.Thread(target=read) for _ in range(4)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        print(json.dumps({"loads": len(loads), "seen": seen}))
+        """
+    )
+
+    assert result["loads"] == 1
+    assert result["seen"] == ["yes"] * 4
+
+
+def test_the_report_skill_reads_llm_provider_from_dotenv():
+    from pathlib import Path
+
+    script = (
+        Path(__file__).parents[1]
+        / "no-code-assets/agent-skills/skills/generate-structured-reports/scripts/run_report.py"
+    )
+    result = _run(
+        f"""
+        def from_file(*args, **kwargs):
+            os.environ["LLM_PROVIDER"] = "anthropic"
+            loads.append(1)
+            return True
+        dotenv.load_dotenv = from_file
+        os.environ.pop("LLM_PROVIDER", None)
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("run_report", {str(script)!r})
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["run_report"] = module
+        spec.loader.exec_module(module)
+        print(json.dumps({{"provider": module.provider_name(None)}}))
+        """
+    )
+
+    assert result["provider"] == "anthropic"
