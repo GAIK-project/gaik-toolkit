@@ -765,6 +765,14 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
      only the top level of `sample_input/` did not start on the customer's layout (UC05,
      6 Oct 2026).
 
+3. For every pattern the scaffolder also writes the package's test page: `poc/app.py` (a
+   standard-library server), `poc/ui/index.html` and `poc/ui/solution.json` (the name, inputs
+   and output fields from the blueprint, as data). Leave `app.py` and `index.html` as written;
+   never generate front-end code of your own. The page starts `run_poc.py` as it is, with the
+   user's files in `sample_input/` (and a typed question as a text file there), so the
+   entrypoint must keep reading its inputs from `sample_input/` and writing its results to
+   `output/`. If you change what the solution takes in, edit `ui/solution.json` to match.
+
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to
 `poc/requirements.txt`, and injects a block in `run_poc.py` that writes `output/result_report.pdf`
