@@ -138,6 +138,11 @@ jobs:
         GAIK_TEST_PG_URL: postgresql://postgres:postgres@localhost:5432/postgres
       run: pytest -m "not llm" --strict-markers
 
+    # The Solution Wizard's tests are outside `testpaths` and share a file name with
+    # unit_tests/ (test_source_tracing.py), so they run in a pytest session of their own.
+    - name: Run Solution Wizard tests
+      run: pytest implementation_layer/solution_wizard/tests -m "not llm" --strict-markers -q
+
   # The demo app's API tests, in the demo's own environment with this
   # repository's gaik installed editable. Not in the release gate or the
   # nightly run: the deployed demo installs gaik from PyPI.
