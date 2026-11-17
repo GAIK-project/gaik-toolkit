@@ -51,6 +51,10 @@ try:
 except ImportError:
     from api.utils.model_settings import provider_error_detail
 try:
+    from utils.log_names import file_tag
+except ImportError:
+    from api.utils.log_names import file_tag
+try:
     from utils.upload_check import upload_problem
 except ImportError:
     from api.utils.upload_check import upload_problem
@@ -212,17 +216,19 @@ def _parse_document_markdown(file_path: str, original_filename: str | None, pref
             result = remote_parser.parse_document(file_path)
             markdown = (result.get("parsed_markdown") or "").strip()
             if markdown:
-                logger.info("Parsed %s via Docling API client", original_filename or file_path)
+                logger.info(
+                    "Parsed %s via Docling API client", file_tag(original_filename or file_path)
+                )
                 return markdown
             logger.warning(
                 "Docling API client returned empty markdown for %s; falling back to PyMuPDFParser",
-                original_filename or file_path,
+                file_tag(original_filename or file_path),
             )
         except Exception as exc:
             logger.warning(
                 "Docling API client unavailable for %s; falling back to PyMuPDFParser: %s",
-                original_filename or file_path,
-                exc,
+                file_tag(original_filename or file_path),
+                type(exc).__name__,
             )
     local_parser = PyMuPDFParser()
     markdown = local_parser.parse_pdf(file_path, use_markdown=True)
@@ -582,7 +588,9 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
             except (ValueError, TypeError) as e:
                 logger.warning(f"Skipping row due to parsing error: {e}")
                 continue
-        logger.info(f"Parsed {len(pricing_rows)} pricing rows from {pricing_file.filename}")
+        logger.info(
+            "Parsed %d pricing rows from %s", len(pricing_rows), file_tag(pricing_file.filename)
+        )
         return pricing_rows
     except Exception as e:
         logger.error(f"Error parsing pricing file: {e}", exc_info=True)

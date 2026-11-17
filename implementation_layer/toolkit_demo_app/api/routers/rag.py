@@ -18,6 +18,10 @@ try:
 except ImportError:
     from api.utils import get_rag_api_config, require_vision, sse_event
     from api.utils.model_settings import request_server_model
+try:
+    from utils.log_names import file_tag
+except ImportError:
+    from api.utils.log_names import file_tag
 import requests
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
@@ -551,7 +555,7 @@ def _index_file(workflow, tmp_path: str, filename: str, parser_choice: str) -> i
             ),
         )
 
-    print(f"[RAG] Starting {filename} ({page_count} pages, parser={parser_choice})")
+    print(f"[RAG] Starting {file_tag(filename)} ({page_count} pages, parser={parser_choice})")
 
     parse_start = time.perf_counter()
     chunks, parser_used = _parse_document_to_chunks(
@@ -562,14 +566,14 @@ def _index_file(workflow, tmp_path: str, filename: str, parser_choice: str) -> i
     )
     parse_duration = time.perf_counter() - parse_start
     print(
-        f"[RAG] Parsed {filename}: {len(chunks)} chunks"
+        f"[RAG] Parsed {file_tag(filename)}: {len(chunks)} chunks"
         f" in {parse_duration:.1f}s (parser={parser_used})"
     )
 
     embed_start = time.perf_counter()
     num_chunks = workflow.index_chunk_documents(chunks)
     embed_duration = time.perf_counter() - embed_start
-    print(f"[RAG] Embedded {filename}: {num_chunks} chunks in {embed_duration:.1f}s")
+    print(f"[RAG] Embedded {file_tag(filename)}: {num_chunks} chunks in {embed_duration:.1f}s")
     return num_chunks
 
 
@@ -673,7 +677,7 @@ async def index_documents(
                                 error=error_msg,
                             )
                         )
-                        print(f"[RAG] Error indexing {file.filename}: {e}")
+                        print(f"[RAG] Error indexing {file_tag(file.filename)}: {type(e).__name__}")
                     finally:
                         Path(tmp_path).unlink(missing_ok=True)
 

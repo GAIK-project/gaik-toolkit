@@ -25,6 +25,10 @@ try:
     from utils import get_model_options, validate_file_size
 except ImportError:
     from api.utils import get_model_options, validate_file_size
+try:
+    from utils.log_names import file_tag
+except ImportError:
+    from api.utils.log_names import file_tag
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
@@ -304,7 +308,7 @@ async def upload_file(
     if not fits:
         _discard(session)
         raise _TOO_MANY_SESSIONS
-    logger.info("tabular_agent session %s loaded %s", session_id, file.filename)
+    logger.info("tabular_agent session %s loaded %s", session_id, file_tag(file.filename))
 
     return UploadResponse(
         session_id=session_id,
