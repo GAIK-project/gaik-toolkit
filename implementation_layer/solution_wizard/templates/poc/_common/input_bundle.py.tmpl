@@ -103,7 +103,9 @@ class InputBundle:
 def load_bundle(sample_dir) -> InputBundle | None:
     """The case's bundle under ``sample_dir`` (searched in subfolders too), or None.
 
-    Paths in it resolve against the bundle's folder first, then ``sample_dir``.
+    Paths in it resolve against the bundle's folder first, then ``sample_dir``. A file
+    with a bundle's name that is not JSON is an input like any other, not a bundle, and so
+    is one of the shorter names (``bundle.json``) that names no file or folder there.
     """
     sample_dir = Path(sample_dir)
     root = sample_dir.resolve()
@@ -112,10 +114,14 @@ def load_bundle(sample_dir) -> InputBundle | None:
             (p for p in sample_dir.rglob(name) if p.is_file() and p.resolve().is_relative_to(root)),
             key=lambda p: len(p.parts),
         )
-        if found:
-            path = found[0]
-            data = json.loads(path.read_text(encoding="utf-8"))
-            return InputBundle(path, data, [path.parent.resolve(), root], within=root)
+        for path in found:
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            bundle = InputBundle(path, data, [path.parent.resolve(), root], within=root)
+            if bundle.files or bundle.dirs or name == BUNDLE_NAMES[0]:
+                return bundle
     return None
 
 

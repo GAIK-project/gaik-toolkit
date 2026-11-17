@@ -395,3 +395,27 @@ def test_a_file_type_in_the_artifact_id_is_no_hint(tmp_path):
 
     assert "hints=('agenda',)" in loaders
     assert "hints=('meeting', 'audio')" in loaders
+
+
+@pytest.mark.parametrize("content", ["not json", '{"participants": ["Ann", "Bo"]}'])
+def test_a_file_named_like_a_bundle_that_is_not_one_is_an_input(ib, tmp_path, content):
+    """bundle.json may be the case's own JSON input: not JSON, or naming no file there."""
+    _write(tmp_path / "bundle.json", content)
+    _write(tmp_path / "agenda.pdf")
+
+    assert ib.load_bundle(tmp_path) is None
+    assert ib.find_input(tmp_path, ".pdf").name == "agenda.pdf"
+    if content.startswith("{"):
+        assert ib.find_input(tmp_path, ".json").name == "bundle.json"
+
+
+def test_a_manifest_name_with_glob_characters_is_found_by_name(dm, tmp_path):
+    manifest_path = _write(
+        tmp_path / "manifest.json", {"documents": [{"file": "documents/report[2024].pdf"}]}
+    )
+    _write(tmp_path / "docs" / "report[2024].pdf")
+    _write(tmp_path / "docs" / "report2.pdf")
+
+    manifest = dm.DocumentManifest.load(manifest_path)
+
+    assert [p.name for p in manifest.documents()] == ["report[2024].pdf"]
