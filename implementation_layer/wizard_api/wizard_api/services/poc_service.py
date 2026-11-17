@@ -1199,6 +1199,12 @@ SOLUTION_DOC_NAMES = (
     "developer_guide",
     "evaluation_plan",
 )
+#: What the AI Act screening writes when the user asks for one (SKILL.md Phase 12): the
+#: data beside the blueprint and the brief in ``docs/``. Optional, and not among the
+#: documents ``generate_docs.py`` writes, so :data:`SOLUTION_DOC_NAMES` stays as that
+#: script has it.
+SCREENING_DATA_NAME = "ai_act_screening.json"
+SCREENING_BRIEF_NAME = f"{SOLUTION_DOCS_DIR}/ai_act_screening.md"
 #: The diagram's name in the deployable package. It is drawn from the session's
 #: blueprint when the package is taken, not copied, see :func:`stored_bpmn`.
 SOLUTION_BPMN_NAME = artifact_sync.WORKFLOW_BPMN_FILE
@@ -1222,9 +1228,10 @@ def solution_files(output_dir: str | None) -> list[tuple[str, str]]:
     session: the blueprint the wizard wrote (the use case, the business and
     technical specification with the model provider and preferences, the
     components and the workflow), the workflow as a Mermaid diagram, and the
-    documents ``generate_docs.py`` writes (:data:`SOLUTION_DOC_NAMES`). Only
-    those: anything else in ``docs/`` (a ``.env``, ``__pycache__``, a copy of a
-    test document) stays out. The BPMN diagram is not here; it is drawn when the
+    documents ``generate_docs.py`` writes (:data:`SOLUTION_DOC_NAMES`), and the AI Act
+    screening with its brief when the user asked for one. Only those: anything
+    else in ``docs/`` (a ``.env``, ``__pycache__``, a copy of a test document)
+    stays out. The BPMN diagram is not here; it is drawn when the
     package is taken (:data:`SOLUTION_BPMN_NAME`).
 
     Real files only, as in the package: a symlink the agent left is not
@@ -1235,8 +1242,12 @@ def solution_files(output_dir: str | None) -> list[tuple[str, str]]:
     root = os.path.realpath(output_dir)
     wanted = [artifact_sync.DRAFT_BLUEPRINT_FILE, artifact_sync.WORKFLOW_MMD_FILE]
     docs = os.path.join(root, SOLUTION_DOCS_DIR)
-    if os.path.isdir(docs) and not os.path.islink(docs):
+    docs_ok = os.path.isdir(docs) and not os.path.islink(docs)
+    if docs_ok:
         wanted += [f"{SOLUTION_DOCS_DIR}/{name}.md" for name in SOLUTION_DOC_NAMES]
+    wanted.append(SCREENING_DATA_NAME)
+    if docs_ok:
+        wanted.append(SCREENING_BRIEF_NAME)
     found: list[tuple[str, str]] = []
     for name in wanted:
         path = _solution_file(root, name)
