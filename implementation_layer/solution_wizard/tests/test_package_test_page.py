@@ -261,6 +261,9 @@ class Page:
         spec.loader.exec_module(self.app)
         self.server = self.app.create_server(poc, host, 0, **limits)
         self.address, self.port = self.server.server_address[:2]
+        if host == "0.0.0.0":
+            # Listening on every address: this computer reaches it on its loopback.
+            self.address = "127.0.0.1"
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
@@ -1270,27 +1273,40 @@ def test_a_head_request_does_not_build_the_zip(page, monkeypatch):
     assert "Content-Length" not in headers
 
 
-def test_the_source_download_is_off_while_the_server_listens_on_the_network(page):
-    """With --host, /api/source handed the package tree to anyone who could reach it."""
+def test_the_source_download_is_on_while_the_server_listens_on_this_computer_only(page):
+    assert page.server.source_download is True
     assert page.get_json("/api/solution")[1]["source_download"] is True
-    # As create_server sets it for an address other computers reach.
-    page.server.source_download = False
-
-    for method in ("GET", "HEAD"):
-        status, _, body = page.request(method, "/api/source")
-        assert status == 403, method
-    status, _, body = page.request("GET", "/api/source")
-    assert json.loads(body)["error"] == {
-        "code": "source_off",
-        "message": (
-            "The source code download is off while the test page listens on the network "
-            "(--host). Start it without --host to download the source code."
-        ),
-    }
-    assert page.get_json("/api/solution")[1]["source_download"] is False
-    # The page shows no download then.
+    assert page.request("GET", "/api/source")[0] == 200
+    # The page shows its download only while the server says it is on.
     html = (COMMON / "ui" / "index.html").read_text(encoding="utf-8")
     assert 'show($("source"), solution.source_download !== false)' in html
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="listening on every address makes the Windows firewall ask for leave on screen",
+)
+def test_the_source_download_is_off_while_the_server_listens_on_the_network(tmp_path):
+    """With --host, /api/source handed the package tree to anyone who could reach it."""
+    served = Page(_scaffold(tmp_path), host="0.0.0.0")
+    try:
+        assert served.server.source_download is False
+        for method in ("GET", "HEAD"):
+            status, _, body = served.request(method, "/api/source")
+            assert status == 403, method
+        status, _, body = served.request("GET", "/api/source")
+        assert json.loads(body)["error"] == {
+            "code": "source_off",
+            "message": (
+                "The source code download is off while the test page listens on the network "
+                "(--host). Start it without --host to download the source code."
+            ),
+        }
+        assert served.get_json("/api/solution")[1]["source_download"] is False
+        # The rest of the page works as before.
+        assert served.request("GET", "/")[0] == 200
+    finally:
+        served.close()
 
 
 @pytest.mark.parametrize(
