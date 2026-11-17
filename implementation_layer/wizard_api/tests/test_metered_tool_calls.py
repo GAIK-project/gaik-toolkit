@@ -10,11 +10,13 @@ user's id.
 """
 
 import asyncio
+import contextlib
 import dataclasses
+import io
 import logging
 
 import pytest
-from wizard_api import config, ops_metrics
+from wizard_api import config, ops_metrics, telemetry
 from wizard_api.services import agent_service, agent_tool_guard
 
 GUARD_LOGGER = "wizard_api.services.agent_tool_guard"
@@ -247,6 +249,21 @@ def test_the_hourly_limit_can_be_turned_off(dirs, monkeypatch) -> None:
     assert agent_tool_guard._USER_CALLS == {}
 
 
+def test_a_user_whose_hour_is_over_is_forgotten(dirs) -> None:
+    alice, bob = _guard(dirs), _guard(dirs, user_id="bob")
+    _schema(alice, now=0)
+    _schema(alice, now=10)
+    assert list(agent_tool_guard._USER_CALLS) == ["alice"]
+
+    _schema(bob, now=3605)  # any metered call sweeps the table
+    assert list(agent_tool_guard._USER_CALLS["alice"]) == [10]  # the one at 0 left
+
+    _schema(bob, now=3611)
+
+    assert list(agent_tool_guard._USER_CALLS) == ["bob"]
+    assert list(agent_tool_guard._USER_CALLS["bob"]) == [3605, 3611]
+
+
 def test_an_agent_without_an_owner_has_the_per_turn_cap_only(dirs, monkeypatch) -> None:
     monkeypatch.setenv("WIZARD_MAX_METERED_CALLS_PER_USER_PER_HOUR", "1")
     guard = _guard(dirs, user_id=None)
@@ -402,6 +419,121 @@ def test_each_decision_is_counted_by_kind_decision_and_reason(dirs, monkeypatch)
     ]
 
 
+class _Kept(logging.Handler):
+    """Stands for the collector's handler on the root, at its default WARNING."""
+
+    def __init__(self, level=logging.WARNING) -> None:
+        super().__init__(level)
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+@contextlib.contextmanager
+def _logging_as_in_the_pod():
+    """Logging as uvicorn leaves it: nothing on the API's loggers or the root.
+
+    Set back in the test's own body, so pytest's handlers on the root are as it
+    left them when it takes them away.
+    """
+    tree, root = logging.getLogger(telemetry.API_LOGGER), logging.getLogger()
+    kept = (tree.level, tree.handlers[:], root.level, root.handlers[:])
+    tree.handlers, root.handlers = [], []
+    tree.setLevel(logging.NOTSET)
+    root.setLevel(logging.WARNING)
+    try:
+        yield tree, root
+    finally:
+        tree.handlers, root.handlers = kept[1], kept[3]
+        tree.setLevel(kept[0])
+        root.setLevel(kept[2])
+
+
+def _hook(guard, tool, tool_input):
+    return asyncio.run(guard.hook({"tool_name": tool, "tool_input": tool_input}, None, None))
+
+
+def test_with_the_default_configuration_each_decision_is_printed_at_info(dirs, monkeypatch) -> None:
+    monkeypatch.delenv("WIZARD_LOG_LEVEL", raising=False)
+    printed = io.StringIO()
+    guard = _guard(dirs)
+    with _logging_as_in_the_pod() as (_tree, root):
+        collector = _Kept()
+        root.addHandler(collector)
+        telemetry.configure_logging(stream=printed)
+
+        _hook(guard, "Read", {"file_path": "SKILL.md"})
+        guard.turn_calls = 3
+        _hook(guard, "Bash", {"command": _schema_command(guard.output)})
+
+    lines = printed.getvalue().splitlines()
+    assert len(lines) == 2
+    assert lines[0].endswith(
+        "INFO wizard_api.services.agent_tool_guard: tool call tool=Read kind=read "
+        "script=- decision=allowed reason=ok"
+    )
+    assert lines[1].endswith("decision=denied reason=turn_limit")
+    assert " WARNING " in lines[1]
+    # The collector's handler keeps its own level: the warning reaches it once,
+    # the INFO line not at all.
+    [warning] = collector.records
+    assert warning.levelno == logging.WARNING
+    assert warning.getMessage().endswith("decision=denied reason=turn_limit")
+
+
+def test_wizard_log_level_sets_what_is_printed(dirs, monkeypatch) -> None:
+    printed = io.StringIO()
+    guard = _guard(dirs)
+    monkeypatch.setenv("WIZARD_LOG_LEVEL", "warning")
+    with _logging_as_in_the_pod():
+        telemetry.configure_logging(stream=printed)
+        _hook(guard, "Read", {"file_path": "SKILL.md"})
+
+    assert printed.getvalue() == ""
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("", logging.INFO),
+        ("debug", logging.DEBUG),
+        ("ERROR", logging.ERROR),
+        ("loud", logging.INFO),
+    ],
+)
+def test_wizard_log_level_reads_a_level_name(monkeypatch, raw, expected) -> None:
+    monkeypatch.setenv("WIZARD_LOG_LEVEL", raw)
+
+    assert telemetry.log_level() == expected
+
+
+def test_logging_is_configured_once_and_never_beside_a_printing_handler(monkeypatch) -> None:
+    monkeypatch.delenv("WIZARD_LOG_LEVEL", raising=False)
+    with _logging_as_in_the_pod() as (tree, root):
+        telemetry.configure_logging(stream=io.StringIO())
+        telemetry.configure_logging(stream=io.StringIO())
+        assert len(tree.handlers) == 1
+
+        tree.handlers = []
+        root.addHandler(logging.StreamHandler(io.StringIO()))  # e.g. a basicConfig
+        telemetry.configure_logging(stream=io.StringIO())
+        assert tree.handlers == []
+        assert tree.level == logging.INFO
+
+
+def test_an_otel_log_level_below_the_pods_lets_those_lines_through(monkeypatch) -> None:
+    monkeypatch.setenv("WIZARD_LOG_LEVEL", "WARNING")
+    with _logging_as_in_the_pod() as (tree, _root):
+        printed = io.StringIO()
+        telemetry.configure_logging(stream=printed)
+        telemetry._let_through(logging.INFO)  # what WIZARD_OTEL_LOG_LEVEL=INFO does
+
+        assert tree.isEnabledFor(logging.INFO)
+        logging.getLogger(GUARD_LOGGER).info("tool call tool=Read")
+        assert printed.getvalue() == ""  # the pod still prints warnings only
+
+
 def test_the_limit_refusals_are_primed_for_alerting() -> None:
     primed = ops_metrics._PRIMED["tool_calls"]
 
@@ -465,20 +597,21 @@ class _Client:
 
 
 @needs_sdk
-def test_the_options_use_the_guard_they_are_given(dirs) -> None:
+def test_the_options_use_the_guard_they_are_given_and_none_are_built_without_one(dirs) -> None:
     wizard, session = dirs
     guard = agent_tool_guard.ToolGuard(wizard, session, user_id="alice")
 
     given = agent_service._build_options(wizard, session, guard=guard)
-    default = agent_service._build_options(wizard, session)
 
     assert given.hooks["PreToolUse"][0].hooks[0].__self__ is guard
-    assert default.hooks["PreToolUse"][0].hooks[0].__self__.user_id is None
+    with pytest.raises(TypeError):
+        agent_service._build_options(wizard, session)  # no guard that skips the owner
 
 
-@needs_sdk
-def test_a_started_agent_has_a_guard_that_knows_its_owner(dirs, monkeypatch) -> None:
-    wizard, session = dirs
+@pytest.fixture()
+def starting(dirs, monkeypatch):
+    """Agent starts without the SDK's client; the options each start is built with."""
+    wizard, _ = dirs
     built: list[dict] = []
     monkeypatch.setenv("WIZARD_DIR", str(wizard))
     monkeypatch.setattr(agent_service, "AGENT_SESSIONS", {})
@@ -488,6 +621,12 @@ def test_a_started_agent_has_a_guard_that_knows_its_owner(dirs, monkeypatch) -> 
         agent_service, "_build_options", lambda *args, **kwargs: built.append(kwargs)
     )
     monkeypatch.setattr(agent_service, "ClaudeSDKClient", lambda options=None: _Client())
+    return built
+
+
+@needs_sdk
+def test_a_started_agent_has_a_guard_that_knows_its_owner(dirs, starting, caplog) -> None:
+    _, session = dirs
 
     agent = asyncio.run(
         agent_service.get_or_create_session("sid", str(session), "en", user_id="o_alice")
@@ -497,7 +636,19 @@ def test_a_started_agent_has_a_guard_that_knows_its_owner(dirs, monkeypatch) -> 
     assert isinstance(guard, agent_tool_guard.ToolGuard)
     assert guard.user_id == "o_alice"
     assert guard.output == session.resolve()
-    assert [kwargs["guard"] for kwargs in built] == [guard]
+    assert [kwargs["guard"] for kwargs in starting] == [guard]
+    assert "without an owner" not in caplog.text
+
+
+@needs_sdk
+def test_an_agent_started_without_an_owner_is_a_warning(dirs, starting, caplog) -> None:
+    _, session = dirs
+
+    agent = asyncio.run(agent_service.get_or_create_session("sid", str(session), "en"))
+
+    assert agent["tool_guard"].user_id is None
+    [record] = [r for r in caplog.records if "without an owner" in r.getMessage()]
+    assert record.levelno == logging.WARNING
 
 
 @needs_sdk
