@@ -32,6 +32,7 @@ from gaik.software_components.extractor.schema import (
     apply_field_policies,
     decimal_field_repr,
     normalize_extracted_data,
+    sanitize_model_name,
 )
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.parsers.multimodal_parser.config import (
@@ -150,17 +151,29 @@ def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
                 value_field = Field(default=finfo.default, description=finfo.description)
 
             verifiable = create_model(
-                f"{fname}_Verifiable",
+                sanitize_model_name(fname, "_Verifiable") + "_Verifiable",
                 __base__=VerifiableField,
                 value=(annotation, value_field),
             )
             wrapped_fields[fname] = (verifiable, outer_field)
 
     return create_model(
-        f"{model.__name__}_Verifiable",
+        # OpenAI and Azure take the class name as the schema name, at most 64 characters.
+        sanitize_model_name(model.__name__, "_Verifiable") + "_Verifiable",
         __config__=model.model_config,
         **wrapped_fields,
     )
+
+
+def _within_schema_name_limit(model: type[BaseModel]) -> type[BaseModel]:
+    """The model under a name of at most 64 characters, which OpenAI and Azure require.
+
+    The SDK sends the class name as ``response_format.json_schema.name``; a longer one
+    is refused with a 400. The subclass keeps every field and setting of ``model``.
+    """
+    if len(model.__name__) <= 64:
+        return model
+    return create_model(sanitize_model_name(model.__name__), __base__=model)
 
 
 def _unwrap_verification(result_dict: dict) -> tuple[dict, dict]:
@@ -987,7 +1000,7 @@ class VisionExtractor:
                         ),
                     },
                 ],
-                response_format=extraction_model,
+                response_format=_within_schema_name_limit(extraction_model),
                 **options,
             )
             # ProviderClient's parsed-output contract returns only the validated
