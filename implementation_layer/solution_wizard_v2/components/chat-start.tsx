@@ -144,6 +144,7 @@ function ChoiceMenu<T extends string>({
         }}
         // A chip (globals.css) that opens a menu: filled while the menu is open.
         className="chip px-2.5"
+        data-empty={current ? undefined : ""}
       >
         <Icon name={current?.icon ?? options[0].icon} size={14} className="shrink-0" />
         <span className={`min-w-0 truncate ${LABEL_HIDDEN[compact]}`}>{current?.label ?? name}</span>

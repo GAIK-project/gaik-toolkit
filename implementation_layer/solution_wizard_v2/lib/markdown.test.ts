@@ -220,6 +220,20 @@ describe("renderMarkdown — formatting", () => {
     expect(renderMarkdown('7. "><b>x')).toBe('<ol start="7"><li>&quot;&gt;&lt;b&gt;x</li></ol>');
   });
 
+  it("an item less indented than a nested list's first item is not drawn at its depth", () => {
+    // c stands between a and b: it is a's, not b's sibling.
+    expect(renderMarkdown("- a\n    - b\n  - c")).toBe(
+      "<ul><li>a<ul><li>b</li></ul><ul><li>c</li></ul></li></ul>",
+    );
+  });
+
+  it("a long staircase of indented items stops nesting and still ends", () => {
+    const lines = Array.from({ length: 3000 }, (_, i) => `${" ".repeat(i * 2)}- level ${i}`);
+    const html = renderMarkdown(lines.join("\n"));
+    expect(html).toContain("level 2999");
+    expect(html.split("<ul>").length - 1).toBeLessThanOrEqual(7);
+  });
+
   it("items of one kind are one list whatever their indentation at the start", () => {
     expect(renderMarkdown("  - one\n- two")).toBe("<ul><li>one</li><li>two</li></ul>");
     expect(renderMarkdown(" 1. one\n2. two")).toBe("<ol><li>one</li><li>two</li></ol>");

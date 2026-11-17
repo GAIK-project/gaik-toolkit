@@ -94,7 +94,8 @@ export function AskStepButton({
       // One button wherever a step is listed. In a narrow list it says
       // "Change" and is named in full; where there is room it says it all.
       className={`btn-inline ${className}`}
-      aria-label={withLabel ? undefined : label}
+      // The name starts with the word on the button, so "click Muuta" by voice finds it.
+      aria-label={withLabel ? undefined : `${t.stepChatShort}: ${label}`}
       title={label}
       onClick={(e) => {
         e.stopPropagation();

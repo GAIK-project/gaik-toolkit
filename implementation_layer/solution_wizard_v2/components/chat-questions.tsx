@@ -238,7 +238,7 @@ export function ChatQuestions({
               data-testid={`chat-question-skip-${i}`}
               // A button of its own beside the field, as tall as the field's
               // one line; pressed, it is filled and ticked (aria-pressed).
-              className="btn-inline col-start-3 mt-px self-start"
+              className="btn-inline col-start-3 min-h-[2.125rem] self-start pointer-coarse:min-h-11"
             >
               {skipped[i] && <Icon name="check" size={12} />}
               {labels.skipButton}

@@ -171,6 +171,9 @@ const LIST_ITEM = /^(\s*)(?:[-*]|(\d{1,9})\.)\s+(.*)$/;
 /** How much deeper than its parent an item stands to be a list under it. */
 const NESTED = 2;
 
+/** Lists inside lists, at most. */
+const MAX_DEPTH = 6;
+
 /**
  * The list that starts at `lines[at]`, and the index of the line after it.
  * Items of the same kind follow each other; an item indented under one (two
@@ -183,25 +186,30 @@ const NESTED = 2;
  * at the margin does come between (a paragraph, bullets that are not
  * indented), the list after it goes on from its own number.
  */
-function renderList(lines: string[], at: number, floor = 0): [string, number] {
+function renderList(lines: string[], at: number, nested = false, depth = 0): [string, number] {
   const first = LIST_ITEM.exec(lines[at]);
   if (!first) return ["", at + 1];
   const base = first[1].length;
   const ordered = first[2] !== undefined;
+  // A list inside an item ends at an item that stands further out than its
+  // own first one; the item around it takes that one up as a list of its own.
+  // At the margin, a first item that happens to be indented starts the list.
+  const min = nested ? base : 0;
   const items: string[] = [];
   let i = at;
   while (i < lines.length) {
     const m = LIST_ITEM.exec(lines[i]);
-    // Another kind of item at this level is another list; one that stands
-    // further out than a nested list may, belongs to the list around it.
-    if (!m || (m[2] !== undefined) !== ordered || m[1].length < floor) break;
+    // Another kind of item at this level is another list.
+    if (!m || (m[2] !== undefined) !== ordered || m[1].length < min) break;
     let item = inline(m[3].trim());
     i++;
-    // Whatever is indented under the item is its own.
+    // Whatever is indented under the item is its own, down to MAX_DEPTH
+    // levels; deeper items are drawn as items of the deepest list, so a long
+    // staircase of indented lines cannot recurse without end.
     for (;;) {
       const under = i < lines.length ? LIST_ITEM.exec(lines[i]) : null;
-      if (!under || under[1].length < base + NESTED) break;
-      const [html, next] = renderList(lines, i, base + NESTED);
+      if (!under || under[1].length < base + NESTED || depth >= MAX_DEPTH) break;
+      const [html, next] = renderList(lines, i, true, depth + 1);
       item += html;
       i = next;
     }

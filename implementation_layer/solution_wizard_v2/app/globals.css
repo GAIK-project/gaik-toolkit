@@ -152,7 +152,7 @@ body {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [role="tab"]:not([aria-disabled="true"]),
-  [role^="menuitem"],
+  [role^="menuitem"]:not([aria-disabled="true"]),
   summary,
   select,
   input[type="checkbox"],
@@ -258,6 +258,12 @@ body {
     @apply inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-border-control bg-surface px-3 py-1 text-xs font-medium text-text transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:bg-brand-soft hover:text-brand-text active:scale-[0.97] aria-pressed:border-brand aria-pressed:bg-brand-soft aria-pressed:text-brand-text aria-expanded:border-brand aria-expanded:bg-brand-soft aria-expanded:text-brand-text disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 pointer-coarse:min-h-11 pointer-coarse:px-3.5;
   }
 
+  /* A chip that still waits for its choice ("Taustasi") is quieter than one
+     that shows a choice. */
+  .chip[data-empty] {
+    @apply text-text-secondary;
+  }
+
   /* One of the answers a question offers: a mark that fills when it is chosen,
      then its words. Not a pill, so it is not read as a tag. */
   .choice {
@@ -277,15 +283,15 @@ body {
   }
 
   /* A control smaller than a finger keeps its size and is pressed from 44 px
-     around its middle on a touch screen. */
+     around its middle on a touch screen. Opt-in, for a control that stands
+     alone: on buttons set side by side (a step's up and down, a toolbar) the
+     areas would overlap and a press on one's edge would go to its neighbour. */
   @media (pointer: coarse) {
-    .hit-area,
-    .icon-btn {
+    .hit-area {
       position: relative;
     }
 
-    .hit-area::after,
-    .icon-btn::after {
+    .hit-area::after {
       content: "";
       position: absolute;
       left: 50%;
