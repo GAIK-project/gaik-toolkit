@@ -65,8 +65,10 @@ marker, everything under `sample_input/` and `output/` and files in a hidden fol
 `__pycache__` are read-only (`file_read_only`, 403), other types
 `file_type_not_editable` (422). `.env` and every `.env*` name except `.env.example` is
 refused for reading and writing with 422 `secrets_not_stored`: the server keeps no keys
-for a user, the web app adds `poc/.env` to the downloaded package in the browser. A save
-whose `base_digest` is not the file's answers 409 `file_changed`, and one sent while the
+for a user, the web app adds `poc/.env` to the downloaded package in the browser. For
+the same reason a save of `.env.example` that gives a credential a value answers 422
+`key_value_not_stored` with the `variables` it names (rule below). A save whose
+`base_digest` is not the file's answers 409 `file_changed`, and one sent while the
 wizard is replying 409 `wizard_responding`.
 
 A saved edit is a package change like one of the agent's. The package digest
@@ -88,6 +90,15 @@ download. The editor says by a file's name whether saving it changes the digest
 (`counts_for_package_digest`, held to the digest by a test). Before a save the approved
 content is compared once, so that an approval recorded under an older digest scheme is
 re-based on the package as it was before the edit, not after it.
+
+`.env.example` lists the variables a package needs, without values. A save is refused
+when a credential has a value there, also on a commented-out line: a variable whose
+name has a part (between underscores) ending in `KEY`, `SECRET`, `TOKEN` or `PASSWORD`
+(`AZURE_API_KEY`, `HF_TOKEN`, `OPENAI_APIKEY`; not `MAX_TOKENS`), or
+`GOOGLE_SERVICE_ACCOUNT_JSON`. Empty, `<…>`, a value starting with `your`
+(`your-key-here`) and `xxxx`-style values are placeholders and stay allowed, and other
+variables keep their example values (`poc_service.env_example_key_values`; the web app
+applies the same rule before it sends the text, `lib/env-file.ts`).
 
 Environment files that would hold keys (`.env` in any spelling but `.env.example`) are
 left out of the package's listing and of both zips (`poc_service.package_files`), and

@@ -112,6 +112,27 @@ describe("PoC file relay", () => {
     expect(audit).toHaveBeenCalledWith("poc.file.save", expect.objectContaining({ outcome: "error" }));
   });
 
+  it("passes a key given a value in .env.example on with the variables it names", async () => {
+    vi.mocked(apiPutPocFile).mockResolvedValue(
+      Response.json(
+        {
+          detail: {
+            error: "key_value_not_stored",
+            message: "a key's value is not kept on the server",
+            variables: ["AZURE_API_KEY"],
+            trace_id: TRACE,
+          },
+        },
+        { status: 422 },
+      ),
+    );
+
+    const res = await put(".env.example", { content: "AZURE_API_KEY=\n", base_digest: "d1" });
+
+    expect(res.status).toBe(422);
+    expect((await res.json()).detail).toMatchObject({ error: "key_value_not_stored", variables: ["AZURE_API_KEY"] });
+  });
+
   it("does not pass on an error it does not know, or a server path in one", async () => {
     vi.mocked(apiPutPocFile).mockResolvedValue(
       refusal(500, "OSError", "[Errno 13] Permission denied: '/data/sessions/abc/poc/run_poc.py'"),
@@ -193,6 +214,29 @@ describe("PoC file relay", () => {
       expect((await put("AI-GENERATED.json", { content: "{}", base_digest: "d" })).status).toBe(403);
       expect((await put("sample_input/note.txt", { content: "x", base_digest: "d" })).status).toBe(403);
       expect(apiGetPocFile).not.toHaveBeenCalled();
+    });
+
+    it("refuses a key's value in .env.example, and says which file a test run is tied to", async () => {
+      const read = await (await get(".env.example")).json();
+      expect(read.affects_package).toBe(true);
+      expect((await (await get("README.md")).json()).affects_package).toBe(false);
+
+      const refused = await put(".env.example", {
+        content: `${read.content}TAVILY_API_KEY=typed-by-mistake\n`,
+        base_digest: read.digest,
+      });
+
+      expect(refused.status).toBe(422);
+      const detail = (await refused.json()).detail;
+      expect(detail).toMatchObject({ error: "key_value_not_stored", variables: ["TAVILY_API_KEY"] });
+      expect(JSON.stringify(detail)).not.toContain("typed-by-mistake");
+      expect((await (await get(".env.example")).json()).content).toBe(read.content);
+      // Without a value the variable is saved.
+      const saved = await put(".env.example", {
+        content: `${read.content}TAVILY_API_KEY=\n`,
+        base_digest: read.digest,
+      });
+      expect(saved.status).toBe(200);
     });
   });
 });

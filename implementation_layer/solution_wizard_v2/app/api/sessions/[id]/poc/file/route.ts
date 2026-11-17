@@ -25,8 +25,8 @@ const MAX_PATH_CHARS = 512;
 const MAX_BODY_BYTES = MAX_POC_FILE_BYTES * 6 + 1024;
 const NO_STORE = { "Cache-Control": "no-store" };
 
-function refusal(status: number, error: string, message: string): Response {
-  return errorResponse({ error, message, trace_id: currentTraceId() }, status);
+function refusal(status: number, error: string, message: string, extra: { variables?: string[] } = {}): Response {
+  return errorResponse({ error, message, trace_id: currentTraceId(), ...extra }, status);
 }
 
 function pathOf(req: NextRequest): string | null {
@@ -106,7 +106,7 @@ export const PUT = withLogging(
       const file = putMockPocFile(id, path, body.content, body.base_digest);
       if (isMockError(file)) {
         saved("error");
-        return refusal(file.status, file.error, file.message);
+        return refusal(file.status, file.error, file.message, file.variables ? { variables: file.variables } : {});
       }
       saved("success");
       return Response.json(file, { headers: NO_STORE });

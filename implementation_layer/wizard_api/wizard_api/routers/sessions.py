@@ -348,7 +348,7 @@ class PocFileWrite(BaseModel):
 
 def _package_file_error(exc: Any) -> HTTPException:
     """A refused read or save of a package file (PackageFileError), in the one error shape."""
-    return api_error(exc.status, exc.code, str(exc))
+    return api_error(exc.status, exc.code, str(exc), **exc.extra)
 
 
 def _session_poc_dir(db: Session, session_id: uuid.UUID) -> tuple[Any, str]:
@@ -424,7 +424,8 @@ def write_poc_file(
     gate reopens exactly as after a chat turn
     (``_reopen_if_approved_content_changed``). The edit is recorded in the
     session's metadata and the agent is told with the next message
-    (``_user_edits_note``).
+    (``_user_edits_note``). ``.env.example`` is refused with a key's value in
+    it (``poc_service.env_example_key_values``): keys are not kept here.
     """
     from wizard_api.services import poc_service
 

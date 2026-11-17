@@ -569,6 +569,8 @@ export type Dict = {
   pocFileConflict: string;
   pocFileConflictReload: string;
   pocFileWizardBusy: string;
+  /** A key given a value in `.env.example`: {names} are the variables. */
+  pocFileKeyValue: string;
   pocFileSaveFailed: string;
   /** What saving a file the test run is tied to (every file but a README) sets off: before Gate 3, and after it. */
   pocFileRetest: string;
@@ -1303,6 +1305,8 @@ const fi: Dict = {
     "Tiedosto on muuttunut sen jälkeen, kun avasit sen: wizard on voinut kirjoittaa sen uudelleen. Muutoksiasi ei tallennettu.",
   pocFileConflictReload: "Avaa uusi versio",
   pocFileWizardBusy: "Wizard vastaa vielä ja voi muuttaa pakettia. Tallenna uudelleen, kun vastaus on valmis.",
+  pocFileKeyValue:
+    "Avainten arvoja ei tallenneta palvelimelle: jätä {names} tyhjäksi .env.example-tiedostossa ja anna arvo, kun lataat käyttöönottopaketin. Muutoksiasi ei tallennettu.",
   pocFileSaveFailed: "Tallennus ei onnistunut. Yritä uudelleen.",
   pocFileRetest: "Tallennus muuttaa pakettia: se tarkistetaan uudelleen, eikä aiempi testiajo enää päde.",
   pocFileReopens:
@@ -2110,6 +2114,8 @@ const en: Dict = {
     "The file has changed since you opened it: the wizard may have rewritten it. Your changes were not saved.",
   pocFileConflictReload: "Open the new version",
   pocFileWizardBusy: "The wizard is still replying and may change the package. Save again when the reply is done.",
+  pocFileKeyValue:
+    "Key values are not kept on the server: leave {names} empty in .env.example and give the value when you download the deployment package. Your changes were not saved.",
   pocFileSaveFailed: "The file could not be saved. Try again.",
   pocFileRetest: "Saving changes the package: it is checked again, and an earlier test run no longer counts.",
   pocFileReopens: "Saving reopens Gate 3: the package is tested and approved again before it is taken into use.",

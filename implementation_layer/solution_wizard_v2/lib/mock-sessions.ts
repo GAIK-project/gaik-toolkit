@@ -15,7 +15,9 @@ import {
 } from "./wizard-state-machine";
 import { REQUIREMENT_POINTS, openingQuestion } from "./requirements-model";
 import type { TargetOutputSpec } from "./target-output-spec";
+import { envExampleKeyValues } from "./env-file";
 import {
+  ENV_EXAMPLE_NAME,
   MAX_POC_FILE_BYTES,
   isSecretEnvName,
   pocFileAffectsPackage,
@@ -809,7 +811,13 @@ function mockDigest(content: string): string {
   return `mock-${(hash >>> 0).toString(16).padStart(8, "0")}-${content.length}`;
 }
 
-export type MockPocFileError = { status: number; error: string; message: string };
+export type MockPocFileError = {
+  status: number;
+  error: string;
+  message: string;
+  /** The variables of `.env.example` given a key's value (`key_value_not_stored`). */
+  variables?: string[];
+};
 
 function mockPocPath(path: string): string | MockPocFileError {
   if (!path || path.startsWith("/") || path.includes("\\") || /^[A-Za-z]:/.test(path)) {
@@ -872,6 +880,15 @@ export function putMockPocFile(sessionId: string, path: string, content: string,
       status: 413,
       error: "file_too_large",
       message: "the file is too large to save here",
+    } satisfies MockPocFileError;
+  }
+  const valued = normalised.split("/").pop() === ENV_EXAMPLE_NAME ? envExampleKeyValues(content) : [];
+  if (valued.length > 0) {
+    return {
+      status: 422,
+      error: "key_value_not_stored",
+      message: `a key's value is not kept on the server: leave ${valued.join(", ")} empty in .env.example and give the value when you download the package`,
+      variables: valued,
     } satisfies MockPocFileError;
   }
   const key = `${sessionId}:${normalised}`;

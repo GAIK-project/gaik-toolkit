@@ -524,6 +524,27 @@ test.describe("The .env form beside the deployable package", () => {
     await expect(form.locator("label").last()).toHaveText("SERPER_API_KEY");
   });
 
+  test("a key's value typed into .env.example is refused before it leaves the browser", async ({ page }) => {
+    await fakePackage(page, { recorded: true });
+    await openPoc(page);
+    const puts: string[] = [];
+    page.on("request", (r) => {
+      if (r.method() === "PUT" && r.url().includes("/poc/file")) puts.push(r.url());
+    });
+
+    const editor = await openFile(page, ".env.example");
+    await typeAtEnd(page, "SERPER_API_KEY=typed-by-mistake");
+    await editor.getByTestId("poc-file-save").click();
+
+    await expect(editor.getByTestId("poc-file-save-error")).toHaveText(
+      "Avainten arvoja ei tallenneta palvelimelle: jätä SERPER_API_KEY tyhjäksi .env.example-tiedostossa ja anna arvo, kun lataat käyttöönottopaketin. Muutoksiasi ei tallennettu.",
+    );
+    await expect(editor).toHaveAttribute("data-dirty", "true");
+    expect(puts).toEqual([]);
+    const kept = await (await page.request.get(`${FILE_URL}?path=.env.example`)).json();
+    expect(kept.content).not.toContain("typed-by-mistake");
+  });
+
   test("the finished solution's banner download carries what is typed in the form, and is the only download", async ({
     page,
     request,

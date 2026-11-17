@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   composeEnv,
   configProviders,
+  envExampleKeyValues,
   envLayout,
   envValue,
   hasEnvValues,
@@ -351,5 +352,51 @@ describe("hasEnvValues", () => {
     expect(hasEnvValues({ A: "x" })).toBe(true);
     expect(hasEnvValues({}, [{ name: "B", value: "x" }])).toBe(true);
     expect(hasEnvValues({}, [{ name: "not a name", value: "x" }])).toBe(false);
+  });
+});
+
+describe("envExampleKeyValues", () => {
+  it("names each credential given a value, also commented out, and nothing else of it", () => {
+    const text = [
+      "AZURE_API_KEY=typed-by-mistake",
+      "# OPENAI_API_KEY=typed-by-mistake",
+      "export HF_TOKEN=typed-by-mistake",
+      'CLIENT_SECRET="typed by mistake"',
+      "DOCLING_API_PASSWORD=hunter2  # the service's",
+      "OPENAI_APIKEY=typed-by-mistake",
+      'GOOGLE_SERVICE_ACCOUNT_JSON={"type": "x"}',
+      "AZURE_API_KEY=again",
+    ].join("\n");
+
+    expect(envExampleKeyValues(text)).toEqual([
+      "AZURE_API_KEY",
+      "OPENAI_API_KEY",
+      "HF_TOKEN",
+      "CLIENT_SECRET",
+      "DOCLING_API_PASSWORD",
+      "OPENAI_APIKEY",
+      "GOOGLE_SERVICE_ACCOUNT_JSON",
+    ]);
+  });
+
+  it("lets placeholders and settings that are not credentials stand", () => {
+    const text = [
+      "AZURE_API_KEY=",
+      "# AZURE_API_KEY=",
+      'AZURE_API_KEY=""',
+      "AZURE_API_KEY=<your key>",
+      "AZURE_API_KEY=your-key-here",
+      "OPENAI_API_KEY=YOUR_API_KEY",
+      "TAVILY_API_KEY=xxxx",
+      "TAVILY_API_KEY=   # from the provider's portal",
+      "AZURE_ENDPOINT=https://your-resource.openai.azure.com/",
+      "AZURE_API_VERSION=2025-03-01-preview",
+      "MAX_TOKENS=4000",
+      "KEYWORDS=invoice,receipt",
+      "# GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials.json",
+      "# Set OPENAI_API_KEY in .env, not here.",
+    ].join("\n");
+
+    expect(envExampleKeyValues(text)).toEqual([]);
   });
 });

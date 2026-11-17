@@ -1270,12 +1270,83 @@ _DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
 
 
 class PackageFileError(ValueError):
-    """A package file the editor may not read or save, with the answer's status and code."""
+    """A package file the editor may not read or save, with the answer's status and code.
 
-    def __init__(self, status: int, code: str, message: str) -> None:
+    ``extra`` goes into the error's detail as it is (``variables`` for a key
+    given a value in ``.env.example``).
+    """
+
+    def __init__(self, status: int, code: str, message: str, **extra: Any) -> None:
         self.status = status
         self.code = code
+        self.extra = extra
         super().__init__(message)
+
+
+# A variable of ``.env.example`` as the web app's form reads it (lib/env-file.ts):
+# ``NAME=value`` and ``export NAME=value``, or commented out, ``# NAME=value``.
+_ENV_ASSIGNMENT = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
+_ENV_COMMENTED_ASSIGNMENT = re.compile(r"^\s*#\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+_ENV_QUOTED = re.compile(r"^([\"'])(.*)\1\s*(?:#.*)?$")
+#: A part of a variable's name (between underscores) ending in one of these
+#: names a credential: AZURE_API_KEY, HF_TOKEN, CLIENT_SECRET, OPENAI_APIKEY,
+#: DOCLING_API_PASSWORD. ``MAX_TOKENS`` and ``KEYWORDS`` do not.
+_CREDENTIAL_WORDS = ("KEY", "SECRET", "TOKEN", "PASSWORD")
+#: Credentials the generated ``.env.example`` lists under a name with no such part.
+_CREDENTIAL_NAMES = frozenset({"GOOGLE_SERVICE_ACCOUNT_JSON"})
+
+
+def _env_value(raw: str) -> str:
+    """A value as ``.env.example`` writes it, without its quotes or a trailing comment."""
+    text = raw.strip()
+    if text.startswith("#"):  # ``NAME=  # a comment``: no value
+        return ""
+    quoted = _ENV_QUOTED.match(text)
+    if quoted:
+        return quoted.group(2)
+    return re.sub(r"\s+#.*$", "", text)
+
+
+def _is_credential_name(name: str) -> bool:
+    upper = name.upper()
+    if upper in _CREDENTIAL_NAMES:
+        return True
+    return any(part.endswith(_CREDENTIAL_WORDS) for part in upper.split("_") if part)
+
+
+def _is_placeholder(value: str) -> bool:
+    """A value that is plainly no key: empty, ``<your key>``, ``your-key-here``, ``xxxx``."""
+    value = value.strip()
+    if not value:
+        return True
+    if value.startswith("<") and value.endswith(">"):
+        return True
+    if value.lower().startswith("your"):
+        return True
+    return set(value) <= set("xX*.-_")
+
+
+def env_example_key_values(text: str) -> list[str]:
+    """The variables of ``.env.example`` that give a credential a value, by name.
+
+    ``.env.example`` lists what the package needs, without values: the keys
+    are typed where the package is downloaded and go into its ``.env`` in the
+    browser. A key typed into ``.env.example`` would be kept on the server and
+    shipped in both zips. A credential (``_is_credential_name``) may stand
+    there empty or with a placeholder (``_is_placeholder``), also commented
+    out; any other value is refused. Other variables (a model name, an API
+    version, an endpoint) keep their example values.
+    """
+    found: list[str] = []
+    for line in text.splitlines():
+        match = _ENV_COMMENTED_ASSIGNMENT.match(line) or _ENV_ASSIGNMENT.match(line)
+        if match is None:
+            continue
+        name, raw = match.group(1), match.group(2)
+        if _is_credential_name(name) and not _is_placeholder(_env_value(raw)):
+            if name not in found:
+                found.append(name)
+    return found
 
 
 def is_secret_name(relative_path: str) -> bool:
@@ -1451,6 +1522,17 @@ def write_package_file(
         raise not_text from exc
     if len(data) > MAX_PACKAGE_FILE_BYTES:
         raise PackageFileError(413, "file_too_large", "the file is too large to save here")
+    if normalised.rsplit("/", 1)[-1] == ENV_EXAMPLE_NAME:
+        valued = env_example_key_values(content)
+        if valued:
+            raise PackageFileError(
+                422,
+                "key_value_not_stored",
+                "a key's value is not kept on the server: leave "
+                + ", ".join(valued)
+                + " empty in .env.example and give the value when you download the package",
+                variables=valued,
+            )
     if content_digest(_read_capped(target)) != base_digest:
         raise PackageFileError(
             409,

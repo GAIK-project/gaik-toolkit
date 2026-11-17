@@ -42,6 +42,7 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   "file_too_large",
   "file_changed",
   "wizard_responding",
+  "key_value_not_stored",
   // the sandbox
   "sandbox_busy",
   // input files
@@ -79,7 +80,7 @@ const INTERNAL_CODES: Record<string, keyof ErrorStrings> = {
 };
 
 /** The extra keys a person needs to act on a refusal; nothing else is passed on. */
-const EXTRA_KEYS = ["gate", "gate_step", "status", "missing", "problems", "keys", "feedback"] as const;
+const EXTRA_KEYS = ["gate", "gate_step", "status", "missing", "problems", "keys", "feedback", "variables"] as const;
 
 export const MESSAGE_MAX_CHARS = 300;
 const MAX_LIST_ITEMS = 20;

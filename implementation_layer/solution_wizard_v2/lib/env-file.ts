@@ -145,6 +145,47 @@ export function parseEnvExample(text: string): EnvVariable[] {
   return found;
 }
 
+// A part of a name (between underscores) ending in one of these names a
+// credential: AZURE_API_KEY, HF_TOKEN, CLIENT_SECRET, OPENAI_APIKEY. Not MAX_TOKENS.
+const CREDENTIAL_WORDS = ["KEY", "SECRET", "TOKEN", "PASSWORD"];
+// Credentials the generated `.env.example` lists under a name with no such part.
+const CREDENTIAL_NAMES = new Set(["GOOGLE_SERVICE_ACCOUNT_JSON"]);
+
+function isCredentialName(name: string): boolean {
+  const upper = name.toUpperCase();
+  if (CREDENTIAL_NAMES.has(upper)) return true;
+  return upper.split("_").some((part) => part !== "" && CREDENTIAL_WORDS.some((word) => part.endsWith(word)));
+}
+
+/** A value that is plainly no key: empty, `<your key>`, `your-key-here`, `xxxx`. */
+function isPlaceholder(value: string): boolean {
+  const v = value.trim();
+  if (v === "") return true;
+  if (v.startsWith("<") && v.endsWith(">")) return true;
+  if (v.toLowerCase().startsWith("your")) return true;
+  return /^[xX*._-]+$/.test(v);
+}
+
+/**
+ * The variables of a `.env.example` that give a credential a value, by name:
+ * wizard_api refuses to keep such a file (`poc_service.env_example_key_values`,
+ * the same rule), and the editor says so before the text leaves the browser.
+ * A credential may stand there empty or with a placeholder, also commented
+ * out; other variables keep their example values.
+ */
+export function envExampleKeyValues(text: string): string[] {
+  const found: string[] = [];
+  for (const line of linesOf(text)) {
+    const match = COMMENTED_ASSIGNMENT.exec(line) ?? ASSIGNMENT.exec(line);
+    if (!match) continue;
+    const raw = match[2].trim();
+    // `NAME=  # a comment`: no value.
+    const value = raw.startsWith("#") ? "" : plainValue(raw);
+    if (isCredentialName(match[1]) && !isPlaceholder(value) && !found.includes(match[1])) found.push(match[1]);
+  }
+  return found;
+}
+
 /**
  * The providers a package's `config.yaml` names: the top-level `provider` and
  * each stage's, lower-cased, each once. Read line by line (`provider: azure`,

@@ -10,6 +10,7 @@ no file that would hold keys.
 import asyncio
 import os
 import uuid
+from pathlib import Path
 
 import pytest
 from helpers import requires_postgres, write_gate_artifacts
@@ -185,6 +186,99 @@ def test_read_only_files_are_still_shown_and_say_so(tmp_path) -> None:
     assert (note["editable"], note["read_only_reason"]) == (False, "file_read_only")
     assert (other["editable"], other["read_only_reason"]) == (False, "file_type_not_editable")
     assert other["content"] == "FROM python:3.12\n"
+
+
+# --- .env.example lists the keys, never their values ------------------------------
+
+
+@pytest.mark.parametrize(
+    ("line", "name", "value"),
+    [
+        ("AZURE_API_KEY=typed-by-mistake", "AZURE_API_KEY", "typed-by-mistake"),
+        # Commented out, it is still in the file the server keeps.
+        ("# OPENAI_API_KEY=typed-by-mistake", "OPENAI_API_KEY", "typed-by-mistake"),
+        ("export HF_TOKEN=typed-by-mistake", "HF_TOKEN", "typed-by-mistake"),
+        ('CLIENT_SECRET="typed by mistake"', "CLIENT_SECRET", "typed by mistake"),
+        ("DOCLING_API_PASSWORD=hunter2  # the service's", "DOCLING_API_PASSWORD", "hunter2"),
+        ("OPENAI_APIKEY=typed-by-mistake", "OPENAI_APIKEY", "typed-by-mistake"),
+        ('GOOGLE_SERVICE_ACCOUNT_JSON={"type": "x"}', "GOOGLE_SERVICE_ACCOUNT_JSON", '"type"'),
+    ],
+)
+def test_a_key_given_a_value_in_the_list_of_variables_is_not_saved(
+    tmp_path, line, name, value
+) -> None:
+    poc = _package(tmp_path)
+    read = poc_service.read_package_file(poc, ".env.example")
+
+    refused = _refusal(
+        lambda: poc_service.write_package_file(
+            poc, ".env.example", f"{ENV_EXAMPLE}{line}\n", read["digest"]
+        )
+    )
+
+    assert (refused.status, refused.code) == (422, "key_value_not_stored")
+    assert refused.extra == {"variables": [name]}
+    assert name in str(refused) and value not in str(refused)
+    with open(os.path.join(poc, ".env.example"), encoding="utf-8") as fh:
+        assert fh.read() == ENV_EXAMPLE
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "AZURE_API_KEY=",
+        "# AZURE_API_KEY=",
+        'AZURE_API_KEY=""',
+        "AZURE_API_KEY=<your key>",
+        "AZURE_API_KEY=your-key-here",
+        "OPENAI_API_KEY=YOUR_API_KEY",
+        "TAVILY_API_KEY=xxxx",
+        "TAVILY_API_KEY=   # from the provider's portal",
+        # Settings that are not credentials keep their example values.
+        "AZURE_ENDPOINT=https://your-resource.openai.azure.com/",
+        "AZURE_API_VERSION=2025-03-01-preview",
+        "MAX_TOKENS=4000",
+        "KEYWORDS=invoice,receipt",
+        "# GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials.json",
+        "# Set OPENAI_API_KEY in .env, not here.",
+    ],
+)
+def test_placeholders_and_settings_in_the_list_of_variables_are_saved(tmp_path, line) -> None:
+    poc = _package(tmp_path)
+    read = poc_service.read_package_file(poc, ".env.example")
+
+    saved = poc_service.write_package_file(
+        poc, ".env.example", f"{ENV_EXAMPLE}{line}\n", read["digest"]
+    )
+
+    assert saved["path"] == ".env.example"
+
+
+def test_the_generated_list_of_variables_is_saved_as_it_is() -> None:
+    """The scaffolder's own .env.example: every provider, every example value."""
+    template = (
+        Path(__file__).resolve().parents[2]
+        / "solution_wizard"
+        / "templates"
+        / "poc"
+        / "_common"
+        / "env.example.tmpl"
+    )
+
+    assert poc_service.env_example_key_values(template.read_text(encoding="utf-8")) == []
+
+
+def test_only_the_list_of_variables_is_read_for_values(tmp_path) -> None:
+    poc = _package(tmp_path)
+    with open(os.path.join(poc, "settings.txt"), "w", encoding="utf-8") as fh:
+        fh.write("x\n")
+    read = poc_service.read_package_file(poc, "settings.txt")
+
+    saved = poc_service.write_package_file(
+        poc, "settings.txt", "AZURE_API_KEY=a-value\n", read["digest"]
+    )
+
+    assert saved["path"] == "settings.txt"
 
 
 def test_the_marker_name_is_the_one_the_download_writes() -> None:
@@ -506,6 +600,24 @@ def test_nothing_is_saved_while_the_wizard_is_replying(client, monkeypatch) -> N
     assert refused.json()["detail"]["error"] == "wizard_responding"
     with open(os.path.join(created["output_dir"], "poc", "run_poc.py"), encoding="utf-8") as fh:
         assert fh.read() == "print('ok')\n"
+
+
+@requires_postgres
+def test_a_key_typed_into_the_list_of_variables_is_refused_and_names_the_variable(client) -> None:
+    created = _session_with_package(client)
+    sid = created["id"]
+    read = _file(client, sid, ".env.example").json()
+
+    refused = _save(client, sid, ".env.example", "AZURE_API_KEY=typed-by-mistake\n", read["digest"])
+
+    assert refused.status_code == 422
+    detail = refused.json()["detail"]
+    assert detail["error"] == "key_value_not_stored"
+    assert detail["variables"] == ["AZURE_API_KEY"]
+    assert "typed-by-mistake" not in refused.text
+    with open(os.path.join(created["output_dir"], "poc", ".env.example"), encoding="utf-8") as fh:
+        assert fh.read() == ENV_EXAMPLE
+    assert "user_edits" not in client.get(f"/sessions/{sid}").json()["metadata"]
 
 
 @requires_postgres

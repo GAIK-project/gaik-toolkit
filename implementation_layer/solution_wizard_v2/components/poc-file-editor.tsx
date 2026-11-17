@@ -5,8 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FileIcon } from "@/components/file-icon";
 import { Icon } from "@/components/icons";
+import { envExampleKeyValues } from "@/lib/env-file";
 import type { Dict } from "@/lib/i18n";
 import {
+  ENV_EXAMPLE_NAME,
   MAX_POC_FILE_BYTES,
   editorLanguage,
   pocFileFrom,
@@ -19,14 +21,20 @@ import {
 // CodeMirror and its languages: fetched when the first file is opened.
 const CodeEditor = dynamic(() => import("@/components/code-editor"), { ssr: false });
 
-type Problem = { code: string; message: string };
+type Problem = { code: string; message: string; variables?: string[] };
 
 async function problemOf(res: Response): Promise<Problem> {
-  const body = (await res.json().catch(() => null)) as { detail?: { error?: unknown; message?: unknown } } | null;
+  const body = (await res.json().catch(() => null)) as {
+    detail?: { error?: unknown; message?: unknown; variables?: unknown };
+  } | null;
   const detail = body?.detail;
+  const variables = Array.isArray(detail?.variables)
+    ? detail.variables.filter((v): v is string => typeof v === "string")
+    : undefined;
   return {
     code: typeof detail?.error === "string" ? detail.error : "",
     message: typeof detail?.message === "string" ? detail.message : "",
+    ...(variables?.length ? { variables } : {}),
   };
 }
 
@@ -132,6 +140,14 @@ export function PocFileEditor({
       setSaveProblem({ code: "file_too_large", message: "" });
       return;
     }
+    // A key typed into .env.example is refused here, before it leaves the
+    // browser; wizard_api refuses it as well (key_value_not_stored).
+    const valued = path.split("/").pop() === ENV_EXAMPLE_NAME ? envExampleKeyValues(draft) : [];
+    if (valued.length > 0) {
+      setJustSaved(false);
+      setSaveProblem({ code: "key_value_not_stored", message: "", variables: valued });
+      return;
+    }
     setSaving(true);
     setSaveProblem(null);
     setJustSaved(false);
@@ -160,7 +176,7 @@ export function PocFileEditor({
     } finally {
       setSaving(false);
     }
-  }, [draft, file, onSaved, saving, url]);
+  }, [draft, file, onSaved, path, saving, url]);
 
   function discard() {
     if (!file) return;
@@ -195,6 +211,7 @@ export function PocFileEditor({
         wizard_responding: t.pocFileWizardBusy,
         file_too_large: t.pocFileTooLargeToSave,
         secrets_not_stored: t.pocFileSecrets,
+        key_value_not_stored: t.pocFileKeyValue.replace("{names}", (saveProblem.variables ?? []).join(", ")),
         file_read_only: t.pocFileReadOnly,
         file_type_not_editable: t.pocFileTypeReadOnly,
         not_found: t.pocFileNotFound,
