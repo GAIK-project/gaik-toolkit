@@ -85,7 +85,7 @@ class ReportSynthesizer:
         model: str | None = None,
         *,
         reviewer_model: str | None = None,
-        strict_review: bool = False,
+        strict_review: bool = True,
         review_attempts: int = 5,
         writer_options: dict | None = None,
         reviewer_options: dict | None = None,
@@ -96,8 +96,9 @@ class ReportSynthesizer:
             config: LLM config from `get_llm_config()`.
             model: Optional writer model override. Defaults to the config's model.
             reviewer_model: Optional reviewer model override. Defaults to the config's model.
-            strict_review: Raise when a reviewer edit cannot be applied, instead of
-                logging it in the review log.
+            strict_review: Raise when a reviewer edit cannot be applied (the
+                default), so a report is never returned as reviewed with a
+                correction left out. ``False`` logs it in the review log instead.
             review_attempts: Most reviewer requests per section, the first one included.
             writer_options: Extra options for every writer call, such as
                 `reasoning_effort` or `temperature`.

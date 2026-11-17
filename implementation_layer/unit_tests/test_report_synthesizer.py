@@ -306,10 +306,18 @@ def test_strict_review_raises_on_unresolved_edits(fakes):
     assert ("write", "summary") not in fakes.events
 
 
+def test_review_is_strict_by_default(fakes):
+    fakes.reviewer.unresolved["services"] = [Edit(search="nowhere", replace="x", reason="r")]
+    with pytest.raises(RuntimeError, match="'services'"):
+        ReportSynthesizer(CONFIG).synthesize(
+            KNOWLEDGE, SECTIONS, title="Condition assessment", instructions=INSTRUCTIONS
+        )
+
+
 def test_unresolved_edits_are_logged_without_strict_review(fakes):
     unresolved = [Edit(search="nowhere", replace="x", reason="r")]
     fakes.reviewer.unresolved["services"] = unresolved
-    report = _synthesize()
+    report = _synthesize(strict_review=False)
     entry = next(e for e in report.review_log if e.section_id == "services")
     assert entry.unresolved == unresolved and entry.applied == [FIX]
 

@@ -278,16 +278,32 @@ def test_agentic_strict_review_raises_before_writing(tmp_path, patch_llm):
     assert not (out / "report.md").exists()
 
 
-def test_agentic_warnings_returned_by_default(tmp_path, patch_llm):
+def test_agentic_warnings_returned_without_strict_review(tmp_path, patch_llm):
     patch_llm(_FakeClient(review_mode="fail"))
     (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
 
     result = _gen().run(
         input_paths=[tmp_path / "src.txt"],
         sections=[{"title": "A", "instructions": "a"}],
-        agentic=True,  # strict_review defaults to False
+        agentic=True,
+        strict_review=False,
     )
     assert result.sections[0].revision_warnings  # unresolved edit -> warning
+
+
+def test_agentic_review_is_strict_by_default(tmp_path, patch_llm):
+    patch_llm(_FakeClient(review_mode="fail"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+    out = tmp_path / "out"
+
+    with pytest.raises(RuntimeError):
+        _gen().run(
+            input_paths=[tmp_path / "src.txt"],
+            sections=[{"title": "A", "instructions": "a"}],
+            output_dir=out,
+            agentic=True,
+        )
+    assert not (out / "report.md").exists()
 
 
 def test_agentic_polish_runs_after_review_and_adds_no_content(tmp_path, patch_llm):
