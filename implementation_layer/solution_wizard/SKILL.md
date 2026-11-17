@@ -840,8 +840,11 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
    is, with the user's files in `sample_input/` (and a typed question as a text file there), so
    the entrypoint must keep reading its inputs from `sample_input/` and writing its results to
    `output/`. If you change what the solution takes in or the steps it runs, edit
-   `ui/solution.json` to match. The page's "Download source code" hands out the package's
-   files as a zip, without `.env`, `sample_input/` and `output/`.
+   `ui/solution.json` to match. The page's "Download source code" hands out a zip of the
+   package's Python files, `README.md`, `config.yaml`, `requirements.txt`, `.env.example`,
+   `.gitignore`, the text files in `schemas/` and `prompts/` and the page's own files, and
+   nothing else: never another hidden file, a credential-named file, `sample_input/`,
+   `output/` or `evals/ground_truth/`. Keep code and settings in those places and names.
 
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to

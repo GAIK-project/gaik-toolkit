@@ -23,9 +23,13 @@ package's code, the files sent with the request in ``sample_input/`` and an empt
 ``output/``. The package's own ``sample_input/`` and ``output/`` are never written to.
 A request that sends no file runs on the examples in the package's ``sample_input/``.
 
-``GET /api/source`` zips what the package is made of: the code, the configuration, the
-prompts, the schemas, this server and its page. The keys (``.env``), the inputs, the
-results, virtual environments and links are never in it.
+``GET /api/source`` zips what the package is made of, and only that: its Python files
+(this server among them), ``README.md``, ``config.yaml``, ``requirements.txt``,
+``.env.example`` and ``.gitignore``, the text files in ``schemas/`` and ``prompts/``,
+and this page's own files in ``ui/``. Nothing else goes in: no other hidden file
+(``.env`` and its keys among them), no file whose name says it holds a credential,
+nothing from ``sample_input/``, ``output/`` or ``evals/ground_truth/``, no virtual
+environment, run folder or link. It is off while the server listens on the network.
 
 There is no sign-in. The server listens on this computer only (127.0.0.1) unless you
 start it with ``--host``; do that only on a network you trust. Ctrl+C, SIGTERM and
@@ -128,12 +132,41 @@ _PAGE_ASSET_TYPES = {
     ".woff2": "font/woff2",
     ".svg": "image/svg+xml",
 }
-#: Never in the source zip: folders of inputs, results, environments and caches ...
-_NOT_SOURCE_DIRS = {SAMPLE_DIR, OUTPUT_DIR, "__pycache__", "venv", "env", "node_modules"}
-#: ... compiled files, key files and anything too large to be source code.
-_NOT_SOURCE_SUFFIXES = (".pyc", ".pyo", ".env", ".pem", ".key", ".p12", ".pfx")
+#: The source zip takes these files and nothing else (see _is_source). At the
+#: package's root: its settings, its instructions and the keys' template ...
+_SOURCE_ROOT_NAMES = {
+    "README.md",
+    "config.yaml",
+    "requirements.txt",
+    ".env.example",
+    ".gitignore",
+}
+#: ... in schemas/ and prompts/: their text files ...
+_SOURCE_TEXT_SUFFIXES = {".py", ".json", ".md", ".txt", ".yaml", ".yml", ".hash"}
+#: ... in ui/: the test page's own files, as the scaffolder writes them ...
+_PAGE_FILES = {
+    "index.html",
+    "solution.json",
+    "gaik.svg",
+    "fonts/OFL.txt",
+    "fonts/sora-latin-wght-normal.woff2",
+    "fonts/sora-latin-ext-wght-normal.woff2",
+}
+#: ... and anywhere else, the package's Python files. Never what is under these
+#: folders: the inputs, the results and the user's own ground truth ...
+_NOT_SOURCE_PATHS = (SAMPLE_DIR, OUTPUT_DIR, "evals/ground_truth")
+#: ... nor in a folder of these names, at any depth (or a hidden one) ...
+_NOT_SOURCE_DIRS = {"__pycache__", "venv", "env", "node_modules", "site-packages"}
+#: ... nor a file whose name says it holds a credential, whatever its kind.
+_CREDENTIAL_NAME = re.compile(
+    r"credential|secret|passw|service[-_]?account|private[-_]?key|(^|[-_.])tokens?([-_.]|$)"
+    r"|^id_(rsa|dsa|ecdsa|ed25519)|\.(pem|key|p12|pfx|jks|keystore)$",
+    re.IGNORECASE,
+)
 MAX_SOURCE_FILE_BYTES = 5 * 1024 * 1024
 MAX_SOURCE_FILES = 2000
+#: What the zip may hold in all, before compression.
+MAX_SOURCE_BYTES = 20 * 1024 * 1024
 
 _RUN_ID_RE = re.compile(r"[0-9a-f]{16}")
 _LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
@@ -267,22 +300,51 @@ def _regular_files(folder: Path) -> list[Path]:
     return found
 
 
-def _is_source(relative: PurePosixPath) -> bool:
-    """Whether a file of the package, by its path inside it, belongs in the source zip.
+def _source_too_large() -> RefusalError:
+    return RefusalError(
+        413,
+        "too_large",
+        f"The package is too large to download as source code: at most "
+        f"{MAX_SOURCE_FILES} files and {MAX_SOURCE_BYTES // (1024 * 1024)} MB.",
+    )
 
-    Out: inputs and results, environments, caches and every hidden folder; the keys
-    (``.env`` and any ``.env.*`` but ``.env.example``, ``*.env``, key files); the
-    record of added inputs; compiled files.
+
+def _not_source_folder(relative: PurePosixPath) -> bool:
+    """Whether nothing under this folder of the package goes into the source zip."""
+    path = relative.as_posix()
+    if any(path == top or path.startswith(top + "/") for top in _NOT_SOURCE_PATHS):
+        return True
+    return any(part in _NOT_SOURCE_DIRS or part.startswith(".") for part in relative.parts)
+
+
+def _is_source(relative: PurePosixPath) -> bool:
+    """Whether a file of the package, by its path inside it, goes into the source zip.
+
+    An allow-list, so a file nobody thought of stays out: the Python files, at the
+    root ``README.md``, ``config.yaml``, ``requirements.txt``, ``.env.example`` and
+    ``.gitignore``, the text files in ``schemas/`` and ``prompts/``, and the test
+    page's own files in ``ui/``. Never a file under ``sample_input/``, ``output/``
+    or ``evals/ground_truth/``, in a hidden folder, an environment or a cache; never
+    another hidden file (``.env``, ``.netrc``, ``.npmrc``, ``.pypirc``,
+    ``.git-credentials``); never a file whose name says it holds a credential
+    (``credentials.json``, ``service-account.json``, ``secrets.toml``, ``id_rsa``).
     """
     *folders, name = relative.parts
-    if any(part in _NOT_SOURCE_DIRS or part.startswith(".") for part in folders):
+    if folders and _not_source_folder(PurePosixPath(*folders)):
         return False
-    lowered = name.lower()
-    if lowered.startswith(".env") and lowered != ".env.example":
+    if _CREDENTIAL_NAME.search(name):
         return False
-    if lowered.endswith(_NOT_SOURCE_SUFFIXES) or name == UPLOADED_NAMES_FILE:
+    if not folders:
+        if name in _SOURCE_ROOT_NAMES:
+            return True
+    if name.startswith("."):
         return False
-    return True
+    top = folders[0] if folders else ""
+    if top == "ui":
+        return "/".join(relative.parts[1:]) in _PAGE_FILES
+    if top in ("schemas", "prompts"):
+        return PurePosixPath(name).suffix.lower() in _SOURCE_TEXT_SUFFIXES
+    return name.endswith(".py")
 
 
 def _tail(path: Path, lines: int = LOG_TAIL_LINES) -> str:
@@ -732,23 +794,26 @@ class Solution:
     def source_files(self) -> list[tuple[str, Path]]:
         """``(name in the zip, file)`` for what the package is made of.
 
-        Real files of the package only (no link, nothing reached through one), and
-        of those what :func:`_is_source` lets through. A virtual environment under
-        any name, the runs' working folders and files too large to be source code
-        are left out as well; such folders are not walked into at all.
+        Real files of the package only (no link, nothing reached through one, no
+        file with a second hard link, which may be a file from elsewhere), and of
+        those what :func:`_is_source` lets through. A virtual environment under any
+        name, the runs' working folders and files too large to be source code are
+        left out as well; such folders are not walked into at all. More than
+        ``MAX_SOURCE_FILES`` files or ``MAX_SOURCE_BYTES`` in all is refused.
         """
         root = self.package_dir
         runs_root = self.runs_root.resolve()
 
         def walked(folder: Path) -> bool:
-            if folder.is_symlink() or folder.name in _NOT_SOURCE_DIRS:
+            if folder.is_symlink() or (folder / "pyvenv.cfg").exists():
                 return False
-            if folder.name.startswith(".") or (folder / "pyvenv.cfg").exists():
+            if _not_source_folder(PurePosixPath(folder.relative_to(root).as_posix())):
                 return False
             real = folder.resolve()
             return real.is_relative_to(root) and not real.is_relative_to(runs_root)
 
         found: list[tuple[str, Path]] = []
+        total = 0
         for current, dirs, names in os.walk(root, followlinks=False):
             dirs[:] = sorted(d for d in dirs if walked(Path(current, d)))
             for name in sorted(names):
@@ -758,23 +823,40 @@ class Solution:
                     continue
                 if not path.resolve().is_relative_to(root):
                     continue
-                if path.stat().st_size > MAX_SOURCE_FILE_BYTES:
+                status = path.stat()
+                if status.st_nlink > 1 or status.st_size > MAX_SOURCE_FILE_BYTES:
                     continue
+                total += status.st_size
                 found.append((str(relative), path))
-                if len(found) >= MAX_SOURCE_FILES:
-                    return found
+                if len(found) > MAX_SOURCE_FILES or total > MAX_SOURCE_BYTES:
+                    raise _source_too_large()
         return found
 
     def source_zip(self) -> tuple[str, bytes]:
-        """``(file name, bytes)`` of the package's source code as a zip, in one folder."""
+        """``(file name, bytes)`` of the package's source code as a zip, in one folder.
+
+        Built in memory, so what is read is held to ``MAX_SOURCE_BYTES`` in all,
+        also when a file grew after :meth:`source_files` looked at it.
+        """
         folder = self.source_name()
         buffer = io.BytesIO()
+        budget = MAX_SOURCE_BYTES
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             for name, path in self.source_files():
                 try:
-                    archive.write(path, f"{folder}/{name}")
+                    entry = zipfile.ZipInfo.from_file(
+                        path, f"{folder}/{name}", strict_timestamps=False
+                    )
+                    with open(path, "rb") as fh:
+                        data = fh.read(MAX_SOURCE_FILE_BYTES + 1)
                 except OSError:
                     continue
+                if len(data) > MAX_SOURCE_FILE_BYTES:
+                    continue
+                budget -= len(data)
+                if budget < 0:
+                    raise _source_too_large()
+                archive.writestr(entry, data, compress_type=zipfile.ZIP_DEFLATED)
         return f"{folder}.zip", buffer.getvalue()
 
     def output_file(self, run_id: str, name: str) -> Path:
@@ -814,14 +896,16 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- answers ------------------------------------------------------------
 
-    def _send(self, status: int, body: bytes, content_type: str, extra: dict | None = None):
+    def _send(self, status: int, body: bytes | None, content_type: str, extra: dict | None = None):
+        """Answer ``body``; None answers a HEAD with the headers alone, its length unknown."""
         self.send_response(status)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
+        if body is not None:
+            self.send_header("Content-Length", str(len(body)))
         for name, value in {**_SECURITY_HEADERS, **(extra or {})}.items():
             self.send_header(name, value)
         self.end_headers()
-        if self.command != "HEAD":
+        if body is not None and self.command != "HEAD":
             self.wfile.write(body)
 
     def _json(self, status: int, payload: dict):
@@ -889,13 +973,27 @@ class Handler(BaseHTTPRequestHandler):
                 200, page, "text/html; charset=utf-8", {"Content-Security-Policy": _PAGE_POLICY}
             )
         elif path == "/api/solution":
-            self._json(200, self.solution.description())
+            described = self.solution.description()
+            described["source_download"] = self.server.source_download  # type: ignore[attr-defined]
+            self._json(200, described)
         elif path == "/api/status":
             self._json(200, self.solution.status())
         elif path == "/api/source":
-            name, body = self.solution.source_zip()
+            if not self.server.source_download:  # type: ignore[attr-defined]
+                # Anyone who can reach the address would get the package's code.
+                raise RefusalError(
+                    403,
+                    "source_off",
+                    "The source code download is off while the test page listens on the "
+                    "network (--host). Start it without --host to download the source code.",
+                )
             # The name is the solution's id cut down to letters, digits, ".", "_" and "-".
-            disposition = f'attachment; filename="{name}"'
+            disposition = f'attachment; filename="{self.solution.source_name()}.zip"'
+            if self.command == "HEAD":
+                # Answered without building the zip.
+                self._send(200, None, "application/zip", {"Content-Disposition": disposition})
+                return
+            _, body = self.solution.source_zip()
             self._send(200, body, "application/zip", {"Content-Disposition": disposition})
         elif path.startswith("/ui/"):
             asset = self.solution.page_asset(unquote(path.removeprefix("/ui/")))
@@ -991,6 +1089,14 @@ def _host_names(host: str, address: str) -> frozenset[str]:
     return frozenset(names - _EVERY_ADDRESS)
 
 
+def _is_loopback(address: str) -> bool:
+    """Whether ``address`` is one only this computer reaches (127.0.0.0/8, ::1)."""
+    try:
+        return ipaddress.ip_address(str(address).split("%", 1)[0]).is_loopback
+    except ValueError:
+        return False
+
+
 def _host_allowed(host: str, names: frozenset[str], every_address: bool) -> bool:
     """Whether ``host``, from a request's Host header, is one of this server's own names.
 
@@ -1016,6 +1122,8 @@ def create_server(
     server.daemon_threads = True
     server.host_names = _host_names(host, server.server_address[0])  # type: ignore[attr-defined]
     server.every_address = host in _EVERY_ADDRESS  # type: ignore[attr-defined]
+    # The source zip only while the server listens on this computer alone.
+    server.source_download = _is_loopback(server.server_address[0])  # type: ignore[attr-defined]
     server.solution = Solution(package_dir, **limits)  # type: ignore[attr-defined]
     return server
 

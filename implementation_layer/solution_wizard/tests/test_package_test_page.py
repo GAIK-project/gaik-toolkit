@@ -1125,7 +1125,30 @@ def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
     (poc / "tryout" / "site.py").write_text("# an environment's file\n", encoding="utf-8")
     (poc / "venv" / "site.py").write_text("# an environment's file\n", encoding="utf-8")
     (poc / ".git" / "config").write_text("[core]\n", encoding="utf-8")
-    (poc / "notes.md").write_text("The user's own note, part of the package.\n", encoding="utf-8")
+    # Hidden files other than .env that hold credentials (review of #229) ...
+    for name in (".netrc", ".npmrc", ".pypirc", ".git-credentials", "prompts/.netrc"):
+        (poc / name).write_text(f"password {secret}\n", encoding="utf-8")
+    # ... files whose name says they hold one, also where code and schemas live ...
+    for name in (
+        "credentials.json",
+        "service-account.json",
+        "secrets.toml",
+        "id_rsa",
+        "client_secret.json",
+        "token.json",
+        "schemas/credentials.json",
+        "prompts/service_account.json",
+        "api_secrets.py",
+    ):
+        (poc / name).write_text(f'{{"key": "{secret}"}}\n', encoding="utf-8")
+    # ... the user's own ground truth for the evaluation ...
+    (poc / "evals" / "ground_truth" / "order_1042.json").write_text(
+        f'{{"customer": "{secret}"}}', encoding="utf-8"
+    )
+    (poc / "evals" / "ground_truth" / "check.py").write_text(f"# {secret}\n", encoding="utf-8")
+    # ... and a file nobody thought of: not code, a setting or a schema.
+    (poc / "notes.md").write_text(f"The user's own note: {secret}\n", encoding="utf-8")
+    (poc / "ui" / "notes.txt").write_text(secret, encoding="utf-8")
     # A run before the download: its working folder and uploads are not the package's.
     assert page.run(files=[("order.pdf", b"%PDF " + secret.encode())])[0] == 200
 
@@ -1150,9 +1173,7 @@ def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
         "provider_config.py",
         "requirements.txt",
         "run_poc.py",
-        "notes.md",
         "evals/run_basic_eval.py",
-        "evals/ground_truth/.gitkeep",
         "prompts/extraction_requirements.md",
         "schemas/output_schema.json",
         "schemas/output_schema.py",
@@ -1183,12 +1204,110 @@ def test_a_link_in_the_package_is_not_in_the_source_zip(page, tmp_path):
 
 
 def test_a_file_too_large_to_be_source_code_is_left_out(page):
-    (page.poc / "model.bin").write_bytes(b"\x00" * (page.app.MAX_SOURCE_FILE_BYTES + 1))
+    (page.poc / "table_data.py").write_bytes(b"#" * (page.app.MAX_SOURCE_FILE_BYTES + 1))
 
     _, files = _source(page)
 
-    assert not any(name.endswith("model.bin") for name in files)
+    assert not any(name.endswith("table_data.py") for name in files)
     assert any(name.endswith("/run_poc.py") for name in files)
+
+
+def test_the_zips_page_files_are_the_ones_the_scaffolder_writes(page):
+    """app.py lists the page's files itself; it must name what the scaffolder writes."""
+    from solution_wizard.scaffolder import _PAGE_ASSETS, TEST_PAGE_TEMPLATES
+
+    written = {name.removeprefix("ui/") for name in TEST_PAGE_TEMPLATES if name.startswith("ui/")}
+    assert page.app._PAGE_FILES == written | set(_PAGE_ASSETS) | {"solution.json"}
+    _, files = _source(page)
+    assert {name.split("/", 1)[1] for name in files if "/ui/" in name} == {
+        f"ui/{name}" for name in page.app._PAGE_FILES
+    }
+
+
+def test_a_file_with_a_second_hard_link_is_not_in_the_source_zip(page, tmp_path):
+    """A hard link is a file from elsewhere under a name of the package's."""
+    outside = tmp_path / "outside.py"
+    outside.write_text("# a file outside the package\n", encoding="utf-8")
+    try:
+        os.link(outside, page.poc / "helper.py")
+    except (OSError, NotImplementedError):
+        pytest.skip("this file system cannot make a hard link")
+
+    _, files = _source(page)
+
+    assert not any(name.endswith("/helper.py") for name in files)
+    assert any(name.endswith("/run_poc.py") for name in files)
+
+
+def test_a_package_over_the_size_limit_is_refused_not_cut_short(page, monkeypatch):
+    """The zip is built in memory: there is a limit on what it holds in all."""
+    sizes = sorted(
+        (page.poc / name).stat().st_size for name, _ in page.server.solution.source_files()
+    )
+    monkeypatch.setattr(page.app, "MAX_SOURCE_BYTES", sum(sizes) - 1)
+
+    status, _, body = page.request("GET", "/api/source")
+
+    assert status == 413
+    assert json.loads(body)["error"]["code"] == "too_large"
+
+    monkeypatch.setattr(page.app, "MAX_SOURCE_BYTES", sum(sizes))
+    assert page.request("GET", "/api/source")[0] == 200
+
+
+def test_a_head_request_does_not_build_the_zip(page, monkeypatch):
+    def not_built():
+        raise AssertionError("HEAD built the zip")
+
+    monkeypatch.setattr(page.server.solution, "source_zip", not_built)
+
+    status, headers, body = page.request("HEAD", "/api/source")
+
+    assert status == 200
+    assert body == b""
+    assert headers["Content-Type"] == "application/zip"
+    assert headers["Content-Disposition"].startswith("attachment;")
+    assert "Content-Length" not in headers
+
+
+def test_the_source_download_is_off_while_the_server_listens_on_the_network(page):
+    """With --host, /api/source handed the package tree to anyone who could reach it."""
+    assert page.get_json("/api/solution")[1]["source_download"] is True
+    # As create_server sets it for an address other computers reach.
+    page.server.source_download = False
+
+    for method in ("GET", "HEAD"):
+        status, _, body = page.request(method, "/api/source")
+        assert status == 403, method
+    status, _, body = page.request("GET", "/api/source")
+    assert json.loads(body)["error"] == {
+        "code": "source_off",
+        "message": (
+            "The source code download is off while the test page listens on the network "
+            "(--host). Start it without --host to download the source code."
+        ),
+    }
+    assert page.get_json("/api/solution")[1]["source_download"] is False
+    # The page shows no download then.
+    html = (COMMON / "ui" / "index.html").read_text(encoding="utf-8")
+    assert 'show($("source"), solution.source_download !== false)' in html
+
+
+@pytest.mark.parametrize(
+    ("address", "loopback"),
+    [
+        ("127.0.0.1", True),
+        ("127.0.0.2", True),
+        ("::1", True),
+        ("0.0.0.0", False),
+        ("::", False),
+        ("192.168.1.20", False),
+        ("fe80::1%eth0", False),
+        ("", False),
+    ],
+)
+def test_only_a_loopback_address_keeps_the_source_download(page, address, loopback):
+    assert page.app._is_loopback(address) is loopback
 
 
 @pytest.mark.parametrize(

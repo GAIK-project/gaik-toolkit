@@ -710,7 +710,8 @@
     renderPicked();
     renderSteps();
     show($("form"), true);
-    show($("source"), true);
+    // Off while the server listens on the network (app.py --host).
+    show($("source"), solution.source_download !== false);
     show($("footer-block"), true);
   }
 
