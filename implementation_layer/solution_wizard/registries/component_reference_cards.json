@@ -2035,10 +2035,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "Agentic mode only. When true, raises before writing any output if the diff-editor reviewer has unresolved edits after retries. Use when the report must never be persisted with unresolved reviewer corrections.",
+        "default": true,
+        "effect": "Agentic mode only. True (the default after gaik 0.11.0; up to 0.11.0 the default was false): raises before writing any output if the diff-editor reviewer has unresolved edits after retries, so a report is never saved as reviewed with a correction left out. False writes the report and returns the unresolved edits as section.revision_warnings.",
         "selection_relevant": true,
-        "infer_from": "agentic == true AND (human_review == yes OR accuracy_critical)"
+        "infer_from": "leave true; pass strict_review=True explicitly while the PoC pins gaik 0.11.0 or older. False only when the user accepts a report with unresolved reviewer corrections listed as revision warnings for a person to resolve"
       },
       {
         "name": "review_options",
@@ -2161,7 +2161,7 @@
   "ReportWriter": {
     "import": "from gaik.software_modules.report_writer import ReportWriter, ReportSpec, SectionSpec, RunSettings, ModelSettings",
     "construct": "writer = ReportWriter(config=get_stage_config(config, 'answer'))",
-    "call": "settings = RunSettings(transcription_language=language, strict_review=False, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = [entry.model_dump(mode='json') for entry in report.review_log]  # Pydantic models: json.dumps takes their model_dump(mode='json'), or use report.save(dir)",
+    "call": "settings = RunSettings(transcription_language=language, strict_review=True, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = [entry.model_dump(mode='json') for entry in report.review_log]  # Pydantic models: json.dumps takes their model_dump(mode='json'), or use report.save(dir)",
     "call_from_spec_file": "spec = ReportSpec.load(spec_path)  # since gaik 0.10.0 (SourcePathError is exported from report_writer): source paths and the sample report are relative to the spec file's folder and must stay inside it; an absolute path, or one leading out through '..' or a symbolic link, raises SourcePathError before any file is read. ReportSpec.load(spec_path, root=parent_folder) accepts paths inside a wider root (and absolute ones inside it). spec.save(path) writes them back relative",
     "call_resume": "report = writer.synthesize(spec, workspace, progress_callback=print)  # after editing workspace/knowledge/*.json; normalize and curate are not rerun",
     "call_rebuild": "report = writer.rebuild(spec, workspace)  # after editing workspace/report/sections/*.md (keep the '## <title>' first line); no LLM call",
@@ -2223,10 +2223,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "RunSettings field. When true, synthesize fails with RuntimeError when a reviewer edit cannot be applied, instead of logging it in report/review_log.json.",
+        "default": true,
+        "effect": "RunSettings field. True (the default after gaik 0.11.0; up to 0.11.0 the default was false): synthesize fails with RuntimeError when a reviewer edit cannot be applied, so a report is never returned as reviewed with a correction left out. False logs the edit in report/review_log.json and returns the report.",
         "selection_relevant": true,
-        "infer_from": "accuracy_critical == yes OR the report must never be saved with unresolved reviewer corrections -> true; otherwise false and surface review_log to the human reviewer"
+        "infer_from": "leave true; set it explicitly while the PoC pins gaik 0.11.0 or older. False only when the user accepts a report with unresolved reviewer corrections and a person reads report/review_log.json before the report is used"
       },
       {
         "name": "review_attempts",
@@ -2405,7 +2405,7 @@
   },
   "ReportSynthesizer": {
     "import": "from gaik.software_components.report_synthesizer import ReportSynthesizer, Report",
-    "construct": "synthesizer = ReportSynthesizer(config=get_stage_config(config, 'answer'), reviewer_model=None, strict_review=False, review_attempts=5)",
+    "construct": "synthesizer = ReportSynthesizer(config=get_stage_config(config, 'answer'), reviewer_model=None, strict_review=True, review_attempts=5)",
     "call": "report = synthesizer.synthesize(knowledge, section_specs, title=report_title, language=report_language, instructions=report_instructions, sample_report=sample_report_markdown, progress_callback=print)\n    report.save(output_dir / 'report', docx=False)\n    report_markdown = report.markdown",
     "call_rebuild": "Report.load(output_dir / 'report').save(output_dir / 'report', docx=False)  # after hand-editing report/sections/*.md; no LLM call",
     "returns": "Report(.title, .sections [ReportSection(.id, .title, .text)], .review_log [ReviewEntry(.section_id, .applied, .unresolved)], .usage, .markdown); .save(dir, docx=True) -> sections/NN_<id>.md, review_log.json, report.md, report.docx; report.model_dump(mode='json') for JSON (json.dumps cannot write the Report, its ReviewEntry or Edit models directly); Report.load(dir)",
@@ -2417,10 +2417,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "When true, a section with unresolved reviewer edits raises RuntimeError and stops the run; otherwise the edits are logged in review_log.",
+        "default": true,
+        "effect": "True (the default after gaik 0.11.0; up to 0.11.0 the default was false): a section with unresolved reviewer edits raises RuntimeError and stops the run, so a report is never returned as reviewed with a correction left out. False logs the edits in review_log and returns the report.",
         "selection_relevant": true,
-        "infer_from": "accuracy_critical == yes OR the report must never be saved with unresolved reviewer corrections -> true"
+        "infer_from": "leave true; pass it explicitly while the PoC pins gaik 0.11.0 or older. False only when the user accepts a report with unresolved reviewer corrections and a person reads review_log before the report is used"
       },
       {
         "name": "reviewer_model",
