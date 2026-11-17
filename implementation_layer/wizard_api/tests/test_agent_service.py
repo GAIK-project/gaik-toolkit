@@ -92,6 +92,16 @@ def test_bootstrap_makes_the_approve_button_the_only_gate_approval(tmp_path):
     )
 
 
+def test_bootstrap_has_the_gate_4_message_end_with_the_ai_act_question(tmp_path):
+    """The offer in SKILL.md Phase 12 went unasked in the Gate 4 message: the agent
+    mentioned it as a remark, or asked it only after the approval."""
+    prompt = " ".join(agent_service._bootstrap_prompt(tmp_path, "en").split())
+
+    assert "THE GATE 4 (HANDOVER) MESSAGE ENDS WITH THE AI ACT QUESTION" in prompt
+    assert '"Would you like a preliminary EU AI Act screening of this solution?"' in prompt
+    assert "approving the gate without answering means no" in prompt
+
+
 def test_bootstrap_has_the_gate_approved_by_its_name_and_not_in_the_panel(tmp_path):
     """The Approve button is also under the reply and at the foot of the workspace,
     and at times the page has no panel beside the chat (issue 146)."""
