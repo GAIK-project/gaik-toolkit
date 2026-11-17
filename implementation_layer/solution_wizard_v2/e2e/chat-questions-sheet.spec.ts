@@ -275,3 +275,133 @@ test.describe("skipping a question with its button", () => {
     );
   });
 });
+
+// Two questions list their answers as bullets; the third is free text.
+const OPTION_ROUND = [
+  "Tarkennan muutaman asian:",
+  "",
+  "1. Missä muodossa ostotilaukset saapuvat?",
+  "   - PDF sähköpostilla",
+  "   - Skannattuna paperina",
+  "   - EDI-sanomana",
+  "2. Kuka tarkistaa poimitut tiedot?",
+  "   - Ostaja",
+  "   - Talousosasto",
+  "3. Kuinka monta tilausta käsittelette päivässä?",
+].join("\n");
+
+test.describe("choosing among the answers a question lists", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test.beforeEach(async ({ request }) => {
+    await resetMockSessions(request);
+  });
+
+  test("the options are choices under their question: one press chooses, and the chosen one says so", async ({
+    page,
+  }) => {
+    const sent = await fakeWizard(page, (_message, earlier) =>
+      reply(earlier === 0 ? OPTION_ROUND : "Kiitos, kirjasin vastauksesi."),
+    );
+    await newSession(page);
+    await chatField(page).fill("Haluan automatisoida ostotilausten käsittelyn.");
+    await chatField(page).press("Enter");
+
+    // The form says it is the place to answer, and is named by that.
+    const form = page.getByRole("form", { name: "Vastaa tässä" });
+    await expect(form).toBeVisible();
+
+    // The options are a group named by their question, each a button that is
+    // off until pressed, tall enough to hit and with the hand cursor.
+    const options = form.getByRole("group", { name: "1. Missä muodossa ostotilaukset saapuvat?" });
+    await expect(options.getByRole("button")).toHaveText(["PDF sähköpostilla", "Skannattuna paperina", "EDI-sanomana"]);
+    const pdf = options.getByRole("button", { name: "PDF sähköpostilla" });
+    const edi = options.getByRole("button", { name: "EDI-sanomana" });
+    await expect(pdf).toHaveAttribute("aria-pressed", "false");
+    await expect(pdf).toHaveCSS("cursor", "pointer");
+    expect((await pdf.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+    // An edge that is seen at rest, not only under the pointer.
+    await expect(pdf).toHaveCSS("border-top-color", "rgb(135, 145, 167)");
+
+    // Chosen: pressed, filled, and its words are the answer in the field.
+    const first = form.getByRole("textbox", { name: "1. Missä muodossa ostotilaukset saapuvat?" });
+    await expect(first).toHaveAttribute("placeholder", "Tai kirjoita oma vastaus");
+    await pdf.click();
+    await expect(pdf).toHaveAttribute("aria-pressed", "true");
+    await expect(pdf).toHaveCSS("background-color", "rgb(230, 241, 250)");
+    await expect(first).toHaveValue("PDF sähköpostilla");
+    // Another option takes its place; the same one again takes the answer back.
+    await edi.click();
+    await expect(edi).toHaveAttribute("aria-pressed", "true");
+    await expect(pdf).toHaveAttribute("aria-pressed", "false");
+    await edi.click();
+    await expect(edi).toHaveAttribute("aria-pressed", "false");
+    await expect(first).toHaveValue("");
+    await pdf.click();
+
+    // From the keyboard: Tab reaches the next option, Space presses it, and
+    // the focus is drawn on it.
+    await pdf.focus();
+    await page.keyboard.press("Tab");
+    const scanned = options.getByRole("button", { name: "Skannattuna paperina" });
+    await expect(scanned).toBeFocused();
+    expect(await scanned.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+    await page.keyboard.press("Space");
+    await expect(scanned).toHaveAttribute("aria-pressed", "true");
+
+    // Skip is a button with an edge of its own, pressed once it is on.
+    const skip = form.getByTestId("chat-question-skip-2");
+    await expect(skip).toHaveCSS("border-top-width", "1px");
+    expect((await skip.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+    await skip.click();
+    await expect(skip).toHaveAttribute("aria-pressed", "true");
+
+    await form.getByRole("group", { name: "2. Kuka tarkistaa poimitut tiedot?" }).getByRole("button", { name: "Ostaja" }).click();
+    await form.getByRole("button", { name: "Lähetä vastaukset" }).click();
+    await expect.poll(() => sent.length).toBe(2);
+    expect(sent[1]).toBe(
+      [
+        "Vastaukseni kysymyksiisi (kysymykset lainattuina):",
+        '1. "Missä muodossa ostotilaukset saapuvat?": Skannattuna paperina',
+        '2. "Kuka tarkistaa poimitut tiedot?": Ostaja',
+        '3. "Kuinka monta tilausta käsittelette päivässä?": ohita',
+      ].join("\n"),
+    );
+  });
+});
+
+test.describe("the choices under a finger", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test.beforeEach(async ({ request }) => {
+    await resetMockSessions(request);
+  });
+
+  test("options, Skip, the checklist's buttons and the examples are 44 px to press", async ({ page }) => {
+    await loginAsDev(page);
+    expect(await page.evaluate(() => window.matchMedia("(pointer: coarse)").matches)).toBe(true);
+    // The start view's examples and the two choices beside the field.
+    const tall = async (name: string, control: ReturnType<Page["locator"]>) =>
+      expect((await control.boundingBox())!.height, name).toBeGreaterThanOrEqual(44);
+    await tall("example", page.getByTestId("chat-examples").getByRole("button").first());
+    await tall("background", page.getByTestId("chat-background").getByRole("button"));
+
+    await fakeWizard(page, () => reply(OPTION_ROUND));
+    await createSession(page, `touch ${Date.now()}`);
+    await chatField(page).fill("Haluan automatisoida ostotilausten käsittelyn.");
+    await chatField(page).press("Enter");
+    const form = page.getByTestId("chat-questions");
+    await expect(form).toBeVisible();
+    await tall("option", form.getByRole("button", { name: "PDF sähköpostilla" }));
+    await tall("skip", form.getByTestId("chat-question-skip-0"));
+
+    // Behind the chat: the checklist's button, and the steps' button, which
+    // stays small beside the title and is pressed from 44 px around it.
+    await page.getByTestId("chat-dock-toggle").tap();
+    await tall("answer in the chat", page.getByTestId("requirement-ask-1"));
+    const steps = page.getByTestId("steps-disclosure");
+    await expect(steps).toHaveCSS("border-top-width", "1px");
+    const reach = await steps.evaluate((el) => parseFloat(getComputedStyle(el, "::after").height));
+    expect(reach).toBeGreaterThanOrEqual(44);
+  });
+});
