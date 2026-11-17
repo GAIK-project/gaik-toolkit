@@ -73,7 +73,21 @@ A saved edit is a package change like one of the agent's. The package digest
 (`package_digest` in `GET /poc/files`) follows the files a test run is tied to, so an
 edit to one of them makes the earlier run a run of another package, and where Gate 3
 was approved it reopens that gate. An edit to a file outside the digest (the README,
-`.env.example`) does neither. Each save is recorded in the session's metadata
+`.env.example`) does neither.
+
+The digest (`poc_service.package_digest`) covers `run_poc.py`, `config.yaml`,
+`provider_config.py`, `requirements.txt`, the schema files, `prompts/` and every other
+Python module of the package a run executes (`pdf_report.py`, `input_bundle.py`, a
+helper the agent added). The test page (`app.py`, `ui/`), `evals/`, `sample_input/` and
+`output/` are not part of it. A digest in this formula starts with `v2:`. One stored
+before it (16 hex characters, with a run or with Gate 3's approval) is compared in the
+formula it was made with, which did not cover the other modules, so an existing session
+neither reopens nor locks because the formula changed; its records move to the new
+formula with the session's next test run, approval or save in the editor.
+
+Environment files that would hold keys (`.env` in any spelling but `.env.example`) are
+left out of the package's listing and of both zips (`poc_service.package_files`), and
+so never reach the sandbox either. The session export still carries every file held. Each save is recorded in the session's metadata
 (`user_edits`, server-owned) and the agent is told once, with the next chat message.
 
 `GET /sessions/{id}/poc/deployable` hands the package over only when the run recorded as

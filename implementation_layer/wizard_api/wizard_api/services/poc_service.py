@@ -88,6 +88,17 @@ def regular_file(path: str | os.PathLike, root: str | os.PathLike) -> bool:
     return real.startswith(real_root + os.sep)
 
 
+def package_files(poc_dir: str | os.PathLike) -> list[str]:
+    """The real files of ``poc/`` that the API lists and zips.
+
+    Without environment files that would hold keys (``is_secret_name``): one
+    the agent or a tool left in the package is never listed, downloaded or
+    sent to the sandbox. A package's settings without their values belong in
+    ``.env.example``.
+    """
+    return [relative for relative in regular_files(poc_dir) if not is_secret_name(relative)]
+
+
 def regular_files(root: str | os.PathLike) -> list[str]:
     """The real files under ``root``, relative to it; symlinked files and folders are skipped."""
     found = []
@@ -341,7 +352,7 @@ def _agent_package(poc_dir: Path) -> dict[str, Any]:
 
 
 def _relative_files(poc_dir: Path) -> list[str]:
-    return [f for f in regular_files(poc_dir) if "__pycache__" not in Path(f).parts]
+    return [f for f in package_files(poc_dir) if "__pycache__" not in Path(f).parts]
 
 
 def generate_poc(
@@ -924,8 +935,7 @@ _VERSION_FILES = (
 )
 
 
-def package_version(poc_dir: str) -> str:
-    """A short digest of the files a preflight reads; changes when any of them does."""
+def _version_files_digest(poc_dir: str) -> Any:
     digest = hashlib.sha256()
     for name in _VERSION_FILES:
         path = os.path.join(poc_dir, name)
@@ -933,7 +943,118 @@ def package_version(poc_dir: str) -> str:
         if regular_file(path, poc_dir):
             with open(path, "rb") as fh:
                 digest.update(fh.read())
+    return digest
+
+
+def _legacy_package_version(poc_dir: str) -> str:
+    """``package_version`` as it was before the package's other modules counted.
+
+    Kept only for ``package_digest``'s first formula: digests stored with a run
+    or an approval before the second one are compared in the formula they were
+    made with.
+    """
+    return _version_files_digest(poc_dir).hexdigest()[:16]
+
+
+#: Folders and files of the package whose Python a test run does not execute:
+#: the test page (``app.py``, ``ui/``) and the evaluation scripts.
+_NOT_RUN_DIRS = ("ui", "evals")
+_NOT_RUN_FILES = ("app.py",)
+
+
+def _is_runtime_module(relative: str) -> bool:
+    """Whether a path inside poc/ is Python the run executes, beside ``_VERSION_FILES``."""
+    parts = relative.replace(os.sep, "/").split("/")
+    if not parts[-1].endswith(".py") or "__pycache__" in parts:
+        return False
+    if parts[0] in _NOT_CODE_DIRS or parts[0] in _NOT_RUN_DIRS:
+        return False
+    return "/".join(parts) not in _NOT_RUN_FILES
+
+
+def runtime_modules(poc_dir: str) -> list[str]:
+    """The package's own Python modules a run executes that ``_VERSION_FILES`` does not name.
+
+    ``pdf_report.py``, ``input_bundle.py``, ``document_manifest.py``, a helper
+    the agent added: ``run_poc.py`` imports them, so a change to one changes
+    what a run does as much as a change to ``run_poc.py`` itself. As POSIX
+    paths, in name order.
+    """
+    named = {name.replace(os.sep, "/") for name in _VERSION_FILES}
+    found = [relative.replace(os.sep, "/") for relative in regular_files(poc_dir)]
+    return sorted(rel for rel in found if _is_runtime_module(rel) and rel not in named)
+
+
+def _update_with_files(digest: Any, root: str, names: list[str]) -> None:
+    for name in names:
+        digest.update(name.encode())
+        with open(os.path.join(root, name), "rb") as fh:
+            digest.update(fh.read())
+
+
+def package_version(poc_dir: str) -> str:
+    """A short digest of the code, settings and schema a run reads; changes when any does.
+
+    The files a preflight reads by name (``_VERSION_FILES``) and the package's
+    other runtime modules (``runtime_modules``). Never stored against a
+    session: it ties a check and the PoC tab's own state to what they looked at.
+    """
+    digest = _version_files_digest(poc_dir)
+    _update_with_files(digest, poc_dir, runtime_modules(poc_dir))
     return digest.hexdigest()[:16]
+
+
+#: What a digest in the second formula starts with. One without it (16 hex
+#: characters) was made with the first.
+PACKAGE_DIGEST_V2 = "v2:"
+_PROMPTS = "prompts"
+
+
+def _is_legacy_digest(stored: Any) -> bool:
+    return isinstance(stored, str) and bool(stored) and not stored.startswith(PACKAGE_DIGEST_V2)
+
+
+def package_digest(poc_dir: str, like: Any = None) -> str:
+    """The package as a test run and an approval are tied to it.
+
+    The code, settings and schema (``package_version``) and the instructions
+    under ``prompts/``, which are read at run time and decide the result as
+    much as the code does.
+
+    Two formulas. The first covered ``_VERSION_FILES`` and ``prompts/`` only,
+    so an edit to another module of the package (``pdf_report.py``) left the
+    digest as it was: Gate 3 stayed approved and the deployable package was
+    handed over with a change no run had tested. The second also covers
+    ``runtime_modules`` and says so in its prefix.
+
+    A digest is stored with each run and each approval and compared with the
+    package later. ``like`` is that stored digest: the answer is made in its
+    formula, so a session approved or tested before the second formula still
+    compares equal while its package is as it was, and nothing reopens or
+    locks because the formula changed. Without ``like`` (a new record, or no
+    stored digest to compare with) the answer is in the second formula.
+    """
+    legacy = _is_legacy_digest(like)
+    version = _legacy_package_version(poc_dir) if legacy else package_version(poc_dir)
+    digest = hashlib.sha256(version.encode())
+    prompts = os.path.join(poc_dir, _PROMPTS)
+    if os.path.isdir(prompts) and not os.path.islink(prompts):
+        _update_with_files(digest, prompts, regular_files(prompts))
+    short = digest.hexdigest()[:16]
+    return short if legacy else PACKAGE_DIGEST_V2 + short
+
+
+def current_formula_digest(poc_dir: str, stored: Any) -> str | None:
+    """``stored`` brought to the second formula, when the package still is what it names.
+
+    For a session whose records are in the first formula: while the package
+    matches the record by that formula, the record can be rewritten in the
+    second, and the package's other modules are watched from then on. None
+    when ``stored`` is not a first-formula digest or no longer matches.
+    """
+    if not _is_legacy_digest(stored) or package_digest(poc_dir, like=stored) != stored:
+        return None
+    return package_digest(poc_dir)
 
 
 def package_is_ready(poc_dir: str) -> bool:
@@ -1124,7 +1245,9 @@ def is_deployable_path(relative_path: str) -> bool:
     if parts[0] in _NOT_DEPLOYABLE_DIRS:
         return False
     name = parts[-1]
-    if name in _NOT_DEPLOYABLE_NAMES:
+    # ``.env`` in any spelling: ``.env.local``, ``.env.production``, ``.envrc``,
+    # ``.ENV``. Only ``.env.example`` is part of a package.
+    if name in _NOT_DEPLOYABLE_NAMES or is_secret_name(relative_path):
         return False
     return not name.endswith(_NOT_DEPLOYABLE_SUFFIXES)
 
@@ -1168,7 +1291,6 @@ MAX_PACKAGE_PATH_CHARS = 512
 _READ_ONLY_DIRS = (SAMPLE_INPUT_DIR, "output")
 #: The wizard's own records inside or beside the package; never a file of it.
 _HIDDEN_NAMES = (MANIFEST_NAME, UPLOADED_NAMES_FILE)
-_PROMPTS_DIR = "prompts"
 _DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
 
 
@@ -1253,12 +1375,16 @@ def package_file_read_only(normalised: str) -> str | None:
 def counts_for_package_digest(normalised: str) -> bool:
     """Whether a change to this file changes the digest a test run is tied to.
 
-    The files a preflight reads (``package_version``) and the prompts the run
-    reads (the sessions router's ``_approved_package_digest``); a README or
-    ``.env.example`` is neither.
+    What ``package_digest`` covers: the files a preflight reads by name, the
+    package's other runtime modules and the prompts. A README, ``.env.example``,
+    the test page (``app.py``, ``ui/``) and ``evals/`` are none of them.
     """
     version_files = {name.replace(os.sep, "/") for name in _VERSION_FILES}
-    return normalised in version_files or normalised.startswith(_PROMPTS_DIR + "/")
+    return (
+        normalised in version_files
+        or normalised.startswith(_PROMPTS + "/")
+        or _is_runtime_module(normalised)
+    )
 
 
 def content_digest(data: bytes) -> str:
