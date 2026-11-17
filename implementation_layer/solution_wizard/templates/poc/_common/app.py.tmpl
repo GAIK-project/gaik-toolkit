@@ -28,7 +28,9 @@ prompts, the schemas, this server and its page. The keys (``.env``), the inputs,
 results, virtual environments and links are never in it.
 
 There is no sign-in. The server listens on this computer only (127.0.0.1) unless you
-start it with ``--host``; do that only on a network you trust. Standard library only.
+start it with ``--host``; do that only on a network you trust. Ctrl+C, SIGTERM and
+SIGHUP (the terminal closing) stop a run that is going and remove the working folders.
+Standard library only.
 """
 
 from __future__ import annotations
@@ -36,12 +38,14 @@ from __future__ import annotations
 import argparse
 import atexit
 import io
+import ipaddress
 import json
 import os
 import re
 import secrets
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -133,6 +137,12 @@ MAX_SOURCE_FILES = 2000
 
 _RUN_ID_RE = re.compile(r"[0-9a-f]{16}")
 _LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
+#: ``--host`` values that listen on every address of this computer.
+_EVERY_ADDRESS = {"", "0.0.0.0", "::"}
+#: Signals that stop the server as Ctrl+C does; SIGHUP is the terminal closing.
+#: Windows has no SIGHUP, and SIGBREAK is its Ctrl+Break.
+_STOP_SIGNALS = ("SIGTERM", "SIGHUP", "SIGBREAK")
+_BUSY_MESSAGE = "A run is already going. Wait for it to finish."
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
@@ -342,21 +352,32 @@ class Solution:
         self.keep_runs = max(1, keep_runs)
         self.runs_root = Path(tempfile.mkdtemp(prefix="poc-test-page-"))
         atexit.register(self.close)
-        self._lock = threading.Lock()
+        # One run at a time. Reentrant: the server takes it before it reads a
+        # request's body (reserve), and run() takes it again in the same thread.
+        self._lock = threading.RLock()
         self._runs: dict[str, Path] = {}
         self._started: float | None = None
         self._log_path: Path | None = None
+        # The process of the run that is going, and whether close() was called:
+        # once it was, no run starts, so none outlives the server.
+        self._state = threading.Lock()
         self._process: subprocess.Popen | None = None
+        self._closed = False
 
     def close(self) -> None:
         """Stop a run that is going and remove every run's working folder."""
-        process = self._process
+        with self._state:
+            self._closed = True
+            process = self._process
         if process is not None and process.poll() is None:
             _kill_tree(process)
             try:
                 process.wait(timeout=10)
             except subprocess.SubprocessError:
                 pass
+        # The stopped run closes its log first: Windows does not remove an open file.
+        if self._lock.acquire(timeout=10):
+            self._lock.release()
         shutil.rmtree(self.runs_root, ignore_errors=True)
 
     # -- what the page reads ------------------------------------------------
@@ -410,6 +431,18 @@ class Solution:
 
     # -- one run ------------------------------------------------------------
 
+    def reserve(self) -> bool:
+        """Take the one run there may be; False while another request holds it.
+
+        The server calls this before it reads a request's body, so requests that
+        would only be refused as busy do not each hold up to the upload limit in
+        memory. Give it back with :meth:`release`.
+        """
+        return self._lock.acquire(blocking=False)
+
+    def release(self) -> None:
+        self._lock.release()
+
     def run(self, fields: dict[str, str], files: list[tuple]) -> dict:
         """Run the solution once on what the request carried; one run at a time."""
         uploads = self._checked_uploads(fields, files)
@@ -426,7 +459,7 @@ class Solution:
                 "Add at least one document: the question is asked of the documents you add.",
             )
         if not self._lock.acquire(blocking=False):
-            raise RefusalError(409, "busy", "A run is already going. Wait for it to finish.")
+            raise RefusalError(409, "busy", _BUSY_MESSAGE)
         try:
             return self._run(uploads, examples)
         finally:
@@ -497,6 +530,8 @@ class Solution:
     def _run(self, uploads: list[tuple], examples: list[Path]) -> dict:
         if not (self.package_dir / ENTRYPOINT).is_file():
             raise RefusalError(500, "no_entrypoint", f"{ENTRYPOINT} is missing from the package.")
+        if self._closed:
+            raise RefusalError(503, "stopping", "The test page is stopping.")
         run_id = secrets.token_hex(8)
         run_dir = self.runs_root / run_id
         log_path = self.runs_root / f"{run_id}.log"
@@ -510,6 +545,10 @@ class Solution:
             # user's files and, from the first copied file on, maybe the keys.
             shutil.rmtree(run_dir, ignore_errors=True)
             _remove(log_path)
+            if self._closed:
+                # close() came while the folder was being made, which made the
+                # runs' folder again.
+                shutil.rmtree(self.runs_root, ignore_errors=True)
             raise
         finally:
             # The keys were needed for the run only; the working folder of a
@@ -587,18 +626,21 @@ class Solution:
         else:
             group = {"start_new_session": True}
         with open(log_path, "wb") as log:
-            # A closed pipe, not the null device: on Windows that one counts as a
-            # terminal, and the entrypoint would wait for a typed question.
-            process = subprocess.Popen(
-                [sys.executable, ENTRYPOINT],
-                cwd=run_dir,
-                env=env,
-                stdin=subprocess.PIPE,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                **group,
-            )
-            self._process = process
+            with self._state:
+                if self._closed:
+                    raise RefusalError(503, "stopping", "The test page is stopping.")
+                # A closed pipe, not the null device: on Windows that one counts as
+                # a terminal, and the entrypoint would wait for a typed question.
+                process = subprocess.Popen(
+                    [sys.executable, ENTRYPOINT],
+                    cwd=run_dir,
+                    env=env,
+                    stdin=subprocess.PIPE,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    **group,
+                )
+                self._process = process
             try:
                 if process.stdin is not None:
                     process.stdin.close()
@@ -810,13 +852,17 @@ class Handler(BaseHTTPRequestHandler):
     def _check_host(self):
         """A page on another site must not reach this server through the browser.
 
-        While the server listens on this computer only, its name in the request is
-        localhost or 127.0.0.1; any other name is a foreign page's. A request a page
-        sends carries that page's origin, which must be this server.
+        The name in the request is one of the server's own (:func:`_host_names`):
+        a name of another site there is a foreign page's, which had its name point
+        at this computer. A request a page sends carries that page's origin, which
+        must be this server.
         """
-        host = urlsplit("//" + (self.headers.get("Host") or "")).hostname or ""
-        bound = self.server.server_address[0]
-        if bound in _LOOPBACK_NAMES and host not in _LOOPBACK_NAMES:
+        try:
+            host = urlsplit("//" + (self.headers.get("Host") or "")).hostname or ""
+        except ValueError:
+            host = ""
+        server = self.server
+        if not _host_allowed(host, server.host_names, server.every_address):  # type: ignore[attr-defined]
             raise RefusalError(403, "forbidden", "This address is not the test page's own.")
         origin = self.headers.get("Origin")
         if origin and urlsplit(origin).netloc != (self.headers.get("Host") or ""):
@@ -877,12 +923,35 @@ class Handler(BaseHTTPRequestHandler):
     def _post(self):
         if urlsplit(self.path).path != "/api/run":
             raise RefusalError(404, "not_found", "No such address.")
-        fields, files = parse_multipart(self.headers.get("Content-Type") or "", self._body())
-        answer = self.solution.run(fields, files)
+        length = self._length()
+        # One run at a time, and a request that would only be refused as busy is
+        # refused before its body is read into memory.
+        if not self.solution.reserve():
+            self._skip(length)
+            raise RefusalError(409, "busy", _BUSY_MESSAGE)
+        try:
+            body = self.rfile.read(length)
+            fields, files = parse_multipart(self.headers.get("Content-Type") or "", body)
+            answer = self.solution.run(fields, files)
+        finally:
+            self.solution.release()
         self._json(200, answer)
 
-    def _body(self) -> bytes:
-        """The request body, refused before it is read when it is over the limit."""
+    def _skip(self, length: int) -> None:
+        """Read ``length`` bytes of the body away, a piece at a time.
+
+        Without this a refusal may not reach the browser: it sees the connection
+        closed under a body it is still sending.
+        """
+        remaining = length
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 1024 * 1024))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+
+    def _length(self) -> int:
+        """The request body's length, refused before the body is read when it is over the limit."""
         try:
             length = int(self.headers.get("Content-Length") or "")
         except ValueError:
@@ -896,19 +965,47 @@ class Handler(BaseHTTPRequestHandler):
             # Read a moderate overshoot away so the answer reaches the browser;
             # a far larger body is left unread and the connection closes.
             if length <= 4 * limit + 1024 * 1024:
-                remaining = length
-                while remaining > 0:
-                    chunk = self.rfile.read(min(remaining, 1024 * 1024))
-                    if not chunk:
-                        break
-                    remaining -= len(chunk)
+                self._skip(length)
             else:
                 self.close_connection = True
             megabytes = max(1, limit // (1024 * 1024))
             raise RefusalError(
                 413, "too_large", f"The files are too large: at most {megabytes} MB in all."
             )
-        return self.rfile.read(length)
+        return length
+
+
+def _host_names(host: str, address: str) -> frozenset[str]:
+    """The names a request to this server may carry in its Host header.
+
+    The loopback names, the name the server was started with (``--host``) and the
+    address it listens on. Listening on every address (``--host 0.0.0.0``), other
+    computers reach it by this computer's name as well; see :func:`_host_allowed`.
+    """
+    names = set(_LOOPBACK_NAMES) | {host.lower(), str(address).lower()}
+    if host in _EVERY_ADDRESS:
+        try:
+            names |= {socket.gethostname().lower(), socket.getfqdn().lower()}
+        except OSError:
+            pass
+    return frozenset(names - _EVERY_ADDRESS)
+
+
+def _host_allowed(host: str, names: frozenset[str], every_address: bool) -> bool:
+    """Whether ``host``, from a request's Host header, is one of this server's own names.
+
+    Listening on every address, any IP address is taken as well: a page of another
+    site can only put its own name there, never an address.
+    """
+    if host in names:
+        return True
+    if not every_address:
+        return False
+    try:
+        ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        return False
+    return True
 
 
 def create_server(
@@ -917,8 +1014,39 @@ def create_server(
     """The server for the package in ``package_dir``; ``limits`` go to :class:`Solution`."""
     server = ThreadingHTTPServer((host, port), Handler)
     server.daemon_threads = True
+    server.host_names = _host_names(host, server.server_address[0])  # type: ignore[attr-defined]
+    server.every_address = host in _EVERY_ADDRESS  # type: ignore[attr-defined]
     server.solution = Solution(package_dir, **limits)  # type: ignore[attr-defined]
     return server
+
+
+def _stop_on_signals() -> None:
+    """Make SIGTERM and SIGHUP stop the server as Ctrl+C does.
+
+    Left as they are, either signal ends Python at once, with no ``finally`` and no
+    atexit: the run's working folder, with its copy of ``.env`` and the user's
+    files, stayed in the temporary folder, and ``run_poc.py``, which runs in a
+    session of its own, went on without its time limit.
+    """
+
+    def stop(signum, frame):
+        # A second signal must not cut the cleanup short.
+        for name in _STOP_SIGNALS:
+            if hasattr(signal, name):
+                signal.signal(getattr(signal, name), signal.SIG_IGN)
+        raise KeyboardInterrupt
+
+    for name in _STOP_SIGNALS:
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), stop)
+
+
+def _say(text: str) -> None:
+    """Print, unless the terminal is gone (the server is stopping because it closed)."""
+    try:
+        print(text, flush=True)
+    except (OSError, ValueError):
+        pass
 
 
 def main() -> None:
@@ -937,17 +1065,18 @@ def main() -> None:
         print("Try another port: python app.py --port 8080", file=sys.stderr)
         sys.exit(1)
     shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
-    print(f"Test page: http://{shown_host}:{server.server_address[1]}")
+    print(f"Test page: http://{shown_host}:{server.server_address[1]}", flush=True)
     if args.host not in _LOOPBACK_NAMES:
         print(
             "NOTE: the page has no sign-in, and now other computers on the network can "
             "reach it and start runs with your model credentials."
         )
-    print("Stop with Ctrl+C.")
+    print("Stop with Ctrl+C.", flush=True)
+    _stop_on_signals()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopped.")
+        _say("\nStopped.")
     finally:
         server.server_close()
         server.solution.close()  # type: ignore[attr-defined]

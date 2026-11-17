@@ -36,9 +36,9 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 router = APIRouter()
 
@@ -252,8 +252,8 @@ async def upload_file(
         )
 
     content = await validate_file_size(file)
-    if (mismatch := content_mismatch(suffix, content)) is not None:
-        raise HTTPException(status_code=415, detail=mismatch)
+    if (problem := await upload_problem(suffix, content)) is not None:
+        raise HTTPException(status_code=problem.status, detail=problem.message)
     if not await _evict_stale(make_room=True):
         raise _TOO_MANY_SESSIONS
 

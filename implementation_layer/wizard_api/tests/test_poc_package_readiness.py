@@ -362,3 +362,74 @@ def test_the_scaffolded_test_page_is_shipped_and_is_no_problem_of_the_package(tm
     (poc / "app.py").unlink()
     shutil.rmtree(poc / "ui")
     assert package_problems(str(poc)) == with_page
+
+
+def _page_package(tmp_path):
+    """A complete package with the test page as the scaffolder writes it."""
+    import pytest
+
+    pytest.importorskip("solution_wizard.scaffolder")
+    from solution_wizard.scaffolder import TEMPLATES_DIR, TEST_PAGE_TEMPLATES
+
+    poc = Path(_package(tmp_path))
+    for relative, template in TEST_PAGE_TEMPLATES.items():
+        (poc / relative).parent.mkdir(parents=True, exist_ok=True)
+        (poc / relative).write_bytes((TEMPLATES_DIR / template).read_bytes())
+    return poc
+
+
+def test_a_changed_test_page_is_a_problem_of_the_package(tmp_path):
+    """Nothing checked that the shipped app.py and ui/index.html were still the template's."""
+    poc = _page_package(tmp_path)
+    assert package_problems(str(poc)) == []
+
+    app = poc / "app.py"
+    app.write_bytes(app.read_bytes() + b"\nprint('one more thing')\n")
+    page = poc / "ui" / "index.html"
+    page.write_bytes(page.read_bytes().replace(b"<body", b"<body data-changed", 1))
+
+    assert package_problems(str(poc)) == [
+        "app.py is not the test page the wizard wrote: it was changed after the package "
+        "was generated. Generate the package again to put it back",
+        "ui/index.html is not the test page the wizard wrote: it was changed after the "
+        "package was generated. Generate the package again to put it back",
+    ]
+
+
+def test_the_test_page_with_other_line_ends_is_the_same_page(tmp_path):
+    """The scaffolder writes text files, so on Windows the copy has CRLF line ends."""
+    poc = _page_package(tmp_path)
+    for relative in ("app.py", "ui/index.html"):
+        path = poc / relative
+        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+
+    assert package_problems(str(poc)) == []
+
+
+def test_a_test_page_from_an_earlier_template_stays_ready(tmp_path):
+    """A package keeps the page the scaffolder wrote for it, also after the template changed."""
+    import hashlib
+    import json
+
+    from wizard_api.services.poc_service import MANIFEST_NAME
+
+    poc = _page_package(tmp_path)
+    earlier = b'"""The test page as an earlier template wrote it."""\n'
+    (poc / "app.py").write_bytes(earlier)
+    assert len(package_problems(str(poc))) == 1
+
+    (poc.parent / MANIFEST_NAME).write_text(
+        json.dumps(
+            {
+                "blueprint": "x",
+                "files": ["app.py"],
+                "hashes": {"app.py": hashlib.sha256(earlier).hexdigest()},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert package_problems(str(poc)) == []
+
+    # Changed after that, it is a problem again.
+    (poc / "app.py").write_bytes(earlier + b"print('changed')\n")
+    assert len(package_problems(str(poc))) == 1

@@ -50,6 +50,10 @@ try:
     from utils.model_settings import provider_error_detail
 except ImportError:
     from api.utils.model_settings import provider_error_detail
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.order_fees import (
@@ -839,7 +843,12 @@ async def process_order(
             if len(bom_files) > MAX_CUSTOM_BOMS:
                 yield sse_event("error", {"message": f"At most {MAX_CUSTOM_BOMS} BOMs"})
                 return
-            await validate_file_size(pricing_file)
+            pricing_bytes = await validate_file_size(pricing_file)
+            pricing_suffix = Path(pricing_file.filename or "").suffix
+            problem = await upload_problem(pricing_suffix, pricing_bytes, check_type=False)
+            if problem is not None:
+                yield sse_event("error", {"message": problem.message})
+                return
             # 1. Parse every document to text
             yield sse_event("status", {"message": "Parsing documents..."})
             po_text, *bom_texts = await asyncio.gather(
@@ -1063,6 +1072,10 @@ async def _parse_upload(upload: UploadFile, prefix: str) -> str:
     pdf_bytes = await validate_file_size(upload)
     if not pdf_bytes.startswith(b"%PDF-"):
         raise HTTPException(status_code=400, detail=f"{upload.filename or prefix} is not a PDF")
+    if (problem := await upload_problem(".pdf", pdf_bytes, check_type=False)) is not None:
+        raise HTTPException(
+            status_code=problem.status, detail=f"{upload.filename or prefix}: {problem.message}"
+        )
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(pdf_bytes)
         tmp_path = tmp.name

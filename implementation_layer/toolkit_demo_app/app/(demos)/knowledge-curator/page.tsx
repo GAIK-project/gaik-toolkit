@@ -441,7 +441,7 @@ export default function KnowledgeCuratorPage() {
       <DemoPageHeader
         icon={LibraryBig}
         title="Knowledge Curator"
-        description="Collect the facts for a fixed set of topics from normalized sources. Every fact carries an exact quote, its file and its location. Edit the facts and check the quotes again."
+        description="Collect facts per topic from normalized sources, each with its exact quote, file and location"
         className="mb-6"
       />
 

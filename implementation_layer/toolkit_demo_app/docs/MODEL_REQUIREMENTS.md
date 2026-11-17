@@ -103,7 +103,7 @@ seconds on Gemma 4 and Qwen 3.8.
 
 Schema generation makes four to six model calls in a row, which is why it is slow on
 Aitta. It also failed on gpt-oss and Qwen until gaik accepted `"enum": []` as "no
-enum" (`FieldSpec`, gaik 0.9.1, which the demo API installs). With gaik 0.9.0 every
+enum" (`FieldSpec`, since gaik 0.9.1; the demo API installs 0.11.0). With gaik 0.9.0 every
 new schema written with gpt-oss failed on the deployed demo after about four minutes;
 the 0.9.1 release smoke run on gpt-oss 120B generated the schema in 17 seconds.
 

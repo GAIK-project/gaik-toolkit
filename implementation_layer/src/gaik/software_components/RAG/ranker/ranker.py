@@ -136,7 +136,7 @@ class Ranker:
 
     Example:
         >>> ranker = Ranker()
-        >>> semantic = store.search_semantic(query_embedding, top_k=50)
+        >>> semantic = store.search_semantic(query_embedding, top_k=50, threshold=0.0)
         >>> keyword = store.search_keyword(query_text, top_k=50)
         >>> hits = ranker.fuse(semantic, keyword, weights=(0.7, 0.3), top_k=10)
 

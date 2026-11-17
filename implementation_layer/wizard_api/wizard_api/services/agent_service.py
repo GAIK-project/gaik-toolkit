@@ -45,6 +45,7 @@ try:
         ClaudeSDKClient,
         HookMatcher,
         ResultMessage,
+        SystemMessage,
         TextBlock,
         ToolUseBlock,
         create_sdk_mcp_server,
@@ -55,7 +56,7 @@ try:
 except ImportError:  # pragma: no cover - exercised only where the SDK is absent
     _SDK_AVAILABLE = False
     AssistantMessage = ClaudeAgentOptions = ClaudeSDKClient = ResultMessage = TextBlock = None  # type: ignore
-    HookMatcher = ToolUseBlock = create_sdk_mcp_server = tool = None  # type: ignore
+    HookMatcher = SystemMessage = ToolUseBlock = create_sdk_mcp_server = tool = None  # type: ignore
 
 # StreamEvent (token-level partials) lives in the types submodule on some SDK
 # versions, the top level on others. Optional.
@@ -428,7 +429,7 @@ STATE_LINE_PREFIX = "[Session state:"
 _SERVER_LINE = re.compile(
     r"^([^\S\n]*\[(?:Session state:|PoC sandbox run|Package check|Preflight of"
     r"|The diagram the user sees|The user changed the blueprint|Reopened gate"
-    r"|Gate 1 cannot be approved))",
+    r"|Gate 1 cannot be approved|The user stopped your previous reply))",
     re.MULTILINE | re.IGNORECASE,
 )
 
@@ -476,6 +477,72 @@ def with_gate_context(
     lines = [gate_context_line(step, gate_statuses), *(notes or [])]
     message = mark_server_lines(user_message)
     return "\n".join(lines) + f"\n\n{message}"
+
+
+# ---------------------------------------------------------------------------
+# A reply the user stopped
+# ---------------------------------------------------------------------------
+
+#: What the stored reply ends with when the user stopped it, in their language.
+STOPPED_NOTE = {"fi": "(Pysäytetty)", "en": "(Stopped)"}
+
+#: ``ResultMessage.terminal_reason`` of a query ended by ``interrupt()``.
+_ABORTED_REASONS = frozenset({"aborted_streaming", "aborted_tools"})
+
+#: The kinds ``activity_frame`` gives a tool call.
+_TOOL_KINDS = frozenset({"write", "read", "run", "search", "work"})
+
+#: How long ``interrupt()`` may take to be acknowledged, and how long the turn
+#: may then take to end, before the agent's process is ended instead.
+_INTERRUPT_TIMEOUT_SECONDS = 10
+_STOP_GRACE_SECONDS = 20
+
+
+def stopped_note(lang: str | None) -> str:
+    """STOPPED_NOTE in the interface language, English when unknown."""
+    return STOPPED_NOTE.get((lang or "").split("-")[0].lower(), STOPPED_NOTE["en"])
+
+
+def stopped_frame(tool: str | None = None) -> dict:
+    """The frame that ends a turn the user stopped.
+
+    ``tool`` is the kind of tool call that was running (``activity_frame``'s
+    kinds), or None when the agent was writing its reply.
+    """
+    return {"stopped": True, "tool": tool}
+
+
+def frame_stopped(frame: str) -> dict | None:
+    """The frame's content when it is a ``stopped_frame``, else None."""
+    try:
+        data = json.loads(frame[len("data: ") :])
+    except (ValueError, AttributeError):
+        return None
+    return data if isinstance(data, dict) and data.get("stopped") else None
+
+
+def stopped_reply_line(tool: str | None = None) -> str:
+    """What the agent is told with the next message after the user stopped a reply.
+
+    The agent's own context ends where it was cut off: without this it may go on
+    as if the rest of what it had planned was done. A stop during a tool call
+    can leave that call half done (a file partly written), which is said too.
+    """
+    if tool:
+        # Only a kind this module names goes into the line, never stored text.
+        tool = tool if tool in _TOOL_KINDS else "work"
+        return (
+            "[The user stopped your previous reply while a tool call of yours was running "
+            f"(kind: {tool}). That call may be half done, for example a file partly written, "
+            "and nothing you had planned after it was carried out. Read the files concerned "
+            "before relying on them, and do not continue the stopped work unless the user "
+            "asks for it.]"
+        )
+    return (
+        "[The user stopped your previous reply before it was finished. Nothing you had "
+        "planned after the point where it was cut off was carried out; do not assume it "
+        "was, and do not continue the stopped work unless the user asks for it.]"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -584,11 +651,28 @@ async def _stream_turn(
     goes into ``out_parts`` for the transcript. A turn whose reply is empty or an
     internal notice ("Background task completed …") is nudged with a quiet
     "Please continue." (up to two retries), mirroring the demo router.
+
+    A turn the user stopped (``stop_turn``) ends with a ``stopped_frame`` instead:
+    what is on the user's screen goes into ``out_parts`` as it is, and the turn
+    is neither nudged nor reported as an error.
     """
     client = session["client"]
     current: list[str] = []  # text of the assistant message being streamed
     shown = ""  # text of the last closed message that is still on the user's screen
     finished = False  # the agent's ResultMessage was seen
+    tool: str | None = None  # the kind of tool call that is running, if one is
+
+    def stopped() -> list[str]:
+        """The frames that end a stopped turn; the text on screen is kept."""
+        text = "".join(current) or shown
+        frames = []
+        if _is_notice(text):
+            frames.append(sse({"narration_end": True}))
+            text = ""
+        out_parts[:] = [text] if text.strip() else []
+        frames.append(sse(stopped_frame(tool)))
+        return frames
+
     # Held in a name so ``finally`` can close it: left suspended, its reader task
     # would go on taking messages off the agent's stream after this turn is gone.
     messages = _receive_with_heartbeat(client)
@@ -599,6 +683,8 @@ async def _stream_turn(
                 continue
 
             if StreamEvent is not None and isinstance(message, StreamEvent):
+                if (getattr(message, "event", None) or {}).get("type") == "message_start":
+                    tool = None  # the model is writing again: the tool call is over
                 delta = _extract_stream_text(message)
                 if delta:
                     if not current and shown:
@@ -626,6 +712,7 @@ async def _stream_turn(
                     shown = text
                 # Say what the agent is about to do while the tool runs; the
                 # next model call can take minutes with nothing else to show.
+                tool = None
                 if ToolUseBlock is not None:
                     for block in message.content:
                         if isinstance(block, ToolUseBlock):
@@ -634,16 +721,36 @@ async def _stream_turn(
                             except Exception:  # noqa: BLE001 - never break the reply
                                 frame = None
                             if frame:
+                                tool = frame["activity"]["kind"]
                                 yield sse(frame)
+            elif SystemMessage is not None and isinstance(message, SystemMessage):
+                _note_system_message(message)
             elif isinstance(message, ResultMessage):
                 finished = True
                 # Tokens and cost of this query, for the turn's span (telemetry).
                 session.setdefault("turn_results", []).append(("turn", message))
                 if getattr(message, "session_id", None):
                     session["sdk_session_id"] = message.session_id
+                reason = getattr(message, "terminal_reason", None)
+                if session.get("stop_requested") and (
+                    reason in _ABORTED_REASONS
+                    or message.is_error
+                    or not (shown or "".join(current)).strip()
+                ):
+                    # The user stopped it. A reply that was whole before the
+                    # stop reached the agent ends as any other, below.
+                    if tool is None and reason == "aborted_tools":
+                        tool = "work"
+                    for frame in stopped():
+                        yield frame
+                    break
                 if message.is_error:
-                    if getattr(message, "subtype", None) == "error_max_turns":
+                    subtype = getattr(message, "subtype", None)
+                    if subtype == "error_max_turns":
                         yield sse(TURN_LIMIT_FRAME)
+                    elif subtype == "error_max_budget_usd":
+                        for frame in _budget_stop(session, shown or "".join(current), out_parts):
+                            yield frame
                     else:
                         yield sse(_error_frame(message.result or f"stopped: {message.stop_reason}"))
                     break
@@ -665,21 +772,59 @@ async def _stream_turn(
         if not finished:
             # The agent's stream ended without a result: its process is gone.
             session["broken"] = True
-            yield sse(_error_frame("the agent's stream ended without a result"))
+            if session.get("stop_requested"):
+                # Ended to make the stop take effect, or by it: not a failure.
+                for frame in stopped():
+                    yield frame
+            else:
+                yield sse(_error_frame("the agent's stream ended without a result"))
     except Exception as exc:  # noqa: BLE001
         # The agent cannot be trusted for another turn: stream_turn_for ends it,
         # and the next message starts a new one from the stored conversation.
         session["broken"] = True
-        yield sse(_error_frame(exc))
+        if session.get("stop_requested"):
+            logger.warning("the agent's stream failed while its reply was being stopped: %r", exc)
+            for frame in stopped():
+                yield frame
+        else:
+            yield sse(_error_frame(exc))
     finally:
         await messages.aclose()
         session["last_active"] = time.time()
+
+
+def _budget_stop(session: dict, reply: str, out_parts: list[str]):
+    """The frames that end a turn the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD.
+
+    The CLI counts the budget for the whole agent process, across messages, so
+    the agent would stop again at once on the next message: it is ended after
+    this turn (stream_turn_for), and the next message resumes it from its
+    transcript, where the CLI counts from zero. No "Please continue." nudge.
+    """
+    from wizard_api import ops_metrics
+
+    ops_metrics.budget_stops.add(1)
+    logger.warning(
+        "agent stopped at its cost limit of %s USD; it is ended and the next message resumes it",
+        config.agent_max_budget_usd(),
+    )
+    session["budget_spent"] = True
+    notice = BUDGET_NOTICE.get(session.get("locale") or "en", BUDGET_NOTICE["en"])
+    if _is_notice(reply):
+        yield sse({"narration_end": True})  # shown while it streamed; not an answer
+        reply = ""
+    reply = reply.strip()
+    yield sse({"delta": f"\n\n{notice}" if reply else notice})
+    out_parts[:] = [f"{reply}\n\n{notice}" if reply else notice]
+    yield sse({"done": True, "limit": "budget"})
 
 
 async def _drain_silent(client):
     """Consume one turn without emitting (used for the bootstrap turn).
     Returns the ResultMessage, whose ``session_id`` names the CLI session."""
     async for message in client.receive_response():
+        if SystemMessage is not None and isinstance(message, SystemMessage):
+            _note_system_message(message)
         if isinstance(message, ResultMessage):
             return message
     return None
@@ -791,7 +936,11 @@ def _build_options(
     *,
     resume: str | None = None,
     session_id: str | None = None,
+    guard: agent_tool_guard.ToolGuard,
 ):
+    """The agent's options. ``guard`` is the session's tool guard, which knows its
+    owner and counts the metered calls of each turn. It has no default, so no
+    agent can be built with a guard that skips its owner's hourly limit."""
     tools = ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
     extra = {}
     if session_id and create_sdk_mcp_server is not None:
@@ -800,21 +949,25 @@ def _build_options(
     if config.agent_bridge_socket():
         # The agent runs in its own container; the SDK starts the bridge's client.
         extra["cli_path"] = agent_cli()
+    budget = config.agent_max_budget_usd()
+    if budget is not None:
+        # Counted by the CLI for this agent process from its start or resume.
+        extra["max_budget_usd"] = budget
+    model = _model()
+    fallback = config.agent_fallback_model()
+    if fallback and fallback != model:
+        extra["fallback_model"] = fallback
     return ClaudeAgentOptions(
         cwd=str(wizard_dir),
         add_dirs=[str(output_dir)],
         env=_agent_env(),
-        model=_model(),
+        model=model,
         allowed_tools=tools,
         **extra,
         permission_mode="bypassPermissions",
         # bypassPermissions lets every tool run; the hook is what limits them to
         # this session's directory and the wizard's own scripts (agent_tool_guard).
-        hooks={
-            "PreToolUse": [
-                HookMatcher(hooks=[agent_tool_guard.ToolGuard(wizard_dir, output_dir).hook])
-            ]
-        },
+        hooks={"PreToolUse": [HookMatcher(hooks=[guard.hook])]},
         setting_sources=[],
         include_partial_messages=True,
         max_turns=config.agent_max_turns(),
@@ -968,6 +1121,39 @@ TURN_LIMIT_FRAME = {
 }
 
 
+#: Said in the chat when the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD. A text
+#: delta, not an error frame: the chat shows an error frame other than the turn
+#: limit as a failed reply, and this is no failure. The agent is ended after the
+#: turn, so the next message resumes it with a budget of its own (see _stream_turn).
+BUDGET_NOTICE = {
+    "fi": (
+        "⚠︎ Wizard pysähtyi, koska sen kustannusraja tuli täyteen. Tähänastinen työ on "
+        "tallessa. Kirjoita esim. ”jatka”, niin se jatkaa."
+    ),
+    "en": (
+        "⚠︎ The wizard stopped because it reached its cost limit. The work so far is kept. "
+        "Send a message (for example “continue”) and it goes on."
+    ),
+}
+
+
+def _note_system_message(message) -> None:
+    """Log the SDK's report that the agent switched to WIZARD_AGENT_FALLBACK_MODEL.
+
+    The CLI sends it as a ``system`` message of subtype ``model_fallback``; the
+    models are the deployment's own names, the trigger a fixed word.
+    """
+    if getattr(message, "subtype", None) != "model_fallback":
+        return
+    data = getattr(message, "data", None) or {}
+    logger.info(
+        "agent switched from %s to its fallback model %s (trigger %s)",
+        data.get("original_model"),
+        data.get("fallback_model"),
+        data.get("trigger"),
+    )
+
+
 def frame_is_error(frame: str) -> bool:
     """True for an SSE frame carrying ``{"error": true}``."""
     try:
@@ -1059,6 +1245,14 @@ async def _start_session(
     resumed: str | None = None
     sdk_session_id: str | None = None
     turn_results: list = []  # the bootstrap's usage, counted with the first turn
+    # One guard for the agent, whichever client below it ends up with: it counts
+    # this owner's metered tool calls per turn and in their hourly window.
+    if not user_id:
+        # The chat route always names the owner; anything else gets the per-turn cap only.
+        logger.warning(
+            "agent started without an owner: metered tool calls are capped per turn only"
+        )
+    guard = agent_tool_guard.ToolGuard(wizard_dir, out, user_id=user_id)
     if resume_id and transcript_exists(resume_id) is False:
         logger.info("agent session %s has no transcript to resume for %s", resume_id, session_id)
         resume_id = None
@@ -1069,7 +1263,9 @@ async def _start_session(
         # context and nothing has to be re-explained (#174).
         try:
             client = ClaudeSDKClient(
-                options=_build_options(wizard_dir, out, resume=resume_id, session_id=session_id)
+                options=_build_options(
+                    wizard_dir, out, resume=resume_id, session_id=session_id, guard=guard
+                )
             )
             await client.connect()
             resumed = "sdk"
@@ -1084,7 +1280,9 @@ async def _start_session(
                 await _disconnect_quietly(client)  # a process may have started
             client = None
     if client is None:
-        client = ClaudeSDKClient(options=_build_options(wizard_dir, out, session_id=session_id))
+        client = ClaudeSDKClient(
+            options=_build_options(wizard_dir, out, session_id=session_id, guard=guard)
+        )
         try:
             await client.connect()
             # Bootstrap turn: invoke the skill + pin output dir. Drained silently —
@@ -1121,6 +1319,8 @@ async def _start_session(
         "sdk_session_id": sdk_session_id,
         # Whose agent this is, for WIZARD_MAX_LIVE_AGENTS_PER_USER.
         "user_id": user_id,
+        # Its tool guard, told by stream_turn_for when a new message begins.
+        "tool_guard": guard,
         # (purpose, ResultMessage) of each query not yet on a span (telemetry).
         "turn_results": turn_results,
     }
@@ -1177,6 +1377,10 @@ class Turn:
         self.frames: list[str] = []
         self.finished = False
         self.task: asyncio.Task | None = None
+        #: The user asked for the reply to be stopped (``stop_turn``).
+        self.stop_requested = False
+        #: Ends the agent if the stop does not take effect; held so it is not collected.
+        self.stop_watchdog: asyncio.Task | None = None
         self._changed = asyncio.Condition()
 
     async def publish(self, frame: str) -> None:
@@ -1240,7 +1444,65 @@ async def end_turn(session_id: str, turn: Turn) -> None:
     """Close the turn's stream and stop offering it to new readers."""
     if TURNS.get(session_id) is turn:
         del TURNS[session_id]
+        # A stop asked for this turn is not the next one's.
+        agent = AGENT_SESSIONS.get(session_id)
+        if agent is not None:
+            agent.pop("stop_requested", None)
+    if turn.stop_watchdog is not None:
+        turn.stop_watchdog.cancel()
     await turn.finish()
+
+
+async def stop_turn(session_id: str) -> bool:
+    """Stop the reply being written for this session. False when none is.
+
+    The agent is interrupted, its turn then ends with a ``stopped_frame`` and
+    the exchange is stored with what was written so far. A turn that has not
+    reached the agent yet is interrupted as soon as its message is sent
+    (``stream_turn_for``), so the agent has the message in its context and
+    knows it was stopped. If the interrupt is not acknowledged, or the turn
+    does not end within ``_STOP_GRACE_SECONDS`` of it, the agent's process is
+    ended: the turn then ends the same way, and the next message starts the
+    agent again from where the conversation is.
+    """
+    turn = TURNS.get(session_id)
+    if turn is None or turn.finished:
+        return False
+    if turn.stop_requested:
+        return True  # pressed again: the stop is already on its way
+    turn.stop_requested = True
+    session = AGENT_SESSIONS.get(session_id)
+    if session is None:
+        return True  # being restarted mid-turn: the new one is told as it starts
+    session["stop_requested"] = True
+    if not session["lock"].locked():
+        return True  # the message is still on its way to the agent
+    try:
+        await asyncio.wait_for(session["client"].interrupt(), timeout=_INTERRUPT_TIMEOUT_SECONDS)
+    except Exception as exc:  # noqa: BLE001 - the stop still has to take effect
+        logger.warning("session %s: the agent did not take the interrupt: %r", session_id, exc)
+        await _end_stopped_agent(session_id, turn, session)
+        return True
+    turn.stop_watchdog = asyncio.create_task(_stop_watchdog(session_id, turn, session))
+    return True
+
+
+async def _stop_watchdog(session_id: str, turn: Turn, session: dict) -> None:
+    """End the agent of a stopped turn that is still running after the grace time."""
+    await asyncio.sleep(_STOP_GRACE_SECONDS)
+    if session["lock"].locked():
+        logger.warning("session %s: the stopped reply did not end; ending the agent", session_id)
+        await _end_stopped_agent(session_id, turn, session)
+
+
+async def _end_stopped_agent(session_id: str, turn: Turn, session: dict) -> None:
+    """End the process of an agent whose turn was stopped but goes on."""
+    if TURNS.get(session_id) is not turn:
+        return
+    if AGENT_SESSIONS.get(session_id) is session:
+        await end_session(session_id)
+    else:
+        await _disconnect_quietly(session["client"])
 
 
 def is_heartbeat(frame: str) -> bool:
@@ -1256,17 +1518,35 @@ async def stream_turn_for(
     An agent whose process failed during the turn (it cannot be read, or its
     stream ended without a result) is ended when the turn is over, so the next
     message starts a new one instead of meeting the broken one.
+
+    The message, with its quiet "Please continue." nudges, is one turn for
+    ``WIZARD_MAX_METERED_CALLS_PER_TURN``: the guard's count starts here.
     """
     async with session["lock"]:
+        guard = session.get("tool_guard")
+        if guard is not None:
+            guard.start_turn()
         try:
             await session["client"].query(user_message)
+            if session.get("stop_requested"):
+                # Stopped while the message was on its way: the agent has it in
+                # its context now, and is interrupted before it does anything.
+                try:
+                    await asyncio.wait_for(
+                        session["client"].interrupt(), timeout=_INTERRUPT_TIMEOUT_SECONDS
+                    )
+                except Exception as exc:  # noqa: BLE001 - the stop still has to take effect
+                    logger.warning("the agent did not take the interrupt: %r", exc)
+                    await _disconnect_quietly(session["client"])
             async for chunk in _stream_turn(session, out_parts):
                 yield chunk
         except Exception:
             session["broken"] = True
             raise
         finally:
-            if session.get("broken"):
+            # An agent at its cost limit would stop again at once: the next
+            # message resumes it, and the CLI counts its budget from there.
+            if session.get("broken") or session.get("budget_spent"):
                 await _discard_session(session)
 
 

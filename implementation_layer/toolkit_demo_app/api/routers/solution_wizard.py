@@ -26,7 +26,8 @@ What bounds a session (the agent has shell tools and runs in the API pod):
     most WIZARD_MAX_MESSAGES messages, and an idle session is ended and its
     workspace removed after SESSION_IDLE_SECONDS.
   * An attachment's size and content are checked before a parser or a model
-    reads it, and its text reaches the agent marked as data.
+    reads it (its type, then macros, PDF actions and malware as for every
+    upload), and its text reaches the agent marked as data.
   * The agent's process does not inherit the API's other credentials
     (`_agent_env`). That is not a boundary: the agent runs as the same user in
     the same container as the API, so the per-user grant is what limits who
@@ -59,11 +60,13 @@ try:
     from utils.errors import public_error
     from utils.file_content import content_mismatch
     from utils.model_settings import provider_error_detail
+    from utils.upload_check import upload_problem
 except ImportError:
     from api.utils import get_api_config, get_model_options, sse_event
     from api.utils.errors import public_error
     from api.utils.file_content import content_mismatch
     from api.utils.model_settings import provider_error_detail
+    from api.utils.upload_check import upload_problem
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -262,8 +265,23 @@ def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
     return ""
 
 
+async def _checked_attachments(files: list[FileAttachment]) -> list[tuple[str, str, bytes]]:
+    """Each attachment's name, extension and bytes, once its type holds and the
+    upload check (macros, PDF actions, malware) passes it.
+
+    Raises what the page shows; nothing is parsed or sent to a model before this.
+    """
+    decoded = [(_attachment_name(f), *_decode_attachment(f)) for f in files]
+    for name, ext, file_bytes in decoded:
+        # The type was checked in _decode_attachment, with this route's own 400.
+        if (problem := await upload_problem(ext, file_bytes, check_type=False)) is not None:
+            raise HTTPException(problem.status, f"{name}: {problem.message}")
+    return decoded
+
+
 def _extract_text_from_attachment(attachment: FileAttachment) -> str:
-    """Check an uploaded file, then extract its text."""
+    """Decode an attachment and check its type, then extract its text; the
+    route also runs the upload check (``_checked_attachments``)."""
     ext, file_bytes = _decode_attachment(attachment)
     return _extract_text(_attachment_name(attachment), ext, file_bytes)
 
@@ -720,13 +738,8 @@ async def start_session(
     return StreamingResponse(gen(), media_type="text/event-stream", headers=_sse_headers())
 
 
-@router.post("/message/{session_id}")
-async def send_message(
-    session_id: str,
-    body: MessageRequest,
-    owner: str = Header("", alias=WIZARD_USER_HEADER),
-) -> StreamingResponse:
-    """Send a user message and stream the wizard's reply for this session."""
+def _ready_session(session_id: str, owner: str) -> dict:
+    """The user's session, when it may take a message now."""
     session = _owned_session(session_id, owner)
     if session["lock"].locked():
         raise HTTPException(status_code=409, detail="The wizard is still responding.")
@@ -735,9 +748,22 @@ async def send_message(
             status_code=409,
             detail="This session has reached its message limit. Download the files and restart.",
         )
+    return session
+
+
+@router.post("/message/{session_id}")
+async def send_message(
+    session_id: str,
+    body: MessageRequest,
+    owner: str = Header("", alias=WIZARD_USER_HEADER),
+) -> StreamingResponse:
+    """Send a user message and stream the wizard's reply for this session."""
+    _ready_session(session_id, owner)
     # Every attachment is checked before the reply starts, so a refused file is
-    # an ordinary 400 and nothing of the message reaches a parser or the agent.
-    attachments = [(_attachment_name(f), *_decode_attachment(f)) for f in body.files]
+    # an ordinary error and nothing of the message reaches a parser or the agent.
+    attachments = await _checked_attachments(body.files)
+    # The check may take a while: the session is looked at again after it.
+    session = _ready_session(session_id, owner)
     session["messages"] = session.get("messages", 0) + 1
     session["last_active"] = time.time()
 

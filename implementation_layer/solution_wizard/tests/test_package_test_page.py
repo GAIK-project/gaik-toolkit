@@ -12,6 +12,8 @@ import importlib.util
 import io
 import json
 import os
+import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -251,14 +253,14 @@ def test_the_readme_says_how_to_start_the_page_and_names_its_addresses(tmp_path)
 class Page:
     """A generated package with a stand-in entrypoint, and its server on a free port."""
 
-    def __init__(self, poc: Path, **limits):
+    def __init__(self, poc: Path, host: str = "127.0.0.1", **limits):
         self.poc = poc
         (poc / "run_poc.py").write_text(FAKE_RUN_POC, encoding="utf-8")
         spec = importlib.util.spec_from_file_location(f"poc_app_{id(self)}", poc / "app.py")
         self.app = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.app)
-        self.server = self.app.create_server(poc, "127.0.0.1", 0, **limits)
-        self.port = self.server.server_address[1]
+        self.server = self.app.create_server(poc, host, 0, **limits)
+        self.address, self.port = self.server.server_address[:2]
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
@@ -268,47 +270,58 @@ class Page:
         self.server.solution.close()
 
     def request(self, method, path, body=None, headers=None):
-        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=60)
-        try:
-            connection.request(method, path, body=body, headers=headers or {})
-            response = connection.getresponse()
-            return response.status, dict(response.getheaders()), response.read()
-        finally:
-            connection.close()
+        return _request(self.address, self.port, method, path, body, headers)
 
     def get_json(self, path):
         status, _, body = self.request("GET", path)
         return status, json.loads(body)
 
     def run(self, files=(), headers=None, **fields):
-        boundary = "----test-boundary-7d1"
-        parts = []
-        for name, value in fields.items():
-            parts.append(
-                f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'.encode()
-                + value.encode("utf-8")
-                + b"\r\n"
-            )
-        for filename, content in files:
-            parts.append(
-                (
-                    f'--{boundary}\r\nContent-Disposition: form-data; name="files"; '
-                    f'filename="{filename}"\r\nContent-Type: application/octet-stream\r\n\r\n'
-                ).encode()
-                + content
-                + b"\r\n"
-            )
-        body = b"".join(parts) + f"--{boundary}--\r\n".encode()
-        status, _, answer = self.request(
-            "POST",
-            "/api/run",
-            body=body,
-            headers={
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-                **(headers or {}),
-            },
+        return _post_run(self.address, self.port, files, headers, **fields)
+
+
+def _request(address, port, method, path, body=None, headers=None):
+    connection = http.client.HTTPConnection(address, port, timeout=60)
+    try:
+        connection.request(method, path, body=body, headers=headers or {})
+        response = connection.getresponse()
+        return response.status, dict(response.getheaders()), response.read()
+    finally:
+        connection.close()
+
+
+def _post_run(address, port, files=(), headers=None, **fields):
+    """POST /api/run with ``files`` (name, bytes) and text ``fields``, as the page sends them."""
+    boundary = "----test-boundary-7d1"
+    parts = []
+    for name, value in fields.items():
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'.encode()
+            + value.encode("utf-8")
+            + b"\r\n"
         )
-        return status, json.loads(answer)
+    for filename, content in files:
+        parts.append(
+            (
+                f'--{boundary}\r\nContent-Disposition: form-data; name="files"; '
+                f'filename="{filename}"\r\nContent-Type: application/octet-stream\r\n\r\n'
+            ).encode()
+            + content
+            + b"\r\n"
+        )
+    body = b"".join(parts) + f"--{boundary}--\r\n".encode()
+    status, _, answer = _request(
+        address,
+        port,
+        "POST",
+        "/api/run",
+        body=body,
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            **(headers or {}),
+        },
+    )
+    return status, json.loads(answer)
 
 
 @pytest.fixture
@@ -479,6 +492,13 @@ def test_a_file_name_cannot_leave_the_input_folder(page):
 
     assert status == 200
     assert answer["result"]["seen"] == [".uploaded", "also.pdf", "evil.pdf"]
+    # Uploads go under the runs' own folder, so that is where a name that climbed
+    # out of sample_input/ would have landed.
+    root = page.server.solution.runs_root
+    written = sorted(p.relative_to(root).as_posix() for p in root.rglob("*.pdf"))
+    run_id = answer["run_id"]
+    assert written == [f"{run_id}/sample_input/also.pdf", f"{run_id}/sample_input/evil.pdf"]
+    assert not (root.parent / "evil.pdf").exists()
     assert not (page.poc.parent / "evil.pdf").exists()
 
 
@@ -1126,6 +1146,7 @@ def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
         "config.yaml",
         "document_manifest.py",
         "input_bundle.py",
+        "poc_output.py",
         "provider_config.py",
         "requirements.txt",
         "run_poc.py",
@@ -1207,3 +1228,171 @@ def test_the_page_links_the_source_download_and_the_readme_names_it(tmp_path):
 
     readme = (_scaffold(tmp_path) / "README.md").read_text(encoding="utf-8")
     assert "GET /api/source" in readme
+
+
+# ---------------------------------------------------------------------------
+# Second review (17 Nov 2026): stop signals, --host and a busy server
+# ---------------------------------------------------------------------------
+
+
+def _wait_until_busy(served: Page) -> None:
+    deadline = time.monotonic() + 20
+    while not served.get_json("/api/status")[1]["busy"]:
+        assert time.monotonic() < deadline, "the first run never started"
+        time.sleep(0.05)
+
+
+def test_a_busy_server_refuses_a_second_run_before_it_reads_the_body(page, monkeypatch):
+    """Parallel posts each held up to the upload limit in memory before the busy refusal."""
+    parsed = []
+    parse = page.app.parse_multipart
+
+    def counting(content_type, body):
+        parsed.append(len(body))
+        return parse(content_type, body)
+
+    monkeypatch.setattr(page.app, "parse_multipart", counting)
+    first = {}
+    thread = threading.Thread(
+        target=lambda: first.update(answer=page.run(files=[("slow.pdf", b"%PDF")]))
+    )
+    thread.start()
+    _wait_until_busy(page)
+
+    status, answer = page.run(files=[("order.pdf", b"x" * 200_000)])
+    thread.join(timeout=60)
+
+    assert status == 409
+    assert answer["error"] == {
+        "code": "busy",
+        "message": "A run is already going. Wait for it to finish.",
+    }
+    # Only the first request's body was read and parsed.
+    assert len(parsed) == 1
+    assert first["answer"][0] == 200 and first["answer"][1]["ok"] is True
+    # A refused request gives the run back: the next one runs.
+    status, _, _ = page.request(
+        "POST", "/api/run", body=b"{}", headers={"Content-Type": "application/json"}
+    )
+    assert status == 415
+    assert page.run(files=[("order.pdf", b"%PDF")])[0] == 200
+
+
+def test_no_run_starts_once_the_server_is_stopping(page):
+    """A run that started after close() would outlive the server, keys and all."""
+    page.server.solution.close()
+
+    status, answer = page.run(files=[("order.pdf", b"%PDF")])
+
+    assert status == 503
+    assert answer["error"]["code"] == "stopping"
+    assert not page.server.solution.runs_root.exists()
+
+
+def test_with_another_address_the_host_check_stays_on(tmp_path):
+    """With --host the check was off: any site's name pointed at this computer got in."""
+    try:
+        served = Page(_scaffold(tmp_path), host="127.0.0.2")
+    except OSError:
+        pytest.skip("127.0.0.2 cannot be listened on here")
+    try:
+        port = served.port
+        for foreign in ("attacker.example", f"attacker.example:{port}", ""):
+            status, _, body = served.request("GET", "/api/solution", headers={"Host": foreign})
+            assert status == 403, foreign
+            assert json.loads(body)["error"]["code"] == "forbidden"
+        for own in (f"127.0.0.2:{port}", f"localhost:{port}", f"127.0.0.1:{port}"):
+            assert served.request("GET", "/api/solution", headers={"Host": own})[0] == 200, own
+    finally:
+        served.close()
+
+
+def test_listening_on_every_address_takes_this_computers_names_and_addresses(page):
+    app = page.app
+    every = app._host_names("0.0.0.0", "0.0.0.0")
+
+    assert {"localhost", "127.0.0.1", "::1"} <= every
+    assert "0.0.0.0" not in every
+    # Another computer reaches the page by an address of this one, or by its name.
+    for host in ("192.168.1.20", "10.0.0.5", "fe80::1%eth0", socket.gethostname().lower()):
+        assert app._host_allowed(host, every, True), host
+    # Only a site's own name can be put there by its page, and that is refused.
+    for host in ("attacker.example", "192.168.1.20.nip.io", ""):
+        assert not app._host_allowed(host, every, True), host
+
+    # Listening on one address, another address is not this server's.
+    one = app._host_names("192.168.1.20", "192.168.1.20")
+    assert app._host_allowed("192.168.1.20", one, False)
+    assert app._host_allowed("localhost", one, False)
+    assert not app._host_allowed("10.0.0.5", one, False)
+    assert not app._host_allowed("attacker.example", one, False)
+
+
+#: The signals that stop the server, with what this platform can send to test them.
+_STOP_SIGNALS = ["CTRL_BREAK_EVENT"] if os.name == "nt" else ["SIGTERM", "SIGHUP"]
+
+
+def _post_and_ignore(port):
+    try:
+        _post_run("127.0.0.1", port, files=[("tree.pdf", b"%PDF")])
+    except (OSError, ValueError, http.client.HTTPException):
+        pass  # the server stops during the run
+
+
+@pytest.mark.parametrize("sent", _STOP_SIGNALS)
+def test_a_stop_signal_stops_the_run_and_removes_its_working_folder(tmp_path, sent):
+    """SIGTERM or SIGHUP ended Python at once: the run's copy of .env stayed in the
+    temporary folder and run_poc.py, in a session of its own, went on."""
+    poc = _scaffold(tmp_path / "package")
+    (poc / "run_poc.py").write_text(FAKE_RUN_POC, encoding="utf-8")
+    (poc / ".env").write_text("EXAMPLE_SETTING=1\n", encoding="utf-8")
+    temp = tmp_path / "temp"
+    temp.mkdir()
+    pid_file = tmp_path / "child.pid"
+    env = {
+        **os.environ,
+        "TMPDIR": str(temp),
+        "TEMP": str(temp),
+        "TMP": str(temp),
+        "POC_TEST_PIDFILE": str(pid_file),
+        "PYTHONUNBUFFERED": "1",
+    }
+    flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+    server = subprocess.Popen(
+        [sys.executable, "app.py", "--port", "0"],
+        cwd=poc,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        creationflags=flags,
+    )
+    child = None
+    try:
+        first = server.stdout.readline()
+        assert first.startswith("Test page: http://127.0.0.1:"), first
+        port = int(first.strip().rsplit(":", 1)[1])
+        threading.Thread(target=_post_and_ignore, args=(port,), daemon=True).start()
+        deadline = time.monotonic() + 30
+        while not (pid_file.exists() and pid_file.read_text(encoding="utf-8")):
+            assert server.poll() is None, server.stdout.read()
+            assert time.monotonic() < deadline, "the run never started its own process"
+            time.sleep(0.1)
+        child = int(pid_file.read_text(encoding="utf-8"))
+        assert list(temp.glob("poc-test-page-*/*/.env")), "the run has its copy of the keys"
+
+        server.send_signal(getattr(signal, sent))
+        server.wait(timeout=30)
+    finally:
+        if server.poll() is None:
+            server.kill()
+            server.wait(timeout=10)
+        server.stdout.close()
+
+    deadline = time.monotonic() + 10
+    while child is not None and _is_running(child) and time.monotonic() < deadline:
+        time.sleep(0.2)
+    assert not _is_running(child), "the entrypoint's own process outlived the server"
+    assert list(temp.iterdir()) == []

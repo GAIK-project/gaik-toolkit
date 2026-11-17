@@ -205,6 +205,7 @@ All wizard outputs go to the directory the user specifies. Never written inside 
 ├── use_case.blueprint.json        # executable blueprint (source of truth)
 ├── workflow.mmd                   # Mermaid diagram (quick flow view)
 ├── workflow.bpmn                  # BPMN 2.0 visual blueprint (derived)
+├── ai_act_screening.json          # optional: preliminary EU AI Act screening (Phase 12)
 ├── poc/
 │   ├── README.md                  # use-case-specific run instructions
 │   ├── run_poc.py                 # runnable pipeline
@@ -238,8 +239,15 @@ All wizard outputs go to the directory the user specifies. Never written inside 
     ├── technical_specification.md
     ├── user_guide.md
     ├── developer_guide.md
-    └── evaluation_plan.md
+    ├── evaluation_plan.md
+    └── ai_act_screening.md        # optional: the screening as a brief
 ```
+
+After Phase 12 the wizard offers an optional preliminary EU AI Act screening with the
+[`ai_act_screening`](ai_act_screening/README.md) skill. It screens the intended deployment and
+only proposes: the user accepts or skips each proposal and the wizard carries on either way. A
+change the user accepts goes through the blueprint-first rule, and the screening is marked
+outdated when the blueprint changes afterwards.
 
 ---
 

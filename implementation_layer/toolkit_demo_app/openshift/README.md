@@ -52,6 +52,42 @@ One-time setup, already done for namespace `gaik`: create the `gaik-demo-webhook
 `oc set triggers deployment/<name> --from-image=<name>:latest -c <name>`, and add each
 BuildConfig's GitHub webhook URL (`oc describe bc/<name>`) to the repository.
 
+## Upload malware check
+
+Every upload is checked before a route uses it (`api/utils/upload_check.py`):
+
+1. **Type:** its content must match its extension. The report writer, source normalizer and
+   knowledge synthesis routes keep their own type rules instead.
+2. **Content:** DOCX, XLSX and XLSM files with macros or ActiveX controls are refused. PDF files
+   are refused when they contain JavaScript, launch or import-data actions or rich media, also
+   inside compressed object streams (`api/utils/pdf_content.py`). Each PDF is checked in a
+   process of its own (`api/utils/pdf_process.py`): at most 20 s and 1 GiB, two at a time.
+3. **Malware:** a ClamAV scan (`api/utils/malware_scan.py`) when `DEMO_MALWARE_SCANNER` is set.
+
+A refused file gets 422. When the scanner is set but does not answer, the upload gets 503 and
+is not used. `GET /health` reports `uploads_scanned`. Without `DEMO_MALWARE_SCANNER`, steps 1
+and 2 still run and the scan is off.
+
+One-time setup in namespace `gaik`. Applying `scanner.yaml` creates only the scanner's own
+objects:
+
+```bash
+oc apply -f scanner.yaml -n gaik
+oc start-build gaik-demo-scanner-git -n gaik --follow
+oc rollout status deployment/gaik-demo-scanner -n gaik
+oc set env deployment/gaik-demo-api DEMO_MALWARE_SCANNER=gaik-demo-scanner:3310 -n gaik
+```
+
+Add the new BuildConfig's GitHub webhook URL (`oc describe bc/gaik-demo-scanner-git`) to the
+repository, so a push to `deploy/demo-app` rebuilds the scanner too. The staging API can use
+the same scanner. Notes:
+
+- **Signatures:** freshclam updates them from `database.clamav.net` twelve times a day, so
+  the pod needs outbound HTTPS. The image also carries the signatures from its build.
+- **Memory:** about 1 GiB at rest, up to 3 GiB while an update loads.
+- **Turn it off:** `oc set env deployment/gaik-demo-api DEMO_MALWARE_SCANNER-` or
+  `DEMO_MALWARE_SCAN=off`.
+
 ## Quick Deploy (first install only)
 
 The live deployments carry env vars set with `oc set env` that these manifests lack;
