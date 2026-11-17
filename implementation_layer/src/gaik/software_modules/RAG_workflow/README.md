@@ -85,9 +85,12 @@ workflow = RAGWorkflow(
 index_result = workflow.index_documents(
     file_paths: list[str | Path],
     filenames: list[str] | None = None,
+    document_ids: list[str] | None = None,
 )
-# Each file is one document, named by its entry in filenames or else its path.
-# Indexing a document again replaces its chunks.
+# Each file is one document, identified by its entry in document_ids or else its
+# path; filenames are display names only, so two files with the same name are two
+# documents. Indexing a document again replaces its chunks. Files saved under a new
+# temporary path each time need document_ids to be replaced.
 
 deleted = workflow.delete_document(document_id: str)  # chunks deleted
 # A persisted collection from an earlier gaik release still answers, but its

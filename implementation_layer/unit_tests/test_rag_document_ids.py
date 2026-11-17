@@ -31,6 +31,13 @@ def _chunks(document: str, texts: list[str]) -> list[Document]:
     ]
 
 
+def _owned(document: str, texts: list[str], owner: str) -> list[Document]:
+    chunks = _chunks(document, texts)
+    for chunk in chunks:
+        chunk.metadata["gaik_owner"] = owner
+    return chunks
+
+
 def _texts(store, document: str) -> list[str]:
     found = store.search(A1, top_k=50, filters={"document_id": document})
     return sorted(doc.page_content for doc, _ in found)
@@ -116,6 +123,99 @@ def test_an_own_document_id_is_kept(store):
     assert store.delete_document("doc-7") == 1
 
 
+def test_two_owners_with_the_same_document_keep_separate_chunks(store):
+    store.add(_owned("report", ["alpha", "beta"], "user-a"), [A1, B1])
+    store.add(_owned("report", ["alpha", "beta"], "user-b"), [A1, B1])
+
+    assert store.count() == 4
+
+    store.add(_owned("report", ["gamma"], "user-a"), [C1], replace=True)
+    assert _texts(store, "report") == ["alpha", "beta", "gamma"]
+    assert store.count() == 3
+
+
+def test_delete_document_deletes_only_the_given_owners_chunks(store):
+    store.add(_owned("report", ["alpha"], "user-a"), [A1])
+    store.add(_owned("report", ["beta"], "user-b"), [B1])
+    store.add(_chunks("report", ["gamma"]), [C1])
+
+    assert store.delete_document("report") == 1
+    assert _texts(store, "report") == ["alpha", "beta"]
+    assert store.delete_document("report", owner="user-a") == 1
+    assert _texts(store, "report") == ["beta"]
+
+
+def test_replace_without_an_owner_leaves_the_owners_chunks(store):
+    store.add(_owned("report", ["alpha"], "user-a"), [A1])
+    store.add(_chunks("report", ["beta"]), [B1], replace=True)
+
+    assert _texts(store, "report") == ["alpha", "beta"]
+
+
+def test_a_store_with_an_owner_deletes_with_it(store):
+    store.add(_owned("report", ["alpha"], "user-a"), [A1])
+    store.add(_owned("report", ["beta"], "user-b"), [B1])
+    store.owner = "user-a"
+
+    with pytest.raises(ValueError):
+        store.delete_document("report", owner="user-b")
+    assert store.delete_document("report") == 1
+    store.owner = None
+    assert _texts(store, "report") == ["beta"]
+
+
+@pytest.mark.parametrize("bad", [{"$ne": "x"}, {"$in": ["report"]}, ["report"], None, 1.5])
+def test_delete_document_refuses_an_id_that_is_not_text(store, bad):
+    store.add(_chunks("report", ["alpha"]), [A1])
+
+    with pytest.raises(ValueError):
+        store.delete_document(bad)
+    assert store.count() == 1
+
+
+def test_a_document_id_that_is_not_text_is_refused(store):
+    with pytest.raises(ValueError):
+        store.add([Document(page_content="x", metadata={"document_id": {"$ne": ""}})], [A1])
+    assert store.count() == 0
+
+
+def test_an_int_document_id_is_stored_and_deleted_as_its_string(store):
+    store.add([Document(page_content="x", metadata={"document_id": 7})], [A1])
+
+    [(doc, _)] = store.search(A1, top_k=1)
+    assert doc.metadata["document_id"] == "7"
+    assert store.delete_document(7) == 1
+
+
+def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):
+    store.add(_chunks("report", ["alpha", "beta"]), [A1, B1])
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("store unavailable")
+
+    if store.persist:
+        monkeypatch.setattr(store._collection, "upsert", fail)
+    else:
+        monkeypatch.setattr(store, "_ids", _FailingList(store._ids))
+    with pytest.raises(RuntimeError):
+        store.add(_chunks("report", ["gamma"]), [C1], replace=True)
+    monkeypatch.undo()
+
+    assert _texts(store, "report") == ["alpha", "beta"]
+
+
+class _FailingList(list):
+    def append(self, item):
+        raise RuntimeError("store unavailable")
+
+
+def test_the_occurrence_is_counted_within_one_call(store):
+    store.add(_chunks("report", ["header"]), [A1])
+    store.add(_chunks("report", ["header"]), [A1])
+
+    assert store.count() == 1
+
+
 # ── RAGWorkflow ──────────────────────────────────────────────────────
 
 
@@ -157,6 +257,59 @@ def test_workflow_reindexing_a_changed_file_replaces_its_chunks(workflow):
 
     stored = sorted(d.page_content for d in workflow.vector_store._documents)
     assert stored == ["four", "one", "other"]
+
+
+def test_workflow_two_files_with_the_same_name_are_two_documents(workflow):
+    workflow.parser.texts = {"/in/1/a.pdf": ["one"], "/in/2/a.pdf": ["two"]}
+    workflow.index_documents(["/in/1/a.pdf"], filenames=["a.pdf"])
+    workflow.index_documents(["/in/2/a.pdf"], filenames=["a.pdf"])
+
+    stored = sorted(d.page_content for d in workflow.vector_store._documents)
+    assert stored == ["one", "two"]
+
+
+def test_workflow_document_ids_identify_the_files(workflow):
+    workflow.parser.texts = {"/tmp/x1.pdf": ["one", "two"], "/tmp/x2.pdf": ["three"]}
+    workflow.index_documents(["/tmp/x1.pdf"], document_ids=["doc-7"])
+    workflow.index_documents(["/tmp/x2.pdf"], document_ids=["doc-7"])
+
+    assert [d.page_content for d in workflow.vector_store._documents] == ["three"]
+    assert workflow.delete_document("doc-7") == 1
+    with pytest.raises(ValueError):
+        workflow.index_documents(["/tmp/x1.pdf"], document_ids=[])
+
+
+def test_workflow_keeps_the_old_chunks_when_the_store_add_fails(workflow, monkeypatch):
+    workflow.parser.texts = {"/in/a.pdf": ["one", "two"]}
+    workflow.index_documents(["/in/a.pdf"])
+    workflow.parser.texts["/in/a.pdf"] = ["three"]
+    monkeypatch.setattr(workflow.vector_store, "_ids", _FailingList(workflow.vector_store._ids))
+
+    with pytest.raises(RuntimeError):
+        workflow.index_documents(["/in/a.pdf"])
+    monkeypatch.undo()
+
+    assert sorted(d.page_content for d in workflow.vector_store._documents) == ["one", "two"]
+
+
+def test_workflow_a_store_without_replace_gets_delete_then_add(workflow):
+    calls = []
+
+    class _Store:
+        persist = False
+
+        def add(self, documents, embeddings):
+            calls.append(("add", [d.page_content for d in documents]))
+
+        def delete_document(self, document_id):
+            calls.append(("delete", document_id))
+            return 0
+
+    workflow.vector_store = _Store()
+    workflow.parser.texts = {"/in/a.pdf": ["one"]}
+    workflow.index_documents(["/in/a.pdf"])
+
+    assert calls == [("delete", "/in/a.pdf"), ("add", ["one"])]
 
 
 def test_workflow_delete_document_removes_one_file(workflow):
@@ -228,23 +381,67 @@ def test_pg_add_upserts_on_a_key_that_is_the_same_for_the_same_chunk():
     assert keys[0] != keys[1]
 
 
+PG_DELETE = (
+    "DELETE FROM documents WHERE metadata @> %s::jsonb"
+    " AND metadata->>'document_id' = %s AND metadata->>'gaik_owner' "
+)
+
+
 def test_pg_replace_deletes_the_documents_rows_before_inserting():
     store, recorder = _pg()
     store.add(_chunks("report", ["alpha"]), [A1], replace=True)
 
-    sqls = [sql for sql, _ in recorder.calls if not sql.startswith("SELECT")]
-    assert sqls[0].startswith("DELETE FROM documents WHERE metadata @>")
-    assert recorder.calls[1][1] == ('{"document_id": "report"}',)
-    assert sqls[1].startswith("INSERT")
+    calls = [(sql, params) for sql, params in recorder.calls if not sql.startswith("SELECT")]
+    assert calls[0] == (PG_DELETE + "IS NULL", ('{"document_id": "report"}', "report"))
+    assert calls[1][0].startswith("INSERT")
 
 
-def test_pg_delete_document_matches_the_document_id_in_metadata():
+def test_pg_replace_deletes_only_the_rows_of_the_added_chunks_owner():
+    store, recorder = _pg()
+    store.add(_owned("report", ["alpha"], "user-a"), [A1], replace=True)
+
+    sql, params = recorder.calls[1]
+    assert sql == PG_DELETE + "= %s"
+    assert params == ('{"document_id": "report"}', "report", "user-a")
+
+
+def test_pg_delete_document_compares_the_document_id_exactly():
     store, recorder = _pg()
     store.delete_document("report")
 
-    sql, params = recorder.calls[-1]
-    assert sql == "DELETE FROM documents WHERE metadata @> %s::jsonb"
-    assert params == ('{"document_id": "report"}',)
+    assert recorder.calls[-1] == (PG_DELETE + "IS NULL", ('{"document_id": "report"}', "report"))
+
+    store.delete_document("report", owner="user-a")
+    assert recorder.calls[-1] == (
+        PG_DELETE + "= %s",
+        ('{"document_id": "report"}', "report", "user-a"),
+    )
+
+
+@pytest.mark.parametrize("bad", [{"$ne": "x"}, ["report"], None, 1.5, True])
+def test_pg_delete_document_refuses_an_id_that_is_not_text(bad):
+    store, recorder = _pg()
+    with pytest.raises(ValueError):
+        store.delete_document(bad)
+    assert recorder.calls == []
+
+
+def test_pg_add_refuses_a_document_id_that_is_not_text():
+    store, recorder = _pg()
+    doc = Document(page_content="x", metadata={"document_id": {"$gt": ""}})
+    with pytest.raises(ValueError):
+        store.add([doc], [A1], replace=True)
+    assert not [sql for sql, _ in recorder.calls if sql.startswith(("DELETE", "INSERT"))]
+
+
+def test_pg_two_owners_get_different_keys_for_the_same_chunk():
+    store, recorder = _pg()
+    store.add(_owned("report", ["alpha"], "user-a"), [A1])
+    store.add(_owned("report", ["alpha"], "user-b"), [A1])
+    store.add(_chunks("report", ["alpha"]), [A1])
+
+    keys = [params[-1] for _, params in _inserts(recorder)]
+    assert len(set(keys)) == 3
 
 
 def test_pg_a_table_without_chunk_key_is_inserted_into_as_before():

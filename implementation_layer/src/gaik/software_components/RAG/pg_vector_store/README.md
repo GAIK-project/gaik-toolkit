@@ -185,10 +185,10 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 | Method | Description |
 |--------|-------------|
 | `setup()` | Create extensions, table, indexes, SQL functions; concurrent calls on one database run one after another |
-| `add(documents, embeddings, *, replace=False)` | Insert documents, or update the rows of chunks already stored; returns list of IDs. `replace=True` first deletes each document's rows, in the same transaction |
+| `add(documents, embeddings, *, replace=False)` | Insert documents, or update the rows of chunks already stored; returns list of IDs. `replace=True` first deletes each document's rows of the same owner, in the same transaction |
 | `count()` | Total document count |
 | `delete(document_ids)` | Delete by row ID, returns deleted count |
-| `delete_document(document_id)` | Delete one document's rows (metadata `document_id`), returns deleted count |
+| `delete_document(document_id, *, owner=None)` | Delete one document's rows (metadata `document_id`, compared exactly) of one owner (metadata `gaik_owner`; without one, rows that name no owner), returns deleted count |
 | `search(query_embedding, *, top_k, filters)` | VectorStore-compatible semantic search |
 | `search_semantic(query_embedding, *, top_k, threshold, filters)` | Pure vector search; `threshold` (default 0.7) drops rows below that similarity |
 | `search_keyword(query_text, *, top_k, filters)` | Pure FTS keyword search |
@@ -201,8 +201,12 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 ### Chunk keys and re-indexing
 
 `setup()` gives the table a `chunk_key` column with a unique index. `add()` sets it
-from the chunk's document and text: the document is `metadata["document_id"]`, else
-`source`, else `document_name`, and is stored in the metadata as `document_id`.
+from the chunk's document, owner and text: the document is `metadata["document_id"]`,
+else `source`, else `document_name`, and is stored in the metadata as `document_id`; a
+`document_id` must be a string (an int is stored as its string), other types raise
+`ValueError`. The owner is `metadata["gaik_owner"]` when set, so two owners who index
+a document under the same id keep separate rows, and `replace=True` and
+`delete_document` touch the rows of one owner only.
 Adding a document's chunks again updates their rows instead of inserting copies;
 `replace=True` also deletes the rows a changed document no longer has; and
 `delete_document(document_id)` removes one document. A chunk whose metadata names no

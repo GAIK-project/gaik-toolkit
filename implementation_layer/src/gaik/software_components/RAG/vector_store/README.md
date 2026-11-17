@@ -57,7 +57,7 @@ store = VectorStore(
 
 ```python
 store.add(documents: list[Document], embeddings: list[list[float]], *, replace: bool = False) -> None
-store.delete_document(document_id) -> int  # chunks deleted
+store.delete_document(document_id: str, *, owner: str | None = None) -> int  # chunks deleted
 
 results = store.search(
     query_embedding: list[float],
@@ -68,16 +68,25 @@ results = store.search(
 
 #### Chunk ids and re-indexing
 
-A chunk's id comes from its document and its text. The document is
+A chunk's id comes from its document, its owner and its text. The document is
 `metadata["document_id"]`, else `source`, else `document_name` (the RAG parsers set
-the last two), and `add()` stores it with the chunk as `document_id`.
+the last two), and `add()` stores it with the chunk as `document_id`. A
+`document_id` must be a string (an int is stored as its string); other types raise
+`ValueError`, and document ids are compared exactly. The owner is
+`metadata["gaik_owner"]` (a user or session id) when set.
 
 - Adding a document's chunks again updates them instead of storing a second copy.
-  A text repeated inside one document keeps one chunk per occurrence.
-- `add(..., replace=True)` first deletes every stored chunk of each document in the
-  call, so the chunks a changed document no longer has do not stay behind. Pass all
-  of a document's chunks in one call.
-- `delete_document(document_id)` deletes one document's chunks and returns how many.
+  A text repeated inside one document keeps one chunk per occurrence, counted within
+  one call: pass all of a document's chunks in one call.
+- `add(..., replace=True)` stores the chunks, then deletes the other stored chunks of
+  each document in the call, so the chunks a changed document no longer has do not
+  stay behind. If storing fails, nothing is deleted.
+- `delete_document(document_id, owner=...)` deletes one document's chunks and returns
+  how many.
+- Two owners who index a document under the same id keep separate chunks.
+  `replace=True` deletes only chunks of the owner of the chunks added, and
+  `delete_document` only those of the `owner` given; without an owner, both touch
+  only chunks that name no owner.
 - A chunk whose metadata names no document is stored as a new one each time.
 
 A Chroma collection built by an earlier gaik release still loads and searches, but

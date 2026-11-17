@@ -26,7 +26,13 @@ except ImportError as exc:
         "Install extras with 'pip install gaik[pg-vector-store]'"
     ) from exc
 
-from gaik.software_components.RAG._chunk_ids import chunk_ids, with_document_id
+from gaik.software_components.RAG._chunk_ids import (
+    CHUNK_OWNER_KEY,
+    chunk_ids,
+    delete_scope,
+    document_scopes,
+    with_document_id,
+)
 
 if TYPE_CHECKING:
     from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
@@ -821,9 +827,10 @@ class PgVectorStore:
 
         The ``title`` field is taken from ``Document.metadata["title"]`` if present.
 
-        Each row gets a ``chunk_key`` from its document and its text: the
-        document is ``metadata["document_id"]``, else ``source``, else
-        ``document_name``, and is stored in the metadata as ``document_id``.
+        Each row gets a ``chunk_key`` from its document, its owner and its
+        text: the document is ``metadata["document_id"]``, else ``source``, else
+        ``document_name``, and is stored in the metadata as ``document_id``; the
+        owner is ``metadata["gaik_owner"]`` when set.
         Adding a chunk that is already stored updates its row instead of
         inserting a second one. A chunk whose metadata names no document gets no
         ``chunk_key`` and is inserted each time, as before. A table made by an older gaik gets the
@@ -831,12 +838,16 @@ class PgVectorStore:
         before, one per call.
 
         Args:
-            documents: List of langchain Documents to store.
+            documents: List of langchain Documents to store. A ``document_id``
+                in the metadata must be a string (an int is stored as its
+                string); other types raise ``ValueError``.
             embeddings: Corresponding embedding vectors (same length as documents).
             replace: First delete every stored row of each document in
                 ``documents``, in the same transaction, so chunks the document
-                no longer has do not stay behind. Pass all of a document's
-                chunks in one call.
+                no longer has do not stay behind. Only rows with the same owner
+                as the ones added (or, without one, rows that name no owner) are
+                deleted. Pass all of a document's chunks in one call. If the add
+                fails, the transaction is rolled back and the old rows stay.
 
         Returns:
             List of row IDs, inserted or updated.
@@ -854,20 +865,16 @@ class PgVectorStore:
         has_chunk_key = self._chunk_key_column(conn)
         keyed = chunk_ids(documents)
         metadatas = [
-            with_document_id(doc.metadata, doc_id) for doc, (doc_id, _) in zip(documents, keyed)
+            with_document_id(doc.metadata, key.document_id) for doc, key in zip(documents, keyed)
         ]
         ids: list[int] = []
 
         with conn.cursor() as cur:
             if replace:
-                for doc_id in dict.fromkeys(
-                    meta["document_id"] for meta in metadatas if "document_id" in meta
-                ):
-                    cur.execute(
-                        f"DELETE FROM {self.table_name} WHERE metadata @> %s::jsonb",
-                        (json.dumps({"document_id": doc_id}),),
-                    )
-            for doc, emb, metadata, (_, chunk_key) in zip(documents, embeddings, metadatas, keyed):
+                for doc_id, owner in document_scopes(keyed):
+                    cur.execute(*self._delete_document_sql(doc_id, owner))
+            for doc, emb, metadata, key in zip(documents, embeddings, metadatas, keyed):
+                chunk_key = key.chunk_id
                 title = metadata.get("title", "")
                 vec_str = _format_vector(emb)
                 columns = ["title", "content", "metadata", "embedding"]
@@ -906,7 +913,8 @@ class PgVectorStore:
 
     def _chunk_key_column(self, conn: psycopg.Connection) -> bool:
         """Whether the table has the ``chunk_key`` column ``setup()`` adds."""
-        if self._has_chunk_key is None:
+        # Only a found column is remembered: setup() may add it later.
+        if not self._has_chunk_key:
             row = conn.execute(
                 """
                 SELECT 1 FROM pg_attribute
@@ -916,8 +924,10 @@ class PgVectorStore:
                 """,
                 (self.table_name,),
             ).fetchone()
+            # Warn once: a None (not checked yet) becomes False only here.
+            warn = self._has_chunk_key is None and not row
             self._has_chunk_key = bool(row)
-            if not self._has_chunk_key:
+            if warn:
                 logger.warning(
                     "Table '%s' has no chunk_key column: adding a document again "
                     "inserts its chunks again. Run setup() to add the column.",
@@ -951,24 +961,47 @@ class PgVectorStore:
         return result.rowcount
 
     @_rolls_back_on_error
-    def delete_document(self, document_id: Any) -> int:
-        """Delete every row whose metadata ``document_id`` is ``document_id``.
+    def delete_document(self, document_id: str, *, owner: str | None = None) -> int:
+        """Delete every row of one document and one owner.
 
         ``add()`` stores ``document_id`` in each row's metadata (the chunk's own
         ``document_id``, else its ``source``, else its ``document_name``). Rows
         added by a gaik release before that have none and are not found:
         index them again into a new table.
 
+        Args:
+            document_id: The document, compared exactly with the metadata's
+                ``document_id``. A string, or an int compared as its string;
+                other types raise ``ValueError``.
+            owner: Delete only the rows recorded for this owner (metadata
+                ``gaik_owner``). Without it, only rows that name no owner are
+                deleted, so a call without an owner never removes an owner's
+                rows. A store with its own ``owner`` uses that one.
+
         Returns:
             Number of rows deleted.
         """
+        doc_id, owner = delete_scope(self, document_id, owner)
         conn = self._get_conn()
-        result = conn.execute(
-            f"DELETE FROM {self.table_name} WHERE metadata @> %s::jsonb",
-            (json.dumps({"document_id": document_id}),),
-        )
+        result = conn.execute(*self._delete_document_sql(doc_id, owner))
         conn.commit()
         return result.rowcount
+
+    def _delete_document_sql(self, document_id: str, owner: str | None) -> tuple[str, tuple]:
+        """The DELETE for one document's rows of exactly one owner (or none).
+
+        The containment test lets the metadata index find the rows; the
+        ``->>`` comparisons then match the document id and owner exactly.
+        """
+        if owner is None:
+            owner_clause, owner_params = f"metadata->>'{CHUNK_OWNER_KEY}' IS NULL", ()
+        else:
+            owner_clause, owner_params = f"metadata->>'{CHUNK_OWNER_KEY}' = %s", (owner,)
+        sql = (
+            f"DELETE FROM {self.table_name} WHERE metadata @> %s::jsonb"
+            f" AND metadata->>'document_id' = %s AND {owner_clause}"
+        )
+        return sql, (json.dumps({"document_id": document_id}), document_id, *owner_params)
 
     # ------------------------------------------------------------------
     # Search methods
