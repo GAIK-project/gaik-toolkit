@@ -725,7 +725,8 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
    - Write `prompts/extraction_requirements.md` if the pipeline includes extraction (then run
      `generate_schema.py` as in Phase 4).
    - After wiring, and with the user's yes, confirm that
-     `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
+     `python -c "import ast; ast.parse(open('<output_dir>/poc/run_poc.py').read())"` passes (the full
+     path: Bash starts in the wizard folder).
    - **Match documents to a manifest with `document_manifest.py`; do not write your own lookup.**
      When the package gates documents with a manifest (access control, classification, a
      catalogue), load it with `DocumentManifest.load(manifest_path)` from the scaffolded
@@ -750,7 +751,6 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
      supplies a bundle, the package must run from that bundle as delivered: a finder that read
      only the top level of `sample_input/` did not start on the customer's layout (UC05,
      6 Oct 2026).
-
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to
 `poc/requirements.txt`, and injects a block in `run_poc.py` that writes `output/result_report.pdf`
