@@ -9,7 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from .blueprint import ArtifactSource, AssumptionStatus, Blueprint
+from .blueprint import (
+    NOTHING_SENT,
+    ArtifactSource,
+    AssumptionStatus,
+    Blueprint,
+    external_services,
+)
 from .registry import Registry, get_registry
 
 # Components whose job is to check an extracted result against its source (Rule 13).
@@ -450,6 +456,12 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     # than left to the hosted default.
     _check_governance_providers(blueprint, errors, warnings)
 
+    # ------------------------------------------------------------------
+    # Rule 15: external services (technical_spec.external_services). The model
+    # has already refused a package or a variable name that is not plain; this
+    # rule checks what the user and the governance flags said about each one.
+    _check_external_services(blueprint, errors, warnings)
+
     ok = len(errors) == 0
     return ValidationResult(ok=ok, errors=errors, warnings=warnings)
 
@@ -521,5 +533,45 @@ def _check_governance_providers(blueprint: Blueprint, errors: list, warnings: li
                     14,
                     f"{flag}; {where} is {provider!r}. Confirm that its base_url points to "
                     "a self-hosted endpoint.",
+                )
+            )
+
+
+def _check_external_services(blueprint: Blueprint, errors: list, warnings: list) -> None:
+    try:
+        services = external_services(blueprint)
+    except ValueError as exc:
+        # The spec was changed after the blueprint was loaded.
+        errors.append(Issue(15, str(exc)))
+        return
+    handling = blueprint.governance.data_handling
+    for index, service in enumerate(services):
+        where = f"technical_spec.external_services[{index}] ({service.name})"
+        sends = service.data_sent.strip().lower() != NOTHING_SENT
+        if sends and handling.local_processing_required:
+            errors.append(
+                Issue(
+                    15,
+                    f"governance.data_handling.local_processing_required is true, but {where} "
+                    f"sends {service.data_sent!r} to a third party. Leave the service out, "
+                    "use one that runs locally (data_sent 'none'), or change the governance "
+                    "flag with the data owner.",
+                )
+            )
+        elif sends and not handling.external_model_api_allowed:
+            warnings.append(
+                Issue(
+                    15,
+                    f"governance.data_handling.external_model_api_allowed is false and {where} "
+                    f"sends {service.data_sent!r} to a third party. Confirm with the data "
+                    "owner that this may leave the organisation.",
+                )
+            )
+        if not service.user_can_provide:
+            warnings.append(
+                Issue(
+                    15,
+                    f"{where}: the user cannot provide it yet, so the PoC runs without it "
+                    f"({service.fallback}). Record it as an open item in assumptions.",
                 )
             )
