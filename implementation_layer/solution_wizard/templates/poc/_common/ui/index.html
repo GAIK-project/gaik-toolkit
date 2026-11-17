@@ -410,7 +410,6 @@
   // ---- what the solution takes in ----------------------------------------
 
   function inputs() { return Array.isArray(solution.inputs) ? solution.inputs.filter(isObject) : []; }
-  function fileInputs() { return inputs().filter(function (i) { return i.kind !== "text"; }); }
   function takesText() { return inputs().some(function (i) { return i.kind === "text"; }); }
   function takesMany() { return inputs().some(function (i) { return i.multiple; }) || inputs().length > 1; }
   function accepted() {
@@ -452,11 +451,12 @@
     if (endings) { files.accept = endings.join(","); }
     $("pick").textContent = many ? t.pickMany : t.pickOne;
     $("drop-hint").textContent = many ? t.dropMany : t.dropOne;
-    var labels = fileInputs().map(function (i) { return i.label; }).filter(Boolean);
+    // Every input takes a file, a text input too: its text can come as .txt or .md,
+    // and a text too long for the field has to.
+    var labels = inputs().map(function (i) { return i.label; }).filter(Boolean);
     $("accepts").textContent =
       (labels.length ? labels.join(" · ") + ". " : "") +
       (endings ? fill(t.accepts, { list: endings.join(", ") }) : t.acceptsAny);
-    show($("drop"), fileInputs().length > 0 || !inputs().length);
 
     $("question-label").textContent = solution.question_label ? String(solution.question_label) : t.question;
     show($("question-field"), Boolean(solution.asks_question));
@@ -536,7 +536,7 @@
     var question = $("question").value.trim();
     var text = $("text").value.trim();
     if (solution.asks_question && !question) { return t.errors.needQuestion; }
-    if (!picked.length && !text && !samples().length && !(solution.asks_question && !fileInputs().length)) {
+    if (!picked.length && !text && !samples().length && !(solution.asks_question && !inputs().length)) {
       return t.errors.needInput;
     }
     var max = limits().max_upload_bytes;

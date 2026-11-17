@@ -407,6 +407,49 @@ def test_the_question_file_the_page_writes_is_one_the_rag_template_reads(tmp_pat
     assert 'UPLOADED_NAMES_FILE = ".uploaded"' in app
 
 
+def _text_only_blueprint() -> Blueprint:
+    bp = _hybrid_blueprint()
+    bp.technical_spec["input_types"] = ["text"]
+    return bp
+
+
+def test_a_text_only_solution_takes_a_text_file_as_well_as_typed_text(tmp_path):
+    """Typed text is capped, and the refusal says to send a file: the file must be takeable."""
+    served = Page(_scaffold(tmp_path, _text_only_blueprint()))
+    try:
+        described = served.get_json("/api/solution")[1]
+        assert [(i["kind"], i["extensions"]) for i in described["inputs"]] == [
+            ("text", [".txt", ".md"])
+        ]
+
+        status, answer = served.run(files=[("notes.md", b"# Long notes")])
+        assert status == 200, answer
+        assert answer["result"]["seen"] == [".uploaded", "notes.md"]
+
+        status, answer = served.run(text="A short message")
+        assert status == 200, answer
+        assert answer["result"]["seen"] == [".uploaded", "input.txt"]
+
+        status, answer = served.run(text="x" * 20_001)
+        assert status == 413
+        assert answer["error"] == {
+            "code": "text_too_long",
+            "message": "The text is too long. Send it as a file instead.",
+        }
+    finally:
+        served.close()
+
+
+def test_the_page_offers_the_file_drop_for_a_text_input_too():
+    """The drop area was hidden when the only input was text (review, 17 Nov 2026)."""
+    page = (COMMON / "ui" / "index.html").read_text(encoding="utf-8")
+
+    # Nothing in the page hides the drop area or leaves the text input out of it.
+    assert 'show($("drop")' not in page
+    assert 'kind !== "text"' not in page
+    assert 'id="drop" class="drop">' in page
+
+
 def test_a_request_with_nothing_to_run_on_is_refused(page):
     status, answer = page.run()
 
