@@ -368,6 +368,8 @@ Two constraints must be satisfied before approving any schema. Check both every 
 
 1. **ExtractionRequirements `field_type` enum** — when editing `output_schema_requirements.json` directly (e.g. adding a field manually), `field_type` must be one of: `str`, `int`, `float`, `bool`, `list[str]`, `date`, `decimal`, `list[dict]`. The value `"dict"` is **not** in this enum and will cause a `ValidationError` at runtime. For a nested object field, write `"field_type": "str"`; for an array of objects write `"field_type": "list[dict]"`.
 
+1b. **`default` is a string or null** — in `output_schema_requirements.json`, a field's `default` must be a string or `null`, never a list, number or object (for a `list[str]` field write `null`, not `[]`). The audio and document templates' `run_poc.py` resets other values to `null` with a warning, but do not rely on that: validate the file after any hand edit.
+
 2. **Azure OpenAI structured output — no bare `dict` types** — when `provider: azure` (including the legacy `azure_openai` alias, or Azure routed through LiteLLM), the Pydantic schema in `output_schema.py` must **never** contain `dict | None` or `list[dict]` as field types. Azure OpenAI's structured output API requires `additionalProperties: false` on every JSON object, which bare Python `dict` does not satisfy. For every nested-object field, define a named sub-model:
 
    ```python
@@ -722,6 +724,30 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
      `generate_schema.py` as in Phase 4).
    - After wiring, and with the user's yes, confirm that
      `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
+   - **Match documents to a manifest with `document_manifest.py`; do not write your own lookup.**
+     When the package gates documents with a manifest (access control, classification, a
+     catalogue), load it with `DocumentManifest.load(manifest_path)` from the scaffolded
+     `poc/document_manifest.py` and get each document's record with `manifest.require(path)`
+     (or `manifest.entry_for(path)`, which returns None). It matches a full path, the manifest's
+     own relative key (`documents/<name>.pdf`) and a unique bare file name alike, and a miss
+     names the file and the manifest's keys. A hand-written lookup keyed the manifest one way and
+     searched it another in four UC03 packages in a row (5 Oct 2026: every document dropped,
+     refused, or `KeyError: '<name>.pdf'`). When paths are relative to a bundle file, pass its
+     folder: `DocumentManifest.load(manifest_path, search_roots=[bundle_dir])`.
+     **Take the list of documents from `manifest.documents()`** too; do not join the manifest's
+     paths to a folder yourself. They are relative to the manifest, and a package that read the
+     manifest with the helper but joined its paths to the bundle's folder found no file
+     (UC03, 6 Oct 2026).
+   - **Find inputs with `input_bundle.py`; do not list `sample_input/` yourself.** Inputs may sit
+     in subfolders and be named by a bundle file (`poc_input_bundle.json` with
+     `input/<name>.wav`, `poc_input/documents/`). Use `find_input(sample_dir, ".wav", ".mp3",
+     hints=("meeting",))` from the scaffolded `poc/input_bundle.py` for each input: it takes the
+     file the bundle names, else searches `sample_input/` and its subfolders, never returns the
+     bundle file itself, and a miss lists what is there. `load_bundle(sample_dir)` gives the
+     bundle (or None) and `bundle.dir("documents")` a folder it names. When the case says it
+     supplies a bundle, the package must run from that bundle as delivered: a finder that read
+     only the top level of `sample_input/` did not start on the customer's layout (UC05,
+     6 Oct 2026).
 
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to

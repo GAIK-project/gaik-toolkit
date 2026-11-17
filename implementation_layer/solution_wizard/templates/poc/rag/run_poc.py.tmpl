@@ -19,9 +19,8 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
+# Only the PoC's own .env, never one from a parent folder.
+load_dotenv(Path(__file__).parent / ".env")
 
 from gaik.software_modules.RAG_workflow import RAGWorkflow  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
@@ -38,7 +37,14 @@ def load_config() -> dict:
 def find_documents(config: dict) -> list:
     sample_dir = Path(__file__).parent / config.get("paths", {}).get("sample_input", "sample_input")
     # RAGWorkflow uses VisionRagParser which expects PDF files.
-    docs = [f for f in sample_dir.iterdir() if f.suffix.lower() == ".pdf"]
+    # Subfolders too: a case's documents often sit in documents/ under the bundle (#255).
+    # Only files that stay inside sample_input/ once links are resolved.
+    root = sample_dir.resolve()
+    docs = [
+        f
+        for f in sample_dir.rglob("*")
+        if f.is_file() and f.suffix.lower() == ".pdf" and f.resolve().is_relative_to(root)
+    ]
     return sorted(docs)
 
 

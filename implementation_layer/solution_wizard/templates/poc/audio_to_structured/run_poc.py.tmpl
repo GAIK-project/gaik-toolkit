@@ -19,9 +19,8 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
+# Only the PoC's own .env, never one from a parent folder.
+load_dotenv(Path(__file__).parent / ".env")
 
 from gaik.software_modules.audio_to_structured_data import AudioToStructuredData  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
@@ -51,6 +50,38 @@ def _requirements_hash() -> str:
     return hashlib.sha256(req_path.read_bytes()).hexdigest()
 
 
+def _normalise_field_defaults(schema_dir: Path, schema_name: str) -> None:
+    """gaik's FieldSpec.default is a string or null; a hand edit that wrote a list or
+    number there (e.g. ``[]`` for a list field) makes the approved schema unloadable.
+    Replace such defaults with null and say so."""
+    req_path = schema_dir / f"{schema_name}_requirements.json"
+    if not req_path.exists():
+        return
+    data = json.loads(req_path.read_text(encoding="utf-8"))
+    fixed = []
+
+    def _walk(node):
+        # The file is {"model_name", "requirements": {"fields": [...]}} and composite
+        # files nest more of these, so look at every field spec wherever it sits.
+        if isinstance(node, dict):
+            default = node.get("default")
+            if "field_name" in node and default is not None and not isinstance(default, str):
+                fixed.append(node.get("field_name") or "?")
+                node["default"] = None
+                if "has_explicit_default" in node:
+                    node["has_explicit_default"] = False
+            for value in node.values():
+                _walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                _walk(value)
+
+    _walk(data)
+    if fixed:
+        req_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"WARNING: set a non-string default to null in {req_path.name} for: {', '.join(fixed)}")
+
+
 def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
     """Load the saved schema if it exists and the requirements prompt hasn't changed.
 
@@ -75,6 +106,7 @@ def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
             return None, None, current_hash
 
     try:
+        _normalise_field_defaults(schema_dir, schema_name)
         existing = pipeline.load_schema(schema_dir, schema_name)
         if existing:
             print("Using approved schema (requirements unchanged).")
@@ -106,15 +138,18 @@ def find_input_file(config: dict, cli_input: str | None) -> Path:
 
     sample_dir = Path(__file__).parent / config.get("paths", {}).get("sample_input", "sample_input")
     audio_exts = (".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm", ".mp4")
-    files = [f for f in sample_dir.iterdir() if f.suffix.lower() in audio_exts]
-    if not files:
+    # Through the case's bundle if it has one, else sample_input/ and its subfolders (#255).
+    from input_bundle import InputNotFound, find_input
+
+    try:
+        return find_input(sample_dir, *audio_exts, pick_first=True)
+    except InputNotFound as exc:
         print(
-            f"ERROR: No audio file found in {sample_dir}\n"
+            f"ERROR: {exc}\n"
             "Place a .wav or .mp3 file there, or use --input to specify one.",
             file=sys.stderr,
         )
         sys.exit(1)
-    return sorted(files)[0]
 
 
 def main() -> None:
