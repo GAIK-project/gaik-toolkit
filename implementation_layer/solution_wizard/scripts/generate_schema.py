@@ -36,7 +36,7 @@ import json
 import keyword
 import sys
 from pathlib import Path
-from typing import Literal, Union, get_args, get_origin
+from typing import Annotated, Literal, Union, get_args, get_origin
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -69,6 +69,10 @@ def _annotation_repr(annotation) -> str:
     decimal_repr = decimal_field_repr(annotation)
     if decimal_repr is not None:
         return decimal_repr
+
+    pattern = _str_pattern(annotation)
+    if pattern is not None:
+        return f"Annotated[str, constr(pattern={pattern!r})]"
 
     origin = get_origin(annotation)
 
@@ -107,6 +111,22 @@ def _annotation_repr(annotation) -> str:
         return annotation.__name__
 
     return repr(annotation)
+
+
+def _str_pattern(annotation) -> str | None:
+    """The pattern of ``Annotated[str, constr(pattern=...)]``, as create_extraction_model
+    writes a str field with a pattern (nested once more inside Optional), else None."""
+    from pydantic import StringConstraints
+
+    if get_origin(annotation) is not Annotated or get_args(annotation)[0] is not str:
+        return None
+    for item in get_args(annotation)[1:]:
+        if isinstance(item, StringConstraints) and item.pattern is not None:
+            return item.pattern
+        nested = _str_pattern(item)
+        if nested is not None:
+            return nested
+    return None
 
 
 def _collect_models(model: type) -> list[type]:
@@ -151,6 +171,7 @@ def _schema_to_py(schema_class: type, schema_name: str) -> str:
     """
     class_blocks: list[str] = []
     needs_decimal_helper = False
+    needs_pattern = False
 
     for current_model in _collect_models(schema_class):
         class_name = _python_name(current_model.__name__, "class name")
@@ -184,6 +205,11 @@ def _schema_to_py(schema_class: type, schema_name: str) -> str:
             if decimal_field_repr(field.annotation) is not None:
                 needs_decimal_helper = True
             annotation = _annotation_repr(field.annotation)
+            # A required str field keeps its constr(pattern=...) in the field's metadata.
+            metadata_patterns = [p for p in map(_str_pattern, field.metadata) if p is not None]
+            if field.annotation is str and metadata_patterns:
+                annotation = f"Annotated[str, constr(pattern={metadata_patterns[0]!r})]"
+            needs_pattern = needs_pattern or "constr(pattern=" in annotation
             if field_args:
                 lines.append(f"    {field_name}: {annotation} = Field({', '.join(field_args)})")
             else:
@@ -197,8 +223,16 @@ def _schema_to_py(schema_class: type, schema_name: str) -> str:
         "Reviewed and approved by the user during Phase 5 (Schema Design).\n"
         'Do not hand-edit -- re-run generate_schema.py if the requirements change.\n"""\n\n'
         "from decimal import Decimal\n"
-        "from typing import List, Literal, Optional, Union\n\n"
-        "from pydantic import BaseModel, Field, ConfigDict\n\n"
+        + (
+            "from typing import Annotated, List, Literal, Optional, Union\n\n"
+            if needs_pattern
+            else "from typing import List, Literal, Optional, Union\n\n"
+        )
+        + (
+            "from pydantic import BaseModel, Field, ConfigDict, constr\n\n"
+            if needs_pattern
+            else "from pydantic import BaseModel, Field, ConfigDict\n\n"
+        )
     )
     if needs_decimal_helper:
         header += DECIMAL_PERSISTED_HELPER_SOURCE.strip() + "\n\n\n"
