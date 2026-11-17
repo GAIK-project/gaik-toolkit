@@ -71,6 +71,12 @@ the same reason a save of `.env.example` that gives a credential a value answers
 `base_digest` is not the file's answers 409 `file_changed`, and one sent while the
 wizard is replying 409 `wizard_responding`.
 
+A save and the start of a chat turn exclude each other (`agent_service.editor_save`, a
+lock per session): the save checks for a running turn and records the edit under the
+lock, and a turn registered meanwhile waits for it before it reads the edits it tells
+the agent of, so the agent never writes over an edit it has not heard of. A turn that
+waits more than 30 seconds answers 409 `file_being_saved`.
+
 A saved edit is a package change like one of the agent's. The package digest
 (`package_digest` in `GET /poc/files`) covers every file of the package but its README
 files, so an edit to any other file (code, settings, prompts, `.env.example`, a data

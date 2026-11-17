@@ -9,11 +9,14 @@ no file that would hold keys.
 
 import asyncio
 import os
+import threading
+import time
 import uuid
 from pathlib import Path
 
 import pytest
 from helpers import requires_postgres, write_gate_artifacts
+from sqlalchemy.orm import sessionmaker
 from wizard_api.ownership import USER_HEADER
 from wizard_api.schemas.session import SessionUpdate
 from wizard_api.services import agent_service, ai_marking, poc_service, session_service
@@ -618,6 +621,117 @@ def test_a_key_typed_into_the_list_of_variables_is_refused_and_names_the_variabl
     with open(os.path.join(created["output_dir"], "poc", ".env.example"), encoding="utf-8") as fh:
         assert fh.read() == ENV_EXAMPLE
     assert "user_edits" not in client.get(f"/sessions/{sid}").json()["metadata"]
+
+
+# --- a save and the start of a chat turn exclude each other ------------------------
+
+
+def test_a_turn_that_starts_during_a_save_waits_until_the_save_is_through() -> None:
+    sid = f"lock-{uuid.uuid4()}"
+    saving = threading.Event()
+    finish = threading.Event()
+    done: list[str] = []
+
+    def save() -> None:
+        with agent_service.editor_save(sid) as free:
+            assert free
+            saving.set()
+            finish.wait(5)
+            done.append("edit recorded")
+
+    saver = threading.Thread(target=save)
+    saver.start()
+    assert saving.wait(5)
+
+    async def turn() -> None:
+        registered = agent_service.begin_turn(sid, "hello")
+        try:
+            waiting = asyncio.create_task(agent_service.wait_for_editor_save(sid))
+            await asyncio.sleep(0.2)
+            assert not waiting.done()
+            finish.set()
+            assert await waiting is True
+            assert done == ["edit recorded"]
+        finally:
+            await agent_service.end_turn(sid, registered)
+
+    asyncio.run(turn())
+    saver.join(5)
+
+
+def test_a_save_that_starts_during_a_turn_is_not_let_through() -> None:
+    sid = f"lock-{uuid.uuid4()}"
+
+    async def turn() -> None:
+        registered = agent_service.begin_turn(sid, "hello")
+        try:
+            with agent_service.editor_save(sid) as free:
+                assert free is False
+        finally:
+            await agent_service.end_turn(sid, registered)
+        with agent_service.editor_save(sid) as free:
+            assert free is True
+        # No save going on: a turn does not wait.
+        assert await agent_service.wait_for_editor_save(sid, timeout=0) is True
+
+    asyncio.run(turn())
+
+
+def test_a_turn_gives_up_on_a_save_that_does_not_end_and_leaves_no_lock_behind() -> None:
+    sid = f"lock-{uuid.uuid4()}"
+    saving = threading.Event()
+    finish = threading.Event()
+
+    def save() -> None:
+        with agent_service.editor_save(sid):
+            saving.set()
+            finish.wait(5)
+
+    saver = threading.Thread(target=save)
+    saver.start()
+    assert saving.wait(5)
+
+    assert asyncio.run(agent_service.wait_for_editor_save(sid, timeout=0.1)) is False
+    finish.set()
+    saver.join(5)
+    # The lock the turn waited on is free again: the next save goes ahead.
+    with agent_service.editor_save(sid) as free:
+        assert free is True
+
+
+@requires_postgres
+def test_a_message_sent_during_a_save_tells_the_agent_of_that_edit(
+    client, db_engine, monkeypatch
+) -> None:
+    """The save had checked that no turn was running; the message came before it had
+    recorded the edit. The turn waits for it, so the agent hears of the edit."""
+    seen: list[str] = []
+    _fake_agent(monkeypatch, seen)
+    sid = _session_with_package(client, "save-then-message")["id"]
+    saving = threading.Event()
+
+    def save() -> None:
+        with agent_service.editor_save(sid) as free:
+            assert free
+            saving.set()
+            deadline = time.monotonic() + 5
+            while agent_service.running_turn(sid) is None and time.monotonic() < deadline:
+                time.sleep(0.01)
+            # Long enough for a turn that did not wait to read the edits first.
+            time.sleep(0.3)
+            with sessionmaker(bind=db_engine)() as db:
+                session = session_service.get_session(db, uuid.UUID(sid))
+                session_service.record_user_edit(db, session, "poc/run_poc.py")
+
+    saver = threading.Thread(target=save)
+    saver.start()
+    assert saving.wait(5)
+
+    client.post(f"/sessions/{sid}/chat", json={"message": "Aja uudelleen."})
+    saver.join(5)
+
+    assert len(seen) == 1
+    assert "[The user edited " in seen[0] and '"poc/run_poc.py"' in seen[0]
 
 
 @requires_postgres

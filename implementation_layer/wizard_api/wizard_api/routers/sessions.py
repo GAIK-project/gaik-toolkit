@@ -415,7 +415,10 @@ def write_poc_file(
     ``.env.example``), not the AI marker, the test material or a run's output,
     and 409 ``file_changed`` when the file is no longer what the editor read.
     Not while the wizard is replying: it may be rewriting the same files, and
-    it is told of an edit only with the next message.
+    it is told of an edit only with the next message. A save and the start of
+    a chat turn exclude each other (``agent_service.editor_save``): a message
+    sent while a save is going on waits for it, so the agent is told of the
+    edit before it can write over it.
 
     A saved edit is a change to the package like one of the agent's. The
     package's digest follows every file but a README
@@ -427,16 +430,22 @@ def write_poc_file(
     (``_user_edits_note``). ``.env.example`` is refused with a key's value in
     it (``poc_service.env_example_key_values``): keys are not kept here.
     """
+    session, poc = _session_poc_dir(db, session_id)
+    with agent_service.editor_save(str(session_id)) as free:
+        if not free:
+            raise api_error(
+                409,
+                "wizard_responding",
+                "The wizard is still responding and may be changing the package; "
+                "save again when it has replied.",
+            )
+        return _save_package_file(db, session, poc, path, payload)
+
+
+def _save_package_file(db: Session, session, poc: str, path: str, payload: PocFileWrite) -> dict:
+    """The save of ``write_poc_file``, while no chat turn can start."""
     from wizard_api.services import poc_service
 
-    session, poc = _session_poc_dir(db, session_id)
-    if agent_service.running_turn(str(session_id)) is not None:
-        raise api_error(
-            409,
-            "wizard_responding",
-            "The wizard is still responding and may be changing the package; "
-            "save again when it has replied.",
-        )
     # Before the file changes, the comparison a chat turn ends with. An
     # approval recorded under an older digest scheme is re-based there on the
     # package as it is (``package_scheme``): done after the save, that would
@@ -1276,6 +1285,16 @@ async def chat(
     turn = agent_service.begin_turn(str(session_id), payload.message)
 
     try:
+        # A save in the PoC tab's editor that began before the turn was
+        # registered is waited for, so its edit is recorded before this turn
+        # reads the edits it tells the agent of; a later one is refused while
+        # the turn runs (``write_poc_file``).
+        if not await agent_service.wait_for_editor_save(str(session_id)):
+            raise api_error(
+                409,
+                "file_being_saved",
+                "A file of the package is being saved; send your message again in a moment.",
+            )
         # The agent was started above, which takes a while: a gate reopened or
         # approved in the panel meanwhile is what this turn is told.
         await asyncio.to_thread(db.refresh, session)

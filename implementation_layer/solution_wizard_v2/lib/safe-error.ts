@@ -43,6 +43,8 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   "file_changed",
   "wizard_responding",
   "key_value_not_stored",
+  // a message sent while a package file was being saved
+  "file_being_saved",
   // the sandbox
   "sandbox_busy",
   // input files

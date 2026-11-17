@@ -21,16 +21,18 @@ returns a clear 503 instead of failing at import time.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import math
 import os
 import re
 import shutil
+import threading
 import time
 import uuid
 from collections import deque
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Iterator
 from pathlib import Path
 
 from wizard_api import config
@@ -1438,6 +1440,61 @@ def begin_turn(session_id: str, user_message: str) -> Turn:
     turn = Turn(user_message)
     TURNS[session_id] = turn
     return turn
+
+
+# ---------------------------------------------------------------------------
+# A save in the PoC tab's editor and the start of a turn
+# ---------------------------------------------------------------------------
+
+# wizard_api session id -> the lock a save in the PoC tab's editor holds. A
+# save checked that no turn was running and then wrote the file and recorded
+# the edit: a turn that started in between read no edit, and the agent could
+# write its own version over the user's without being told of it. The save
+# (PUT /poc/file) runs in a worker thread and a turn starts on the event loop,
+# so the lock is a thread lock. One per session that has saved a file.
+_EDITOR_SAVES: dict[str, threading.Lock] = {}
+_EDITOR_SAVES_GUARD = threading.Lock()
+#: How long a turn waits for a save going on before it gives up (a save takes
+#: well under a second).
+EDITOR_SAVE_WAIT_SECONDS = 30.0
+
+
+@contextlib.contextmanager
+def editor_save(session_id: str) -> Iterator[bool]:
+    """Held for a save in the editor; True when it may go ahead, False while a turn runs.
+
+    The lock is taken before the check for a running turn and held until the
+    edit is recorded. A turn registered first makes the save wait for its
+    reply (False); a turn registered after the check waits for the save
+    (``wait_for_editor_save``) and is told of the edit.
+    """
+    with _EDITOR_SAVES_GUARD:
+        lock = _EDITOR_SAVES.setdefault(session_id, threading.Lock())
+    with lock:
+        yield running_turn(session_id) is None
+
+
+def _wait_for(lock: threading.Lock, timeout: float) -> bool:
+    # Taken and given back in the same thread: a turn cancelled while it waits
+    # leaves no lock held behind it.
+    if not lock.acquire(timeout=timeout):
+        return False
+    lock.release()
+    return True
+
+
+async def wait_for_editor_save(session_id: str, timeout: float | None = None) -> bool:
+    """After ``begin_turn``: wait for a save that began before the turn was registered.
+
+    A save that comes later sees the turn and is refused, so once this returns
+    True every edit made before the turn is recorded and the turn's note can
+    name it. False when the save did not end within ``timeout`` seconds.
+    """
+    lock = _EDITOR_SAVES.get(session_id)
+    if lock is None or not lock.locked():
+        return True
+    wait = EDITOR_SAVE_WAIT_SECONDS if timeout is None else timeout
+    return await asyncio.to_thread(_wait_for, lock, wait)
 
 
 async def end_turn(session_id: str, turn: Turn) -> None:
