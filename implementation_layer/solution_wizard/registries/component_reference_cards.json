@@ -943,7 +943,7 @@
         "name": "owner",
         "type": "str | None",
         "default": null,
-        "effect": "A user or session id. Rows added are recorded for it (metadata gaik_owner), and every search_*(), count() and delete() sees only that owner's rows, whatever the filters say; several owners can share one table. Sets hnsw_iterative_scan='relaxed_order' unless given (pgvector 0.8+), since the owner filters every HNSW search. health() and relemmatize() stay table-wide. Without it every caller reads the whole table, and add() refuses metadata naming an owner.",
+        "effect": "A user or session id. Rows added are recorded for it (metadata gaik_owner), and every search_*(), count() and delete() sees only that owner's rows, whatever the filters say; several owners can share one table. Sets hnsw_iterative_scan='relaxed_order' unless given (pgvector 0.8+), since the owner filters every HNSW search. health() and relemmatize() stay table-wide. Without it every caller reads the whole table, add() refuses metadata naming an owner and delete() removes any owner's rows. A filter in gaik, not database access control: any other client of the table reads every row.",
         "selection_relevant": true,
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
@@ -1794,7 +1794,7 @@
         "name": "owner",
         "type": "str | None",
         "default": null,
-        "effect": "A user or session id. Documents indexed are recorded for it (metadata gaik_owner), and ask() retrieves only that owner's chunks, whatever the filters say; several owners can share one collection or table. Without it every caller of the collection reads every chunk. The conversation history is kept on the workflow object, so create one RAGWorkflow per user or session. Without it, add() refuses metadata that already names an owner.",
+        "effect": "A user or session id. Documents indexed are recorded for it (metadata gaik_owner), and ask() retrieves only that owner's documents, also from a collection or folder other owners share (Chroma or in memory). A filter in gaik, not access control. The conversation history is kept on the workflow object, so create one RAGWorkflow per user or session.",
         "selection_relevant": true,
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
@@ -3106,7 +3106,7 @@
         "name": "owner",
         "type": "str | None",
         "default": null,
-        "effect": "A user or session id. Chunks added are recorded for it (metadata gaik_owner), and search() and count() see only that owner's chunks, whatever the filters say; several owners can share one collection or table. Without it every caller of the collection reads every chunk. Without it, add() refuses metadata that already names an owner.",
+        "effect": "A user or session id. Chunks added are recorded for it (metadata gaik_owner), and search() and count() see only that owner's chunks, whatever the filters say; several owners can share one collection or folder. A filter in gaik, not access control: any other client of the folder reads every chunk. Without it every caller of the collection reads every chunk, and add() refuses metadata that already names an owner.",
         "selection_relevant": true,
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }

@@ -60,7 +60,12 @@ Pass `owner` (a user or session id) and the store records it on every chunk it a
 under the metadata key `gaik_owner`, and its searches and counts see only that owner's
 chunks. A caller's filter is added to the owner condition; it cannot replace it. Without
 `owner`, everyone using the same collection reads every chunk in it, and `add()` refuses
-metadata that already names an owner, so content cannot be planted into an owner's view.
+metadata that already names an owner.
+
+This is a filter in gaik, not access control. Every process that can open the folder (a
+store without an owner, an older gaik, chromadb itself) reads and writes every owner's
+chunks, including chunks that name an owner. Treat all of them as trusted, or give users
+who must not reach each other's data separate collections or folders.
 
 ### Methods
 

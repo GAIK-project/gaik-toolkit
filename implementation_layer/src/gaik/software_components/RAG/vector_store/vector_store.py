@@ -56,9 +56,11 @@ class VectorStore:
 
     With ``owner`` (a user or session id), every chunk this store adds is recorded
     for that owner, and :meth:`search` and :meth:`count` see only that owner's
-    chunks, whatever the caller's filters say. Several owners can then share one
-    collection and one folder without reading each other's documents. Without it,
-    every caller of the same collection reads every chunk in it.
+    chunks, whatever the caller's filters say. This is a filter in gaik, not access
+    control: every process that can open the folder (a store without an owner, an
+    older gaik, chromadb itself) still reads and writes every chunk, so it is trusted
+    the same. Separate users who must not reach each other's data with separate
+    collections or folders.
     """
 
     def __init__(

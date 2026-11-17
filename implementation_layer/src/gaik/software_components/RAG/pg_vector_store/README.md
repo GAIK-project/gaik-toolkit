@@ -276,8 +276,13 @@ Standard PostgreSQL URI: `postgresql://user:password@host:port/database`
 (`gaik_owner`) and adds it to the metadata filter of every search, `count()` and
 `delete()`, so one table can hold several users' documents. A caller's `filters` are
 combined with it and cannot replace it. Without `owner` the store reads the whole table,
-and its `add()` refuses metadata that already names an owner, so content cannot be
-planted into an owner's view.
+and its `add()` refuses metadata that already names an owner. A store without an owner
+also deletes rows of any owner by id.
+
+This is a filter in gaik, not database access control. Every client of the table (a
+store without an owner, an older gaik, psql, the application's own SQL) reads and writes
+every owner's rows. For tenants that must be kept apart in the database itself, use
+separate tables or PostgreSQL row-level security.
 
 The owner is a filter on every search, and an HNSW scan filters only after picking its
 candidates, so a store with `owner` sets `hnsw_iterative_scan="relaxed_order"` unless you
