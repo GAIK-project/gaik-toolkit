@@ -28,6 +28,20 @@ def check_owner(owner: str | None) -> str | None:
     return owner
 
 
+def refuse_foreign_owner(documents) -> None:
+    """Raise ``ValueError`` if a document's metadata already names an owner.
+
+    A store without an owner would store such a chunk as it is, and it would then show
+    up in that owner's searches: content planted into another user's view.
+    """
+    for doc in documents:
+        if OWNER_KEY in (doc.metadata or {}):
+            raise ValueError(
+                f"metadata key {OWNER_KEY!r} is set by a store with an owner; "
+                "add these documents through a store created with owner=..."
+            )
+
+
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     norm_a = math.sqrt(sum(x * x for x in a))
@@ -124,6 +138,7 @@ class VectorStore:
     def _owned(self, documents: list[Document]) -> list[Document]:
         """``documents`` recorded for this store's owner (copies; the caller's are kept)."""
         if self.owner is None:
+            refuse_foreign_owner(documents)
             return documents
         return [
             Document(

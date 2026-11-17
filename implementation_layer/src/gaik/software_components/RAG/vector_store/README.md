@@ -59,7 +59,8 @@ store = VectorStore(
 Pass `owner` (a user or session id) and the store records it on every chunk it adds,
 under the metadata key `gaik_owner`, and its searches and counts see only that owner's
 chunks. A caller's filter is added to the owner condition; it cannot replace it. Without
-`owner`, everyone using the same collection reads every chunk in it.
+`owner`, everyone using the same collection reads every chunk in it, and `add()` refuses
+metadata that already names an owner, so content cannot be planted into an owner's view.
 
 ### Methods
 

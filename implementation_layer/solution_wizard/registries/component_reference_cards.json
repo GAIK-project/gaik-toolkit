@@ -937,13 +937,13 @@
         "default": null,
         "effect": "Per-connection hnsw.iterative_scan ('relaxed_order', 'strict_order' or 'off'; pgvector 0.8+). Without it, a search with a selective filters argument can return fewer rows than asked, or none: the HNSW index picks its nearest candidates first and the filter is applied afterwards. Measured: 0 of 20 rows on a 20,000-row table where 40 rows matched, 20 of 20 with 'relaxed_order'.",
         "selection_relevant": true,
-        "infer_from": "searches pass filters (per-tenant, per-document, per-category retrieval) -> 'relaxed_order'; unfiltered search -> leave None"
+        "infer_from": "searches pass filters (per-tenant, per-document, per-category retrieval) -> 'relaxed_order'; unfiltered search -> leave None; with owner set it defaults to relaxed_order"
       },
       {
         "name": "owner",
         "type": "str | None",
         "default": null,
-        "effect": "A user or session id. Chunks added are recorded for it (metadata gaik_owner), and search() and count() see only that owner's chunks, whatever the filters say; several owners can share one collection or table. Without it every caller of the collection reads every chunk.",
+        "effect": "A user or session id. Rows added are recorded for it (metadata gaik_owner), and every search_*(), count() and delete() sees only that owner's rows, whatever the filters say; several owners can share one table. Sets hnsw_iterative_scan='relaxed_order' unless given (pgvector 0.8+), since the owner filters every HNSW search. health() and relemmatize() stay table-wide. Without it every caller reads the whole table, and add() refuses metadata naming an owner.",
         "selection_relevant": true,
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
@@ -1794,7 +1794,7 @@
         "name": "owner",
         "type": "str | None",
         "default": null,
-        "effect": "A user or session id. Documents indexed are recorded for it (metadata gaik_owner), and ask() retrieves only that owner's chunks, whatever the filters say; several owners can share one collection or table. Without it every caller of the collection reads every chunk. The conversation history is kept on the workflow object, so create one RAGWorkflow per user or session.",
+        "effect": "A user or session id. Documents indexed are recorded for it (metadata gaik_owner), and ask() retrieves only that owner's chunks, whatever the filters say; several owners can share one collection or table. Without it every caller of the collection reads every chunk. The conversation history is kept on the workflow object, so create one RAGWorkflow per user or session. Without it, add() refuses metadata that already names an owner.",
         "selection_relevant": true,
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
@@ -3106,7 +3106,7 @@
         "name": "owner",
         "type": "str | None",
         "default": null,
-        "effect": "A user or session id. Chunks added are recorded for it (metadata gaik_owner), and search() and count() see only that owner's chunks, whatever the filters say; several owners can share one collection or table. Without it every caller of the collection reads every chunk.",
+        "effect": "A user or session id. Chunks added are recorded for it (metadata gaik_owner), and search() and count() see only that owner's chunks, whatever the filters say; several owners can share one collection or table. Without it every caller of the collection reads every chunk. Without it, add() refuses metadata that already names an owner.",
         "selection_relevant": true,
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }

@@ -133,7 +133,7 @@ def _owner_in(params) -> bool:
     ],
     ids=["semantic", "keyword", "hybrid", "weighted", "search", "count", "delete"],
 )
-def test_pg_every_read_count_and_delete_is_scoped_to_the_owner(pg, call):
+def test_pg_every_search_count_and_delete_is_scoped_to_the_owner(pg, call):
     store, conn = pg
 
     call(store)
@@ -191,3 +191,46 @@ def test_rag_workflow_passes_its_owner_to_the_store(monkeypatch):
     )
 
     assert seen["owner"] == "alice"
+
+
+def test_an_unowned_store_refuses_a_chunk_that_names_an_owner():
+    store = VectorStore()
+
+    with pytest.raises(ValueError, match=OWNER_KEY):
+        store.add([_doc("planted", **{OWNER_KEY: "alice"})], [E])
+    assert store.count() == 0
+
+
+def test_an_unowned_chroma_store_refuses_a_planted_owner(tmp_path):
+    pytest.importorskip("chromadb")
+    kwargs = {"persist": True, "persist_path": str(tmp_path), "collection_name": "shared"}
+    VectorStore(owner="alice", **kwargs).add([_doc("alice's fact")], [E])
+
+    with pytest.raises(ValueError, match=OWNER_KEY):
+        VectorStore(**kwargs).add([_doc("planted", **{OWNER_KEY: "alice"})], [E])
+
+    found = VectorStore(owner="alice", **kwargs).search(E, top_k=5)
+    assert [d.page_content for d, _ in found] == ["alice's fact"]
+
+
+def test_pg_unowned_add_refuses_a_planted_owner():
+    pytest.importorskip("psycopg")
+    from gaik.software_components.RAG.pg_vector_store.pg_vector_store import PgVectorStore
+
+    store = PgVectorStore("postgresql://stub@localhost:1/stub", embedding_dim=2)
+    store._get_conn = lambda: pytest.fail("no statement may run")
+
+    with pytest.raises(ValueError, match=OWNER_KEY):
+        store.add([_doc("planted", **{OWNER_KEY: "alice"})], [E])
+
+
+def test_pg_owner_turns_on_iterative_scans_unless_told_otherwise():
+    pytest.importorskip("psycopg")
+    from gaik.software_components.RAG.pg_vector_store.pg_vector_store import PgVectorStore
+
+    dsn = "postgresql://stub@localhost:1/stub"
+    assert PgVectorStore(dsn, owner="alice").hnsw_iterative_scan == "relaxed_order"
+    assert PgVectorStore(dsn, owner="alice", hnsw_iterative_scan="off").hnsw_iterative_scan == (
+        "off"
+    )
+    assert PgVectorStore(dsn).hnsw_iterative_scan is None
