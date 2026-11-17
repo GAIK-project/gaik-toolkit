@@ -21,6 +21,7 @@ try:
 except Exception:
     pass
 
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
 from gaik.software_components.parsers.vision import OpenAIConfig, VisionParser
 
@@ -117,6 +118,7 @@ class VisionPlusParser:
         if self.verbose:
             print(f"Processing PDF with vision enhancement: {file_path}")
 
+        check_file_type(file_path, {"pdf"})
         self.limits.check_pdf(file_path)
         result = self.converter.convert(file_path, **docling_limits(self.limits))
         doc = result.document

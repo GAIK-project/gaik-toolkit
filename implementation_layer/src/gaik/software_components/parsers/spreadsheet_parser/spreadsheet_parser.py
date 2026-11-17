@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from ...file_type import TEXT_TYPES, check_file_type
 from ...input_limits import InputLimits, count_table_rows
 
 # Characters a number format shows as they are, without quotes.
@@ -221,6 +222,9 @@ class SpreadsheetParser:
 
         Raises:
             ValueError: For an unsupported type or a spreadsheet without rows.
+            FileTypeMismatchError: If the content is not the type the file's
+                extension says: an .xlsx that is no XLSX workbook, a .csv that is
+                not text (a ``ValueError``).
             InputLimitError: If the file is over ``max_file_bytes``, an .xlsx unpacks
                 to more than ten times that, or a sheet has more than ``max_table_rows``.
         """
@@ -228,9 +232,11 @@ class SpreadsheetParser:
         suffix = path.suffix.lower()
         if suffix == ".xlsx":
             self.limits.check_zip_container(path)
+            check_file_type(path, {"xlsx"})
             blocks = _xlsx_blocks(path, self.limits)
         elif suffix == ".csv":
             self.limits.check_file_size(path)
+            check_file_type(path, TEXT_TYPES)
             with path.open(encoding="utf-8-sig", newline="") as handle:
                 rows = count_table_rows(csv.reader(handle), self.limits, path.name)
                 blocks = [table] if (table := _table(rows)) else []

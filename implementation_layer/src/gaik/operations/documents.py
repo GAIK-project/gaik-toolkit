@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import re
+import shutil
+import tempfile
 import zipfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -144,9 +149,14 @@ def _pdf_pages(file: Path) -> list[str]:
         raise need("parse_document", "PyMuPDF") from error
 
     with pymupdf.open(file) as document:
+        # PyMuPDF picks its handler from the name and the content; the parser gets a
+        # .pdf name below, so a file PyMuPDF does not read as a PDF stops here.
+        if not document.is_pdf:
+            raise ValueError("the content of the file is not a PDF document")
         page_count = document.page_count
     try:
-        marked = PyMuPDFParser().parse_pdf(str(file), page_markers=True)
+        with _named_as(file, ".pdf") as named:
+            marked = PyMuPDFParser().parse_pdf(str(named), page_markers=True)
     except InputLimitError:
         # A PDF over a limit is still a PDF; the message names the file only.
         raise
@@ -168,4 +178,25 @@ def _docx_text(file: Path) -> str:
         from gaik.software_components.parsers import DocxParser
     except ImportError as error:
         raise need("parse_document", "python-docx") from error
-    return DocxParser().parse_docx(str(file), keep_structure=True).strip()
+    with _named_as(file, ".docx") as named:
+        return DocxParser().parse_docx(str(named), keep_structure=True).strip()
+
+
+@contextmanager
+def _named_as(file: Path, suffix: str) -> Iterator[Path]:
+    """``file`` under a name that ends in ``suffix``.
+
+    The kind here comes from the content, and the parsers refuse a file whose
+    extension names another type; a file of the right kind under another name is
+    handed to them as a link (or a copy) with the matching extension.
+    """
+    if file.suffix.lower() == suffix:
+        yield file
+        return
+    with tempfile.TemporaryDirectory() as folder:
+        named = Path(folder) / f"document{suffix}"
+        try:
+            os.symlink(file.resolve(), named)
+        except OSError:
+            shutil.copyfile(file, named)
+        yield named
