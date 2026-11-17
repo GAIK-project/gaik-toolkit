@@ -1323,8 +1323,9 @@ def _solution_description(
     """The data the test page reads: what the solution is, takes in and gives out."""
     language = str(variables.get("language") or "en")
     ui_language = "fi" if language.lower().startswith("fi") else "en"
-    output_types = [str(t).lower() for t in _spec_list(blueprint.technical_spec, "output_types")]
-    asks_question = pattern == "rag" or "answer" in output_types
+    # Only the RAG entrypoint reads a question from a text file beside the documents.
+    # A pipeline the agent wires takes typed text where its input_types say text.
+    asks_question = pattern == "rag"
     return {
         "id": blueprint.use_case.id,
         "name": _short(blueprint.use_case.name, 200),

@@ -303,6 +303,7 @@
         bad_extension: "One of the files is not a type this solution takes.",
         text_too_long: "The text is too long. Send it as a file instead.",
         no_input: "Add a file or a text first.",
+        no_documents: "Add at least one document first: the question is asked of the documents you add.",
         run_failed: "The run ended with an error. The log below says why.",
         timeout: "The run took too long and was stopped.",
         network: "The test page's server is not answering. Is “python app.py” still running?",
@@ -359,6 +360,7 @@
         bad_extension: "Jokin tiedostoista ei ole tyyppiä, jota tämä ratkaisu käsittelee.",
         text_too_long: "Teksti on liian pitkä. Lähetä se tiedostona.",
         no_input: "Lisää ensin tiedosto tai teksti.",
+        no_documents: "Lisää ensin vähintään yksi asiakirja: kysymys esitetään lisäämillesi asiakirjoille.",
         run_failed: "Ajo päättyi virheeseen. Alla oleva loki kertoo syyn.",
         timeout: "Ajo kesti liian kauan ja se pysäytettiin.",
         network: "Testisivun palvelin ei vastaa. Onko ”python app.py” vielä käynnissä?",
@@ -425,7 +427,15 @@
     return all;
   }
   function limits() { return isObject(solution.limits) ? solution.limits : {}; }
-  function samples() { return Array.isArray(solution.sample_files) ? solution.sample_files : []; }
+  // The package's example files a run without an added file works on. Where the
+  // solution answers questions these are the documents only: the examples' own
+  // question files are not part of a run that brings a question.
+  function samples() {
+    var names = Array.isArray(solution.sample_files) ? solution.sample_files : [];
+    var endings = accepted();
+    if (!solution.asks_question || !endings) { return names; }
+    return names.filter(function (name) { return endings.indexOf(suffixOf(String(name))) !== -1; });
+  }
 
   function describe() {
     lang = String(solution.language || "en").toLowerCase().slice(0, 2) === "fi" ? "fi" : "en";
@@ -536,9 +546,8 @@
     var question = $("question").value.trim();
     var text = $("text").value.trim();
     if (solution.asks_question && !question) { return t.errors.needQuestion; }
-    if (!picked.length && !text && !samples().length && !(solution.asks_question && !inputs().length)) {
-      return t.errors.needInput;
-    }
+    if (solution.asks_question && !picked.length && !samples().length) { return t.errors.no_documents; }
+    if (!picked.length && !text && !samples().length) { return t.errors.needInput; }
     var max = limits().max_upload_bytes;
     var total = picked.reduce(function (sum, file) { return sum + file.size; }, 0);
     if (max && total > max) { return fill(t.errors.tooLarge, { size: formatSize(max) }); }

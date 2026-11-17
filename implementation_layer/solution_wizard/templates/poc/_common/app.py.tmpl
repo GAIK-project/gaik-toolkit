@@ -35,6 +35,7 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -70,6 +71,13 @@ OUTPUT_DIR = "output"
 #: The names of the files a user added, one a line; input_bundle.py reads it and
 #: takes those files before the package's examples.
 UPLOADED_NAMES_FILE = ".uploaded"
+#: The text files the RAG entrypoint reads as questions, one a line.
+QUESTION_SUFFIXES = (".txt", ".md")
+#: Names Windows keeps for devices, whatever their case and ending: a file of such
+#: a name cannot be written there.
+_DEVICE_NAMES = {"CON", "PRN", "AUX", "NUL"} | {
+    f"{d}{n}" for d in ("COM", "LPT") for n in "123456789"
+}
 #: Never copied into a run's working folder.
 _SKIP_DIRS = {SAMPLE_DIR, OUTPUT_DIR, "ui", "__pycache__", ".venv", "venv", ".git", "node_modules"}
 
@@ -183,6 +191,8 @@ def safe_name(name: str) -> str:
     name = "".join(ch for ch in name if ch.isprintable() and ch not in '<>:"|?*').strip(" .")
     if not name:
         raise RefusalError(400, "bad_name", "A file has no usable name.")
+    if name.split(".", 1)[0].strip().upper() in _DEVICE_NAMES:
+        name = "_" + name
     stem, dot, suffix = name.rpartition(".")
     if dot and stem:
         return stem[:120] + "." + suffix[:16]
@@ -238,6 +248,41 @@ def _tail(path: Path, lines: int = LOG_TAIL_LINES) -> str:
     return "\n".join(text.splitlines()[-lines:])
 
 
+def _remove(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _kill_tree(process: subprocess.Popen) -> None:
+    """Stop a run and every process it started.
+
+    The run was started as the head of a group of its own, so the group is what
+    is stopped: an entrypoint that started a process of its own does not leave
+    it behind, holding the model connection and the working folder.
+    """
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(process.pid)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=20,
+                check=False,
+            )
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        if process.poll() is None:
+            process.kill()
+    except OSError:
+        pass
+
+
 class Solution:
     """The package this server stands in: what it takes in, and its runs."""
 
@@ -261,9 +306,17 @@ class Solution:
         self._runs: dict[str, Path] = {}
         self._started: float | None = None
         self._log_path: Path | None = None
+        self._process: subprocess.Popen | None = None
 
     def close(self) -> None:
-        """Remove every run's working folder."""
+        """Stop a run that is going and remove every run's working folder."""
+        process = self._process
+        if process is not None and process.poll() is None:
+            _kill_tree(process)
+            try:
+                process.wait(timeout=10)
+            except subprocess.SubprocessError:
+                pass
         shutil.rmtree(self.runs_root, ignore_errors=True)
 
     # -- what the page reads ------------------------------------------------
@@ -320,14 +373,50 @@ class Solution:
     def run(self, fields: dict[str, str], files: list[tuple]) -> dict:
         """Run the solution once on what the request carried; one run at a time."""
         uploads = self._checked_uploads(fields, files)
+        question_sent = bool(fields.get("question", "").strip())
+        examples = self._examples(sent_files=bool(files), question_sent=question_sent)
+        if not uploads and not examples:
+            raise RefusalError(400, "no_input", "Add a file or a text first.")
+        if question_sent and not files and not self._has_documents(examples):
+            # A package as delivered has no sample_input/: a question alone has
+            # nothing to be asked of, and the run would only fail.
+            raise RefusalError(
+                400,
+                "no_documents",
+                "Add at least one document: the question is asked of the documents you add.",
+            )
         if not self._lock.acquire(blocking=False):
             raise RefusalError(409, "busy", "A run is already going. Wait for it to finish.")
         try:
-            return self._run(uploads, sent_files=bool(files))
+            return self._run(uploads, examples)
         finally:
             self._started = None
             self._log_path = None
             self._lock.release()
+
+    def _examples(self, sent_files: bool, question_sent: bool) -> list[Path]:
+        """The package's own sample_input/ files a run without a sent file works on.
+
+        With a question in the request the examples' own question files are left
+        out: the run answers what was asked, not the sample questions as well.
+        """
+        if sent_files:
+            return []
+        found = [
+            p
+            for p in _regular_files(self.package_dir / SAMPLE_DIR)
+            if p.name != UPLOADED_NAMES_FILE
+        ]
+        if question_sent:
+            found = [p for p in found if p.suffix.lower() not in QUESTION_SUFFIXES]
+        return found
+
+    def _has_documents(self, examples: list[Path]) -> bool:
+        """Whether a solution that answers questions has an example document to search."""
+        if not self.description().get("asks_question"):
+            return True
+        accepted = self.accepted_suffixes()
+        return any(accepted is None or p.suffix.lower() in accepted for p in examples)
 
     def _checked_uploads(self, fields: dict[str, str], files: list[tuple]) -> list[tuple]:
         """``(file name, bytes)`` for every file and text of the request, names made safe."""
@@ -363,49 +452,31 @@ class Solution:
             name = _unused_name(filename, taken)
             taken.add(name.lower())
             uploads.append((name, (text + "\n").encode("utf-8")))
-        if not uploads and not _regular_files(self.package_dir / SAMPLE_DIR):
-            raise RefusalError(400, "no_input", "Add a file or a text first.")
         return uploads
 
-    def _run(self, uploads: list[tuple], sent_files: bool) -> dict:
+    def _run(self, uploads: list[tuple], examples: list[Path]) -> dict:
         if not (self.package_dir / ENTRYPOINT).is_file():
             raise RefusalError(500, "no_entrypoint", f"{ENTRYPOINT} is missing from the package.")
         run_id = secrets.token_hex(8)
         run_dir = self.runs_root / run_id
-        self._copy_package(run_dir)
-        sample_dir = run_dir / SAMPLE_DIR
-        sample_dir.mkdir()
-        (run_dir / OUTPUT_DIR).mkdir()
-        # No file sent (a question or a text at most): the package's own examples
-        # are the material.
-        examples = [] if sent_files else _regular_files(self.package_dir / SAMPLE_DIR)
-        examples = [p for p in examples if p.name != UPLOADED_NAMES_FILE]
-        used_examples = bool(examples)
-        if used_examples:
-            for source in examples:
-                target = sample_dir / source.relative_to(self.package_dir / SAMPLE_DIR)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(source, target)
-        for name, content in uploads:
-            (sample_dir / name).write_bytes(content)
-        if uploads:
-            (sample_dir / UPLOADED_NAMES_FILE).write_text(
-                "".join(f"{name}\n" for name, _ in uploads), encoding="utf-8"
-            )
-
         log_path = self.runs_root / f"{run_id}.log"
-        self._log_path = log_path
-        self._started = time.monotonic()
         try:
+            self._prepare(run_dir, uploads, examples)
+            self._log_path = log_path
+            self._started = time.monotonic()
             exit_code, timed_out = self._execute(run_dir, log_path)
+        except BaseException:
+            # Nothing of a run that did not happen stays: the folder holds the
+            # user's files and, from the first copied file on, maybe the keys.
+            shutil.rmtree(run_dir, ignore_errors=True)
+            _remove(log_path)
+            raise
         finally:
-            # The keys were needed for the run only, also when it could not start;
-            # the working folder stays for its downloads.
-            try:
-                (run_dir / ".env").unlink(missing_ok=True)
-            except OSError:
-                pass
+            # The keys were needed for the run only; the working folder of a
+            # finished run stays for its downloads.
+            _remove(run_dir / ".env")
         duration = round(time.monotonic() - self._started, 1)
+        used_examples = bool(examples)
 
         self._runs[run_id] = run_dir
         self._forget_old_runs()
@@ -435,6 +506,25 @@ class Solution:
             }
         return answer
 
+    def _prepare(self, run_dir: Path, uploads: list[tuple], examples: list[Path]) -> None:
+        """The run's working folder: the package's code, then the inputs."""
+        self._copy_package(run_dir)
+        sample_dir = run_dir / SAMPLE_DIR
+        sample_dir.mkdir()
+        (run_dir / OUTPUT_DIR).mkdir()
+        # No file sent (a question or a text at most): the package's own examples
+        # are the material.
+        for source in examples:
+            target = sample_dir / source.relative_to(self.package_dir / SAMPLE_DIR)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        for name, content in uploads:
+            (sample_dir / name).write_bytes(content)
+        if uploads:
+            (sample_dir / UPLOADED_NAMES_FILE).write_text(
+                "".join(f"{name}\n" for name, _ in uploads), encoding="utf-8"
+            )
+
     def _copy_package(self, run_dir: Path) -> None:
         """The package's code and settings, without its inputs, results and this page."""
         for source in _regular_files(self.package_dir):
@@ -450,6 +540,12 @@ class Solution:
         """Start run_poc.py in ``run_dir``; its output goes to ``log_path``."""
         env = dict(os.environ)
         env.update({"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1"})
+        # The run heads a process group of its own, so a timeout can stop what
+        # the entrypoint started as well.
+        if os.name == "nt":
+            group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        else:
+            group = {"start_new_session": True}
         with open(log_path, "wb") as log:
             # A closed pipe, not the null device: on Windows that one counts as a
             # terminal, and the entrypoint would wait for a typed question.
@@ -460,15 +556,19 @@ class Solution:
                 stdin=subprocess.PIPE,
                 stdout=log,
                 stderr=subprocess.STDOUT,
+                **group,
             )
-            if process.stdin is not None:
-                process.stdin.close()
+            self._process = process
             try:
+                if process.stdin is not None:
+                    process.stdin.close()
                 return process.wait(timeout=self.timeout), False
             except subprocess.TimeoutExpired:
-                process.kill()
+                _kill_tree(process)
                 process.wait()
                 return None, True
+            finally:
+                self._process = None
 
     def _forget_old_runs(self) -> None:
         while len(self._runs) > self.keep_runs:

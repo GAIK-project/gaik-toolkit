@@ -10,6 +10,8 @@ import hashlib
 import http.client
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 import threading
 import time
@@ -43,6 +45,12 @@ names = sorted(p.name for p in sample.iterdir() if p.is_file())
 print("Reading", names)
 if "slow.pdf" in names:
     time.sleep(3)
+if "tree.pdf" in names:
+    # A process of the entrypoint's own, as a parser or a worker pool starts one.
+    import os, subprocess
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    Path(os.environ["POC_TEST_PIDFILE"]).write_text(str(child.pid), encoding="utf-8")
+    time.sleep(60)
 if "fail.pdf" in names:
     print("ERROR: No usable text in fail.pdf", file=sys.stderr)
     sys.exit(3)
@@ -376,15 +384,11 @@ def test_a_question_becomes_the_text_file_the_rag_entrypoint_reads(tmp_path):
 
         assert status == 200, answer
         result = answer["result"]
-        # No file was sent, so the package's examples are the material, and the
-        # question is named as the user's own so it is read before the sample one.
+        # No file was sent, so the package's example documents are the material.
+        # The examples' own question file is left out: the run answers what was
+        # asked, not the sample questions as well.
         assert answer["used_examples"] is True
-        assert result["seen"] == [
-            ".uploaded",
-            "handbook.pdf",
-            "question.txt",
-            "sample_questions.txt",
-        ]
+        assert result["seen"] == [".uploaded", "handbook.pdf", "question.txt"]
         assert result["uploaded"] == ["question.txt"]
         assert result["question"] == "Kuka hyväksyy lomat?"
         assert served.get_json("/api/solution")[1]["sample_files"] == [
@@ -673,3 +677,214 @@ def test_the_working_folders_are_removed_when_the_server_closes(tmp_path):
     served.close()
 
     assert not root.exists()
+
+
+# ---------------------------------------------------------------------------
+# Review of the pull request (17 Nov 2026)
+# ---------------------------------------------------------------------------
+
+
+def _rag_page(tmp_path) -> Page:
+    return Page(_scaffold(tmp_path, Blueprint.from_file(EXAMPLES / "rag_workflow_blueprint.json")))
+
+
+def test_only_the_rag_pattern_asks_a_question(tmp_path):
+    """Only the RAG entrypoint reads a question file; "answer" as an output type is not enough."""
+    bp = _hybrid_blueprint()
+    bp.technical_spec["output_types"] = ["answer"]
+    described = json.loads(
+        (_scaffold(tmp_path / "a", bp) / "ui" / "solution.json").read_text(encoding="utf-8")
+    )
+    assert described["pattern"] != "rag"
+    assert described["asks_question"] is False
+    assert described["question_label"] == ""
+    assert "text" not in {i["kind"] for i in described["inputs"]}
+
+    # Typed text is offered where the blueprint says the solution takes text.
+    bp = _hybrid_blueprint()
+    bp.technical_spec["output_types"] = ["answer"]
+    bp.technical_spec["input_types"] = ["text", "pdf"]
+    described = json.loads(
+        (_scaffold(tmp_path / "b", bp) / "ui" / "solution.json").read_text(encoding="utf-8")
+    )
+    assert described["asks_question"] is False
+    assert {i["kind"] for i in described["inputs"]} == {"text", "document"}
+
+
+def test_a_question_without_any_document_is_refused_before_a_run(tmp_path):
+    """A deployable package has no sample_input/: a question alone has nothing to search."""
+    served = _rag_page(tmp_path)
+    try:
+        refusal = {
+            "ok": False,
+            "error": {
+                "code": "no_documents",
+                "message": (
+                    "Add at least one document: the question is asked of the documents you add."
+                ),
+            },
+        }
+        assert served.run(question="Who approves leave?") == (400, refusal)
+
+        # Example question files are not documents either.
+        (served.poc / "sample_input" / "sample_questions.txt").write_text("Old?", "utf-8")
+        assert served.run(question="Who approves leave?") == (400, refusal)
+        assert list(served.server.solution.runs_root.iterdir()) == []
+
+        # With a document sent, or one among the examples, the question runs.
+        status, answer = served.run(files=[("handbook.pdf", b"%PDF")], question="Who approves?")
+        assert status == 200 and answer["ok"] is True
+        (served.poc / "sample_input" / "policy.pdf").write_bytes(b"%PDF")
+        status, answer = served.run(question="Who approves?")
+        assert status == 200 and answer["result"]["seen"] == [
+            ".uploaded",
+            "policy.pdf",
+            "question.txt",
+        ]
+    finally:
+        served.close()
+
+
+def test_a_run_without_a_question_keeps_the_examples_question_file(tmp_path):
+    served = _rag_page(tmp_path)
+    try:
+        (served.poc / "sample_input" / "handbook.pdf").write_bytes(b"%PDF")
+        (served.poc / "sample_input" / "sample_questions.txt").write_text("Old?", "utf-8")
+
+        status, answer = served.run()
+
+        assert status == 200
+        assert answer["result"]["seen"] == ["handbook.pdf", "sample_questions.txt"]
+    finally:
+        served.close()
+
+
+@pytest.mark.parametrize(
+    ("name", "safe"),
+    [
+        ("CON", "_CON"),
+        ("con.pdf", "_con.pdf"),
+        ("NUL.txt", "_NUL.txt"),
+        ("Aux.tar.gz", "_Aux.tar.gz"),
+        ("prn", "_prn"),
+        ("com1.pdf", "_com1.pdf"),
+        ("LPT9", "_LPT9"),
+        ("../nul.pdf", "_nul.pdf"),
+        # Not device names.
+        ("console.pdf", "console.pdf"),
+        ("com10.pdf", "com10.pdf"),
+        ("com0.pdf", "com0.pdf"),
+        ("null.pdf", "null.pdf"),
+    ],
+)
+def test_a_windows_device_name_is_renamed(page, name, safe):
+    assert page.app.safe_name(name) == safe
+
+
+def test_a_file_with_a_device_name_is_written_under_another_name(page):
+    status, answer = page.run(files=[("NUL.pdf", b"%PDF")])
+
+    assert status == 200
+    assert answer["result"]["seen"] == [".uploaded", "_NUL.pdf"]
+
+
+def _is_running(pid: int) -> bool:
+    if os.name == "nt":
+        listed = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout
+        return f'"{pid}"' in listed
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def test_a_timeout_stops_what_the_entrypoint_started_too(tmp_path, monkeypatch):
+    pid_file = tmp_path / "child.pid"
+    monkeypatch.setenv("POC_TEST_PIDFILE", str(pid_file))
+    served = _page_with(tmp_path, timeout=4)
+    try:
+        status, answer = served.run(files=[("tree.pdf", b"%PDF")])
+
+        assert status == 200
+        assert answer["error"]["code"] == "timeout"
+        child = int(pid_file.read_text(encoding="utf-8"))
+        deadline = time.monotonic() + 10
+        while _is_running(child) and time.monotonic() < deadline:
+            time.sleep(0.2)
+        assert not _is_running(child), "the entrypoint's own process outlived the run"
+    finally:
+        served.close()
+
+
+def test_closing_the_server_stops_a_run_that_is_going(tmp_path, monkeypatch):
+    pid_file = tmp_path / "child.pid"
+    monkeypatch.setenv("POC_TEST_PIDFILE", str(pid_file))
+    served = _page_with(tmp_path)
+    thread = threading.Thread(target=lambda: served.run(files=[("tree.pdf", b"%PDF")]))
+    thread.start()
+    deadline = time.monotonic() + 30
+    while not pid_file.exists() or not pid_file.read_text(encoding="utf-8"):
+        assert time.monotonic() < deadline, "the run never started its own process"
+        time.sleep(0.1)
+    child = int(pid_file.read_text(encoding="utf-8"))
+
+    served.server.solution.close()
+    thread.join(timeout=30)
+    served.close()
+
+    deadline = time.monotonic() + 10
+    while _is_running(child) and time.monotonic() < deadline:
+        time.sleep(0.2)
+    assert not thread.is_alive()
+    assert not _is_running(child)
+
+
+@pytest.mark.parametrize("step", ["_copy_package", "_execute", "inputs"])
+def test_a_run_that_cannot_be_prepared_leaves_no_folder_and_no_keys(page, step):
+    """The keys file is among the first files copied; a failure after it removes it all."""
+    (page.poc / ".env").write_text("EXAMPLE_SETTING=1", encoding="utf-8")
+    solution = page.server.solution
+    copied = {}
+
+    if step == "_copy_package":
+        copy_package = solution._copy_package
+
+        def fail(run_dir):
+            copy_package(run_dir)
+            copied["env"] = (run_dir / ".env").is_file()
+            raise OSError("disk full")
+
+        solution._copy_package = fail
+    elif step == "_execute":
+
+        def fail(run_dir, log_path):
+            copied["env"] = (run_dir / ".env").is_file()
+            log_path.write_text("started", encoding="utf-8")
+            raise OSError("cannot start")
+
+        solution._execute = fail
+    else:
+        # The inputs cannot be written: their folder cannot be made.
+        copy_package = solution._copy_package
+
+        def blocked(run_dir):
+            copy_package(run_dir)
+            copied["env"] = (run_dir / ".env").is_file()
+            (run_dir / "sample_input").mkdir()
+
+        solution._copy_package = blocked
+
+    status, answer = page.run(files=[("order.pdf", b"%PDF")])
+
+    assert status == 500
+    assert answer["error"]["code"] == "server_error"
+    assert copied == {"env": True}
+    assert list(solution.runs_root.iterdir()) == []
+    assert page.get_json("/api/status")[1]["busy"] is False
+    assert (page.poc / ".env").is_file()
