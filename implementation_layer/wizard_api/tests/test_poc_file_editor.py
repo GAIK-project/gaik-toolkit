@@ -237,14 +237,14 @@ def test_a_save_over_a_file_changed_since_it_was_read_is_refused(tmp_path) -> No
 def test_a_save_replaces_the_file_whole_and_keeps_its_mode(tmp_path) -> None:
     poc = _package(tmp_path)
     target = os.path.join(poc, "run_poc.py")
-    os.chmod(target, 0o755)
+    os.chmod(target, 0o700)
     read = poc_service.read_package_file(poc, "run_poc.py")
 
     saved = poc_service.write_package_file(poc, "run_poc.py", "print('ö')\n", read["digest"])
 
     with open(target, "rb") as fh:
         assert fh.read() == "print('ö')\n".encode()
-    assert os.stat(target).st_mode & 0o777 == 0o755
+    assert os.stat(target).st_mode & 0o777 == 0o700
     assert saved["digest"] != read["digest"]
     assert not [name for name in os.listdir(poc) if name.startswith(".edit-")]
     # Only a file that is there: the editor creates none.
