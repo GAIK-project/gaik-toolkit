@@ -145,7 +145,7 @@
         "default": false,
         "effect": "Since the gaik release after 0.11.0: when a chunk of a split recording cannot be transcribed, transcribe() raises RuntimeError naming the segment and its time range, and the remaining chunks are not sent. allow_partial=True restores the earlier result: the transcript comes back with a '[Transcription failed for segment N]' line under that chunk's timestamp and the rest transcribed. A recording sent in a single request raises on failure either way.",
         "selection_relevant": true,
-        "infer_from": "leave False, so a gap in the recording stops the run. Set True only when the user accepts a transcript with missing stretches; then the PoC must look for the '[Transcription failed for segment' line and tell the user which part is missing."
+        "infer_from": "leave False, so a gap in the recording stops the run. Set True only when the user accepts a transcript with missing stretches; then the PoC must look for the '[Transcription failed for segment' line in result.raw_transcript (not the enhanced transcript: transcript enhancement may drop or rewrite the line) and tell the user which part is missing."
       },
       {
         "name": "api_config",

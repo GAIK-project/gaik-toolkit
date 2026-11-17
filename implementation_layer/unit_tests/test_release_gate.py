@@ -276,7 +276,7 @@ def test_transcription_check_certifies_both_requests_without_keeping_transcripts
         ([_SENTENCES[1], *_SENTENCES], "lost a sentence"),
         # The second chunk comes back in English.
         ([_BOTH_SENTENCES, _SENTENCES[0], "The leak was found on Monday."], "lost a sentence"),
-        # The second chunk request fails; the Transcriber only marks it in the text.
+        # The second chunk request fails; the Transcriber raises, naming its time range.
         ([_BOTH_SENTENCES, _SENTENCES[0], RuntimeError("chunk failed")], "request failed"),
     ],
 )

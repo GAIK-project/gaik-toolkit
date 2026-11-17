@@ -114,9 +114,12 @@ audio, and a recording whose length cannot be read at all is refused. Every ffpr
 call has a 60-second timeout, decoding a 10-minute one.
 
 A chunk that FFmpeg cannot create, even on its sequential retry, stops the run with a
-`RuntimeError` that names the missing time ranges, so a transcript never comes back with
-a stretch of the recording silently left out. A chunk whose transcription fails after its
-retries stops the run too.
+`RuntimeError` that names the missing time ranges, and a chunk whose transcription fails
+after its retries stops the run too. A chunk the provider transcribes as empty text is not
+an error, so a stretch of speech the provider returns nothing for looks like silence;
+compare the transcript's timestamps with the recording where a gap matters. A chunk of
+0.1 MB or less before the last one, which a file whose header overstates its length can
+produce past the real end of the audio, is skipped and logged, as before.
 
 ### TranscriptionConfig
 

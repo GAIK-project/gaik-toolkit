@@ -633,12 +633,18 @@ def split_and_transcribe(
     max_size_mb=25,
     max_duration_seconds=DEFAULT_MAX_DURATION_SECONDS,
     audio=None,
+    allow_partial: bool = False,
 ):
-    """Backward-compatible wrapper without explicit context parameter."""
+    """Backward-compatible wrapper without explicit context parameter.
+
+    Since the gaik release after 0.11.0 a chunk that fails raises ``RuntimeError``;
+    ``allow_partial=True`` keeps the earlier marked result.
+    """
     return split_and_transcribe_with_context(
         audio_path,
         api_config,
         max_size_mb=max_size_mb,
         max_duration_seconds=max_duration_seconds,
         audio=audio,
+        allow_partial=allow_partial,
     )

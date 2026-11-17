@@ -202,3 +202,27 @@ class TestSplitIntoChunksNoGaps:
         assert "(0:00:55-0:02:00)" in message
         assert "decode error" in message
         assert attempts.count("chunk_01.mp3") == 2  # the parallel pass and the retry
+
+
+@patch(
+    "gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available",
+    return_value=True,
+)
+def test_a_near_empty_chunk_before_the_last_is_skipped_not_fatal(_mock_ffmpeg, tmp_path: Path):
+    # A header that overstates the length gives a near-empty chunk past the real end.
+    specs = [_make_spec(0, tmp_path), _make_spec(1, tmp_path), _make_spec(2, tmp_path)]
+    specs[2].is_last = True
+
+    def fake_popen(cmd, **kwargs):
+        chunk_path = Path(cmd[-1])
+        size = 10 if chunk_path.name == "chunk_01.mp3" else 200_000
+        chunk_path.write_bytes(b"\x00" * size)
+        mock = MagicMock()
+        mock.returncode = 0
+        mock.communicate.return_value = ("", "")
+        return mock
+
+    with patch("subprocess.Popen", side_effect=fake_popen):
+        chunks = split_into_chunks(str(tmp_path / "input.mp3"), specs)
+
+    assert [c["metadata"]["index"] for c in chunks] == [0, 2]

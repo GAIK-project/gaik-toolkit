@@ -365,8 +365,9 @@ def split_into_chunks(
     """Split an audio file into chunks using parallel FFmpeg processes.
 
     Failed chunks are retried sequentially before giving up. A chunk that still
-    fails stops the split, so a transcript never comes back with a stretch of
-    the recording silently missing.
+    fails stops the split and names its time range. A near-empty chunk before the
+    last one (0.1 MB or less) is skipped and logged, as before this check: a file
+    whose header overstates its length can produce one past the real end.
 
     Args:
         audio_file_path: Source audio (or video when *strip_video* is True).
@@ -479,7 +480,7 @@ def split_into_chunks(
                     chunk_size_mb,
                 )
                 chunk_path.unlink(missing_ok=True)
-                return {"error": f"chunk too small ({chunk_size_mb:.2f} MB)", "index": spec.index}
+                return {"skipped": True, "index": spec.index}
 
             logger.info(
                 "Chunk %d/%d: %s (%.1f MB)",
