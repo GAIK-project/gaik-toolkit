@@ -92,3 +92,18 @@ def test_text_in_the_spec_stays_text(tmp_path) -> None:
     written = write_schema_files(spec, "Note", tmp_path)
     schema = json.loads(written["output_schema.json"].read_text())
     assert schema["properties"]["body"]["description"] == 'Quote " and a new\nline, and {braces}'
+
+
+def test_a_nested_collection_description_stays_text_in_the_source() -> None:
+    spec = {
+        "schema_name": "Order",
+        "fields": ["line_items"],
+        "required_fields": ["line_items"],
+        "field_descriptions": {"line_items": 'Rows"), x=__import__("os"), y=Field("'},
+        "nested": {"line_items": {"fields": ["sku"], "required_fields": ["sku"]}},
+    }
+    namespace: dict = {}
+    exec(build_pydantic_model(spec, "Order"), namespace)  # noqa: S102 - test reference
+    model = namespace["Order"]
+    assert list(model.model_fields) == ["line_items"]
+    assert model.model_fields["line_items"].description == spec["field_descriptions"]["line_items"]

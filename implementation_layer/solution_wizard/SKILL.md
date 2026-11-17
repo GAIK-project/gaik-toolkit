@@ -179,6 +179,32 @@ Generate the three specification objects, populating **every field collected in 
 
 **`target_output_spec`** — `schema_name`, `fields`, `field_types`, `required_fields`, `optional_fields`, `field_descriptions`, `allowed_values`, `confidence_required`, `missing_value_policy`, `validation_rules`.
 
+**Repeated records inside the output** — when one output holds *many* of
+something (a purchase order's line items, an invoice's rows, a meeting's
+participants), that is not one field. List the container in `fields`, and
+describe one row under `nested`:
+
+```json
+"target_output_spec": {
+  "fields": ["po_number", "supplier_name", "line_items"],
+  "nested": {
+    "line_items": {
+      "fields": ["item_number", "article_code", "quantity", "unit_price"],
+      "field_types": {"quantity": "int", "unit_price": "decimal"},
+      "required_fields": ["item_number", "quantity"],
+      "description": "One entry per order line"
+    }
+  }
+}
+```
+
+A nested block generates a named row model (`line_items` → `LineItem`) and the
+nested extraction requirements (`parent_with_nested_list`). Without it the row
+fields end up flattened into the parent as single values, and the output cannot
+represent more than one row — which is usually the whole point of the case. Ask
+how many rows a document can have if it is not obvious; the answer is almost never
+"one". Rows are one level deep: a row cannot hold rows of its own.
+
 For any genuinely-unknown item, set the value to `"unknown"` (or `[]` for a list "none") and record an `assumptions[]` entry. Write these specs into a **draft blueprint** (`use_case` + the three specs + `governance`) at `<output_dir>/use_case.blueprint.json` so the completeness checker can read it. Present the spec summary and ask the user to confirm.
 
 ---
