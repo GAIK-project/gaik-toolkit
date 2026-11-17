@@ -180,6 +180,8 @@ describe("PoC file relay", () => {
       const stale = await put("run_poc.py", { content: "print('late')\n", base_digest: read.digest });
       expect(stale.status).toBe(409);
       expect((await stale.json()).detail.error).toBe("file_changed");
+      // A refused save is audited here as it is with wizard_api.
+      expect(audit).toHaveBeenLastCalledWith("poc.file.save", expect.objectContaining({ outcome: "error" }));
 
       for (const path of [".env", "config/.env.local"]) {
         const refused = await get(path);

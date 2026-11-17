@@ -104,7 +104,10 @@ export const PUT = withLogging(
 
     if (!wizardApiEnabled()) {
       const file = putMockPocFile(id, path, body.content, body.base_digest);
-      if (isMockError(file)) return refusal(file.status, file.error, file.message);
+      if (isMockError(file)) {
+        saved("error");
+        return refusal(file.status, file.error, file.message);
+      }
       saved("success");
       return Response.json(file, { headers: NO_STORE });
     }
