@@ -158,6 +158,51 @@ def test_media_probe_reads_the_duration(tmp_path, monkeypatch):
     assert input_limits.probe_media_seconds(tmp_path / "a.mp3") == 12.5
 
 
+def test_media_tools_open_the_recording_as_a_local_file_only(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    args = input_limits.media_input_args("http:meeting.mp3")
+
+    assert args[:3] == ["-protocol_whitelist", "file", "-i"]
+    assert args[3] == str(tmp_path / "http:meeting.mp3")
+
+
+def test_media_probe_opens_only_the_local_file(tmp_path, monkeypatch):
+    seen = []
+
+    def run(cmd, **kwargs):
+        seen.append(cmd)
+        return SimpleNamespace(returncode=0, stdout='{"format": {"duration": "1"}}')
+
+    monkeypatch.setattr(input_limits.shutil, "which", lambda _name: "/usr/bin/ffprobe")
+    monkeypatch.setattr(input_limits.subprocess, "run", run)
+    input_limits.probe_media_seconds(tmp_path / "a.mp3")
+
+    assert seen[0][-4:] == input_limits.media_input_args(tmp_path / "a.mp3")
+
+
+_LISTS = {
+    "hls": b"#EXTM3U\n#EXTINF:2,\nother.mp3\n",
+    "ffconcat": b"\xef\xbb\xbfffconcat version 1.0\nfile 'other.mp3'\n",
+    "dash": b'<?xml version="1.0"?>\n<MPD xmlns="urn:mpeg:dash:schema:mpd:2011">',
+}
+
+
+@pytest.mark.parametrize("kind", sorted(_LISTS))
+def test_a_playlist_in_a_recording_slot_is_refused(tmp_path, kind):
+    listing = tmp_path / "meeting.mp3"
+    listing.write_bytes(_LISTS[kind])
+
+    with pytest.raises(ValueError, match="playlist or file list"):
+        InputLimits().check_media(listing)
+
+
+def test_a_recording_passes_the_playlist_check(tmp_path):
+    audio = tmp_path / "meeting.mp3"
+    audio.write_bytes(b"ID3\x04\x00" + b"\x00" * 64)
+
+    assert InputLimits(max_media_seconds=None).check_media(audio) is None
+
+
 def test_docling_limits_pass_pages_and_size_to_docling():
     assert input_limits.docling_limits(InputLimits(max_pages=7, max_file_bytes=9)) == {
         "max_num_pages": 7,
@@ -600,6 +645,17 @@ def test_transcriber_refuses_a_recording_longer_than_the_limit(tmp_path, monkeyp
     remote.assert_not_called()
 
 
+def test_transcriber_refuses_a_playlist_before_any_model_call(tmp_path):
+    listing = tmp_path / "meeting.mp3"
+    listing.write_bytes(_LISTS["hls"])
+    transcriber = _transcriber(output_dir=tmp_path / "w")
+
+    with patch.object(transcriber, "_transcribe_input_remote") as remote:
+        with pytest.raises(ValueError, match="playlist or file list"):
+            transcriber.transcribe(listing)
+    remote.assert_not_called()
+
+
 def test_transcriber_uses_the_decoded_length_when_the_probe_cannot_read_it(tmp_path, monkeypatch):
     audio = tmp_path / "meeting.mp3"
     audio.write_bytes(b"\x00" * 64)
@@ -809,6 +865,23 @@ def test_parallel_transcriber_measures_a_stream_written_webm_by_decoding_it(
     monkeypatch.setattr(over, "_transcribe_single", lambda *a: pytest.fail("transcribed"))
     with pytest.raises(InputLimitError, match="0:00:05, longer than"):
         over.transcribe(recording)
+
+
+def test_installed_ffmpeg_reads_a_recording_opened_as_a_local_file(tmp_path):
+    from gaik.software_components.parallel_transcriber import ffmpeg
+
+    recording = _stream_written_webm(tmp_path / "recording.webm", seconds=2)
+    mp3 = tmp_path / "recording.mp3"
+    subprocess.run(
+        ["ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i", "sine=duration=2", str(mp3)],
+        check=True,
+        timeout=60,
+    )
+
+    assert input_limits.probe_media_seconds(mp3) == pytest.approx(2.0, abs=0.1)
+    assert ffmpeg.get_audio_duration(mp3) == pytest.approx(2.0, abs=0.1)
+    assert ffmpeg.decoded_audio_seconds(recording) == pytest.approx(2.0, abs=0.1)
+    assert ffmpeg.has_audio_stream(mp3) and not ffmpeg.has_video_stream(mp3)
 
 
 # -- tabular agent ------------------------------------------------------------------------
