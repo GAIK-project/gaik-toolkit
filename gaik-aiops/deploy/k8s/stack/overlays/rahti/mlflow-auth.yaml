@@ -24,7 +24,6 @@ spec:
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
-        seccompProfile: {type: RuntimeDefault}
       containers:
         - name: nginx
           image: registry.access.redhat.com/ubi9/nginx-126:1-1777855212

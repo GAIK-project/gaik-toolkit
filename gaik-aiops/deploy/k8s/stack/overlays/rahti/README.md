@@ -10,6 +10,7 @@ its quota.
 | `buildconfigs.yaml` | Builds the MLflow and sink images on Rahti from this repository |
 | `mlflow-auth.yaml`, `mlflow-auth-nginx.conf` | Basic auth in front of MLflow, which has no sign-in of its own |
 | `routes.yaml` | `https://grafana-gaik-aiops.2.rahtiapp.fi` and `https://mlflow-gaik-aiops.2.rahtiapp.fi` |
+| `patch-rahti-seccomp.yaml` | Drops the base's `RuntimeDefault` seccomp profile, which Rahti refuses since 10 Nov 2026; Rahti applies its own |
 | `networkpolicy-router.yaml` | Lets the OpenShift router reach Grafana and the MLflow sign-in, nothing else |
 | `create-secrets.sh` | Generates the Secrets on Rahti, once; nothing goes to git |
 | `send-test-event.sh` | Sends one test event and prints its trace id |
