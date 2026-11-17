@@ -172,6 +172,14 @@ describe("renderMarkdown — links", () => {
 });
 
 describe("renderMarkdown — formatting", () => {
+  it("ends on a line that starts with a number too long to be a list item", () => {
+    // Ten digits and a dot: no list item (at most nine digits), so a paragraph.
+    expect(renderMarkdown("1234567890. tilaus")).toBe("<p>1234567890. tilaus</p>");
+    expect(renderMarkdown("Tilaukset:\n12345678901. ensimmäinen\n2. toinen")).toContain(
+      "12345678901. ensimmäinen",
+    );
+  });
+
   it("renders headings two levels down, capped at h6", () => {
     expect(renderMarkdown("# Title")).toBe("<h3>Title</h3>");
     expect(renderMarkdown("#### Deep")).toBe("<h6>Deep</h6>");

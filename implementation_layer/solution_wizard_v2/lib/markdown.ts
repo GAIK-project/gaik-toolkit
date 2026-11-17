@@ -292,10 +292,17 @@ export function renderMarkdown(src: string): string {
       lines[i].trim() !== "" &&
       !/^```/.test(lines[i].trim()) &&
       !/^(#{1,6})\s+/.test(lines[i]) &&
-      !/^\s*[-*]\s+/.test(lines[i]) &&
-      !/^\s*\d+\.\s+/.test(lines[i]) &&
+      // The same test the list branch above uses: a line it does not take as
+      // a list item (say "1234567890. id", past its nine digits) is text here.
+      !LIST_ITEM.test(lines[i]) &&
       !(lines[i].includes("|") && i + 1 < lines.length && isTableSep(lines[i + 1]))
     ) {
+      para.push(inline(lines[i]));
+      i++;
+    }
+    // Every branch above must take at least one line; should a later change
+    // let them disagree again, the line is text rather than a loop that never ends.
+    if (para.length === 0) {
       para.push(inline(lines[i]));
       i++;
     }
