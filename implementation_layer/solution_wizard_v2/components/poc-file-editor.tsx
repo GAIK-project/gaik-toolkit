@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FileIcon } from "@/components/file-icon";
 import { Icon } from "@/components/icons";
 import type { Dict } from "@/lib/i18n";
@@ -208,7 +209,11 @@ export function PocFileEditor({
   // What a save sets off, said before it: only for a file the test run is tied to.
   const costText = file?.editable && file.affectsPackage ? (gate3Approved ? t.pocFileReopens : t.pocFileRetest) : null;
 
-  return (
+  // A modal dialog (showModal): the page behind is inert, focus stays inside
+  // and Esc is the dialog's. Rendered at the end of <body>, not inside the
+  // PoC pane: the pane is a size container that scrolls, and the dimmed
+  // backdrop was not drawn for a dialog placed in it.
+  return createPortal(
     <dialog
       ref={dialog}
       aria-labelledby="poc-file-title"
@@ -232,7 +237,7 @@ export function PocFileEditor({
         }
         onClose();
       }}
-      className="m-auto h-dvh max-h-none w-screen max-w-none overflow-hidden bg-surface p-0 text-text shadow-lg backdrop:bg-black/40 sm:h-[min(46rem,calc(100dvh-4rem))] sm:w-[min(64rem,calc(100vw-4rem))] sm:rounded-lg sm:border sm:border-border"
+      className="m-auto h-dvh max-h-none w-screen max-w-none overflow-hidden bg-surface p-0 text-text shadow-lg backdrop:bg-text/40 sm:h-[min(46rem,calc(100dvh-4rem))] sm:w-[min(64rem,calc(100vw-4rem))] sm:rounded-lg sm:border sm:border-border"
     >
       <div className="flex h-full min-h-0 flex-col">
         <header className="flex items-center gap-2 border-b border-border px-4 py-2.5">
@@ -371,6 +376,7 @@ export function PocFileEditor({
           )
         )}
       </div>
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }
