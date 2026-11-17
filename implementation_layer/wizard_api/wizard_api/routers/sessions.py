@@ -458,8 +458,9 @@ def write_poc_file(
         logger.error("approved content could not be compared after an edit", exc_info=True)
         db.rollback()
         reopened = _reopen_gate_3_after_unchecked_edit(db, session, saved)
-    # The path is the request's; the audit record in the web app names it.
-    logger.info("session %s: the user saved a package file in the editor", session_id)
+    # The session's own id, not the request's; the audit record in the web app
+    # names the path.
+    logger.info("session %s: the user saved a package file in the editor", session.id)
     return {
         **saved,
         "package_digest": _approved_package_digest(poc),
