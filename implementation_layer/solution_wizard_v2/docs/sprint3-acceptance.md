@@ -108,7 +108,7 @@ No acceptance criteria — nothing to verify.
 
 | Acceptance criterion | Verified by | Runs |
 |---|---|---|
-| A declared hallucination check with no grounding input on the validator step is an error, not silence<br><sub>issue #146</sub> | `wizard` test_validator.py › test_rule13_judge_without_grounding_input_is_an_error<br>`wizard` test_validator.py › test_rule13_judge_with_grounding_input_passes<br>`wizard` test_validator.py › test_rule13_not_applied_when_hallucination_check_is_off<br>`wizard` test_validator.py › test_rule13_warns_when_check_declared_but_no_validator_step | ✅ PR |
+| A declared hallucination check with no grounding input on the validator step is an error, not silence<br><sub>issue #146</sub> | `wizard` test_validator.py › test_rule14_judge_without_grounding_input_is_an_error<br>`wizard` test_validator.py › test_rule14_judge_with_grounding_input_passes<br>`wizard` test_validator.py › test_rule14_not_applied_when_hallucination_check_is_off<br>`wizard` test_validator.py › test_rule14_warns_when_check_declared_but_no_validator_step | ✅ PR |
 
 ### #157 — Pattern classification can silently drop inputs a case declared (UC05)
 

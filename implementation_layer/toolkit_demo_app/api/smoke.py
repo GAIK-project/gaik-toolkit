@@ -212,6 +212,36 @@ def check_tabular_agent(client) -> str:
     return "total quantity 42"
 
 
+def check_ai_act_screening(client) -> str:
+    """EU AI Act screening: the skill's checker accepts a valid screening and rejects a bad one.
+
+    The screening agent itself runs in Next.js (``/api/ai-act-screening``) and is not reached
+    from here; this covers the FastAPI side, the checker that decides what the page shows.
+    """
+    try:
+        from utils.ai_act_sample import sample
+    except ImportError:
+        from api.utils.ai_act_sample import sample
+
+    intake, screening = sample()
+    good = _json(
+        client.post("/ai-act-screening/check", json={"intake": intake, "screening": screening}),
+        "POST /ai-act-screening/check",
+    )
+    _expect(good["ok"] is True, f"a valid screening failed: {good['errors'][:2]}"[:160])
+    _expect(
+        good["screening"]["summary"]["risk_class"] == "minimal",
+        "the checked screening lost its class",
+    )
+    screening["findings"][0]["evidence"][0]["quote"] = "Words nobody wrote."
+    bad = _json(
+        client.post("/ai-act-screening/check", json={"intake": intake, "screening": screening}),
+        "POST /ai-act-screening/check",
+    )
+    _expect(bad["ok"] is False, "an invented quote was accepted")
+    return "valid screening accepted, invented quote refused"
+
+
 CHECKS: dict[str, Callable] = {
     "health": check_health,
     "parse_pdf": check_parse_pdf,
@@ -220,6 +250,7 @@ CHECKS: dict[str, Callable] = {
     "classify": check_classify,
     "llm_judge": check_llm_judge,
     "tabular_agent": check_tabular_agent,
+    "ai_act_screening": check_ai_act_screening,
 }
 
 

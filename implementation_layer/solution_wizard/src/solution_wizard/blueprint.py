@@ -7,6 +7,7 @@ hand-edited.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from enum import Enum
@@ -222,10 +223,11 @@ _HTTPS_URL_PATTERN = r"^https://[^\s]+$"
 #: One line of text: no line break or other control character.
 _ONE_LINE_PATTERN = r"^[^\x00-\x1f\x7f\x85\u2028\u2029]+$"
 
-#: Variables of the model providers, the wizard's sandbox and the Python process.
+#: Variables of gaik, the model providers, the wizard's sandbox and the Python process.
 #: A service that named one would have the PoC send that key or setting to a
 #: third party: the sandbox holds the provider's key under these names.
 RESERVED_ENV_PREFIXES = (
+    "GAIK_",
     "AZURE_",
     "OPENAI_",
     "AITTA_",
@@ -251,7 +253,7 @@ def env_name_problem(name: Any) -> str | None:
         return f"{name!r} must be an UPPER_CASE name (letters, digits, _), at most 64 characters"
     if name in RESERVED_ENV_NAMES or name.startswith(RESERVED_ENV_PREFIXES):
         return (
-            f"{name!r} belongs to the model providers, the sandbox or Python; give the "
+            f"{name!r} belongs to gaik, the model providers, the sandbox or Python; give the "
             "service a name of its own, for example SEARCH_API_KEY"
         )
     return None
@@ -560,6 +562,23 @@ class Blueprint(BaseModel):
 
     def to_file(self, path: str | Path) -> None:
         Path(path).write_text(self.model_dump_json(indent=2), encoding="utf-8")
+
+    def fingerprint(self) -> Dict[str, str]:
+        """Which blueprint an output came from: its id, version and content hash.
+
+        The hash is the SHA-256 of the blueprint's canonical JSON (sorted keys, no
+        spaces), leaving out ``visualizations``: generate_bpmn.py writes its mapping
+        there, and redrawing a diagram does not change what the blueprint asks for.
+        Any other change gives another hash, so a PoC or document whose hash differs
+        from the current blueprint's was generated from an earlier version.
+        """
+        data = self.model_dump(mode="json", exclude={"visualizations"})
+        canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return {
+            "blueprint_id": self.metadata.blueprint_id or self.use_case.id,
+            "blueprint_version": self.blueprint_version,
+            "blueprint_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+        }
 
     @classmethod
     def export_json_schema(cls, path: str | Path) -> None:

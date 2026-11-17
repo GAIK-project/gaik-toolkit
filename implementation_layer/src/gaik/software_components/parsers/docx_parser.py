@@ -10,6 +10,8 @@ import os
 import zipfile
 from typing import Any
 
+from ..input_limits import InputLimits
+
 try:
     from docx import Document
     from docx.table import Table
@@ -34,11 +36,17 @@ class DocxParser:
     - Extract text from paragraphs and tables
     - Simple text extraction or structured output with formatting info
     - Support for Word 2007+ documents (.docx)
+    - Refuses a file over its input limits (size, unpacked size) with
+      ``InputLimitError`` before reading it
     """
 
-    def __init__(self):
+    def __init__(self, *, limits: InputLimits | None = None):
         """
         Initialize the DocxParser.
+
+        Args:
+            limits: Size limits checked before parsing; defaults to
+                :class:`~gaik.software_components.input_limits.InputLimits`.
 
         Raises:
             ImportError: If python-docx is not installed
@@ -48,6 +56,7 @@ class DocxParser:
                 "python-docx is not available. Install it with: pip install python-docx"
             )
 
+        self.limits = limits or InputLimits()
         self.supported_extensions = [".docx", ".doc"]
 
     def parse_docx(
@@ -70,6 +79,8 @@ class DocxParser:
             FileNotFoundError: If file does not exist
             ValueError: If keep_structure is used with structured text, or the
                 file's content is not a DOCX
+            InputLimitError: If the file is over ``max_file_bytes``, or unpacks
+                to more than ten times that
             Exception: If DOCX parsing fails
         """
         if not os.path.exists(file_path):
@@ -80,6 +91,7 @@ class DocxParser:
         # same test decides here whether the content can be one at all.
         if not zipfile.is_zipfile(file_path):
             raise ValueError(f"The content of '{file_path}' is not a DOCX document.")
+        self.limits.check_zip_container(file_path)
 
         try:
             doc = Document(file_path)

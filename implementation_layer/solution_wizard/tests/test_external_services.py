@@ -149,6 +149,7 @@ def test_a_variable_name_that_is_not_upper_case_is_refused(name) -> None:
         "ANTHROPIC_API_KEY",
         "LITELLM_API_KEY",
         "WIZARD_API_TOKEN",
+        "GAIK_ALLOWED_ENDPOINT_HOSTS",
         "PYTHONPATH",
         "PATH",
     ],
@@ -158,7 +159,7 @@ def test_a_provider_or_sandbox_variable_is_not_a_services_own(name) -> None:
     would send it to a third party."""
     message = _refused(env_vars=[name])
 
-    assert "belongs to the model providers, the sandbox or Python" in message
+    assert "belongs to gaik, the model providers, the sandbox or Python" in message
 
 
 def test_every_variable_the_env_template_names_is_reserved() -> None:
@@ -381,7 +382,7 @@ def test_env_example_is_unchanged_without_services(tmp_path) -> None:
     env = (poc / ".env.example").read_text(encoding="utf-8")
 
     assert "External services" not in env
-    assert env.endswith("# DOCLING_API_PASSWORD=\n")
+    assert env.endswith("# GAIK_ALLOWED_ENDPOINT_HOSTS=\n")
 
 
 def test_the_readme_and_the_documents_list_the_services_and_keys(tmp_path) -> None:

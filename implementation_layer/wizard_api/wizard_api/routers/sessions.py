@@ -716,7 +716,13 @@ def _gate_span(session, payload: SessionUpdate) -> Iterator[None]:
         ops_metrics.record_gate_changes(session, changes)
 
 
-def _approved_content(session) -> dict[str, str] | None:
+#: What the package digest covers. 2: every Python file and every file in
+#: ``schemas/`` (``poc_service._version_files``); before it, a fixed list. A
+#: package approved under another scheme is not comparable with today's digest.
+_PACKAGE_DIGEST_SCHEME = 2
+
+
+def _approved_content(session) -> dict[str, str | int] | None:
     """Digests of the solution and of the package as they are now, or None without a draft."""
 
     solution = artifact_sync.solution_digest(artifact_sync.read_draft_blueprint(session.output_dir))
@@ -724,7 +730,7 @@ def _approved_content(session) -> dict[str, str] | None:
         return None
     poc = _poc_dir(session.output_dir)
     package = _approved_package_digest(poc) if poc and os.path.isdir(poc) else ""
-    return {"solution": solution, "package": package}
+    return {"solution": solution, "package": package, "package_scheme": _PACKAGE_DIGEST_SCHEME}
 
 
 def _approved_package_digest(poc: str) -> str:
@@ -792,6 +798,14 @@ def _reopen_if_approved_content_changed(db: Session, session) -> bool:
         return False
     if approved.get("solution") != now["solution"]:
         gate_key = "gate_2"
+    elif approved.get("package_scheme") != now["package_scheme"]:
+        # Approved under a digest that covered fewer files: it differs from
+        # today's for a package nobody changed. Start from the package as it is,
+        # as for a session approved before this was kept.
+        session_service.update_session(
+            db, session, SessionUpdate(metadata={session_service.APPROVED_CONTENT_KEY: now})
+        )
+        return False
     elif approved.get("package") != now["package"]:
         gate_key = "gate_3"
     else:

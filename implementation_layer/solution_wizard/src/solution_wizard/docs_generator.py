@@ -212,8 +212,14 @@ def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
         "python poc/run_poc.py" if "cli" in str(runtime).lower() else f"({runtime} entry point)"
     )
 
+    fingerprint = blueprint.fingerprint()
     return {
         # identity
+        "blueprint_line": (
+            f"{md_text(fingerprint['blueprint_id'])}, version "
+            f"{md_text(fingerprint['blueprint_version'])}, "
+            f"SHA-256 {fingerprint['blueprint_sha256']}"
+        ),
         "use_case_name": md_text(uc.name),
         "use_case_id": md_text(uc.id),
         "domain": md_text(uc.domain) if uc.domain else "_not specified_",

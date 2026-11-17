@@ -22,6 +22,7 @@ def guard(tmp_path):
         "promote_template.py",
         "generate_schema.py",
         "run_wizard.py",
+        "refresh_schema_model.py",
     ):
         (wizard / "scripts" / name).write_text("")
     (wizard / "SKILL.md").write_text("")
@@ -108,6 +109,14 @@ def test_a_script_path_option_the_shell_would_expand_is_refused(guard) -> None:
     command = "python scripts/validate_blueprint.py --blueprint ~/use_case.blueprint.json"
 
     assert guard.check("Bash", {"command": command})
+
+
+def test_the_schema_refresh_script_is_refused_even_on_the_sessions_schemas(guard) -> None:
+    # SKILL.md Step 4.5 asks for it, but it imports the session's output_schema.py,
+    # and the guard runs only scripts that run the wizard's own code.
+    for target in (guard.session / "poc" / "schemas", guard.other):
+        command = f"python scripts/refresh_schema_model.py --schemas-dir {target.as_posix()}"
+        assert guard.check("Bash", {"command": command})
 
 
 def test_a_session_path_with_a_tilde_later_in_it_is_still_readable(guard) -> None:

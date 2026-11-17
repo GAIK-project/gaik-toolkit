@@ -33,7 +33,8 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent))
-from provider_config import get_stage_config  # noqa: E402
+from provider_config import external_model_forbidden, get_stage_config  # noqa: E402
+import poc_output  # noqa: E402
 
 # Component imports for this pipeline (uncomment / adjust as you wire each step):
 # ${component_imports_placeholder}
@@ -272,7 +273,9 @@ def _save_output_schema(schema_gen, schema, requirements, schema_dir: Path) -> N
 def main() -> None:
     parser = argparse.ArgumentParser(description="${use_case_name} PoC")
     parser.add_argument("--synthetic", action="store_true", help="Use synthetic/generated input")
+    poc_output.add_output_flags(parser)
     args = parser.parse_args()
+    poc_output.configure(args)
 
     config = load_config()
     language = config.get("language", "en")
@@ -308,7 +311,7 @@ ${generic_pipeline_skeleton}
             encoding="utf-8",
         )
         print(f"\nResult written to: {output_dir / 'result.json'}")
-        print(json.dumps(extracted_fields, indent=2, ensure_ascii=False, default=str))
+        poc_output.show_result(extracted_fields)
     else:
         print("\nNOTE: extracted_fields is still None -- finish wiring the pipeline above.")
 
@@ -319,4 +322,4 @@ ${llm_judge_section_generic}
 
 
 if __name__ == "__main__":
-    main()
+    poc_output.run(main)

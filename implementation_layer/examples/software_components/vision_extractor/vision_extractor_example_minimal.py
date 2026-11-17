@@ -91,7 +91,7 @@ result = extractor.extract(
     ],  # list of PDF or image paths (.pdf .png .jpg .jpeg .gif .webp .tiff .bmp)
     # --- Extraction task ---
     user_requirements=task,  # natural language description of what to extract
-    schema_dir="PO_schema",  # directory to save/load schema.py + requirements.json
+    schema_dir="PO_schema",  # directory to save/load schema_model.json + requirements.json
 )
 
 total_s = round(time.perf_counter() - t_start, 3)

@@ -78,7 +78,7 @@ export function UseCaseChooser({
           aria-selected={open === "example"}
           onClick={() => choose("example")}
           className={cn(
-            "bg-card flex items-start gap-4 rounded-2xl border-2 p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0",
+            "bg-card flex items-start gap-3 rounded-2xl border-2 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 sm:gap-4 sm:p-6",
             open === "example" ? "border-primary" : "border-border",
           )}
         >
@@ -106,12 +106,12 @@ export function UseCaseChooser({
           aria-selected={open === "create"}
           onClick={() => choose("create")}
           className={cn(
-            "border-primary/50 from-primary/15 via-card to-card ring-primary/20 flex items-start gap-5 rounded-2xl border-2 bg-gradient-to-br p-8 text-left shadow-lg ring-4 transition-all hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0",
+            "border-primary/50 from-primary/15 via-card to-card ring-primary/20 flex items-start gap-3 rounded-2xl border-2 bg-gradient-to-br p-5 text-left shadow-lg ring-4 transition-all hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0 sm:gap-5 sm:p-8",
             open === "create" && "border-primary",
           )}
         >
-          <span className="bg-primary text-primary-foreground flex size-14 shrink-0 items-center justify-center rounded-xl shadow-sm">
-            <Wand2 className="size-7" />
+          <span className="bg-primary text-primary-foreground flex size-11 shrink-0 items-center justify-center rounded-xl shadow-sm sm:size-14">
+            <Wand2 className="size-6 sm:size-7" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-serif text-xl font-semibold md:text-2xl">

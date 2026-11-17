@@ -283,6 +283,9 @@ def test_generate_produces_the_v1_scaffolder_file_set(client, db_session) -> Non
         "document_manifest.py",
         # And the input finder (#255).
         "input_bundle.py",
+        # Counts unless --verbose, one-line errors unless --debug (upstream's
+        # governance and PoC output change, brought in with the upstream main sync).
+        "poc_output.py",
         "evals/ground_truth/.gitkeep",
         "evals/run_basic_eval.py",
         "prompts/extraction_requirements.md",

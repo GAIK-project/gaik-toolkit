@@ -331,11 +331,45 @@ def main() -> int:
         generator.item_requirements
     )
 
+    # -- Describe the model for output_schema_model.json: what load_schema()
+    # rebuilds the model from (gaik >= the release that loads saved schemas as
+    # data); the .py file below is for reading and is never imported. The
+    # description is made before any file is written, so a model the saved
+    # format refuses leaves the schemas folder as it was, not half-written.
+    try:
+        from gaik.software_components.extractor.saved_schema import (
+            SavedSchemaError,
+            describe_model,
+        )
+    except ImportError:  # older gaik: load_schema() still reads output_schema.py
+        describe_model = None
+    model_description = None
+    if describe_model is not None:
+        try:
+            model_description = describe_model(schema_class)
+        except SavedSchemaError as exc:
+            print(
+                f"ERROR: the generated schema cannot be saved as data: {exc}\n"
+                f"Nothing was written to {schemas_dir}.",
+                file=sys.stderr,
+            )
+            return 1
+
     # -- Write output_schema.py --
     py_content = _schema_to_py(schema_class, args.schema_name or schema_class.__name__)
     py_path = schemas_dir / "output_schema.py"
     py_path.write_text(py_content, encoding="utf-8")
     print(f"\nSchema written to:       {py_path}")
+
+    model_path = schemas_dir / "output_schema_model.json"
+    if model_description is not None:
+        model_path.write_text(
+            json.dumps(model_description, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        print(f"Model written to:        {model_path}")
+    else:
+        # A model file from an earlier run would no longer match the new files.
+        model_path.unlink(missing_ok=True)
 
     # -- Write output_schema_requirements.json (load_schema() contract) --
     req_payload = _requirements_to_json(schema_class, requirements)
@@ -370,7 +404,9 @@ def main() -> int:
         f"\nFields: {_requirements_field_summary(requirements)}"
         f"\n\nPresent {py_path} to the user for review."
         "\nIf the user requests changes, edit output_schema.py and"
-        "\noutput_schema_requirements.json directly -- do NOT re-run this script."
+        "\noutput_schema_requirements.json directly -- do NOT re-run this script --"
+        "\nthen run scripts/refresh_schema_model.py --schemas-dir <schemas dir>:"
+        "\nthe PoC loads output_schema_model.json, not output_schema.py."
     )
     return 0
 

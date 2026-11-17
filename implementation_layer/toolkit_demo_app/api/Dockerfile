@@ -43,6 +43,11 @@ RUN uv pip install --system --no-cache --require-hashes \
 COPY implementation_layer/solution_wizard ./implementation_layer/solution_wizard
 ENV WIZARD_DIR=/app/implementation_layer/solution_wizard
 
+# The EU AI Act screening skill: routers/ai_act_screening.py runs its checker
+# (scripts/check_screening.py, Python standard library only) over each screening.
+COPY implementation_layer/no-code-assets/agent-skills/skills/ai-act-use-case-screening      ./implementation_layer/no-code-assets/agent-skills/skills/ai-act-use-case-screening
+ENV AI_ACT_SKILL_DIR=/app/implementation_layer/no-code-assets/agent-skills/skills/ai-act-use-case-screening
+
 # Copy API application code
 COPY implementation_layer/toolkit_demo_app/api/ .
 

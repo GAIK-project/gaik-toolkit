@@ -512,22 +512,22 @@
             {
               "level": "wizard",
               "file": "../solution_wizard/tests/test_validator.py",
-              "name": "test_rule13_judge_without_grounding_input_is_an_error"
+              "name": "test_rule14_judge_without_grounding_input_is_an_error"
             },
             {
               "level": "wizard",
               "file": "../solution_wizard/tests/test_validator.py",
-              "name": "test_rule13_judge_with_grounding_input_passes"
+              "name": "test_rule14_judge_with_grounding_input_passes"
             },
             {
               "level": "wizard",
               "file": "../solution_wizard/tests/test_validator.py",
-              "name": "test_rule13_not_applied_when_hallucination_check_is_off"
+              "name": "test_rule14_not_applied_when_hallucination_check_is_off"
             },
             {
               "level": "wizard",
               "file": "../solution_wizard/tests/test_validator.py",
-              "name": "test_rule13_warns_when_check_declared_but_no_validator_step"
+              "name": "test_rule14_warns_when_check_declared_but_no_validator_step"
             }
           ]
         }
