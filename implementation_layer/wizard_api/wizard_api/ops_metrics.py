@@ -74,6 +74,10 @@ uploads_scanned = meter.create_counter(
     "wizard.uploads.scanned",
     description="Uploaded files by malware check result: clean, refused, unavailable",
 )
+budget_stops = meter.create_counter(
+    "wizard.agent.budget_stops",
+    description="Chat turns the agent ended at its cost limit (WIZARD_AGENT_MAX_BUDGET_USD)",
+)
 tool_calls = meter.create_counter(
     "wizard.agent.tool_calls",
     description="Agent tool calls the tool guard decided, by kind, decision and reason code",
@@ -177,6 +181,7 @@ _PRIMED = {
         for t in ("approved", "rejected", "pending")
     ],
     "ownership_denied": [{}],
+    "budget_stops": [{}],
     # Metered calls refused at a limit (agent_tool_guard.METERED_KINDS).
     "tool_calls": [
         {"kind": k, "decision": "denied", "reason": r}
