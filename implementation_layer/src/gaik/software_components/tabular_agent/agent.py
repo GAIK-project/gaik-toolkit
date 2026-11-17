@@ -330,8 +330,10 @@ class TabularAgent:
         material = SourceMaterial()
         messages = source_material_messages(
             _LAYOUT_SYSTEM_PROMPT,
-            "The sheet, its name as the block's label:\n\n"
-            + material.wrap(grid, label=f"sheet {sheet_label}"),
+            # The sheet's name comes from the workbook too: it goes in the block, not in
+            # the block's label.
+            "The sheet, its name on the first line:\n\n"
+            + material.wrap(f"Sheet: {sheet_label}\n\n{grid}", label="sheet"),
         )
         parsed = self._parse_structured(messages, SheetLayout)
         if not isinstance(parsed, SheetLayout):

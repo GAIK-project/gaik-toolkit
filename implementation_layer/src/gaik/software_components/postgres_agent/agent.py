@@ -419,7 +419,7 @@ class PostgresAgent:
         schema = schema.model_copy(
             update={"tables": [t.model_copy(update={"sample_rows": []}) for t in schema.tables]}
         )
-        # Names and comments come from the database, and a database error can quote its
+        # Table and column names come from the database, and a database error can quote its
         # data: each goes in a data block. The question and the caller's extra
         # instructions stay outside the blocks.
         material = SourceMaterial()
