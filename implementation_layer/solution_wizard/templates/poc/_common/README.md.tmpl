@@ -56,18 +56,22 @@ Then open http://127.0.0.1:8000. The page takes this solution's inputs, starts
 `run_poc.py` and shows the result, the output files and the run's log. Each run works
 in a temporary folder of its own; `sample_input/` and `output/` here are not written
 to. A run without an added file uses the examples in `sample_input/`.
+The page also shows the solution's steps and hands out its source code as a zip.
 
 Käynnistä `python app.py` ja avaa http://127.0.0.1:8000. Sivu ottaa vastaan ratkaisun
 syötteet, ajaa `run_poc.py`:n ja näyttää tuloksen, tulostiedostot ja ajon lokin.
+Sivu näyttää myös ratkaisun vaiheet, ja siltä saa lähdekoodin zip-tiedostona.
 
 The page has no sign-in and listens on this computer only. It needs nothing beyond
 `requirements.txt`; `python app.py --port 8080` picks another port.
+Its font is Sora, under the SIL Open Font License 1.1 (`ui/fonts/OFL.txt`).
 
 Another front end (a Next.js app, for one) can call the same server from its own
 server side:
 
 - `GET /api/solution`: what the solution is, its inputs and its output fields (`ui/solution.json`).
 - `POST /api/run`: a multipart form with `files` and, where the solution takes them, `question` or `text`; answers `{ok, exit_code, log_tail, outputs: [{name, kind, size, url}], result}`.
+- `GET /api/source`: this package's source code as a zip, the page's "Download source code" / "Lataa lähdekoodi": the code, the configuration, the prompts, the schemas, `app.py` and `ui/`; never `.env`, `sample_input/`, `output/` or a virtual environment.
 
 ---
 

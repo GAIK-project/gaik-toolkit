@@ -11,6 +11,7 @@ what it wrote. Another front end can call the same server:
                                           optional text fields ``question`` and ``text``
     GET  /api/status                      whether a run is going, and the end of its log
     GET  /api/runs/<id>/files/<name>      one output file of a run
+    GET  /api/source                      this package's source code as a zip
 
 ``POST /api/run`` answers with JSON: ``ok``, ``exit_code``, ``log_tail``, ``outputs``
 (``name``, ``kind``, ``size``, ``url``), ``result`` (the main JSON output, when there is
@@ -22,6 +23,10 @@ package's code, the files sent with the request in ``sample_input/`` and an empt
 ``output/``. The package's own ``sample_input/`` and ``output/`` are never written to.
 A request that sends no file runs on the examples in the package's ``sample_input/``.
 
+``GET /api/source`` zips what the package is made of: the code, the configuration, the
+prompts, the schemas, this server and its page. The keys (``.env``), the inputs, the
+results, virtual environments and links are never in it.
+
 There is no sign-in. The server listens on this computer only (127.0.0.1) unless you
 start it with ``--host``; do that only on a network you trust. Standard library only.
 """
@@ -30,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import atexit
+import io
 import json
 import os
 import re
@@ -42,6 +48,7 @@ import tempfile
 import threading
 import time
 import traceback
+import zipfile
 from email.message import Message
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
@@ -112,6 +119,18 @@ _RESULT_ENDINGS = ("_result.json", "_ticket.json", "query_result.json", "session
 _NOT_RESULT_ENDINGS = ("_validation.json", "_source_trace.json")
 _TRACE_ENDING = "_source_trace.json"
 
+#: The page's own files beside index.html (ui/): its fonts and the GAIK mark.
+_PAGE_ASSET_TYPES = {
+    ".woff2": "font/woff2",
+    ".svg": "image/svg+xml",
+}
+#: Never in the source zip: folders of inputs, results, environments and caches ...
+_NOT_SOURCE_DIRS = {SAMPLE_DIR, OUTPUT_DIR, "__pycache__", "venv", "env", "node_modules"}
+#: ... compiled files, key files and anything too large to be source code.
+_NOT_SOURCE_SUFFIXES = (".pyc", ".pyo", ".env", ".pem", ".key", ".p12", ".pfx")
+MAX_SOURCE_FILE_BYTES = 5 * 1024 * 1024
+MAX_SOURCE_FILES = 2000
+
 _RUN_ID_RE = re.compile(r"[0-9a-f]{16}")
 _LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
 _SECURITY_HEADERS = {
@@ -119,12 +138,15 @@ _SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "no-store",
 }
-#: The page carries its own style and script and loads nothing from elsewhere.
+#: The page carries its own style and script and loads nothing from elsewhere; its
+#: font files and the GAIK mark come from this server (ui/).
 _PAGE_POLICY = (
     "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
-    "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; "
-    "frame-ancestors 'none'"
+    "connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; "
+    "form-action 'none'; frame-ancestors 'none'"
 )
+#: An asset opened as a document of its own runs nothing.
+_ASSET_POLICY = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
 
 
 class RefusalError(Exception):
@@ -233,6 +255,24 @@ def _regular_files(folder: Path) -> list[Path]:
             if path.resolve().is_relative_to(root):
                 found.append(path)
     return found
+
+
+def _is_source(relative: PurePosixPath) -> bool:
+    """Whether a file of the package, by its path inside it, belongs in the source zip.
+
+    Out: inputs and results, environments, caches and every hidden folder; the keys
+    (``.env`` and any ``.env.*`` but ``.env.example``, ``*.env``, key files); the
+    record of added inputs; compiled files.
+    """
+    *folders, name = relative.parts
+    if any(part in _NOT_SOURCE_DIRS or part.startswith(".") for part in folders):
+        return False
+    lowered = name.lower()
+    if lowered.startswith(".env") and lowered != ".env.example":
+        return False
+    if lowered.endswith(_NOT_SOURCE_SUFFIXES) or name == UPLOADED_NAMES_FILE:
+        return False
+    return True
 
 
 def _tail(path: Path, lines: int = LOG_TAIL_LINES) -> str:
@@ -623,6 +663,78 @@ class Solution:
         except (OSError, ValueError):
             return None
 
+    def page_asset(self, name: str) -> Path:
+        """The page's own file ``name`` under ui/ (a font, the mark); a RefusalError otherwise."""
+        missing = RefusalError(404, "not_found", "No such file.")
+        if not name or "\\" in name or "\x00" in name or name.startswith("/"):
+            raise missing
+        parts = PurePosixPath(name).parts
+        if any(part in ("", ".", "..") or part.startswith(".") for part in parts):
+            raise missing
+        if PurePosixPath(name).suffix.lower() not in _PAGE_ASSET_TYPES:
+            raise missing
+        ui_dir = (self.package_dir / "ui").resolve()
+        path = ui_dir.joinpath(*parts)
+        if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(ui_dir):
+            raise missing
+        return path
+
+    # -- the source code ----------------------------------------------------
+
+    def source_name(self) -> str:
+        """The source zip's name without its ending: ``<solution id>-source``."""
+        solution_id = str(self.description().get("id") or "")
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "-", solution_id).strip("-.")[:80]
+        return f"{safe or 'solution'}-source"
+
+    def source_files(self) -> list[tuple[str, Path]]:
+        """``(name in the zip, file)`` for what the package is made of.
+
+        Real files of the package only (no link, nothing reached through one), and
+        of those what :func:`_is_source` lets through. A virtual environment under
+        any name, the runs' working folders and files too large to be source code
+        are left out as well; such folders are not walked into at all.
+        """
+        root = self.package_dir
+        runs_root = self.runs_root.resolve()
+
+        def walked(folder: Path) -> bool:
+            if folder.is_symlink() or folder.name in _NOT_SOURCE_DIRS:
+                return False
+            if folder.name.startswith(".") or (folder / "pyvenv.cfg").exists():
+                return False
+            real = folder.resolve()
+            return real.is_relative_to(root) and not real.is_relative_to(runs_root)
+
+        found: list[tuple[str, Path]] = []
+        for current, dirs, names in os.walk(root, followlinks=False):
+            dirs[:] = sorted(d for d in dirs if walked(Path(current, d)))
+            for name in sorted(names):
+                path = Path(current, name)
+                relative = PurePosixPath(path.relative_to(root).as_posix())
+                if path.is_symlink() or not path.is_file() or not _is_source(relative):
+                    continue
+                if not path.resolve().is_relative_to(root):
+                    continue
+                if path.stat().st_size > MAX_SOURCE_FILE_BYTES:
+                    continue
+                found.append((str(relative), path))
+                if len(found) >= MAX_SOURCE_FILES:
+                    return found
+        return found
+
+    def source_zip(self) -> tuple[str, bytes]:
+        """``(file name, bytes)`` of the package's source code as a zip, in one folder."""
+        folder = self.source_name()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for name, path in self.source_files():
+                try:
+                    archive.write(path, f"{folder}/{name}")
+                except OSError:
+                    continue
+        return f"{folder}.zip", buffer.getvalue()
+
     def output_file(self, run_id: str, name: str) -> Path:
         """The output file ``name`` of run ``run_id``; a RefusalError when there is none."""
         missing = RefusalError(404, "not_found", "No such file.")
@@ -734,6 +846,19 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, self.solution.description())
         elif path == "/api/status":
             self._json(200, self.solution.status())
+        elif path == "/api/source":
+            name, body = self.solution.source_zip()
+            # The name is the solution's id cut down to letters, digits, ".", "_" and "-".
+            disposition = f'attachment; filename="{name}"'
+            self._send(200, body, "application/zip", {"Content-Disposition": disposition})
+        elif path.startswith("/ui/"):
+            asset = self.solution.page_asset(unquote(path.removeprefix("/ui/")))
+            self._send(
+                200,
+                asset.read_bytes(),
+                _PAGE_ASSET_TYPES[asset.suffix.lower()],
+                {"Content-Security-Policy": _ASSET_POLICY},
+            )
         elif path.startswith("/api/runs/"):
             run_id, separator, name = path.removeprefix("/api/runs/").partition("/files/")
             if not separator:
