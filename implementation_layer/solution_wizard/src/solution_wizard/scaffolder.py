@@ -27,7 +27,13 @@ from typing import Any
 from .blueprint import Blueprint
 from .docs_generator import md_text
 from .registry import get_registry
-from .schema_designer import write_extraction_requirements, write_schema_files
+from .schema_designer import (
+    NESTED_KEY,
+    check_schema_names,
+    nested_row_fields,
+    write_extraction_requirements,
+    write_schema_files,
+)
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "poc"
 
@@ -120,6 +126,22 @@ def _code_values_problems(blueprint: Blueprint) -> list[str]:
     for field in spec.get("fields", []):
         if isinstance(field, str) and not _is_python_name(field):
             problems.append(f"output field {field!r} must be a Python name")
+    # The rows of a nested collection become a model of their own in the same file.
+    for container, fields in nested_row_fields(spec).items():
+        for field in fields:
+            if not _is_python_name(field):
+                problems.append(f"field {field!r} of the {container!r} rows must be a Python name")
+        if nested_row_fields(spec[NESTED_KEY][container]):
+            problems.append(
+                f"the {container!r} rows have rows of their own; only one level of nested "
+                "rows is supported"
+            )
+    if spec.get(NESTED_KEY) and not problems:
+        # Anything else the rows' model would refuse, before a file is written.
+        try:
+            check_schema_names(spec, schema_name or "OutputSchema")
+        except ValueError as exc:
+            problems.append(f"target_output_spec.nested: {exc}")
     return problems
 
 
