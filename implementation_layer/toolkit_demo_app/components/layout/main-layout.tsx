@@ -5,6 +5,7 @@ import { SiteNavServer } from "@/components/layout/site-nav-server";
 import { AccessNotice, ModelSettingsNotice } from "@/components/model-settings";
 import { RunAccessProvider } from "@/components/run-access";
 import { getUserAccessStatus } from "@/lib/queries/access";
+import { runRefusal } from "@/lib/run-refusal";
 import { getTrialLimits } from "@/lib/trial";
 
 interface MainLayoutProps {
@@ -53,6 +54,7 @@ export async function MainLayout({
             loggedIn={!!access.user}
             unlocked={access.isUnlocked}
             ownKeyRuns={access.ownKeyRuns}
+            emailUnconfirmed={access.emailUnconfirmed}
             trialRunsPerDay={
               access.isTrial ? getTrialLimits().runsPerDay : null
             }
@@ -61,6 +63,14 @@ export async function MainLayout({
         {accessNotice && (
           <ModelSettingsNotice
             loggedIn={!!access?.user || !!access?.bypassAuth}
+            runRefusal={
+              access && !access.ownKeyRuns
+                ? runRefusal({
+                    loggedIn: !!access.user,
+                    emailUnconfirmed: access.emailUnconfirmed,
+                  })
+                : null
+            }
           />
         )}
         {aiNotice && <AiNotice />}
@@ -70,6 +80,7 @@ export async function MainLayout({
               loggedIn: !!access.user,
               canRun: access.isUnlocked || access.isTrial,
               ownKeyRuns: access.ownKeyRuns,
+              emailUnconfirmed: access.emailUnconfirmed,
             }}
           >
             {content}

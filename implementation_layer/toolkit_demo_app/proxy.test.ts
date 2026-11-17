@@ -358,8 +358,9 @@ test("a visitor with their own model key is asked to sign in", async () => {
 
 const OWN_KEY_RUN = "https://demo.test/api/extract";
 
-test("a visitor with an expired session and their own model key is asked to sign in", async () => {
-  // The session cannot be refreshed: the request is anonymous.
+test("a visitor whose refresh token is spent and who sends their own model key is asked to sign in", async () => {
+  // The first request spends the refresh token; the second cannot refresh the
+  // session, so it is anonymous.
   await run(sessionCookie("r1", expired()));
   backendCalls = 0;
   const response = await post(OWN_KEY_RUN, {

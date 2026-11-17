@@ -71,6 +71,12 @@ import {
   type ActiveModel,
 } from "@/lib/model-use";
 import { useRunAccess } from "@/components/run-access";
+import {
+  accessNoticeText,
+  heldOwnKeyUse,
+  runRefusal as refusalFor,
+  type RunRefusal,
+} from "@/lib/run-refusal";
 
 const LABELS = { openai: "OpenAI", azure: "Azure OpenAI", aitta: "CSC Aitta" };
 const CUSTOM = "__custom__";
@@ -794,11 +800,16 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
  */
 export function ModelSettingsNotice({
   loggedIn = true,
-}: { loggedIn?: boolean } = {}) {
+  runRefusal = null,
+}: {
+  loggedIn?: boolean;
+  /** Set when the proxy refuses this account's own-key runs, and why. */
+  runRefusal?: RunRefusal | null;
+} = {}) {
   const pathname = usePathname();
   const active = useActiveModel(loggedIn);
   if (!active || (!active.own && active.isDefault)) return null;
-  const use = modelUse(pathname, active);
+  const use = heldOwnKeyUse(modelUse(pathname, active), active.own, runRefusal);
   const aitta = active.provider === "aitta" && use.runsHere;
   return (
     <div
@@ -864,20 +875,23 @@ export function ModelSettingsNotice({
 }
 
 /**
- * Tells visitors who cannot run a demo yet how to: sign in, and once signed in,
- * use their own key. A pending user on the trial allowance is told the daily
- * limit instead.
+ * Tells visitors who cannot run a demo yet how to: sign in, confirm the e-mail
+ * address, and once runs are open to the account, use their own key. A pending
+ * user on the trial allowance is told the daily limit instead.
  */
 export function AccessNotice({
   loggedIn,
   unlocked,
   ownKeyRuns = false,
+  emailUnconfirmed = false,
   trialRunsPerDay = null,
 }: {
   loggedIn: boolean;
   unlocked: boolean;
   /** Signed in, and approved or pending with a confirmed e-mail address. */
   ownKeyRuns?: boolean;
+  /** Pending approval, and the e-mail address is not confirmed yet. */
+  emailUnconfirmed?: boolean;
   /** Set when the user is pending approval and on the trial allowance. */
   trialRunsPerDay?: number | null;
 }) {
@@ -907,9 +921,7 @@ export function AccessNotice({
     >
       <p>
         <strong>View only.</strong>{" "}
-        {loggedIn
-          ? "Your access is pending approval, so running demos is off for now."
-          : "Sign in to run this demo."}
+        {accessNoticeText(refusalFor({ loggedIn, emailUnconfirmed }))}
         {ownKeyWorks ? " You can also run it with your own model key." : ""}
       </p>
       <div className="flex gap-2">
