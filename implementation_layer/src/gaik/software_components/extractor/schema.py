@@ -2242,6 +2242,99 @@ def normalize_composite_extracted_data(
 # -----------------------------------------------------------------------------
 
 
+_COMPARED_ATTRIBUTES = (
+    "field_type",
+    "required_in_output",
+    "nullable",
+    "enum",
+    "pattern",
+    "format",
+    "default",
+    "description",
+)
+
+
+@dataclass(frozen=True)
+class FieldChange:
+    """One field present in both schemas whose specification differs."""
+
+    field_name: str
+    """The field, prefixed with its child collection for a nested schema (``items.sku``)."""
+    changes: dict[str, tuple[object, object]]
+    """Attribute name -> ``(approved value, new value)``."""
+
+
+@dataclass(frozen=True)
+class SchemaDiff:
+    """How a newly generated schema differs from the one a person approved.
+
+    The requirement text steers which fields a generated schema gets, so a field can
+    drop out or change between two runs. Show this diff to a person before the new
+    schema replaces the approved one. ``is_empty`` is true when the two are the same.
+    """
+
+    added: list[str]
+    removed: list[str]
+    changed: list[FieldChange]
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.added or self.removed or self.changed)
+
+    def __str__(self) -> str:
+        if self.is_empty:
+            return "No changes to the approved schema."
+        lines = [f"+ {name}" for name in self.added]
+        lines += [f"- {name}" for name in self.removed]
+        for change in self.changed:
+            parts = ", ".join(
+                f"{attr}: {old!r} -> {new!r}" for attr, (old, new) in change.changes.items()
+            )
+            lines.append(f"~ {change.field_name} ({parts})")
+        return "\n".join(lines)
+
+
+def _fields_by_name(
+    requirements: ExtractionRequirements | CompositeExtractionRequirements,
+) -> dict[str, FieldSpec]:
+    if isinstance(requirements, CompositeExtractionRequirements):
+        found = {f.field_name: f for f in requirements.parent_requirements.fields}
+        for child in requirements.children:
+            for f in child.requirements.fields:
+                found[f"{child.container_name}.{f.field_name}"] = f
+        return found
+    return {f.field_name: f for f in requirements.fields}
+
+
+def compare_requirements(
+    approved: ExtractionRequirements | CompositeExtractionRequirements,
+    new: ExtractionRequirements | CompositeExtractionRequirements,
+) -> SchemaDiff:
+    """The fields ``new`` adds, removes or changes compared with ``approved``.
+
+    Fields are matched by name (``container.field`` inside a nested schema); a field
+    whose type, output policy, allowed values, pattern, format, default or description
+    differs is listed with each change. A flat schema compared with a nested one shows
+    every field as removed and added.
+    """
+    old_fields, new_fields = _fields_by_name(approved), _fields_by_name(new)
+    changed = []
+    for name in old_fields.keys() & new_fields.keys():
+        old, cur = old_fields[name], new_fields[name]
+        diffs = {
+            attr: (getattr(old, attr), getattr(cur, attr))
+            for attr in _COMPARED_ATTRIBUTES
+            if getattr(old, attr) != getattr(cur, attr)
+        }
+        if diffs:
+            changed.append(FieldChange(field_name=name, changes=diffs))
+    return SchemaDiff(
+        added=sorted(new_fields.keys() - old_fields.keys()),
+        removed=sorted(old_fields.keys() - new_fields.keys()),
+        changed=sorted(changed, key=lambda c: c.field_name),
+    )
+
+
 @dataclass
 class SchemaGenerationResult:
     """Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`.
@@ -2259,6 +2352,8 @@ class SchemaGenerationResult:
             ``None`` when none of the responses carried a usage payload.
         duration_s: Wall-clock seconds the schema generation took.
         model: Resolved model identifier the calls used.
+        diff: With ``approved_requirements``, how the new schema differs from the
+            approved one; ``None`` without it.
     """
 
     schema: type[BaseModel]
@@ -2267,6 +2362,7 @@ class SchemaGenerationResult:
     usage: UsageRecord | None
     duration_s: float
     model: str
+    diff: SchemaDiff | None = None
 
 
 class SchemaGenerator:
@@ -2434,13 +2530,27 @@ class SchemaGenerator:
 
         return self.extraction_model
 
-    def generate_schema_with_usage(self, user_requirements: str) -> SchemaGenerationResult:
+    def generate_schema_with_usage(
+        self,
+        user_requirements: str,
+        *,
+        approved_requirements: ExtractionRequirements
+        | CompositeExtractionRequirements
+        | None = None,
+    ) -> SchemaGenerationResult:
         """
         Generate schema and report token usage + latency + cost.
 
         Same input as :meth:`generate_schema`; returns a
         :class:`SchemaGenerationResult` aggregating usage across the
         underlying LLM calls (structure detection + requirement parsing).
+
+        Args:
+            user_requirements: Natural language description of fields to extract.
+            approved_requirements: The requirements of the schema a person approved,
+                e.g. from a saved schema. The result's ``diff`` then lists the fields
+                the new schema adds, removes or changes, for a person to review
+                before the new schema replaces the approved one.
         """
         print("Generating schema from requirements...")
         schema, usage, duration_s = self._generate_schema_inner(user_requirements)
@@ -2457,6 +2567,11 @@ class SchemaGenerator:
             usage=usage,
             duration_s=duration_s,
             model=self.model,
+            diff=(
+                compare_requirements(approved_requirements, self.item_requirements)
+                if approved_requirements is not None
+                else None
+            ),
         )
 
     def get_schema_info(self) -> dict:

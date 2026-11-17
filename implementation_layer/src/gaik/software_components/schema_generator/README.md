@@ -71,7 +71,11 @@ generator = SchemaGenerator(
 )
 
 schema = generator.generate_schema(user_requirements: str)
-result = generator.generate_schema_with_usage(user_requirements: str)
+result = generator.generate_schema_with_usage(
+    user_requirements: str,
+    *,
+    approved_requirements=None,  # the requirements of the schema a person approved
+)
 ```
 
 `generate_schema()` returns a Pydantic model class. After generation, parsed
@@ -80,7 +84,28 @@ requirements and structure metadata are available through
 
 `generate_schema_with_usage()` returns a `SchemaGenerationResult` containing
 the schema, parsed requirements, structure analysis, token usage, duration, and
-model identifier.
+model identifier, and with `approved_requirements` a `diff`.
+
+### Review a new schema against the approved one
+
+The requirement text steers which fields a generated schema gets, so a field can drop
+out or change between two runs. Before a new schema replaces one a person approved,
+show them the difference:
+
+```python
+from gaik.software_components.schema_generator import compare_requirements
+
+result = generator.generate_schema_with_usage(text, approved_requirements=approved)
+if not result.diff.is_empty:
+    print(result.diff)      # + added, - removed, ~ changed (attribute: old -> new)
+    # ask for approval before saving result.schema over the approved one
+```
+
+`compare_requirements(approved, new)` gives the same `SchemaDiff` for any two
+requirements, e.g. a saved one and an edited one. Fields are matched by name
+(`container.field` in a nested schema); type, output policy, allowed values, pattern,
+format, default and description are compared. gaik does not block a changed schema:
+the decision stays with the caller.
 
 ## Generated Artifacts
 
