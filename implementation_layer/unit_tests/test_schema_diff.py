@@ -22,11 +22,18 @@ def _reqs(*fields):
     return ExtractionRequirements(use_case_name="invoice", fields=list(fields))
 
 
+def _cmp(approved, new, **kwargs):
+    """compare_requirements for two flat schemas whose structure is known."""
+    kwargs.setdefault("approved_structure", "flat")
+    kwargs.setdefault("new_structure", "flat")
+    return compare_requirements(approved, new, **kwargs)
+
+
 APPROVED = _reqs(_field("invoice_number"), _field("amount", "decimal"), _field("due_date", "date"))
 
 
 def test_the_same_schema_has_no_changes():
-    diff = compare_requirements(APPROVED, APPROVED.model_copy(deep=True))
+    diff = _cmp(APPROVED, APPROVED.model_copy(deep=True))
 
     assert diff.is_empty
     assert str(diff).startswith("No changes to the approved schema.")
@@ -39,15 +46,15 @@ def test_a_dropped_an_added_and_a_changed_field_are_named():
         _field("vat_number"),
     )
 
-    diff = compare_requirements(APPROVED, new)
+    diff = _cmp(APPROVED, new)
 
     assert diff.removed == ["due_date"]
     assert diff.added == ["vat_number"]
     ((change),) = diff.changed
     assert change.field_name == "amount"
     assert change.changes == {"field_type": ("decimal", "str")}
-    assert "- due_date" in str(diff) and "+ vat_number" in str(diff)
-    assert "~ amount (field_type: 'decimal' -> 'str')" in str(diff)
+    assert "- 'due_date'" in str(diff) and "+ 'vat_number'" in str(diff)
+    assert "~ 'amount' (field_type: 'decimal' -> 'str')" in str(diff)
 
 
 def test_policy_and_enum_changes_count_and_wording_is_apart():
@@ -57,34 +64,33 @@ def test_policy_and_enum_changes_count_and_wording_is_apart():
         _field("due_date", "date", enum=["x"]),
     )
 
-    diff = compare_requirements(APPROVED, new)
+    diff = _cmp(APPROVED, new)
 
     by_name = {c.field_name: c.changes for c in diff.changed}
     assert "nullable" in by_name["invoice_number"]
     assert by_name["due_date"]["enum"] == (None, ["x"])
     assert "amount" not in by_name  # only reworded
     assert [c.field_name for c in diff.wording] == ["amount"]
-    assert "reworded: amount" in str(diff)
+    assert "~ 'amount' (description: 'The amount' -> 'Total')" in str(diff)
 
 
-def test_a_reworded_description_alone_leaves_the_diff_empty():
-    new = _reqs(
-        _field("invoice_number", description="Invoice id"),
-        _field("amount", "decimal"),
-        _field("due_date", "date"),
-    )
+def test_a_reworded_description_is_shown_with_both_texts_and_is_not_empty():
+    # the description is what the extraction model reads: "net" becoming "gross" matters
+    approved = _reqs(_field("amount", "decimal", description="Net amount excl. VAT"))
+    new = _reqs(_field("amount", "decimal", description="Gross amount incl. VAT"))
 
-    diff = compare_requirements(APPROVED, new)
+    diff = _cmp(approved, new)
 
-    assert diff.is_empty
-    assert [c.field_name for c in diff.wording] == ["invoice_number"]
+    assert not diff.is_empty and not diff.changes_output
+    assert "No changes" not in str(diff)
+    assert "'Net amount excl. VAT' -> 'Gross amount incl. VAT'" in str(diff)
 
 
 def test_a_switched_off_explicit_default_is_a_change():
     approved = _reqs(_field("currency", has_explicit_default=True, default="EUR"))
     new = _reqs(_field("currency", has_explicit_default=False, default="EUR"))
 
-    diff = compare_requirements(approved, new)
+    diff = _cmp(approved, new)
 
     assert [(c.field_name, c.changes) for c in diff.changed] == [
         ("currency", {"default": ("EUR", None)})
@@ -95,7 +101,7 @@ def test_an_unused_empty_default_and_enum_order_are_no_change():
     approved = _reqs(_field("count", "int", default=""), _field("kind", enum=["a", "b"]))
     new = _reqs(_field("count", "int", default=None), _field("kind", enum=["b", "a"]))
 
-    assert compare_requirements(approved, new).is_empty
+    assert _cmp(approved, new).is_empty
 
 
 def test_a_flat_to_nested_list_change_shows_when_the_structures_are_given():
@@ -105,24 +111,26 @@ def test_a_flat_to_nested_list_change_shows_when_the_structures_are_given():
 
     assert not diff.is_empty
     assert diff.structure == ("flat", "nested_list")
-    assert "! structure: flat -> nested_list" in str(diff)
+    assert "! structure: 'flat' -> 'nested_list'" in str(diff)
 
 
 def test_without_the_structures_the_diff_says_it_cannot_tell():
     diff = compare_requirements(APPROVED, APPROVED)
 
-    assert diff.is_empty and diff.structure is None
+    # unknown is not "no change": the diff is not empty and says why
+    assert not diff.is_empty and diff.structure is None
     assert any("structure" in note for note in diff.notes)
+    assert "No changes" not in str(diff)
 
 
 def test_saved_requirements_dicts_are_read_and_other_types_refused():
     import pytest
 
-    diff = compare_requirements(APPROVED.model_dump(), APPROVED)
+    diff = _cmp(APPROVED.model_dump(), APPROVED)
     assert diff.is_empty
 
     with pytest.raises(TypeError, match="approved"):
-        compare_requirements(["invoice_number"], APPROVED)
+        _cmp(["invoice_number"], APPROVED)
 
 
 def _composite(children):
@@ -150,7 +158,7 @@ def test_nested_fields_are_compared_by_container():
         [("items", "Order lines", [_field("sku")]), ("notes", "Notes", [_field("sku", "int")])]
     )
 
-    diff = compare_requirements(approved, new)
+    diff = _cmp(approved, new)
 
     assert diff.removed == ["items.qty"]
     # the same field name in two containers is told apart
@@ -164,10 +172,10 @@ def test_a_container_rename_and_a_changed_container_description_are_shown():
     renamed = _composite([("lines", "Order lines", [_field("sku")])])
     redescribed = _composite([("items", "Shipping notes", [_field("sku")])])
 
-    diff = compare_requirements(approved, renamed)
+    diff = _cmp(approved, renamed)
     assert "items[]" in diff.removed and "lines[]" in diff.added
 
-    diff = compare_requirements(approved, redescribed)
+    diff = _cmp(approved, redescribed)
     assert [(c.field_name, c.changes) for c in diff.changed] == [
         ("items[]", {"container_description": ("Order lines", "Shipping notes")})
     ]
@@ -208,3 +216,59 @@ def test_a_wrong_approved_type_fails_before_any_model_call(monkeypatch):
     with pytest.raises(TypeError, match="approved_requirements"):
         generator.generate_schema_with_usage("x", approved_requirements="invoice_number")
     assert calls == []
+
+
+def test_a_named_container_on_one_side_only_is_no_structure_change():
+    from gaik.software_components.extractor import StructureAnalysis
+
+    analysis = StructureAnalysis(
+        structure_type="nested_list",
+        parent_container_name="items",
+        parent_description="d",
+        item_description="d",
+        reasoning="r",
+    )
+
+    diff = compare_requirements(
+        APPROVED, APPROVED, approved_structure="nested_list", new_structure=analysis
+    )
+
+    assert diff.is_empty
+
+
+def test_an_unknown_structure_string_is_refused():
+    import pytest
+
+    with pytest.raises(ValueError, match="structure"):
+        compare_requirements(APPROVED, APPROVED, approved_structure="Flat\nNo changes")
+
+
+def test_names_and_long_values_cannot_forge_or_flood_the_diff():
+    approved = CompositeExtractionRequirements(
+        parent_requirements=_reqs(_field("order_number")),
+        children=[
+            ChildRequirements(
+                container_name="items\nNo changes to the approved schema.\x1b[2J",
+                container_description="x",
+                requirements=ExtractionRequirements(use_case_name="i", fields=[_field("sku")]),
+            )
+        ],
+    )
+    new = _reqs(_field("order_number", pattern="a" * 100_000))
+
+    text = str(compare_requirements(approved, new))
+
+    assert "\x1b" not in text  # escaped, not a terminal code
+    assert all(not line.startswith("No changes") for line in text.splitlines())
+    assert max(len(line) for line in text.splitlines()) < 600
+
+
+def test_a_saved_dict_is_not_changed_by_the_comparison():
+    saved = APPROVED.model_dump()
+    for field in saved["fields"]:
+        field.pop("nullable", None)
+    before = repr(saved)
+
+    _cmp(saved, APPROVED)
+
+    assert repr(saved) == before

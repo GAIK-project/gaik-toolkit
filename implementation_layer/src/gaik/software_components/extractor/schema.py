@@ -17,6 +17,7 @@ Main Interface:
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 import time
@@ -2279,10 +2280,12 @@ class SchemaDiff:
     drop out or change between two runs. Show this diff to a person before the new
     schema replaces the approved one.
 
-    ``is_empty`` is true when nothing that changes the output differs: no field or
-    container added or removed, no change of structure, type, output policy, allowed
-    values, pattern, format or effective default. Reworded descriptions, which a model
-    produces on almost every run, are listed apart in ``wording``.
+    ``is_empty`` is true only when nothing differs and nothing is unknown: no field or
+    container added, removed or changed, no structure change, no reworded description
+    (a description is part of what the extraction model reads, so "net" becoming
+    "gross" changes the result) and no note that the structure could not be compared.
+    ``changes_output`` is the narrower test: a field, container or structure change.
+    Reworded descriptions are listed apart in ``wording``, with both texts.
     """
 
     added: list[str]
@@ -2295,32 +2298,61 @@ class SchemaDiff:
     notes: list[str] = _dc_field(default_factory=list)
 
     @property
+    def changes_output(self) -> bool:
+        return bool(self.added or self.removed or self.changed or self.structure)
+
+    @property
     def is_empty(self) -> bool:
-        return not (self.added or self.removed or self.changed or self.structure)
+        return not (self.changes_output or self.wording or self.notes)
 
     def __str__(self) -> str:
         lines = []
         if self.structure:
-            lines.append(f"! structure: {self.structure[0]} -> {self.structure[1]}")
-        lines += [f"+ {name}" for name in self.added]
-        lines += [f"- {name}" for name in self.removed]
+            lines.append(f"! structure: {_shown(self.structure[0])} -> {_shown(self.structure[1])}")
+        lines += [f"+ {_shown(name)}" for name in self.added]
+        lines += [f"- {_shown(name)}" for name in self.removed]
         for change in self.changed:
             parts = ", ".join(
-                f"{attr}: {old!r} -> {new!r}" for attr, (old, new) in change.changes.items()
+                f"{attr}: {_shown(old)} -> {_shown(new)}"
+                for attr, (old, new) in change.changes.items()
             )
-            lines.append(f"~ {change.field_name} ({parts})")
+            lines.append(f"~ {_shown(change.field_name)} ({parts})")
+        for c in self.wording:
+            old, new = c.changes["description"]
+            lines.append(f"~ {_shown(c.field_name)} (description: {_shown(old)} -> {_shown(new)})")
         if not lines:
-            lines.append("No changes to the approved schema.")
-        lines += [f"  reworded: {c.field_name}" for c in self.wording]
+            lines.append(
+                "No changes to the approved schema."
+                if not self.notes
+                else "No field changes found, but the comparison is incomplete:"
+            )
         lines += [f"  note: {n}" for n in self.notes]
         return "\n".join(lines)
 
 
+_SHOWN_MAX = 200
+
+
+def _shown(value) -> str:
+    """``value`` for a person to read: quoted, control characters escaped, cut to 200.
+
+    Names and values can come from a saved or edited dict, so a newline or a terminal
+    code in them must not make up a line of the diff, and a huge value must not push
+    the other lines out of view.
+    """
+    text = repr(value)
+    return text if len(text) <= _SHOWN_MAX else text[: _SHOWN_MAX - 1] + "…"
+
+
 def _coerce_requirements(value, what: str):
-    """``value`` as requirements; a saved ``requirements`` dict is read as one."""
+    """``value`` as requirements; a saved ``requirements`` dict is read as one.
+
+    The dict is copied first: validation would otherwise write into the caller's dict.
+    """
     if isinstance(value, (ExtractionRequirements, CompositeExtractionRequirements)):
         return value
     if isinstance(value, dict):
+        value = copy.deepcopy(value)
         if value.get("structure_type") == "parent_with_nested_list":
             return CompositeExtractionRequirements.model_validate(value)
         return ExtractionRequirements.model_validate(value)
@@ -2330,19 +2362,42 @@ def _coerce_requirements(value, what: str):
     )
 
 
-def _structure_label(structure, requirements) -> str | None:
-    """A short name of the output's shape, or None when it cannot be told."""
+_STRUCTURE_KINDS = ("flat", "nested_list", "parent_with_nested_list")
+
+
+def _structure_key(structure, requirements) -> tuple[str, str | None] | None:
+    """``(kind, container)`` of the output's shape, or None when it cannot be told.
+
+    The requirements decide where they can: parent-with-children requirements are that
+    shape, and plain requirements are never it, whatever an analysis says (a failed
+    parent-with-children parse falls back to flat ones). A string names only the kind.
+    """
     if isinstance(requirements, CompositeExtractionRequirements):
-        return "parent_with_nested_list"
+        return ("parent_with_nested_list", None)
     if structure is None:
         return None
     if isinstance(structure, StructureAnalysis):
         kind, container = structure.structure_type, structure.parent_container_name
+    elif isinstance(structure, str) and structure in _STRUCTURE_KINDS:
+        kind, container = structure, None
     else:
-        kind, container = str(structure), None
-    if kind == "nested_list" and container:
-        return f"nested_list in {_sanitize_field_name(container)}"
-    return kind
+        raise ValueError(
+            f"structure must be a StructureAnalysis or one of {_STRUCTURE_KINDS}, not {structure!r}"
+        )
+    if kind == "parent_with_nested_list":
+        kind = "flat"
+    if kind != "nested_list":
+        container = None
+    return kind, _sanitize_field_name(container) if container else None
+
+
+def _same_structure(a: tuple[str, str | None], b: tuple[str, str | None]) -> bool:
+    """Same kind, and the same container where both name one."""
+    return a[0] == b[0] and (a[1] is None or b[1] is None or a[1] == b[1])
+
+
+def _label(key: tuple[str, str | None]) -> str:
+    return f"{key[0]} in {key[1]}" if key[1] else key[0]
 
 
 def _fields_by_name(requirements) -> dict[str, FieldSpec]:
@@ -2419,16 +2474,18 @@ def compare_requirements(
                     changes={"container_description": (old_boxes[box], new_boxes[box])},
                 )
             )
-    old_label = _structure_label(approved_structure, approved)
-    new_label = _structure_label(new_structure, new)
+    old_key = _structure_key(approved_structure, approved)
+    new_key = _structure_key(new_structure, new)
     notes = []
-    if old_label is None or new_label is None:
+    if old_key is None or new_key is None:
         notes.append(
             "the structure of one schema is not known, so a flat versus nested-list "
             "change cannot be seen; pass approved_structure and new_structure"
         )
     structure = (
-        (old_label, new_label) if old_label and new_label and old_label != new_label else None
+        (_label(old_key), _label(new_key))
+        if old_key and new_key and not _same_structure(old_key, new_key)
+        else None
     )
     return SchemaDiff(
         added=sorted(

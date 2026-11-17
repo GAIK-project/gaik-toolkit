@@ -100,16 +100,23 @@ result = generator.generate_schema_with_usage(
     approved_structure=approved_analysis,  # StructureAnalysis or "flat" / "nested_list"
 )
 if not result.diff.is_empty:
-    print(result.diff)   # ! structure, + added, - removed, ~ changed (old -> new)
+    print(result.diff)   # ! structure, + added, - removed, ~ changed (old -> new), notes
     # ask for approval before saving result.schema over the approved one
 ```
 
-- `is_empty` covers what changes the output: fields and child containers added or
-  removed (`items[]`), the structure, and each field's type, output policy, allowed
-  values (in any order), pattern, format and effective default. A reworded description,
-  which a model writes on almost every run, is listed apart in `diff.wording`.
-- A flat and a nested-list schema hold the same fields. Pass `approved_structure` to see
-  that change; without it `diff.notes` says it cannot be told.
+- Ask for approval unless `is_empty` is true. `is_empty` is true only when nothing
+  differs and nothing is unknown. A reworded description counts: the description is
+  what the extraction model reads, so "net amount" becoming "gross amount" changes the
+  result. `str(diff)` shows both texts. `changes_output` is the narrower test (fields
+  and child containers added or removed as `items[]`, the structure, and each field's
+  type, output policy, allowed values in any order, pattern, format and effective
+  default).
+- A flat and a nested-list schema hold the same fields. Pass `approved_structure`
+  (`"flat"`, `"nested_list"` or the approved `StructureAnalysis`) to compare it; without
+  it `diff.notes` says so and `is_empty` is false.
+- Names and values in `str(diff)` are quoted and cut to 200 characters, so a name or a
+  value from a saved or edited dict cannot make up a diff line. Letters that only look
+  alike (Latin and Cyrillic) are not told apart on screen.
 - A wrong `approved_requirements` type raises `TypeError` before any model call.
 - `compare_requirements(approved, new, approved_structure=..., new_structure=...)` gives
   the same `SchemaDiff` for any two requirements, e.g. a saved one and an edited one.
