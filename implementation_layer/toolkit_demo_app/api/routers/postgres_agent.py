@@ -19,6 +19,7 @@ import asyncio
 import decimal
 import logging
 import os
+import threading
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -72,10 +73,18 @@ def _agent_database_url() -> tuple[str | None, bool]:
     return os.getenv("DATABASE_URL"), False
 
 
-# What the agent's role may do, read in one query: role attributes, whether it can
-# create in the database or in any schema, the demo tables it can change, and the
-# tables outside the demo schema and the system schemas that it can read.
-_ROLE_FACTS_SQL = """
+# What the agent's role may do, read in one query. Outside the system schemas: role
+# attributes; whether it can create in the database or in any schema; its memberships
+# in other roles (SET ROLE, or rights inherited from them, such as the pg_* roles that
+# read server files or run programs); the relations of any kind (tables, views,
+# materialized views, foreign tables) it can write, also through a column grant; the
+# relations outside the demo schema it can read, also through a column grant, and the
+# sequences it can use; and the SECURITY DEFINER functions it can call, which run with
+# their owner's rights.
+_NOT_SYSTEM = (
+    "n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\\_%%'"
+)
+_ROLE_FACTS_SQL = f"""
 SELECT
     r.rolsuper,
     r.rolcreaterole,
@@ -83,17 +92,19 @@ SELECT
     r.rolbypassrls,
     has_database_privilege(current_database(), 'CREATE'),
     EXISTS (SELECT 1 FROM pg_namespace n
-             WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-               AND n.nspname NOT LIKE 'pg\\_%%'
-               AND has_schema_privilege(n.oid, 'CREATE')),
-    (SELECT count(*) FROM pg_tables t
-       WHERE t.schemaname = %(schema)s
-         AND has_table_privilege(
-               format('%%I.%%I', t.schemaname, t.tablename),
-               'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')),
-    (SELECT count(*) FROM pg_tables t
-       WHERE t.schemaname NOT IN (%(schema)s, 'pg_catalog', 'information_schema')
-         AND has_table_privilege(format('%%I.%%I', t.schemaname, t.tablename), 'SELECT'))
+             WHERE {_NOT_SYSTEM} AND has_schema_privilege(n.oid, 'CREATE')),
+    (SELECT count(*) FROM pg_auth_members m WHERE m.member = r.oid),
+    (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE {_NOT_SYSTEM} AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+         AND (has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+              OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES'))),
+    (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE {_NOT_SYSTEM}
+         AND ((c.relkind IN ('r', 'p', 'v', 'm', 'f') AND n.nspname <> %(schema)s
+               AND has_any_column_privilege(c.oid, 'SELECT'))
+              OR (c.relkind = 'S' AND has_sequence_privilege(c.oid, 'USAGE, SELECT, UPDATE')))),
+    (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE {_NOT_SYSTEM} AND p.prosecdef AND has_function_privilege(p.oid, 'EXECUTE'))
 FROM pg_roles r
 WHERE r.rolname = current_user
 """
@@ -103,9 +114,18 @@ def _role_problems(facts: tuple | None) -> list[str]:
     """Why the agent's role is not read-only on the demo schema; empty when it is."""
     if facts is None:
         return ["the role was not found"]
-    (superuser, createrole, createdb, bypassrls, db_create, schema_create, writable, elsewhere) = (
-        facts
-    )
+    (
+        superuser,
+        createrole,
+        createdb,
+        bypassrls,
+        db_create,
+        schema_create,
+        memberships,
+        writable,
+        elsewhere,
+        definer_functions,
+    ) = facts
     problems = []
     if superuser:
         problems.append("it is a superuser")
@@ -113,29 +133,42 @@ def _role_problems(facts: tuple | None) -> list[str]:
         problems.append("it can create roles or databases, or bypass row security")
     if db_create or schema_create:
         problems.append("it can create schemas or objects")
+    if memberships:
+        problems.append(f"it is a member of {memberships} other role(s)")
     if writable:
-        problems.append(f"it can change {writable} demo table(s)")
+        problems.append(f"it can change {writable} table(s) or view(s)")
     if elsewhere:
-        problems.append(f"it can read {elsewhere} table(s) outside the demo schema")
+        problems.append(
+            f"it can read or use {elsewhere} relation(s) or sequence(s) outside the demo tables"
+        )
+    if definer_functions:
+        problems.append(f"it can call {definer_functions} SECURITY DEFINER function(s)")
     return problems
 
 
-def _check_agent_role(database_url: str) -> list[str]:
-    """Check the agent's own role once per process; the problems found."""
-    global _role_checked
-    if _role_checked is None:
-        import psycopg
+_role_lock = threading.Lock()
 
-        with psycopg.connect(database_url) as conn:
-            facts = conn.execute(_ROLE_FACTS_SQL, {"schema": DEMO_SCHEMA}).fetchone()
-        _role_checked = _role_problems(facts)
-        if _role_checked:
-            logger.error(
-                "postgres_agent: %s is not read-only: %s",
-                AGENT_DATABASE_ENV,
-                "; ".join(_role_checked),
-            )
-    return _role_checked
+
+def _check_agent_role(database_url: str) -> list[str]:
+    """Check the agent's own role once per process; the problems found.
+
+    A refusal is kept until the API restarts, so restart it after fixing the role.
+    """
+    global _role_checked
+    with _role_lock:
+        if _role_checked is None:
+            import psycopg
+
+            with psycopg.connect(database_url, connect_timeout=5) as conn:
+                facts = conn.execute(_ROLE_FACTS_SQL, {"schema": DEMO_SCHEMA}).fetchone()
+            _role_checked = _role_problems(facts)
+            if _role_checked:
+                logger.error(
+                    "postgres_agent: %s is not read-only: %s. Fix the role, then restart the API",
+                    AGENT_DATABASE_ENV,
+                    "; ".join(_role_checked),
+                )
+        return _role_checked
 
 
 def _llm_config() -> dict | None:
@@ -217,6 +250,18 @@ def _seed_demo_schema(database_url: str) -> None:
     logger.info("postgres_agent demo schema '%s' ready", DEMO_SCHEMA)
 
 
+def _own_role_passes() -> bool:
+    """True when the agent has its own connection and its role passed the check."""
+    url, own = _agent_database_url()
+    if not own or not url:
+        return False
+    try:
+        return not _check_agent_role(url)
+    except Exception:  # noqa: BLE001 - an unreachable database is reported as not ready
+        logger.warning("postgres_agent: the agent's role could not be checked", exc_info=True)
+        return False
+
+
 class AgentRoleError(RuntimeError):
     """The agent's own database role can do more than read the demo tables."""
 
@@ -294,7 +339,8 @@ class SchemaResponse(BaseModel):
 class StatusResponse(BaseModel):
     database_configured: bool
     own_read_only_role: bool = False
-    """The agent's SQL runs on its own role (POSTGRES_AGENT_DATABASE_URL), not DATABASE_URL."""
+    """The agent's SQL runs on its own role (POSTGRES_AGENT_DATABASE_URL), and that role
+    passed the read-only check."""
     llm_configured: bool
     demo_schema: str
     demo_tables: list[str]
@@ -308,7 +354,7 @@ async def postgres_agent_status():
     """Report whether the demo database and LLM are configured."""
     return StatusResponse(
         database_configured=_agent_database_url()[0] is not None,
-        own_read_only_role=bool(os.getenv(AGENT_DATABASE_ENV)),
+        own_read_only_role=await asyncio.to_thread(_own_role_passes),
         llm_configured=bool(os.getenv("AZURE_API_KEY") or os.getenv("OPENAI_API_KEY")),
         demo_schema=DEMO_SCHEMA,
         demo_tables=DEMO_TABLES,
@@ -318,7 +364,7 @@ async def postgres_agent_status():
 @router.get("/schema", response_model=SchemaResponse)
 async def get_demo_schema():
     """Return the introspected demo schema (tables, columns, sample rows)."""
-    agent = _resolve_agent()
+    agent = await asyncio.to_thread(_resolve_agent)
     try:
         return await asyncio.to_thread(_run_schema, agent)
     except Exception as e:
@@ -332,7 +378,7 @@ async def ask_question(req: AskRequest):
     if not question:
         raise HTTPException(status_code=400, detail="Question must not be empty.")
 
-    agent = _resolve_agent()
+    agent = await asyncio.to_thread(_resolve_agent)
     try:
         return await asyncio.to_thread(_run_ask, agent, question)
     except Exception as e:

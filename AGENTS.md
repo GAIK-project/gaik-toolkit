@@ -152,8 +152,9 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   serves no route that writes the shared video-search index.
   The Postgres agent's model-written SQL runs on its own read-only role
   (`POSTGRES_AGENT_DATABASE_URL`, created with `api/scripts/postgres_agent_role.sql`);
-  the API refuses a role that can write, and falls back to `DATABASE_URL` with a
-  warning while the variable is unset.
+  the API refuses a role that can write, create, call a SECURITY DEFINER function, is a
+  member of another role or can read outside the demo schema, and falls back to
+  `DATABASE_URL` with a warning while the variable is unset.
 
 ## docs site (GitHub Pages)
 

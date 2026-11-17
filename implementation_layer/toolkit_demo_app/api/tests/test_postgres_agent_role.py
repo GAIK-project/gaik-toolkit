@@ -9,7 +9,7 @@ import pytest
 from api.routers import postgres_agent as route
 from fastapi import HTTPException
 
-READ_ONLY = (False, False, False, False, False, False, 0, 0)
+READ_ONLY = (False, False, False, False, False, False, 0, 0, 0, 0)
 
 
 @pytest.fixture(autouse=True)
@@ -25,16 +25,36 @@ def test_a_read_only_role_has_no_problems():
     assert route._role_problems(READ_ONLY) == []
 
 
+def _with(**changes):
+    names = [
+        "superuser",
+        "createrole",
+        "createdb",
+        "bypassrls",
+        "db_create",
+        "schema_create",
+        "memberships",
+        "writable",
+        "elsewhere",
+        "definer",
+    ]
+    facts = dict(zip(names, READ_ONLY))
+    facts.update(changes)
+    return tuple(facts[n] for n in names)
+
+
 @pytest.mark.parametrize(
     ("facts", "problem"),
     [
-        ((True, False, False, False, False, False, 0, 0), "superuser"),
-        ((False, True, False, False, False, False, 0, 0), "create roles"),
-        ((False, False, False, True, False, False, 0, 0), "bypass row security"),
-        ((False, False, False, False, True, False, 0, 0), "create schemas"),
-        ((False, False, False, False, False, True, 0, 0), "create schemas"),
-        ((False, False, False, False, False, False, 2, 0), "change 2 demo table(s)"),
-        ((False, False, False, False, False, False, 0, 3), "read 3 table(s) outside"),
+        (_with(superuser=True), "superuser"),
+        (_with(createrole=True), "create roles"),
+        (_with(bypassrls=True), "bypass row security"),
+        (_with(db_create=True), "create schemas"),
+        (_with(schema_create=True), "create schemas"),
+        (_with(memberships=1), "member of 1 other role"),
+        (_with(writable=2), "change 2 table(s) or view(s)"),
+        (_with(elsewhere=3), "read or use 3 relation(s)"),
+        (_with(definer=1), "SECURITY DEFINER"),
         (None, "not found"),
     ],
 )
@@ -96,20 +116,29 @@ def test_the_role_is_checked_once_per_process(monkeypatch):
 
     import psycopg
 
-    monkeypatch.setattr(psycopg, "connect", lambda url: Conn())
+    monkeypatch.setattr(psycopg, "connect", lambda url, **kwargs: Conn())
 
     assert route._check_agent_role("postgresql://agent@db/demo") == []
     assert route._check_agent_role("postgresql://agent@db/demo") == []
     assert calls == [{"schema": route.DEMO_SCHEMA}]
 
 
-def test_status_tells_whether_the_agent_has_its_own_role(monkeypatch):
+def test_status_reports_whether_the_agents_role_passed(monkeypatch):
     import asyncio
 
     monkeypatch.setenv("DATABASE_URL", "postgresql://admin@db/demo")
     assert asyncio.run(route.postgres_agent_status()).own_read_only_role is False
     monkeypatch.setenv(route.AGENT_DATABASE_ENV, "postgresql://agent@db/demo")
+    monkeypatch.setattr(route, "_check_agent_role", lambda url: ["it is a superuser"])
+    assert asyncio.run(route.postgres_agent_status()).own_read_only_role is False
+    monkeypatch.setattr(route, "_check_agent_role", lambda url: [])
     assert asyncio.run(route.postgres_agent_status()).own_read_only_role is True
+
+    def unreachable(url):
+        raise OSError("no route to host")
+
+    monkeypatch.setattr(route, "_check_agent_role", unreachable)
+    assert asyncio.run(route.postgres_agent_status()).own_read_only_role is False
 
 
 ADMIN_URL = os.getenv("GAIK_DEMO_TEST_POSTGRES_URL")
@@ -140,6 +169,36 @@ def test_the_role_script_makes_a_role_the_check_accepts(monkeypatch):
 
     assert route._role_problems(facts(agent_url)) == []
     assert "it is a superuser" in route._role_problems(facts(ADMIN_URL))
+
+    # Each grant below makes the role more than read-only; the check names each one.
+    cases = {
+        "member of": "GRANT pg_read_server_files TO gaik_sql_agent",
+        "change": "GRANT INSERT ON public.gaik_review_index TO gaik_sql_agent",
+        "read or use": "GRANT SELECT ON public.gaik_review_view TO gaik_sql_agent",
+        "read or use ": "GRANT SELECT (secret) ON public.gaik_review_index TO gaik_sql_agent",
+        "SECURITY DEFINER": "GRANT EXECUTE ON FUNCTION public.gaik_review_wipe() TO gaik_sql_agent",
+    }
+    with psycopg.connect(ADMIN_URL, autocommit=True) as conn:
+        conn.execute("DROP VIEW IF EXISTS public.gaik_review_view")
+        conn.execute("DROP TABLE IF EXISTS public.gaik_review_index")
+        conn.execute("CREATE TABLE public.gaik_review_index (id int, secret text)")
+        conn.execute(
+            "CREATE VIEW public.gaik_review_view AS SELECT id FROM public.gaik_review_index"
+        )
+        conn.execute(
+            "CREATE OR REPLACE FUNCTION public.gaik_review_wipe() RETURNS void "
+            "LANGUAGE sql SECURITY DEFINER AS 'DELETE FROM public.gaik_review_index'"
+        )
+        conn.execute("REVOKE EXECUTE ON FUNCTION public.gaik_review_wipe() FROM PUBLIC")
+        assert route._role_problems(facts(agent_url)) == []
+        for problem, grant in cases.items():
+            conn.execute(grant)
+            found = route._role_problems(facts(agent_url))
+            assert any(problem.strip() in p for p in found), (grant, found)
+            conn.execute(grant.replace("GRANT", "REVOKE", 1).replace(" TO ", " FROM ", 1))
+        assert route._role_problems(facts(agent_url)) == []
+
     with psycopg.connect(agent_url) as conn:
-        with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
-            conn.execute(f"DELETE FROM {route.DEMO_SCHEMA}.orders")
+        assert conn.execute(f"SELECT count(*) FROM {route.DEMO_SCHEMA}.orders").fetchone()
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("SELECT count(*) FROM public.gaik_review_index")
