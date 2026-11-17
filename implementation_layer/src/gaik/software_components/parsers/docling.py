@@ -392,6 +392,7 @@ class DoclingParser:
                 pass
 
         # Convert document using docling, within the input limits
+        self.limits.check_file_size(file_path)
         check_file_type(file_path)
         self.limits.check_document(file_path)
         result = self.converter.convert(file_path, **docling_limits(self.limits))

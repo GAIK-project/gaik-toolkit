@@ -46,8 +46,9 @@ def build_chat_document_content(
     :data:`~gaik.software_components.source_material.SOURCE_MATERIAL_INSTRUCTION`.
 
     ``limits`` (default :class:`~gaik.software_components.input_limits.InputLimits`)
-    is checked for the pixels of every page image before any page is rendered,
-    and for the size and pixels of every image file before it is read.
+    is checked for the size of every file before it is read, for the pixels of
+    every page image before any page is rendered, and for the pixels of every
+    image file.
 
     A file whose content is not a PDF or an image, or not the type its extension
     says, is refused with
@@ -65,6 +66,7 @@ def build_chat_document_content(
                     "PDF input through the shared vision client requires PyMuPDF; "
                     "install 'gaik[parser]'."
                 ) from exc
+            limits.check_file_size(path)
             check_file_type(path, {"pdf"})
             with fitz.open(path) as document:
                 for page_number, page in enumerate(document, start=1):
@@ -85,6 +87,7 @@ def build_chat_document_content(
             mime = _IMAGE_MIME_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0]
             if not mime or not mime.startswith("image/"):
                 raise ValueError(f"Unsupported vision input type: {path.suffix}")
+            limits.check_file_size(path)
             mime = MIME_TYPES[check_file_type(path, IMAGE_TYPES)]
             limits.check_image_file(path)
             content.append({"type": "text", "text": clean_label(path.name)})

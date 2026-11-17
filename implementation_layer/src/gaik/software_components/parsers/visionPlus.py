@@ -118,6 +118,7 @@ class VisionPlusParser:
         if self.verbose:
             print(f"Processing PDF with vision enhancement: {file_path}")
 
+        self.limits.check_file_size(file_path)
         check_file_type(file_path, {"pdf"})
         self.limits.check_pdf(file_path)
         result = self.converter.convert(file_path, **docling_limits(self.limits))

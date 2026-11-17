@@ -283,6 +283,7 @@ class VisionParser:
             raise ValueError(f"Unsupported image type: {image_path.suffix}")
         # The content decides the type sent to the model, also for an unknown or
         # missing suffix (e.g. a temporary upload).
+        self.limits.check_file_size(image_path)
         mime_type = MIME_TYPES[check_file_type(image_path, IMAGE_TYPES)]
         self.limits.check_image_file(image_path)
         image_bytes = image_path.read_bytes()

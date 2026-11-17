@@ -119,6 +119,12 @@ named `.docx`, a ZIP archive named `.xlsx` or a PDF named `.png` is refused; a
 content has. Content of no recognised type in a `.pdf` file is left to the PDF parser,
 which reports a file it cannot read.
 
+The size limit (`InputLimits.max_file_bytes`) is checked first, and the content check
+reads a bounded part of the file. Text is content without NUL bytes, or UTF-16 with or
+without a byte order mark; a `.txt`, `.csv` or `.md` file with other NUL bytes in its
+first 8 KiB is refused. HEIC and AVIF images are refused: the parsers read PNG, JPEG,
+GIF, WebP, TIFF (BigTIFF included) and BMP.
+
 ```python
 from gaik.software_components.file_type import FileTypeMismatchError, detect_file_type
 

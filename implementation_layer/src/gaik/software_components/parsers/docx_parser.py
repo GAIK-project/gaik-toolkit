@@ -91,6 +91,8 @@ class DocxParser:
             raise ValueError("keep_structure needs use_markdown=True")
         # A DOCX is a ZIP container holding word/document.xml; python-docx finds
         # the container with zipfile, and so does the content check.
+        # The size comes first: the content check reads the archive's directory.
+        self.limits.check_file_size(file_path)
         check_file_type(file_path, {"docx"})
         self.limits.check_zip_container(file_path)
 

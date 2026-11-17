@@ -148,6 +148,10 @@ def _pdf_pages(file: Path) -> list[str]:
     except ImportError as error:
         raise need("parse_document", "PyMuPDF") from error
 
+    parser = PyMuPDFParser()
+    # The size is checked on the file itself before it is opened, so the message names
+    # the caller's file and not the name the parser is given below.
+    parser.limits.check_file_size(file)
     with pymupdf.open(file) as document:
         # PyMuPDF picks its handler from the name and the content; the parser gets a
         # .pdf name below, so a file PyMuPDF does not read as a PDF stops here.
@@ -156,7 +160,7 @@ def _pdf_pages(file: Path) -> list[str]:
         page_count = document.page_count
     try:
         with _named_as(file, ".pdf") as named:
-            marked = PyMuPDFParser().parse_pdf(str(named), page_markers=True)
+            marked = parser.parse_pdf(str(named), page_markers=True)
     except InputLimitError:
         # A PDF over a limit is still a PDF; the message names the file only.
         raise
@@ -178,8 +182,12 @@ def _docx_text(file: Path) -> str:
         from gaik.software_components.parsers import DocxParser
     except ImportError as error:
         raise need("parse_document", "python-docx") from error
+    parser = DocxParser()
+    # The limits are checked on the file itself, so a message names the caller's file
+    # and not the name the parser is given below.
+    parser.limits.check_zip_container(file)
     with _named_as(file, ".docx") as named:
-        return DocxParser().parse_docx(str(named), keep_structure=True).strip()
+        return parser.parse_docx(str(named), keep_structure=True).strip()
 
 
 @contextmanager
@@ -188,7 +196,9 @@ def _named_as(file: Path, suffix: str) -> Iterator[Path]:
 
     The kind here comes from the content, and the parsers refuse a file whose
     extension names another type; a file of the right kind under another name is
-    handed to them as a link (or a copy) with the matching extension.
+    handed to them as a link (or a copy) with the matching extension. A message the
+    parser raises then names ``document`` with that extension, so the callers check
+    the input limits on ``file`` first.
     """
     if file.suffix.lower() == suffix:
         yield file

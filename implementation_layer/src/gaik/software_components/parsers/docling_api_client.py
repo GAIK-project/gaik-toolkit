@@ -64,6 +64,7 @@ class DoclingApiClientParser:
         input_file = Path(document_path)
         if not input_file.exists():
             raise FileNotFoundError(f"Document file not found: {input_file}")
+        self.limits.check_file_size(input_file)
         check_file_type(input_file)
         self.limits.check_document(input_file)
 

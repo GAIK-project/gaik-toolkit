@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -59,7 +60,12 @@ def _file(tmp_path, name, data):
         (GIF, "gif"),
         (WEBP, "webp"),
         (TIFF, "tiff"),
+        (b"II+\x00\x08\x00\x00\x00" + b"\x00" * 32, "tiff"),
+        (b"MM\x00+\x00\x08\x00\x00" + b"\x00" * 32, "tiff"),
         (BMP, "bmp"),
+        ("name;summa\nPäivä;3\n".encode("utf-16-le"), "text"),
+        ("name;summa\nPäivä;3\n".encode("utf-16-be"), "text"),
+        (b"words\x00and a NUL", "unknown"),
         (b"name,amount\nBMW,3\n", "text"),
         (b"BMW sales were up\n", "text"),
         ("Päivämäärä;Summa\n".encode(), "text"),
@@ -85,6 +91,8 @@ def test_detect_file_type_reads_the_type_from_the_content(tmp_path, data, expect
         ("photo.jpg", JPEG),
         ("photo.jpeg", JPEG),
         ("scan.tif", TIFF),
+        ("scan.tiff", b"II+\x00\x08\x00\x00\x00" + b"\x00" * 32),
+        ("export.csv", "a;b\n1;2\n".encode("utf-16-le")),
         ("log.csv", b"a,b\n1,2\n"),
         ("readme.md", b"# Title\n"),
         ("unknown.xyz", b"\x01\x00"),
@@ -237,3 +245,202 @@ def test_chat_content_refuses_an_image_whose_content_differs_from_its_extension(
 
     with pytest.raises(FileTypeMismatchError, match="is a GIF image, not a PNG image"):
         build_chat_document_content([_file(tmp_path, "scan.png", GIF)], "Read this")
+
+
+# -- a bounded read before the limits ------------------------------------------
+
+
+def _many_entries(path: Path, count: int) -> Path:
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("word/document.xml", "<w:document/>")
+        for number in range(count):
+            archive.writestr(f"media/part{number:05}.bin", b"")
+    return path
+
+
+def _refuse_zipfile(monkeypatch):
+    opened = []
+
+    class Recorder(zipfile.ZipFile):
+        def __init__(self, *args, **kwargs):
+            opened.append(args[0] if args else kwargs.get("file"))
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(zipfile, "ZipFile", Recorder)
+    return opened
+
+
+def test_a_docx_over_the_size_limit_is_refused_before_its_directory_is_read(tmp_path, monkeypatch):
+    pytest.importorskip("docx")
+    from gaik.software_components.input_limits import InputLimitError, InputLimits
+    from gaik.software_components.parsers.docx_parser import DocxParser
+
+    path = _many_entries(tmp_path / "notes.docx", 3000)
+    opened = _refuse_zipfile(monkeypatch)
+    parser = DocxParser(limits=InputLimits(max_file_bytes=1024))
+    with pytest.raises(InputLimitError, match="max_file_bytes"):
+        parser.parse_docx(str(path))
+    assert opened == []
+
+
+def test_an_archive_with_a_directory_over_the_cap_is_typed_from_its_first_entries(
+    tmp_path, monkeypatch
+):
+    from gaik.software_components import file_type
+
+    path = _many_entries(tmp_path / "notes.docx", 200)
+    monkeypatch.setattr(file_type, "_MAX_ZIP_DIRECTORY_BYTES", 1024)
+    opened = _refuse_zipfile(monkeypatch)
+    assert file_type.detect_file_type(path) == "docx"
+    assert opened == []
+
+    monkeypatch.setattr(file_type, "_MAX_ZIP_DIRECTORY_BYTES", 2 * 1024 * 1024)
+    monkeypatch.setattr(file_type, "_MAX_ZIP_ENTRIES", 100)
+    assert file_type.detect_file_type(path) == "docx"
+    assert opened == []
+    assert file_type.detect_file_type(_file(tmp_path, "other.zip", ZIP)) == "zip"
+    assert len(opened) == 1
+
+
+def test_a_zip64_archive_is_read_from_its_zip64_end_record(tmp_path):
+    from gaik.software_components import file_type
+
+    path = tmp_path / "notes.docx"
+    with zipfile.ZipFile(path, "w", allowZip64=True) as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("word/document.xml", "<w:document/>")
+    data = path.read_bytes()
+    # The end record of a small archive, rewritten as a ZIP64 one would leave it.
+    at = data.rfind(b"PK\x05\x06")
+    fields = list(file_type._END_RECORD.unpack_from(data, at))
+    entries, directory, offset = fields[4], fields[5], fields[6]
+    fields[3:7] = [0xFFFF, 0xFFFF, 0xFFFFFFFF, 0xFFFFFFFF]
+    record_64 = file_type._END_RECORD_64.pack(
+        b"PK\x06\x06", 44, 45, 45, 0, 0, entries, entries, directory, offset
+    )
+    locator = file_type._END_RECORD_64_LOCATOR.pack(b"PK\x06\x07", 0, at, 1)
+    path.write_bytes(data[:at] + record_64 + locator + file_type._END_RECORD.pack(*fields))
+    assert file_type._zip_directory_size(path) == (entries, directory)
+    assert file_type.detect_file_type(path) == "docx"
+
+
+@pytest.mark.parametrize(
+    ("call", "name"),
+    [
+        ("chat_pdf", "scan.pdf"),
+        ("chat_image", "scan.png"),
+        ("vision_image", "scan.png"),
+    ],
+)
+def test_the_image_and_pdf_paths_check_the_size_before_the_content(
+    tmp_path, monkeypatch, call, name
+):
+    from gaik.software_components.input_limits import InputLimitError, InputLimits
+
+    path = _many_entries(tmp_path / name, 50)
+    opened = _refuse_zipfile(monkeypatch)
+    limits = InputLimits(max_file_bytes=1024)
+    with pytest.raises(InputLimitError, match="max_file_bytes"):
+        if call == "vision_image":
+            parser, _sent = _vision_parser(monkeypatch)
+            parser.limits = limits
+            parser.convert_image(path)
+        else:
+            if call == "chat_pdf":
+                pytest.importorskip("fitz")
+            from gaik.software_components.parsers.multimodal_parser.chat_content import (
+                build_chat_document_content,
+            )
+
+            build_chat_document_content([path], "Read this", limits=limits)
+    assert opened == []
+
+
+# -- the parsers that need Docling or a model ------------------------------------
+
+
+class _Converter:
+    def __init__(self):
+        self.calls = []
+
+    def convert(self, *args, **kwargs):
+        self.calls.append(args)
+        raise AssertionError("the converter ran")
+
+
+def _docling_parser(limits=None):
+    pytest.importorskip("docling")
+    pytest.importorskip("psutil")
+    from gaik.software_components.input_limits import InputLimits
+    from gaik.software_components.parsers.docling import DoclingParser
+
+    parser = object.__new__(DoclingParser)
+    parser.limits = limits or InputLimits.local_parsing()
+    parser.docling_available = True
+    parser.supported_extensions = [".pdf", ".docx"]
+    parser.converter = _Converter()
+    return parser
+
+
+def _vision_plus_parser(limits=None):
+    pytest.importorskip("docling")
+    from gaik.software_components.input_limits import InputLimits
+    from gaik.software_components.parsers.visionPlus import VisionPlusParser
+
+    parser = object.__new__(VisionPlusParser)
+    parser.limits = limits or InputLimits.local_parsing()
+    parser.verbose = False
+    parser.converter = _Converter()
+    return parser
+
+
+def _multimodal_parser(limits=None):
+    pytest.importorskip("markdown_it")
+    from gaik.software_components.input_limits import InputLimits
+    from gaik.software_components.parsers.multimodal_parser.multimodal_parser import (
+        MultimodalParser,
+    )
+
+    parser = object.__new__(MultimodalParser)
+    parser.limits = limits or InputLimits()
+    parser._shared_config = True
+    parser._call_shared = lambda *args: (_ for _ in ()).throw(AssertionError("model call"))
+    return parser
+
+
+def _parse(kind, parser, path):
+    if kind == "multimodal":
+        return parser.parse(path)
+    return parser.parse_document(str(path))
+
+
+_BUILDERS = {
+    "docling": _docling_parser,
+    "vision_plus": _vision_plus_parser,
+    "multimodal": _multimodal_parser,
+}
+
+
+@pytest.mark.parametrize("kind", sorted(_BUILDERS))
+def test_docling_vision_plus_and_multimodal_parsers_refuse_an_image_named_pdf(tmp_path, kind):
+    parser = _BUILDERS[kind]()
+    path = _file(tmp_path, "report.pdf", PNG)
+    with pytest.raises(FileTypeMismatchError, match=r"'report\.pdf' is a PNG image"):
+        _parse(kind, parser, path)
+    if kind != "multimodal":
+        assert parser.converter.calls == []
+
+
+@pytest.mark.parametrize("kind", sorted(_BUILDERS))
+def test_docling_vision_plus_and_multimodal_parsers_check_the_size_first(
+    tmp_path, monkeypatch, kind
+):
+    from gaik.software_components.input_limits import InputLimitError, InputLimits
+
+    parser = _BUILDERS[kind](InputLimits(max_file_bytes=1024))
+    path = _many_entries(tmp_path / "report.pdf", 50)
+    opened = _refuse_zipfile(monkeypatch)
+    with pytest.raises(InputLimitError, match="max_file_bytes"):
+        _parse(kind, parser, path)
+    assert opened == []
