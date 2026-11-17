@@ -77,6 +77,61 @@ def _normalise_field_defaults(schema_dir: Path, schema_name: str) -> None:
         print(f"WARNING: set a non-string default to null in {req_path.name} for: {', '.join(fixed)}")
 
 
+def _refresh_model_file(schema_dir: Path, schema_name: str) -> None:
+    """Write <schema_name>_model.json again when <schema_name>.py was edited after it.
+
+    load_schema() reads the model file and never imports the .py, so a correction made
+    to output_schema.py (SKILL.md Step 4.5, a Gate 3 refinement) would not reach this
+    run. Same steps as the wizard's scripts/refresh_schema_model.py. A .py that does not
+    import, or a model the saved format refuses, stops the run: the old schema is never
+    used without a word. gaik's own copy of a schema it generated in a run is for
+    reading only (it may not import); there the model file is the schema.
+    """
+    py_path = schema_dir / f"{schema_name}.py"
+    model_path = schema_dir / f"{schema_name}_model.json"
+    req_path = schema_dir / f"{schema_name}_requirements.json"
+    if not (py_path.is_file() and model_path.is_file() and req_path.is_file()):
+        return
+    if py_path.stat().st_mtime <= model_path.stat().st_mtime:
+        return
+    try:
+        from gaik.software_components.extractor.saved_schema import write_model_file
+    except ImportError:  # an older gaik: load_schema() reads the .py itself
+        return
+    if "(do not edit manually)" in py_path.read_text(encoding="utf-8")[:200]:
+        print(
+            f"WARNING: {py_path.name} is newer than {model_path.name}, but it is gaik's "
+            f"read-only copy of a generated schema; the run uses {model_path.name}."
+        )
+        return
+    import importlib.util
+
+    model_name = json.loads(req_path.read_text(encoding="utf-8"))["model_name"]
+    spec = importlib.util.spec_from_file_location(f"_poc_{schema_name}", py_path)
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        raise RuntimeError(
+            f"{py_path.name} was edited after {model_path.name} but does not import "
+            f"({type(exc).__name__}: {exc}); fix it, or remove the edit"
+        ) from exc
+    model = getattr(module, model_name, None)
+    if model is None:
+        raise RuntimeError(
+            f"{py_path.name} has no class {model_name!r}, the name in {req_path.name}"
+        )
+    # Written next to the old file first, so a refused model leaves it as it was.
+    # write_model_file() refuses a model whose description does not rebuild it.
+    tmp_path = model_path.with_suffix(".json.tmp")
+    try:
+        write_model_file(model, tmp_path)
+        tmp_path.replace(model_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    print(f"{py_path.name} was edited after {model_path.name}: model file written again.")
+
+
 def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
     """Load the saved schema if it exists and the requirements prompt hasn't changed.
 
@@ -96,6 +151,7 @@ def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
 
     try:
         _normalise_field_defaults(schema_dir, schema_name)
+        _refresh_model_file(schema_dir, schema_name)
         existing = pipeline.load_schema(schema_dir, schema_name)
         if existing:
             print("Using approved schema (requirements unchanged).")
