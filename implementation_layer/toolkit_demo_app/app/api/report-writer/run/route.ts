@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bodyLimitFor, readFormWithin } from "@/lib/upload-limits";
 import {
   forwardReportRun,
   gateReportWriter,
@@ -7,7 +8,6 @@ import {
 import { getReportWriterLimits } from "@/lib/report-writer/limits";
 import {
   COMPRESS_HINT,
-  REPORT_REQUEST_MAX_BYTES,
   REPORT_UPLOAD_MAX_MB,
 } from "@/lib/report-writer/upload-limit";
 
@@ -24,24 +24,19 @@ export async function POST(request: NextRequest) {
   if (gate instanceof Response) return gate;
   const { userId, staff } = gate;
 
-  // 3) Parse + validate the multipart body. A body over the proxy cap arrives
-  //    truncated and fails to parse, so reject it by its declared length first.
-  const declaredBytes = Number(request.headers.get("content-length") ?? 0);
-  if (declaredBytes > REPORT_REQUEST_MAX_BYTES) {
-    return NextResponse.json(
-      {
-        error: `Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. ${COMPRESS_HINT}`,
-      },
-      { status: 413 },
-    );
+  // Parse the multipart body within the route's limits (lib/upload-limits.ts):
+  // reading stops at the first chunk past the size, and a form with more files
+  // than the run takes is refused.
+  const read = await readFormWithin(request, bodyLimitFor("/report-writer/run"));
+  if (!read.ok) {
+    if (read.status === 413)
+      return NextResponse.json(
+        { error: `Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. ${COMPRESS_HINT}` },
+        { status: 413 },
+      );
+    return NextResponse.json({ error: read.error }, { status: 400 });
   }
-
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
-  }
+  const form = read.form;
 
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
   const sample = form.get("sample_report");

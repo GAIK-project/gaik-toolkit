@@ -1,11 +1,12 @@
 /**
  * Report Writer upload budget, shared by the page and its run route.
  *
- * Runs may carry 100 MiB of file content, the sample report included. The Next
- * proxy caps a whole request at 128 MiB (proxyClientMaxBodySize in
- * next.config.ts) and silently truncates anything larger, which the route could
- * only report as unparseable form data. The page checks the files against the
- * budget before sending, so the user gets compression advice instead.
+ * Runs may carry 100 MiB of file content, the sample report included. A run
+ * route reads at most 128 MiB of a request (the report runs' entries in
+ * api/upload_limits.json, read through lib/upload-limits.ts) and refuses a
+ * larger one as soon as it declares or passes that. The page checks the files
+ * against the budget before sending, so the user gets compression advice
+ * instead.
  */
 export const REPORT_UPLOAD_MAX_MB = 100;
 export const REPORT_UPLOAD_MAX_BYTES = REPORT_UPLOAD_MAX_MB * 1024 * 1024;

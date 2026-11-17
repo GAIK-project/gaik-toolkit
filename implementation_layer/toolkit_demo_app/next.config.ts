@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["shiki"],
   experimental: {
     // Include multipart metadata and config above the 100 MiB file budget.
+    // Each route holds its own, smaller limit while the body is read
+    // (lib/upload-limits.ts); this must stay at least the largest of them.
     proxyClientMaxBodySize: "128mb",
   },
   poweredByHeader: false,

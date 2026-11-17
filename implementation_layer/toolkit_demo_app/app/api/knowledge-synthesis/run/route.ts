@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bodyLimitFor, readFormWithin } from "@/lib/upload-limits";
 import { checkSynthesizeForm } from "@/lib/knowledge-synthesis/workspace";
 import {
   forwardReportRun,
@@ -6,7 +7,6 @@ import {
   recordReportUsage,
 } from "@/lib/report-writer/gate";
 import { getReportWriterLimits } from "@/lib/report-writer/limits";
-import { REPORT_REQUEST_MAX_BYTES } from "@/lib/report-writer/upload-limit";
 
 /**
  * Knowledge Synthesis run. Carved out of the generic proxy like the Report Writer routes:
@@ -22,20 +22,19 @@ export async function POST(request: NextRequest) {
   if (gate instanceof Response) return gate;
   const { userId, staff } = gate;
 
-  const declaredBytes = Number(request.headers.get("content-length") ?? 0);
-  if (declaredBytes > REPORT_REQUEST_MAX_BYTES) {
-    return NextResponse.json(
-      { error: `Uploads exceed the ${limits.maxUploadMb} MB limit.` },
-      { status: 413 },
-    );
+  // Parse the multipart body within the route's limits (lib/upload-limits.ts):
+  // reading stops at the first chunk past the size, and a form with more files
+  // than the run takes is refused.
+  const read = await readFormWithin(request, bodyLimitFor("/knowledge-synthesis/run"));
+  if (!read.ok) {
+    if (read.status === 413)
+      return NextResponse.json(
+        { error: `Uploads exceed the ${limits.maxUploadMb} MB limit.` },
+        { status: 413 },
+      );
+    return NextResponse.json({ error: read.error }, { status: 400 });
   }
-
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
-  }
+  const form = read.form;
   const invalid = await checkSynthesizeForm(form, limits);
   if (invalid) {
     return NextResponse.json({ error: invalid.error }, { status: invalid.status });

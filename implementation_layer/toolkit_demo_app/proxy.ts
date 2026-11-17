@@ -35,6 +35,12 @@ import {
 import { takeTrialRun } from "@/lib/trial";
 import { recordWizardUse, wizardUseKind } from "@/lib/wizard-usage";
 import { attachCsp, isPagePath, setCsp } from "@/lib/csp";
+import {
+  type BodyLimit,
+  bodyLimitFor,
+  declaresMoreThan,
+  readBodyWithin,
+} from "@/lib/upload-limits";
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -47,6 +53,15 @@ export const config = {
 
 function hasBody(method: string): boolean {
   return method !== "GET" && method !== "HEAD";
+}
+
+// A body over its route's limit (lib/upload-limits.ts). The pages read
+// `detail` from the API's answers and `error` from the proxy's; both say it.
+function tooLarge(limit: BodyLimit): NextResponse {
+  return NextResponse.json(
+    { error: limit.message, detail: limit.message },
+    { status: 413 },
+  );
 }
 
 // A page request gets a fresh nonce and its Content-Security-Policy, on the
@@ -111,6 +126,18 @@ async function route(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // A body that declares more than its route takes is refused before any of
+    // it is read, and before the gates below spend a trial run on it.
+    const backendPath = pathname.slice("/api".length);
+    const bodyLimit = bodyLimitFor(backendPath);
+    if (
+      hasBody(request.method) &&
+      declaresMoreThan(request, bodyLimit.maxBytes)
+    ) {
+      await request.body?.cancel().catch(() => {});
+      return tooLarge(bodyLimit);
+    }
+
     // The first Solution Wizard has a gate of its own on top of the one below,
     // for every method: the per-user grant (lib/api-access.ts, wizardRefusal).
     const wizardApi = isWizardApiPath(pathname);
@@ -166,7 +193,6 @@ async function route(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    const backendPath = pathname.slice("/api".length);
     // Null when the URL would not be on the backend's own origin.
     const targetUrl = backendTarget(
       BACKEND_URL,
@@ -237,11 +263,13 @@ async function route(request: NextRequest): Promise<NextResponse> {
     }
 
     try {
-      // Buffer the full body to preserve binary integrity for large
-      // multipart uploads. Streaming truncates data in Bun/standalone.
+      // Buffer the body to preserve binary integrity for large multipart
+      // uploads (streaming truncates data in Bun/standalone), but only within
+      // the route's limit: reading stops at the first chunk past it.
       let body: ArrayBuffer | null = null;
       if (hasBody(request.method)) {
-        body = await request.arrayBuffer();
+        body = await readBodyWithin(request, bodyLimit.maxBytes);
+        if (body === null) return reply(tooLarge(bodyLimit));
         headers.set("content-length", body.byteLength.toString());
       }
 

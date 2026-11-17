@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bodyLimitFor, readFormWithin } from "@/lib/upload-limits";
 import {
   forwardReportRun,
   gateReportWriter,
@@ -18,12 +19,19 @@ export async function POST(request: NextRequest) {
   if (gate instanceof Response) return gate;
   const { userId, staff } = gate;
 
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
+  // Parse the multipart body within the route's limits (lib/upload-limits.ts):
+  // reading stops at the first chunk past the size, and a form with more files
+  // than the run takes is refused.
+  const read = await readFormWithin(request, bodyLimitFor("/report-writer-v2/run"));
+  if (!read.ok) {
+    if (read.status === 413)
+      return NextResponse.json(
+        { error: `Uploads exceed the ${limits.maxUploadMb} MB limit.` },
+        { status: 413 },
+      );
+    return NextResponse.json({ error: read.error }, { status: 400 });
   }
+  const form = read.form;
   const invalid = checkRunForm(form, limits);
   if (invalid) {
     return NextResponse.json({ error: invalid.error }, { status: invalid.status });
