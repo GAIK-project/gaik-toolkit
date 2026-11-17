@@ -161,7 +161,7 @@
     "import": "from gaik.software_components.enhance_transcript import TranscriptEnhancer",
     "construct": "enhancer = TranscriptEnhancer(api_config=get_stage_config(config, 'extraction'))",
     "call": "er = enhancer.enhance_text(transcript_text)\n    text = er.enhanced_text",
-    "returns": "result(.enhanced_text, .summary)",
+    "returns": "TranscriptEnhancerResult(.original_text, .enhanced_text, .correction_summary (always set), .diff_chunks (with diff_chunks=True), .refused_passes [RefusedPass(.pass_name, .reason)])",
     "install_extra": "enhance-transcript",
     "options": [
       {
@@ -184,8 +184,8 @@
         "name": "generate_summary",
         "type": "bool",
         "default": false,
-        "effect": "Appends a CorrectionSummary (total_changes, insertions, deletions, substitutions) to the result for auditing how many tokens were changed.",
-        "selection_relevant": true,
+        "effect": "Kept for compatibility: the correction summary is always computed now (result.correction_summary).",
+        "selection_relevant": false,
         "infer_from": "human_review == yes OR audit trail of corrections is required"
       },
       {
@@ -227,6 +227,14 @@
         "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "max_change_ratio",
+        "type": "float | None",
+        "default": 0.25,
+        "effect": "Constructor argument: largest share of a pass's input words one pass may change. A pass over it, or one that changes any digit, is refused: its input is kept and the refusal is listed in result.refused_passes. None turns the ratio check off; the digit check always applies.",
+        "selection_relevant": true,
+        "infer_from": "transcripts where names and figures matter (medical, legal, inspection) -> keep the default or lower it; heavily garbled ASR where large repairs are wanted -> raise it; the PoC should report result.refused_passes"
       }
     ],
     "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=True) instead, which calls this internally. Use this standalone only to enhance an already-existing transcript (text input)."

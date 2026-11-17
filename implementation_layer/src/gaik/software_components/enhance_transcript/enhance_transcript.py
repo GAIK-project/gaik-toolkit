@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -15,6 +16,7 @@ from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import resolve_provider
+from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,9 @@ Invoked four times per ``enhance_text`` call:
 Errors raised by the callback are swallowed so a misbehaving observer
 can never break the enhancement run.
 """
+
+DEFAULT_MAX_CHANGE_RATIO = 0.25
+"""Largest share of the input's words one pass may change before the pass is refused."""
 
 DEFAULT_MODEL_AZURE = "gpt-6-luna"
 DEFAULT_MODEL_OPENAI = "gpt-6-luna"
@@ -206,16 +211,63 @@ class DiffChunk(BaseModel):
     corrected: str = ""
 
 
+class RefusedPass(BaseModel):
+    """A pass whose answer was not used, and why; its input was kept instead."""
+
+    pass_name: str
+    reason: str
+
+
 class TranscriptEnhancerResult(BaseModel):
     original_text: str
+    """The transcript as it came in, always kept next to the enhanced one."""
     enhanced_text: str
     source_file: str | None = None
     correction_summary: CorrectionSummary | None = None
+    """Word-level changes between ``original_text`` and ``enhanced_text``; always set."""
     diff_chunks: list[DiffChunk] | None = None
+    refused_passes: list[RefusedPass] = []
+    """Passes whose answer changed digits or too many words, so their input was kept."""
+
+
+_DIGITS = re.compile(r"\d+")
+
+
+def _digit_runs(text: str) -> list[str]:
+    return _DIGITS.findall(text)
+
+
+def _change_ratio(original: str, changed: str) -> float:
+    """Changed words (inserted, deleted or substituted) per word of ``original``."""
+    words = max(1, len(original.split()))
+    return TranscriptEnhancer._summarize_corrections(original, changed).total_changes / words
+
+
+def _refusal(before: str, after: str, max_change_ratio: float | None) -> str | None:
+    """Why a pass's answer may not replace its input, or None when it may.
+
+    The prompts forbid changing digits and rewriting the text; these checks hold the
+    pass to that in code, so a spoken instruction in the recording or a model error
+    cannot change a number or rewrite the transcript unnoticed.
+    """
+    if _digit_runs(before) != _digit_runs(after):
+        return "digits changed"
+    if max_change_ratio is not None:
+        ratio = _change_ratio(before, after)
+        if ratio > max_change_ratio:
+            return f"changed {ratio:.0%} of the words, more than {max_change_ratio:.0%}"
+    return None
 
 
 class TranscriptEnhancer:
-    """Enhance Finnish transcripts using a two-pass prompt workflow."""
+    """Enhance Finnish transcripts using a two-pass prompt workflow.
+
+    Each pass's answer replaces its input only if it keeps every digit and changes at
+    most ``max_change_ratio`` of the words; otherwise the input is kept and the pass is
+    listed in ``refused_passes``. The original transcript is always in the result.
+    """
+
+    max_change_ratio: float | None = DEFAULT_MAX_CHANGE_RATIO
 
     def __init__(
         self,
@@ -224,7 +276,19 @@ class TranscriptEnhancer:
         use_azure: bool = True,
         model: str | None = None,
         reasoning_effort: str | None = None,
+        max_change_ratio: float | None = DEFAULT_MAX_CHANGE_RATIO,
     ) -> None:
+        """
+        Args:
+            max_change_ratio: Largest share of a pass's input words (inserted, deleted
+                or substituted) the pass may change. A pass over it, or one that
+                changes any digit, is refused: its input is kept and the refusal is
+                listed in ``TranscriptEnhancerResult.refused_passes``. ``None`` turns
+                the ratio check off; the digit check always applies.
+        """
+        if max_change_ratio is not None and not 0 < max_change_ratio <= 1:
+            raise ValueError("max_change_ratio must be between 0 and 1, or None")
+        self.max_change_ratio = max_change_ratio
         config = (
             dict(api_config) if api_config is not None else get_openai_config(use_azure=use_azure)
         )
@@ -254,30 +318,51 @@ class TranscriptEnhancer:
         if not transcript_text:
             raise ValueError("transcript_text must not be empty")
 
+        refused: list[RefusedPass] = []
+
         self._notify(progress_callback, "pass1_started", {"chars": len(transcript_text)})
-        pass1_text = self._enhance_pass1(transcript_text, domain_rules=domain_rules)
+        pass1_text = self._checked(
+            "pass1",
+            transcript_text,
+            self._enhance_pass1(transcript_text, domain_rules=domain_rules),
+            refused,
+        )
         self._notify(progress_callback, "pass1_completed", {"chars": len(pass1_text)})
 
         self._notify(progress_callback, "pass2_started", {"chars": len(pass1_text)})
-        enhanced_text = self._enhance_pass2(
+        enhanced_text = self._checked(
+            "pass2",
             pass1_text,
-            additional_instructions=additional_instructions,
-            domain_rules=domain_rules,
+            self._enhance_pass2(
+                pass1_text,
+                additional_instructions=additional_instructions,
+                domain_rules=domain_rules,
+            ),
+            refused,
         )
         self._notify(progress_callback, "pass2_completed", {"chars": len(enhanced_text)})
 
+        # ``generate_summary`` is kept for callers; the summary is always computed now,
+        # so every result says how much the enhancement changed.
+        del generate_summary
         return TranscriptEnhancerResult(
             original_text=transcript_text,
             enhanced_text=enhanced_text,
-            correction_summary=(
-                self._summarize_corrections(transcript_text, enhanced_text)
-                if generate_summary
-                else None
-            ),
+            refused_passes=refused,
+            correction_summary=self._summarize_corrections(transcript_text, enhanced_text),
             diff_chunks=self._build_diff_chunks(transcript_text, enhanced_text)
             if diff_chunks
             else None,
         )
+
+    def _checked(self, name: str, before: str, after: str, refused: list[RefusedPass]) -> str:
+        """``after``, or ``before`` when the pass broke a rule the code checks."""
+        reason = _refusal(before, after, self.max_change_ratio)
+        if reason is None:
+            return after
+        logger.warning("TranscriptEnhancer %s refused (%s); kept its input", name, reason)
+        refused.append(RefusedPass(pass_name=name, reason=reason))
+        return before
 
     @staticmethod
     def _notify(
@@ -335,17 +420,15 @@ class TranscriptEnhancer:
         *,
         domain_rules: str | None = None,
     ) -> str:
-        messages = [
-            {
-                "role": "system",
-                "content": apply_domain_rules(PASS1_SYSTEM_PROMPT, domain_rules),
-            },
-            {
-                "role": "user",
-                "content": f"Edit this Finnish transcript for spelling consistency:\n\n{transcript_text}",
-            },
-        ]
-        return self._chat_text(messages, fallback=transcript_text)
+        # The transcript is what was said: an instruction spoken in the recording stays
+        # data, in a block of its own, apart from the editing rules.
+        material = SourceMaterial()
+        messages = source_material_messages(
+            apply_domain_rules(PASS1_SYSTEM_PROMPT, domain_rules),
+            "Edit this Finnish transcript for spelling consistency:\n\n"
+            + material.wrap(transcript_text, label="transcript"),
+        )
+        return material.strip_echo(self._chat_text(messages, fallback=transcript_text))
 
     def _enhance_pass2(
         self,
@@ -354,20 +437,17 @@ class TranscriptEnhancer:
         additional_instructions: str | None = None,
         domain_rules: str | None = None,
     ) -> str:
-        user_prompt = (
-            f"Repair remaining ASR errors in this Finnish transcript:\n\n{transcript_text}"
+        material = SourceMaterial()
+        user_prompt = "Repair remaining ASR errors in this Finnish transcript:\n\n" + material.wrap(
+            transcript_text, label="transcript"
         )
         if additional_instructions and additional_instructions.strip():
             user_prompt += f"\n\nADDITIONAL INSTRUCTIONS:\n{additional_instructions.strip()}"
 
-        messages = [
-            {
-                "role": "system",
-                "content": apply_domain_rules(PASS2_SYSTEM_PROMPT, domain_rules),
-            },
-            {"role": "user", "content": user_prompt},
-        ]
-        return self._chat_text(messages, fallback=transcript_text)
+        messages = source_material_messages(
+            apply_domain_rules(PASS2_SYSTEM_PROMPT, domain_rules), user_prompt
+        )
+        return material.strip_echo(self._chat_text(messages, fallback=transcript_text))
 
     def _chat_text(self, messages: list[dict], *, fallback: str) -> str:
         # ``reasoning_effort`` is omitted unless explicitly configured so we

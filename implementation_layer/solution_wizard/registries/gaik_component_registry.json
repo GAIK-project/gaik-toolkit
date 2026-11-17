@@ -443,7 +443,8 @@
       "api_config",
       "model",
       "reasoning_effort",
-      "use_azure"
+      "use_azure",
+      "max_change_ratio"
     ],
     "supported_providers": [
       "openai",
@@ -468,6 +469,7 @@
     "known_limitations": [
       "Tuned for Finnish; other languages require prompt customisation",
       "Should not be used when transcript faithfulness is more important than correctness",
+      "Each pass is refused in code, keeping its input, when it changes any digit or more than max_change_ratio (default 25%) of the words; result.refused_passes lists them and original_text keeps the raw transcript. Names are not checked in code.",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
