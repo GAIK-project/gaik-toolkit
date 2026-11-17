@@ -2280,13 +2280,13 @@
         "id": "ask_database",
         "component": "PostgresAgent",
         "inputs": [
-          "user_question",
-          "connection_string"
+          "user_question"
         ],
         "outputs": [
           "natural_language_answer"
         ],
         "parameters": {
+          "connection_string": "env:DATABASE_URL",
           "table_allowlist": [
             "customers",
             "orders"

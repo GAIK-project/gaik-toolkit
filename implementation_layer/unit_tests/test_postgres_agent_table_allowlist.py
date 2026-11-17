@@ -128,3 +128,8 @@ def test_schema_shown_to_the_model_names_no_table_off_the_list():
     assert columns["customer_id"].references == "customers.id"
     assert columns["owner_id"].references is None
     assert "secrets" not in schema.to_prompt_text()
+
+
+def test_empty_allowlist_introspects_no_table():
+    schema = introspect_schema(_KeysConn(), allowlist=[])
+    assert schema.tables == []

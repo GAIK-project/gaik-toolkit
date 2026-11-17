@@ -251,7 +251,12 @@ class PostgresAgent:
             PostgreSQL stores their names (case-sensitive: ``"Users"`` is the
             table created as ``"Users"``). Only these appear in the schema the
             LLM sees, and a query that touches any other table, view or
-            system catalog is refused before it runs. A missing list raises
+            system catalog is refused before it runs. Type casts are checked
+            against the list too: a cast to an ``oid`` or ``reg*`` type, or to
+            a type that is neither built in nor a listed table, is refused, as
+            are session and server details such as ``version()``. A listed
+            table's rows include those of its partitions and of tables that
+            inherit from it. A missing list raises
             ``TypeError`` and an empty one ``ValueError`` at construction;
             releases up to gaik 0.11.0 read every table in ``schema_name``
             when no list was given.

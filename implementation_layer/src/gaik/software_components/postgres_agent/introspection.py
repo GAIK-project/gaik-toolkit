@@ -41,14 +41,16 @@ def introspect_schema(
     Args:
         conn: An open psycopg connection.
         schema_name: The schema to introspect.
-        allowlist: When given, only these tables are included.
+        allowlist: When given, only these tables are included; an empty list
+            includes none, as in ``validate_read_only``. ``None`` includes
+            every table in the schema.
         include_samples: When True, attach up to three sample rows per table.
 
     Returns:
         A ``SchemaInfo`` describing every (allowed) base table and view.
     """
     # Exact names, as the SQL validator compares them: "Users" is not "users".
-    allowed = set(allowlist) if allowlist else None
+    allowed = set(allowlist) if allowlist is not None else None
 
     table_rows = conn.execute(
         """

@@ -127,3 +127,32 @@ def test_cte_named_after_a_table_outside_the_allowlist_is_rejected(schema):
     with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders"]) as agent:
         with pytest.raises(UnsafeSQLError):
             agent.run_sql("WITH users AS (SELECT * FROM users) SELECT * FROM users")
+
+
+def test_casts_to_built_in_types_and_listed_tables_run(schema):
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders", "Users"]) as agent:
+        rows = agent.run_sql(
+            "SELECT id::text AS id, amount::numeric(10, 2) AS amount, "
+            "'a b'::tsvector::text AS words, 'x'::\"char\"::text AS letter, "
+            "(CAST(ROW(id, amount) AS orders)).amount AS row_amount, "
+            'CAST(NULL AS "Users") IS NULL AS no_user '
+            "FROM orders ORDER BY id LIMIT 1"
+        )
+    assert rows == [
+        {
+            "id": "1",
+            "amount": 10,
+            "words": "'a' 'b'",
+            "letter": "x",
+            "row_amount": 10,
+            "no_user": True,
+        }
+    ]
+
+
+def test_cast_to_a_table_off_the_list_is_refused(schema):
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders"]) as agent:
+        with pytest.raises(UnsafeSQLError, match="type casts are checked against the table list"):
+            agent.run_sql("SELECT CAST(NULL AS users)")
+        with pytest.raises(UnsafeSQLError, match="type casts are checked against the table list"):
+            agent.run_sql("SELECT 'users'::regclass")

@@ -10,6 +10,13 @@ query over the agent's schema is rejected:
   extensions add more, so a denylist cannot hold. Functions sqlglot models as
   their own node are standard SQL; every other call must be named in
   ``SAFE_FUNCTIONS``;
+* **session and server details are not readable**: ``version()``,
+  ``current_database()``, ``current_user`` and the like describe the server,
+  not the tables, so they are refused;
+* **type casts are checked against the table list**: object identifier types
+  (``oid``, ``regclass`` and the other ``reg*`` types) are refused, and a
+  name that is not a built-in type must name a table on the allowlist, which
+  is then qualified with the schema like a table reference;
 * every table reference is resolved the way PostgreSQL resolves it: a name is
   a CTE only where that CTE is in scope, quoted identifiers keep their case,
   and every other unqualified name is rewritten to ``schema.table`` so it can
@@ -116,7 +123,40 @@ _DENIED_FUNCTIONS: frozenset[str] = frozenset(
     "table_to_xml table_to_xml_and_xmlschema table_to_xmlschema "
     "schema_to_xml schema_to_xml_and_xmlschema schema_to_xmlschema "
     "database_to_xml database_to_xml_and_xmlschema database_to_xmlschema "
-    "cursor_to_xml cursor_to_xmlschema ts_stat ts_rewrite crosstab".split()
+    "cursor_to_xml cursor_to_xmlschema ts_stat ts_rewrite crosstab "
+    # session and server details
+    "version current_version current_database current_catalog current_schema "
+    "current_schemas current_user current_role session_user system_user user "
+    "inet_server_addr inet_server_port inet_client_addr inet_client_port".split()
+)
+
+# Session and server details that sqlglot models as their own node. Refused by
+# class too, so a renamed node cannot let one through.
+_SERVER_INFO_NODES: tuple[type, ...] = tuple(
+    getattr(exp, name)
+    for name in (
+        "CurrentVersion",
+        "CurrentDatabase",
+        "CurrentCatalog",
+        "CurrentSchema",
+        "CurrentSchemas",
+        "CurrentUser",
+        "CurrentRole",
+        "SessionUser",
+    )
+    if hasattr(exp, name)
+)
+
+# Reserved words PostgreSQL reads as session details when they stand alone,
+# where sqlglot reads them as column names. A quoted "user" is a column.
+_SERVER_INFO_KEYWORDS: frozenset[str] = frozenset(
+    "user current_user session_user current_role current_catalog current_schema system_user".split()
+)
+
+# Built-in PostgreSQL types that sqlglot reads as user-defined type names.
+_BUILTIN_TYPE_NAMES: frozenset[str] = frozenset(
+    "tsvector tsquery char bpchar macaddr macaddr8 cidr varbit jsonpath "
+    "line lseg box path polygon circle".split()
 )
 
 
@@ -136,8 +176,10 @@ def _check_functions(statement: exp.Expression) -> None:
         else:
             names = {name.lower() for name in type(func).sql_names()}
             allowed = True
-        if not allowed or any(
-            n in _DENIED_FUNCTIONS or n.startswith(_DENIED_FUNCTION_PREFIXES) for n in names
+        if (
+            not allowed
+            or isinstance(func, _SERVER_INFO_NODES)
+            or any(n in _DENIED_FUNCTIONS or n.startswith(_DENIED_FUNCTION_PREFIXES) for n in names)
         ):
             raise UnsafeSQLError(
                 f"Function '{sorted(names)[0]}' is not allowed. Use standard SQL functions "
@@ -151,6 +193,61 @@ def _check_functions(statement: exp.Expression) -> None:
             raise UnsafeSQLError(
                 f"Schema-qualified function calls are not allowed ('{sorted(names)[0]}')."
             )
+
+
+def _check_server_info_keywords(statement: exp.Expression) -> None:
+    """Reject a bare ``user`` / ``current_role`` / ... that sqlglot reads as a column."""
+    for column in statement.find_all(exp.Column):
+        identifier = column.this
+        if (
+            not column.args.get("table")
+            and isinstance(identifier, exp.Identifier)
+            and not identifier.args.get("quoted")
+            and identifier.name.lower() in _SERVER_INFO_KEYWORDS
+        ):
+            raise UnsafeSQLError(
+                f"'{identifier.name}' is not allowed: session and server details cannot "
+                'be read. Quote the name ("user") if it is a column.'
+            )
+
+
+def _check_types(statement: exp.Expression, schema_key: str, allowed: set[str] | None) -> None:
+    """Check every type a query names: in casts, ``::``, ``TRY_CAST`` and column lists.
+
+    Object identifier types (``oid``, ``regclass`` and the other ``reg*`` types)
+    are refused. A name sqlglot does not know as a built-in type is a table's
+    row type or a type of the database, so it must name a table on the
+    allowlist (or, with no allowlist, sit in the schema); it is then qualified
+    with the schema, as a table reference is.
+    """
+    for dtype in statement.find_all(exp.DataType):
+        rendered = dtype.sql(dialect="postgres")
+        if isinstance(dtype, exp.ObjectIdentifier) or str(dtype.this).upper().startswith("REG"):
+            raise UnsafeSQLError(
+                f"Type '{rendered}' is not allowed: type casts are checked against the "
+                "table list, and object identifier types (oid, reg*) are not allowed."
+            )
+        if dtype.this != exp.DataType.Type.USERDEFINED:
+            continue
+        kind = dtype.args.get("kind")
+        schema = None
+        if isinstance(kind, exp.Dot):
+            schema, kind = kind.this, kind.expression
+        if not isinstance(kind, exp.Identifier) or (
+            schema is not None and not isinstance(schema, exp.Identifier)
+        ):
+            raise UnsafeSQLError(f"Type '{rendered}' is not allowed.")
+        name = _fold(kind)
+        if schema is None and name in _BUILTIN_TYPE_NAMES:
+            continue
+        if schema is not None and _fold(schema) != schema_key:
+            raise UnsafeSQLError(f"Cross-schema type reference is not allowed: '{rendered}'.")
+        if allowed is not None and name not in allowed:
+            raise UnsafeSQLError(
+                f"Type '{rendered}' is not allowed: type casts are checked against the "
+                "table list. Use a built-in type such as text, numeric, date or jsonb."
+            )
+        dtype.set("kind", exp.Dot(this=exp.to_identifier(schema_key, quoted=True), expression=kind))
 
 
 def _walk_tables(
@@ -212,7 +309,8 @@ def validate_read_only(
     Returns:
         The re-rendered SQL -- exactly what should be executed. It is
         normalized and semicolon-free, and every table reference that is not a
-        CTE is qualified with ``schema_name``. It is rendered from the checked
+        CTE, and every table row type a cast names, is qualified with
+        ``schema_name``. It is rendered from the checked
         syntax tree rather than passed through as written, so nothing sqlglot
         did not parse can reach the database. A query that sqlglot cannot
         render without losing part of it is refused instead.
@@ -221,6 +319,8 @@ def validate_read_only(
         UnsafeSQLError: If the statement is not exactly one
             ``SELECT`` / ``WITH ... SELECT`` query, contains a write/DDL/command
             node or a row lock, calls a function outside the allowlist,
+            reads session or server details, casts to an object identifier type or
+            to a type that is neither built in nor a table on the allowlist,
             references another schema or database, or touches a table outside
             the allowlist.
     """
@@ -252,9 +352,11 @@ def validate_read_only(
         raise UnsafeSQLError("Row locks (FOR UPDATE / FOR SHARE) are not allowed.")
 
     _check_functions(statement)
+    _check_server_info_keywords(statement)
 
     schema_key = schema_name.lower()
     allowed = set(allowlist) if allowlist is not None else None
+    _check_types(statement, schema_key, allowed)
 
     def check_table(table: exp.Table, visible_ctes: frozenset[str]) -> None:
         if table.args.get("catalog"):

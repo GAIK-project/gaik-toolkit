@@ -1259,8 +1259,8 @@
       {
         "name": "table_allowlist",
         "type": "list[str]",
-        "default": null,
-        "effect": "Required: the tables and views the agent may read, as PostgreSQL stores their names (case-sensitive). Only these reach the LLM's schema, and a query that touches any other table, view or system catalog (information_schema, pg_catalog), also through a CTE, subquery, join or UNION, is refused before it runs. Since the release after gaik 0.11.0, constructing the agent without it raises TypeError and an empty list raises ValueError; earlier releases read every table in schema_name.",
+        "required": true,
+        "effect": "Required: the tables and views the agent may read, as PostgreSQL stores their names (case-sensitive). Only these reach the LLM's schema, and a query that touches any other table, view or system catalog (information_schema, pg_catalog), also through a CTE, subquery, join or UNION, is refused before it runs. Type casts are checked against the list too: a cast to an oid or reg* type, or to a type that is neither built in nor a listed table, is refused, as are session and server details such as version() and current_user. A listed table's rows include those of its partitions and of tables created with INHERITS from it, so list a parent only if its child tables may be read. Since the release after gaik 0.11.0, constructing the agent without it raises TypeError and an empty list raises ValueError; earlier releases read every table in schema_name.",
         "selection_relevant": true,
         "infer_from": "the tables the use case's questions need (data sources / security_constraints); ask the user to name them -- never leave it out or list every table"
       },

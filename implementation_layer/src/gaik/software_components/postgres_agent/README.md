@@ -18,10 +18,18 @@ connector:
 - **Only the tables you name.** `table_allowlist` is required: the agent sees
   and reads only those tables and views. A query that touches any other
   table, view or system catalog (`information_schema`, `pg_catalog`), also
-  inside a CTE, subquery, join or `UNION`, is refused before it runs.
+  inside a CTE, subquery, join or `UNION`, is refused before it runs. Type
+  casts are checked against the table list too: a cast to an object
+  identifier type (`oid`, `regclass`, `regtype` and the other `reg*` types)
+  or to a type that is neither built in nor a listed table is refused.
+  Session and server details (`version()`, `current_database()`,
+  `current_user`, `session_user`) are refused as well.
   Constructing the agent without the list raises `TypeError`, and an empty
   list raises `ValueError`; up to gaik 0.11.0 the agent read every table in
   `schema_name` when the list was left out.
+- **Child tables read through their parent.** A listed table's rows include
+  those of its partitions and of tables created with `INHERITS` from it, as
+  in PostgreSQL. List a parent only if its child tables may be read too.
 - **One schema.** The agent operates on a single schema (`schema_name`).
   Cross-schema and cross-database references are rejected, and unqualified
   table names are read from that schema only.
@@ -71,7 +79,12 @@ The agent executes LLM-generated SQL. Three layers limit what it can do:
      that run SQL text, change settings, read files or sequences, or sleep are
      not on it, and neither are your own functions or extension functions.
      Schema-qualified function calls are rejected;
-   - tables are in `schema_name` and on `table_allowlist`.
+   - tables are in `schema_name` and on `table_allowlist`;
+   - type casts are checked against the table list: object identifier types
+     (`oid` and the `reg*` types) are refused, and a type that is not built
+     in must name a listed table, which is then qualified with the schema;
+   - session and server details (`version()`, `current_database()`,
+     `current_user` and the like) are refused;
      Unqualified table names are rewritten to `schema.table`, so a name cannot
      resolve to a system catalog or another schema on the search path. The
      SQL that runs is this rewritten form; `QueryResult.sql` keeps the query
