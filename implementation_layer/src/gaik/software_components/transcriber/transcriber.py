@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import math
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -15,12 +17,17 @@ from pathlib import Path
 
 from openai import AzureOpenAI
 from pydub import AudioSegment
+from pydub.audio_segment import fix_wav_headers
 
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
-from gaik.software_components.input_limits import InputLimits, check_not_media_list
+from gaik.software_components.input_limits import (
+    InputLimits,
+    check_not_media_list,
+    media_input_args,
+)
 from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
@@ -46,19 +53,47 @@ REMOTE_MAX_DURATION_SECONDS = 1400
 DEFAULT_MAX_DURATION_SECONDS = 1200
 
 
-def _decode_audio(path: str | Path) -> AudioSegment:
-    """Decode the local file at ``path`` with pydub.
+# Decoding a long recording to WAV takes a while; this only stops one that hangs.
+DECODE_TIMEOUT_SECONDS = 30 * 60
 
-    pydub gets the open file, not its name: ffmpeg and ffprobe then read the
-    file's bytes from a pipe, so a name such as ``http:...`` or ``concat:...``
-    is never read as a protocol or as a list of other files. The format is
-    judged from the content, as before.
+
+def _decode_audio(path: str | Path) -> AudioSegment:
+    """Decode the local file at ``path`` into a pydub segment.
+
+    ffmpeg runs here, not inside pydub, with the arguments every other media call
+    uses (:func:`~gaik.software_components.input_limits.media_input_args`): the path
+    is absolute, so a name such as ``http:...`` or ``concat:...`` is a file, and only
+    the ``file`` protocol is allowed, so nothing the file's content names (a stream
+    address, another file in a manifest) is opened over the network. pydub then reads
+    the WAV ffmpeg wrote with its own Python code, without starting ffmpeg again.
 
     Raises:
         OSError: If ``path`` is not a file that can be opened.
+        subprocess.CalledProcessError: If ffmpeg cannot decode the file.
     """
-    with open(path, "rb") as handle:
-        return AudioSegment.from_file(handle)
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"No such file: {path.name}")
+    decoded = subprocess.run(
+        [
+            AudioSegment.converter,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            *media_input_args(path),
+            "-vn",
+            "-f",
+            "wav",
+            "-",
+        ],
+        capture_output=True,
+        check=True,
+        timeout=DECODE_TIMEOUT_SECONDS,
+    ).stdout
+    wav = bytearray(decoded)
+    fix_wav_headers(wav)  # a WAV written to a pipe carries no final sizes
+    return AudioSegment.from_file(io.BytesIO(bytes(wav)), format="wav")
 
 
 def _audio_provider(api_config: dict) -> str:

@@ -1,4 +1,4 @@
-"""pydub decodes the given local file from its bytes, never from its name.
+"""The given local file is decoded by gaik's own ffmpeg call, which opens only that file.
 
 The real pydub code runs; only the ffmpeg and ffprobe processes it starts are
 replaced, so each test sees the exact command lines and stdin pydub would use.
@@ -8,6 +8,7 @@ The provider is an ``httpx.MockTransport``, so no request leaves the test.
 from __future__ import annotations
 
 import io
+import shutil
 import subprocess
 import wave
 from pathlib import Path
@@ -73,8 +74,16 @@ class _MediaTools:
 
         return _Process()
 
+    def media(self) -> list[tuple[list[str], bytes | None]]:
+        """The ffmpeg and ffprobe calls only (other processes, e.g. uname, are left out)."""
+        return [
+            (args, data)
+            for args, data in self.calls
+            if Path(args[0]).name.startswith(("ffmpeg", "ffprobe", "avconv", "avprobe"))
+        ]
+
     def decodes(self) -> list[tuple[list[str], bytes | None]]:
-        return [(args, data) for args, data in self.calls if args[-1] == "-"]
+        return [(args, data) for args, data in self.media() if args[-1] == "-"]
 
 
 @pytest.fixture
@@ -113,12 +122,22 @@ def _recording() -> Path:
 
 
 def _assert_only_the_file_bytes_reach_the_media_tools(tools: _MediaTools) -> None:
-    assert tools.calls, "pydub started no media tool"
-    for args, _data in tools.calls:
-        assert not any(RECORDING_NAME in arg for arg in args), args
-    assert tools.decodes(), "pydub decoded nothing"
-    for _args, data in tools.decodes():
-        assert data == b"synthetic recording bytes"
+    """Every decode of the recording opens its absolute path under the file protocol.
+
+    The other media calls are pydub's exports of the chunks, which read a WAV pydub
+    wrote itself; they never name the recording.
+    """
+    absolute = str(Path(RECORDING_NAME).absolute())
+    assert tools.decodes(), "nothing was decoded"
+    for args, data in tools.decodes():
+        assert args[args.index("-protocol_whitelist") + 1] == "file", args
+        assert args[args.index("-i") + 1] == absolute, args
+        assert data is None  # no pipe input: the whitelist applies to the file
+        assert not any(a.startswith(("pipe:", "cache:")) for a in args), args
+    for args, _data in tools.media():
+        assert not any(a == RECORDING_NAME for a in args), args  # never the bare name
+        if args not in [d for d, _ in tools.decodes()]:
+            assert absolute not in args, args  # exports read pydub's own files
 
 
 def test_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(media_tools, provider):
@@ -206,3 +225,22 @@ def test_transcribe_refuses_a_name_that_is_not_a_local_file(media_tools, provide
 
     assert media_tools.calls == []
     assert requests == []
+
+
+FFMPEG = shutil.which("ffmpeg")
+
+
+@pytest.mark.skipif(FFMPEG is None, reason="needs ffmpeg on PATH")
+def test_real_ffmpeg_decodes_a_wav_and_opens_no_stream_a_file_names(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    Path("speech.wav").write_bytes(_wav_bytes(2))
+    assert len(module._decode_audio("speech.wav")) == 2000
+
+    # A session description names network streams; under the file-only whitelist
+    # ffmpeg refuses to open them instead of connecting.
+    Path("call.mp3").write_text(
+        "v=0\no=- 0 0 IN IP4 127.0.0.1\ns=x\nc=IN IP4 127.0.0.1\nt=0 0\nm=audio 9 RTP/AVP 0\n"
+    )
+    with pytest.raises(subprocess.CalledProcessError) as refused:
+        module._decode_audio("call.mp3")
+    assert b"whitelist" in refused.value.stderr or b"not on whitelist" in refused.value.stderr

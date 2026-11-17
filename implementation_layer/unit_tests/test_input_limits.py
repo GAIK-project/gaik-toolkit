@@ -184,6 +184,10 @@ _LISTS = {
     "hls": b"#EXTM3U\n#EXTINF:2,\nother.mp3\n",
     "ffconcat": b"\xef\xbb\xbfffconcat version 1.0\nfile 'other.mp3'\n",
     "dash": b'<?xml version="1.0"?>\n<MPD xmlns="urn:mpeg:dash:schema:mpd:2011">',
+    "dash-lowercase": b'<?xml version="1.0"?>\n<mpd xmlns="urn:mpeg:dash:schema:mpd:2011">',
+    "dash-after-2kib": b'<?xml version="1.0"?>\n<!--' + b"x" * 2048 + b"-->\n<MPD>",
+    "imf": b'<?xml version="1.0"?>\n<CompositionPlaylist xmlns="http://www.smpte-ra.org">',
+    "sdp": b"v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=x\r\nm=audio 9 RTP/AVP 0\r\n",
 }
 
 
@@ -664,7 +668,7 @@ def test_transcriber_uses_the_decoded_length_when_the_probe_cannot_read_it(tmp_p
 
     with (
         patch(
-            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            "gaik.software_components.transcriber.transcriber._decode_audio",
             return_value=_FakeAudio(seconds=90),
         ),
         patch.object(transcriber, "_transcribe_input_remote") as remote,
@@ -684,7 +688,7 @@ def test_transcriber_checks_the_decoded_length_even_when_the_probe_reads_less(
 
     with (
         patch(
-            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            "gaik.software_components.transcriber.transcriber._decode_audio",
             return_value=_FakeAudio(seconds=90),
         ),
         patch.object(transcriber, "_transcribe_input_remote") as remote,

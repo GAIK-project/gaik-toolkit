@@ -92,7 +92,12 @@ PROBE_TIMEOUT_SECONDS = 60
 # written in it: an HLS playlist and an ffconcat list. A DASH manifest is XML
 # with an <MPD> element.
 _MEDIA_LIST_STARTS = (b"#EXTM3U", b"ffconcat version")
-_MEDIA_LIST_HEAD_BYTES = 1024
+# XML manifests ffmpeg follows (DASH, IMF), matched in any case within the first
+# 64 KiB, more than ffmpeg's own probe reads before it decides; and an SDP session
+# description, which names network streams.
+_MEDIA_LIST_HEAD_BYTES = 64 * 1024
+_MEDIA_LIST_XML = (b"<mpd", b"<compositionplaylist", b"<assetmap")
+_SDP = re.compile(rb"\Av=0\r?\n(?:.*\r?\n)*?m=", re.IGNORECASE)
 
 
 def media_input_args(path: str | Path) -> list[str]:
@@ -114,8 +119,8 @@ def check_not_media_list(path: str | Path) -> None:
     ffmpeg version.
 
     Raises:
-        ValueError: If the file starts like an HLS playlist, an ffconcat list
-            or a DASH manifest.
+        ValueError: If the file starts like an HLS playlist, an ffconcat list,
+            a DASH or IMF manifest or an SDP session description.
     """
     path = Path(path)
     try:
@@ -124,7 +129,12 @@ def check_not_media_list(path: str | Path) -> None:
     except OSError:
         return  # the caller reports a file it cannot read
     head = head.removeprefix(b"\xef\xbb\xbf").lstrip()
-    is_list = head.startswith(_MEDIA_LIST_STARTS) or (head.startswith(b"<") and b"<MPD" in head)
+    lowered = head.lower()
+    is_list = (
+        head.startswith(_MEDIA_LIST_STARTS)
+        or (head.startswith(b"<") and any(tag in lowered for tag in _MEDIA_LIST_XML))
+        or _SDP.match(head) is not None
+    )
     if is_list:
         raise ValueError(
             f"{path.name} is a playlist or file list, not a recording; give the "
