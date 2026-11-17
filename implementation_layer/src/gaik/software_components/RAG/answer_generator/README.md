@@ -97,22 +97,33 @@ model is asked to cite by those references only. The citations are then built in
 code from the chunks:
 
 - each reference in the answer becomes `[document_name, page X]`, taken from that
-  chunk's metadata;
+  chunk's metadata; references next to each other that name one page show it once;
 - a `[name, page X]` the model writes itself is kept only when a retrieved chunk has
-  that document and page;
-- a reference that is not one of the retrieved chunks, or a document and page that no
-  retrieved chunk has, is removed from the answer.
+  that document and page, and removed otherwise.
 
 `generate()` returns the answer with its citations built this way.
 `generate_with_citations()` also returns `citations`, a list of `Citation`
 (`reference`, `document_name`, `page_number` and the retrieved `document`) in the
-order the answer first cites them, and `dropped_citations`, the citations it
-removed, as the model wrote them. When the answer streams, both lists are filled in
-once the stream has been read to the end. A string context has no chunks, so every
-citation in its answer is removed. Only a bracketed list of numbers (`[1]`,
-`[1, 3]`) and a bracketed document with a page are read as citations; other
-bracketed text, such as a Markdown link, is left as written. With
-`citations=False` the answer is returned as the model wrote it.
+order the answer first cites them, and `dropped_citations`, the `[name, page X]`
+citations it removed, as the model wrote them. When the answer streams, both lists
+are filled in once the stream has been read to the end.
+
+`citations` only ever holds retrieved chunks, but not every source the model writes
+is caught. Only two bracket forms are read:
+
+- a list of numbers (`[1]`, `[1, 3]`) whose numbers are all retrieved chunks'
+  references. A list with any other number (`[0]`, `[2019]`, or `[7]` with four
+  chunks) is left as written and is not a citation, so a number the model invents
+  stays in the text;
+- a document with a page (`[report.pdf, page 3]`).
+
+Text in other forms, such as `[fake.pdf]` or `(report.pdf, page 3)`, is left as
+written and is not listed anywhere. A bracket is never read inside a fenced code
+block or an inline code span, directly after a name, a digit, `)` or `]` (`arr[0]`,
+`matrix[1][2]`), or after `=` (`nums = [1, 2]`); a Markdown link stays as it is too.
+A string context has no chunks, so its answer has no citations and every
+`[name, page X]` in it is removed. With `citations=False` the answer is returned as
+the model wrote it.
 
 ### Retrieved text as data
 

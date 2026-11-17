@@ -47,9 +47,9 @@ class RAGWorkflowResult:
     """The answer and the retrieved chunks.
 
     With ``citations=True``, ``citations`` lists the retrieved chunks the answer cites
-    and ``dropped_citations`` the citations it wrote that are not one of them (removed
-    from the answer). When the answer streams, both are filled in once it has been
-    read to the end.
+    and ``dropped_citations`` the ``[name, page X]`` citations it wrote that match
+    none of them (removed from the answer). When the answer streams, both are filled
+    in once it has been read to the end.
     """
 
     answer: str | Iterable[str]

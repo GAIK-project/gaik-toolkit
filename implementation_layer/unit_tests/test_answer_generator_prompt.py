@@ -110,7 +110,7 @@ def test_custom_prompt_replaces_repeated_placeholders() -> None:
     assert prompt == "Question / Question\nEvidence / Evidence"
 
 
-def test_default_prompt_templates_are_unchanged() -> None:
+def test_default_prompt_templates_match_the_pinned_text() -> None:
     instructions = (
         "You are a helpful assistant that answers questions using only the provided context.\n"
         "If the context does not contain the answer, say you do not have enough information.\n"

@@ -74,8 +74,17 @@ NO_RESULTS_MESSAGE = (
     "documents have been indexed."
 )
 
-# Custom RAG prompt - friendly and flexible
-CUSTOM_RAG_PROMPT = """You are a friendly document assistant 📚
+# Custom RAG prompt - friendly and flexible. Its citation guideline depends on the
+# installed gaik: one that numbers the retrieved chunks (``generate_with_citations``)
+# is asked for [1]; an older one, such as the 0.11.0 the API image installs, for
+# [document_name, page X].
+_NUMBERED_CITATIONS = (
+    "- Cite each fact with the reference number its context block starts with, such as [1]\n"
+    "  or [2][3]. Only when a block starts with no number, cite [document_name, page X]"
+)
+_NAMED_CITATIONS = "- Include citations [document_name, page X] when answering questions"
+
+_RAG_PROMPT_TEMPLATE = """You are a friendly document assistant 📚
 
 Your job is to help users find information from the indexed documents.
 
@@ -87,8 +96,7 @@ Guidelines:
   they'd like to know. 
 - Do not summarize or list document contents unless the user asks.
 - Only share specific information when the user asks for it
-- Cite each fact with the reference number its context block starts with, such as [1]
-  or [2][3]. Only when a block starts with no number, cite [document_name, page X]
+{citation_guideline}
 - If you can't find an answer, say so briefly and suggest they rephrase
 
 Answer style:
@@ -103,6 +111,24 @@ Context:
 {context}
 
 Question: {query}"""
+
+
+def rag_prompt(answer_generator_class: type) -> str:
+    """The demo prompt with the citation guideline the installed gaik supports."""
+    numbered = hasattr(answer_generator_class, "generate_with_citations")
+    guideline = _NUMBERED_CITATIONS if numbered else _NAMED_CITATIONS
+    return _RAG_PROMPT_TEMPLATE.replace("{citation_guideline}", guideline)
+
+
+def _installed_rag_prompt() -> str:
+    try:
+        from gaik.software_components.RAG.answer_generator import AnswerGenerator
+    except ImportError:
+        return rag_prompt(object)
+    return rag_prompt(AnswerGenerator)
+
+
+CUSTOM_RAG_PROMPT = _installed_rag_prompt()
 
 # Example document configuration
 # In Docker: /app/routers/rag.py -> parent.parent = /app/
@@ -191,7 +217,12 @@ def _cited_sources(citations: list, sources: list[dict[str, Any]]) -> list[dict[
     """
     if not citations:
         return sources
-    return [_source(citation.document.metadata or {}) for citation in citations]
+    cited: list[dict[str, Any]] = []
+    for citation in citations:
+        source = _source(citation.document.metadata or {})
+        if source not in cited:
+            cited.append(source)
+    return cited
 
 
 async def _get_collection_lock(collection_id: str) -> asyncio.Lock:
@@ -385,7 +416,7 @@ class DemoRagWorkflow:
             config=config,
             citations=True,
             stream=True,
-            prompt=CUSTOM_RAG_PROMPT,
+            prompt=rag_prompt(AnswerGenerator),
             conversation_history=True,
             last_n=3,
         )

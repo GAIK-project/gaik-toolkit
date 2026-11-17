@@ -67,14 +67,14 @@ def test_a_reference_becomes_the_document_and_page_of_its_chunk(monkeypatch):
     assert result.dropped_citations == []
 
 
-def test_a_reference_outside_the_retrieved_chunks_never_reaches_the_citations(monkeypatch):
+def test_a_number_outside_the_retrieved_chunks_is_left_as_written_and_not_cited(monkeypatch):
     generator = _generator(monkeypatch, "It runs for 36 hours [1]. Fuel is diesel [7].")
 
     result = generator.generate_with_citations(QUESTION, CHUNKS)
 
-    assert result.answer == "It runs for 36 hours [depot_manual.pdf, page 7]. Fuel is diesel."
+    assert result.answer == "It runs for 36 hours [depot_manual.pdf, page 7]. Fuel is diesel [7]."
     assert _cited(result.citations) == [(1, "depot_manual.pdf", 7)]
-    assert result.dropped_citations == ["[7]"]
+    assert result.dropped_citations == []
 
 
 def test_a_page_the_retrieval_did_not_return_never_reaches_the_citations(monkeypatch):
@@ -105,14 +105,24 @@ def test_a_document_and_page_written_by_the_model_is_kept_when_a_chunk_has_them(
     assert _cited(result.citations) == [(2, "visitor_rules.pdf", 2)]
 
 
-def test_a_list_of_references_keeps_the_retrieved_ones_and_drops_the_rest(monkeypatch):
-    generator = _generator(monkeypatch, "Both apply [2, 1, 5].")
+def test_a_list_of_references_becomes_the_labels_of_its_chunks(monkeypatch):
+    generator = _generator(monkeypatch, "Both apply [2, 1].")
 
     result = generator.generate_with_citations(QUESTION, CHUNKS)
 
     assert result.answer == ("Both apply [visitor_rules.pdf, page 2] [depot_manual.pdf, page 7].")
     assert [c.reference for c in result.citations] == [2, 1]
-    assert result.dropped_citations == ["[5]"]
+    assert result.dropped_citations == []
+
+
+def test_a_list_with_a_number_outside_the_chunks_is_left_as_written(monkeypatch):
+    generator = _generator(monkeypatch, "Both apply [2, 1, 5].")
+
+    result = generator.generate_with_citations(QUESTION, CHUNKS)
+
+    assert result.answer == "Both apply [2, 1, 5]."
+    assert result.citations == []
+    assert result.dropped_citations == []
 
 
 def test_other_bracketed_text_is_left_as_written(monkeypatch):
@@ -127,20 +137,22 @@ def test_other_bracketed_text_is_left_as_written(monkeypatch):
 
 
 def test_a_streamed_answer_resolves_references_split_across_deltas(monkeypatch):
-    deltas = ["It runs for 36 hours ", "[", "1", "] and uses diesel ", "[", "4]", "."]
+    deltas = ["It runs for 36 hours ", "[", "1", "] and uses diesel ", "[", "2]", "."]
     generator = _generator(monkeypatch, deltas)
 
     result = generator.generate_with_citations(QUESTION, CHUNKS, stream=True)
     shown = list(result.answer)
 
-    assert "".join(shown) == ("It runs for 36 hours [depot_manual.pdf, page 7] and uses diesel.")
-    assert all("[4" not in delta for delta in shown)
-    assert _cited(result.citations) == [(1, "depot_manual.pdf", 7)]
-    assert result.dropped_citations == ["[4]"]
+    assert "".join(shown) == (
+        "It runs for 36 hours [depot_manual.pdf, page 7]"
+        " and uses diesel [visitor_rules.pdf, page 2]."
+    )
+    assert all("[1" not in delta and "[2" not in delta for delta in shown)
+    assert _cited(result.citations) == [(1, "depot_manual.pdf", 7), (2, "visitor_rules.pdf", 2)]
 
 
 def test_generate_returns_the_answer_with_the_built_citations(monkeypatch):
-    generator = _generator(monkeypatch, ["Sign in [2", "][9]."])
+    generator = _generator(monkeypatch, ["Sign in [2", "][fake.pdf, page 9]."])
 
     assert generator.generate(QUESTION, CHUNKS) == "Sign in [visitor_rules.pdf, page 2]."
     assert "".join(generator.generate(QUESTION, CHUNKS, stream=True)) == (
@@ -153,9 +165,9 @@ def test_a_string_context_has_no_chunks_to_cite(monkeypatch):
 
     result = generator.generate_with_citations(QUESTION, "Invoice total is 1 500 EUR.")
 
-    assert result.answer == "Total is 1 500 EUR."
+    assert result.answer == "Total is 1 500 EUR [1]."
     assert result.citations == []
-    assert result.dropped_citations == ["[1]", "[invoice.pdf, page 1]"]
+    assert result.dropped_citations == ["[invoice.pdf, page 1]"]
 
 
 def test_without_citations_the_answer_is_returned_as_written(monkeypatch):
@@ -169,7 +181,9 @@ def test_without_citations_the_answer_is_returned_as_written(monkeypatch):
 
 
 def test_the_history_keeps_the_answer_with_the_built_citations(monkeypatch):
-    generator = _generator(monkeypatch, "It runs for 36 hours [1][3].", conversation_history=True)
+    generator = _generator(
+        monkeypatch, "It runs for 36 hours [1][fake.pdf, page 3].", conversation_history=True
+    )
 
     generator.generate(QUESTION, CHUNKS)
 
@@ -189,3 +203,101 @@ def test_rag_workflow_returns_the_citations_of_the_retrieved_chunks(monkeypatch)
     assert result.documents is CHUNKS
     assert _cited(result.citations) == [(1, "depot_manual.pdf", 7)]
     assert result.dropped_citations == ["[depot_manual.pdf, page 8]"]
+
+
+# Brackets that are code, data or an index stay as written. Each case is checked
+# whole and streamed in every two-delta split, which must show the same text.
+LEFT_AS_WRITTEN = [
+    "Read `arr[0]` first.",
+    "Then arr[0] holds it.",
+    "Use x[2] here.",
+    "The cell matrix[1][2] is set.",
+    "Set nums = [1, 2] there.",
+    "```python\nnums = [1, 2]\nprint(x [1])\n```\n",
+    "~~~\n[2] stays\n~~~\n",
+    "Call `` f([1]) `` once.",
+    "It started in [2019] and has [12] sites.",
+    "No reference [0] here.",
+    "Sources [fake.pdf] and (depot_manual.pdf, page 9) stay.",
+]
+
+
+def _splits(text: str):
+    for cut in range(1, len(text)):
+        yield [text[:cut], text[cut:]]
+
+
+@pytest.mark.parametrize("reply", LEFT_AS_WRITTEN)
+def test_code_data_and_indexes_are_left_as_written(monkeypatch, reply):
+    generator = _generator(monkeypatch, reply)
+
+    result = generator.generate_with_citations(QUESTION, CHUNKS)
+
+    assert result.answer == reply
+    assert result.citations == []
+    assert result.dropped_citations == []
+
+
+MIXED = (
+    "Intro [1].\n"
+    "```\n"
+    "rows = data[2]\n"
+    "print([1, 2])\n"
+    "```\n"
+    "Then `x[1]` and y[2], but the visitors sign in [2]."
+)
+MIXED_RESOLVED = (
+    "Intro [depot_manual.pdf, page 7].\n"
+    "```\n"
+    "rows = data[2]\n"
+    "print([1, 2])\n"
+    "```\n"
+    "Then `x[1]` and y[2], but the visitors sign in [visitor_rules.pdf, page 2]."
+)
+
+
+@pytest.mark.parametrize("reply", [*LEFT_AS_WRITTEN, MIXED])
+def test_a_streamed_answer_shows_what_the_whole_answer_shows(monkeypatch, reply):
+    whole = _generator(monkeypatch, reply).generate_with_citations(QUESTION, CHUNKS)
+
+    for deltas in [*_splits(reply), list(reply)]:
+        streamed = _generator(monkeypatch, deltas).generate_with_citations(
+            QUESTION, CHUNKS, stream=True
+        )
+        assert "".join(streamed.answer) == whole.answer, deltas
+        assert _cited(streamed.citations) == _cited(whole.citations)
+
+
+def test_references_outside_code_resolve_and_code_stays(monkeypatch):
+    result = _generator(monkeypatch, MIXED).generate_with_citations(QUESTION, CHUNKS)
+
+    assert result.answer == MIXED_RESOLVED
+    assert [c.reference for c in result.citations] == [1, 2]
+
+
+def test_references_next_to_each_other_on_one_page_show_the_page_once(monkeypatch):
+    chunks = [
+        Document(
+            page_content="a", metadata={"document_name": "depot_manual.pdf", "page_number": 7}
+        ),
+        Document(
+            page_content="b", metadata={"document_name": "depot_manual.pdf", "page_number": 7}
+        ),
+    ]
+    generator = _generator(monkeypatch, "It runs for 36 hours [1][2]. And [1] [2].")
+
+    result = generator.generate_with_citations(QUESTION, chunks)
+
+    assert result.answer == (
+        "It runs for 36 hours [depot_manual.pdf, page 7]. And [depot_manual.pdf, page 7]."
+    )
+    assert [c.reference for c in result.citations] == [1, 2]
+
+
+def test_a_citation_removed_at_a_line_start_leaves_no_space(monkeypatch):
+    generator = _generator(monkeypatch, "Intro.\n[fake.pdf, page 9] Refill weekly.")
+
+    result = generator.generate_with_citations(QUESTION, CHUNKS)
+
+    assert result.answer == "Intro.\nRefill weekly."
+    assert result.dropped_citations == ["[fake.pdf, page 9]"]

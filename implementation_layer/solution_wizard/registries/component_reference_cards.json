@@ -1026,7 +1026,7 @@
         "name": "citations",
         "type": "bool",
         "default": false,
-        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and the answer shows [document_name, page X] from that chunk's metadata. A reference or page that is not one of the retrieved chunks is removed. generate_with_citations() also returns them as a list (CitedAnswer.citations).",
+        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and each numbered reference becomes [document_name, page X] from that chunk's metadata. The citations list (generate_with_citations() -> CitedAnswer.citations) holds only retrieved chunks; a [name, page X] no chunk has is removed. A number that is not a chunk's reference, code, and sources in other forms are left as written.",
         "selection_relevant": true,
         "infer_from": "traceability / citation requirement"
       },
@@ -1642,7 +1642,7 @@
         "name": "citations",
         "type": "bool",
         "default": true,
-        "effect": "Include source citations in the answer, built from the retrieved chunks (RAGWorkflowResult.citations); a reference or page the retrieval did not return is removed. ON by default -- unlike the standalone AnswerGenerator, where citations defaults to false.",
+        "effect": "Include source citations in the answer, numbered references resolved to the retrieved chunks; RAGWorkflowResult.citations holds only retrieved chunks, and a [name, page X] the retrieval did not return is removed. Sources written in other forms are left as written. ON by default -- unlike the standalone AnswerGenerator, where citations defaults to false.",
         "selection_relevant": true,
         "infer_from": "leave true unless the requirements explicitly say citations are undesired in the output"
       },

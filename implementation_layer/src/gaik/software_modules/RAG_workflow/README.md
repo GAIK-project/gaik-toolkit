@@ -44,8 +44,9 @@ print(result.answer)
 - **Text Parsing** - `parser="text"` reads the text layer without Docling or a vision model
 - **Persistent Vector Store** - Chroma-backed storage
 - **Re-ranked Retrieval** - Optional cross-encoder reranking
-- **Citations** - Optional; built from the retrieved chunks, so a citation names only a
-  document and page the retrieval returned (`RAGWorkflowResult.citations`; see the
+- **Citations** - Optional; numbered references are resolved to the retrieved chunks,
+  and `RAGWorkflowResult.citations` holds only retrieved chunks. A source written in
+  another form is left as written (see the
   [Answer Generator README](../../software_components/RAG/answer_generator/README.md#citations))
 - **Conversation History** - Last-n Q/A memory
 - **Retrieved Text as Data** - Each chunk reaches the answer model in its own

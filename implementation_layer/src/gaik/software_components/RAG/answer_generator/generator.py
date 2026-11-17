@@ -140,11 +140,14 @@ class AnswerGenerator:
         With ``citations=True`` each retrieved chunk gets a reference, ``[1]`` for
         the first, and the model cites by those references. Each reference in the
         answer becomes ``[document_name, page X]`` from that chunk's metadata, and
-        ``citations`` lists the cited chunks. A reference that is not one of the
-        retrieved chunks, or a document and page that no retrieved chunk has, is
-        removed from the answer and listed in ``dropped_citations``. A string context
-        has no chunks, so every citation in its answer is removed. With
-        ``citations=False`` the answer is returned as the model wrote it.
+        ``citations`` lists the cited chunks; ``citations`` only ever holds retrieved
+        chunks. A ``[name, page X]`` that no retrieved chunk has is removed from the
+        answer and listed in ``dropped_citations``. A bracketed number that is not a
+        retrieved chunk's (``[7]`` with four chunks, ``[2019]``), a bracket in code
+        or after a name (``arr[0]``), and a source written in any other form are
+        left as written and are not citations. A string context has no chunks, so
+        its answer has no citations and every ``[name, page X]`` in it is removed.
+        With ``citations=False`` the answer is returned as the model wrote it.
         """
         use_stream = self.stream if stream is None else stream
         documents = context if self.citations and not isinstance(context, str) else []

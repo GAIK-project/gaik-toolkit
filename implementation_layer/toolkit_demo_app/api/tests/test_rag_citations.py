@@ -108,3 +108,35 @@ def test_a_generator_without_a_citation_list_still_answers() -> None:
     result = _result(response)
     assert result["answer"] == "Holidays go via the lead [halden_handbook, page 5]."
     assert [s["page_number"] for s in result["sources"]] == [5]
+
+
+def test_the_prompt_asks_for_numbered_references_only_when_gaik_resolves_them() -> None:
+    class _Resolves:
+        def generate_with_citations(self): ...
+
+    class _Older:
+        def generate(self): ...
+
+    numbered = rag.rag_prompt(_Resolves)
+    named = rag.rag_prompt(_Older)
+
+    assert "such as [1]" in numbered
+    assert "such as [1]" not in named
+    assert "- Include citations [document_name, page X] when answering questions" in named
+    for prompt in (numbered, named):
+        assert "{citation_guideline}" not in prompt
+        assert prompt.endswith("Context:\n{context}\n\nQuestion: {query}")
+
+
+def test_a_page_cited_twice_is_one_source() -> None:
+    page = Document(
+        page_content="New staff get a laptop on the first day.",
+        metadata={"document_name": "halden_onboarding", "page_number": 3},
+    )
+    citations = [SimpleNamespace(document=page), SimpleNamespace(document=page)]
+
+    sources = rag._cited_sources(citations, [])
+
+    assert sources == [
+        {"document_name": "halden_onboarding", "relevance_score": None, "page_number": 3}
+    ]

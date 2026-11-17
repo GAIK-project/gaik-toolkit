@@ -3,13 +3,22 @@
 Each retrieved chunk gets a reference number, ``[1]`` for the first chunk, ``[2]`` for
 the second, and so on. The model cites by those numbers. A ``CitationResolver`` reads
 the answer, turns each reference into ``[document_name, page X]`` from that chunk's
-metadata, and collects the chunks it cited. A reference that is not one of the
-retrieved chunks, and a ``[name, page X]`` written by the model that matches no
-retrieved chunk, is removed from the answer and listed in ``dropped``.
+metadata, and collects the chunks it cited. A ``[name, page X]`` written by the model
+that matches no retrieved chunk is removed from the answer and listed in ``dropped``.
 
-Only two bracket forms are read as citations: a list of numbers (``[1]``,
-``[1, 3]``, ``[2; 4]``) and a document with a page (``[report.pdf, page 3]``,
-``[Document: report.pdf, Page: 3]``). Any other bracketed text is left as it is.
+Only two bracket forms are read as citations:
+
+- a list of numbers (``[1]``, ``[1, 3]``, ``[2; 4]``) whose numbers are all between 1
+  and the number of retrieved chunks. A list with any other number (``[0]``,
+  ``[2019]``, or ``[7]`` with four chunks) is left as written and is not a citation,
+  so a number the model invents stays in the text but never in ``citations``;
+- a document with a page (``[report.pdf, page 3]``, ``[Document: report.pdf, Page: 3]``).
+
+A bracket is not read at all when it is code or looks like an index: inside a fenced
+code block, inside an inline code span on one line, directly after a letter, digit,
+``_``, ``)`` or a bracket that is not a citation (``arr[0]``, ``matrix[1][2]``), or
+after ``=`` (``nums = [1, 2]``). Any other text, including a source the model writes in
+another form such as ``(report.pdf, page 3)``, is left as written.
 """
 
 from __future__ import annotations
@@ -28,8 +37,12 @@ _NAME_AND_PAGE = re.compile(
     re.IGNORECASE,
 )
 _PAGE_RANGE = re.compile(r"(\d+)\s*[-\u2013]\s*(\d+)")
-# Optional horizontal space before a bracket, so a removed citation takes its space along.
-_BRACKET = re.compile(r"[ \t]*\[(?P<inner>[^\[\]\n]{1," + str(_MAX_CITATION_LENGTH) + r"})\]")
+_BRACKET = re.compile(r"\[(?P<inner>[^\[\]\n]{1," + str(_MAX_CITATION_LENGTH) + r"})\]")
+# A fence line opens or closes a fenced code block; a line start that may still
+# become one waits for more text.
+_FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")
+_MAYBE_FENCE = re.compile(r" {0,3}(`*|~*)")
+_PLAIN = re.compile(r"[^`\[ \t]+")
 
 
 @dataclass(frozen=True)
@@ -99,8 +112,9 @@ class CitationResolver:
 
     Feed it the answer (whole, or delta by delta while it streams), then call
     ``finish``. ``citations`` lists the cited chunks in the order the answer first
-    cites them; ``dropped`` lists the citations the answer wrote that are not one of
-    the retrieved chunks, as written.
+    cites them; ``dropped`` lists the ``[name, page X]`` citations the answer wrote
+    that match no retrieved chunk, as written. A citation that repeats the label just
+    before it (``[1][2]`` of one page) is shown once.
     """
 
     def __init__(self, documents: Sequence[Any] | None) -> None:
@@ -116,6 +130,15 @@ class CitationResolver:
         self.citations: list[Citation] = []
         self.dropped: list[str] = []
         self._buffer = ""
+        # Where the answer is: the kind of the current line (None at a line start,
+        # "text", "code" or "fence"), the marker of an open fenced block, the last
+        # character shown, the label of a citation shown right before it, and
+        # whether space after a citation removed at a line start is dropped.
+        self._line: str | None = None
+        self._fence: str | None = None
+        self._last = "\n"
+        self._last_label: str | None = None
+        self._skip_space = False
 
     def resolve(self, answer: str) -> str:
         """The whole answer with its citations resolved."""
@@ -124,14 +147,11 @@ class CitationResolver:
     def feed(self, delta: str) -> str:
         """The part of the answer so far that can be shown; the rest waits for more."""
         self._buffer += delta
-        hold = self._hold_from(self._buffer)
-        ready, self._buffer = self._buffer[:hold], self._buffer[hold:]
-        return self._replace(ready)
+        return self._process(final=False)
 
     def finish(self) -> str:
         """The rest of the answer, at its end."""
-        rest, self._buffer = self._buffer, ""
-        return self._replace(rest)
+        return self._process(final=True)
 
     def stream(self, deltas: Iterable[str]) -> Iterator[str]:
         """The deltas with their citations resolved; ``citations`` is complete at the end."""
@@ -143,54 +163,167 @@ class CitationResolver:
         if text:
             yield text
 
+    # The answer is read line by line, and a line that is not complete yet only as
+    # far as the rest of it cannot change how it is read, so a streamed answer
+    # shows the same text as the whole answer.
+
+    def _process(self, *, final: bool) -> str:
+        out: list[str] = []
+        while self._buffer:
+            newline = self._buffer.find("\n")
+            line = self._buffer if newline == -1 else self._buffer[: newline + 1]
+            complete = newline != -1 or final
+            if self._line is None:
+                if _FENCE.match(line):
+                    self._line = "fence"
+                elif not complete and _MAYBE_FENCE.fullmatch(line):
+                    break
+                else:
+                    self._line = "code" if self._fence else "text"
+            if self._line == "fence":
+                if not complete:
+                    break
+                self._fence_line(line)
+                consumed = len(line)
+                out.append(self._show_code(line))
+            elif self._line == "code":
+                consumed = len(line)
+                out.append(self._show_code(line))
+            else:
+                text, consumed = self._text(line, complete)
+                out.append(text)
+            self._buffer = self._buffer[consumed:]
+            if consumed < len(line):
+                break
+            if line.endswith("\n"):
+                self._line = None
+        return "".join(out)
+
+    def _fence_line(self, line: str) -> None:
+        marker = _FENCE.match(line).group(1)
+        if self._fence is None:
+            self._fence = marker
+        elif (
+            marker[0] == self._fence[0]
+            and len(marker) >= len(self._fence)
+            and not line.strip(" \t\r\n").strip(marker[0])
+        ):
+            self._fence = None
+
+    def _show_code(self, text: str) -> str:
+        if text:
+            self._last, self._last_label, self._skip_space = text[-1], None, False
+        return text
+
+    def _show_text(self, text: str) -> str:
+        if self._skip_space:
+            text = text.lstrip(" \t")
+        return self._show_code(text)
+
+    def _text(self, line: str, complete: bool) -> tuple[str, int]:
+        """A line outside fenced code with its citations resolved, and how much of
+        it was read; an incomplete line is read only as far as it is settled."""
+        out: list[str] = []
+        at = 0
+        while at < len(line):
+            char = line[at]
+            if char == "`":
+                end = self._code_span_end(line, at, complete)
+                if end is None:
+                    break
+                out.append(self._show_text(line[at:end]))
+                at = end
+            elif char in " \t" or char == "[":
+                space_end = at
+                while space_end < len(line) and line[space_end] in " \t":
+                    space_end += 1
+                if space_end == len(line) and not complete:
+                    break
+                if space_end == len(line) or line[space_end] != "[":
+                    out.append(self._show_text(line[at:space_end]))
+                    at = space_end
+                    continue
+                bracket = _BRACKET.match(line, space_end)
+                if bracket is None:
+                    rest = line[space_end + 1 :]
+                    if not complete and not re.search(r"[\[\]\n]", rest):
+                        if len(rest) <= _MAX_CITATION_LENGTH:
+                            break
+                    out.append(self._show_text(line[at : space_end + 1]))
+                    at = space_end + 1
+                    continue
+                if "`" in bracket.group("inner"):
+                    out.append(self._show_text(line[at : space_end + 1]))
+                    at = space_end + 1
+                    continue
+                out.append(self._bracket(line[at:space_end], bracket))
+                at = bracket.end()
+            else:
+                plain = _PLAIN.match(line, at)
+                out.append(self._show_text(plain.group(0)))
+                at = plain.end()
+        return "".join(out), at
+
     @staticmethod
-    def _hold_from(text: str) -> int:
-        """Where the text that may still become a citation starts.
+    def _code_span_end(line: str, at: int, complete: bool) -> int | None:
+        """The end of the code span or backtick run at ``at``; ``None`` to wait."""
+        run = len(line[at:]) - len(line[at:].lstrip("`"))
+        if at + run == len(line) and not complete:
+            return None
+        closing = re.compile(r"(?<!`)" + "`" * run + r"(?!`)")
+        for found in closing.finditer(line, at + run):
+            if found.end() == len(line) and not complete:
+                return None
+            return found.end()
+        if not complete:
+            return None
+        return at + run
 
-        An open bracket with no closing one yet waits, with the space before it;
-        so does trailing space, in case a citation that is removed follows it.
-        """
-        open_at = text.rfind("[")
-        if open_at != -1 and "]" not in text[open_at:]:
-            tail = text[open_at:]
-            if "\n" not in tail and len(tail) <= _MAX_CITATION_LENGTH:
-                return len(text[:open_at].rstrip(" \t"))
-        return len(text.rstrip(" \t"))
+    def _may_cite(self, space: str) -> bool:
+        """Whether a bracket after ``space`` can be a citation, not an index."""
+        last = self._last
+        if not space and (
+            last.isalnum() or last in "_)" or (last == "]" and self._last_label is None)
+        ):
+            return False
+        return last != "="
 
-    def _replace(self, text: str) -> str:
-        return _BRACKET.sub(self._replace_bracket, text)
-
-    def _replace_bracket(self, match: re.Match[str]) -> str:
-        read = self._read(match.group("inner").strip())
+    def _bracket(self, space: str, match: re.Match[str]) -> str:
+        if self._skip_space:
+            space = ""
+        read = self._read(match.group("inner").strip()) if self._may_cite(space) else None
         if read is None:
-            return match.group(0)
+            return self._show_text(space + match.group(0))
         found, dropped = read
         self.dropped.extend(dropped)
         if not found:
+            if not space and self._last == "\n":
+                self._skip_space = True
             return ""
-        space = match.group(0)[: match.start("inner") - match.start() - 1]
         labels: list[str] = []
         for citation in found:
             if citation not in self.citations:
                 self.citations.append(citation)
-            if citation.label not in labels:
+            if citation.label not in labels and citation.label != self._last_label:
                 labels.append(citation.label)
+        if not labels:
+            return ""
+        self._last, self._last_label, self._skip_space = "]", labels[-1], False
         return space + " ".join(labels)
 
     def _read(self, inner: str) -> tuple[list[Citation], list[str]] | None:
         """The retrieved chunks a bracket cites and the parts that cite none.
 
-        ``None`` when the bracket is not a citation at all.
+        ``None`` when the bracket is not a citation at all, which is also the case
+        for a list of numbers with a number that is not a retrieved chunk's.
         """
         cited: list[Citation] = []
         dropped: list[str] = []
         if _NUMBERS.fullmatch(inner):
-            for number in (int(text) for text in re.findall(r"\d+", inner)):
-                if 1 <= number <= len(self._citations):
-                    cited.append(self._citations[number - 1])
-                else:
-                    dropped.append(f"[{number}]")
-            return cited, dropped
+            numbers = [int(text) for text in re.findall(r"\d+", inner)]
+            if not all(1 <= number <= len(self._citations) for number in numbers):
+                return None
+            return [self._citations[number - 1] for number in numbers], dropped
         parts = [part.strip() for part in inner.split(";")]
         matches = [_NAME_AND_PAGE.fullmatch(part) for part in parts]
         if not all(matches):
