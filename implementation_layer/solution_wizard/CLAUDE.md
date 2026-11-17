@@ -4,8 +4,10 @@
 
 The PoC's `load_schema()` reads `schemas/output_schema_model.json` and never imports
 `output_schema.py`. After editing `output_schema.py` (SKILL.md Step 4.5), run
-`python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas`; without it
-the PoC runs on the schema from before the edit, with no warning.
+`python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas`: it says at
+once whether the edit can be saved. The audio and document PoCs also write the model file
+again themselves when `output_schema.py` is newer, and stop when it does not import or
+cannot be saved.
 
 ## Schema generation constraints
 
