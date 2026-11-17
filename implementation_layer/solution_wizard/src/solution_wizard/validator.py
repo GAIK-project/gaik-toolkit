@@ -12,6 +12,21 @@ from typing import List, Optional
 from .blueprint import ArtifactSource, AssumptionStatus, Blueprint
 from .registry import Registry, get_registry
 
+# Components whose job is to check an extracted result against its source (Rule 14).
+_VALIDATOR_COMPONENTS = {"LLMJudge", "LLMJudgePanel"}
+
+# Artifact types that can serve as grounding evidence for a hallucination check:
+# the source text the extracted values must be traceable back to (Rule 14).
+_GROUNDING_ARTIFACT_TYPES = {
+    "text",
+    "transcript",
+    "enhanced_transcript",
+    "parsed_text",
+    "paged_text",
+    "normalized_evidence",
+    "document_collection",
+}
+
 
 @dataclass
 class Issue:
@@ -424,6 +439,41 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
                 "API: confirm that the chosen provider's data processing terms cover them.",
             )
         )
+
+    # ------------------------------------------------------------------
+    # Rule 14: a declared hallucination check must actually receive grounding
+    # evidence. When the grounding artifact is dropped from the blueprint --
+    # e.g. a transcript removed because the producing component does not declare
+    # that output type -- the workflow still validates, `hallucination_check`
+    # still reads true, and nothing downstream notices that the check can no
+    # longer run. Catch that here instead of shipping a blueprint whose diagram
+    # and documentation describe a check the pipeline cannot perform.
+    if steps and blueprint.validation.get("hallucination_check"):
+        validating_steps = [s for s in steps if s.component in _VALIDATOR_COMPONENTS]
+        if not validating_steps:
+            warnings.append(
+                Issue(
+                    14,
+                    "validation.hallucination_check is true but no step uses a validator "
+                    f"component ({', '.join(sorted(_VALIDATOR_COMPONENTS))}). Either add the "
+                    "validation step or set hallucination_check to false.",
+                )
+            )
+        for step in validating_steps:
+            input_types = {artifacts[a].type for a in step.inputs if a in artifacts}
+            if not (input_types & _GROUNDING_ARTIFACT_TYPES):
+                errors.append(
+                    Issue(
+                        14,
+                        f"Step '{step.id}' performs the declared hallucination check but "
+                        f"receives no grounding evidence: its inputs are of type(s) "
+                        f"{sorted(input_types) or '[]'}, none of which is a source text "
+                        f"({', '.join(sorted(_GROUNDING_ARTIFACT_TYPES))}). Add the source "
+                        "artifact to this step's inputs, or set "
+                        "validation.hallucination_check to false.",
+                        step_id=step.id,
+                    )
+                )
 
     ok = len(errors) == 0
     return ValidationResult(ok=ok, errors=errors, warnings=warnings)

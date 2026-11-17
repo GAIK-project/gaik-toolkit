@@ -8,7 +8,9 @@
       "video"
     ],
     "output_artifact_types": [
-      "structured_json"
+      "structured_json",
+      "transcript",
+      "enhanced_transcript"
     ],
     "knowledge_processes": [
       "knowledge_capture"
@@ -120,7 +122,8 @@
       "document"
     ],
     "output_artifact_types": [
-      "structured_json"
+      "structured_json",
+      "parsed_text"
     ],
     "knowledge_processes": [
       "knowledge_capture"
@@ -1009,7 +1012,8 @@
       "structured_json",
       "text",
       "transcript",
-      "enhanced_transcript"
+      "enhanced_transcript",
+      "parsed_text"
     ],
     "output_artifact_types": [
       "validation_report",
