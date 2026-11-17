@@ -186,7 +186,7 @@ def test_bootstrap_keeps_test_values_out_of_the_poc(tmp_path):
     assert prompt.index("NEVER COPY TEST VALUES") < prompt.index("in English")
 
 
-def test_bootstrap_keeps_customer_content_out_of_what_the_agent_writes(tmp_path):
+def test_the_prompt_says_customer_content_stays_out_of_what_the_agent_writes(tmp_path):
     prompt = " ".join(agent_service._bootstrap_prompt(tmp_path, "en").split())
 
     assert "NO CUSTOMER CONTENT OR PERSONAL DATA IN WHAT YOU WRITE" in prompt
@@ -210,7 +210,7 @@ def test_bootstrap_keeps_customer_content_out_of_what_the_agent_writes(tmp_path)
     )
 
 
-def test_bootstrap_asks_for_a_sample_of_the_users_own_before_synthetic_data(tmp_path):
+def test_the_prompt_says_to_ask_for_a_sample_of_the_users_own_before_synthetic_data(tmp_path):
     prompt = " ".join(agent_service._bootstrap_prompt(tmp_path, "fi").split())
 
     assert "THE TEST RUN STARTS BY ITSELF ONLY ON THE USER'S OWN SAMPLE" in prompt

@@ -1,5 +1,8 @@
-"""The wizard skill keeps customer content out of what it writes, asks for a real sample
-before generating test data, and handles needs outside GAIK as external services."""
+"""What SKILL.md says: keep customer content out of what the agent writes, ask for a real
+sample before generating test data, and handle needs outside GAIK as external services.
+
+These tests check the skill's text, not what an agent does with it. The one exception is
+the Phase 10 service example, which is run."""
 
 import re
 import sys
@@ -22,7 +25,7 @@ def _flat(text: str) -> str:
     return " ".join(text.split())
 
 
-def test_the_constraints_keep_customer_content_out_of_every_artifact() -> None:
+def test_the_skill_says_customer_content_stays_out_of_every_artifact() -> None:
     constraints = _flat(_section("**Constraints:**", "## Phase 1"))
 
     assert "No customer content or personal data in what you write" in constraints
@@ -43,7 +46,7 @@ def test_the_constraints_keep_customer_content_out_of_every_artifact() -> None:
     assert "which is not part of the deployable package" in constraints
 
 
-def test_the_rule_is_repeated_where_artifacts_are_written() -> None:
+def test_the_skill_repeats_that_rule_where_artifacts_are_written() -> None:
     assert "Example values are invented" in _section("## Phase 4", "## Phase 5")
     phase_10 = _flat(_section("## Phase 10", "## Phase 11"))
     assert "No values from the user's material in the code or its comments" in phase_10
@@ -52,7 +55,7 @@ def test_the_rule_is_repeated_where_artifacts_are_written() -> None:
     assert "carries no customer content or personal data" in phase_13
 
 
-def test_phase_10_asks_for_a_real_sample_before_synthetic_data() -> None:
+def test_the_skill_says_phase_10_asks_for_a_real_sample_before_synthetic_data() -> None:
     phase_10 = _flat(_section("## Phase 10", "## Phase 11"))
 
     assert "ask for a real sample first" in phase_10
@@ -67,7 +70,7 @@ def test_phase_10_asks_for_a_real_sample_before_synthetic_data() -> None:
     assert phase_10.index("ask for a real sample first") < phase_10.index("ask for permission")
 
 
-def test_a_need_outside_gaik_is_named_explained_asked_and_recorded() -> None:
+def test_the_skill_says_a_need_outside_gaik_is_named_explained_asked_and_recorded() -> None:
     step = _flat(_section("**Step 2b -- Needs outside GAIK", "**Step 3 --"))
 
     assert "do not invent a GAIK capability" in step
@@ -79,7 +82,7 @@ def test_a_need_outside_gaik_is_named_explained_asked_and_recorded() -> None:
     assert 'write `"none"`' in step
 
 
-def test_a_service_added_after_gate_2_reopens_it() -> None:
+def test_the_skill_says_a_service_added_after_gate_2_reopens_it() -> None:
     step = _flat(_section("**Step 2b -- Needs outside GAIK", "**Step 3 --"))
 
     assert "**A service added or changed after Gate 2 is approved**" in step
@@ -87,7 +90,7 @@ def test_a_service_added_after_gate_2_reopens_it() -> None:
     assert "ask the user to confirm it" in step
 
 
-def test_the_poc_skips_an_external_service_it_cannot_reach() -> None:
+def test_the_skill_says_the_poc_skips_an_external_service_it_cannot_reach() -> None:
     phase_10 = _flat(_section("## Phase 10", "## Phase 11"))
 
     assert "external_service(name, module, env_vars)" in phase_10
