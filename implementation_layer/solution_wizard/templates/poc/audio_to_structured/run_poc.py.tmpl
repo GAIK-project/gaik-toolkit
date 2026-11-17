@@ -143,9 +143,9 @@ def find_input_file(config: dict, cli_input: str | None) -> Path:
 
     try:
         return find_input(sample_dir, *audio_exts, pick_first=True)
-    except InputNotFound:
+    except InputNotFound as exc:
         print(
-            f"ERROR: No audio file found in {sample_dir}\n"
+            f"ERROR: {exc}\n"
             "Place a .wav or .mp3 file there, or use --input to specify one.",
             file=sys.stderr,
         )

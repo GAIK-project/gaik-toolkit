@@ -342,7 +342,7 @@ Two constraints must be satisfied before approving any schema. Check both every 
 
 1. **ExtractionRequirements `field_type` enum** — when editing `output_schema_requirements.json` directly (e.g. adding a field manually), `field_type` must be one of: `str`, `int`, `float`, `bool`, `list[str]`, `date`, `decimal`, `list[dict]`. The value `"dict"` is **not** in this enum and will cause a `ValidationError` at runtime. For a nested object field, write `"field_type": "str"`; for an array of objects write `"field_type": "list[dict]"`.
 
-1b. **`default` is a string or null** — in `output_schema_requirements.json`, a field's `default` must be a string or `null`, never a list, number or object (for a `list[str]` field write `null`, not `[]`). The generated `run_poc.py` resets other values to `null` with a warning, but do not rely on that: validate the file after any hand edit.
+1b. **`default` is a string or null** — in `output_schema_requirements.json`, a field's `default` must be a string or `null`, never a list, number or object (for a `list[str]` field write `null`, not `[]`). The audio and document templates' `run_poc.py` resets other values to `null` with a warning, but do not rely on that: validate the file after any hand edit.
 
 2. **Azure OpenAI structured output — no bare `dict` types** — when `provider: azure` (including the legacy `azure_openai` alias, or Azure routed through LiteLLM), the Pydantic schema in `output_schema.py` must **never** contain `dict | None` or `list[dict]` as field types. Azure OpenAI's structured output API requires `additionalProperties: false` on every JSON object, which bare Python `dict` does not satisfy. For every nested-object field, define a named sub-model:
 

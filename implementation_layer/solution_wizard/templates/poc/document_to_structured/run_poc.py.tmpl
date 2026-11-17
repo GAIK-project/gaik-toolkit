@@ -131,9 +131,9 @@ def find_input_file(config: dict, cli_input: str | None) -> Path:
 
     try:
         return find_input(sample_dir, *doc_exts, pick_first=True)
-    except InputNotFound:
+    except InputNotFound as exc:
         print(
-            f"ERROR: No document file found in {sample_dir}\n"
+            f"ERROR: {exc}\n"
             "Place a .pdf or .docx file there, or use --input to specify one.",
             file=sys.stderr,
         )

@@ -844,7 +844,9 @@ def _build_input_loaders(blueprint: Blueprint) -> str:
         else:
             exts = doc_exts
         lines.append(f"    # Load user-upload artifact: {art_id} (type={art.type})")
-        hints = tuple(w for w in art_id.lower().split("_") if len(w) > 2)
+        # The id's words pick between several inputs. A file type ("pdf" in agenda_pdf)
+        # is in every file name of that type, so it would pick none.
+        hints = tuple(w for w in art_id.lower().split("_") if len(w) > 2 and f'".{w}"' not in exts)
         lines.append(f"    {art_id}_path = _find_input(sample_dir, {exts}, hints={hints!r})")
         lines.append(f"    print(f'{art_id}: {{{art_id}_path}}')")
         lines.append("")
