@@ -13,6 +13,8 @@ import os
 import re
 from pathlib import Path
 
+from gaik.software_components.input_limits import InputLimits
+
 try:
     from langchain_core.documents import Document
 except ImportError:  # pragma: no cover - optional dependency
@@ -31,9 +33,19 @@ class TextRagParser:
         overlap_chars: Characters of the previous chunk repeated at the start of the
             next one on the same page, so a sentence split between chunks is found
             from either.
+        limits: Size and page limits checked before a file is read; a file over one
+            raises ``InputLimitError``. Defaults to
+            :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`,
+            which limits the size and not the page count.
     """
 
-    def __init__(self, chunk_chars: int = 1200, overlap_chars: int = 150):
+    def __init__(
+        self,
+        chunk_chars: int = 1200,
+        overlap_chars: int = 150,
+        *,
+        limits: InputLimits | None = None,
+    ):
         if Document is None:
             raise ImportError(
                 "RAGWorkflow(parser='text') needs langchain-core: "
@@ -43,6 +55,7 @@ class TextRagParser:
             raise ValueError("chunk_chars must be >= 200 and overlap_chars < chunk_chars / 2")
         self.chunk_chars = chunk_chars
         self.overlap_chars = overlap_chars
+        self.limits = limits or InputLimits.local_parsing()
 
     def convert_doc_to_chunks(
         self, path: str | Path, document_name: str | None = None
@@ -52,9 +65,12 @@ class TextRagParser:
         Raises:
             ValueError: An unsupported file type, or a file without any text (a
                 scanned PDF needs ``parser="vision"``).
+            InputLimitError: The file is over one of ``limits``.
         """
         path = Path(path)
         name = document_name or os.path.splitext(path.name)[0]
+        if path.suffix.lower() in SUFFIXES:
+            self.limits.check_document(path)
         pages = self._pages(path)
         if not any(text.strip() for _, text in pages):
             raise ValueError(

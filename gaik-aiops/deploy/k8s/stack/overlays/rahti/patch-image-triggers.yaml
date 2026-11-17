@@ -1,0 +1,31 @@
+# The images built on Rahti (buildconfigs.yaml) are tagged :latest in the project's image streams. These
+# triggers make OpenShift write the built image's digest into each Deployment and roll it out when a build
+# finishes. Between builds every pod, also one rescheduled to another node, runs the digest it was rolled
+# out with, never whatever :latest points to at that moment. A build is therefore a rollout.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"aiops-mlflow:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mlflow\")].image"}]'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"aiops-mlflow:latest"},"fieldPath":"spec.template.spec.initContainers[?(@.name==\"mlflow-setup\")].image"}]'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-setup
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"aiops-mlflow:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"grafana-setup\")].image"}]'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sink
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"aiops-sink:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"sink\")].image"}]'

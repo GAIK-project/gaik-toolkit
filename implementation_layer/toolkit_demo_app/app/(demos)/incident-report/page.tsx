@@ -21,7 +21,7 @@ function CreateSection() {
 
 export default function IncidentReportPage() {
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <DemoPageHeader
         icon={AlertTriangle}
         iconClassName="h-8 w-8 text-amber-500"

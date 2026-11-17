@@ -28,6 +28,12 @@ JevClassifier(api_key=gaik_decide_key, base_url="https://gaik-decide.2.rahtiapp.
 Inside the `gaik` Rahti namespace use `http://gaik-decide:8080`. With your own TypeSafe key,
 leave `base_url` out. The component never reads the environment; the caller passes the key.
 
+The key goes only to TypeSafe, `gaik-decide.2.rahtiapp.fi`, the address set in
+`GAIK_DECIDE_URL` or `TYPESAFE_BASE_URL` (plain http works for that address), and hosts in
+`GAIK_ALLOWED_ENDPOINT_HOSTS` or `allowed_endpoint_hosts`; any other `base_url` raises
+`EndpointNotAllowedError` when the classifier is built. So set the in-namespace address in
+`GAIK_DECIDE_URL` and pass that value.
+
 **Privacy:** the text is sent to TypeSafe in the United States. Send only what the decision
 needs, and no sensitive personal data.
 

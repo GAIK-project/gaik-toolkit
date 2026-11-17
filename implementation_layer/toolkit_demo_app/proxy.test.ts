@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 import { NextRequest, type NextResponse } from "next/server";
+import { SHARED_DATA_DENIAL } from "./lib/api-access";
 
 // A demo run from a page left open past the access token's lifetime: the API
 // gate refreshes the session, and the browser must get the new cookies, or its
@@ -149,6 +150,62 @@ test("a spent refresh token is refused and the dead session cleared", async () =
   expect(await again.json()).toEqual({ error: "Sign in to use this feature." });
   expect(again.cookies.get(COOKIE)?.value).toBe("");
   expect(backendCalls).toBe(1);
+});
+
+// Analytics requests are rewritten to PostHog (next.config.ts) and carry this
+// site's cookies. The proxy hands them on without the Cookie header and leaves
+// the session alone.
+
+/** The request headers Next.js forwards after the proxy, or null for none set. */
+function forwarded(response: NextResponse): Map<string, string> | null {
+  const names = response.headers.get("x-middleware-override-headers");
+  if (names === null) return null;
+  return new Map(
+    names
+      .split(",")
+      .filter(Boolean)
+      .map((name) => [
+        name,
+        response.headers.get(`x-middleware-request-${name}`) ?? "",
+      ]),
+  );
+}
+
+test("an analytics request goes on without this site's cookies", async () => {
+  const cookie = [
+    sessionCookie("r1", expired()),
+    "admin_session=signed-admin-value",
+    "wizard_access=team-secret",
+  ].join("; ");
+  for (const [method, path] of [
+    ["POST", "/a/e/?ip=1"],
+    ["POST", "/a/i/v0/e/"],
+    ["GET", "/a/static/array.js"],
+    ["POST", "/A/flags/?v=2"],
+    ["GET", "/a"],
+  ]) {
+    const response = await proxy(
+      new NextRequest(`https://demo.test${path}`, {
+        method,
+        headers: { cookie, "user-agent": "test-agent" },
+      }),
+    );
+    const headers = forwarded(response);
+    expect(headers?.get("user-agent")).toBe("test-agent");
+    expect(headers?.has("cookie")).toBe(false);
+    expect(response.cookies.getAll()).toEqual([]);
+  }
+  // The expired session was neither refreshed nor read.
+  expect(refreshes).toEqual([]);
+  expect(backendCalls).toBe(0);
+});
+
+test("a page request keeps its cookies for the app", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const response = await proxy(
+    new NextRequest("https://demo.test/extractor", { headers: { cookie } }),
+  );
+  expect(forwarded(response)?.get("cookie")).toBe(cookie);
 });
 
 // The access rules match the path the backend routes on, so an encoded letter
@@ -339,4 +396,38 @@ test("the generic proxy does not pass on the report run header", async () => {
   expect(response.status).toBe(200);
   expect(backendCalls).toBe(1);
   expect(backendHeaders?.has("x-gaik-report-run")).toBe(false);
+});
+
+// A user waiting for approval runs demos on the trial, which never covers a
+// write to the video-search index that every visitor searches. Without Redis the
+// trial is off here and this user's e-mail address is unconfirmed, so the
+// refusal is told apart by its reason; that it holds with trial runs left is in
+// lib/api-access.test.ts.
+
+test("a pending user's DELETE /api/video-search/clear is refused", async () => {
+  accessRow = { status: "pending", wizard_access: false };
+  const cookie = sessionCookie("r1", fresh());
+  const requests = [
+    ...[
+      "/api/video-search/clear",
+      "/api/video-search/%63lear",
+      "/api/video-search/clear/",
+    ].map(
+      (path) =>
+        new NextRequest(`https://demo.test${path}`, {
+          method: "DELETE",
+          headers: { cookie },
+        }),
+    ),
+    new NextRequest("https://demo.test/api/video-search/ingest/stream", {
+      method: "POST",
+      headers: { cookie },
+    }),
+  ];
+  for (const request of requests) {
+    const response = await proxy(request);
+    expect(response.status).toBe(SHARED_DATA_DENIAL.status);
+    expect(await response.json()).toEqual({ error: SHARED_DATA_DENIAL.error });
+  }
+  expect(backendCalls).toBe(0);
 });

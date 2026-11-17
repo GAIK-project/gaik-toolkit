@@ -67,7 +67,17 @@ spec:
                 -H "X-Wizard-User-Id: ${WIZARD_USER_ID:-}" \
                 "${WIZARD_API_URL}/sessions/SESSION_ID_PLACEHOLDER/poc" \
                 -o /workspace/poc.zip
-              python -c "import zipfile; zipfile.ZipFile('/workspace/poc.zip').extractall('/workspace')"
+              # Each file keeps the time the archive gives it; extractall would give
+              # every file the moment of extraction. A document or audio PoC writes
+              # schemas/output_schema_model.json again when output_schema.py is newer
+              # (GAIK-project/gaik-toolkit#247), so an edit made after Phase 4 reaches
+              # the run only if the times are kept.
+              python -c "import os, time, zipfile
+              archive = zipfile.ZipFile('/workspace/poc.zip')
+              for entry in archive.infolist():
+                  path = archive.extract(entry, '/workspace')
+                  stamp = time.mktime(entry.date_time + (0, 0, -1))
+                  os.utime(path, (stamp, stamp))"
               rm /workspace/poc.zip
           env:
             - name: WIZARD_API_URL

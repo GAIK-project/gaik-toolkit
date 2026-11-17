@@ -716,7 +716,13 @@ def _gate_span(session, payload: SessionUpdate) -> Iterator[None]:
         ops_metrics.record_gate_changes(session, changes)
 
 
-def _approved_content(session) -> dict[str, str] | None:
+#: What the package digest covers. 2: every Python file and every file in
+#: ``schemas/`` (``poc_service._version_files``); before it, a fixed list. A
+#: package approved under another scheme is not comparable with today's digest.
+_PACKAGE_DIGEST_SCHEME = 2
+
+
+def _approved_content(session) -> dict[str, str | int] | None:
     """Digests of the solution and of the package as they are now, or None without a draft."""
 
     solution = artifact_sync.solution_digest(artifact_sync.read_draft_blueprint(session.output_dir))
@@ -724,7 +730,7 @@ def _approved_content(session) -> dict[str, str] | None:
         return None
     poc = _poc_dir(session.output_dir)
     package = _approved_package_digest(poc) if poc and os.path.isdir(poc) else ""
-    return {"solution": solution, "package": package}
+    return {"solution": solution, "package": package, "package_scheme": _PACKAGE_DIGEST_SCHEME}
 
 
 def _approved_package_digest(poc: str) -> str:
@@ -792,6 +798,14 @@ def _reopen_if_approved_content_changed(db: Session, session) -> bool:
         return False
     if approved.get("solution") != now["solution"]:
         gate_key = "gate_2"
+    elif approved.get("package_scheme") != now["package_scheme"]:
+        # Approved under a digest that covered fewer files: it differs from
+        # today's for a package nobody changed. Start from the package as it is,
+        # as for a session approved before this was kept.
+        session_service.update_session(
+            db, session, SessionUpdate(metadata={session_service.APPROVED_CONTENT_KEY: now})
+        )
+        return False
     elif approved.get("package") != now["package"]:
         gate_key = "gate_3"
     else:
@@ -1112,6 +1126,7 @@ async def chat(
         notes = [
             note
             for note in (
+                _stopped_reply_note(session),
                 reopened_note,
                 gate1_note,
                 run_note,
@@ -1161,6 +1176,8 @@ async def chat(
             parts.append(notice_text)
             yield agent_service.sse({"delta": notice_text})
         replied = False
+        # The frame that says the user stopped this reply, once it has come.
+        stopped: dict | None = None
         async for frame in agent_service.stream_turn_for(agent, agent_message, parts):
             if (
                 agent.get("resumed") == "sdk"
@@ -1199,11 +1216,17 @@ async def chat(
                 parts.clear()
                 parts.append(notice_text)
                 yield agent_service.sse({"delta": notice_text})
+                if turn.stop_requested:
+                    # Stopped while the agent was being started again: the new
+                    # one is interrupted as soon as it has the message.
+                    agent["stop_requested"] = True
                 async for retry_frame in agent_service.stream_turn_for(agent, agent_message, parts):
+                    stopped = stopped or agent_service.frame_stopped(retry_frame)
                     yield retry_frame
                 break
             if '"delta"' in frame:
                 replied = True
+            stopped = stopped or agent_service.frame_stopped(frame)
             yield frame
         agent["resume_verified"] = True
         sdk_id = agent.get("sdk_session_id")
@@ -1224,6 +1247,18 @@ async def chat(
             reopened_text = agent_service.reopened_notice(lang, reopened)
             assistant_text = f"{assistant_text}\n\n{reopened_text}"
             yield agent_service.sse({"delta": f"\n\n{reopened_text}"})
+        mark = None
+        if stopped is not None:
+            # What was written so far is the reply, marked as stopped; with
+            # nothing written the note alone, so the user's message is kept.
+            note = agent_service.stopped_note(lang)
+            mark = {"note": note, "tool": stopped.get("tool")}
+            assistant_text = f"{assistant_text}\n\n{note}" if assistant_text else note
+            logger.info(
+                "session %s: reply stopped by the user (%s)",
+                session_id,
+                "during a tool call" if stopped.get("tool") else "while writing",
+            )
         if assistant_text:
             # Persist off the event loop (sync SQLAlchemy commit).
             await asyncio.to_thread(
@@ -1232,6 +1267,7 @@ async def chat(
                 turn_session,
                 user_message,
                 assistant_text,
+                stopped=mark,
             )
             if seen_run:
                 # Told once: the next message does not repeat the same run.
@@ -1286,6 +1322,7 @@ async def chat(
                     turn_agents,
                     agent_service._model(),
                     _turn_failed,
+                    lambda frame: agent_service.frame_stopped(frame) is not None,
                 ):
                     # Each reader keeps its own connection alive (Turn.subscribe).
                     if not agent_service.is_heartbeat(frame):
@@ -1354,6 +1391,27 @@ async def end_agent(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dic
     if ended:
         logger.info("session %s: agent ended by the user", session_id)
     return {"ended": ended}
+
+
+@router.post("/{session_id}/chat/stop", status_code=202)
+async def stop_chat(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    """Stop the reply that is being written for this session.
+
+    The agent is interrupted and its turn ends: what it had written is stored
+    as the reply, marked as stopped, and the session takes the next message.
+    The answer comes when the stop has been passed on (202); the turn's own
+    stream says when it has ended (a ``stopped`` frame, then the stream closes
+    once the exchange is stored). 409 ``no_reply_running`` when no reply is
+    being written, so a caller can tell "nothing to stop" from "stopping".
+    """
+    session = session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    # Not held while the agent is being interrupted.
+    await asyncio.to_thread(db.commit)
+    if not await agent_service.stop_turn(str(session_id)):
+        raise api_error(409, "no_reply_running", "No reply is being written right now.")
+    return {"stopping": True}
 
 
 @router.get("/{session_id}/chat/stream")
@@ -1464,6 +1522,20 @@ def _latest_run_note(session) -> tuple[str | None, str | None]:
     except Exception:  # noqa: BLE001 - see the docstring
         logger.warning("latest run %s could not be read for the agent", run_id, exc_info=True)
         return None, None
+
+
+def _stopped_reply_note(session) -> str | None:
+    """A line for the agent when the user stopped its previous reply, else None.
+
+    Read from the stored conversation, so it holds across an agent restart, and
+    said with every message until a reply after the stopped one is stored.
+    """
+    messages = session.session_metadata.get("messages")
+    last = messages[-1] if isinstance(messages, list) and messages else None
+    if not isinstance(last, dict) or not last.get("stopped"):
+        return None
+    tool = last.get("stoppedDuring")
+    return agent_service.stopped_reply_line(tool if isinstance(tool, str) else None)
 
 
 def _gate1_missing_note(session) -> str | None:

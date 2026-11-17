@@ -254,7 +254,7 @@ export default function ParserPage() {
       <DemoPageHeader
         icon={FileText}
         title="Parser"
-        description="Read text and layout from PDF, Word files, and images accurately"
+        description="Read the text and layout of PDFs, Word files and images"
         className="mb-6"
       />
 

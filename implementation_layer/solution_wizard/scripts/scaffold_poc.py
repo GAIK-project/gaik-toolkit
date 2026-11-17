@@ -136,6 +136,8 @@ def main() -> int:
 
     print(f"Scaffolding PoC into: {output_dir / 'poc'}")
     result_info = scaffold_poc(blueprint, output_dir, synthetic=args.synthetic)
+    for note in result_info.get("notes", []):
+        print(f"NOTE: {note}")
 
     poc_dir = result_info["poc_dir"]
     pattern = result_info["pattern"]
@@ -174,7 +176,7 @@ To run it:
          -- then open .env and fill in your API key
   3. Add a sample input file:
          See {poc_dir / "README.md"} for the expected input format
-  4. Run the pipeline:
+  4. Run the pipeline (it prints counts and file names; add --verbose for the values):
          python {poc_dir / "run_poc.py"}
   5. Inspect the output:
          Check {poc_dir / "output"} for the generated result

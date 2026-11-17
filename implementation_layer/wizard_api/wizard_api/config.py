@@ -1,3 +1,4 @@
+import math
 import os
 from pathlib import Path
 from uuid import UUID
@@ -151,6 +152,52 @@ def agent_max_turns() -> int:
     when the reply comes back empty, so one message stays under three times this.
     """
     return _int_env("WIZARD_AGENT_MAX_TURNS", 100)
+
+
+def agent_max_budget_usd() -> float | None:
+    """Estimated USD one agent may spend from its start or resume; None means no limit.
+
+    The agent SDK's ``max_budget_usd``. Its CLI counts the spend of the whole
+    agent process, across messages, from its own price table, so this is not a
+    limit per message and not a bill (README, "Agent and chat limits"). Unset,
+    0, a negative, an unreadable or an infinite value is off, the default.
+    """
+    try:
+        value = float(os.getenv("WIZARD_AGENT_MAX_BUDGET_USD", "").strip() or 0)
+    except ValueError:
+        return None
+    return value if 0 < value < math.inf else None
+
+
+def agent_fallback_model() -> str | None:
+    """The model the agent switches to when its own fails or is unavailable; None is off."""
+    return os.getenv("WIZARD_AGENT_FALLBACK_MODEL", "").strip() or None
+
+
+def max_metered_calls_per_turn() -> int:
+    """Metered tool calls the agent may make for one chat message.
+
+    Metered are the calls that reach a model or the web other than the agent's
+    own model calls, which ``WIZARD_AGENT_MAX_TURNS`` counts: a wizard script
+    that calls a model, web search and fetch, and the tools of an MCP server
+    other than the wizard's own (``agent_tool_guard``). A cap like
+    ``WIZARD_AGENT_MAX_TURNS``: 0, a negative or an unreadable value is the default.
+    """
+    return _int_env("WIZARD_MAX_METERED_CALLS_PER_TURN", 10)
+
+
+def max_metered_calls_per_user_per_hour() -> int:
+    """Metered tool calls one user's agents may make in a sliding hour; 0 means no limit.
+
+    Counted across all of the user's sessions, in this API process, like
+    ``WIZARD_MAX_CHAT_TURNS_PER_MINUTE``. A negative or unreadable value is the
+    default, so a typo does not lift the limit.
+    """
+    try:
+        value = int(os.getenv("WIZARD_MAX_METERED_CALLS_PER_USER_PER_HOUR", "").strip() or 60)
+    except ValueError:
+        return 60
+    return value if value >= 0 else 60
 
 
 def turn_timeout_seconds() -> int:

@@ -6,7 +6,10 @@ manifest and fail if any of it is weakened — a manifest is easy to relax by
 accident and nothing else would notice.
 """
 
+import re
 import subprocess
+import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -131,6 +134,43 @@ def test_the_run_container_starts_the_entrypoint_the_scaffolder_writes(
     assert script.splitlines()[0] == "python run_poc.py"
     assert 'exit "$rc"' in script
     assert run["workingDir"] == "/workspace/poc"
+
+
+def test_the_package_fetch_keeps_the_times_of_the_files(tmp_path: Path) -> None:
+    """A PoC writes its saved schema model again when output_schema.py is newer
+    (GAIK-project/gaik-toolkit#247). zipfile.extractall gives every file the
+    moment of extraction, the model file last, so an edit made after Phase 4 never
+    reached a sandbox run."""
+    template = yaml.safe_load(TEMPLATE.read_text(encoding="utf-8"))
+    fetch = next(
+        c
+        for c in template["spec"]["template"]["spec"]["initContainers"]
+        if c["name"] == "fetch-poc"
+    )
+    script = fetch["command"][-1]
+    code = re.search(r'python -c "(.*?)"\n', script, re.S).group(1)
+    assert "extractall" not in code
+
+    package = tmp_path / "poc.zip"
+    with zipfile.ZipFile(package, "w") as archive:
+        # The order the api writes them in: the model file after the .py.
+        archive.writestr(
+            zipfile.ZipInfo("poc/schemas/output_schema.py", (2026, 11, 17, 12, 0, 10)), "edited"
+        )
+        archive.writestr(
+            zipfile.ZipInfo("poc/schemas/output_schema_model.json", (2026, 11, 17, 12, 0, 0)), "{}"
+        )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    code = code.replace("/workspace/poc.zip", package.as_posix()).replace(
+        "/workspace", workspace.as_posix()
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+    schemas = workspace / "poc" / "schemas"
+    edited = (schemas / "output_schema.py").stat().st_mtime
+    model = (schemas / "output_schema_model.json").stat().st_mtime
+    assert edited - model == pytest.approx(10, abs=1)
 
 
 def _run_script(pod_spec: dict, tmp_path: Path, python_body: str) -> subprocess.CompletedProcess:

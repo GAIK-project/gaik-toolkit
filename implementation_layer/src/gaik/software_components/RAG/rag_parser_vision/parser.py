@@ -23,6 +23,8 @@ try:
 except Exception:
     pass
 
+from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
+
 if TYPE_CHECKING:
     from langchain_core.documents import Document
 
@@ -63,6 +65,7 @@ class VisionRagParser:
         verbose: bool = True,
         save_markdown: bool = False,
         vision_prompt: str | None = None,
+        limits: InputLimits | None = None,
     ) -> None:
         """
         Initialize the VisionRagParser.
@@ -77,7 +80,14 @@ class VisionRagParser:
             verbose: Print verbose output
             save_markdown: Persist markdown output when output_path is provided
             vision_prompt: Custom prompt for vision model (defaults to chart/diagram analysis)
+            limits: Input limits; a PDF over the size or page limit is refused before
+                Docling reads it, and one with more images (or larger ones) than
+                allowed before the first vision call. Defaults to
+                :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`:
+                Docling reads the pages locally, so only the images, one vision call
+                each, and the size are limited.
         """
+        self.limits = limits or InputLimits.local_parsing()
         self.verbose = verbose
         self.save_markdown = save_markdown
 
@@ -138,6 +148,7 @@ class VisionRagParser:
             use_context=False,  # We handle context via Docling structure
             max_tokens=2048,
             temperature=0.0,
+            limits=self.limits,
         )
 
     def convert_doc_to_chunks_with_vision(
@@ -154,7 +165,8 @@ class VisionRagParser:
         This method:
         1. Uses Docling to extract document structure and images
         2. Sends images to vision model for detailed descriptions
-        3. Appends descriptions to chunk text by page
+        3. Appends a page's descriptions to its first chunk (or to a chunk of
+           their own when the page has no text chunk)
         4. Chunks by document structure using HierarchicalChunker
 
         Args:
@@ -189,6 +201,7 @@ class VisionRagParser:
         doc_name = document_name or os.path.splitext(os.path.basename(pdf_path))[0]
         langchain_docs: list[Document] = []
         chunk_id = 0
+        described_pages: set[int] = set()
 
         for chunk in chunker.chunk(doc):
             try:
@@ -220,7 +233,14 @@ class VisionRagParser:
                 ):
                     heading = chunk_dict["meta"]["headings"][0]
 
-                if page_num is not None and page_num in descriptions_by_page:
+                # A page's descriptions go on its first chunk only; on every chunk
+                # they crowded out the chunk text in retrieval and the context.
+                if (
+                    page_num is not None
+                    and page_num in descriptions_by_page
+                    and page_num not in described_pages
+                ):
+                    described_pages.add(page_num)
                     desc_block = "\n\n[IMAGE DESCRIPTIONS]\n" + "\n\n".join(
                         descriptions_by_page[page_num]
                     )
@@ -258,6 +278,23 @@ class VisionRagParser:
                 )
                 chunk_id += 1
 
+        # A page with images but no text chunk still gets its descriptions.
+        for page_num in sorted(set(descriptions_by_page) - described_pages):
+            langchain_docs.append(
+                Document(
+                    page_content="[IMAGE DESCRIPTIONS]\n"
+                    + "\n\n".join(descriptions_by_page[page_num]),
+                    metadata={
+                        "source": pdf_path,
+                        "document_name": doc_name,
+                        "page_number": page_num,
+                        "heading": None,
+                        "chunk_id": chunk_id,
+                    },
+                )
+            )
+            chunk_id += 1
+
         if self.verbose:
             print(
                 f"Created {len(langchain_docs)} chunks with vision-enhanced content from {doc_name}"
@@ -271,7 +308,8 @@ class VisionRagParser:
         if self.verbose:
             print(f"Processing PDF with vision enhancement: {pdf_path}")
 
-        result = self.converter.convert(pdf_path)
+        self.limits.check_pdf(pdf_path)
+        result = self.converter.convert(pdf_path, **docling_limits(self.limits))
         doc = result.document
 
         if self.verbose:
@@ -282,6 +320,10 @@ class VisionRagParser:
         images_with_positions = self._collect_images(doc)
         if self.verbose:
             print(f"Found {len(images_with_positions)} images to analyze")
+        self.limits.check_images_to_describe(
+            [image_size(self._as_pil_image(entry["image"])) for entry in images_with_positions],
+            os.path.basename(pdf_path),
+        )
 
         image_descriptions, descriptions_by_page = self._describe_images(images_with_positions)
 

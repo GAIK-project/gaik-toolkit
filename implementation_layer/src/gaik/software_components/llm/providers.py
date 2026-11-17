@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class Provider(str, Enum):
@@ -39,8 +42,21 @@ def resolve_provider(
         return Provider.AZURE.value if config["use_azure"] else Provider.OPENAI.value
     env = os.getenv("LLM_PROVIDER")
     if env:
-        return _validate(env)
+        name = _validate(env)
+        _log_once(f"gaik provider {name!r} chosen by LLM_PROVIDER")
+        return name
+    _log_once("gaik provider 'azure' chosen by default: no provider given and LLM_PROVIDER unset")
     return Provider.AZURE.value
+
+
+_logged: set[str] = set()
+
+
+def _log_once(message: str) -> None:
+    """Log how the provider was chosen once per process, so a changed environment shows."""
+    if message not in _logged:
+        _logged.add(message)
+        logger.info(message)
 
 
 def _validate(name: str) -> str:

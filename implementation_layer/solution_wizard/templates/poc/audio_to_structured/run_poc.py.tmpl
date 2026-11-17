@@ -24,7 +24,12 @@ load_dotenv(Path(__file__).parent / ".env")
 
 from gaik.software_modules.audio_to_structured_data import AudioToStructuredData  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
-from provider_config import get_stage_config  # noqa: E402
+from provider_config import (  # noqa: E402
+    external_model_forbidden,
+    get_stage_config,
+    local_transcriber_options,
+)
+import poc_output  # noqa: E402
 
 
 def load_config() -> dict:
@@ -77,6 +82,73 @@ def _normalise_field_defaults(schema_dir: Path, schema_name: str) -> None:
         print(f"WARNING: set a non-string default to null in {req_path.name} for: {', '.join(fixed)}")
 
 
+def _refresh_model_file(schema_dir: Path, schema_name: str) -> None:
+    """Write <schema_name>_model.json again when <schema_name>.py was edited after it.
+
+    load_schema() reads the model file and never imports the .py, so a correction made
+    to output_schema.py (SKILL.md Step 4.5, a Gate 3 refinement) would not reach this
+    run. Same steps as the wizard's scripts/refresh_schema_model.py. A .py that does not
+    import, or a model the saved format refuses, stops the run and says why: the old
+    schema is never used without a word. gaik's own copy of a schema it generated in a run is for
+    reading only (it may not import); there the model file is the schema.
+    """
+    py_path = schema_dir / f"{schema_name}.py"
+    model_path = schema_dir / f"{schema_name}_model.json"
+    req_path = schema_dir / f"{schema_name}_requirements.json"
+    if not (py_path.is_file() and model_path.is_file() and req_path.is_file()):
+        return
+    if py_path.stat().st_mtime <= model_path.stat().st_mtime:
+        return
+    try:
+        from gaik.software_components.extractor.saved_schema import write_model_file
+    except ImportError:  # an older gaik: load_schema() reads the .py itself
+        return
+    if "(do not edit manually)" in py_path.read_text(encoding="utf-8", errors="replace")[:200]:
+        print(
+            f"WARNING: {py_path.name} is newer than {model_path.name}, but it is gaik's "
+            f"read-only copy of a generated schema; the run uses {model_path.name}."
+        )
+        return
+    import importlib.util
+
+    try:
+        # Only this PoC's own schema file is run, wherever config.yaml points.
+        if not py_path.resolve().is_relative_to(Path(__file__).resolve().parent):
+            raise ValueError(f"{py_path} is outside this PoC's folder")
+        model_name = json.loads(req_path.read_text(encoding="utf-8"))["model_name"]
+        spec = importlib.util.spec_from_file_location(f"_poc_{schema_name}", py_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot read {py_path.name}")
+        module = importlib.util.module_from_spec(spec)
+        # Registered while it is used, so a forward reference in the file resolves.
+        sys.modules[spec.name] = module
+        try:
+            spec.loader.exec_module(module)
+            model = getattr(module, model_name, None)
+            if model is None:
+                raise LookupError(f"it has no class {model_name!r}, the name in {req_path.name}")
+            # Written next to the old file first, so a refused model leaves it as it was.
+            # write_model_file() refuses a model whose description does not rebuild it.
+            tmp_path = model_path.with_suffix(".json.tmp")
+            try:
+                write_model_file(model, tmp_path)
+                tmp_path.replace(model_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        finally:
+            sys.modules.pop(spec.name, None)
+    except Exception as exc:
+        print(
+            f"\nERROR: {py_path.name} was edited after {model_path.name}, and the edit "
+            f"cannot be used: {type(exc).__name__}: {exc}\n"
+            f"{model_path.name} was not changed, so the run would use the schema from before "
+            f"the edit. Fix {py_path.name} and run again.\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(f"{py_path.name} was edited after {model_path.name}: model file written again.")
+
+
 def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
     """Load the saved schema if it exists and the requirements prompt hasn't changed.
 
@@ -102,6 +174,7 @@ def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
 
     try:
         _normalise_field_defaults(schema_dir, schema_name)
+        _refresh_model_file(schema_dir, schema_name)
         existing = pipeline.load_schema(schema_dir, schema_name)
         if existing:
             print("Using approved schema (requirements unchanged).")
@@ -110,15 +183,14 @@ def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
         print("No saved schema found -- will generate from extraction_requirements.md.")
         return None, None, current_hash
     except Exception as exc:
-        import traceback as _tb
         print(
             f"\nERROR: The approved schema exists but could not be loaded.\n"
+            f"  Model        : {schema_dir}/{schema_name}_model.json\n"
             f"  Schema       : {schema_dir}/{schema_name}.py\n"
             f"  Requirements : {schema_dir}/{schema_name}_requirements.json\n"
-            f"  Reason       : {type(exc).__name__}: {exc}\n\n"
-            f"{_tb.format_exc()}"
+            f"  Reason       : {poc_output.error_detail(exc)}\n\n"
             f"The approved schema has NOT been overwritten.\n"
-            f"To regenerate, delete the two files above and re-run.\n",
+            f"To regenerate, delete the files above and re-run.\n",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -139,9 +211,9 @@ def find_input_file(config: dict, cli_input: str | None) -> Path:
 
     try:
         return find_input(sample_dir, *audio_exts, pick_first=True)
-    except InputNotFound:
+    except InputNotFound as exc:
         print(
-            f"ERROR: No audio file found in {sample_dir}\n"
+            f"ERROR: {exc}\n"
             "Place a .wav or .mp3 file there, or use --input to specify one.",
             file=sys.stderr,
         )
@@ -156,7 +228,9 @@ def main() -> None:
         action="store_true",
         help="Audio input cannot be synthesised automatically. Place a real .wav or .mp3 in sample_input/ instead.",
     )
+    poc_output.add_output_flags(parser)
     args = parser.parse_args()
+    poc_output.configure(args)
 
     if args.synthetic:
         print(
@@ -192,8 +266,11 @@ def main() -> None:
     transcriber_ctor = {
         "output_dir": str(Path(__file__).parent / "output"),
         "compress_audio": True,
-        "enhanced_transcript": True,
+        # Enhancement sends the transcript to the transcription stage's cloud provider.
+        "enhanced_transcript": not external_model_forbidden(config),
         "language": language,
+        # Self-hosted Whisper: its endpoint and key from LOCAL_TRANSCRIBER_API_*.
+        **local_transcriber_options(config, audio_config),
     }
     extractor_ctor = {}
     if extraction_model:
@@ -237,7 +314,7 @@ ${source_tracing_section}${llm_judge_section}
     )
 
     print(f"\nExtracted fields written to: {output_path}")
-    print(json.dumps(result.extracted_fields, indent=2, ensure_ascii=False, default=str))
+    poc_output.show_result(result.extracted_fields)
 
     if result.transcription:
         transcript_path = output_dir / f"{input_file.stem}_transcript.txt"
@@ -252,4 +329,4 @@ ${source_tracing_section}${llm_judge_section}
 ${pdf_report_section}
 
 if __name__ == "__main__":
-    main()
+    poc_output.run(main)

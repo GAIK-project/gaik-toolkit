@@ -58,7 +58,9 @@ function borderHeight(el: Parameters<typeof fitField>[0]): number {
  * the button at its end; without them the button stands beside the text, so a
  * running conversation's field is one line tall until it is written in. The
  * start view and a session's chat draw the same card. Enter sends (the form's
- * submit), Shift+Enter breaks the line.
+ * submit), Shift+Enter breaks the line. While a reply is being written the
+ * button stops it instead (`stop`): the same button in the same place, so it
+ * is where the hand and the tab order already are.
  *
  * The field is as tall as its text, up to FIELD_MAX. Where the browser cannot
  * size it from the stylesheet, it is measured here (lib/field-grow).
@@ -79,6 +81,7 @@ export function ComposerCard({
   sendLabel,
   sendDisabled = false,
   sendBusy = false,
+  stop,
 }: {
   fieldRef: RefObject<HTMLTextAreaElement | null>;
   /** The card itself: where the field stands on the page. */
@@ -100,13 +103,41 @@ export function ComposerCard({
   sendDisabled?: boolean;
   /** The message is on its way: the button turns. */
   sendBusy?: boolean;
+  /** A reply is being written: the button stops it. `busy` once it is pressed. */
+  stop?: { label: string; onStop: () => void; busy?: boolean };
 }) {
   // Only where the stylesheet cannot do it. The placeholder counts too: a
   // longer one (a gate's change request) may wrap.
   useGrowingField(fieldRef, FIELD_MAX, [value, large, placeholder]);
 
   const empty = value.trim() === "";
-  const send = (
+  const round = `inline-flex shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform,opacity] duration-150 ease-out active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 ${
+    large ? "h-9 w-9" : "h-8 w-8"
+  }`;
+  // One button element for both: it keeps its place and the focus when a
+  // message is sent and when its reply ends.
+  const send = stop ? (
+    <button
+      type="button"
+      data-testid="chat-stop"
+      disabled={stop.busy}
+      aria-busy={stop.busy || undefined}
+      aria-label={stop.label}
+      title={stop.label}
+      onClick={(e) => {
+        // The second press of a double click that sent the message is not a stop.
+        if (e.detail > 1) return;
+        stop.onStop();
+      }}
+      className={`${round} bg-brand text-on-brand hover:bg-brand-hover active:bg-brand-active`}
+    >
+      {stop.busy ? (
+        <Icon name="loaderCircle" size={18} className="animate-spin motion-reduce:animate-none" />
+      ) : (
+        <Icon name="square" size={12} fill="currentColor" />
+      )}
+    </button>
+  ) : (
     <button
       type="submit"
       disabled={sendDisabled}
@@ -115,9 +146,7 @@ export function ComposerCard({
       title={sendLabel}
       // Quiet while there is nothing to send, filled once there is.
       data-empty={empty || undefined}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform,opacity] duration-150 ease-out active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 ${
-        large ? "h-9 w-9" : "h-8 w-8"
-      } ${
+      className={`${round} ${
         empty
           ? "bg-surface-muted text-text-muted"
           : "bg-brand text-on-brand hover:bg-brand-hover active:bg-brand-active"
