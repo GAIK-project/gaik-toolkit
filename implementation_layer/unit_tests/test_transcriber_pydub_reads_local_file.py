@@ -1,0 +1,208 @@
+"""pydub decodes the given local file from its bytes, never from its name.
+
+The real pydub code runs; only the ffmpeg and ffprobe processes it starts are
+replaced, so each test sees the exact command lines and stdin pydub would use.
+The provider is an ``httpx.MockTransport``, so no request leaves the test.
+"""
+
+from __future__ import annotations
+
+import io
+import subprocess
+import wave
+from pathlib import Path
+
+import httpx
+import pydub.utils
+import pytest
+from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.transcriber import transcriber as module
+
+# A relative name that ffmpeg and ffprobe would read as a protocol address.
+RECORDING_NAME = "http:recording.mp3"
+SECONDS = 3
+
+
+def _wav_bytes(seconds: int = SECONDS) -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(8000)
+        out.writeframes(b"\x00\x00" * 8000 * seconds)
+    return buffer.getvalue()
+
+
+class _MediaTools:
+    """Stands in for every ffmpeg and ffprobe process and records how it was started."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[list[str], bytes | None]] = []
+
+    def popen(self, args, stdin=None, stdout=None, stderr=None, **kwargs):
+        tools = self
+
+        class _Process:
+            returncode = 0
+
+            def __init__(self) -> None:
+                self.args = list(args)
+
+            def communicate(self, input=None, timeout=None):  # noqa: A002 - Popen signature
+                tools.calls.append((self.args, input))
+                if Path(self.args[0]).name.startswith(("ffprobe", "avprobe")):
+                    return b"{}", b""
+                if self.args[-1] == "-":  # a decode to WAV on stdout
+                    return _wav_bytes(), b""
+                return b"", b""  # an export to a file pydub names itself
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        return _Process()
+
+    def decodes(self) -> list[tuple[list[str], bytes | None]]:
+        return [(args, data) for args, data in self.calls if args[-1] == "-"]
+
+
+@pytest.fixture
+def media_tools(monkeypatch, tmp_path) -> _MediaTools:
+    tools = _MediaTools()
+    monkeypatch.setattr(subprocess, "Popen", tools.popen)
+    monkeypatch.setattr(pydub.utils, "Popen", tools.popen)
+    monkeypatch.setattr(module.time, "sleep", lambda _: None)
+    monkeypatch.chdir(tmp_path)
+    return tools
+
+
+@pytest.fixture
+def provider():
+    requests: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"text": "synthetic transcript"})
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+        config = {
+            "provider": "openai",
+            "api_key": "test-key",
+            "base_url": "https://api.openai.com/v1",
+            "http_client": client,
+            "max_retries": 0,
+        }
+        yield config, requests
+
+
+def _recording() -> Path:
+    path = Path(RECORDING_NAME)
+    path.write_bytes(b"synthetic recording bytes")
+    return path
+
+
+def _assert_only_the_file_bytes_reach_the_media_tools(tools: _MediaTools) -> None:
+    assert tools.calls, "pydub started no media tool"
+    for args, _data in tools.calls:
+        assert not any(RECORDING_NAME in arg for arg in args), args
+    assert tools.decodes(), "pydub decoded nothing"
+    for _args, data in tools.decodes():
+        assert data == b"synthetic recording bytes"
+
+
+def test_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(media_tools, provider):
+    config, requests = provider
+    transcriber = module.Transcriber(
+        config, output_dir="workspace", limits=InputLimits(max_media_seconds=None)
+    )
+    _recording()
+
+    result = transcriber.transcribe(RECORDING_NAME)
+
+    _assert_only_the_file_bytes_reach_the_media_tools(media_tools)
+    # The duration read and the chunking check each decode the file once.
+    assert len(media_tools.decodes()) == 2
+    assert result.audio_duration_s == SECONDS
+    assert result.raw_transcript == "synthetic transcript"
+    assert len(requests) == 1
+
+
+def test_chunked_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(
+    media_tools, provider
+):
+    config, requests = provider
+    transcriber = module.Transcriber(
+        config,
+        output_dir="workspace",
+        max_duration_seconds=1,
+        limits=InputLimits(max_media_seconds=None),
+    )
+    _recording()
+
+    result = transcriber.transcribe(RECORDING_NAME)
+
+    _assert_only_the_file_bytes_reach_the_media_tools(media_tools)
+    # Duration read, chunking check and the decode the chunks are cut from.
+    assert len(media_tools.decodes()) == 3
+    assert "synthetic transcript" in result.raw_transcript
+    assert len(requests) > 1
+
+
+def test_split_and_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(
+    media_tools, provider
+):
+    config, requests = provider
+    _recording()
+
+    transcript = module.split_and_transcribe_with_context(
+        RECORDING_NAME, config, max_duration_seconds=1, transcription_model="whisper-1"
+    )
+
+    _assert_only_the_file_bytes_reach_the_media_tools(media_tools)
+    assert len(media_tools.decodes()) == 1
+    assert "synthetic transcript" in transcript
+    assert requests
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"#EXTM3U\n#EXTINF:1,\nother.mp3\n",
+        b"ffconcat version 1.0\nfile other.mp3\n",
+        b'<?xml version="1.0"?>\n<MPD xmlns="urn:mpeg:dash:schema:mpd:2011"></MPD>\n',
+    ],
+    ids=["hls-playlist", "ffconcat-list", "dash-manifest"],
+)
+def test_split_and_transcribe_refuses_a_playlist_before_any_decode_or_request(
+    media_tools, provider, content
+):
+    config, requests = provider
+    Path("talk.mp3").write_bytes(content)
+
+    with pytest.raises(ValueError, match="playlist or file list"):
+        module.split_and_transcribe_with_context("talk.mp3", config)
+
+    assert media_tools.calls == []
+    assert requests == []
+
+
+def test_transcribe_refuses_a_name_that_is_not_a_local_file(media_tools, provider):
+    config, requests = provider
+    transcriber = module.Transcriber(config, output_dir="workspace")
+
+    with pytest.raises(FileNotFoundError):
+        transcriber.transcribe("http://example.invalid/recording.mp3")
+
+    assert media_tools.calls == []
+    assert requests == []

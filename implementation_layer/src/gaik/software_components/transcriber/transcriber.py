@@ -20,7 +20,7 @@ from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
-from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.input_limits import InputLimits, check_not_media_list
 from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
@@ -44,6 +44,21 @@ REMOTE_MAX_DURATION_SECONDS = 1400
 
 # Default chunking threshold, with margin below the API ceiling.
 DEFAULT_MAX_DURATION_SECONDS = 1200
+
+
+def _decode_audio(path: str | Path) -> AudioSegment:
+    """Decode the local file at ``path`` with pydub.
+
+    pydub gets the open file, not its name: ffmpeg and ffprobe then read the
+    file's bytes from a pipe, so a name such as ``http:...`` or ``concat:...``
+    is never read as a protocol or as a list of other files. The format is
+    judged from the content, as before.
+
+    Raises:
+        OSError: If ``path`` is not a file that can be opened.
+    """
+    with open(path, "rb") as handle:
+        return AudioSegment.from_file(handle)
 
 
 def _audio_provider(api_config: dict) -> str:
@@ -249,7 +264,7 @@ class Transcriber:
         # we fall back to None rather than blocking transcription.
         audio_duration_s: float | None = None
         try:
-            audio_duration_s = round(len(AudioSegment.from_file(str(input_path))) / 1000.0, 3)
+            audio_duration_s = round(len(_decode_audio(input_path)) / 1000.0, 3)
         except Exception as exc:
             print(f"Could not read audio duration: {exc}")
         if audio_duration_s is not None:
@@ -412,9 +427,7 @@ class Transcriber:
         """
         if self._needs_chunking(input_path):
             print("Chunking input for transcription...")
-            audio = AudioSegment.from_file(
-                input_path
-            )  # works for audio, and many video containers via ffmpeg
+            audio = _decode_audio(input_path)  # audio, and many video containers via ffmpeg
             self.limits.check_media_seconds(len(audio) / 1000, input_path.name)
             return split_and_transcribe_with_context(
                 str(input_path),
@@ -437,7 +450,7 @@ class Transcriber:
             return True
 
         try:
-            duration_seconds = len(AudioSegment.from_file(file_path)) / 1000
+            duration_seconds = len(_decode_audio(file_path)) / 1000
         except Exception as exc:
             print(f"Could not read audio duration for chunking check: {exc}")
             return False
@@ -527,14 +540,19 @@ def split_and_transcribe_with_context(
     ``usage``, if given, gets the usage of every chunk request added to it.
     ``language``, a two-letter ISO-639-1 code, goes with every chunk request;
     ``None`` or ``"auto"`` sends none, so the provider detects the language.
+
+    Raises:
+        ValueError: If ``audio_path`` is a playlist or file list rather than a
+            recording (:func:`~gaik.software_components.input_limits.check_not_media_list`).
     """
 
     _audio_provider(api_config)
+    check_not_media_list(audio_path)
     if transcription_model is None:
         transcription_model = api_config.get("transcription_model", "whisper")
 
     if audio is None:
-        audio = AudioSegment.from_file(audio_path)
+        audio = _decode_audio(audio_path)
 
     duration_seconds = len(audio) / 1000
     file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
