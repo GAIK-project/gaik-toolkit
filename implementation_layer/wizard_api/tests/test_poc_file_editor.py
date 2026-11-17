@@ -25,6 +25,15 @@ ALICE = {USER_HEADER: "alice@example.com"}
 BOB = {USER_HEADER: "bob@example.com"}
 
 ENV_EXAMPLE = "# The model provider's key\nAZURE_API_KEY=\n"
+#: A Secret of the runs' own, other than the project's shared one.
+OWN_RUNNER_SECRET = "wizard-v2-poc-run-keys"
+
+
+@pytest.fixture(autouse=True)
+def _runs_use_their_own_key(monkeypatch):
+    """Code is saved only while the test runs use a runner key of their own: the tests
+    here are about the editor with that on. Those about the shared key unset it."""
+    monkeypatch.setenv("WIZARD_POC_RUNNER_SECRET", OWN_RUNNER_SECRET)
 
 
 def _package(tmp_path) -> str:
@@ -380,6 +389,74 @@ def test_every_file_the_editor_saves_but_a_readme_is_one_a_test_run_is_tied_to(t
     assert not poc_service.counts_for_package_digest("README.md")
 
 
+# --- code is saved only when the test runs use their own runner key ---------------
+
+_CODE = ("run_poc.py", "helpers/dates.py", "schemas/output_schema.py", "requirements.txt")
+_NOT_CODE = (
+    ".env.example",
+    "config.yaml",
+    "prompts/extract.md",
+    "schemas/output_schema.json",
+    "labels.json",
+    "README.md",
+)
+
+
+def _with_code(tmp_path) -> str:
+    poc = _package(tmp_path)
+    os.makedirs(os.path.join(poc, "helpers"))
+    for name, text in (
+        ("helpers/dates.py", "def parse(value):\n    return value\n"),
+        ("schemas/output_schema.py", "x = 1\n"),
+        ("schemas/output_schema.json", "{}\n"),
+        ("requirements.txt", "gaik[extract]\n"),
+        ("config.yaml", "stages: {}\n"),
+        ("labels.json", "[]\n"),
+    ):
+        with open(os.path.join(poc, name), "w", encoding="utf-8") as fh:
+            fh.write(text)
+    return poc
+
+
+@pytest.mark.parametrize("setting", [None, "gaik-demo-api-keys", "Not_A_Secret_Name"])
+def test_with_the_shared_runner_key_code_is_shown_but_not_saved(
+    tmp_path, monkeypatch, setting
+) -> None:
+    if setting is None:
+        monkeypatch.delenv("WIZARD_POC_RUNNER_SECRET")
+    else:
+        monkeypatch.setenv("WIZARD_POC_RUNNER_SECRET", setting)
+    poc = _with_code(tmp_path)
+
+    for path in _CODE:
+        read = poc_service.read_package_file(poc, path)
+        assert (read["editable"], read["read_only_reason"]) == (
+            False,
+            "code_edit_needs_own_runner_key",
+        ), path
+        refused = _refusal(
+            lambda p=path, d=read["digest"]: poc_service.write_package_file(poc, p, "x\n", d)
+        )
+        assert (refused.status, refused.code) == (403, "code_edit_needs_own_runner_key"), path
+        assert poc_service.read_package_file(poc, path)["content"] == read["content"]
+    # The prompts, the schema's JSON, the settings and the list of variables stay editable.
+    for path in _NOT_CODE:
+        read = poc_service.read_package_file(poc, path)
+        assert read["editable"] is True, path
+        saved = poc_service.write_package_file(poc, path, read["content"] + "\n", read["digest"])
+        assert saved["path"] == path
+
+
+def test_with_a_runner_key_of_their_own_code_is_saved(tmp_path) -> None:
+    poc = _with_code(tmp_path)
+
+    for path in _CODE + _NOT_CODE:
+        read = poc_service.read_package_file(poc, path)
+        assert (read["editable"], read["read_only_reason"]) == (True, None), path
+        saved = poc_service.write_package_file(poc, path, read["content"] + "\n", read["digest"])
+        assert saved["path"] == path
+
+
 def test_the_packages_test_page_is_shown_but_not_saved(tmp_path) -> None:
     """``app.py`` at the root and everything under ``ui/`` are the test page the
     scaffolder writes from its templates; ``ui/`` is outside the digest."""
@@ -631,6 +708,27 @@ def test_nothing_is_saved_while_the_wizard_is_replying(client, monkeypatch) -> N
     assert refused.json()["detail"]["error"] == "wizard_responding"
     with open(os.path.join(created["output_dir"], "poc", "run_poc.py"), encoding="utf-8") as fh:
         assert fh.read() == "print('ok')\n"
+
+
+@requires_postgres
+def test_with_the_shared_runner_key_the_api_refuses_code_and_saves_the_rest(
+    client, monkeypatch
+) -> None:
+    monkeypatch.delenv("WIZARD_POC_RUNNER_SECRET")
+    created = _session_with_package(client, "shared-key")
+    sid = created["id"]
+
+    read = _file(client, sid, "run_poc.py").json()
+    refused = _save(client, sid, "run_poc.py", "print('edited')\n", read["digest"])
+
+    assert (read["editable"], read["read_only_reason"]) == (False, "code_edit_needs_own_runner_key")
+    assert refused.status_code == 403
+    assert refused.json()["detail"]["error"] == "code_edit_needs_own_runner_key"
+    with open(os.path.join(created["output_dir"], "poc", "run_poc.py"), encoding="utf-8") as fh:
+        assert fh.read() == "print('ok')\n"
+    assert "user_edits" not in client.get(f"/sessions/{sid}").json()["metadata"]
+    readme = _file(client, sid, "README.md").json()
+    assert _save(client, sid, "README.md", "# Edited\n", readme["digest"]).status_code == 200
 
 
 @requires_postgres

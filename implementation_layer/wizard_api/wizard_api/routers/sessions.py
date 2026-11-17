@@ -413,6 +413,8 @@ def write_poc_file(
     The same path rules as the read, and further: only the kinds of file a
     person edits by hand (``poc_service.EDITABLE_SUFFIXES`` and
     ``.env.example``), not the AI marker, the test material or a run's output,
+    no code while the test runs use the shared runner key (403
+    ``code_edit_needs_own_runner_key``, ``poc_service.package_file_read_only``),
     and 409 ``file_changed`` when the file is no longer what the editor read.
     Not while the wizard is replying: it may be rewriting the same files, and
     it is told of an edit only with the next message. A save and the start of

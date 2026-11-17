@@ -557,6 +557,8 @@ export type Dict = {
   /** Why a file is shown but not edited. */
   pocFileReadOnly: string;
   pocFileTypeReadOnly: string;
+  /** The package's code while the test runs use the shared runner key. */
+  pocFileCodeNeedsOwnKey: string;
   /** Why a file cannot be opened. */
   pocFileNotText: string;
   pocFileTooLargeToOpen: string;
@@ -1294,6 +1296,7 @@ const fi: Dict = {
   pocFileDiscardClose: "Sulje tallentamatta",
   pocFileReadOnly: "Vain luku: tätä tiedostoa ei muokata käsin.",
   pocFileTypeReadOnly: "Vain luku: tämän tyyppistä tiedostoa ei voi muokata täällä.",
+  pocFileCodeNeedsOwnKey: "Vain luku: koodia voi muokata täällä, kun testiajot käyttävät omaa avaintaan.",
   pocFileNotText: "Tiedostoa ei voi näyttää, koska se ei ole tekstiä.",
   pocFileTooLargeToOpen: "Tiedosto on liian suuri avattavaksi täällä (yli 256 kt). Se on mukana ladattavassa paketissa.",
   pocFileNotFound: "Tiedostoa ei enää ole paketissa.",
@@ -2103,6 +2106,7 @@ const en: Dict = {
   pocFileDiscardClose: "Close without saving",
   pocFileReadOnly: "Read-only: this file is not changed by hand.",
   pocFileTypeReadOnly: "Read-only: files of this type cannot be edited here.",
+  pocFileCodeNeedsOwnKey: "Read-only: the code can be edited here once the test runs use their own key.",
   pocFileNotText: "The file cannot be shown because it is not text.",
   pocFileTooLargeToOpen: "The file is too large to open here (over 256 KB). It is in the package you download.",
   pocFileNotFound: "The file is no longer in the package.",

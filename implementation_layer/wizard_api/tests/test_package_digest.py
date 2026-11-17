@@ -24,6 +24,14 @@ from wizard_api.routers import sessions as sessions_router
 from wizard_api.schemas.session import SessionUpdate
 from wizard_api.services import poc_service, session_service
 
+
+@pytest.fixture(autouse=True)
+def _runs_use_their_own_key(monkeypatch):
+    """The editor saves code only while the test runs use a runner key of their own
+    (``test_poc_file_editor.py`` covers the shared key); these tests edit modules."""
+    monkeypatch.setenv("WIZARD_POC_RUNNER_SECRET", "wizard-v2-poc-run-keys")
+
+
 _PACKAGE = {
     "run_poc.py": "from gaik.software_components.extractor import Extractor\n",
     "requirements.txt": "gaik[extract]\n",

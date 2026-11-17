@@ -212,6 +212,7 @@ export function PocFileEditor({
         file_too_large: t.pocFileTooLargeToSave,
         secrets_not_stored: t.pocFileSecrets,
         key_value_not_stored: t.pocFileKeyValue.replace("{names}", (saveProblem.variables ?? []).join(", ")),
+        code_edit_needs_own_runner_key: t.pocFileCodeNeedsOwnKey,
         file_read_only: t.pocFileReadOnly,
         file_type_not_editable: t.pocFileTypeReadOnly,
         not_found: t.pocFileNotFound,
@@ -219,9 +220,11 @@ export function PocFileEditor({
     : null;
   const readOnlyText =
     file && !file.editable
-      ? file.readOnlyReason === "file_type_not_editable"
-        ? t.pocFileTypeReadOnly
-        : t.pocFileReadOnly
+      ? ({
+          file_type_not_editable: t.pocFileTypeReadOnly,
+          // wizard_api's rule: code is saved only when the test runs use their own runner key.
+          code_edit_needs_own_runner_key: t.pocFileCodeNeedsOwnKey,
+        }[file.readOnlyReason ?? ""] ?? t.pocFileReadOnly)
       : null;
   // What a save sets off, said before it: only for a file the test run is tied to.
   const costText = file?.editable && file.affectsPackage ? (gate3Approved ? t.pocFileReopens : t.pocFileRetest) : null;

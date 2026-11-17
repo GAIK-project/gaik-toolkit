@@ -762,7 +762,10 @@ export function setMockReplyPace(ms: number): void {
 //
 // The mock has no package on disk. Every session has the same small one, so
 // the editor can be opened, saved and brought into conflict without
-// wizard_api; a save is kept per session until the mocks are reset.
+// wizard_api; a save is kept per session until the mocks are reset. It answers
+// as a deployment whose test runs use their own runner key, so code is
+// editable; wizard_api with the shared key keeps it read-only
+// (`code_edit_needs_own_runner_key`), which only wizard_api decides.
 
 const MOCK_POC_FILES: Record<string, string> = {
   "README.md": "# PoC\n\nRun `python run_poc.py` after `pip install -r requirements.txt`.\n",

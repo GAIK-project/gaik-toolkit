@@ -1431,7 +1431,10 @@ def package_file_read_only(normalised: str) -> str | None:
     package digest (``_in_version``), and every saved edit must count as a
     change to the package a test run is tied to, but a README's. Nor the test
     page (``app.py`` at the root and everything under ``ui/``), which is the
-    scaffolder's template as it is.
+    scaffolder's template as it is. Nor, while the test runs use the project's
+    shared runner key, the package's code (``is_package_code``,
+    ``code_edit_needs_own_runner_key``): user-written code runs only with a
+    runner key of its own. The other files stay editable.
     """
     parts = normalised.split("/")
     if parts[-1] == AI_MARKER_NAME or parts[0] in _READ_ONLY_DIRS:
@@ -1442,7 +1445,36 @@ def package_file_read_only(normalised: str) -> str | None:
         return "file_read_only"
     if parts[-1] != ENV_EXAMPLE_NAME and not parts[-1].lower().endswith(EDITABLE_SUFFIXES):
         return "file_type_not_editable"
+    if is_package_code(normalised) and _code_edits_wait():
+        return CODE_NEEDS_OWN_RUNNER_KEY
     return None
+
+
+#: Why code is not saved: the test runs use the project's shared runner key.
+CODE_NEEDS_OWN_RUNNER_KEY = "code_edit_needs_own_runner_key"
+#: Besides every Python file, what decides what a run installs.
+_INSTALL_NAMES = frozenset({"requirements.txt"})
+
+
+def is_package_code(normalised: str) -> bool:
+    """Whether a package file is code: what a run executes or what decides what it installs.
+
+    Every Python file (the run imports the package's modules and loads
+    ``schemas/output_schema.py`` with importlib) and ``requirements.txt``. The
+    other files a run reads are data to it: ``config.yaml`` is read with
+    ``yaml.safe_load``, the prompts as text and the schema's JSON files as
+    JSON, and the run installs nothing (the runner image has its packages).
+    """
+    name = normalised.rsplit("/", 1)[-1].lower()
+    return name.endswith(".py") or name in _INSTALL_NAMES
+
+
+def _code_edits_wait() -> bool:
+    """True while the editor saves no code: user-written code runs only with a runner key
+    of its own (``sandbox_runner.runs_use_shared_key``)."""
+    from wizard_api.services import sandbox_runner
+
+    return sandbox_runner.runs_use_shared_key()
 
 
 def counts_for_package_digest(normalised: str) -> bool:
@@ -1526,6 +1558,12 @@ def write_package_file(
     reason = package_file_read_only(package_file_path(relative))
     if reason == "file_read_only":
         raise PackageFileError(403, reason, "this file is not changed by hand")
+    if reason == CODE_NEEDS_OWN_RUNNER_KEY:
+        raise PackageFileError(
+            403,
+            reason,
+            "the package's code can be edited here once the test runs use their own key",
+        )
     if reason is not None:
         raise PackageFileError(422, reason, "files of this type cannot be edited here")
     normalised, target = _package_file(poc_dir, relative)

@@ -314,6 +314,37 @@ test.describe("PoC file editor", () => {
     await expect(page.locator('li[data-path="poc/AI-GENERATED.json"] button')).toBeFocused();
   });
 
+  test("code the api keeps read-only (the runs use the shared key) is shown with the reason and no save", async ({
+    page,
+  }) => {
+    await fakePackage(page);
+    // wizard_api's answer while the test runs use the project's shared runner key.
+    await page.route(
+      (url) => url.pathname.endsWith("/poc/file") && url.searchParams.get("path") === "run_poc.py",
+      (route) =>
+        route.fulfill({
+          json: {
+            path: "run_poc.py",
+            content: "print('ok')\n",
+            digest: "d1",
+            bytes: 12,
+            editable: false,
+            read_only_reason: "code_edit_needs_own_runner_key",
+            affects_package: true,
+          },
+        }),
+    );
+    await openPoc(page);
+
+    const editor = await openFile(page, "run_poc.py");
+
+    await expect(editor.getByTestId("poc-file-note")).toHaveText(
+      "Vain luku: koodia voi muokata täällä, kun testiajot käyttävät omaa avaintaan.",
+    );
+    await expect(editor.getByTestId("poc-file-save")).toHaveCount(0);
+    await expect(editor.locator(".cm-content")).toHaveAttribute("contenteditable", "false");
+  });
+
   test("the AI marker is shown read-only, and what lies beside poc/ is not opened", async ({ page }) => {
     await fakePackage(page);
     await openPoc(page);

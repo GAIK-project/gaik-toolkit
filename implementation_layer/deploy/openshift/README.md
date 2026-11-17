@@ -57,7 +57,10 @@ cp secrets.yaml.example secrets.yaml     # secrets.yaml is gitignored
 > `sandbox-job.yaml` read it as `optional: true`. Sandbox runs can read their
 > Azure settings from another Secret with the same keys, for example one with a
 > spending cap: set `WIZARD_POC_RUNNER_SECRET=<secret name>` on the api
-> Deployment. The api and the agent keep the shared Secret.
+> Deployment. The api and the agent keep the shared Secret. Setting it to a
+> Secret with its own capped key also turns on code editing in the PoC tab's
+> editor: user-written code (`.py`, `requirements.txt`) runs only with a
+> separate runner key, so with the shared Secret those files stay read-only.
 
 ## Deploy
 
