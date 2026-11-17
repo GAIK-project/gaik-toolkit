@@ -361,10 +361,10 @@ def content_digest(content: dict[str, Any]) -> str:
 
 #: What Gate 2 approves, as the parts of the agent's draft that decide what the
 #: solution does: its output fields, its steps and components, who takes part,
-#: and what goes in and comes out. Wording (descriptions, a step's label, the
-#: reason a component was chosen, the business text, the change log) is left
-#: out on purpose: the agent rewrites it freely, and a reworded sentence is not
-#: a changed solution.
+#: what goes in and comes out, and which external services (third parties) get
+#: data. Wording (descriptions, a step's label, the reason a component was
+#: chosen, the business text, the change log) is left out on purpose: the agent
+#: rewrites it freely, and a reworded sentence is not a changed solution.
 _SOLUTION_PARTS: dict[str, tuple[str, ...]] = {
     "target_output_spec": (
         "fields",
@@ -380,6 +380,7 @@ _SOLUTION_PARTS: dict[str, tuple[str, ...]] = {
         "output_types",
         "model_provider",
         "human_review_required",
+        "external_services",
     ),
     "business_spec": ("reviewers",),
     "business_process": ("participants",),

@@ -698,3 +698,52 @@ def test_a_draft_written_down_again_has_the_digest_it_had() -> None:
 
     assert artifact_sync.solution_digest(rewritten) == artifact_sync.solution_digest(draft)
     assert artifact_sync.solution_digest(changed) != artifact_sync.solution_digest(draft)
+
+
+_SEARCH = {
+    "name": "Web search",
+    "purpose": "Finds public news about the supplier",
+    "python_package": "tavily-python>=0.5",
+    "env_vars": ["SEARCH_API_KEY"],
+    "data_sent": "The supplier's company name",
+    "user_can_provide": True,
+    "fallback": "The news field is left empty",
+}
+
+
+def test_a_new_or_changed_external_service_is_a_changed_solution() -> None:
+    """A third party that gets the case's data is part of what Gate 2 approved."""
+    from wizard_api.services import artifact_sync
+
+    draft = {"technical_spec": {"input_types": ["pdf"]}, "workflow": {"steps": []}}
+    empty = {**draft, "technical_spec": {"input_types": ["pdf"], "external_services": []}}
+    added = {**draft, "technical_spec": {"input_types": ["pdf"], "external_services": [_SEARCH]}}
+    sends_more = {
+        **draft,
+        "technical_spec": {
+            "input_types": ["pdf"],
+            "external_services": [{**_SEARCH, "data_sent": "The whole invoice"}],
+        },
+    }
+
+    # A session approved before the list existed, or without services, is unchanged.
+    assert artifact_sync.solution_digest(empty) == artifact_sync.solution_digest(draft)
+    assert artifact_sync.solution_digest(added) != artifact_sync.solution_digest(draft)
+    assert artifact_sync.solution_digest(sends_more) != artifact_sync.solution_digest(added)
+
+
+@requires_postgres
+def test_a_turn_that_adds_an_external_service_reopens_gate_2(client, db_session) -> None:
+    created, session = _session_past_gate_3(client, db_session)
+    sid = created["id"]
+
+    _edit_draft(
+        created["output_dir"],
+        lambda draft: draft.setdefault("technical_spec", {}).update(external_services=[_SEARCH]),
+    )
+    sessions_router._sync_artifacts_and_advance(db_session, session)
+
+    detail = client.get(f"/sessions/{sid}").json()
+    assert detail["gate_statuses"]["gate_2"] == "pending"
+    assert detail["metadata"]["gate_reopened"]["gate"] == "gate_2"
+    assert detail["metadata"]["gate_reopened"]["by"] == "change"
