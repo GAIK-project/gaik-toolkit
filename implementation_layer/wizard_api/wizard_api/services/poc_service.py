@@ -1251,12 +1251,16 @@ class PackageFileError(ValueError):
 def is_secret_name(relative_path: str) -> bool:
     """Whether a path names an environment file that would hold keys.
 
-    ``.env`` and every ``.env*`` name but ``.env.example``, in any folder and
-    any case. The server keeps no such file for a user: the keys are added to
-    the downloaded package in the browser.
+    ``.env``, every ``.env*`` name but ``.env.example`` and every ``*.env``
+    name, in any folder and any case. The server keeps no such file for a
+    user: the keys are added to the downloaded package in the browser.
     """
     name = relative_path.replace("\\", "/").rsplit("/", 1)[-1].lower()
-    return name.startswith(".env") and name != ENV_EXAMPLE_NAME
+    if name == ENV_EXAMPLE_NAME:
+        return False
+    # ``.env``, ``.env.local``, ``.envrc``, and the other way round:
+    # ``prod.env``, ``local.env``, ``keys.env``.
+    return name.startswith(".env") or name.endswith(".env")
 
 
 def package_file_path(relative: Any) -> str:

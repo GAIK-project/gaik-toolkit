@@ -331,8 +331,17 @@ def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
     }
 
 
+def _max_file_chars() -> int:
+    from wizard_api.services import poc_service
+
+    return poc_service.MAX_PACKAGE_FILE_BYTES
+
+
 class PocFileWrite(BaseModel):
-    content: str
+    # In characters, which are never more than the bytes the service counts
+    # (413 ``file_too_large``): a body far over the limit is refused as it is
+    # validated, not carried further.
+    content: str = Field(max_length=_max_file_chars())
     # The digest the editor was given with the text it changed.
     base_digest: str = Field(min_length=1, max_length=128)
 
@@ -445,15 +454,57 @@ def write_poc_file(
         if _reopen_if_approved_content_changed(db, session):
             noted = session.session_metadata.get(session_service.REOPENED_KEY) or {}
             reopened = noted.get("gate")
-    except Exception:  # noqa: BLE001 - the file is saved; the next chat turn compares again
-        logger.warning("approved content could not be compared after an edit", exc_info=True)
+    except Exception:  # noqa: BLE001 - the file is saved; the approval must not outlive it
+        logger.error("approved content could not be compared after an edit", exc_info=True)
         db.rollback()
+        reopened = _reopen_gate_3_after_unchecked_edit(db, session, saved)
     logger.info("session %s: the user saved poc/%s in the editor", session_id, saved["path"])
     return {
         **saved,
         "package_digest": _approved_package_digest(poc),
         "gate_reopened": reopened,
     }
+
+
+def _reopen_gate_3_after_unchecked_edit(db: Session, session, saved: dict) -> str | None:
+    """Take Gate 3's approval back when an edit could not be compared with it.
+
+    The file is saved and the comparison that would have reopened the gate
+    failed. Left there, the approval would cover an edit nobody tested and the
+    deployable package would be handed over with it. So for a file the digest
+    covers the gate is reopened without the comparison: asking for one test
+    run too many is the safe side. Should this fail as well, the download
+    still refuses (``_approved_package_changed``).
+    """
+    if not saved.get("affects_package"):
+        return None
+    try:
+        db.refresh(session)
+        if session.gate_statuses.get("gate_3") != "approved":
+            return None
+        session_service.reopen_gate(db, session, "gate_3", by="change")
+        logger.info("session %s: gate_3 reopened after an edit that was not compared", session.id)
+        return "gate_3"
+    except Exception:  # noqa: BLE001 - logged; the download's own check holds
+        logger.error("gate_3 could not be reopened after an edit", exc_info=True)
+        db.rollback()
+        return None
+
+
+def _approved_package_changed(session, poc: str) -> bool:
+    """Whether the package differs from the one Gate 3's approval was recorded on.
+
+    Read only, for the download: the comparison that reopens the gate runs
+    after every chat turn and every save in the editor, and this is what
+    stands when one of those failed. An approval of an older digest scheme, or
+    none on record, is not held against the package.
+    """
+    approved = (session.session_metadata or {}).get(session_service.APPROVED_CONTENT_KEY)
+    if not isinstance(approved, dict):
+        return False
+    if approved.get("package_scheme") != _PACKAGE_DIGEST_SCHEME:
+        return False
+    return approved.get("package") != _approved_package_digest(poc)
 
 
 @router.get("/{session_id}/poc")
@@ -2562,11 +2613,16 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
     # Until Gate 3 is approved. From then on the approval is what holds the
     # package: a change to it reopens the gate and takes the run away
     # (``_reopen_if_approved_content_changed``, after every chat turn and every
-    # save in the editor), so there is nothing left for this to catch, and a
-    # run recorded under an older digest scheme (the scheme is kept with the
-    # approval, not with the run) does not lock an approved session's download.
-    if session.gate_statuses.get("gate_3") != "approved" and _successful_run_is_of_another_package(
-        session
+    # save in the editor), and a run recorded under an older digest scheme
+    # (the scheme is kept with the approval, not with the run) does not lock an
+    # approved session's download. The package is then compared with the
+    # approval's own record here too, read only: should that comparison have
+    # failed after an edit, the edit is still not handed over.
+    gate_3_approved = session.gate_statuses.get("gate_3") == "approved"
+    if (
+        _approved_package_changed(session, poc)
+        if gate_3_approved
+        else _successful_run_is_of_another_package(session)
     ):
         raise api_error(
             409,

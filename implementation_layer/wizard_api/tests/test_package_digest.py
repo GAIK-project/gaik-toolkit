@@ -330,3 +330,75 @@ def test_before_gate_3_a_run_of_the_older_scheme_asks_for_a_new_run_as_the_gate_
     assert refused.json()["detail"]["error"] == "package_changed_since_run"
     session = session_service.get_session(db_session, uuid.UUID(sid))
     assert sessions_router._successful_run_is_of_another_package(session) is True
+
+
+# --- a comparison that fails must not leave an untested edit approved -------------
+
+
+def _fail_after(monkeypatch, calls_before_failing: int) -> None:
+    """Let the approved-content comparison work ``calls_before_failing`` times, then raise."""
+    real = sessions_router._reopen_if_approved_content_changed
+    seen = {"calls": 0}
+
+    def comparison(db, session):
+        seen["calls"] += 1
+        if seen["calls"] > calls_before_failing:
+            raise RuntimeError("the comparison could not be made")
+        return real(db, session)
+
+    monkeypatch.setattr(sessions_router, "_reopen_if_approved_content_changed", comparison)
+
+
+@requires_postgres
+def test_an_edit_whose_comparison_fails_reopens_gate_3_anyway(
+    client, db_session, monkeypatch
+) -> None:
+    sid = _approved_session(client, db_session, "fails-after", older_scheme=False)["id"]
+    # The one before the save works; the one after it raises.
+    _fail_after(monkeypatch, 1)
+
+    saved = _save(client, sid, "pdf_report.py", "def render():\n    return 'untested'\n")
+
+    assert saved.status_code == 200
+    assert saved.json()["gate_reopened"] == "gate_3"
+    detail = _detail(client, sid)
+    assert detail["gate_statuses"]["gate_3"] == "pending"
+    assert detail["metadata"]["last_successful_run"] is None
+    assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 409
+
+
+@requires_postgres
+def test_when_the_gate_cannot_be_reopened_either_the_download_still_refuses(
+    client, db_session, monkeypatch
+) -> None:
+    sid = _approved_session(client, db_session, "fails-twice", older_scheme=False)["id"]
+    assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
+    _fail_after(monkeypatch, 1)
+
+    def no_reopening(*args, **kwargs):
+        raise RuntimeError("the gate could not be reopened")
+
+    monkeypatch.setattr(session_service, "reopen_gate", no_reopening)
+
+    saved = _save(client, sid, "run_poc.py", "print('untested')\n")
+
+    assert saved.status_code == 200 and saved.json()["gate_reopened"] is None
+    # The approval is still on record, and the package it names is not this one.
+    assert _detail(client, sid)["gate_statuses"]["gate_3"] == "approved"
+    refused = client.get(f"/sessions/{sid}/poc/deployable")
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["error"] == "package_changed_since_run"
+
+
+@requires_postgres
+def test_a_failed_comparison_takes_nothing_back_for_a_file_outside_the_digest(
+    client, db_session, monkeypatch
+) -> None:
+    sid = _approved_session(client, db_session, "fails-readme", older_scheme=False)["id"]
+    _fail_after(monkeypatch, 0)
+
+    saved = _save(client, sid, "README.md", "# Edited\n")
+
+    assert saved.status_code == 200 and saved.json()["gate_reopened"] is None
+    assert _detail(client, sid)["gate_statuses"]["gate_3"] == "approved"
+    assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200

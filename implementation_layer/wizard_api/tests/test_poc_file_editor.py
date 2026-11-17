@@ -107,7 +107,18 @@ def test_a_link_is_neither_read_nor_written_through(tmp_path) -> None:
 
 
 @pytest.mark.parametrize(
-    "path", [".env", ".env.local", ".ENV", "config/.env", ".env.production", ".envrc"]
+    "path",
+    [
+        ".env",
+        ".env.local",
+        ".ENV",
+        "config/.env",
+        ".env.production",
+        ".envrc",
+        "prod.env",
+        "config/local.env",
+        "Keys.ENV",
+    ],
 )
 def test_an_environment_file_with_keys_is_not_kept(tmp_path, path) -> None:
     poc = _package(tmp_path)
@@ -372,13 +383,29 @@ def test_refusals_answer_in_the_one_error_shape(client) -> None:
         (_save(client, sid, "../workflow.bpmn", "x", "d"), 422, "invalid_path"),
         (_save(client, sid, "run_poc.py", "x", "not-the-digest"), 409, "file_changed"),
         (_save(client, sid, "run_poc.py", "x\x00y", digest), 422, "file_not_text"),
+        (_save(client, sid, "prod.env", "NAME=other\n", "d"), 422, "secrets_not_stored"),
+        (_file(client, sid, "config/keys.env"), 422, "secrets_not_stored"),
+        # Within the limit in characters, over it in bytes: the service's own count.
         (
             _save(
-                client, sid, "run_poc.py", "x" * (poc_service.MAX_PACKAGE_FILE_BYTES + 1), digest
+                client,
+                sid,
+                "run_poc.py",
+                "ä" * (poc_service.MAX_PACKAGE_FILE_BYTES // 2 + 1),
+                digest,
             ),
             413,
             "file_too_large",
         ),
+        # Over it in characters: refused as the body is validated.
+        (
+            _save(
+                client, sid, "run_poc.py", "x" * (poc_service.MAX_PACKAGE_FILE_BYTES + 1), digest
+            ),
+            422,
+            "invalid_request",
+        ),
+        (_save(client, sid, "run_poc.py", "x" * 5_000_000, digest), 422, "invalid_request"),
     ]
 
     for res, status, code in cases:

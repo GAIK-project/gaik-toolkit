@@ -23,6 +23,10 @@ SECRET_NAMES = [
     ".envrc",
     ".ENV",
     os.path.join("config", ".env.development"),
+    # The name the other way round.
+    "prod.env",
+    "keys.env",
+    os.path.join("config", "Local.ENV"),
 ]
 
 
@@ -50,7 +54,15 @@ def test_no_spelling_of_an_environment_file_is_deployable(name) -> None:
 
 
 def test_the_list_of_variables_and_ordinary_files_are_deployable() -> None:
-    for name in (".env.example", "config/.env.example", "environment.py", "env.yaml", "run_poc.py"):
+    for name in (
+        ".env.example",
+        "config/.env.example",
+        "environment.py",
+        "env.yaml",
+        "run_poc.py",
+        "prod.env.md",
+        "dotenv",
+    ):
         assert poc_service.is_deployable_path(name), name
 
 
