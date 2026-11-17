@@ -296,7 +296,7 @@ def test_agentic_review_is_strict_by_default(tmp_path, patch_llm):
     (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
     out = tmp_path / "out"
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="unresolved reviewer edits remain"):
         _gen().run(
             input_paths=[tmp_path / "src.txt"],
             sections=[{"title": "A", "instructions": "a"}],

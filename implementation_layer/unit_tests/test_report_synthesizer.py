@@ -301,14 +301,18 @@ def test_usage_heading_order_and_review_log(fakes):
 
 def test_strict_review_raises_on_unresolved_edits(fakes):
     fakes.reviewer.unresolved["services"] = [Edit(search="nowhere", replace="x", reason="r")]
-    with pytest.raises(RuntimeError, match="'services'"):
+    with pytest.raises(RuntimeError, match="'services'") as raised:
         _synthesize(strict_review=True)
+    message = str(raised.value)
+    assert "1 reviewer edit(s) could not be applied" in message
+    assert "strict_review=False" in message and "review_log" in message
+    assert "nowhere" not in message
     assert ("write", "summary") not in fakes.events
 
 
 def test_review_is_strict_by_default(fakes):
     fakes.reviewer.unresolved["services"] = [Edit(search="nowhere", replace="x", reason="r")]
-    with pytest.raises(RuntimeError, match="'services'"):
+    with pytest.raises(RuntimeError, match=r"'services'.*could not be applied \(strict_review"):
         ReportSynthesizer(CONFIG).synthesize(
             KNOWLEDGE, SECTIONS, title="Condition assessment", instructions=INSTRUCTIONS
         )

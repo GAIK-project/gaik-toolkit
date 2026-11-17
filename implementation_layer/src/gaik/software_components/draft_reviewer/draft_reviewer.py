@@ -42,6 +42,22 @@ def _apply(text: str, edits: list[Edit]) -> tuple[str, list[Edit], list[tuple[Ed
     return text, applied, failed
 
 
+LEFT_OUT = "left out of the last answer, propose it again"
+
+
+def _answers(edit: Edit, earlier: Edit) -> bool:
+    """Whether a retry edit stands for an earlier failed edit.
+
+    It does when it gives the same reason or makes the same replacement (the earlier
+    replacement text occurs in its own; a deletion is answered by another deletion).
+    """
+    if edit.reason.strip() == earlier.reason.strip():
+        return True
+    if earlier.replace.strip():
+        return earlier.replace.strip() in edit.replace
+    return not edit.replace.strip()
+
+
 class DraftReviewer:
     """Fact-check a text against reference material and apply exact corrections."""
 
@@ -112,8 +128,16 @@ class DraftReviewer:
             ).edits
             if not edits:
                 break
+            previous = failed
             text, done, failed = _apply(text, edits)
             applied.extend(done)
+            # A failed edit that the retry answer does not stand for stays failed, so it
+            # is asked for again and ends in ``unresolved`` rather than disappearing.
+            failed += [
+                (edit, LEFT_OUT)
+                for edit, _ in previous
+                if not any(_answers(new, edit) for new in edits)
+            ]
             if not failed:
                 break
         return ReviewResult(text=text, applied=applied, unresolved=[edit for edit, _ in failed])

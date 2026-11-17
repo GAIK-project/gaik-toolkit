@@ -216,8 +216,10 @@ class ReportSynthesizer:
                     raise RuntimeError(f"Section {section.id!r} is empty after review")
                 if self.strict_review and result.unresolved:
                     raise RuntimeError(
-                        f"Section {section.id!r}: {len(result.unresolved)} reviewer edits could "
-                        f"not be applied (strict_review): {[e.search for e in result.unresolved]}"
+                        f"Section {section.id!r} ({section.title!r}): "
+                        f"{len(result.unresolved)} reviewer edit(s) could not be applied "
+                        "(strict_review=True). Run the report again, or pass "
+                        "strict_review=False and read review_log for the unresolved edits."
                     )
                 notify(
                     f"Finished {section.title}: {len(result.applied)} edits applied, "

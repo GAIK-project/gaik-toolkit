@@ -470,7 +470,7 @@ The reviewer:
 - applies corrections locally with exact and fuzzy matching
 - retries failed corrections up to the configured retry limit
 
-Unresolved reviewer edits become `section.revision_warnings` by default.
+With `strict_review=False`, unresolved reviewer edits become `section.revision_warnings` and the report is written.
 
 By default (`strict_review=True`), unresolved reviewer edits raise before final report files such as `report.md` and `sections/` are written. Intermediate curation artifacts may already exist if `curate_evidence=True`.
 

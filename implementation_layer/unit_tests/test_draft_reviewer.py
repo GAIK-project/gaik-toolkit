@@ -124,6 +124,20 @@ def test_empty_retry_answer_keeps_failed_edits_unresolved(make):
     assert len(client.calls) == 2
 
 
+def test_edit_left_out_of_retry_answer_stays_unresolved(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    paint = Edit(search="painted red", replace="painted grey", reason="The colour is wrong.")
+    reviewer, client = make(_edits(typo, paint), _edits(YEAR), _edits())
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.text == DRAFT.replace("1999", "1998")
+    assert result.applied == [YEAR]
+    assert result.unresolved == [paint]
+    assert len(client.calls) == 3
+    third = client.calls[2][2]["content"]
+    assert "'painted red'" in third
+    assert "'opened in 1990'" not in third
+
+
 def test_empty_replace_deletes_passage(make):
     delete = Edit(search=" It was painted blue.", replace="", reason="Not in the reference.")
     reviewer, _ = make(_edits(delete))
