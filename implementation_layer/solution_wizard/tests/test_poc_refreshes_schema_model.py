@@ -9,10 +9,10 @@ The cases run the scaffolded run_poc.py's own schema functions on the scaffolded
 """
 
 import hashlib
+import importlib.util
 import json
 import os
 import sys
-import types
 from pathlib import Path
 
 import pytest
@@ -63,7 +63,14 @@ def _edit(poc: Path, old: str, new: str) -> None:
     os.utime(py_path, (later, later))
 
 
-def _load(poc: Path, pattern: str, capsys) -> Run:
+def _module(path: Path):
+    spec = importlib.util.spec_from_file_location(f"_test_{path.stem}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load(poc: Path, pattern: str, capsys, schema_dir: Path | None = None) -> Run:
     """Call the generated run_poc.py's _load_schema_if_fresh, as its main() does."""
     source = (poc / "run_poc.py").read_text(encoding="utf-8")
     functions = source[source.index("def _requirements_hash") : source.index("def find_input_file")]
@@ -73,14 +80,14 @@ def _load(poc: Path, pattern: str, capsys) -> Run:
         "json": json,
         "Path": Path,
         "sys": sys,
-        "poc_output": types.SimpleNamespace(error_detail=str),
+        "poc_output": _module(poc / "poc_output.py"),
     }
     exec(compile(functions, str(poc / "run_poc.py"), "exec"), namespace)
     pipeline_cls = PATTERNS[pattern][1]
     capsys.readouterr()
     try:
         schema, _requirements, _hash = namespace["_load_schema_if_fresh"](
-            pipeline_cls.__new__(pipeline_cls), poc / "schemas", "output_schema"
+            pipeline_cls.__new__(pipeline_cls), schema_dir or poc / "schemas", "output_schema"
         )
         code = None
     except SystemExit as exc:
@@ -156,11 +163,17 @@ def test_files_that_agree_are_loaded_as_before(capsys, tmp_path):
         (
             "class PurchaseOrder(BaseModel):\n",
             "class PurchaseOrder(BaseModel)\n",
-            "does not import",
+            "SyntaxError",
         ),
         ("class PurchaseOrder(BaseModel):\n", "class Order(BaseModel):\n", "has no class"),
+        # Imports, but the saved format refuses it: a constraint it cannot hold.
+        (
+            "    currency: Optional[str] = None\n",
+            "    currency: Optional[str] = None\n    count: int = Field(0, ge=0)\n",
+            "cannot be saved as data",
+        ),
     ],
-    ids=["syntax", "renamed"],
+    ids=["syntax", "renamed", "refused"],
 )
 def test_an_edit_that_cannot_be_saved_stops_the_run(capsys, tmp_path, old, new, reason):
     """Never the old schema without a word: the run stops and keeps the model file."""
@@ -173,6 +186,8 @@ def test_an_edit_that_cannot_be_saved_stops_the_run(capsys, tmp_path, old, new, 
 
     assert run.returncode == 1
     assert reason in run.stderr
+    assert "was edited after output_schema_model.json" in run.stderr
+    assert "delete the files" not in run.stderr  # that would lose the edit
     assert model_path.read_bytes() == before
     assert not (poc / "schemas" / "output_schema_model.json.tmp").exists()
 
@@ -215,3 +230,75 @@ def test_the_poc_writes_what_refresh_schema_model_writes(capsys, tmp_path):
     assert (poc / "schemas" / "output_schema_model.json").read_text(encoding="utf-8") == (
         copy / "output_schema_model.json"
     ).read_text(encoding="utf-8")
+
+
+def test_a_schema_file_outside_the_poc_is_not_run(capsys, tmp_path):
+    """config.yaml's paths.schemas may point anywhere; only the PoC's own file is run."""
+    import shutil
+
+    poc = _scaffold(tmp_path / "pkg", "document_to_structured")
+    elsewhere = tmp_path / "elsewhere"
+    shutil.copytree(poc / "schemas", elsewhere)
+    marker = tmp_path / "ran.txt"
+    py_path = elsewhere / "output_schema.py"
+    py_path.write_text(
+        py_path.read_text(encoding="utf-8")
+        + f"\nfrom pathlib import Path as _P\n_P({str(marker)!r}).write_text('x')\n",
+        encoding="utf-8",
+    )
+    later = (elsewhere / "output_schema_model.json").stat().st_mtime + 5
+    os.utime(py_path, (later, later))
+
+    run = _load(poc, "document_to_structured", capsys, schema_dir=elsewhere)
+
+    assert run.returncode == 1
+    assert "outside this PoC's folder" in run.stderr
+    assert not marker.exists()
+
+
+def test_a_schema_with_postponed_annotations_is_refreshed(capsys, tmp_path):
+    """The module is registered while it is used, so string annotations resolve."""
+    poc = _scaffold(tmp_path, "document_to_structured")
+    _edit(
+        poc,
+        '"""\n\nfrom pydantic',
+        '"""\n\nfrom __future__ import annotations\n\nfrom pydantic',
+    )
+
+    run = _load(poc, "document_to_structured", capsys)
+
+    assert "po_number" in _schema(run)["properties"]
+    assert "model file written again" in run.stdout
+
+
+@pytest.mark.parametrize("required", [True, False])
+def test_generate_schemas_py_keeps_a_fields_pattern(required):
+    """A refresh from output_schema.py must not drop what the model file holds:
+    generate_schema.py wrote a pattern field as plain str, so it was lost."""
+    from gaik.software_components.extractor.saved_schema import describe_model
+    from gaik.software_components.extractor.schema import (
+        ExtractionRequirements,
+        FieldSpec,
+        create_extraction_model,
+    )
+
+    generate_schema = _module(SCRIPT.parent / "generate_schema.py")
+    model = create_extraction_model(
+        ExtractionRequirements(
+            use_case_name="t",
+            fields=[
+                FieldSpec(
+                    field_name="code",
+                    field_type="str",
+                    description="Code",
+                    required=required,
+                    pattern=r"^[A-Z]{3}-\d+$",
+                )
+            ],
+        )
+    )
+
+    namespace: dict = {}
+    exec(generate_schema._schema_to_py(model, model.__name__), namespace)
+
+    assert describe_model(namespace[model.__name__]) == describe_model(model)

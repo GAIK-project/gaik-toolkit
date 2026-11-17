@@ -88,8 +88,8 @@ def _refresh_model_file(schema_dir: Path, schema_name: str) -> None:
     load_schema() reads the model file and never imports the .py, so a correction made
     to output_schema.py (SKILL.md Step 4.5, a Gate 3 refinement) would not reach this
     run. Same steps as the wizard's scripts/refresh_schema_model.py. A .py that does not
-    import, or a model the saved format refuses, stops the run: the old schema is never
-    used without a word. gaik's own copy of a schema it generated in a run is for
+    import, or a model the saved format refuses, stops the run and says why: the old
+    schema is never used without a word. gaik's own copy of a schema it generated in a run is for
     reading only (it may not import); there the model file is the schema.
     """
     py_path = schema_dir / f"{schema_name}.py"
@@ -103,7 +103,7 @@ def _refresh_model_file(schema_dir: Path, schema_name: str) -> None:
         from gaik.software_components.extractor.saved_schema import write_model_file
     except ImportError:  # an older gaik: load_schema() reads the .py itself
         return
-    if "(do not edit manually)" in py_path.read_text(encoding="utf-8")[:200]:
+    if "(do not edit manually)" in py_path.read_text(encoding="utf-8", errors="replace")[:200]:
         print(
             f"WARNING: {py_path.name} is newer than {model_path.name}, but it is gaik's "
             f"read-only copy of a generated schema; the run uses {model_path.name}."
@@ -111,29 +111,41 @@ def _refresh_model_file(schema_dir: Path, schema_name: str) -> None:
         return
     import importlib.util
 
-    model_name = json.loads(req_path.read_text(encoding="utf-8"))["model_name"]
-    spec = importlib.util.spec_from_file_location(f"_poc_{schema_name}", py_path)
-    module = importlib.util.module_from_spec(spec)
     try:
-        spec.loader.exec_module(module)
+        # Only this PoC's own schema file is run, wherever config.yaml points.
+        if not py_path.resolve().is_relative_to(Path(__file__).resolve().parent):
+            raise ValueError(f"{py_path} is outside this PoC's folder")
+        model_name = json.loads(req_path.read_text(encoding="utf-8"))["model_name"]
+        spec = importlib.util.spec_from_file_location(f"_poc_{schema_name}", py_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot read {py_path.name}")
+        module = importlib.util.module_from_spec(spec)
+        # Registered while it is used, so a forward reference in the file resolves.
+        sys.modules[spec.name] = module
+        try:
+            spec.loader.exec_module(module)
+            model = getattr(module, model_name, None)
+            if model is None:
+                raise LookupError(f"it has no class {model_name!r}, the name in {req_path.name}")
+            # Written next to the old file first, so a refused model leaves it as it was.
+            # write_model_file() refuses a model whose description does not rebuild it.
+            tmp_path = model_path.with_suffix(".json.tmp")
+            try:
+                write_model_file(model, tmp_path)
+                tmp_path.replace(model_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        finally:
+            sys.modules.pop(spec.name, None)
     except Exception as exc:
-        raise RuntimeError(
-            f"{py_path.name} was edited after {model_path.name} but does not import "
-            f"({type(exc).__name__}: {exc}); fix it, or remove the edit"
-        ) from exc
-    model = getattr(module, model_name, None)
-    if model is None:
-        raise RuntimeError(
-            f"{py_path.name} has no class {model_name!r}, the name in {req_path.name}"
+        print(
+            f"\nERROR: {py_path.name} was edited after {model_path.name}, and the edit "
+            f"cannot be used: {type(exc).__name__}: {exc}\n"
+            f"{model_path.name} was not changed, so the run would use the schema from before "
+            f"the edit. Fix {py_path.name} and run again.\n",
+            file=sys.stderr,
         )
-    # Written next to the old file first, so a refused model leaves it as it was.
-    # write_model_file() refuses a model whose description does not rebuild it.
-    tmp_path = model_path.with_suffix(".json.tmp")
-    try:
-        write_model_file(model, tmp_path)
-        tmp_path.replace(model_path)
-    finally:
-        tmp_path.unlink(missing_ok=True)
+        sys.exit(1)
     print(f"{py_path.name} was edited after {model_path.name}: model file written again.")
 
 
