@@ -33,7 +33,7 @@ print(answer)
 
 ## Features
 
-- **Citations** - Optional citation formatting in answers
+- **Citations** - Optional citations, built from the retrieved chunks
 - **Custom Prompt** - Provide a custom prompt template
 - **Streaming** - Stream or return full responses
 - **Conversation History** - Optional last-n Q/A memory
@@ -65,6 +65,12 @@ answer = generator.generate(
     context: str | list[Document],
     stream: bool | None = None,
 )  # -> str | Iterable[str]
+
+cited = generator.generate_with_citations(
+    query: str,
+    context: str | list[Document],
+    stream: bool | None = None,
+)  # -> CitedAnswer(.answer, .citations, .dropped_citations)
 ```
 
 ---
@@ -83,12 +89,38 @@ braces remain literal, so a JSON example needs no escaping, nested or not:
 `str.format`, where every other brace is doubled (`{{"answer": "..."}}`), still works:
 its `{{` and `}}` become single braces.
 
+### Citations
+
+With `citations=True` each retrieved chunk gets a reference: its block starts with
+`[1] [Document: name, Page: X]` for the first chunk, `[2] ...` for the second, and the
+model is asked to cite by those references only. The citations are then built in
+code from the chunks:
+
+- each reference in the answer becomes `[document_name, page X]`, taken from that
+  chunk's metadata;
+- a `[name, page X]` the model writes itself is kept only when a retrieved chunk has
+  that document and page;
+- a reference that is not one of the retrieved chunks, or a document and page that no
+  retrieved chunk has, is removed from the answer.
+
+`generate()` returns the answer with its citations built this way.
+`generate_with_citations()` also returns `citations`, a list of `Citation`
+(`reference`, `document_name`, `page_number` and the retrieved `document`) in the
+order the answer first cites them, and `dropped_citations`, the citations it
+removed, as the model wrote them. When the answer streams, both lists are filled in
+once the stream has been read to the end. A string context has no chunks, so every
+citation in its answer is removed. Only a bracketed list of numbers (`[1]`,
+`[1, 3]`) and a bracketed document with a page are read as citations; other
+bracketed text, such as a Markdown link, is left as written. With
+`citations=False` the answer is returned as the model wrote it.
+
 ### Retrieved text as data
 
 Each retrieved chunk reaches the model inside its own `<source_material>` block
 in the user message, with a random id for each call and a label naming its
 document, page and chunk (`report.pdf, page 3, chunk 12`); the block starts with
-the `[Document: name, Page: X]` line that citations are taken from. The question
+the `[Document: name, Page: X]` line, after the chunk's reference with
+`citations=True`. The question
 stays outside the blocks, and the system message holds the instructions with the
 sentence in `SOURCE_MATERIAL_INSTRUCTION`
 ([`gaik.software_components.source_material`](../../source_material.py)). A

@@ -3191,7 +3191,7 @@
     "known_limitations": [
       "RAGWorkflow already performs answer generation -- select this directly only for custom pipelines",
       "Streams by default (stream=True); set stream=False to receive a single string",
-      "Citation quality depends entirely on the retrieved context -- it formats citations, it does not verify sources",
+      "Citations are built from the retrieved chunks: the model cites by reference number, and a reference or document/page that is not one of the retrieved chunks is removed from the answer. It cannot check that a cited chunk supports the sentence it is attached to",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [

@@ -1026,7 +1026,7 @@
         "name": "citations",
         "type": "bool",
         "default": false,
-        "effect": "Include source citations in the answer.",
+        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and the answer shows [document_name, page X] from that chunk's metadata. A reference or page that is not one of the retrieved chunks is removed. generate_with_citations() also returns them as a list (CitedAnswer.citations).",
         "selection_relevant": true,
         "infer_from": "traceability / citation requirement"
       },
@@ -1630,7 +1630,7 @@
     "import": "from gaik.software_modules.RAG_workflow import RAGWorkflow",
     "construct": "workflow = RAGWorkflow(parser_config=get_stage_config(config, 'parser'), embedding_config=get_stage_config(config, 'embedding'), answer_config=get_stage_config(config, 'answer'), persist=True, persist_path=str(output_dir / 'chroma_store'), citations=True, stream=False)",
     "call": "workflow.index_documents(document_paths)\n    rr = workflow.ask(user_query)\n    answer = rr.answer",
-    "returns": "RAGWorkflowResult(.answer, .documents)",
+    "returns": "RAGWorkflowResult(.answer, .documents, .citations, .dropped_citations)",
     "install_extra": "rag-workflow",
     "subsumes": [
       "Embedder",
@@ -1642,7 +1642,7 @@
         "name": "citations",
         "type": "bool",
         "default": true,
-        "effect": "Include source citations in the answer. ON by default -- unlike the standalone AnswerGenerator, where citations defaults to false.",
+        "effect": "Include source citations in the answer, built from the retrieved chunks (RAGWorkflowResult.citations); a reference or page the retrieval did not return is removed. ON by default -- unlike the standalone AnswerGenerator, where citations defaults to false.",
         "selection_relevant": true,
         "infer_from": "leave true unless the requirements explicitly say citations are undesired in the output"
       },
