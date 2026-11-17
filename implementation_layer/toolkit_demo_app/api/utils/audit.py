@@ -7,11 +7,13 @@ every state-changing request, to the ``gaik.audit`` logger:
 
     audit user=6f1c... method=POST route=/pipeline/document status=200 ms=5321
 
-The user is the account id the proxy sends (a random id, no name or e-mail), ``-``
-without one; the route is the matched template (``/pipeline/pdf/{job_id}``), never the
-raw path, query, headers, body or file names. A streamed response is logged when its
-last chunk is sent, or when the client goes away. Writing the line never affects the
-request.
+The user is the account id the proxy sends (a random id, no name or e-mail), and the
+report runs' route handlers send it too (``lib/report-writer/gate.ts``); ``-`` without
+one, which is a call from inside the pod. The route is the matched template
+(``/pipeline/pdf/{job_id}``), never the raw path, query, headers, body or file names.
+The account id is personal data (it leads to the account); the privacy notice says so.
+A streamed response is logged when its last chunk is sent, or when the client goes
+away. Writing the line never affects the request.
 """
 
 from __future__ import annotations
@@ -30,11 +32,32 @@ audit_logger = logging.getLogger("gaik.audit")
 
 _STATE_CHANGING = {"POST", "PUT", "PATCH", "DELETE"}
 _USER_ID = re.compile(r"[A-Za-z0-9-]{1,64}\Z")
+_USER_HEADER_BYTES = USER_HEADER.encode("latin-1")  # ASGI header names are lowercase
+
+
+def route_template(scope) -> str:
+    """The matched route's full template, e.g. ``/pipeline/pdf/{job_id}``.
+
+    FastAPI keeps a route's own template (``/pdf/{job_id}``, or ``""`` for a route at
+    its router's root) and adds the ``include_router`` prefix only when matching. The
+    prefix is the part of the path before the part the route's pattern matches; it is
+    a fixed string, so no id or query value ever reaches the result.
+    """
+    route = scope.get("route")
+    template = getattr(route, "path", None)
+    pattern = getattr(route, "path_regex", None)
+    path = scope.get("path", "")
+    if template is None or pattern is None:
+        return "unmatched"
+    for start in range(len(path) + 1):
+        if (start == len(path) or path[start] == "/") and pattern.match(path[start:]):
+            return path[:start] + template or "/"
+    return template or "unmatched"
 
 
 def _user_of(scope) -> str | None:
     for name, value in scope.get("headers") or ():
-        if name.decode("latin-1").lower() == USER_HEADER:
+        if name == _USER_HEADER_BYTES:
             user = value.decode("latin-1").strip()
             return user if _USER_ID.match(user) else "invalid"
     return None
@@ -64,7 +87,7 @@ class AuditMiddleware:
                 return
             logged = True
             with contextlib.suppress(Exception):
-                route = getattr(scope.get("route"), "path", None) or "unmatched"
+                route = route_template(scope)
                 audit_logger.info(
                     "audit user=%s method=%s route=%s status=%s ms=%d",
                     user or "-",

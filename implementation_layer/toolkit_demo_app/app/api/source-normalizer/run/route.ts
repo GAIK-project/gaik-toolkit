@@ -62,5 +62,5 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("[source-normalizer] failed to record usage:", e);
     }
-  });
+  }, userId);
 }

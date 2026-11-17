@@ -96,7 +96,7 @@ def test_a_stream_is_logged_once_when_it_ends(client, caplog):
 
     assert response.content == b"ab"
     (line,) = _lines(caplog)
-    assert "route=/stream status=200" in line
+    assert "route=/stream status=200 ms=" in line  # ended, not "200-incomplete"
 
 
 def test_a_failure_is_logged_without_its_message(client, caplog):
@@ -105,3 +105,26 @@ def test_a_failure_is_logged_without_its_message(client, caplog):
 
     (line,) = _lines(caplog)
     assert "route=/fails status=error" in line and "Matti" not in line
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "template"),
+    [
+        ("GET", "/pipeline/pdf/abc123?inline=true", "/pipeline/pdf/{job_id}"),
+        ("POST", "/classify", "/classify"),
+        ("POST", "/tabular-agent/ask", "/tabular-agent/ask"),
+        ("POST", "/report-writer/run", "/report-writer/run"),
+        ("POST", "/no/such/route", "unmatched"),
+    ],
+)
+def test_the_real_app_logs_the_full_route_template(caplog, method, path, template):
+    from api.main import app
+
+    with caplog.at_level(logging.INFO, logger="gaik.audit"):
+        TestClient(app, raise_server_exceptions=False).request(
+            method, path, headers={USER_HEADER: "u1"}
+        )
+
+    (line,) = _lines(caplog)
+    assert f" route={template} status=" in line
+    assert "abc123" not in line and "inline" not in line

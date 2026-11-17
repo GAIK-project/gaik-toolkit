@@ -56,5 +56,5 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("[knowledge-synthesis] failed to record usage:", e);
     }
-  });
+  }, userId);
 }
