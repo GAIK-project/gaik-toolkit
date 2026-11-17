@@ -1,3 +1,4 @@
+import math
 import os
 from pathlib import Path
 from uuid import UUID
@@ -151,6 +152,26 @@ def agent_max_turns() -> int:
     when the reply comes back empty, so one message stays under three times this.
     """
     return _int_env("WIZARD_AGENT_MAX_TURNS", 100)
+
+
+def agent_max_budget_usd() -> float | None:
+    """Estimated USD one agent may spend from its start or resume; None means no limit.
+
+    The agent SDK's ``max_budget_usd``. Its CLI counts the spend of the whole
+    agent process, across messages, from its own price table, so this is not a
+    limit per message and not a bill (README, "Agent and chat limits"). Unset,
+    0, a negative, an unreadable or an infinite value is off, the default.
+    """
+    try:
+        value = float(os.getenv("WIZARD_AGENT_MAX_BUDGET_USD", "").strip() or 0)
+    except ValueError:
+        return None
+    return value if 0 < value < math.inf else None
+
+
+def agent_fallback_model() -> str | None:
+    """The model the agent switches to when its own fails or is unavailable; None is off."""
+    return os.getenv("WIZARD_AGENT_FALLBACK_MODEL", "").strip() or None
 
 
 def max_metered_calls_per_turn() -> int:
