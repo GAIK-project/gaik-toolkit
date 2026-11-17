@@ -9,12 +9,13 @@ import pytest
 from api.routers import postgres_agent as route
 from fastapi import HTTPException
 
-READ_ONLY = (False, False, False, False, False, False, 0, 0, 0, 0)
+READ_ONLY = (False, False, False, False, False, False, 0, 0, 0, 0, False, False, 0, False)
 
 
 @pytest.fixture(autouse=True)
 def fresh(monkeypatch):
     monkeypatch.setattr(route, "_role_checked", None)
+    monkeypatch.setattr(route, "_role_checked_at", 0.0)
     monkeypatch.setattr(route, "_warned_fallback", False)
     monkeypatch.setattr(route, "_seeded", True)
     monkeypatch.delenv(route.AGENT_DATABASE_ENV, raising=False)
@@ -37,6 +38,10 @@ def _with(**changes):
         "writable",
         "elsewhere",
         "definer",
+        "switched",
+        "large_objects",
+        "extensions",
+        "default_grants",
     ]
     facts = dict(zip(names, READ_ONLY))
     facts.update(changes)
@@ -52,9 +57,13 @@ def _with(**changes):
         (_with(db_create=True), "create schemas"),
         (_with(schema_create=True), "create schemas"),
         (_with(memberships=1), "member of 1 other role"),
-        (_with(writable=2), "change 2 table(s) or view(s)"),
-        (_with(elsewhere=3), "read or use 3 relation(s)"),
+        (_with(writable=2), "change or maintain 2 table(s) or view(s)"),
+        (_with(elsewhere=3), "read or use 3 relation(s) or sequence(s) besides the demo tables"),
         (_with(definer=1), "SECURITY DEFINER"),
+        (_with(switched=True), "switches to another role"),
+        (_with(large_objects=True), "large objects"),
+        (_with(extensions=1), "reaches other hosts or files"),
+        (_with(default_grants=True), "default privileges"),
         (None, "not found"),
     ],
 )
@@ -120,25 +129,61 @@ def test_the_role_is_checked_once_per_process(monkeypatch):
 
     assert route._check_agent_role("postgresql://agent@db/demo") == []
     assert route._check_agent_role("postgresql://agent@db/demo") == []
-    assert calls == [{"schema": route.DEMO_SCHEMA}]
+    assert calls == [{"schema": route.DEMO_SCHEMA, "tables": route.DEMO_TABLES}]
 
 
-def test_status_reports_whether_the_agents_role_passed(monkeypatch):
+def test_status_reports_the_last_check_and_never_connects(monkeypatch):
     import asyncio
 
+    import psycopg
+
+    def no_connect(*args, **kwargs):
+        pytest.fail("/status must not connect")
+
+    monkeypatch.setattr(psycopg, "connect", no_connect)
     monkeypatch.setenv("DATABASE_URL", "postgresql://admin@db/demo")
     assert asyncio.run(route.postgres_agent_status()).own_read_only_role is False
     monkeypatch.setenv(route.AGENT_DATABASE_ENV, "postgresql://agent@db/demo")
-    monkeypatch.setattr(route, "_check_agent_role", lambda url: ["it is a superuser"])
+    assert asyncio.run(route.postgres_agent_status()).own_read_only_role is False  # not checked
+    monkeypatch.setattr(route, "_role_checked", ["it is a superuser"])
     assert asyncio.run(route.postgres_agent_status()).own_read_only_role is False
-    monkeypatch.setattr(route, "_check_agent_role", lambda url: [])
+    monkeypatch.setattr(route, "_role_checked", [])
     assert asyncio.run(route.postgres_agent_status()).own_read_only_role is True
 
-    def unreachable(url):
-        raise OSError("no route to host")
 
-    monkeypatch.setattr(route, "_check_agent_role", unreachable)
-    assert asyncio.run(route.postgres_agent_status()).own_read_only_role is False
+def test_a_passing_check_is_repeated_after_ten_minutes(monkeypatch):
+    import psycopg
+
+    calls = []
+
+    class Conn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def execute(self, sql, params):
+            calls.append(1)
+
+            class Cursor:
+                @staticmethod
+                def fetchone():
+                    return READ_ONLY
+
+            return Cursor()
+
+    monkeypatch.setattr(psycopg, "connect", lambda url, **kwargs: Conn())
+    now = [1000.0]
+    monkeypatch.setattr(route.time, "monotonic", lambda: now[0])
+
+    route._check_agent_role("postgresql://agent@db/demo")
+    now[0] += 60
+    route._check_agent_role("postgresql://agent@db/demo")
+    now[0] += route._ROLE_RECHECK_SECONDS
+    route._check_agent_role("postgresql://agent@db/demo")
+
+    assert len(calls) == 2
 
 
 ADMIN_URL = os.getenv("GAIK_DEMO_TEST_POSTGRES_URL")
@@ -156,16 +201,21 @@ def test_the_role_script_makes_a_role_the_check_accepts(monkeypatch):
     route._seed_demo_schema(ADMIN_URL)
     script = Path(route.__file__).parents[1] / "scripts" / "postgres_agent_role.sql"
     subprocess.run(
-        ["psql", ADMIN_URL, "-q", "-v", "agent_password=pw-test", "-f", str(script)],
+        ["psql", ADMIN_URL, "-q", "-f", str(script)],
         check=True,
     )
+    with psycopg.connect(ADMIN_URL, autocommit=True) as conn:
+        # the script sets no password; a test sets one the way \\password would not
+        conn.execute("ALTER ROLE gaik_sql_agent PASSWORD 'pw-test'")
     parts = urlsplit(ADMIN_URL)
     host = parts.netloc.split("@", 1)[1]
     agent_url = urlunsplit(parts._replace(netloc=f"gaik_sql_agent:pw-test@{host}"))
 
     def facts(url):
         with psycopg.connect(url) as conn:
-            return conn.execute(route._ROLE_FACTS_SQL, {"schema": route.DEMO_SCHEMA}).fetchone()
+            return conn.execute(
+                route._ROLE_FACTS_SQL, {"schema": route.DEMO_SCHEMA, "tables": route.DEMO_TABLES}
+            ).fetchone()
 
     assert route._role_problems(facts(agent_url)) == []
     assert "it is a superuser" in route._role_problems(facts(ADMIN_URL))
@@ -177,13 +227,20 @@ def test_the_role_script_makes_a_role_the_check_accepts(monkeypatch):
         "read or use": "GRANT SELECT ON public.gaik_review_view TO gaik_sql_agent",
         "read or use ": "GRANT SELECT (secret) ON public.gaik_review_index TO gaik_sql_agent",
         "SECURITY DEFINER": "GRANT EXECUTE ON FUNCTION public.gaik_review_wipe() TO gaik_sql_agent",
+        "besides the demo tables": f"GRANT SELECT ON {route.DEMO_SCHEMA}.gaik_review_peek "
+        "TO gaik_sql_agent",
     }
     with psycopg.connect(ADMIN_URL, autocommit=True) as conn:
+        conn.execute(f"DROP VIEW IF EXISTS {route.DEMO_SCHEMA}.gaik_review_peek")
         conn.execute("DROP VIEW IF EXISTS public.gaik_review_view")
         conn.execute("DROP TABLE IF EXISTS public.gaik_review_index")
         conn.execute("CREATE TABLE public.gaik_review_index (id int, secret text)")
         conn.execute(
             "CREATE VIEW public.gaik_review_view AS SELECT id FROM public.gaik_review_index"
+        )
+        conn.execute(
+            f"CREATE VIEW {route.DEMO_SCHEMA}.gaik_review_peek AS "
+            "SELECT secret FROM public.gaik_review_index"
         )
         conn.execute(
             "CREATE OR REPLACE FUNCTION public.gaik_review_wipe() RETURNS void "
@@ -202,3 +259,21 @@ def test_the_role_script_makes_a_role_the_check_accepts(monkeypatch):
         assert conn.execute(f"SELECT count(*) FROM {route.DEMO_SCHEMA}.orders").fetchone()
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute("SELECT count(*) FROM public.gaik_review_index")
+
+
+@pytest.mark.skipif(not ADMIN_URL, reason="set GAIK_DEMO_TEST_POSTGRES_URL to a throwaway database")
+def test_a_role_switched_through_the_url_options_is_refused():
+    from urllib.parse import urlsplit, urlunsplit
+
+    import psycopg
+
+    # The login role is the owner; a role set through the URL's options does not change it.
+    parts = urlsplit(ADMIN_URL)
+    switched = urlunsplit(parts._replace(query="options=-crole%3Dgaik_sql_agent"))
+    with psycopg.connect(switched) as conn:
+        facts = conn.execute(
+            route._ROLE_FACTS_SQL, {"schema": route.DEMO_SCHEMA, "tables": route.DEMO_TABLES}
+        ).fetchone()
+    problems = route._role_problems(facts)
+    assert "it is a superuser" in problems
+    assert any("switches to another role" in p for p in problems)
