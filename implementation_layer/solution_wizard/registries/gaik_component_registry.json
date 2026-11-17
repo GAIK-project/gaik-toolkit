@@ -1013,7 +1013,9 @@
       "text",
       "transcript",
       "enhanced_transcript",
-      "parsed_text"
+      "parsed_text",
+      "pdf",
+      "image"
     ],
     "output_artifact_types": [
       "validation_report",
@@ -1795,7 +1797,9 @@
     "type": "software_component",
     "input_artifact_types": [
       "structured_json",
-      "text"
+      "text",
+      "pdf",
+      "image"
     ],
     "output_artifact_types": [
       "validation_report",

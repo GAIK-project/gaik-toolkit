@@ -634,3 +634,67 @@ def test_rule14_a_module_hands_the_judge_the_text_it_read(module, upload_type, s
     result = validate(bp)
 
     assert not [e for e in result.errors if e.rule in (4, 14)], result.errors
+
+
+def _source_and_judge(source_type: str, judge: str, upload: str = "pdf") -> Blueprint:
+    """upload -> VisionExtractor -> judge, the judge reading ``source_type`` beside the record."""
+    artifacts = {
+        "upload": Artifact(type=upload, source=ArtifactSource.USER_UPLOAD, optional=False),
+        "record": Artifact(
+            type="structured_json",
+            source=ArtifactSource.GENERATED,
+            optional=False,
+            produced_by="extract",
+            final_output=True,
+        ),
+        "report": Artifact(
+            type="validation_report",
+            source=ArtifactSource.GENERATED,
+            optional=False,
+            produced_by="judge",
+        ),
+    }
+    judge_inputs = ["record"] + (["upload"] if source_type == upload else [])
+    return _base_blueprint(
+        artifacts=artifacts,
+        components=Components(selected_building_blocks=["VisionExtractor", judge]),
+        workflow=Workflow(
+            steps=[
+                WorkflowStep(
+                    id="extract",
+                    name="Extract",
+                    type="automated_task",
+                    component="VisionExtractor",
+                    inputs=["upload"],
+                    outputs=["record"],
+                ),
+                WorkflowStep(
+                    id="judge",
+                    name="Validate",
+                    type="automated_task",
+                    component=judge,
+                    inputs=judge_inputs,
+                    outputs=["report"],
+                    depends_on=["extract"],
+                ),
+            ]
+        ),
+        validation={"hallucination_check": True},
+    )
+
+
+@pytest.mark.parametrize("judge", ["LLMJudge", "LLMJudgePanel"])
+@pytest.mark.parametrize("upload", ["pdf", "image"])
+def test_rule14_a_judge_may_check_against_the_pages_themselves(judge, upload):
+    """VisionExtractor returns no text; the judges' validate(source_pages=...) reads the
+    PDF's or image's pages, so the upload itself is the grounding evidence."""
+    result = validate(_source_and_judge(upload, judge, upload=upload))
+
+    assert not [e for e in result.errors if e.rule in (4, 14)], result.errors
+
+
+@pytest.mark.parametrize("judge", ["LLMJudge", "llm_judge", "LLMJudgePanel", "llm_judge_panel"])
+def test_rule14_a_judge_named_by_its_registry_id_is_checked_too(judge):
+    result = validate(_source_and_judge("none", judge))
+
+    assert any(e.rule == 14 and e.step_id == "judge" for e in result.errors)
