@@ -1,0 +1,38 @@
+{
+  "about": "The scripts the wizard agent may run and every option each takes, read by agent_tool_guard.py. A path must be in the session's output folder, a url a known provider's https endpoint. Options are spelled out in full, because argparse accepts an abbreviation the guard would not recognise. test_agent_tool_guard.py fails when a script's argparse options differ from what is listed here and under left_out, or when SKILL.md runs a script that is not listed.",
+  "kinds": {
+    "path": "a path in the session's output folder",
+    "value": "any plain value",
+    "url": "a known provider's own https endpoint",
+    "flag": "an option without a value"
+  },
+  "scripts": {
+    "check_requirements.py": {"--blueprint": "path"},
+    "generate_bpmn.py": {"--blueprint": "path", "--output-dir": "path", "--skip-validation": "flag"},
+    "generate_docs.py": {"--blueprint": "path", "--output-dir": "path", "--skip-validation": "flag"},
+    "generate_mermaid.py": {"--blueprint": "path", "--output-dir": "path", "--skip-validation": "flag"},
+    "generate_schema.py": {
+      "--requirements": "path",
+      "--schema-name": "value",
+      "--output-dir": "path",
+      "--provider": "value",
+      "--use-azure": "flag",
+      "--no-azure": "flag",
+      "--model": "value",
+      "--base-url": "url"
+    },
+    "run_wizard.py": {"--blueprint": "path", "--output-dir": "path", "--show-registry": "flag"},
+    "scaffold_poc.py": {
+      "--blueprint": "path",
+      "--output-dir": "path",
+      "--synthetic": "flag",
+      "--skip-validation": "flag"
+    },
+    "validate_blueprint.py": {"--blueprint": "path"}
+  },
+  "left_out": {
+    "promote_template.py": "a promoted template is reused by every later session; the person runs it",
+    "refresh_schema_model.py": "it imports output_schema.py, which the agent writes, so it would run the agent's own code. Skip it: the audio and document PoCs write output_schema_model.json again themselves when output_schema.py is newer",
+    "run_wizard.py --export-schema": "it rewrites the wizard's own schema file"
+  }
+}
