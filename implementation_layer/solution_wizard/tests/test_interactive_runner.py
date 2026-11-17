@@ -420,6 +420,15 @@ def test_a_relative_output_folder_is_taken_from_where_the_runner_starts(
     assert runner.resolve_output_dir("out/case", tmp_path) == (tmp_path / "out" / "case").resolve()
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Git Bash drive paths are Windows only")
+def test_a_git_bash_output_folder_is_read_as_a_windows_path(tmp_path, monkeypatch) -> None:
+    _temp_is_an_ordinary_folder(monkeypatch, tmp_path)
+    target = tmp_path / "case"
+    drive, rest = target.as_posix().split(":", 1)
+
+    assert runner.resolve_output_dir(f"/{drive.lower()}{rest}", tmp_path) == target.resolve()
+
+
 @pytest.mark.parametrize("inside", [".", "implementation_layer/solution_wizard/out"])
 def test_an_output_folder_inside_the_repository_is_refused(inside) -> None:
     with pytest.raises(ValueError, match="inside the GAIK repository"):

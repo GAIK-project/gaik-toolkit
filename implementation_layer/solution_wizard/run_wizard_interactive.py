@@ -426,7 +426,8 @@ def resolve_output_dir(raw: str, cwd: Path) -> Path:
     scripts' Python loads code from. Names are compared the way the filesystem
     reads them (in any case on macOS and Windows).
     """
-    path = Path(raw.strip().strip('"')).expanduser()
+    # A Git Bash /c/... path is C:/... on Windows, as the guard reads it.
+    path = Path(agent_tool_guard._native(raw.strip().strip('"'))).expanduser()
     path = Path(os.path.realpath(path if path.is_absolute() else cwd / path))
     repo = Path(os.path.realpath(REPO_ROOT))
     home = Path(os.path.realpath(Path.home()))
