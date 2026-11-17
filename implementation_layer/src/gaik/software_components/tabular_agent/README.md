@@ -147,6 +147,14 @@ Queries may only read the loaded tables. A CTE name counts as a CTE only where
 that CTE is in scope; inside its own body (without `RECURSIVE`) or in an
 earlier CTE the name is a table and must be one of the loaded ones.
 
+The SQL that runs is rendered from the checked syntax tree. A query that
+`sqlglot` cannot render without dropping part of it, or that it reads without
+one of a function's arguments (such as a time zone given to `date_trunc`), is
+rejected, so the agent asks the LLM for another one. The argument check leaves
+out functions `sqlglot` reads with a parser of their own (such as `arg_max` and
+`quantile_cont`), and it is skipped, with a warning, when sqlglot's compiled
+build (`sqlglot[c]`) is installed; the other checks run either way.
+
 **2. A locked-down engine.** External access is enabled only while *our own*
 loader reads the paths you passed in. Before a single generated query runs, the
 connection is closed off permanently:
@@ -192,8 +200,15 @@ TabularAgent(
     extra_instructions: str | None = None,
     answer_language: str = "en",         # ISO 639-1 for the answer
     temperature: float | None = 0.0,
+    limits: InputLimits | None = None,   # file size and rows per sheet/file
 )
 ```
+
+`limits` (default `InputLimits()`) holds `max_file_bytes` (100 MiB, checked in the
+constructor; an .xlsx may unpack to 10 × that) and `max_table_rows` (1,000,000 per sheet
+or flat file, checked while loading). A file over a limit raises `InputLimitError`.
+`max_rows` is a different thing: it caps the rows a query returns. Excel rows are written
+through a private temporary directory (mode 0700) that is removed after loading.
 
 `config` is only resolved on the first LLM call, so `get_schema()` and
 `run_sql()` work without LLM credentials.

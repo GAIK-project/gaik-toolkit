@@ -30,7 +30,12 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent))
-from provider_config import get_stage_config  # noqa: E402
+from provider_config import (  # noqa: E402
+    external_model_forbidden,
+    get_stage_config,
+    local_transcriber_options,
+)
+import poc_output  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +115,9 @@ def main() -> None:
         description="${use_case_name} PoC"
     )
     parser.add_argument("--synthetic", action="store_true", help="Use synthetic/generated input")
+    poc_output.add_output_flags(parser)
     args = parser.parse_args()
+    poc_output.configure(args)
 
     config = load_config()
     language = config.get("language", "${language}")
@@ -146,10 +153,14 @@ def main() -> None:
     # ----- Step: transcribe_audio (Transcriber) -----
     print("\n[1/4] Transcribing audio input...")
     from gaik.software_components.transcriber import Transcriber
+    audio_config = get_stage_config(config, "transcription")
     transcriber = Transcriber(
-        api_config=get_stage_config(config, "transcription"),
+        api_config=audio_config,
         language=language,
-        enhanced_transcript=True,
+        # Enhancement sends the transcript to the transcription stage's cloud provider.
+        enhanced_transcript=not external_model_forbidden(config),
+        # Self-hosted Whisper: its endpoint and key from LOCAL_TRANSCRIBER_API_*.
+        **local_transcriber_options(config, audio_config),
     )
     tr = transcriber.transcribe(audio_input_path)
     raw_transcript = tr.enhanced_transcript or tr.raw_transcript
@@ -202,7 +213,7 @@ def main() -> None:
             encoding="utf-8",
         )
         print(f"\nResult written to: {output_dir / 'result.json'}")
-        print(json.dumps(extracted_fields, indent=2, ensure_ascii=False, default=str))
+        poc_output.show_result(extracted_fields)
     else:
         print("\nNOTE: extracted_fields is still None — finish wiring the pipeline above.")
 
@@ -228,7 +239,7 @@ def main() -> None:
             if report.flags:
                 print(f"WARNING: {len(report.flags)} hallucination flag(s) detected:")
                 for flag in report.flags:
-                    print(f"  field={flag.field}  value={flag.value}  reason={flag.reason}")
+                    print(f"  field={flag.field}" + (f"  value={flag.value}  reason={flag.reason}" if poc_output.VERBOSE else ""))
             if judge_error:
                 print(f"WARNING: the judge's response could not be read ({judge_error}).")
             elif not report.flags:
@@ -252,8 +263,8 @@ def main() -> None:
         except ImportError:
             print("LLMJudge skipped: gaik[llm-judge] not installed.")
         except Exception as _judge_exc:
-            print(f"LLMJudge warning: {_judge_exc}")
+            print(f"LLMJudge warning: {poc_output.short_error(_judge_exc)}")
 
 
 if __name__ == "__main__":
-    main()
+    poc_output.run(main)

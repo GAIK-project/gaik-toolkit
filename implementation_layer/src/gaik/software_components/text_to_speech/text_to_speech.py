@@ -9,6 +9,7 @@ from typing import Literal
 import requests
 
 from gaik.software_components.config import create_openai_client, get_openai_config
+from gaik.software_components.endpoints import check_endpoint, log_endpoint
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -84,6 +85,9 @@ class TextToSpeech:
             if self.api_config.get("use_azure", False)
             else create_openai_client(self.api_config)
         )
+        if self.api_config.get("use_azure", False) and self._azure_tts_endpoint():
+            # Refuse a wrong address when the speaker is built, not at the first request.
+            self._check_azure_tts_endpoint(self._azure_tts_endpoint())
         self.model = model or self._resolve_default_model()
         if language not in SUPPORTED_LANGUAGES:
             supported = ", ".join(SUPPORTED_LANGUAGES)
@@ -170,12 +174,7 @@ class TextToSpeech:
         response_format: str,
         speed: float,
     ) -> bytes:
-        tts_endpoint = os.getenv("TTS_ENDPOINT")
-        api_key = os.getenv("AZURE_API_KEY")
-        if not tts_endpoint:
-            raise ValueError("TTS_ENDPOINT is not set for Azure text-to-speech.")
-        if not api_key:
-            raise ValueError("AZURE_API_KEY is not set for Azure text-to-speech.")
+        tts_endpoint, api_key = self._azure_tts_target()
 
         payload = {
             "model": self.model,
@@ -194,6 +193,41 @@ class TextToSpeech:
         )
         response.raise_for_status()
         return response.content
+
+    def _azure_tts_endpoint(self) -> str | None:
+        return self.api_config.get("tts_endpoint") or os.getenv("TTS_ENDPOINT")
+
+    def _azure_tts_target(self) -> tuple[str, str]:
+        """The Azure speech URL and its key, taken together from one source.
+
+        ``api_config["tts_endpoint"]`` goes with ``api_config["api_key"]``; ``TTS_ENDPOINT``
+        goes with ``AZURE_API_KEY``, as before, so a speech resource with its own key keeps
+        working. Either falls back to the other key when its own is missing.
+        """
+        tts_endpoint = self._azure_tts_endpoint()
+        if self.api_config.get("tts_endpoint"):
+            api_key = self.api_config.get("api_key") or os.getenv("AZURE_API_KEY")
+        else:
+            api_key = os.getenv("AZURE_API_KEY") or self.api_config.get("api_key")
+        if not tts_endpoint:
+            raise ValueError(
+                "No Azure text-to-speech endpoint: set api_config['tts_endpoint'] or TTS_ENDPOINT."
+            )
+        if not api_key:
+            raise ValueError(
+                "No Azure text-to-speech key: set api_config['api_key'] or AZURE_API_KEY."
+            )
+        self._check_azure_tts_endpoint(tts_endpoint)
+        return tts_endpoint, api_key
+
+    def _check_azure_tts_endpoint(self, tts_endpoint: str) -> None:
+        host = check_endpoint(
+            tts_endpoint,
+            provider="azure",
+            allowed_hosts=self.api_config.get("allowed_endpoint_hosts"),
+            what="tts_endpoint",
+        )
+        log_endpoint("azure", host)
 
     def _build_instructions(self, *, language: str, instructions: str | None) -> str:
         language_instruction = {

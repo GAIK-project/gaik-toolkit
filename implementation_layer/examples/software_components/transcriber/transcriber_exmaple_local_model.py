@@ -6,6 +6,7 @@ This example keeps transcript error fixing disabled.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -29,7 +30,10 @@ def main() -> None:
         output_dir=".",
         enhanced_transcript=True,  # Two-pass transcript correction
         transcription_model="whisper_local",  # Force local transcription backend
-        local_api_base="http://YOUR_ADDRESS:8080",  # Local whisper base URL
+        # Local whisper base URL. gaik sends the key only to https hosts or to an
+        # address the deployment names: this machine, LOCAL_TRANSCRIBER_API_BASE
+        # or GAIK_ALLOWED_ENDPOINT_HOSTS (http://YOUR_ADDRESS for plain http).
+        local_api_base=os.getenv("LOCAL_TRANSCRIBER_API_BASE", "http://YOUR_ADDRESS:8080"),
         local_api_key="YOUR_KEY",  # API key sent to local whisper service
         language="fi",  # Language code. "auto" for detection. "fi" for Finnish.
         diarization=False,  # Enable/disable speaker diarization

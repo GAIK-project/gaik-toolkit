@@ -57,7 +57,7 @@ result = tts.synthesize(
 
 ## Azure Configuration
 
-When Azure mode is active, the component sends a direct HTTP request to the Azure TTS endpoint. Set these environment variables:
+When Azure mode is active, the component sends a direct HTTP request to the Azure TTS endpoint. It takes the endpoint and key from `api_config["tts_endpoint"]` and `api_config["api_key"]` when given, otherwise from these environment variables:
 - `AZURE_API_KEY`
 - `TTS_ENDPOINT`
 - `AZURE_TTS_MODEL`
@@ -69,6 +69,8 @@ AZURE_API_KEY=...
 AZURE_TTS_MODEL=tts-hd
 TTS_ENDPOINT=https://<resource>.cognitiveservices.azure.com/openai/deployments/tts-hd/audio/speech?api-version=2025-03-01-preview
 ```
+
+The endpoint must be `https://` on an Azure host (`*.openai.azure.com`, `*.cognitiveservices.azure.com`, `*.services.ai.azure.com`) or on a host listed in `GAIK_ALLOWED_ENDPOINT_HOSTS`; otherwise the constructor raises `EndpointNotAllowedError`.
 
 The Azure request payload matches this shape:
 

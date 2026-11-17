@@ -272,7 +272,7 @@ export default function TranscriberPage() {
       <DemoPageHeader
         icon={Mic}
         title="Transcriber"
-        description="Convert voice recordings and videos into clear, written text"
+        description="Turn recordings and videos into text"
         className="mb-6"
       />
 

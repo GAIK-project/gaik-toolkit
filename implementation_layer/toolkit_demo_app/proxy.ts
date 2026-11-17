@@ -80,7 +80,8 @@ async function route(request: NextRequest): Promise<NextResponse> {
     pathname === "/api/source-normalizer/run" || // likewise
     pathname === "/api/knowledge-curator/run" || // likewise
     pathname === "/api/knowledge-synthesis/run" || // likewise
-    pathname === "/api/helpdesk-chat"; // runs its model in Next.js
+    pathname === "/api/helpdesk-chat" || // runs its model in Next.js
+    pathname === "/api/ai-act-screening"; // likewise
   if (isApiPath(pathname) && !isNextApiRoute) {
     // Rate limit requests that change state (heavy processing, deletes). While
     // the configured Redis does not answer, the limiter refuses them (503).

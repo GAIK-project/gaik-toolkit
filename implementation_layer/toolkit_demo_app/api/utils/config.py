@@ -102,12 +102,17 @@ def aitta_speech_config(config: dict) -> dict:
     The Transcriber takes OpenAI and Azure configs only, so Aitta's
     OpenAI-compatible ``/audio/transcriptions`` is addressed as an OpenAI base
     URL. The chat model stays in the config for the optional transcript fix.
+    gaik checks an OpenAI config's address against OpenAI's hosts, so the config
+    names the Aitta address it uses, which comes from the server's own Aitta
+    configuration, as allowed.
     """
+    base_url = config.get("base_url") or AITTA_BASE_URL
     speech = {
         "provider": "openai",
         "use_azure": False,
         "api_key": config["api_key"],
-        "base_url": config.get("base_url") or AITTA_BASE_URL,
+        "base_url": base_url,
+        "allowed_endpoint_hosts": [base_url],
         "model": config["model"],
         "transcription_model": aitta_speech_model(),
         "timeout": config.get("timeout") or 600.0,

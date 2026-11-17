@@ -1,0 +1,8 @@
+{
+  "name": "report-writing-filesystem-mcp",
+  "private": true,
+  "description": "The filesystem MCP server the report-writing skill uses, pinned with integrity hashes in package-lock.json.",
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "2026.8.31"
+  }
+}

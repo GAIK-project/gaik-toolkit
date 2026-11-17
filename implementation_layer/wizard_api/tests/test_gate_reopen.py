@@ -394,6 +394,7 @@ def test_a_turn_that_changes_the_accepted_solution_reopens_gate_2(
     assert set(client.get(f"/sessions/{sid}").json()["metadata"]["approved_content"]) == {
         "solution",
         "package",
+        "package_scheme",
     }
 
     # The agent adds an output field and says "ok"; nobody calls the tool.
@@ -487,6 +488,27 @@ def test_a_session_accepted_before_this_was_kept_starts_from_what_is_there(
     detail = client.get(f"/sessions/{sid}").json()
     assert detail["gate_statuses"]["gate_3"] == "approved"
     assert "approved_content" in detail["metadata"]
+
+
+@requires_postgres
+def test_a_package_approved_under_the_older_digest_is_not_reopened(client, db_session) -> None:
+    """The package digest covers more files since the upstream main sync, so the
+    same package has another digest; that is no change by the user or the agent."""
+    created, session = _session_past_gate_3(client, db_session, "older-digest")
+    sid = created["id"]
+    approved = dict(session.session_metadata["approved_content"])
+    approved.pop("package_scheme")
+    approved["package"] = "digest-of-the-older-scheme"
+    session.session_metadata = {**session.session_metadata, "approved_content": approved}
+    db_session.commit()
+
+    sessions_router._sync_artifacts_and_advance(db_session, session)
+
+    detail = client.get(f"/sessions/{sid}").json()
+    assert detail["gate_statuses"]["gate_3"] == "approved"
+    kept = detail["metadata"]["approved_content"]
+    assert kept["package_scheme"] == sessions_router._PACKAGE_DIGEST_SCHEME
+    assert kept["package"] != "digest-of-the-older-scheme"
 
 
 @requires_postgres
