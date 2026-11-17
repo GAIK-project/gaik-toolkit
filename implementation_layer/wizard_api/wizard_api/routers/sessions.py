@@ -23,7 +23,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from starlette.background import BackgroundTask
@@ -328,6 +328,122 @@ def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
         # What a run is tied to (``latest_run_package`` in the session's metadata):
         # a result whose digest differs from this one is of an older package.
         "package_digest": _approved_package_digest(poc),
+    }
+
+
+class PocFileWrite(BaseModel):
+    content: str
+    # The digest the editor was given with the text it changed.
+    base_digest: str = Field(min_length=1, max_length=128)
+
+
+def _package_file_error(exc: Any) -> HTTPException:
+    """A refused read or save of a package file (PackageFileError), in the one error shape."""
+    return api_error(exc.status, exc.code, str(exc))
+
+
+def _session_poc_dir(db: Session, session_id: uuid.UUID) -> tuple[Any, str]:
+    """The session and its package folder, or 404 for either that is not there."""
+    session = session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    poc = _poc_dir(session.output_dir)
+    if not poc or not os.path.isdir(poc) or os.path.islink(os.path.join(session.output_dir, "poc")):
+        raise HTTPException(status_code=404, detail="no PoC generated yet")
+    return session, poc
+
+
+_POC_FILE_PATH = Query(min_length=1, max_length=512)
+
+
+@router.get("/{session_id}/poc/file")
+def read_poc_file(
+    session_id: uuid.UUID,
+    path: str = _POC_FILE_PATH,
+    db: Session = Depends(get_db),
+) -> Response:
+    """One file of the package as text, for the PoC tab's editor.
+
+    ``path`` is relative to ``poc/``. Only the session's own regular files
+    (no ``..``, no absolute path, no symlink on the way), only UTF-8 text up to
+    ``poc_service.MAX_PACKAGE_FILE_BYTES``, and never an environment file that
+    would hold keys. The answer says whether the editor may save the file and
+    whether a change to it changes the package a test run is tied to.
+
+    The AI marker is shown as the deployable package will carry it: the
+    download writes it in place of any file of that name.
+    """
+    from wizard_api.services import ai_marking, poc_service
+
+    session, poc = _session_poc_dir(db, session_id)
+    try:
+        normalised = poc_service.package_file_path(path)
+        if normalised == ai_marking.MARKER_FILE:
+            data = ai_marking.marker_json(session, "poc-package-deployable").encode()
+            answer = {
+                **poc_service.package_file_answer(normalised, data),
+                "content": data.decode(),
+            }
+        else:
+            answer = poc_service.read_package_file(poc, normalised)
+    except poc_service.PackageFileError as exc:
+        raise _package_file_error(exc) from exc
+    # The text of a file is not for a cache between the api and the browser.
+    return JSONResponse(answer, headers={"Cache-Control": "no-store"})
+
+
+@router.put("/{session_id}/poc/file")
+def write_poc_file(
+    session_id: uuid.UUID,
+    payload: PocFileWrite,
+    path: str = _POC_FILE_PATH,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Save the editor's text over one existing file of the package.
+
+    The same path rules as the read, and further: only the kinds of file a
+    person edits by hand (``poc_service.EDITABLE_SUFFIXES`` and
+    ``.env.example``), not the AI marker, the test material or a run's output,
+    and 409 ``file_changed`` when the file is no longer what the editor read.
+    Not while the wizard is replying: it may be rewriting the same files, and
+    it is told of an edit only with the next message.
+
+    A saved edit is a change to the package like one of the agent's. The
+    package's digest follows the files (``_approved_package_digest``), so the
+    PoC tab checks and tests the new package; where Gate 3 was approved on the
+    old one, that gate reopens exactly as after a chat turn
+    (``_reopen_if_approved_content_changed``). The edit is recorded in the
+    session's metadata and the agent is told with the next message
+    (``_user_edits_note``).
+    """
+    from wizard_api.services import poc_service
+
+    session, poc = _session_poc_dir(db, session_id)
+    if agent_service.running_turn(str(session_id)) is not None:
+        raise api_error(
+            409,
+            "wizard_responding",
+            "The wizard is still responding and may be changing the package; "
+            "save again when it has replied.",
+        )
+    try:
+        saved = poc_service.write_package_file(poc, path, payload.content, payload.base_digest)
+    except poc_service.PackageFileError as exc:
+        raise _package_file_error(exc) from exc
+    session = session_service.record_user_edit(db, session, f"poc/{saved['path']}")
+    reopened = None
+    try:
+        if _reopen_if_approved_content_changed(db, session):
+            noted = session.session_metadata.get(session_service.REOPENED_KEY) or {}
+            reopened = noted.get("gate")
+    except Exception:  # noqa: BLE001 - the file is saved; the next chat turn compares again
+        logger.warning("approved content could not be compared after an edit", exc_info=True)
+        db.rollback()
+    logger.info("session %s: the user saved poc/%s in the editor", session_id, saved["path"])
+    return {
+        **saved,
+        "package_digest": _approved_package_digest(poc),
+        "gate_reopened": reopened,
     }
 
 
@@ -1109,6 +1225,7 @@ async def chat(
         lang = (payload.locale or "fi").split("-")[0].lower()
         reopened_note = _reopened_gate_note(session, lang)
         gate1_note = await asyncio.to_thread(_gate1_missing_note, session)
+        edits_note, seen_edit = _user_edits_note(session)
         notes = [
             note
             for note in (
@@ -1116,6 +1233,7 @@ async def chat(
                 gate1_note,
                 run_note,
                 package_note,
+                edits_note,
                 view_note,
                 blueprint_note,
             )
@@ -1240,6 +1358,14 @@ async def chat(
                     turn_db,
                     turn_session,
                     SessionUpdate(metadata={"agent_seen_run": seen_run}),
+                )
+            if seen_edit:
+                # Told once, like a run: an edit saved since is told next time.
+                await asyncio.to_thread(
+                    session_service.update_session,
+                    turn_db,
+                    turn_session,
+                    SessionUpdate(metadata={session_service.AGENT_SEEN_EDIT_KEY: seen_edit}),
                 )
         # The agent writes its artifacts to disk as the conversation moves;
         # pull them into the session so the workspace keeps up (#141).
@@ -1464,6 +1590,29 @@ def _latest_run_note(session) -> tuple[str | None, str | None]:
     except Exception:  # noqa: BLE001 - see the docstring
         logger.warning("latest run %s could not be read for the agent", run_id, exc_info=True)
         return None, None
+
+
+def _user_edits_note(session) -> tuple[str | None, str | None]:
+    """The line about package files the user saved in the editor, and the latest edit's time.
+
+    The agent wrote the package and goes on from the files it remembers: told
+    nothing, it would write its own version back over the user's change. Told
+    once, with the first message after the edit; the caller marks the time as
+    told when the turn is through. The names are the package's own, which the
+    agent may have chosen from a document's text, so they are quoted as data.
+    """
+    from wizard_api.services import run_context
+
+    edits = session_service.unseen_user_edits(session.session_metadata)
+    if not edits:
+        return None, None
+    files = ", ".join(f"{run_context.quoted(e['path'])} at {e['at'][:19]}Z" for e in edits[-10:])
+    return (
+        f"[The user edited {files} in the PoC tab editor after your last reply; what is on "
+        "disk is the user's version. Read a file again before you change it, and keep the "
+        "user's edits unless they ask for something else.]",
+        edits[-1]["at"],
+    )
 
 
 def _gate1_missing_note(session) -> str | None:

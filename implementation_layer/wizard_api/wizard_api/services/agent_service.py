@@ -428,7 +428,7 @@ STATE_LINE_PREFIX = "[Session state:"
 _SERVER_LINE = re.compile(
     r"^([^\S\n]*\[(?:Session state:|PoC sandbox run|Package check|Preflight of"
     r"|The diagram the user sees|The user changed the blueprint|Reopened gate"
-    r"|Gate 1 cannot be approved))",
+    r"|Gate 1 cannot be approved|The user edited))",
     re.MULTILINE | re.IGNORECASE,
 )
 

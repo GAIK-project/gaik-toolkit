@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -1131,6 +1132,234 @@ def is_deployable_path(relative_path: str) -> bool:
 def deployable_files(poc_dir: str) -> list[str]:
     """The package as someone else receives it, relative to poc/."""
     return [rel for rel in regular_files(poc_dir) if is_deployable_path(rel)]
+
+
+# ---------------------------------------------------------------------------
+# One package file, read and saved in the PoC tab's editor
+# ---------------------------------------------------------------------------
+
+#: The files a person may change by hand: source, settings and documentation as text.
+EDITABLE_SUFFIXES = (
+    ".py",
+    ".md",
+    ".txt",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".toml",
+    ".cfg",
+    ".ini",
+    ".html",
+    ".css",
+    ".js",
+)
+#: The list of the variables the package needs, without their values. The one
+#: ``.env*`` name the editor opens: it is where a key's *name* is added.
+ENV_EXAMPLE_NAME = ".env.example"
+#: The AI marker (``ai_marking.MARKER_FILE``, which imports the agent: a test
+#: holds the two names together). The download writes it; nobody edits it.
+AI_MARKER_NAME = "AI-GENERATED.json"
+#: The largest file the editor reads or saves.
+MAX_PACKAGE_FILE_BYTES = 256 * 1024
+#: The longest path the editor is given.
+MAX_PACKAGE_PATH_CHARS = 512
+#: Folders whose files are shown but not changed by hand: the test material
+#: (replaced through its own upload, which scans it) and a run's result.
+_READ_ONLY_DIRS = (SAMPLE_INPUT_DIR, "output")
+#: The wizard's own records inside or beside the package; never a file of it.
+_HIDDEN_NAMES = (MANIFEST_NAME, UPLOADED_NAMES_FILE)
+_PROMPTS_DIR = "prompts"
+_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
+
+
+class PackageFileError(ValueError):
+    """A package file the editor may not read or save, with the answer's status and code."""
+
+    def __init__(self, status: int, code: str, message: str) -> None:
+        self.status = status
+        self.code = code
+        super().__init__(message)
+
+
+def is_secret_name(relative_path: str) -> bool:
+    """Whether a path names an environment file that would hold keys.
+
+    ``.env`` and every ``.env*`` name but ``.env.example``, in any folder and
+    any case. The server keeps no such file for a user: the keys are added to
+    the downloaded package in the browser.
+    """
+    name = relative_path.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    return name.startswith(".env") and name != ENV_EXAMPLE_NAME
+
+
+def package_file_path(relative: Any) -> str:
+    """``relative`` as a plain path inside ``poc/``; PackageFileError for anything else.
+
+    No absolute path, no ``..``, no backslash (a Windows separator would be one
+    file name here and another path there), no control character.
+    """
+    invalid = PackageFileError(422, "invalid_path", "the path is not a file of the package")
+    if (
+        not isinstance(relative, str)
+        or len(relative) > MAX_PACKAGE_PATH_CHARS
+        or "\\" in relative
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in relative)
+        or relative.startswith("/")
+        or _DRIVE_PREFIX.match(relative)
+    ):
+        raise invalid
+    normalised = _normalise(relative)
+    if normalised is None:
+        raise invalid
+    if is_secret_name(normalised):
+        raise PackageFileError(
+            422,
+            "secrets_not_stored",
+            "environment files with keys are not kept on the server; "
+            "add the keys to the package when you download it",
+        )
+    return normalised
+
+
+def _package_file(poc_dir: str, relative: Any) -> tuple[str, str]:
+    """The normalised path and the real file it names inside ``poc_dir``.
+
+    The file must be the session's own regular file: not a symlink and not
+    reached through one (``_linked_part``, ``regular_file``).
+    """
+    normalised = package_file_path(relative)
+    missing = PackageFileError(404, "not_found", "file not found")
+    if normalised.rsplit("/", 1)[-1] in _HIDDEN_NAMES:
+        raise missing
+    root = Path(poc_dir)
+    if _linked_part(root, normalised) is not None:
+        raise missing
+    target = root / normalised
+    if not regular_file(target, poc_dir):
+        raise missing
+    return normalised, str(target)
+
+
+def package_file_read_only(normalised: str) -> str | None:
+    """Why the editor may not save this file, as an error code; None when it may."""
+    parts = normalised.split("/")
+    if parts[-1] == AI_MARKER_NAME or parts[0] in _READ_ONLY_DIRS:
+        return "file_read_only"
+    if parts[-1] != ENV_EXAMPLE_NAME and not parts[-1].lower().endswith(EDITABLE_SUFFIXES):
+        return "file_type_not_editable"
+    return None
+
+
+def counts_for_package_digest(normalised: str) -> bool:
+    """Whether a change to this file changes the digest a test run is tied to.
+
+    The files a preflight reads (``package_version``) and the prompts the run
+    reads (the sessions router's ``_approved_package_digest``); a README or
+    ``.env.example`` is neither.
+    """
+    version_files = {name.replace(os.sep, "/") for name in _VERSION_FILES}
+    return normalised in version_files or normalised.startswith(_PROMPTS_DIR + "/")
+
+
+def content_digest(data: bytes) -> str:
+    """What a save is compared against: the file as the editor read it."""
+    return hashlib.sha256(data).hexdigest()
+
+
+def package_file_answer(normalised: str, data: bytes) -> dict[str, Any]:
+    """What the editor is told about a file beside its text."""
+    reason = package_file_read_only(normalised)
+    return {
+        "path": normalised,
+        "digest": content_digest(data),
+        "bytes": len(data),
+        "editable": reason is None,
+        "read_only_reason": reason,
+        "affects_package": counts_for_package_digest(normalised),
+    }
+
+
+def _text(data: bytes) -> str:
+    """``data`` as the text the editor shows; PackageFileError for anything but UTF-8 text."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        text = None
+    if text is None or "\x00" in text:
+        raise PackageFileError(415, "file_not_text", "the file is not text and cannot be shown")
+    return text
+
+
+def _read_capped(target: str) -> bytes:
+    """Up to one byte over the limit of ``target``, never through a link.
+
+    The file was checked to be a regular one; ``O_NOFOLLOW`` (where the
+    platform has it) keeps a link put in its place since then from being read.
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    try:
+        fd = os.open(target, flags)
+    except OSError as exc:  # gone, or a link now
+        raise PackageFileError(404, "not_found", "file not found") from exc
+    with os.fdopen(fd, "rb") as fh:
+        return fh.read(MAX_PACKAGE_FILE_BYTES + 1)
+
+
+def read_package_file(poc_dir: str, relative: Any) -> dict[str, Any]:
+    """One file of the package as text, with the digest a later save names."""
+    normalised, target = _package_file(poc_dir, relative)
+    data = _read_capped(target)
+    if len(data) > MAX_PACKAGE_FILE_BYTES:
+        raise PackageFileError(413, "file_too_large", "the file is too large to open here")
+    return {**package_file_answer(normalised, data), "content": _text(data)}
+
+
+def write_package_file(
+    poc_dir: str, relative: Any, content: str, base_digest: str
+) -> dict[str, Any]:
+    """Save the editor's text over an existing package file.
+
+    Only a file that is already there, of a kind a person edits by hand, and
+    only while it is still what the editor read (``base_digest``): the agent
+    rewrites the package during its turns, and a save over its newer version
+    would lose that silently. The new content replaces the file in one step (a
+    temporary file beside it, then a rename), so a run or a zip never reads
+    half of it, and a link put in the file's place is replaced, not followed.
+    """
+    # By its name first: the AI marker is refused whether or not one is on disk.
+    reason = package_file_read_only(package_file_path(relative))
+    if reason == "file_read_only":
+        raise PackageFileError(403, reason, "this file is not changed by hand")
+    if reason is not None:
+        raise PackageFileError(422, reason, "files of this type cannot be edited here")
+    normalised, target = _package_file(poc_dir, relative)
+    not_text = PackageFileError(422, "file_not_text", "the content is not text")
+    if "\x00" in content:
+        raise not_text
+    try:
+        data = content.encode("utf-8")
+    except UnicodeEncodeError as exc:  # a lone surrogate
+        raise not_text from exc
+    if len(data) > MAX_PACKAGE_FILE_BYTES:
+        raise PackageFileError(413, "file_too_large", "the file is too large to save here")
+    if content_digest(_read_capped(target)) != base_digest:
+        raise PackageFileError(
+            409,
+            "file_changed",
+            "the file was changed after you opened it; open it again to see the new version",
+        )
+    mode = os.stat(target).st_mode & 0o777
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(target), prefix=".edit-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.chmod(temporary, mode)
+        os.replace(temporary, target)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
+    return package_file_answer(normalised, data)
 
 
 #: The folder the wizard writes the solution's documentation into (step 12).

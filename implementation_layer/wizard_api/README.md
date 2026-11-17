@@ -50,8 +50,31 @@ NEXT_PUBLIC_DEV_AUTH=true
 | `PATCH` | `/sessions/{id}` | Update `step`, `gate_statuses`, `metadata` |
 | `POST` | `/sessions/{id}/messages` | Append chat messages (Sprint 1 stub) |
 | `POST` | `/sessions/{id}/versions` | New blueprint version |
+| `GET` | `/sessions/{id}/poc/file?path=` | One file of the package as UTF-8 text (up to 256 KB), with the digest a save names |
+| `PUT` | `/sessions/{id}/poc/file?path=` | Save `{content, base_digest}` over that file |
 
 Steps are **1–13** (matches V2 UI phase stepper). Gate keys: `gate_1` … `gate_4`.
+
+### One package file (the PoC tab's editor)
+
+`path` is relative to the session's `poc/`. Only the session's own regular files are
+read or written: no absolute path, no `..`, no backslash, no symlink on the way
+(`poc_service.package_file_path`, `regular_file`). A save needs an existing file with
+one of the suffixes in `poc_service.EDITABLE_SUFFIXES` (or `.env.example`); the AI
+marker and everything under `sample_input/` and `output/` are read-only
+(`file_read_only`, 403), other types `file_type_not_editable` (422). `.env` and every
+`.env*` name except `.env.example` is refused for reading and writing with 422
+`secrets_not_stored`: the server keeps no keys for a user, the web app adds `poc/.env`
+to the downloaded package in the browser. A save whose `base_digest` is not the file's
+answers 409 `file_changed`, and one sent while the wizard is replying 409
+`wizard_responding`.
+
+A saved edit is a package change like one of the agent's. The package digest
+(`package_digest` in `GET /poc/files`) follows the files a test run is tied to, so an
+edit to one of them makes the earlier run a run of another package, and where Gate 3
+was approved it reopens that gate. An edit to a file outside the digest (the README,
+`.env.example`) does neither. Each save is recorded in the session's metadata
+(`user_edits`, server-owned) and the agent is told once, with the next chat message.
 
 ### Errors
 
