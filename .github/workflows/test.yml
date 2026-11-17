@@ -9,6 +9,7 @@ on:
       - 'src/**'
       - 'implementation_layer/**'
       - '.claude-plugin/**'
+      - '.claude/skills/gaik-sync/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
       - '.github/workflows/test.yml'
@@ -23,6 +24,7 @@ on:
       - 'src/**'
       - 'implementation_layer/**'
       - '.claude-plugin/**'
+      - '.claude/skills/gaik-sync/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
       - '.github/workflows/test.yml'
@@ -137,6 +139,15 @@ jobs:
       env:
         GAIK_TEST_PG_URL: postgresql://postgres:postgres@localhost:5432/postgres
       run: pytest -m "not llm" --strict-markers
+
+    # The Solution Wizard's tests are outside `testpaths` and share a file name with
+    # unit_tests/ (test_source_tracing.py), so they run in a pytest session of their own.
+    # ReportLab is what a generated PoC installs for its PDF report (scaffolder.py); no
+    # gaik extra brings it, and without it test_pdf_report.py skips as a whole.
+    - name: Run Solution Wizard tests
+      run: |
+        uv pip install --system "reportlab>=4.0"
+        pytest implementation_layer/solution_wizard/tests -m "not llm" --strict-markers -q
 
   # The demo app's API tests, in the demo's own environment with this
   # repository's gaik installed editable. Not in the release gate or the

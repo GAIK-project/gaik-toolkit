@@ -86,6 +86,19 @@
       "tryPrompt": "Use the brief-to-slides skill ({url}) to make a 20-minute slide deck with speaker notes. I will tell you the topic and the audience next."
     },
     {
+      "id": "ai-act-use-case-screening",
+      "group": "no-code",
+      "path": "agent-skills/skills/ai-act-use-case-screening",
+      "title": "EU AI Act screening",
+      "tagline": "Describe an AI use case and get a preliminary EU AI Act risk class, what you must do and by when.",
+      "input": "A description of the AI use case, then short answers to follow-up questions",
+      "output": "A plain-language report and the screening as data (JSON)",
+      "needs": [
+        "code execution (Python, standard library only)"
+      ],
+      "tryPrompt": "Use the ai-act-use-case-screening skill ({url}) to screen an AI use case against the EU AI Act. I will describe the use case next."
+    },
+    {
       "id": "parsing-documents",
       "group": "developer",
       "path": "agent-skills/skills/parsing-documents",
