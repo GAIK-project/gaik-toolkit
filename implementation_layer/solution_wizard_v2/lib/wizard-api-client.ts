@@ -143,6 +143,20 @@ export async function openRunningChatStream(id: string): Promise<Response> {
   });
 }
 
+/**
+ * Stop the reply that is being written for a session (POST /chat/stop): 202
+ * when the stop was passed on to the agent, 409 when no reply is running.
+ * Returns the raw Response, like openAgentChatStream.
+ */
+export async function stopAgentChat(id: string): Promise<Response> {
+  const base = getWizardApiUrl() ?? DEFAULT_API_URL;
+  return fetch(`${base}/sessions/${encodeURIComponent(id)}/chat/stop`, {
+    method: "POST",
+    headers: await outgoingHeaders(),
+    cache: "no-store",
+  });
+}
+
 async function wizardFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const base = getWizardApiUrl() ?? DEFAULT_API_URL;
   const res = await fetch(`${base}${path}`, {

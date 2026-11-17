@@ -91,6 +91,7 @@ app/
     route.ts          POST: uusi sessio ilman ensimmäistä viestiä (testit, skriptit)
   api/sessions/[id]/chat/
     route.ts          SSE-streaming-endpoint chatin (mock) vastaukselle
+    stop/route.ts     POST: pysäyttää kesken olevan vastauksen (send-nappi on silloin "Pysäytä")
   login/
     page.tsx          kirjautumis-/rekisteröitymislomake
     actions.ts        server actions: login / signup / signOut
