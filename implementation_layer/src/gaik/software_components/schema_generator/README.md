@@ -75,6 +75,7 @@ result = generator.generate_schema_with_usage(
     user_requirements: str,
     *,
     approved_requirements=None,  # the requirements of the schema a person approved
+    approved_structure=None,     # its StructureAnalysis, or "flat" / "nested_list"
 )
 ```
 
@@ -93,19 +94,27 @@ out or change between two runs. Before a new schema replaces one a person approv
 show them the difference:
 
 ```python
-from gaik.software_components.schema_generator import compare_requirements
-
-result = generator.generate_schema_with_usage(text, approved_requirements=approved)
+result = generator.generate_schema_with_usage(
+    text,
+    approved_requirements=approved,        # ExtractionRequirements, or the saved dict
+    approved_structure=approved_analysis,  # StructureAnalysis or "flat" / "nested_list"
+)
 if not result.diff.is_empty:
-    print(result.diff)      # + added, - removed, ~ changed (attribute: old -> new)
+    print(result.diff)   # ! structure, + added, - removed, ~ changed (old -> new)
     # ask for approval before saving result.schema over the approved one
 ```
 
-`compare_requirements(approved, new)` gives the same `SchemaDiff` for any two
-requirements, e.g. a saved one and an edited one. Fields are matched by name
-(`container.field` in a nested schema); type, output policy, allowed values, pattern,
-format, default and description are compared. gaik does not block a changed schema:
-the decision stays with the caller.
+- `is_empty` covers what changes the output: fields and child containers added or
+  removed (`items[]`), the structure, and each field's type, output policy, allowed
+  values (in any order), pattern, format and effective default. A reworded description,
+  which a model writes on almost every run, is listed apart in `diff.wording`.
+- A flat and a nested-list schema hold the same fields. Pass `approved_structure` to see
+  that change; without it `diff.notes` says it cannot be told.
+- A wrong `approved_requirements` type raises `TypeError` before any model call.
+- `compare_requirements(approved, new, approved_structure=..., new_structure=...)` gives
+  the same `SchemaDiff` for any two requirements, e.g. a saved one and an edited one.
+
+gaik does not block a changed schema: the decision stays with the caller.
 
 ## Generated Artifacts
 
