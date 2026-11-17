@@ -280,6 +280,19 @@ def test_the_generated_list_of_variables_is_saved_as_it_is() -> None:
     assert poc_service.env_example_key_values(template.read_text(encoding="utf-8")) == []
 
 
+def test_a_value_with_a_long_run_of_spaces_is_read_at_once() -> None:
+    """A trailing comment is found by a scan: a regex backtracked over a long run of
+    spaces with no ``#`` after it, quadratic in the line's length (CodeQL)."""
+    line = "AZURE_API_KEY=a" + " " * 200_000 + "b\n"
+    started = time.monotonic()
+
+    assert poc_service.env_example_key_values(line) == ["AZURE_API_KEY"]
+    assert time.monotonic() - started < 2.0
+    # The comment rule is the same: a "#" after white space starts it, one inside a value does not.
+    assert poc_service.env_example_key_values("HF_TOKEN=\t# from the portal\n") == []
+    assert poc_service.env_example_key_values("HF_TOKEN=abc#def\n") == ["HF_TOKEN"]
+
+
 def test_only_the_list_of_variables_is_read_for_values(tmp_path) -> None:
     poc = _package(tmp_path)
     with open(os.path.join(poc, "settings.txt"), "w", encoding="utf-8") as fh:

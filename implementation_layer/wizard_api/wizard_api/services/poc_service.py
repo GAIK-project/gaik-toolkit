@@ -1316,7 +1316,12 @@ def _env_value(raw: str) -> str:
     quoted = _ENV_QUOTED.match(text)
     if quoted:
         return quoted.group(2)
-    return re.sub(r"\s+#.*$", "", text)
+    # ``value  # a comment``: a ``#`` after white space starts the comment. Found
+    # by a scan, not a regex, which backtracks on a long run of spaces.
+    for at, char in enumerate(text):
+        if char == "#" and at > 0 and text[at - 1].isspace():
+            return text[:at].rstrip()
+    return text
 
 
 def _is_credential_name(name: str) -> bool:
