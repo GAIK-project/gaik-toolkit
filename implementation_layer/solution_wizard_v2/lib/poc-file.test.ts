@@ -43,7 +43,7 @@ describe("isSecretEnvName", () => {
 
 describe("pocFileReadOnly", () => {
   it("lets text files of the package and .env.example be edited", () => {
-    for (const path of ["run_poc.py", "README.md", "config.yaml", "schemas/x.json", "ui/index.html", ".env.example"]) {
+    for (const path of ["run_poc.py", "README.md", "config.yaml", "schemas/x.json", "pages/a.html", ".env.example"]) {
       expect(pocFileReadOnly(path), path).toBeNull();
     }
   });
@@ -56,6 +56,13 @@ describe("pocFileReadOnly", () => {
     expect(pocFileReadOnly("logo.png")).toBe("file_type_not_editable");
   });
 
+  it("keeps the package's test page read-only: app.py at the root and everything under ui/", () => {
+    expect(pocFileReadOnly("app.py")).toBe("file_read_only");
+    expect(pocFileReadOnly("ui/index.html")).toBe("file_read_only");
+    expect(pocFileReadOnly("ui/solution.json")).toBe("file_read_only");
+    expect(pocFileReadOnly("helpers/app.py")).toBeNull();
+  });
+
   it("keeps a file in a hidden folder or __pycache__ read-only: the digest leaves those out", () => {
     expect(pocFileReadOnly(".streamlit/config.toml")).toBe("file_read_only");
     expect(pocFileReadOnly("helpers/__pycache__/notes.txt")).toBe("file_read_only");
@@ -65,10 +72,17 @@ describe("pocFileReadOnly", () => {
 
 describe("pocFileAffectsPackage", () => {
   it("is every file the editor saves but a README, as wizard_api's digest is", () => {
-    for (const path of ["run_poc.py", "labels.json", ".env.example", "ui/index.html", "notes.txt", "prompts/README.md"]) {
+    for (const path of ["run_poc.py", "app.py", "labels.json", ".env.example", "notes.txt", "prompts/README.md"]) {
       expect(pocFileAffectsPackage(path), path).toBe(true);
     }
-    for (const path of ["README.md", "helpers/Readme.md", "AI-GENERATED.json", "sample_input/a.txt", ".cache/x.py"]) {
+    for (const path of [
+      "README.md",
+      "helpers/Readme.md",
+      "ui/index.html",
+      "AI-GENERATED.json",
+      "sample_input/a.txt",
+      ".cache/x.py",
+    ]) {
       expect(pocFileAffectsPackage(path), path).toBe(false);
     }
   });

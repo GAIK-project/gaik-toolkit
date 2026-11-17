@@ -966,6 +966,15 @@ _README_NAME = "readme.md"
 #: The temporary file a save in the editor writes beside its file, for a moment.
 _EDIT_TEMP_PREFIX = ".edit-"
 _EDIT_TEMP_SUFFIX = ".tmp"
+#: The package's own test page: ``app.py`` at the root serves the page in
+#: ``ui/`` (its HTML, the solution's description, fonts and the mark). The page
+#: runs on the machine of whoever takes the package; no sandbox run reads
+#: ``ui/``, so it is outside the version. ``app.py`` is Python of the package
+#: and stays in it. Both are the scaffolder's templates, meant to stay as
+#: written (the test page's package check compares them with the templates), so
+#: the editor does not change them.
+_TEST_PAGE_ENTRY = "app.py"
+_TEST_PAGE_DIR = "ui"
 
 
 def _in_version(parts: list[str]) -> bool:
@@ -975,12 +984,15 @@ def _in_version(parts: list[str]) -> bool:
     data file (a root ``labels.json``), a setting or a template as much as a
     module, so a change to any of them may change what runs. Left out is what
     no run reads or is not part of the package: README files outside
-    ``prompts/``, the AI marker the download writes, the wizard's own records,
-    environment files with keys, the editor's temporary files, compiled Python,
-    the run's own folders, hidden folders and ``__pycache__``.
+    ``prompts/``, the test page's ``ui/`` folder, the AI marker the download
+    writes, the wizard's own records, environment files with keys, the editor's
+    temporary files, compiled Python, the run's own folders, hidden folders and
+    ``__pycache__``.
     """
     folders, name = parts[:-1], parts[-1]
     if folders and folders[0] in _RUN_FOLDERS:
+        return False
+    if folders and folders[0] == _TEST_PAGE_DIR:
         return False
     if any(folder.startswith(".") or folder == "__pycache__" for folder in folders):
         return False
@@ -1417,12 +1429,16 @@ def package_file_read_only(normalised: str) -> str | None:
 
     Nor a file in a hidden folder or ``__pycache__``: those are outside the
     package digest (``_in_version``), and every saved edit must count as a
-    change to the package a test run is tied to, but a README's.
+    change to the package a test run is tied to, but a README's. Nor the test
+    page (``app.py`` at the root and everything under ``ui/``), which is the
+    scaffolder's template as it is.
     """
     parts = normalised.split("/")
     if parts[-1] == AI_MARKER_NAME or parts[0] in _READ_ONLY_DIRS:
         return "file_read_only"
     if any(folder.startswith(".") or folder == "__pycache__" for folder in parts[:-1]):
+        return "file_read_only"
+    if parts == [_TEST_PAGE_ENTRY] or (len(parts) > 1 and parts[0] == _TEST_PAGE_DIR):
         return "file_read_only"
     if parts[-1] != ENV_EXAMPLE_NAME and not parts[-1].lower().endswith(EDITABLE_SUFFIXES):
         return "file_type_not_editable"

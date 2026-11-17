@@ -360,7 +360,7 @@ def test_the_wizards_own_records_are_not_files_of_the_package(tmp_path) -> None:
 
 def test_every_file_the_editor_saves_but_a_readme_is_one_a_test_run_is_tied_to(tmp_path) -> None:
     poc = _package(tmp_path)
-    for name in ("labels.json", "settings.toml", "notes.txt", "ui/page.html", "templates/a.md"):
+    for name in ("labels.json", "settings.toml", "notes.txt", "pages/page.html", "templates/a.md"):
         os.makedirs(os.path.dirname(os.path.join(poc, name)) or poc, exist_ok=True)
         with open(os.path.join(poc, name), "w", encoding="utf-8") as fh:
             fh.write("x\n")
@@ -378,6 +378,34 @@ def test_every_file_the_editor_saves_but_a_readme_is_one_a_test_run_is_tied_to(t
         assert counts is (posix.rsplit("/", 1)[-1].lower() != "readme.md"), posix
     assert poc_service.counts_for_package_digest("prompts/extract.md")
     assert not poc_service.counts_for_package_digest("README.md")
+
+
+def test_the_packages_test_page_is_shown_but_not_saved(tmp_path) -> None:
+    """``app.py`` at the root and everything under ``ui/`` are the test page the
+    scaffolder writes from its templates; ``ui/`` is outside the digest."""
+    poc = _package(tmp_path)
+    os.makedirs(os.path.join(poc, "ui"))
+    os.makedirs(os.path.join(poc, "helpers"))
+    for name, text in (
+        ("app.py", "print('the test page')\n"),
+        ("ui/index.html", "<p>test page</p>\n"),
+        ("ui/solution.json", "{}\n"),
+        ("helpers/app.py", "x = 1\n"),
+    ):
+        with open(os.path.join(poc, name), "w", encoding="utf-8") as fh:
+            fh.write(text)
+
+    for path in ("app.py", "ui/index.html", "ui/solution.json"):
+        read = poc_service.read_package_file(poc, path)
+        refused = _refusal(
+            lambda p=path, d=read["digest"]: poc_service.write_package_file(poc, p, "x\n", d)
+        )
+        assert (read["editable"], read["read_only_reason"]) == (False, "file_read_only"), path
+        assert (refused.status, refused.code) == (403, "file_read_only"), path
+    assert not poc_service.counts_for_package_digest("ui/index.html")
+    assert poc_service.counts_for_package_digest("app.py")
+    # Only the root's app.py is the page's.
+    assert poc_service.read_package_file(poc, "helpers/app.py")["editable"] is True
 
 
 def test_a_file_in_a_hidden_folder_is_shown_but_not_saved(tmp_path) -> None:

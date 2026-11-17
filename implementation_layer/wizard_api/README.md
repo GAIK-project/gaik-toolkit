@@ -61,8 +61,9 @@ Steps are **1–13** (matches V2 UI phase stepper). Gate keys: `gate_1` … `gat
 read or written: no absolute path, no `..`, no backslash, no symlink on the way
 (`poc_service.package_file_path`, `regular_file`). A save needs an existing file with
 one of the suffixes in `poc_service.EDITABLE_SUFFIXES` (or `.env.example`); the AI
-marker, everything under `sample_input/` and `output/` and files in a hidden folder or
-`__pycache__` are read-only (`file_read_only`, 403), other types
+marker, everything under `sample_input/` and `output/`, files in a hidden folder or
+`__pycache__`, and the package's test page (`app.py` at the root and everything under
+`ui/`, the scaffolder's templates) are read-only (`file_read_only`, 403), other types
 `file_type_not_editable` (422). `.env` and every `.env*` name except `.env.example` is
 refused for reading and writing with 422 `secrets_not_stored`: the server keeps no keys
 for a user, the web app adds `poc/.env` to the downloaded package in the browser. For
@@ -86,9 +87,10 @@ approved it reopens that gate. An edit to a `README.md` (outside `prompts/`) doe
 neither: no run reads it, while the prompts are Markdown too and a run reads them.
 
 The digest (`poc_service._version_files`, `_in_version`; scheme 3) covers every file of
-`poc/` but README files, the AI marker, the wizard's own records, environment files
-with keys, the editor's temporary files, compiled Python, `sample_input/`, `output/`,
-hidden folders and `__pycache__`. It is the preflight's version too, so the PoC tab
+`poc/` but README files, the test page's `ui/` folder (the page runs where the package
+is taken; no sandbox run reads it), the AI marker, the wizard's own records,
+environment files with keys, the editor's temporary files, compiled Python,
+`sample_input/`, `output/`, hidden folders and `__pycache__`. It is the preflight's version too, so the PoC tab
 checks the package again after any such change. Scheme 2 covered Python files,
 `schemas/` and `prompts/` only; a session approved under it is re-based on the package
 as it is, and a run recorded under it is asked for again before Gate 3 or the

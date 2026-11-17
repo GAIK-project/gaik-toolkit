@@ -41,6 +41,7 @@ _PACKAGE = {
     "ui/index.html": "<p>test page</p>\n",
     "evals/run_evals.py": "print('evals')\n",
     "labels.json": '["invoice", "receipt"]\n',
+    "templates/report.md": "# The report\n",
     "sample_input/note.txt": "a note\n",
 }
 
@@ -138,11 +139,9 @@ def _scheme_2_digest(poc: str) -> str:
         ("document_manifest.py", True),  # one that was not there before
         # Python of the test page and the evaluations is Python of the package.
         ("app.py", True),
-        ("ui/server.py", True),
         ("evals/run_evals.py", True),
         # Every other file of the package too: run_poc.py may read any of them.
         ("labels.json", True),
-        ("ui/index.html", True),
         (".env.example", True),
         ("notes.txt", True),
         ("templates/report.md", True),
@@ -150,6 +149,10 @@ def _scheme_2_digest(poc: str) -> str:
         # Documentation for people, which no run reads.
         ("README.md", False),
         ("helpers/Readme.md", False),
+        # The test page's folder: the page runs where the package is taken, no run reads it.
+        ("ui/index.html", False),
+        ("ui/solution.json", False),
+        ("ui/server.py", False),
         # Not part of the package.
         ("AI-GENERATED.json", False),
         (".env", False),
@@ -344,7 +347,7 @@ def test_an_edit_to_a_module_reopens_gate_3_in_such_a_session_too(client, db_ses
 
 
 @requires_postgres
-@pytest.mark.parametrize("path", ["helpers/dates.py", "app.py", "evals/run_evals.py"])
+@pytest.mark.parametrize("path", ["helpers/dates.py", "input_bundle.py", "evals/run_evals.py"])
 def test_an_edit_to_any_python_file_reopens_gate_3(client, db_session, path) -> None:
     sid = _approved_session(client, db_session, f"now-{path}", older_scheme=False)["id"]
 
@@ -360,7 +363,7 @@ def test_an_edit_to_any_python_file_reopens_gate_3(client, db_session, path) -> 
     [
         ("labels.json", '["invoice", "receipt", "credit note"]\n'),
         (".env.example", "AZURE_API_KEY=\nTAVILY_API_KEY=\n"),
-        ("ui/index.html", "<p>edited</p>\n"),
+        ("templates/report.md", "# The report, edited\n"),
     ],
 )
 def test_an_edit_to_a_file_that_is_not_code_reopens_gate_3_too(

@@ -25,6 +25,12 @@ export const ENV_EXAMPLE_NAME = ".env.example";
 export const AI_MARKER_NAME = "AI-GENERATED.json";
 export const MAX_POC_FILE_BYTES = 256 * 1024;
 const READ_ONLY_DIRS = ["sample_input", "output"];
+// The package's own test page: app.py at the root serves ui/. Both are the
+// scaffolder's templates; no run reads ui/, so it is outside the digest.
+const TEST_PAGE_ENTRY = "app.py";
+const TEST_PAGE_DIR = "ui";
+const isTestPage = (parts: string[]) =>
+  (parts.length === 1 && parts[0] === TEST_PAGE_ENTRY) || (parts.length > 1 && parts[0] === TEST_PAGE_DIR);
 
 /** wizard_api's answer for one file, in the web app's own spelling. */
 export type PocFile = {
@@ -100,13 +106,15 @@ const outsideDigest = (folder: string) => folder.startsWith(".") || folder === "
 
 /**
  * Why the editor may not save `path` (relative to `poc/`), as wizard_api's code; null when it may.
- * Nor in a hidden folder or `__pycache__`: those are outside the package digest.
+ * Nor in a hidden folder or `__pycache__`: those are outside the package digest. Nor the test
+ * page (`app.py` at the root, everything under `ui/`). Whether code may be saved at all depends
+ * on the deployment's runner key, which only wizard_api knows: its answer says so.
  */
 export function pocFileReadOnly(path: string): "file_read_only" | "file_type_not_editable" | null {
   const parts = path.split("/");
   const name = parts[parts.length - 1];
   if (name === AI_MARKER_NAME || READ_ONLY_DIRS.includes(parts[0])) return "file_read_only";
-  if (parts.slice(0, -1).some(outsideDigest)) return "file_read_only";
+  if (parts.slice(0, -1).some(outsideDigest) || isTestPage(parts)) return "file_read_only";
   if (name !== ENV_EXAMPLE_NAME && !POC_EDITABLE_SUFFIXES.some((s) => name.toLowerCase().endsWith(s))) {
     return "file_type_not_editable";
   }
@@ -122,6 +130,7 @@ export function pocFileAffectsPackage(path: string): boolean {
   const parts = path.split("/");
   const name = parts[parts.length - 1];
   if (READ_ONLY_DIRS.includes(parts[0]) || parts.slice(0, -1).some(outsideDigest)) return false;
+  if (parts.length > 1 && parts[0] === TEST_PAGE_DIR) return false;
   if (name === AI_MARKER_NAME || isSecretEnvName(name)) return false;
   return !(name.toLowerCase() === "readme.md" && parts[0] !== "prompts");
 }
