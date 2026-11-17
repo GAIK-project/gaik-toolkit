@@ -1,19 +1,18 @@
-"""Semantic video search router - Hybrid search over transcribed video segments."""
+"""Semantic video search router - Hybrid search over transcribed video segments.
+
+Every visitor searches the same index, so the API only reads it. The index is
+seeded with ``api/scripts/seed_dental_demo.py``, which writes to the database
+directly.
+"""
 
 import logging
 import os
-from collections.abc import AsyncGenerator
 
 try:
-    from utils import generate_presigned_url, sse_error_response, sse_event
+    from utils import generate_presigned_url
 except ImportError:
-    from api.utils import generate_presigned_url, sse_error_response, sse_event
-try:
-    from utils.upload_check import upload_problem
-except ImportError:
-    from api.utils.upload_check import upload_problem
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+    from api.utils import generate_presigned_url
+from fastapi import APIRouter, Form, HTTPException
 from pydantic import BaseModel
 
 try:
@@ -260,139 +259,5 @@ async def search_videos(
             query=query,
             total_results=len(formatted),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=error_detail(e)) from e
-
-
-@router.post("/ingest/stream")
-async def ingest_srt_stream(
-    file: UploadFile = File(...),
-    video_title: str = Form(...),
-    video_id: str = Form(None),
-):
-    """
-    Ingest an SRT subtitle file: parse, chunk, embed, and store segments.
-    Returns SSE progress events.
-    """
-    store = _get_store()
-    embedder = _get_embedder()
-
-    if store is None:
-        return sse_error_response("Database not configured (DATABASE_URL missing)")
-
-    if embedder is None:
-        return sse_error_response("Embedder not configured (API key missing)")
-
-    if not file.filename:
-        return sse_error_response("No filename provided")
-
-    raw = await file.read()
-    if (problem := await upload_problem(".srt", raw, check_type=False)) is not None:
-        return sse_error_response(problem.message)
-    srt_content = raw.decode("utf-8", errors="replace")
-
-    import uuid as uuid_mod
-
-    vid = video_id or uuid_mod.uuid4().hex[:12]
-
-    async def event_generator() -> AsyncGenerator[str, None]:
-        steps = [
-            {"step": 1, "name": "Parse SRT", "status": "pending"},
-            {"step": 2, "name": "Chunk Segments", "status": "pending"},
-            {"step": 3, "name": "Generate Embeddings", "status": "pending"},
-            {"step": 4, "name": "Store in Database", "status": "pending"},
-        ]
-
-        yield sse_event("steps", {"steps": steps})
-
-        try:
-            import asyncio
-
-            from gaik.software_components.transcriber.srt_utils import chunk_segments, parse_srt
-
-            # Step 1: Parse SRT
-            steps[0]["status"] = "in_progress"
-            steps[0]["message"] = "Parsing subtitle file..."
-            yield sse_event("step_update", steps[0])
-
-            segments = parse_srt(srt_content)
-
-            steps[0]["status"] = "completed"
-            steps[0]["message"] = f"Parsed {len(segments)} subtitle cues"
-            yield sse_event("step_update", steps[0])
-
-            # Step 2: Chunk
-            steps[1]["status"] = "in_progress"
-            steps[1]["message"] = "Grouping into search chunks..."
-            yield sse_event("step_update", steps[1])
-
-            chunks = chunk_segments(segments, target_seconds=45)
-
-            steps[1]["status"] = "completed"
-            steps[1]["message"] = f"Created {len(chunks)} search chunks"
-            yield sse_event("step_update", steps[1])
-
-            # Step 3: Embed
-            steps[2]["status"] = "in_progress"
-            steps[2]["message"] = f"Generating embeddings for {len(chunks)} chunks..."
-            yield sse_event("step_update", steps[2])
-
-            from gaik.software_components.RAG.pg_vector_store.video_search_helpers import (
-                ingest_video_segments,
-            )
-
-            ids = await asyncio.to_thread(
-                ingest_video_segments,
-                store,
-                embedder,
-                video_title=video_title,
-                video_id=vid,
-                segments=chunks,
-            )
-
-            steps[2]["status"] = "completed"
-            steps[2]["message"] = f"Generated {len(ids)} embeddings"
-            yield sse_event("step_update", steps[2])
-
-            # Step 4: Done (storage happened in ingest_video_segments)
-            steps[3]["status"] = "completed"
-            steps[3]["message"] = f"Stored {len(ids)} segments in database"
-            yield sse_event("step_update", steps[3])
-
-            yield sse_event(
-                "result",
-                {
-                    "video_id": vid,
-                    "video_title": video_title,
-                    "segments_stored": len(ids),
-                    "total_segments_in_db": store.count(),
-                },
-            )
-
-        except Exception as e:
-            message = error_detail(e)
-            for step in steps:
-                if step["status"] == "in_progress":
-                    step["status"] = "error"
-                    step["message"] = message
-                    yield sse_event("step_update", step)
-                    break
-            yield sse_event("error", {"message": message})
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-@router.delete("/clear")
-async def clear_all_segments():
-    """Clear all indexed video segments from the database."""
-    store = _get_store()
-    if store is None:
-        raise HTTPException(status_code=503, detail="Database not configured")
-
-    try:
-        conn = store._get_conn()
-        result = conn.execute(f"DELETE FROM {TABLE_NAME}")
-        conn.commit()
-        return {"deleted": result.rowcount, "message": "All segments cleared"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=error_detail(e)) from e

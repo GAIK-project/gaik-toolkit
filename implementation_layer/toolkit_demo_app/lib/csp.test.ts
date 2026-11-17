@@ -100,6 +100,13 @@ test("API paths, encoded ones too, and the PostHog rewrite are not pages", () =>
   expect(isPagePath("/parser")).toBe(true);
   expect(isPagePath("/")).toBe(true);
   expect(isPagePath("/about")).toBe(true);
-  for (const path of ["/api/docs", "/api", "/%61pi/docs", "/a/e/", "/a"])
+  for (const path of [
+    "/api/docs",
+    "/api",
+    "/%61pi/docs",
+    "/a/e/",
+    "/a",
+    "/A/e/",
+  ])
     expect(isPagePath(path)).toBe(false);
 });
