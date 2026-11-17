@@ -36,7 +36,6 @@ from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.source_material import (
     SourceMaterial,
-    clean_label,
     source_material_messages,
 )
 
@@ -331,7 +330,7 @@ class TabularAgent:
         material = SourceMaterial()
         messages = source_material_messages(
             _LAYOUT_SYSTEM_PROMPT,
-            f"Sheet: {clean_label(sheet_label)}\n\n"
+            "The sheet, its name as the block's label:\n\n"
             + material.wrap(grid, label=f"sheet {sheet_label}"),
         )
         parsed = self._parse_structured(messages, SheetLayout)
@@ -363,13 +362,19 @@ class TabularAgent:
         self._get_conn()
         return list(self._tables)
 
-    def generate_sql(self, question: str, *, error_context: str | None = None) -> GeneratedSQL:
+    def generate_sql(
+        self, question: str, *, error_context: str | None = None, advice: str | None = None
+    ) -> GeneratedSQL:
         """Generate a read-only SQL query for ``question`` (no execution).
 
         Args:
             question: The natural-language question.
             error_context: Feedback from a previous failed attempt, fed back to
-                the LLM so it can correct the query.
+                the LLM so it can correct the query. It can quote the data, so it
+                goes in a data block.
+            advice: The caller's own guidance for the retry, such as how to make a
+                timed-out query cheaper. It is an instruction, so it stays outside
+                the data blocks.
 
         Returns:
             A :class:`~gaik.software_components.tabular_agent.models.GeneratedSQL`.
@@ -390,6 +395,8 @@ class TabularAgent:
             user_prompt += "\n\nThe previous attempt failed -- fix it.\n" + material.wrap(
                 error_context, label="previous attempt"
             )
+        if advice:
+            user_prompt += f"\n\n{advice}"
 
         parsed = self._parse_structured(
             source_material_messages(_SQL_SYSTEM_PROMPT, user_prompt), GeneratedSQL
@@ -445,11 +452,13 @@ class TabularAgent:
         result = QueryResult(question=question)
         self.get_schema()
         error_context: str | None = None
+        advice: str | None = None
 
         for attempt in range(1, self.max_retries + 1):
             result.attempts = attempt
             try:
-                generated = self.generate_sql(question, error_context=error_context)
+                generated = self.generate_sql(question, error_context=error_context, advice=advice)
+                advice = None
                 result.sql = generated.sql
                 result.reasoning = generated.reasoning
                 rows = self.run_sql(generated.sql)
@@ -465,8 +474,8 @@ class TabularAgent:
                 msg = f"Query exceeded the {self.query_timeout_s}s time limit."
                 result.error = msg
                 if attempt == 1:
-                    error_context = (
-                        f"{msg} Failed SQL:\n{result.sql}\n\n"
+                    error_context = f"{msg} Failed SQL:\n{result.sql}"
+                    advice = (
                         "Rewrite the query to do less work: drop unused JOINs, "
                         "narrow the filters, aggregate earlier, or remove ORDER BY "
                         "over the full table. Do NOT resubmit the same query."
@@ -525,8 +534,9 @@ class TabularAgent:
         material = SourceMaterial()
         user_prompt = (
             f"Question: {question}\n\n"
-            f"SQL query used:\n{query_result.sql}\n\n"
-            f"Query result ({query_result.row_count} row(s)):\n"
+            "SQL query used:\n"
+            + material.wrap(query_result.sql or "", label="SQL query used")
+            + f"\n\nQuery result ({query_result.row_count} row(s)):\n"
             + material.wrap(_format_rows_for_prompt(query_result.rows), label="query result")
         )
         messages = source_material_messages(system_prompt, user_prompt)

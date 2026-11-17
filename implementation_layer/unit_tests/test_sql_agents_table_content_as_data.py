@@ -109,6 +109,8 @@ def test_tabular_query_rows_are_data(tabular, monkeypatch):
     )
 
     _assert_only_in_block(sent[0], "query result")
+    assert "SELECT note FROM orders" in _blocks(sent[0][1]["content"])["SQL query used"]
+    assert "SELECT note FROM orders" in _blocks(sent[0][1]["content"])["SQL query used"]
 
 
 def test_tabular_sheet_grid_is_data(tabular, monkeypatch):
@@ -131,6 +133,8 @@ def test_tabular_sheet_grid_is_data(tabular, monkeypatch):
     (label,) = _blocks(user)
     assert label.startswith("sheet ")
     _assert_only_in_block(messages, label)
+    # the sheet's name, which comes from the file, is only the block's label
+    assert "Sheet1" not in _outside_blocks(user).replace(label, "")
 
 
 # ---------------------------------------------------------------------------
@@ -201,3 +205,53 @@ def test_postgres_query_rows_are_data(postgres):
     )
 
     _assert_only_in_block(sent[0], "query result")
+    assert "SELECT note FROM orders" in _blocks(sent[0][1]["content"])["SQL query used"]
+
+
+def test_tabular_timeout_advice_stays_an_instruction(tabular, monkeypatch):
+    import duckdb
+    from gaik.software_components.tabular_agent.models import GeneratedSQL
+
+    sent: list[list[dict]] = []
+
+    def parse(messages, schema):
+        sent.append(messages)
+        return GeneratedSQL(sql="SELECT * FROM orders", reasoning="stub")
+
+    def slow(sql):
+        raise duckdb.InterruptException("timeout")
+
+    monkeypatch.setattr(tabular, "_parse_structured", parse)
+    monkeypatch.setattr(tabular, "run_sql", slow)
+
+    tabular.query("Everything?")
+
+    retry = sent[1][1]["content"]
+    assert "Do NOT resubmit the same query." in _outside_blocks(retry)
+    assert "Do NOT resubmit" not in _blocks(retry)["previous attempt"]
+    assert "SELECT * FROM orders" in _blocks(retry)["previous attempt"]
+
+
+def test_postgres_timeout_advice_stays_an_instruction(postgres, monkeypatch):
+    import psycopg
+    from gaik.software_components.postgres_agent.models import GeneratedSQL
+
+    from ._pg_agent_fake_client import FakeProviderClient
+
+    sent: list[list[dict]] = []
+
+    def parsed(**kwargs):
+        sent.append(kwargs["messages"])
+        return GeneratedSQL(sql="SELECT * FROM orders", reasoning="stub")
+
+    def slow(sql):
+        raise psycopg.errors.QueryCanceled("canceling statement due to statement timeout")
+
+    postgres._llm_client = FakeProviderClient(chat_parsed_impl=parsed)
+    monkeypatch.setattr(postgres, "run_sql", slow)
+
+    postgres.query("Everything?")
+
+    retry = sent[1][1]["content"]
+    assert "Do NOT resubmit" in _outside_blocks(retry)
+    assert "Do NOT resubmit" not in _blocks(retry)["previous attempt"]
