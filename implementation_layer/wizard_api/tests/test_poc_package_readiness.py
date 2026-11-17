@@ -397,30 +397,29 @@ def test_the_test_page_with_other_line_ends_is_the_same_page(tmp_path):
     assert package_problems(str(poc)) == []
 
 
-def test_a_test_page_from_an_earlier_template_stays_ready(tmp_path):
-    """A package keeps the page the scaffolder wrote for it, also after the template changed."""
+def test_a_manifest_hash_does_not_make_a_changed_test_page_pass(tmp_path):
+    """The scaffold manifest is in the session folder, which the agent can write: a hash
+    recorded there for a changed app.py does not make the change the wizard's."""
     import hashlib
     import json
 
     from wizard_api.services.poc_service import MANIFEST_NAME
 
     poc = _page_package(tmp_path)
-    earlier = b'"""The test page as an earlier template wrote it."""\n'
-    (poc / "app.py").write_bytes(earlier)
-    assert len(package_problems(str(poc))) == 1
-
+    changed = (poc / "app.py").read_bytes() + b"\nprint('one more thing')\n"
+    (poc / "app.py").write_bytes(changed)
     (poc.parent / MANIFEST_NAME).write_text(
         json.dumps(
             {
                 "blueprint": "x",
                 "files": ["app.py"],
-                "hashes": {"app.py": hashlib.sha256(earlier).hexdigest()},
+                "hashes": {"app.py": hashlib.sha256(changed).hexdigest()},
             }
         ),
         encoding="utf-8",
     )
-    assert package_problems(str(poc)) == []
 
-    # Changed after that, it is a problem again.
-    (poc / "app.py").write_bytes(earlier + b"print('changed')\n")
-    assert len(package_problems(str(poc))) == 1
+    assert package_problems(str(poc)) == [
+        "app.py is not the test page the wizard wrote: it was changed after the package "
+        "was generated. Generate the package again to put it back",
+    ]
