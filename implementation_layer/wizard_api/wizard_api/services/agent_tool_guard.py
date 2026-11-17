@@ -12,18 +12,34 @@ the wizard's assets, so a PreToolUse hook decides every tool call before it runs
 
 A refusal tells the agent what is allowed, so it can carry on within the rules.
 The PoC itself runs in the sandbox Job, not here.
+
+``WIZARD_AGENT_MAX_TURNS`` counts the agent's own model calls only. A call that
+reaches a model or the web another way is *metered*: a run of a wizard script
+that calls a model itself, web search and fetch, and the tools of an MCP server
+other than the wizard's own. Each one the rules let run is counted for the chat
+message (``WIZARD_MAX_METERED_CALLS_PER_TURN``) and for the user in a sliding
+hour (``WIZARD_MAX_METERED_CALLS_PER_USER_PER_HOUR``); over either it is refused
+too. The web tools and outside MCP servers are refused by the rules today and
+are metered by name, so they fall under the limits the moment they are allowed.
+
+Every decision is one log line and one count of ``wizard.agent.tool_calls``:
+the tool's name, its kind and the reason, never its input.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 import shlex
+import time
+from collections import deque
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
+from wizard_api import config
 from wizard_api.services import scaffold_guard
 
 logger = logging.getLogger(__name__)
@@ -92,6 +108,150 @@ _ONE_LINER_COMMAND = re.compile(r'^python3? -c "([^"\\$`]*)"$')
 _CONTINUATION = re.compile(r"\\\r?\n")
 _SHELL_SYNTAX = re.compile(r"[;&|`$<>(){}\\\n\r*?\[\]~!#]")
 
+#: Scripts in ``_SCRIPTS`` that call a model themselves: generate_schema.py runs
+#: gaik's SchemaGenerator. No other listed script does.
+_MODEL_SCRIPTS = frozenset({"generate_schema.py"})
+_WEB_TOOLS = frozenset({"WebSearch", "WebFetch"})
+_MCP_PREFIX = "mcp__"
+_WIZARD_MCP_PREFIX = "mcp__wizard__"
+#: The kinds of call counted against the metered-call limits.
+METERED_KINDS = frozenset({"model_script", "web", "mcp"})
+#: The reason code a refusal by the rules gets, by kind of call.
+_REFUSED = {
+    "read": "path_not_allowed",
+    "write": "path_not_allowed",
+    "command": "command_not_allowed",
+    "model_script": "command_not_allowed",
+}
+_LIMIT_CODES = frozenset({"turn_limit", "user_limit"})
+#: A tool name fit for a log line and a metric; anything else is logged as "other".
+_TOOL_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,99}$")
+
+_METERED_WHAT = (
+    "calls that use a model or the web (generate_schema.py, web search or fetch, outside MCP tools)"
+)
+_TURN_LIMIT = (
+    "This call was not run: this message has already made {limit} " + _METERED_WHAT + ", "
+    "the most one message may make. Carry on without it. If the work cannot go on without "
+    "it, tell the user in plain words that the wizard stopped at its limit for one message "
+    "and that their next message lets you continue."
+)
+_USER_LIMIT = (
+    "This call was not run: the user has made {limit} " + _METERED_WHAT + " in the last "
+    "hour, the most the wizard allows. Carry on without it. If the work cannot go on "
+    "without it, tell the user in plain words that the wizard's hourly limit is reached and "
+    "that they can try again in about {minutes} minutes."
+)
+
+#: user id -> times (time.monotonic) of the metered calls let run in the last hour,
+#: across every agent of that user. In this API process, as the chat turn rate is.
+_USER_CALLS: dict[str, deque[float]] = {}
+_USER_WINDOW_SECONDS = 3600
+
+
+def _forget_old_calls(now: float) -> None:
+    """Drop the calls older than the window, and every user left with none.
+
+    Run on each metered call, over every user: a user who stops working does not
+    stay in memory, and the table holds no more than the last hour's callers.
+    """
+    cutoff = now - _USER_WINDOW_SECONDS
+    for user_id, calls in list(_USER_CALLS.items()):
+        while calls and calls[0] <= cutoff:
+            calls.popleft()
+        if not calls:
+            del _USER_CALLS[user_id]
+
+
+class Decision(NamedTuple):
+    """What the guard decided for one call, and what of it may be logged."""
+
+    kind: str
+    #: The wizard script a Bash call runs, by its name in ``_SCRIPTS``, or None.
+    script: str | None
+    #: ``ok`` when the call may run, else why not (a fixed code).
+    code: str
+    #: What the agent is told when the call is refused, None when it may run.
+    reason: str | None
+
+
+def _normalise(command: str) -> str:
+    return _CONTINUATION.sub(" ", command).strip()
+
+
+def _script_name(command: str) -> str | None:
+    """The wizard script a Bash command runs, or None (a one-liner, anything else).
+
+    Parsed as ``_check_bash`` parses it, so a command the guard lets run is
+    named by the script that runs, however it is quoted or spelled out.
+    """
+    command = _normalise(command)
+    if _ONE_LINER_COMMAND.match(command) or _SHELL_SYNTAX.search(command):
+        return None
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return None
+    if len(argv) < 2 or argv[0] not in _PYTHON:
+        return None
+    name = Path(argv[1]).name
+    return name if name in _SCRIPTS else None
+
+
+def call_kind(tool: str, tool_input: dict[str, Any]) -> tuple[str, str | None]:
+    """The kind of a call and, for Bash, the wizard script it runs."""
+    if tool in _HARMLESS_TOOLS:
+        return "internal", None
+    if tool in _WIZARD_TOOLS or tool.startswith(_WIZARD_MCP_PREFIX):
+        return "wizard", None
+    if tool in _WRITE_TOOLS:
+        return "write", None
+    if tool in _READ_TOOLS:
+        return "read", None
+    if tool == "Bash":
+        script = _script_name(str(tool_input.get("command") or ""))
+        return ("model_script" if script in _MODEL_SCRIPTS else "command"), script
+    if tool in _WEB_TOOLS:
+        return "web", None
+    if tool.startswith(_MCP_PREFIX):
+        return "mcp", None
+    return "other", None
+
+
+def _record(tool: str, decision: Decision, *, failed: bool = False) -> None:
+    """One log line and one count for a decision: no command, path, input, URL or id.
+
+    Allowed calls and refusals by the rules are INFO; a refusal at a limit is a
+    WARNING, which also reaches the WP5 collector; a call the guard could not
+    decide is an ERROR with its traceback (which stays in the pod).
+    """
+    name = tool if _TOOL_NAME.match(tool or "") else "other"
+    outcome = "allowed" if decision.reason is None else "denied"
+    if failed:
+        level = logging.ERROR
+    elif decision.code in _LIMIT_CODES:
+        level = logging.WARNING
+    else:
+        level = logging.INFO
+    logger.log(
+        level,
+        "tool call tool=%s kind=%s script=%s decision=%s reason=%s",
+        name,
+        decision.kind,
+        decision.script or "-",
+        outcome,
+        decision.code,
+        exc_info=failed,
+    )
+    try:
+        from wizard_api import ops_metrics
+
+        ops_metrics.tool_calls.add(
+            1, {"kind": decision.kind, "decision": outcome, "reason": decision.code}
+        )
+    except Exception:  # noqa: BLE001 - a count never changes a decision
+        logger.debug("tool call could not be counted", exc_info=True)
+
 
 def _deny(reason: str) -> dict[str, Any]:
     return {
@@ -123,23 +283,75 @@ def _inside(path: str, roots: list[Path], cwd: Path) -> bool:
 
 
 class ToolGuard:
-    """Per-session rules; ``hook`` is registered as the agent's PreToolUse hook."""
+    """Per-session rules; ``hook`` is registered as the agent's PreToolUse hook.
 
-    def __init__(self, wizard_dir: Path, output_dir: Path) -> None:
+    ``user_id`` is the session owner, whose metered calls are counted together
+    across their sessions; ``start_turn`` begins the count of a new chat message.
+    """
+
+    def __init__(self, wizard_dir: Path, output_dir: Path, *, user_id: str | None = None) -> None:
         self.cwd = Path(os.path.realpath(wizard_dir))
         self.output = Path(os.path.realpath(output_dir))
         self.readable = [self.output, self.cwd]
         self.writable = [self.output]
+        self.user_id = user_id
+        #: Metered calls let run since the chat message began.
+        self.turn_calls = 0
+
+    def start_turn(self) -> None:
+        """A new chat message: its metered calls are counted from zero."""
+        self.turn_calls = 0
 
     async def hook(self, input_data: Any, tool_use_id: str | None, context: Any) -> dict[str, Any]:
+        tool = ""
         try:
-            tool = input_data.get("tool_name", "")
+            tool = str(input_data.get("tool_name", "") or "")
             tool_input = input_data.get("tool_input") or {}
-            reason = self.check(tool, tool_input if isinstance(tool_input, dict) else {})
+            decision = self.decide(tool, tool_input if isinstance(tool_input, dict) else {})
         except Exception:  # noqa: BLE001 - a call the rules cannot decide does not run
-            logger.exception("tool guard could not decide a call; refusing it")
-            reason = "The wizard could not check this tool call, so it was not run."
-        return _deny(reason) if reason else {}
+            decision = Decision(
+                "other",
+                None,
+                "guard_error",
+                "The wizard could not check this tool call, so it was not run.",
+            )
+            _record(tool, decision, failed=True)
+            return _deny(decision.reason)
+        _record(tool, decision)
+        return _deny(decision.reason) if decision.reason else {}
+
+    def decide(
+        self, tool: str, tool_input: dict[str, Any], *, now: float | None = None
+    ) -> Decision:
+        """The rules first, then the metered-call limits for a call the rules let run.
+
+        A metered call that may run is counted here, so a refused one uses up nothing.
+        """
+        kind, script = call_kind(tool, tool_input)
+        reason = self.check(tool, tool_input)
+        if reason is not None:
+            return Decision(kind, script, _REFUSED.get(kind, "tool_not_available"), reason)
+        if kind in METERED_KINDS:
+            over = self._meter(time.monotonic() if now is None else now)
+            if over is not None:
+                return Decision(kind, script, *over)
+        return Decision(kind, script, "ok", None)
+
+    def _meter(self, now: float) -> tuple[str, str] | None:
+        """The limit a metered call is over, as (code, refusal), or None once it is counted."""
+        turn_limit = config.max_metered_calls_per_turn()
+        if self.turn_calls >= turn_limit:
+            return "turn_limit", _TURN_LIMIT.format(limit=turn_limit)
+        user_limit = config.max_metered_calls_per_user_per_hour()
+        if self.user_id and user_limit > 0:
+            _forget_old_calls(now)
+            calls = _USER_CALLS.get(self.user_id)
+            if calls is not None and len(calls) >= user_limit:
+                minutes = max(1, math.ceil((calls[0] + _USER_WINDOW_SECONDS - now) / 60))
+                return "user_limit", _USER_LIMIT.format(limit=user_limit, minutes=minutes)
+            _USER_CALLS.setdefault(self.user_id, deque()).append(now)
+        self.turn_calls += 1
+        return None
 
     def check(self, tool: str, tool_input: dict[str, Any]) -> str | None:
         """Why the call is refused, or None when it may run."""
@@ -178,7 +390,7 @@ class ToolGuard:
             "Use the Read, Write, Edit, Glob and Grep tools for files. The PoC runs in the sandbox "
             "from the wizard's Run button, not here."
         )
-        command = _CONTINUATION.sub(" ", command).strip()
+        command = _normalise(command)  # as _script_name reads it
         whole = _ONE_LINER_COMMAND.match(command)
         if whole:
             return self._check_one_liner(whole.group(1), allowed)

@@ -166,6 +166,8 @@ every chat message is a billed model call. Limits on them:
 | `WIZARD_MAX_CHAT_TURNS_PER_MINUTE` | `0` (off) | chat messages one user may send in a sliding minute |
 | `WIZARD_MAX_CHAT_MESSAGE_CHARS` | `20000` | characters in one chat message |
 | `WIZARD_AGENT_MAX_TURNS` | `100` | model calls the agent may make for one message |
+| `WIZARD_MAX_METERED_CALLS_PER_TURN` | `10` | metered tool calls (below) the agent may make for one message |
+| `WIZARD_MAX_METERED_CALLS_PER_USER_PER_HOUR` | `60` (`0` turns it off) | metered tool calls one user's agents may make in a sliding hour, across all their sessions |
 | `WIZARD_POC_MODEL_TIMEOUT_SECONDS` | `120` | seconds a PoC waits for one model call in its extraction and judge stages, unless the package names its own limit |
 
 A user is the session's owner (the user named in `X-Wizard-User-Id`).
@@ -184,8 +186,38 @@ A user is the session's owner (the user named in `X-Wizard-User-Id`).
   before an agent is woken, and only accepted turns are counted (a `409` while
   the agent is still replying does not use one up).
 
-The counts live in the API process, as the agents do; with more than one API
-replica each counts its own. The sandbox's run limits (`WIZARD_MAX_ACTIVE_RUNS`,
+**Metered tool calls.** `WIZARD_AGENT_MAX_TURNS` counts the agent's own model
+calls, not the ones its tools make. The tool guard (`services/agent_tool_guard.py`)
+counts every call that reaches a model or the web another way: a run of a wizard
+script that calls a model itself (`generate_schema.py`, through gaik's
+`SchemaGenerator`; no other script the agent may run does), `WebSearch`,
+`WebFetch`, and the tools of any MCP server other than the wizard's own
+`mcp__wizard__*`. The web tools and outside MCP servers are refused today; they
+are counted by name, so they fall under both limits the moment they are allowed.
+Only calls the guard lets run are counted, per message (with its quiet "Please
+continue." nudges) and per user in a sliding hour. Over a limit the call is
+refused with a message the agent passes on in plain words (it carries on without
+the tool, or asks the user to wait or to send another message), a warning is
+logged and `wizard.agent.tool_calls` counts it with reason `turn_limit` or
+`user_limit`. One run of `generate_schema.py` is one metered call: the model
+calls inside it (two for a flat schema, one more for each kind of repeated
+record in a nested one, each tried at most four times) are bounded by gaik's own
+code, which has no setting for them.
+
+Every tool call the guard decides is one line on the logger
+`wizard_api.services.agent_tool_guard`, for example
+`tool call tool=Bash kind=model_script script=generate_schema.py decision=allowed reason=ok`:
+the tool's name, its kind, the wizard script it runs, the decision and a reason
+code, never the command, a path, an input, a URL or who the user is. Allowed
+calls and refusals by the rules are `INFO`, refusals at a limit `WARNING`, a call
+the guard could not decide `ERROR`. The pod prints them at `WIZARD_LOG_LEVEL`
+(below).
+
+The counts, metered calls included, live in the API process, as the agents do:
+the API runs as one replica, and with more than one each would count its own. A
+restart of the API starts them again from zero, so the hourly window of metered
+calls and the chat turn minute begin anew with it.
+The sandbox's run limits (`WIZARD_MAX_ACTIVE_RUNS`,
 `WIZARD_MAX_ACTIVE_RUNS_PER_USER`, `429 sandbox_busy`) follow the same pattern.
 
 ## Telemetry for the WP5 stack
@@ -200,13 +232,27 @@ nothing is sent:
   progress and the oldest one's age, sandbox runs active and their limit, refusals by
   error code, ownership denials, sessions created (by owner id), deletions by reason and
   outcome, turns by outcome and their duration, agent failures by kind (rate limit,
-  overload, server error, timeout), gate changes, the components of solutions at Gate 2,
+  overload, server error, timeout), agent tool calls by kind, decision and reason (metered
+  calls refused at a limit among them), gate changes, the components of solutions at Gate 2,
   sandbox runs by phase, the sessions volume's use and size, the database size, the api
   container's memory and its limit, sessions by state (total, active, overdue for
   removal), session rows and folders without each other, and whether sandbox runs still
   use the shared model key.
 - **Log records** at `WIZARD_OTEL_LOG_LEVEL` (`WARNING` unless set) and above, because
   a shared project gives no way to collect the pod's own output.
+
+### The pod's own log
+
+The API's loggers (`wizard_api.*`) print to stderr at `WIZARD_LOG_LEVEL` (`INFO`
+unless set; `DEBUG`, `INFO`, `WARNING` or `ERROR`), each line as
+`<time> <LEVEL> <logger>: <message>`. Uvicorn configures only its own loggers, so
+without this the API's `INFO` lines, such as each tool call the agent's guard
+decides, were dropped. The level is set when the app is imported
+(`telemetry.configure_logging`). No handler is added when one that prints is
+already on the root (a `basicConfig`, a uvicorn `--log-config`), so no line is
+printed twice. The collector's handler keeps its own level: an `INFO` line
+reaches the collector only with `WIZARD_OTEL_LOG_LEVEL=INFO`, which now works for
+the API's lines even where the pod prints warnings only.
 
 No metric or log label carries an e-mail address or what anyone wrote. Checks that read
 the database or walk the sessions volume run at most every `WIZARD_OPS_CHECK_SECONDS`

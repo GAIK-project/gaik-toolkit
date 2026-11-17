@@ -74,6 +74,10 @@ uploads_scanned = meter.create_counter(
     "wizard.uploads.scanned",
     description="Uploaded files by malware check result: clean, refused, unavailable",
 )
+tool_calls = meter.create_counter(
+    "wizard.agent.tool_calls",
+    description="Agent tool calls the tool guard decided, by kind, decision and reason code",
+)
 turn_duration = meter.create_histogram(
     "wizard.turn.duration", unit="s", description="Length of a chat turn, start to end"
 )
@@ -173,6 +177,12 @@ _PRIMED = {
         for t in ("approved", "rejected", "pending")
     ],
     "ownership_denied": [{}],
+    # Metered calls refused at a limit (agent_tool_guard.METERED_KINDS).
+    "tool_calls": [
+        {"kind": k, "decision": "denied", "reason": r}
+        for k in ("model_script", "web", "mcp")
+        for r in ("turn_limit", "user_limit")
+    ],
 }
 
 
