@@ -10,7 +10,13 @@ from pydantic import BaseModel
 
 from gaik.observability.tracing import record_request, record_response
 from gaik.software_components.endpoints import check_endpoint, log_endpoint
-from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
+from gaik.software_components.llm.base import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_TIMEOUT_SECONDS,
+    ChatMessage,
+    ChatResponse,
+    UsageCounter,
+)
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 
@@ -56,6 +62,8 @@ class LiteLLMProvider:
         ):
             if self._config.get(source) is not None:
                 options[target] = self._config[source]
+        options.setdefault("timeout", DEFAULT_TIMEOUT_SECONDS)
+        options.setdefault("num_retries", DEFAULT_MAX_RETRIES)
         options.update(kwargs)
         if chat:
             model = options.get("model", self.model)

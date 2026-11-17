@@ -17,7 +17,13 @@ from pydantic import BaseModel
 
 from gaik.observability.tracing import record_request, record_response
 from gaik.software_components.endpoints import ANTHROPIC_URL, foundry_host, host_of, log_endpoint
-from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
+from gaik.software_components.llm.base import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_TIMEOUT_SECONDS,
+    ChatMessage,
+    ChatResponse,
+    UsageCounter,
+)
 from gaik.software_components.llm.content import image_data
 
 # The `output_config.effort` levels each model accepts (Foundry deployments use
@@ -160,6 +166,8 @@ class AnthropicProvider:
             for key in ("timeout", "max_retries", "http_client")
             if config.get(key) is not None
         }
+        options.setdefault("timeout", DEFAULT_TIMEOUT_SECONDS)
+        options.setdefault("max_retries", DEFAULT_MAX_RETRIES)
         if config.get("provider") == "anthropic_foundry":
             log_endpoint("anthropic_foundry", foundry_host(config["resource"]))
             return anthropic.AnthropicFoundry(
