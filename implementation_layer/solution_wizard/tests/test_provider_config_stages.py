@@ -261,3 +261,41 @@ def test_self_hosted_whisper_written_as_model_reads_no_credentials(provider_conf
         "provider": "openai",
         "use_azure": False,
     }
+
+
+def test_a_borrowed_deployment_keeps_its_model_family(provider_config):
+    """gaik reads a custom Azure deployment's family from model_family (llm/parameters.py)."""
+    config = {
+        "stages": {
+            "transcription": {"provider": "azure", "model": "gpt-4o-transcribe"},
+            "extraction": {
+                "provider": "azure",
+                "model": "prod-chat",
+                "model_family": "gpt-6-luna",
+            },
+        }
+    }
+
+    result = provider_config.get_stage_config(config, "transcription")
+
+    assert result["model"] == "prod-chat" and result["model_family"] == "gpt-6-luna"
+
+
+def test_a_chat_deployment_named_for_transcripts_stays_the_chat_model(provider_config):
+    """'transcript-cleaner' is a chat deployment; only audio-model names move."""
+    config = {"stages": {"transcription": {"provider": "azure", "model": "transcript-cleaner"}}}
+
+    result = provider_config.get_stage_config(config, "transcription")
+
+    assert result["model"] == "transcript-cleaner"
+    assert "transcription_model" not in result
+
+
+@pytest.mark.parametrize("name", ["AZURE_API_KEY", "OPENAI_API_KEY", "HF_TOKEN", "DB_PASSWORD"])
+def test_an_env_value_never_names_a_credential(provider_config, monkeypatch, name):
+    """Its value would be sent, and printed in errors, as a model name or address."""
+    monkeypatch.setenv(name, "secret-value")
+    config = {"stages": {"answer": {"provider": "azure", "model": f"env:{name}"}}}
+
+    with pytest.raises(ValueError, match="names a credential"):
+        provider_config.get_stage_config(config, "answer")

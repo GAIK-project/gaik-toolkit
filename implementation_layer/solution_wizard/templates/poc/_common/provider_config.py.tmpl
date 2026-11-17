@@ -11,9 +11,14 @@ from gaik.software_components.llm.providers import resolve_provider
 # Settings in this PoC's own config that name a provider address.
 _ADDRESS_SETTINGS = ("base_url", "azure_endpoint", "azure_audio_endpoint")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-#: A transcription model or deployment name, as opposed to the chat model that enhances
-#: the transcript.
-_AUDIO_MODEL = re.compile(r"transcri|whisper", re.IGNORECASE)
+#: A transcription model or deployment name (gpt-4o-transcribe, whisper-1), as opposed to
+#: the chat model that enhances the transcript.
+_AUDIO_MODEL = re.compile(r"transcribe|whisper", re.IGNORECASE)
+#: An env: reference names a setting, never a credential: its value would be sent and
+#: printed as a model name or address (the scaffolder refuses the same names).
+_CREDENTIAL_NAME = re.compile(
+    r"KEY|TOKEN|SECRET|PASSW|CREDENTIAL|DATABASE|DSN|PRIVATE|CERT", re.IGNORECASE
+)
 
 
 def _local_host(url: str, governance: dict) -> bool:
@@ -80,6 +85,11 @@ def _resolve_env_values(node):
         for key, value in node.items():
             if isinstance(value, str) and value.strip()[:4].lower() == "env:":
                 name = value.strip()[4:].strip()
+                if _CREDENTIAL_NAME.search(name):
+                    raise ValueError(
+                        f"{key} = {value!r} names a credential; env: names a setting such as "
+                        "a deployment or an endpoint. Keep keys in the provider's own variables."
+                    )
                 resolved = (os.environ.get(name) or "").strip()
                 if resolved:
                     out[key] = resolved
@@ -129,6 +139,9 @@ def _stage_provider(config: dict, stage: str, settings: dict, *, warn: bool = Tr
 
 #: Settings that name the chat endpoint a model or deployment name belongs to.
 _CHAT_ADDRESS_SETTINGS = ("base_url", "azure_endpoint")
+#: Settings that describe a borrowed chat model: a custom Azure deployment name needs its
+#: model_family for gaik to build valid request options.
+_CHAT_MODEL_SETTINGS = ("model", "model_family")
 
 
 def _same_chat_endpoint(
@@ -174,14 +187,14 @@ def get_stage_config(config: dict, stage: str) -> dict:
             # stage names the same provider and chat endpoint.
             if config.get("stages"):
                 extraction = config["stages"].get("extraction") or {}
-                chat_model = extraction.get("model")
+                borrowed = {k: extraction[k] for k in _CHAT_MODEL_SETTINGS if extraction.get(k)}
             else:
                 extraction = {}
-                chat_model = (config.get("models") or {}).get("extraction")
-            if chat_model and _same_chat_endpoint(
+                borrowed = {"model": (config.get("models") or {}).get("extraction")}
+            if borrowed.get("model") and _same_chat_endpoint(
                 config, "extraction", settings, extraction, provider
             ):
-                settings["model"] = chat_model
+                settings.update(borrowed)
     if stage not in (config.get("stages") or {}):
         models = config.get("models") or {}
         if stage == "transcription":
