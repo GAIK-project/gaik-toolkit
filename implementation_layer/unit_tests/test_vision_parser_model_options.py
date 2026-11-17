@@ -93,6 +93,7 @@ def test_explicit_non_azure_provider_uses_configured_endpoint(monkeypatch, provi
             "model": "vision-model",
             "api_key": "test",
             "base_url": "https://inference.example.test/v1",
+            "allowed_endpoint_hosts": "inference.example.test",
             "timeout": 300.0,
             "max_retries": 0,
             "http_client": http_client,

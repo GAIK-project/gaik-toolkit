@@ -1,5 +1,6 @@
 import asyncio
 import collections
+import hashlib
 import io
 import logging
 import os
@@ -326,9 +327,7 @@ def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
         "version": poc_service.package_version(poc),
         # What a run is tied to (``latest_run_package`` in the session's metadata):
         # a result whose digest differs from this one is of an older package.
-        # In the formula of the digest kept with the successful run, which
-        # the tab compares it with (``poc_service.package_digest``).
-        "package_digest": _approved_package_digest(poc, like=_successful_run_package(session)),
+        "package_digest": _approved_package_digest(poc),
     }
 
 
@@ -427,13 +426,14 @@ def write_poc_file(
             "The wizard is still responding and may be changing the package; "
             "save again when it has replied.",
         )
-    # Before the file changes: a session whose records are in the digest's
-    # first formula gets them in the second while the package still matches
-    # them, so this edit is seen whichever module it is in.
+    # Before the file changes, the comparison a chat turn ends with. An
+    # approval recorded under an older digest scheme is re-based there on the
+    # package as it is (``package_scheme``): done after the save, that would
+    # take this edit into the approval instead of seeing it.
     try:
-        session = _upgrade_package_digests(db, session, poc)
-    except Exception:  # noqa: BLE001 - the records stay as they were, compared as before
-        logger.warning("package digests could not be brought up to date", exc_info=True)
+        _reopen_if_approved_content_changed(db, session)
+    except Exception:  # noqa: BLE001 - compared again after the save and after every turn
+        logger.warning("approved content could not be compared before an edit", exc_info=True)
         db.rollback()
     try:
         saved = poc_service.write_package_file(poc, path, payload.content, payload.base_digest)
@@ -451,7 +451,7 @@ def write_poc_file(
     logger.info("session %s: the user saved poc/%s in the editor", session_id, saved["path"])
     return {
         **saved,
-        "package_digest": _approved_package_digest(poc, like=_successful_run_package(session)),
+        "package_digest": _approved_package_digest(poc),
         "gate_reopened": reopened,
     }
 
@@ -843,7 +843,13 @@ def _gate_span(session, payload: SessionUpdate) -> Iterator[None]:
         ops_metrics.record_gate_changes(session, changes)
 
 
-def _approved_content(session) -> dict[str, str] | None:
+#: What the package digest covers. 2: every Python file and every file in
+#: ``schemas/`` (``poc_service._version_files``); before it, a fixed list. A
+#: package approved under another scheme is not comparable with today's digest.
+_PACKAGE_DIGEST_SCHEME = 2
+
+
+def _approved_content(session) -> dict[str, str | int] | None:
     """Digests of the solution and of the package as they are now, or None without a draft."""
 
     solution = artifact_sync.solution_digest(artifact_sync.read_draft_blueprint(session.output_dir))
@@ -851,48 +857,27 @@ def _approved_content(session) -> dict[str, str] | None:
         return None
     poc = _poc_dir(session.output_dir)
     package = _approved_package_digest(poc) if poc and os.path.isdir(poc) else ""
-    return {"solution": solution, "package": package}
+    return {"solution": solution, "package": package, "package_scheme": _PACKAGE_DIGEST_SCHEME}
 
 
-def _approved_package_digest(poc: str, like: Any = None) -> str:
-    """The package as a run tested it and a gate approved it (``poc_service.package_digest``).
+def _approved_package_digest(poc: str) -> str:
+    """The package as approved: what a preflight reads, and the prompts the run reads.
 
-    ``like`` is the stored digest this one is compared with: the answer is in
-    that digest's formula, so a record from before the digest covered the
-    package's other modules still compares equal to an unchanged package.
+    ``package_version`` covers the code, the settings and the schema. The
+    extraction instructions under ``prompts/`` are read at run time and decide
+    the result as much as the code does, so a change to them after Gate 3 is a
+    change to what was accepted too.
     """
     from wizard_api.services import poc_service
 
-    return poc_service.package_digest(poc, like=like)
-
-
-def _upgrade_package_digests(db: Session, session, poc: str):
-    """Rewrite the session's first-formula package digests in the second, where they still hold.
-
-    The digest of the successful run, of the latest run and of the approved
-    content, each only while the package matches it by the formula it was made
-    with. Nothing is reopened or locked by this: a record that matched still
-    matches. From then on a change to any runtime module is seen.
-    """
-    from wizard_api.services import poc_service
-
-    metadata = session.session_metadata or {}
-    changes: dict[str, Any] = {}
-    for key in (session_service.SUCCESSFUL_RUN_PACKAGE_KEY, session_service.RUN_PACKAGE_KEY):
-        stored = metadata.get(key)
-        if stored == session_service.UNKNOWN_RUN_PACKAGE:
-            continue
-        current = poc_service.current_formula_digest(poc, stored)
-        if current is not None:
-            changes[key] = current
-    approved = metadata.get(session_service.APPROVED_CONTENT_KEY)
-    if isinstance(approved, dict):
-        current = poc_service.current_formula_digest(poc, approved.get("package"))
-        if current is not None:
-            changes[session_service.APPROVED_CONTENT_KEY] = {**approved, "package": current}
-    if not changes:
-        return session
-    return session_service.update_session(db, session, SessionUpdate(metadata=changes))
+    digest = hashlib.sha256(poc_service.package_version(poc).encode())
+    prompts = os.path.join(poc, "prompts")
+    if os.path.isdir(prompts) and not os.path.islink(prompts):
+        for name in poc_service.regular_files(prompts):
+            digest.update(name.encode())
+            with open(os.path.join(prompts, name), "rb") as fh:
+                digest.update(fh.read())
+    return digest.hexdigest()[:16]
 
 
 def _gate_reopened_by_turn(db: Session, session) -> str | None:
@@ -938,16 +923,17 @@ def _reopen_if_approved_content_changed(db: Session, session) -> bool:
             db, session, SessionUpdate(metadata={session_service.APPROVED_CONTENT_KEY: now})
         )
         return False
-    # The package, in the formula its approval was recorded in.
-    poc = _poc_dir(session.output_dir)
-    package_now = (
-        _approved_package_digest(poc, like=approved.get("package"))
-        if poc and os.path.isdir(poc)
-        else ""
-    )
     if approved.get("solution") != now["solution"]:
         gate_key = "gate_2"
-    elif approved.get("package") != package_now:
+    elif approved.get("package_scheme") != now["package_scheme"]:
+        # Approved under a digest that covered fewer files: it differs from
+        # today's for a package nobody changed. Start from the package as it is,
+        # as for a session approved before this was kept.
+        session_service.update_session(
+            db, session, SessionUpdate(metadata={session_service.APPROVED_CONTENT_KEY: now})
+        )
+        return False
+    elif approved.get("package") != now["package"]:
         gate_key = "gate_3"
     else:
         return False
@@ -1159,7 +1145,7 @@ def _successful_run_is_of_another_package(session) -> bool:
     poc = _poc_dir(session.output_dir)
     if not poc or not os.path.isdir(poc):
         return False
-    return _approved_package_digest(poc, like=tested) != tested
+    return _approved_package_digest(poc) != tested
 
 
 @router.post("/{session_id}/messages", response_model=SessionDetailResponse)
@@ -2572,7 +2558,16 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
     # in the PoC tab's editor, could change run_poc.py and the changed package
     # was still handed over as the tested one. A change outside the digest (the
     # README, .env.example) leaves the download open.
-    if _successful_run_is_of_another_package(session):
+    #
+    # Until Gate 3 is approved. From then on the approval is what holds the
+    # package: a change to it reopens the gate and takes the run away
+    # (``_reopen_if_approved_content_changed``, after every chat turn and every
+    # save in the editor), so there is nothing left for this to catch, and a
+    # run recorded under an older digest scheme (the scheme is kept with the
+    # approval, not with the run) does not lock an approved session's download.
+    if session.gate_statuses.get("gate_3") != "approved" and _successful_run_is_of_another_package(
+        session
+    ):
         raise api_error(
             409,
             "package_changed_since_run",

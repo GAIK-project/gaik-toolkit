@@ -35,6 +35,10 @@ except ImportError:
     from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.model_settings import unsupported_option_detail
     from api.utils.report_runs import require_report_run_grant
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import component_error
@@ -264,11 +268,15 @@ async def run_stage(
         report_spec = spec_class.load(inputs / "report_spec.json")
         (inputs / "report_spec.json").unlink()  # a source may have the same name
         for name, upload in zip(names, uploads):
+            data = await upload.read()
+            problem = await upload_problem(Path(name).suffix, data, check_type=False)
+            if problem is not None:
+                raise HTTPException(problem.status, f"{name}: {problem.message}")
             try:
                 # "x" refuses to overwrite: names that differ only in case collide on a
                 # case-insensitive dev machine.
                 with (inputs / name).open("xb") as out:
-                    out.write(await upload.read())
+                    out.write(data)
             except OSError as exc:
                 logger.warning("Cannot store an uploaded file name: %s", type(exc).__name__)
                 raise HTTPException(

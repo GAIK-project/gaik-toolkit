@@ -25,8 +25,10 @@ from __future__ import annotations
 from collections.abc import Callable
 
 try:
-    import sqlglot
     from sqlglot import exp
+    from sqlglot.errors import ErrorLevel, UnsupportedError
+
+    from gaik.software_components import _sql_parse
 except ImportError as exc:
     raise ImportError(
         "postgres_agent requires 'sqlglot'. Install extras with 'pip install gaik[postgres-agent]'"
@@ -36,6 +38,10 @@ except ImportError as exc:
 class UnsafeSQLError(ValueError):
     """Raised when a SQL string is not a single, read-only query."""
 
+
+# A query, or a set operation (UNION, EXCEPT, INTERSECT) of queries. Newer
+# sqlglot releases no longer derive Except and Intersect from Union.
+_QUERY_NODES: tuple[type, ...] = (exp.Select, exp.Union, exp.Except, exp.Intersect)
 
 # AST node types that indicate a write, DDL, or out-of-band command.
 _FORBIDDEN_NODES: tuple[type, ...] = (
@@ -95,6 +101,12 @@ SAFE_FUNCTIONS: frozenset[str] = frozenset(
     "ts_rank ts_rank_cd websearch_to_tsquery word_similarity".split()
 )
 
+# SQL syntax that sqlglot parses as a call to a function of this name:
+# ``x <> ALL (...)``, ``x > SOME (...)`` and the ``ROW(...)`` constructor. They are
+# reserved words in PostgreSQL, so no function can carry these names, and their
+# arguments are still walked by the function and table checks.
+_SYNTAX_CALLS: frozenset[str] = frozenset({"all", "some", "row"})
+
 # Checked against every function, including those sqlglot has a node for, so a
 # sqlglot release that starts to model one of these cannot let it through.
 _DENIED_FUNCTION_PREFIXES: tuple[str, ...] = ("pg_", "lo_", "dblink", "binary_upgrade")
@@ -120,7 +132,7 @@ def _check_functions(statement: exp.Expression) -> None:
         # exp.Anonymous and a few aggregate variants carry the called name as text.
         if isinstance(func, exp.Anonymous) or isinstance(func.this, str):
             names = {str(func.this).lower()}
-            allowed = names <= SAFE_FUNCTIONS
+            allowed = names <= SAFE_FUNCTIONS | _SYNTAX_CALLS
         else:
             names = {name.lower() for name in type(func).sql_names()}
             allowed = True
@@ -150,18 +162,23 @@ def _walk_tables(
 
     A CTE is visible to the CTEs after it in the same ``WITH`` and to the query
     the ``WITH`` belongs to. It is visible inside its own body only under
-    ``WITH RECURSIVE``. Everywhere else the same name is an ordinary table.
+    ``WITH RECURSIVE``, where every CTE of that ``WITH`` is visible in every
+    body, also the ones before it. Everywhere else the same name is an
+    ordinary table.
     """
     # sqlglot renamed this argument from "with" to "with_".
     with_ = node.args.get("with_") or node.args.get("with")
     if isinstance(with_, exp.With):
         recursive = bool(with_.args.get("recursive"))
+        names = []
         for cte in with_.expressions:
             alias = cte.args.get("alias")
             identifier = alias.this if alias is not None else None
-            name = _fold(identifier) if isinstance(identifier, exp.Identifier) else None
-            in_body = visible_ctes | {name} if recursive and name else visible_ctes
-            _walk_tables(cte, in_body, check)
+            names.append(_fold(identifier) if isinstance(identifier, exp.Identifier) else None)
+        if recursive:
+            visible_ctes = visible_ctes | {name for name in names if name}
+        for cte, name in zip(with_.expressions, names):
+            _walk_tables(cte, visible_ctes, check)
             if name:
                 visible_ctes = visible_ctes | {name}
     if isinstance(node, exp.Table):
@@ -192,7 +209,10 @@ def validate_read_only(
     Returns:
         The re-rendered SQL -- exactly what should be executed. It is
         normalized and semicolon-free, and every table reference that is not a
-        CTE is qualified with ``schema_name``.
+        CTE is qualified with ``schema_name``. It is rendered from the checked
+        syntax tree rather than passed through as written, so nothing sqlglot
+        did not parse can reach the database. A query that sqlglot cannot
+        render without losing part of it is refused instead.
 
     Raises:
         UnsafeSQLError: If the statement is not exactly one
@@ -205,7 +225,7 @@ def validate_read_only(
         raise UnsafeSQLError("Empty SQL statement.")
 
     try:
-        parsed = sqlglot.parse(sql, read="postgres")
+        parsed = _sql_parse.parse(sql, "postgres")
     except Exception as exc:
         raise UnsafeSQLError(f"Could not parse SQL: {exc}") from exc
 
@@ -214,7 +234,7 @@ def validate_read_only(
         raise UnsafeSQLError(f"Expected exactly one SQL statement, found {len(statements)}.")
     statement = statements[0]
 
-    if not isinstance(statement, (exp.Select, exp.Union)):
+    if not isinstance(statement, _QUERY_NODES):
         raise UnsafeSQLError(
             f"Only read-only SELECT queries are allowed (got {type(statement).__name__})."
         )
@@ -257,4 +277,17 @@ def validate_read_only(
 
     _walk_tables(statement, frozenset(), check_table)
 
-    return statement.sql(dialect="postgres")
+    # sqlglot ignores an argument it has no slot for, so the tree would run a
+    # different query than the one written.
+    lossy = _sql_parse.dropped_argument(statement)
+    if lossy is not None:
+        raise UnsafeSQLError(
+            "The query cannot be checked as written: a function call loses one of its "
+            f"arguments and would run as {lossy.sql(dialect='postgres')}. "
+            "Write that call another way."
+        )
+
+    try:
+        return statement.sql(dialect="postgres", unsupported_level=ErrorLevel.RAISE)
+    except UnsupportedError as exc:
+        raise UnsafeSQLError(f"The query cannot be checked as written: {exc}") from exc

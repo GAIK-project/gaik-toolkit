@@ -578,6 +578,28 @@ def config_with_model_timeout(poc_dir: str) -> str | None:
     return yaml.safe_dump(config, sort_keys=False, allow_unicode=True) if changed else None
 
 
+def _names_a_transcriber(source: str) -> bool:
+    """Whether the code imports or uses a transcribing component.
+
+    A docstring or comment that mentions one does not count: the scaffolder's own
+    ``provider_config.py`` documents its Transcriber arguments in every package.
+    Code that does not parse is searched as text.
+    """
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return bool(_TRANSCRIBING_NAME.search(source))
+    names = scaffold_guard.TRANSCRIBING_COMPONENTS
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in names:
+            return True
+        if isinstance(node, ast.Attribute) and node.attr in names:
+            return True
+        if isinstance(node, ast.alias) and node.name.rsplit(".", 1)[-1] in names:
+            return True
+    return False
+
+
 def _package_transcribes(poc_dir: str) -> bool:
     """Whether the package's code reads the transcription stage or builds a transcriber."""
     for relative in regular_files(poc_dir):
@@ -589,7 +611,7 @@ def _package_transcribes(poc_dir: str) -> bool:
                 source = fh.read()
         except OSError:
             continue
-        if _TRANSCRIPTION_STAGE_CALL.search(source) or _TRANSCRIBING_NAME.search(source):
+        if _TRANSCRIPTION_STAGE_CALL.search(source) or _names_a_transcriber(source):
             return True
     return False
 
@@ -935,126 +957,48 @@ _VERSION_FILES = (
 )
 
 
-def _version_files_digest(poc_dir: str) -> Any:
+#: Folders of a package that hold a run's inputs and outputs, not the package.
+_RUN_FOLDERS = frozenset({"sample_input", "output"})
+
+
+def _version_files(poc_dir: str) -> list[str]:
+    """``_VERSION_FILES``, every Python file of the package and every file in ``schemas/``.
+
+    run_poc.py imports the helpers the scaffolder copies in (``poc_output.py``,
+    ``document_manifest.py``, ``input_bundle.py``) and any module the agent adds, and
+    from the gaik release after 0.10.0 the PoC loads ``schemas/output_schema_model.json``
+    rather than the .py file, so a change to any of them changes what runs.
+    """
+    names = set(_VERSION_FILES)
+    for folder, dirs, files in os.walk(poc_dir):
+        rel = os.path.relpath(folder, poc_dir)
+        dirs[:] = sorted(
+            d
+            for d in dirs
+            if not os.path.islink(os.path.join(folder, d))
+            and not d.startswith(".")
+            and d != "__pycache__"
+            and not (rel == "." and d in _RUN_FOLDERS)
+        )
+        for name in files:
+            path = os.path.join(folder, name)
+            relpath = os.path.normpath(os.path.join(rel, name))
+            in_schemas = relpath.split(os.sep, 1)[0] == "schemas"
+            if (name.endswith(".py") or in_schemas) and regular_file(path, poc_dir):
+                names.add(relpath)
+    return sorted(names)
+
+
+def package_version(poc_dir: str) -> str:
+    """A short digest of the files that decide what a run does; changes when any of them does."""
     digest = hashlib.sha256()
-    for name in _VERSION_FILES:
+    for name in _version_files(poc_dir):
         path = os.path.join(poc_dir, name)
         digest.update(name.encode())
         if regular_file(path, poc_dir):
             with open(path, "rb") as fh:
                 digest.update(fh.read())
-    return digest
-
-
-def _legacy_package_version(poc_dir: str) -> str:
-    """``package_version`` as it was before the package's other modules counted.
-
-    Kept only for ``package_digest``'s first formula: digests stored with a run
-    or an approval before the second one are compared in the formula they were
-    made with.
-    """
-    return _version_files_digest(poc_dir).hexdigest()[:16]
-
-
-#: Folders and files of the package whose Python a test run does not execute:
-#: the test page (``app.py``, ``ui/``) and the evaluation scripts.
-_NOT_RUN_DIRS = ("ui", "evals")
-_NOT_RUN_FILES = ("app.py",)
-
-
-def _is_runtime_module(relative: str) -> bool:
-    """Whether a path inside poc/ is Python the run executes, beside ``_VERSION_FILES``."""
-    parts = relative.replace(os.sep, "/").split("/")
-    if not parts[-1].endswith(".py") or "__pycache__" in parts:
-        return False
-    if parts[0] in _NOT_CODE_DIRS or parts[0] in _NOT_RUN_DIRS:
-        return False
-    return "/".join(parts) not in _NOT_RUN_FILES
-
-
-def runtime_modules(poc_dir: str) -> list[str]:
-    """The package's own Python modules a run executes that ``_VERSION_FILES`` does not name.
-
-    ``pdf_report.py``, ``input_bundle.py``, ``document_manifest.py``, a helper
-    the agent added: ``run_poc.py`` imports them, so a change to one changes
-    what a run does as much as a change to ``run_poc.py`` itself. As POSIX
-    paths, in name order.
-    """
-    named = {name.replace(os.sep, "/") for name in _VERSION_FILES}
-    found = [relative.replace(os.sep, "/") for relative in regular_files(poc_dir)]
-    return sorted(rel for rel in found if _is_runtime_module(rel) and rel not in named)
-
-
-def _update_with_files(digest: Any, root: str, names: list[str]) -> None:
-    for name in names:
-        digest.update(name.encode())
-        with open(os.path.join(root, name), "rb") as fh:
-            digest.update(fh.read())
-
-
-def package_version(poc_dir: str) -> str:
-    """A short digest of the code, settings and schema a run reads; changes when any does.
-
-    The files a preflight reads by name (``_VERSION_FILES``) and the package's
-    other runtime modules (``runtime_modules``). Never stored against a
-    session: it ties a check and the PoC tab's own state to what they looked at.
-    """
-    digest = _version_files_digest(poc_dir)
-    _update_with_files(digest, poc_dir, runtime_modules(poc_dir))
     return digest.hexdigest()[:16]
-
-
-#: What a digest in the second formula starts with. One without it (16 hex
-#: characters) was made with the first.
-PACKAGE_DIGEST_V2 = "v2:"
-_PROMPTS = "prompts"
-
-
-def _is_legacy_digest(stored: Any) -> bool:
-    return isinstance(stored, str) and bool(stored) and not stored.startswith(PACKAGE_DIGEST_V2)
-
-
-def package_digest(poc_dir: str, like: Any = None) -> str:
-    """The package as a test run and an approval are tied to it.
-
-    The code, settings and schema (``package_version``) and the instructions
-    under ``prompts/``, which are read at run time and decide the result as
-    much as the code does.
-
-    Two formulas. The first covered ``_VERSION_FILES`` and ``prompts/`` only,
-    so an edit to another module of the package (``pdf_report.py``) left the
-    digest as it was: Gate 3 stayed approved and the deployable package was
-    handed over with a change no run had tested. The second also covers
-    ``runtime_modules`` and says so in its prefix.
-
-    A digest is stored with each run and each approval and compared with the
-    package later. ``like`` is that stored digest: the answer is made in its
-    formula, so a session approved or tested before the second formula still
-    compares equal while its package is as it was, and nothing reopens or
-    locks because the formula changed. Without ``like`` (a new record, or no
-    stored digest to compare with) the answer is in the second formula.
-    """
-    legacy = _is_legacy_digest(like)
-    version = _legacy_package_version(poc_dir) if legacy else package_version(poc_dir)
-    digest = hashlib.sha256(version.encode())
-    prompts = os.path.join(poc_dir, _PROMPTS)
-    if os.path.isdir(prompts) and not os.path.islink(prompts):
-        _update_with_files(digest, prompts, regular_files(prompts))
-    short = digest.hexdigest()[:16]
-    return short if legacy else PACKAGE_DIGEST_V2 + short
-
-
-def current_formula_digest(poc_dir: str, stored: Any) -> str | None:
-    """``stored`` brought to the second formula, when the package still is what it names.
-
-    For a session whose records are in the first formula: while the package
-    matches the record by that formula, the record can be rewritten in the
-    second, and the package's other modules are watched from then on. None
-    when ``stored`` is not a first-formula digest or no longer matches.
-    """
-    if not _is_legacy_digest(stored) or package_digest(poc_dir, like=stored) != stored:
-        return None
-    return package_digest(poc_dir)
 
 
 def package_is_ready(poc_dir: str) -> bool:
@@ -1291,6 +1235,7 @@ MAX_PACKAGE_PATH_CHARS = 512
 _READ_ONLY_DIRS = (SAMPLE_INPUT_DIR, "output")
 #: The wizard's own records inside or beside the package; never a file of it.
 _HIDDEN_NAMES = (MANIFEST_NAME, UPLOADED_NAMES_FILE)
+_PROMPTS = "prompts"
 _DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
 
 
@@ -1375,16 +1320,23 @@ def package_file_read_only(normalised: str) -> str | None:
 def counts_for_package_digest(normalised: str) -> bool:
     """Whether a change to this file changes the digest a test run is tied to.
 
-    What ``package_digest`` covers: the files a preflight reads by name, the
-    package's other runtime modules and the prompts. A README, ``.env.example``,
-    the test page (``app.py``, ``ui/``) and ``evals/`` are none of them.
+    By its name, what ``_version_files`` walks and the sessions router's
+    ``_approved_package_digest`` adds: the files a preflight reads by name,
+    every Python file of the package and every file in ``schemas/`` (outside
+    the run's own folders, hidden folders and ``__pycache__``), and the
+    prompts. A README or ``.env.example`` is none of them.
     """
-    version_files = {name.replace(os.sep, "/") for name in _VERSION_FILES}
-    return (
-        normalised in version_files
-        or normalised.startswith(_PROMPTS + "/")
-        or _is_runtime_module(normalised)
-    )
+    parts = normalised.split("/")
+    folders = parts[:-1]
+    if normalised in {name.replace(os.sep, "/") for name in _VERSION_FILES}:
+        return True
+    if folders and folders[0] == _PROMPTS:
+        return True
+    if folders and folders[0] in _RUN_FOLDERS:
+        return False
+    if any(folder.startswith(".") or folder == "__pycache__" for folder in folders):
+        return False
+    return parts[-1].endswith(".py") or bool(folders and folders[0] == "schemas")
 
 
 def content_digest(data: bytes) -> str:

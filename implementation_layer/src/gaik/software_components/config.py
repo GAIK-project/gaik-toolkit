@@ -10,6 +10,8 @@ import os
 from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
+from gaik.software_components.endpoints import AITTA_BASE_URL, check_openai_endpoint
+
 # Load environment variables
 load_dotenv()
 
@@ -77,6 +79,7 @@ def create_openai_client(config: dict):
         if config.get(key) is not None
     }
     if name == Provider.AZURE.value:
+        check_openai_endpoint(config, name)
         options["api_version"] = config["api_version"]
         if config.get("base_url"):
             options["base_url"] = config["base_url"]
@@ -93,10 +96,11 @@ def create_openai_client(config: dict):
         for field in ("base_url", "model"):
             if not config.get(field):
                 raise ValueError(f"openai_compatible requires an explicit {field!r}")
+    check_openai_endpoint(config, name)
     if config.get("base_url"):
         options["base_url"] = config["base_url"]
     elif name == Provider.AITTA.value:
-        options["base_url"] = "https://aitta-api.csc.fi/openai/v1"
+        options["base_url"] = AITTA_BASE_URL
     if name == Provider.AITTA.value:
         options.setdefault("timeout", 600.0)
     return OpenAI(api_key=config["api_key"], **options)

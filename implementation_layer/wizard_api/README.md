@@ -75,15 +75,14 @@ edit to one of them makes the earlier run a run of another package, and where Ga
 was approved it reopens that gate. An edit to a file outside the digest (the README,
 `.env.example`) does neither.
 
-The digest (`poc_service.package_digest`) covers `run_poc.py`, `config.yaml`,
-`provider_config.py`, `requirements.txt`, the schema files, `prompts/` and every other
-Python module of the package a run executes (`pdf_report.py`, `input_bundle.py`, a
-helper the agent added). The test page (`app.py`, `ui/`), `evals/`, `sample_input/` and
-`output/` are not part of it. A digest in this formula starts with `v2:`. One stored
-before it (16 hex characters, with a run or with Gate 3's approval) is compared in the
-formula it was made with, which did not cover the other modules, so an existing session
-neither reopens nor locks because the formula changed; its records move to the new
-formula with the session's next test run, approval or save in the editor.
+The digest covers the files a preflight reads by name, every Python file of the
+package and every file in `schemas/` (`poc_service._version_files`), and `prompts/`.
+That includes the test page's and the evaluations' Python (`app.py`, `ui/*.py`,
+`evals/`); `sample_input/`, `output/`, hidden folders and `__pycache__` are outside it.
+The editor says by a file's name whether saving it changes the digest
+(`counts_for_package_digest`, held to the digest by a test). Before a save the approved
+content is compared once, so that an approval recorded under an older digest scheme is
+re-based on the package as it was before the edit, not after it.
 
 Environment files that would hold keys (`.env` in any spelling but `.env.example`) are
 left out of the package's listing and of both zips (`poc_service.package_files`), and
@@ -93,7 +92,10 @@ so never reach the sandbox either. The session export still carries every file h
 `GET /sessions/{id}/poc/deployable` hands the package over only when the run recorded as
 successful tested it as it is now: the digest kept with that run against the package's
 digest, the comparison Gate 3 makes. After a change to a file in the digest it answers
-409 `package_changed_since_run` until a new run has succeeded.
+409 `package_changed_since_run` until a new run has succeeded. Once Gate 3 is approved
+the approval holds the package instead (a change reopens the gate and takes the run
+away), so a run recorded under an older digest scheme does not lock an approved
+session's download.
 
 ### Errors
 

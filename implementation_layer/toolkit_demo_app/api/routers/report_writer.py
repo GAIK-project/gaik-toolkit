@@ -19,10 +19,12 @@ try:
     from utils import get_api_config, sse_event
     from utils.model_allow_list import chat_models, check_model, transcription_models
     from utils.report_runs import report_writer_limits, require_report_run_grant
+    from utils.upload_check import upload_problem
 except ImportError:
     from api.utils import get_api_config, sse_event
     from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.report_runs import report_writer_limits, require_report_run_grant
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import error_detail
@@ -304,18 +306,34 @@ async def generate_report(
     sample_path: str | None = None
 
     used_names: set[str] = {"output", "transcripts"}
+
+    async def checked(upload: UploadFile) -> tuple[str, bytes]:
+        # The route takes many kinds of file and keeps its own type rules, so
+        # the shared check skips only the type step (utils/upload_check.py).
+        name = _upload_name(upload.filename, used_names)
+        data = await upload.read()
+        problem = await upload_problem(Path(name).suffix, data, check_type=False)
+        if problem is not None:
+            raise HTTPException(problem.status, f"{name}: {problem.message}")
+        return name, data
+
     try:
         for uf in files:
             if not uf.filename:
                 continue
-            dest = tmp_dir / _upload_name(uf.filename, used_names)
-            dest.write_bytes(await uf.read())
+            name, data = await checked(uf)
+            dest = tmp_dir / name
+            dest.write_bytes(data)
             input_paths.append(str(dest))
 
         if sample_report and sample_report.filename:
-            dest = tmp_dir / _upload_name(sample_report.filename, used_names)
-            dest.write_bytes(await sample_report.read())
+            name, data = await checked(sample_report)
+            dest = tmp_dir / name
+            dest.write_bytes(data)
             sample_path = str(dest)
+    except HTTPException:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise
     except Exception as exc:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         logger.warning("Cannot store the uploads: %s", type(exc).__name__)

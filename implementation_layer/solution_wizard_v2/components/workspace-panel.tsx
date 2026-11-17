@@ -2679,7 +2679,11 @@ export function WorkspacePanel({
   // The api hands the package over only when the run that passed tested it as
   // it is now (409 package_changed_since_run otherwise): after a change to
   // the package the download waits for a new run, and the step says so.
-  const packageChanged = runRecorded && packageChangedSinceRun(packageDigest, testedDigest);
+  // Until Gate 3 is approved, as the api: from then on the approval holds the
+  // package (a change reopens the gate and takes the run away), and a run
+  // recorded under an older digest scheme must not lock an approved session.
+  const packageChanged =
+    runRecorded && wizardStep <= GATE_3_STEP && packageChangedSinceRun(packageDigest, testedDigest);
   const deployableOpen = runRecorded && !packageChanged;
   const deployableLockedHint = packageChanged ? t.pocDeployableChanged : t.pocDeployableHint;
   const handover = handoverState({ packageReady: pocReady, runRecorded: deployableOpen, shownRunHasWarnings });

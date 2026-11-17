@@ -131,6 +131,7 @@ config = get_llm_config(
     "openai_compatible",
     api_key=server_api_key,
     base_url="https://your-inference-server.example/v1",
+    allowed_endpoint_hosts=["your-inference-server.example"],
     model="your-served-model",
     timeout=120.0,
     max_retries=1,
@@ -138,7 +139,20 @@ config = get_llm_config(
 client = create_llm_client(config)
 ```
 
+From the gaik release after 0.10.0, gaik sends the key only to https hosts the deployment names (see [Allowed endpoints](#allowed-endpoints)). A compatible server has no host of its own, so name it: set its address in `OPENAI_BASE_URL` (an `http://` address there is used as set; on a host outside a private network, gaik logs a warning once that the key goes to it without encryption), list its host in `GAIK_ALLOWED_ENDPOINT_HOSTS` (comma-separated; `http://host` for plain http on a private network), or pass `allowed_endpoint_hosts=["your-inference-server.example"]` to `get_llm_config`. A server on this machine (`localhost`, `127.0.0.1`) needs none of these. An address that is not allowed raises `EndpointNotAllowedError` before any request. An application that forwards user settings should not forward `allowed_endpoint_hosts`. The same list names other hosts gaik does not know: Azure in a sovereign cloud, Azure API Management (`*.azure-api.net`), and a local server reached by a service name such as `host.docker.internal` (as `http://host.docker.internal` for plain http).
+
 For embeddings, also set `embedding_model` or `EMBEDDING_MODEL` to a model served by that endpoint. Protocol compatibility does not add features the server or model lacks.
+
+### Allowed endpoints
+
+From the gaik release after 0.10.0, a client that sends a key, token or password checks its address when it is built, before any request, so the key cannot be sent to a host the deployment did not choose. This covers the OpenAI, Azure, Aitta and compatible clients, LiteLLM's `base_url`, Vertex's `generate_content_url`, the Docling client, local Whisper, Azure speech and the Jev classifier. The address is accepted when it is:
+
+- https on the provider's own host, for example `api.openai.com`, `*.openai.azure.com`, `*.cognitiveservices.azure.com`, `aitta-api.csc.fi` or the Vertex AI hosts;
+- the address set in that provider's environment variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `LITELLM_BASE_URL`, `GOOGLE_GENERATE_CONTENT_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`, ...). An `http://` address set there is used as set, with a warning once per host outside a private network;
+- on a host listed in `GAIK_ALLOWED_ENDPOINT_HOSTS` (comma-separated), or in the `allowed_endpoint_hosts` setting the application passes in code. An entry is a host (`llm.example.org`), a suffix pattern (`*.example.org`), or `http://` with the host to allow plain http (`http://docling.internal`);
+- on this machine (`localhost`, `127.0.0.1`), over http too, for compatible model servers, LiteLLM, Docling and local Whisper.
+
+Anything else raises `EndpointNotAllowedError` (a `ValueError`), whose message names `GAIK_ALLOWED_ENDPOINT_HOSTS`. Do not fill `allowed_endpoint_hosts` from user input: the list is the deployment's decision. The Azure patterns accept every Azure resource, not only the deployment's own, so do not take an Azure endpoint from user input for the deployment's key. Sovereign Azure clouds, API Management gateways (`*.azure-api.net`) and local servers reached by a service name need an entry, as described for compatible servers above.
 
 ## ProviderClient interface
 

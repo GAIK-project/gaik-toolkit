@@ -5,6 +5,7 @@ import { PageTransition } from "@/components/demo/page-transition";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Wand2 } from "lucide-react";
 import Link from "next/link";
+import { AiActBanner } from "./ai-act-banner";
 import { OwnDataCallout } from "./own-data-callout";
 import { ProcessOverview } from "./process-overview";
 import { WizardEntry } from "./wizard-entry";
@@ -114,7 +115,10 @@ export function Hero({
             </div>
           </div>
 
-          <ProcessOverview className="hidden lg:flex" />
+          <div className="flex flex-col gap-3">
+            <AiActBanner />
+            <ProcessOverview className="hidden lg:flex" />
+          </div>
         </div>
 
         <OwnDataCallout />

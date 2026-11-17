@@ -1,56 +1,47 @@
-"""The package digest covers every module a run executes, and old records still compare.
+"""The editor and the deployable download on the package digest (``package_version``).
 
-A test run and Gate 3's approval are tied to a digest of the package. It covered
-``run_poc.py``, the settings, the schema and ``prompts/``, and none of the package's
-other modules (``pdf_report.py``, ``input_bundle.py``, a helper the agent added): an
-edit to one left the digest as it was, Gate 3 stayed approved and the deployable
-package was handed over with a change no run had tested.
+The digest covers every Python file of the package and every file in ``schemas/``
+(``poc_service._version_files``, tests in ``test_package_version.py``), and an
+approval recorded under the older scheme is re-based on the package as it is
+(``package_scheme``, ``test_gate_reopen.py``). These are about what the editor and
+the download make of that:
 
-The digest has a second formula that covers them. A digest stored before it is
-compared in the formula it was made with, so a session approved or tested earlier
-neither reopens nor locks because the formula changed.
+- the editor tells, by a file's name, whether saving it changes the digest, and that
+  must agree with the digest itself;
+- a save in the editor reopens Gate 3 for a change to any module, also in a session
+  whose approval is of the older scheme: the re-basing must not take the edit into
+  the approval;
+- a session approved before the scheme changed keeps its approval and its download.
 """
 
 import hashlib
 import os
 import uuid
 
+import pytest
 from helpers import requires_postgres, write_gate_artifacts
 from wizard_api.routers import sessions as sessions_router
 from wizard_api.schemas.session import SessionUpdate
 from wizard_api.services import poc_service, session_service
 
-_FIRST_FORMULA_FILES = (
-    "run_poc.py",
-    "config.yaml",
-    "provider_config.py",
-    "requirements.txt",
-    "schemas/output_schema.py",
-    "schemas/output_schema_requirements.json",
-)
-
-
-def _first_formula(poc: str) -> str:
-    """The digest as it was computed before the second formula, written out again here.
-
-    Not a call into the code under test: this is what the stored digests of
-    existing sessions were made with, and it must keep giving the same value.
-    """
-    inner = hashlib.sha256()
-    for name in _FIRST_FORMULA_FILES:
-        inner.update(name.encode())
-        path = os.path.join(poc, name)
-        if os.path.isfile(path):
-            with open(path, "rb") as fh:
-                inner.update(fh.read())
-    outer = hashlib.sha256(inner.hexdigest()[:16].encode())
-    prompts = os.path.join(poc, "prompts")
-    if os.path.isdir(prompts):
-        for name in sorted(os.listdir(prompts)):
-            outer.update(name.encode())
-            with open(os.path.join(prompts, name), "rb") as fh:
-                outer.update(fh.read())
-    return outer.hexdigest()[:16]
+_PACKAGE = {
+    "run_poc.py": "from gaik.software_components.extractor import Extractor\n",
+    "requirements.txt": "gaik[extract]\n",
+    "config.yaml": "stages: {}\n",
+    "README.md": "# PoC\n",
+    ".env.example": "AZURE_API_KEY=\n",
+    "schemas/output_schema.json": "{}\n",
+    "schemas/output_schema.py": "x = 1\n",
+    "prompts/extract.md": "Extract the fields.\n",
+    "pdf_report.py": "def render():\n    return 'report'\n",
+    "input_bundle.py": "def bundle():\n    return []\n",
+    "helpers/dates.py": "def parse(value):\n    return value\n",
+    "app.py": "print('the test page')\n",
+    "ui/server.py": "print('ui')\n",
+    "ui/index.html": "<p>test page</p>\n",
+    "evals/run_evals.py": "print('evals')\n",
+    "sample_input/note.txt": "a note\n",
+}
 
 
 def _write(poc: str, relative: str, content: str) -> None:
@@ -61,125 +52,78 @@ def _write(poc: str, relative: str, content: str) -> None:
 
 
 def _package(poc: str) -> None:
-    """A complete package with the modules the scaffolder and the agent put beside run_poc.py."""
-    for relative, content in {
-        "run_poc.py": "from gaik.software_components.extractor import Extractor\n",
-        "requirements.txt": "gaik[extract]\n",
-        "config.yaml": "stages: {}\n",
-        "README.md": "# PoC\n",
-        ".env.example": "AZURE_API_KEY=\n",
-        "schemas/output_schema.json": "{}\n",
-        "schemas/output_schema.py": "x = 1\n",
-        "prompts/extract.md": "Extract the fields.\n",
-        "pdf_report.py": "def render():\n    return 'report'\n",
-        "input_bundle.py": "def bundle():\n    return []\n",
-        "helpers/dates.py": "def parse(value):\n    return value\n",
-        "app.py": "print('the test page')\n",
-        "ui/server.py": "print('ui')\n",
-        "evals/run_evals.py": "print('evals')\n",
-        "sample_input/note.txt": "a note\n",
-    }.items():
+    for relative, content in _PACKAGE.items():
         _write(poc, relative, content)
 
 
-# --- the two formulas -------------------------------------------------------------
+def _older_scheme_digest(poc: str) -> str:
+    """The digest as the scheme before this one made it: a fixed list of files, and the prompts.
 
-
-def test_the_first_formula_gives_what_it_always_gave(tmp_path) -> None:
-    poc = str(tmp_path / "poc")
-    _package(poc)
-    stored = _first_formula(poc)
-
-    assert poc_service.package_digest(poc, like=stored) == stored
-    assert len(stored) == 16 and not stored.startswith(poc_service.PACKAGE_DIGEST_V2)
-    # It never covered the other modules, and still does not.
-    _write(poc, "pdf_report.py", "def render():\n    return 'changed'\n")
-    assert poc_service.package_digest(poc, like=stored) == stored
-    # What it did cover, it still sees.
-    _write(poc, "prompts/extract.md", "Extract other fields.\n")
-    assert poc_service.package_digest(poc, like=stored) != stored
-    assert poc_service.package_digest(poc, like=stored) == _first_formula(poc)
-
-
-def test_a_new_digest_is_in_the_second_formula_and_says_so(tmp_path) -> None:
-    poc = str(tmp_path / "poc")
-    _package(poc)
-
-    digest = poc_service.package_digest(poc)
-
-    assert digest.startswith(poc_service.PACKAGE_DIGEST_V2)
-    assert digest == poc_service.package_digest(poc, like=digest)
-    assert digest == poc_service.package_digest(poc, like=None)
-    assert digest == poc_service.package_digest(poc, like="")
-    assert digest != poc_service.package_digest(poc, like=_first_formula(poc))
-
-
-def test_the_modules_a_run_executes_change_the_digest_and_the_rest_do_not(tmp_path) -> None:
-    poc = str(tmp_path / "poc")
-    _package(poc)
-    assert poc_service.runtime_modules(poc) == [
-        "helpers/dates.py",
-        "input_bundle.py",
-        "pdf_report.py",
-    ]
-
-    def changes(relative: str, content: str = "# changed\n") -> bool:
-        before, version = poc_service.package_digest(poc), poc_service.package_version(poc)
-        _write(poc, relative, content)
-        after = poc_service.package_digest(poc)
-        # The preflight's version follows the code the same way (prompts aside).
-        if not relative.startswith("prompts/"):
-            assert (poc_service.package_version(poc) != version) == (after != before), relative
-        assert poc_service.counts_for_package_digest(relative) == (after != before), relative
-        return after != before
-
-    for relative in (
+    Written out here, not taken from the code: it is what sessions approved and
+    tested before the scheme changed have stored.
+    """
+    inner = hashlib.sha256()
+    for name in (
         "run_poc.py",
         "config.yaml",
+        "provider_config.py",
+        "requirements.txt",
         "schemas/output_schema.py",
-        "prompts/extract.md",
-        "pdf_report.py",
-        "input_bundle.py",
-        "helpers/dates.py",
-        "document_manifest.py",  # one that was not there before
+        "schemas/output_schema_requirements.json",
     ):
-        assert changes(relative), relative
-    for relative in (
-        "README.md",
-        ".env.example",
-        "app.py",
-        "ui/server.py",
-        "evals/run_evals.py",
-        "sample_input/script.py",
-        "output/result.py",
-        "notes.txt",
-    ):
-        assert not changes(relative), relative
+        inner.update(name.encode())
+        path = os.path.join(poc, name)
+        if os.path.isfile(path):
+            with open(path, "rb") as fh:
+                inner.update(fh.read())
+    outer = hashlib.sha256(inner.hexdigest()[:16].encode())
+    prompts = os.path.join(poc, "prompts")
+    for name in sorted(os.listdir(prompts)):
+        outer.update(name.encode())
+        with open(os.path.join(prompts, name), "rb") as fh:
+            outer.update(fh.read())
+    return outer.hexdigest()[:16]
 
 
-def test_a_linked_module_is_not_read_into_the_digest(tmp_path) -> None:
+# --- what the editor says of a file agrees with the digest -------------------------
+
+
+@pytest.mark.parametrize(
+    ("relative", "counts"),
+    [
+        ("run_poc.py", True),
+        ("config.yaml", True),
+        ("requirements.txt", True),
+        ("schemas/output_schema.py", True),
+        ("schemas/output_schema.json", True),
+        ("prompts/extract.md", True),
+        ("pdf_report.py", True),
+        ("input_bundle.py", True),
+        ("helpers/dates.py", True),
+        ("document_manifest.py", True),  # one that was not there before
+        # Python of the test page and the evaluations is Python of the package.
+        ("app.py", True),
+        ("ui/server.py", True),
+        ("evals/run_evals.py", True),
+        ("ui/index.html", False),
+        ("README.md", False),
+        (".env.example", False),
+        ("notes.txt", False),
+        ("sample_input/script.py", False),
+        ("output/result.py", False),
+        (".cache/tool.py", False),
+        ("helpers/__pycache__/dates.py", False),
+    ],
+)
+def test_a_files_name_says_whether_saving_it_changes_the_digest(tmp_path, relative, counts) -> None:
     poc = str(tmp_path / "poc")
     _package(poc)
-    before = poc_service.package_digest(poc)
-    outside = tmp_path / "outside.py"
-    outside.write_text("secret = 1\n", encoding="utf-8")
+    before = sessions_router._approved_package_digest(poc)
 
-    os.symlink(outside, os.path.join(poc, "linked.py"))
+    _write(poc, relative, "# changed\n")
 
-    assert poc_service.package_digest(poc) == before
-    assert "linked.py" not in poc_service.runtime_modules(poc)
-
-
-def test_a_record_is_brought_to_the_second_formula_only_while_it_still_holds(tmp_path) -> None:
-    poc = str(tmp_path / "poc")
-    _package(poc)
-    stored = _first_formula(poc)
-
-    assert poc_service.current_formula_digest(poc, stored) == poc_service.package_digest(poc)
-    assert poc_service.current_formula_digest(poc, poc_service.package_digest(poc)) is None
-    assert poc_service.current_formula_digest(poc, None) is None
-    _write(poc, "run_poc.py", "print('changed since the record')\n")
-    assert poc_service.current_formula_digest(poc, stored) is None
+    assert (sessions_router._approved_package_digest(poc) != before) is counts
+    assert poc_service.counts_for_package_digest(relative) is counts
 
 
 # --- sessions --------------------------------------------------------------------
@@ -198,12 +142,15 @@ def _save(client, sid: str, path: str, content: str):
     )
 
 
-def _approved_session(client, db_session, user: str, *, first_formula: bool) -> dict:
+def _approved_session(client, db_session, user: str, *, older_scheme: bool) -> dict:
     """A session past Gate 3 with a tested, approved package.
 
-    With ``first_formula`` its three stored digests are what a session approved
-    before the second formula holds.
+    With ``older_scheme`` its stored digests and its approval are what a session
+    approved before the digest covered every module holds: the older digest, and
+    no ``package_scheme``.
     """
+    # A user id is not a path: the tests name sessions after the file they edit.
+    user = user.replace("/", "-")
     created = client.post("/sessions", json={"user_id": user, "title": "Digest"}).json()
     sid = created["id"]
     write_gate_artifacts(created["output_dir"], "gate_3")
@@ -215,7 +162,7 @@ def _approved_session(client, db_session, user: str, *, first_formula: bool) -> 
     client.patch(f"/sessions/{sid}", json={"gate_statuses": {"gate_2": "approved"}})
     client.patch(f"/sessions/{sid}", json={"step": 10})
     session = session_service.get_session(db_session, uuid.UUID(sid))
-    tested = _first_formula(poc) if first_formula else poc_service.package_digest(poc)
+    now = sessions_router._approved_package_digest(poc)
     session_service.update_session(
         db_session,
         session,
@@ -223,8 +170,8 @@ def _approved_session(client, db_session, user: str, *, first_formula: bool) -> 
             metadata={
                 "last_successful_run": "run-1",
                 "agent_step": 10,
-                session_service.RUN_PACKAGE_KEY: tested,
-                session_service.SUCCESSFUL_RUN_PACKAGE_KEY: tested,
+                session_service.RUN_PACKAGE_KEY: now,
+                session_service.SUCCESSFUL_RUN_PACKAGE_KEY: now,
             }
         ),
     )
@@ -232,138 +179,133 @@ def _approved_session(client, db_session, user: str, *, first_formula: bool) -> 
     approved = client.patch(f"/sessions/{sid}", json={"gate_statuses": {"gate_3": "approved"}})
     assert approved.status_code == 200, approved.text
     client.patch(f"/sessions/{sid}", json={"step": 12})
-    if first_formula:
+    if older_scheme:
+        older = _older_scheme_digest(poc)
+        assert older != now
         session = session_service.get_session(db_session, uuid.UUID(sid))
         content = dict(session.session_metadata[session_service.APPROVED_CONTENT_KEY])
-        content["package"] = tested
+        content["package"] = older
+        content.pop("package_scheme")
         session_service.update_session(
             db_session,
             session,
-            SessionUpdate(metadata={session_service.APPROVED_CONTENT_KEY: content}),
+            SessionUpdate(
+                metadata={
+                    session_service.APPROVED_CONTENT_KEY: content,
+                    session_service.RUN_PACKAGE_KEY: older,
+                    session_service.SUCCESSFUL_RUN_PACKAGE_KEY: older,
+                }
+            ),
         )
     return created
 
 
-def _metadata(client, sid: str) -> dict:
-    return client.get(f"/sessions/{sid}").json()["metadata"]
+def _detail(client, sid: str) -> dict:
+    return client.get(f"/sessions/{sid}").json()
 
 
 @requires_postgres
-def test_a_session_approved_before_the_second_formula_stays_approved_and_open(
+def test_a_session_approved_under_the_older_scheme_keeps_its_approval_and_its_download(
     client, db_session
 ) -> None:
-    created = _approved_session(client, db_session, "before", first_formula=True)
-    sid = created["id"]
-    stored = _metadata(client, sid)[session_service.SUCCESSFUL_RUN_PACKAGE_KEY]
-    assert len(stored) == 16
+    sid = _approved_session(client, db_session, "older", older_scheme=True)["id"]
 
-    # What the PoC tab compares with the stored digest is in the same formula.
-    assert client.get(f"/sessions/{sid}/poc/files").json()["package_digest"] == stored
-    # What a chat turn runs when it ends: nothing changed, nothing reopens.
+    # The download, before anything has compared or re-based the approval.
+    assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
+    # What a chat turn ends with.
     session = session_service.get_session(db_session, uuid.UUID(sid))
     assert sessions_router._reopen_if_approved_content_changed(db_session, session) is False
-    assert sessions_router._successful_run_is_of_another_package(session) is False
-    detail = client.get(f"/sessions/{sid}").json()
+
+    detail = _detail(client, sid)
     assert detail["gate_statuses"]["gate_3"] == "approved"
     assert "gate_reopened" not in detail["metadata"]
+    assert detail["metadata"]["last_successful_run"] == "run-1"
     assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
-    # Reading changed no record.
-    assert _metadata(client, sid)[session_service.SUCCESSFUL_RUN_PACKAGE_KEY] == stored
-    assert _metadata(client, sid)[session_service.APPROVED_CONTENT_KEY]["package"] == stored
 
 
 @requires_postgres
-def test_such_a_session_still_sees_a_change_to_what_its_digest_covered(client, db_session) -> None:
-    created = _approved_session(client, db_session, "before-run-poc", first_formula=True)
-    sid = created["id"]
-    # The agent rewrites run_poc.py; no editor, no upgrade of the records.
-    _write(os.path.join(created["output_dir"], "poc"), "run_poc.py", "print('rewritten')\n")
-
-    session = session_service.get_session(db_session, uuid.UUID(sid))
-    assert sessions_router._successful_run_is_of_another_package(session) is True
-    assert sessions_router._reopen_if_approved_content_changed(db_session, session) is True
-    assert client.get(f"/sessions/{sid}").json()["gate_statuses"]["gate_3"] == "pending"
-
-
-@requires_postgres
-def test_an_edit_outside_the_digest_brings_its_records_to_the_second_formula_and_keeps_all_open(
+def test_an_edit_outside_the_digest_leaves_such_a_session_approved_and_open(
     client, db_session
 ) -> None:
-    sid = _approved_session(client, db_session, "before-readme", first_formula=True)["id"]
+    sid = _approved_session(client, db_session, "older-readme", older_scheme=True)["id"]
 
     saved = _save(client, sid, "README.md", "# Edited\n")
 
     assert saved.status_code == 200 and saved.json()["gate_reopened"] is None
-    metadata = _metadata(client, sid)
-    for value in (
-        metadata[session_service.SUCCESSFUL_RUN_PACKAGE_KEY],
-        metadata[session_service.RUN_PACKAGE_KEY],
-        metadata[session_service.APPROVED_CONTENT_KEY]["package"],
-    ):
-        assert value.startswith(poc_service.PACKAGE_DIGEST_V2)
-    detail = client.get(f"/sessions/{sid}").json()
+    detail = _detail(client, sid)
     assert detail["gate_statuses"]["gate_3"] == "approved"
-    assert detail["metadata"]["last_successful_run"] == "run-1"
-    listed = client.get(f"/sessions/{sid}/poc/files").json()["package_digest"]
-    assert listed == metadata[session_service.SUCCESSFUL_RUN_PACKAGE_KEY]
+    approved = detail["metadata"][session_service.APPROVED_CONTENT_KEY]
+    assert approved["package_scheme"] == sessions_router._PACKAGE_DIGEST_SCHEME
     assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
 
 
 @requires_postgres
-def test_an_edit_to_another_module_reopens_gate_3_in_an_old_session_too(client, db_session) -> None:
-    sid = _approved_session(client, db_session, "before-helper", first_formula=True)["id"]
-    assert _file(client, sid, "pdf_report.py").json()["affects_package"] is True
+@pytest.mark.parametrize("path", ["pdf_report.py", "run_poc.py"])
+def test_an_edit_to_a_module_reopens_gate_3_in_such_a_session_too(client, db_session, path) -> None:
+    """The approval is re-based on the package before the save, not after it: after it,
+    the edit would be part of what the approval was re-based on, and go unseen."""
+    sid = _approved_session(client, db_session, f"older-{path}", older_scheme=True)["id"]
+    assert _file(client, sid, path).json()["affects_package"] is True
 
-    saved = _save(client, sid, "pdf_report.py", "def render():\n    return 'edited'\n")
+    saved = _save(client, sid, path, "print('edited after approval')\n")
 
     assert saved.status_code == 200
     assert saved.json()["gate_reopened"] == "gate_3"
-    detail = client.get(f"/sessions/{sid}").json()
+    detail = _detail(client, sid)
     assert detail["gate_statuses"]["gate_3"] == "pending"
+    assert detail["metadata"]["last_successful_run"] is None
     assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 409
 
 
 @requires_postgres
-def test_an_edit_to_another_module_reopens_gate_3(client, db_session) -> None:
-    sid = _approved_session(client, db_session, "after-helper", first_formula=False)["id"]
+@pytest.mark.parametrize("path", ["helpers/dates.py", "app.py", "evals/run_evals.py"])
+def test_an_edit_to_any_python_file_reopens_gate_3(client, db_session, path) -> None:
+    sid = _approved_session(client, db_session, f"now-{path}", older_scheme=False)["id"]
 
-    saved = _save(client, sid, "helpers/dates.py", "def parse(value):\n    return None\n")
+    saved = _save(client, sid, path, "print('edited')\n")
 
     assert saved.json()["gate_reopened"] == "gate_3"
-    assert client.get(f"/sessions/{sid}").json()["gate_statuses"]["gate_3"] == "pending"
+    assert _detail(client, sid)["gate_statuses"]["gate_3"] == "pending"
 
 
 @requires_postgres
-def test_the_test_page_and_the_evals_are_not_what_a_run_tested(client, db_session) -> None:
-    sid = _approved_session(client, db_session, "after-ui", first_formula=False)["id"]
+def test_what_is_not_code_or_schema_keeps_the_approval(client, db_session) -> None:
+    sid = _approved_session(client, db_session, "now-rest", older_scheme=False)["id"]
 
-    for path in ("app.py", "ui/server.py", "evals/run_evals.py"):
+    for path in ("README.md", ".env.example", "ui/index.html"):
         assert _file(client, sid, path).json()["affects_package"] is False
-        saved = _save(client, sid, path, "print('edited')\n")
+        saved = _save(client, sid, path, "edited\n")
         assert saved.status_code == 200 and saved.json()["gate_reopened"] is None
 
-    assert client.get(f"/sessions/{sid}").json()["gate_statuses"]["gate_3"] == "approved"
+    assert _detail(client, sid)["gate_statuses"]["gate_3"] == "approved"
     assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
 
 
-@requires_postgres
-def test_before_gate_3_an_edit_to_another_module_closes_the_download(client, db_session) -> None:
-    created = client.post("/sessions", json={"user_id": "tested", "title": "Digest"}).json()
-    sid = created["id"]
+def _tested_session(client, db_session, user: str, digest_of) -> dict:
+    """A package with a passed run recorded on it; Gate 3 not approved yet."""
+    created = client.post("/sessions", json={"user_id": user, "title": "Digest"}).json()
     write_gate_artifacts(created["output_dir"], "gate_3")
     poc = os.path.join(created["output_dir"], "poc")
     _package(poc)
-    session = session_service.get_session(db_session, uuid.UUID(sid))
+    session = session_service.get_session(db_session, uuid.UUID(created["id"]))
     session_service.update_session(
         db_session,
         session,
         SessionUpdate(
             metadata={
                 "last_successful_run": "run-1",
-                session_service.SUCCESSFUL_RUN_PACKAGE_KEY: poc_service.package_digest(poc),
+                session_service.SUCCESSFUL_RUN_PACKAGE_KEY: digest_of(poc),
             }
         ),
     )
+    return created
+
+
+@requires_postgres
+def test_before_gate_3_an_edit_to_another_module_closes_the_download(client, db_session) -> None:
+    sid = _tested_session(client, db_session, "tested", sessions_router._approved_package_digest)[
+        "id"
+    ]
     assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
 
     _save(client, sid, "input_bundle.py", "def bundle():\n    return ['edited']\n")
@@ -371,8 +313,20 @@ def test_before_gate_3_an_edit_to_another_module_closes_the_download(client, db_
     refused = client.get(f"/sessions/{sid}/poc/deployable")
     assert refused.status_code == 409
     assert refused.json()["detail"]["error"] == "package_changed_since_run"
-    listing = client.get(f"/sessions/{sid}/poc/files").json()
-    assert (
-        listing["package_digest"]
-        != _metadata(client, sid)[session_service.SUCCESSFUL_RUN_PACKAGE_KEY]
-    )
+
+
+@requires_postgres
+def test_before_gate_3_a_run_of_the_older_scheme_asks_for_a_new_run_as_the_gate_does(
+    client, db_session
+) -> None:
+    """The scheme is kept with the approval, not with the run. A run recorded under the
+    older one cannot be compared with today's digest: Gate 3 is refused on it until a
+    new run has passed, and the download waits for the same run."""
+    sid = _tested_session(client, db_session, "tested-older", _older_scheme_digest)["id"]
+
+    refused = client.get(f"/sessions/{sid}/poc/deployable")
+
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["error"] == "package_changed_since_run"
+    session = session_service.get_session(db_session, uuid.UUID(sid))
+    assert sessions_router._successful_run_is_of_another_package(session) is True

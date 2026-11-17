@@ -21,6 +21,7 @@ try:
 except Exception:
     pass
 
+from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
 from gaik.software_components.parsers.vision import OpenAIConfig, VisionParser
 
 
@@ -28,6 +29,11 @@ class VisionPlusParser:
     """Parser combining Docling text extraction with vision-based image interpretation.
 
     Returns markdown and metadata only (no chunking).
+
+    Every embedded image becomes one vision model call, so a PDF over ``limits``
+    (size, pages, number or pixels of the images) is refused with
+    :class:`~gaik.software_components.input_limits.InputLimitError`: size and
+    pages before Docling runs, the images before the first vision call.
     """
 
     def __init__(
@@ -43,8 +49,10 @@ class VisionPlusParser:
         vision_prompt: str | None = None,
         temperature: float | None = 0.0,
         reasoning_effort: str | None = None,
+        limits: InputLimits | None = None,
     ) -> None:
         self.verbose = verbose
+        self.limits = limits or InputLimits.local_parsing()
 
         # Defer docling imports to avoid heavy import side-effects at module import time.
         try:
@@ -101,6 +109,7 @@ class VisionPlusParser:
             max_tokens=2048,
             temperature=temperature,
             reasoning_effort=reasoning_effort,
+            limits=self.limits,
         )
 
     def parse_document(self, file_path: str) -> dict[str, Any]:
@@ -108,7 +117,8 @@ class VisionPlusParser:
         if self.verbose:
             print(f"Processing PDF with vision enhancement: {file_path}")
 
-        result = self.converter.convert(file_path)
+        self.limits.check_pdf(file_path)
+        result = self.converter.convert(file_path, **docling_limits(self.limits))
         doc = result.document
 
         if self.verbose:
@@ -118,6 +128,10 @@ class VisionPlusParser:
         images_with_positions = self._collect_images(doc)
         if self.verbose:
             print(f"Found {len(images_with_positions)} images to analyze")
+        self.limits.check_images_to_describe(
+            [image_size(self._as_pil_image(entry["image"])) for entry in images_with_positions],
+            os.path.basename(file_path),
+        )
 
         image_descriptions, descriptions_by_page = self._describe_images(images_with_positions)
 

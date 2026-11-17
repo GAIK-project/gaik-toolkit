@@ -230,6 +230,12 @@ comparing two runs.
   before calling anything unstable.
 - A failed document must score zero and stay in the sample. Dropping it lets a pipeline
   improve its own average by crashing on the hardest inputs.
+- From the gaik release after 0.10.0 (the pins above install 0.10.0, which has none of
+  this), `VisionExtractor` checks its files against `limits=InputLimits(...)` before any
+  model call, schema generation included: 100 MiB per file, about 89 megapixels per
+  image, and 500 pages for all files of one call together. A PDF whose pages cannot be
+  counted is refused too. The refusal is `InputLimitError`, a `ValueError` naming the
+  limit; score that document as refused, not as a model failure.
 - Stability alone rewards silence: a branch that leaves deep fields empty is perfectly
   repeatable, because empty is always the same empty. Read a stability metric next to a
   completeness metric or it will point the wrong way.

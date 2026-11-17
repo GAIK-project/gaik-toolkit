@@ -1,0 +1,84 @@
+"""What the PoC prints.
+
+By default the PoC prints counts, field names and file names, not the content it
+extracted: the content is in the files under output/. --verbose prints the content
+too. An error is printed as one short line; --debug prints the full traceback.
+
+The output files are written as plain files. Who may read them and how long they are
+kept is the owner's decision; delete output/ when a test run's results are no longer
+needed, above all when the inputs hold personal data.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import traceback
+from typing import Any, Callable
+
+VERBOSE = False
+DEBUG = False
+
+
+def add_output_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="also print the extracted content (it is always written to output/)",
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="print the full traceback when something fails"
+    )
+
+
+def configure(args: argparse.Namespace) -> None:
+    global VERBOSE, DEBUG
+    VERBOSE = bool(getattr(args, "verbose", False))
+    DEBUG = bool(getattr(args, "debug", False))
+
+
+def describe(fields: Any) -> str:
+    """Counts and field names of an extraction result, without its values."""
+    records = fields if isinstance(fields, list) else [fields]
+    records = [record for record in records if isinstance(record, dict)]
+    names = sorted({str(name) for record in records for name in record})
+    values = sum(len(record) for record in records)
+    filled = sum(
+        1 for record in records for value in record.values() if value not in (None, "", [], {})
+    )
+    shown = ", ".join(names) if names else "none"
+    return f"{len(records)} record(s), {filled} of {values} field value(s) filled; fields: {shown}"
+
+
+def show_result(fields: Any, label: str = "Extracted fields") -> None:
+    print(f"{label}: {describe(fields)}")
+    if VERBOSE:
+        print(json.dumps(fields, indent=2, ensure_ascii=False, default=str))
+    else:
+        print("  (the values are in the output file; run with --verbose to print them)")
+
+
+def short_error(exc: BaseException) -> str:
+    """The exception's type and the first line of its message, at most 200 characters."""
+    lines = str(exc).strip().splitlines()
+    first = lines[0][:200] if lines else ""
+    return f"{type(exc).__name__}: {first}" if first else type(exc).__name__
+
+
+def error_detail(exc: BaseException) -> str:
+    return traceback.format_exc() if DEBUG else short_error(exc)
+
+
+def run(main: Callable[[], None]) -> None:
+    """Run ``main``; an error ends the run with one short line unless --debug is given."""
+    try:
+        main()
+    except (SystemExit, KeyboardInterrupt):
+        raise
+    except Exception as exc:
+        if DEBUG or "--debug" in sys.argv[1:]:
+            raise
+        print(f"ERROR: {short_error(exc)}", file=sys.stderr)
+        print("Run again with --debug for the full traceback.", file=sys.stderr)
+        sys.exit(1)

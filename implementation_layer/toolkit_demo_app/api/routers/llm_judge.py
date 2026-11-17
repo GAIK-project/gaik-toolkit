@@ -26,9 +26,9 @@ except ImportError:
     from api.utils.model_settings import get_request_api_config, provider_error_detail
 
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import component_error
@@ -284,8 +284,8 @@ async def validate_pdf(
     rubric_payload.setdefault("scoring_mode", scoring_mode)
 
     content = await validate_file_size(pdf)
-    if (mismatch := content_mismatch(".pdf", content)) is not None:
-        raise HTTPException(status_code=415, detail=mismatch)
+    if (problem := await upload_problem(".pdf", content)) is not None:
+        raise HTTPException(status_code=problem.status, detail=problem.message)
     tmp_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:

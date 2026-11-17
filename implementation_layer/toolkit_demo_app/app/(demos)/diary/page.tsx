@@ -19,7 +19,7 @@ function CreateSection() {
 
 export default function DiaryPage() {
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <DemoPageHeader
         icon={HardHat}
         iconClassName="h-8 w-8 text-amber-500"
