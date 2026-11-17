@@ -38,7 +38,7 @@ _VALIDATED_VERSION_FILE = Path(__file__).parent.parent.parent / "gaik_validated_
 
 
 def _gaik_version_spec() -> str:
-    """Return the pip specifier for gaik, for example ``>=0.10.0,<0.11``."""
+    """Return the pip specifier for gaik, for example ``>=0.11.0,<0.12``."""
     version = _VALIDATED_VERSION_FILE.read_text(encoding="utf-8").strip()
     major, minor = (int(part) for part in version.split(".")[:2])
     return f">={version},<{major}.{minor + 1}"
