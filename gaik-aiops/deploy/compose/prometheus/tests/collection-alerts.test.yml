@@ -48,6 +48,61 @@ tests:
             exp_annotations:
               summary: "api: p95 latency 2.425k ms"
 
+  - name: streaming routes do not count towards p95 latency
+    interval: 1m
+    input_series:
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/chat/stream", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/chat/stream", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/chat/stream", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/runs/{run_id}/stream", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/runs/{run_id}/stream", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/runs/{run_id}/stream", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="1000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HighLatencyP95
+        exp_alerts: []
+
+  - name: a slow request-response route still fires next to streaming ones
+    interval: 1m
+    input_series:
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HighLatencyP95
+        exp_alerts:
+          - exp_labels: {service_name: api, severity: warning}
+            exp_annotations:
+              summary: "api: p95 latency 57.05k ms"
+
   - name: collector down or missing
     interval: 1m
     input_series:

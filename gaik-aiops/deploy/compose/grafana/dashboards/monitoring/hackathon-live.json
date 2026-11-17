@@ -337,7 +337,9 @@
     "h": 10
    },
    "fieldConfig": {
-    "defaults": {},
+    "defaults": {
+     "decimals": 0
+    },
     "overrides": []
    },
    "targets": [
@@ -421,7 +423,9 @@
     "h": 10
    },
    "fieldConfig": {
-    "defaults": {},
+    "defaults": {
+     "decimals": 0
+    },
     "overrides": []
    },
    "targets": [
@@ -431,7 +435,7 @@
       "type": "prometheus",
       "uid": "prometheus"
      },
-     "expr": "sort_desc(sum by (component) (increase(wizard_components_selected_total{service_name=\"wizard-v2-api\"}[$__range])))",
+     "expr": "sort_desc(clamp_min(sum by (component) ((wizard_components_selected_total{service_name=\"wizard-v2-api\"} - wizard_components_selected_total{service_name=\"wizard-v2-api\"} offset $__range) or wizard_components_selected_total{service_name=\"wizard-v2-api\"}), 0))",
      "legendFormat": "{{component}}"
     }
    ],
@@ -619,7 +623,53 @@
       }
      }
     },
-    "overrides": []
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "succeeded"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "green"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "failed"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "red"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "timeout"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "orange"
+        }
+       }
+      ]
+     }
+    ]
    },
    "targets": [
     {
