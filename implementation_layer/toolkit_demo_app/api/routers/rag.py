@@ -87,7 +87,8 @@ Guidelines:
   they'd like to know. 
 - Do not summarize or list document contents unless the user asks.
 - Only share specific information when the user asks for it
-- Include citations [document_name, page X] when answering questions
+- Cite each fact with the reference number its context block starts with, such as [1]
+  or [2][3]. Only when a block starts with no number, cite [document_name, page X]
 - If you can't find an answer, say so briefly and suggest they rephrase
 
 Answer style:
@@ -142,6 +143,14 @@ def extract_page_filter(query: str) -> dict | None:
     return None
 
 
+def _source(meta: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "document_name": meta.get("document_name", "unknown"),
+        "relevance_score": meta.get("relevance_score"),
+        "page_number": meta.get("page_number", "unknown"),
+    }
+
+
 def _normalize_source_name(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().lower())
 
@@ -149,6 +158,11 @@ def _normalize_source_name(value: str) -> str:
 def _filter_sources_by_citations(
     answer: str, sources: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
+    """The sources whose document and page the answer text names.
+
+    Only for a gaik without ``AnswerGenerator.generate_with_citations`` (0.11.0, which
+    the API image installs); with it, ``_cited_sources`` reads the built citations.
+    """
     citations = re.findall(r"\[([^\]]+?),\s*page\s+(\d+)\]", answer, flags=re.IGNORECASE)
     if not citations:
         return sources
@@ -167,6 +181,17 @@ def _filter_sources_by_citations(
         in cited_pairs
     ]
     return filtered or sources
+
+
+def _cited_sources(citations: list, sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The sources of the retrieved chunks the answer cites, or all when it cites none.
+
+    gaik builds the citations from the retrieved chunks, so a document or page the
+    model wrote that no chunk has is never among them.
+    """
+    if not citations:
+        return sources
+    return [_source(citation.document.metadata or {}) for citation in citations]
 
 
 async def _get_collection_lock(collection_id: str) -> asyncio.Lock:
@@ -822,16 +847,7 @@ async def query_rag_stream(
                 return
 
             # Extract sources
-            sources = []
-            for doc in documents:
-                meta = doc.metadata
-                sources.append(
-                    {
-                        "document_name": meta.get("document_name", "unknown"),
-                        "relevance_score": meta.get("relevance_score"),
-                        "page_number": meta.get("page_number", "unknown"),
-                    }
-                )
+            sources = [_source(doc.metadata) for doc in documents]
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = f"Found {len(documents)} relevant chunks"
@@ -842,12 +858,21 @@ async def query_rag_stream(
             steps[1]["status"] = "in_progress"
             yield sse_event("step_update", steps[1])
 
-            # Stream the answer
-            answer_gen = iter(
-                await asyncio.to_thread(
-                    workflow.answer_generator.generate, question, documents, stream=True
+            # Stream the answer; its citations are built from the retrieved chunks
+            # and complete once the stream has ended.
+            generator = workflow.answer_generator
+            generate_with_citations = getattr(generator, "generate_with_citations", None)
+            if generate_with_citations is not None:
+                cited = await asyncio.to_thread(
+                    generate_with_citations, question, documents, stream=True
                 )
-            )
+                answer = cited.answer
+            else:
+                cited = None
+                answer = await asyncio.to_thread(
+                    generator.generate, question, documents, stream=True
+                )
+            answer_gen = iter(answer)
 
             collected_answer = []
             while (chunk := await asyncio.to_thread(next, answer_gen, _END)) is not _END:
@@ -860,7 +885,10 @@ async def query_rag_stream(
             yield sse_event("step_update", steps[1])
 
             # Send final result with sources limited to the pages actually cited.
-            cited_sources = _filter_sources_by_citations(full_answer, sources)
+            if cited is not None:
+                cited_sources = _cited_sources(cited.citations, sources)
+            else:
+                cited_sources = _filter_sources_by_citations(full_answer, sources)
             yield sse_event(
                 "result",
                 {
