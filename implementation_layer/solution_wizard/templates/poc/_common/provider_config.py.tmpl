@@ -48,9 +48,8 @@ def _allowed_hosts(config: dict, settings: dict) -> list[str]:
     """Hosts gaik may send this stage's key to beyond its own provider hosts.
 
     These are a stage address on this machine and the self-hosted servers the approved
-    blueprint lists in models.local_endpoints, over http too. From the gaik release
-    after 0.10.0, any other address goes through gaik's own check: name it in
-    GAIK_ALLOWED_ENDPOINT_HOSTS. gaik 0.10.0 ignores the list.
+    blueprint lists in models.local_endpoints, over http too. Any other address goes
+    through gaik's own check: name it in GAIK_ALLOWED_ENDPOINT_HOSTS.
     """
     listed = settings.get("allowed_endpoint_hosts") or []
     hosts = listed.split(",") if isinstance(listed, str) else list(listed)
