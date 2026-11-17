@@ -72,8 +72,8 @@ _SCRIPTS: dict[str, dict[str, str]] = {
     "validate_blueprint.py": {"--blueprint": _PATH},
     # refresh_schema_model.py (SKILL.md Step 4.5) is left out: it imports the
     # session's output_schema.py, and every script here runs the wizard's own code
-    # only. With gaik 0.10.0 the step changes nothing; how the model file is
-    # refreshed from the next gaik pin is open.
+    # only. Since gaik 0.11.0 the PoC loads output_schema_model.json, so how
+    # that file follows the agent's edits to output_schema.py is still open.
 }
 #: Scripts that turn the blueprint into code, so they get its text checked first.
 _SCAFFOLDING_SCRIPTS = frozenset({"scaffold_poc.py"})

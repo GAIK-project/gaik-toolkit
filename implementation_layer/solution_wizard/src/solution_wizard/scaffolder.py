@@ -42,7 +42,7 @@ _VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def _gaik_version_spec() -> str:
-    """Return the pip specifier for gaik, for example ``>=0.10.0,<0.11``.
+    """Return the pip specifier for gaik, for example ``>=0.11.0,<0.12``.
 
     Without a readable ``X.Y.Z`` pin only the floor is set.
     """
