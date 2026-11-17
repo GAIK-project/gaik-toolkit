@@ -791,10 +791,11 @@ def _build_options(
     *,
     resume: str | None = None,
     session_id: str | None = None,
-    guard: agent_tool_guard.ToolGuard | None = None,
+    guard: agent_tool_guard.ToolGuard,
 ):
     """The agent's options. ``guard`` is the session's tool guard, which knows its
-    owner and counts the metered calls of each turn; one without an owner otherwise."""
+    owner and counts the metered calls of each turn. It has no default, so no
+    agent can be built with a guard that skips its owner's hourly limit."""
     tools = ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
     extra = {}
     if session_id and create_sdk_mcp_server is not None:
@@ -813,13 +814,7 @@ def _build_options(
         permission_mode="bypassPermissions",
         # bypassPermissions lets every tool run; the hook is what limits them to
         # this session's directory and the wizard's own scripts (agent_tool_guard).
-        hooks={
-            "PreToolUse": [
-                HookMatcher(
-                    hooks=[(guard or agent_tool_guard.ToolGuard(wizard_dir, output_dir)).hook]
-                )
-            ]
-        },
+        hooks={"PreToolUse": [HookMatcher(hooks=[guard.hook])]},
         setting_sources=[],
         include_partial_messages=True,
         max_turns=config.agent_max_turns(),
@@ -1066,6 +1061,11 @@ async def _start_session(
     turn_results: list = []  # the bootstrap's usage, counted with the first turn
     # One guard for the agent, whichever client below it ends up with: it counts
     # this owner's metered tool calls per turn and in their hourly window.
+    if not user_id:
+        # The chat route always names the owner; anything else gets the per-turn cap only.
+        logger.warning(
+            "agent started without an owner: metered tool calls are capped per turn only"
+        )
     guard = agent_tool_guard.ToolGuard(wizard_dir, out, user_id=user_id)
     if resume_id and transcript_exists(resume_id) is False:
         logger.info("agent session %s has no transcript to resume for %s", resume_id, session_id)

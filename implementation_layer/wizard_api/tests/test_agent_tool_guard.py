@@ -227,7 +227,8 @@ def test_the_agent_is_started_with_the_hook(tmp_path) -> None:
 
     if not agent_service._SDK_AVAILABLE:
         pytest.skip("claude_agent_sdk is not installed")
-    options = agent_service._build_options(tmp_path, tmp_path / "out")
+    guard = agent_tool_guard.ToolGuard(tmp_path, tmp_path / "out")
+    options = agent_service._build_options(tmp_path, tmp_path / "out", guard=guard)
 
     [matcher] = options.hooks["PreToolUse"]
     assert matcher.matcher is None  # every tool, not only Bash

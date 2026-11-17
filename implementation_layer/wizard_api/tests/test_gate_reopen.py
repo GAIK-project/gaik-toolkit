@@ -337,9 +337,10 @@ def test_the_tool_guard_lets_the_wizards_own_tool_through(tmp_path):
 
 def test_the_agent_gets_the_tool_only_with_its_session(tmp_path):
     pytest.importorskip("claude_agent_sdk")
+    guard = ToolGuard(tmp_path, tmp_path)
 
-    with_session = agent_service._build_options(tmp_path, tmp_path, session_id="s-3")
-    without = agent_service._build_options(tmp_path, tmp_path)
+    with_session = agent_service._build_options(tmp_path, tmp_path, session_id="s-3", guard=guard)
+    without = agent_service._build_options(tmp_path, tmp_path, guard=guard)
 
     assert agent_service.REOPEN_GATE_TOOL in with_session.allowed_tools
     assert "wizard" in with_session.mcp_servers
