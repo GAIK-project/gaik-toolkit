@@ -150,6 +150,9 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   `/admin`, for reads too: its agent has shell tools in the API pod. A write to data
   that every visitor shares needs an approved user (`writesSharedData`), and the API
   serves no route that writes the shared video-search index.
+  A generated result (PDF, subtitles, tabular session) belongs to the user whose run
+  made it: the proxy sends the signed-in user in `X-GAIK-User`, and the API serves the
+  result by id only to that user (`api/utils/result_owner.py`).
 
 ## docs site (GitHub Pages)
 

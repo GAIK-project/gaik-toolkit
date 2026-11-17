@@ -48,6 +48,13 @@ export function isWizardApiPath(pathname: string): boolean {
 export const WIZARD_USER_HEADER = "x-gaik-wizard-user";
 
 /**
+ * The signed-in user a request is forwarded for. The API records it next to a
+ * generated result (PDF, subtitles, tabular session) and serves the result only
+ * to the same user (api/utils/result_owner.py). Only the proxy sets it.
+ */
+export const USER_HEADER = "x-gaik-user";
+
+/**
  * Why a first-wizard request is refused, or null when it may go on. Its agent
  * has shell tools and runs in the demo API pod, so approval is not enough: an
  * admin grants the wizard to each user (`wizard_access`, set in /admin). This

@@ -316,6 +316,36 @@ test("another route does not get the wizard's user header", async () => {
   expect(backendHeaders?.has("x-gaik-wizard-user")).toBe(false);
 });
 
+test("a signed-in user's request names the user, never the browser's claim", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const runResponse = await proxy(
+    new NextRequest(RUN, {
+      method: "POST",
+      headers: { cookie, "x-gaik-user": "someone-else" },
+    }),
+  );
+  expect(runResponse.status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-user")).toBe("u1");
+
+  const download = await proxy(
+    new NextRequest("https://demo.test/api/pipeline/pdf/abc", {
+      headers: { cookie, "x-gaik-user": "someone-else" },
+    }),
+  );
+  expect(download.status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-user")).toBe("u1");
+});
+
+test("a visitor who is not signed in names no user, whatever the browser sends", async () => {
+  const download = await proxy(
+    new NextRequest("https://demo.test/api/pipeline/pdf/abc", {
+      headers: { "x-gaik-user": "u1" },
+    }),
+  );
+  expect(download.status).toBe(200);
+  expect(backendHeaders?.has("x-gaik-user")).toBe(false);
+});
+
 test("a path the rules cannot judge is not forwarded", async () => {
   const cookie = sessionCookie("r1", fresh());
   for (const path of ["/api//wizard/start", "/api/x%2F..%2Fwizard/start"]) {

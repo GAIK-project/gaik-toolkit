@@ -16,7 +16,12 @@ from pathlib import Path
 from types import UnionType
 from typing import Annotated, Any, Union, get_args, get_origin
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+try:
+    from utils.result_owner import current_user, remember_owner, require_owner
+except ImportError:
+    from api.utils.result_owner import current_user, remember_owner, require_owner
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response, StreamingResponse
 from fpdf import FPDF
@@ -818,6 +823,7 @@ async def process_order(
     po_file: Annotated[UploadFile, File(description="Purchase Order PDF")],
     bom_files: Annotated[list[UploadFile], File(description="BOM PDF files")],
     pricing_file: Annotated[UploadFile, File(description="Pricing CSV/Excel file")],
+    user: str = Depends(current_user),
 ) -> StreamingResponse:
     """
     Process a purchase order with streaming progress updates.
@@ -879,6 +885,7 @@ async def process_order(
                 enriched_items, shipping=parts.shipping, tax_rate=parts.tax_rate
             )
             job_id = str(uuid.uuid4())
+            remember_owner(job_id, user)
             pdf_bytes = generate_pdf(
                 parts.po_number or "",
                 parts.customer or "",
@@ -924,8 +931,12 @@ async def process_order(
 
 
 @router.get("/pdf/{job_id}")
-async def download_pdf(job_id: str, download: bool = False) -> Response:
-    """Return generated order draft PDF for inline preview or download."""
+async def download_pdf(
+    job_id: str, download: bool = False, user: str = Depends(current_user)
+) -> Response:
+    """Return generated order draft PDF for inline preview or download, only for the
+    user whose run made it."""
+    require_owner(job_id, user, "PDF not found or expired")
     entry = pdf_storage.get(job_id)
     if not entry or (datetime.now().timestamp() - entry[1] > PDF_TTL_SECONDS):
         if entry:

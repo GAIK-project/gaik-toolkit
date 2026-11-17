@@ -1,4 +1,5 @@
 import {
+  USER_HEADER,
   WIZARD_USER_HEADER,
   accessRefusal,
   isStateChanging,
@@ -211,6 +212,13 @@ async function route(request: NextRequest): Promise<NextResponse> {
     if (wizardApi) {
       const { userId } = await accessState();
       if (userId) headers.set(WIZARD_USER_HEADER, userId);
+    }
+    // A generated result (PDF, subtitles, tabular session) belongs to the user
+    // whose run made it; the API serves it only to the same user. Set on every
+    // forwarded request, like the wizard's header, never copied from the browser.
+    {
+      const { userId } = await accessState();
+      if (userId) headers.set(USER_HEADER, userId);
     }
 
     // A server model the user picked. The API checks it against its own list.
