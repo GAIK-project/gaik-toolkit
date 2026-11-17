@@ -781,17 +781,19 @@ def test_a_reworded_external_service_is_the_same_solution() -> None:
     sentence does not reopen Gate 2."""
     from wizard_api.services import artifact_sync
 
+    # Two keys, so that writing them in the other order is a real reordering.
+    service = {**_SEARCH, "env_vars": ["SEARCH_API_KEY", "SEARCH_REGION"]}
     reworded = {
-        **_SEARCH,
+        **service,
         "purpose": "Looks up recent public news on the supplier",
         "fallback": "Without it the news field stays empty",
         "docs_url": "https://docs.example.com/search",
-        "env_vars": list(reversed(_SEARCH["env_vars"])),
-        "data_sent": f"  {_SEARCH['data_sent']} ",
+        "env_vars": ["SEARCH_REGION", "SEARCH_API_KEY"],
+        "data_sent": f"  {service['data_sent']} ",
     }
 
     assert artifact_sync.solution_digest(_with_service(reworded)) == (
-        artifact_sync.solution_digest(_with_service(_SEARCH))
+        artifact_sync.solution_digest(_with_service(service))
     )
 
 
