@@ -26,9 +26,9 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-load_dotenv()
+# Only the PoC's own .env, never one from a parent folder.
+load_dotenv(Path(__file__).parent / ".env")
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 from provider_config import (  # noqa: E402
     external_model_forbidden,
@@ -52,18 +52,26 @@ def load_requirements() -> str:
     return req_path.read_text(encoding="utf-8") if req_path.exists() else ""
 
 
-def _find_input(sample_dir: Path, exts: tuple) -> Path:
-    files = [f for f in sample_dir.iterdir() if f.suffix.lower() in exts]
-    if not files:
-        print(f"ERROR: No input file with extensions {exts} found in {sample_dir}", file=sys.stderr)
+def _find_input(sample_dir: Path, exts: tuple, hints: tuple = ()) -> Path:
+    # Through the case's bundle if it has one, else sample_input/ and its subfolders:
+    # a top-level-only search did not start on the customer's bundle layout (#255).
+    from input_bundle import InputNotFound, find_input
+
+    try:
+        return find_input(sample_dir, *exts, hints=hints, pick_first=True)
+    except InputNotFound as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
-    return sorted(files)[0]
 
 
-def _find_optional_input(sample_dir: Path, exts: tuple) -> Path | None:
+def _find_optional_input(sample_dir: Path, exts: tuple, hints: tuple = ()) -> Path | None:
     """Like _find_input but returns None instead of exiting when no file is found."""
-    files = [f for f in sample_dir.iterdir() if f.suffix.lower() in exts]
-    return sorted(files)[0] if files else None
+    from input_bundle import InputNotFound, find_input
+
+    try:
+        return find_input(sample_dir, *exts, hints=hints, pick_first=True)
+    except InputNotFound:
+        return None
 
 
 def _load_approved_schema(schema_dir: Path):

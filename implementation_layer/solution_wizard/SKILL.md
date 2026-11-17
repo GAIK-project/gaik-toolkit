@@ -179,6 +179,32 @@ Generate the three specification objects, populating **every field collected in 
 
 **`target_output_spec`** — `schema_name`, `fields`, `field_types`, `required_fields`, `optional_fields`, `field_descriptions`, `allowed_values`, `confidence_required`, `missing_value_policy`, `validation_rules`.
 
+**Repeated records inside the output** — when one output holds *many* of
+something (a purchase order's line items, an invoice's rows, a meeting's
+participants), that is not one field. List the container in `fields`, and
+describe one row under `nested`:
+
+```json
+"target_output_spec": {
+  "fields": ["po_number", "supplier_name", "line_items"],
+  "nested": {
+    "line_items": {
+      "fields": ["item_number", "article_code", "quantity", "unit_price"],
+      "field_types": {"quantity": "int", "unit_price": "decimal"},
+      "required_fields": ["item_number", "quantity"],
+      "description": "One entry per order line"
+    }
+  }
+}
+```
+
+A nested block generates a named row model (`line_items` → `LineItem`) and the
+nested extraction requirements (`parent_with_nested_list`). Without it the row
+fields end up flattened into the parent as single values, and the output cannot
+represent more than one row — which is usually the whole point of the case. Ask
+how many rows a document can have if it is not obvious; the answer is almost never
+"one". Rows are one level deep: a row cannot hold rows of its own.
+
 For any genuinely-unknown item, set the value to `"unknown"` (or `[]` for a list "none") and record an `assumptions[]` entry. Write these specs into a **draft blueprint** (`use_case` + the three specs + `governance`) at `<output_dir>/use_case.blueprint.json` so the completeness checker can read it. Present the spec summary and ask the user to confirm.
 
 ---
@@ -327,8 +353,10 @@ The PoC does not import `output_schema.py`: `load_schema()` reads
 python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas
 ```
 
-If it exits with an error, nothing was written and the PoC would still run the old schema:
-fix `output_schema.py` (the class name must match `model_name` in the requirements JSON,
+The audio and document PoCs do the same themselves when `output_schema.py` is newer than
+the model file, and stop with the reason when it cannot be done; the script tells you now
+instead of at the next run. If it exits with an error, nothing was written: fix
+`output_schema.py` (the class name must match `model_name` in the requirements JSON,
 the field types must be ones the schema generator produces, and the class adds no
 validators, serializers, methods, private attributes or config options other than
 `extra`; keep the generated `DecimalField` / `OptionalDecimalField` helpers as they are)
@@ -341,6 +369,8 @@ After each edit, confirm the change with the user before proceeding.
 Two constraints must be satisfied before approving any schema. Check both every time:
 
 1. **ExtractionRequirements `field_type` enum** — when editing `output_schema_requirements.json` directly (e.g. adding a field manually), `field_type` must be one of: `str`, `int`, `float`, `bool`, `list[str]`, `date`, `decimal`, `list[dict]`. The value `"dict"` is **not** in this enum and will cause a `ValidationError` at runtime. For a nested object field, write `"field_type": "str"`; for an array of objects write `"field_type": "list[dict]"`.
+
+1b. **`default` is a string or null** — in `output_schema_requirements.json`, a field's `default` must be a string or `null`, never a list, number or object (for a `list[str]` field write `null`, not `[]`). The audio and document templates' `run_poc.py` resets other values to `null` with a warning, but do not rely on that: validate the file after any hand edit.
 
 2. **Azure OpenAI structured output — no bare `dict` types** — when `provider: azure` (including the legacy `azure_openai` alias, or Azure routed through LiteLLM), the Pydantic schema in `output_schema.py` must **never** contain `dict | None` or `list[dict]` as field types. Azure OpenAI's structured output API requires `additionalProperties: false` on every JSON object, which bare Python `dict` does not satisfy. For every nested-object field, define a named sub-model:
 
@@ -490,7 +520,7 @@ Choose them like this:
 2. **Do not ask** when the user has already said what they want: use that. When the requirements ask for evidence — for example "cite the source", "show where each value came from", "audit trail", "traceable to the document", a regulated or audited domain — add `SourceTracing`.
 3. **No user to answer** (the wizard runs unattended): add `LLMJudge` when `human_review == yes` (what this step has always done), and add `SourceTracing` as well when the requirements ask for evidence. When `human_review` is no, add `LLMJudge` only if the user explicitly wants output quality checking.
 
-Order in the workflow: extraction → `SourceTracing` → `LLMJudge` → the `human_review` step. Tracing comes first because it is cheap and needs no model, and the reviewer sees both sets of flags. Record the choice by the steps the blueprint contains; a `SourceTracing` step takes `source_text` and `structured_json` and produces a `validation_report`, with `source = "text"` or `"files"` in its `parameters` (see its card). `SourceTracing` composes around the extraction step or module — keep that step, never replace it — and for `AudioToStructuredData` and `DocumentsToStructuredData` the PoC must pass the schema and requirements itself (see the card).
+Order in the workflow: extraction → `SourceTracing` → `LLMJudge` → the `human_review` step. Tracing comes first because it is cheap and needs no model, and the reviewer sees both sets of flags. Record the choice by the steps the blueprint contains; a `SourceTracing` step takes `source_text` and `structured_json` and produces a `validation_report`, with `source = "text"` or `"files"` in its `parameters` (see its card). `SourceTracing` composes around the extraction step or module — keep that step, never replace it — and for `AudioToStructuredData` and `DocumentsToStructuredData` the PoC must pass the schema and requirements itself (see the card). A judge step takes the source it checks against as well as the `structured_json`: for `LLMJudge` the `transcript`, `enhanced_transcript` or `parsed_text` (`AudioToStructuredData` and `DocumentsToStructuredData` list theirs among their outputs), or the `pdf` or `image` itself for its `validate(source_pages=...)`, which is all `LLMJudgePanel` has. With `validation.hallucination_check: true` the validator refuses a judge step without one (rule 14).
 
 The fixed PoC templates for audio and document extraction inject `SourceTracing` (like `LLMJudge`): the generated `run_poc.py` asks the extractor for the quotes before the run, checks the values against the text it read afterwards, writes `output/<input>_source_trace.json` and prints what a reviewer should look at. The schema must exist for that, so on the first run, when the pipeline generates the schema, tracing is skipped with a note; the next run traces. The RAG template has no extraction step and does not inject it. Any other block the fixed template does not cover (for example `DocumentClassifier` or `DraftReviewer`) still makes the scaffolder use the `_generic` template: the generated `run_poc.py` then has a labelled block per step with the card's reference calls, and you wire the evidence request on the extractor call and the check yourself from the card's recipe. Tell the user when that happens.
 
@@ -582,7 +612,7 @@ Then fill the template in:
    - **Audio**: hosted Transcriber, ParallelTranscriber and TextToSpeech accept native OpenAI/Azure configurations only. Audio-to-text and speech deployments are separate from chat models. For Aitta/Google/Anthropic/LiteLLM text pipelines, provide a separate native OpenAI/Azure transcription config. The existing explicitly configured local-Whisper modes have their own endpoint and capability rules from Phase 5. For self-hosted Whisper set `transcription_model: whisper_local` in `models.transcription_config` (provider `openai` or `azure`) and have the user set `LOCAL_TRANSCRIBER_API_BASE` and `LOCAL_TRANSCRIBER_API_KEY` in `.env`; the generated PoC passes them to `Transcriber`. With `external_model_api_allowed: false` or `local_processing_required: true`, transcript enhancement is off, the stage reads no cloud credentials, the endpoint must be on `localhost` or a host in `models.local_endpoints`, and either provider combines with a local `openai_compatible` stage. When external APIs are allowed, enhancement uses the stage's credentials, so an `openai` transcription stage cannot share a PoC with an `openai_compatible` stage; use `azure` for it.
    - **Embeddings**: configure a separate embedding model/deployment, never the chat model. Anthropic/Foundry has no native embedding API; use another embedding provider. Aitta, custom compatible endpoints and LiteLLM require an explicit offered embedding model. Verify vector dimensions, use the same provider/model for ingestion and query embedding, and rebuild the collection when either changes.
    - **Optional backends**: add `gaik[llm-google]` for native Google/Vertex, `gaik[llm-anthropic]` for Anthropic/Foundry, or `gaik[llm-litellm]` for LiteLLM, alongside component extras. LiteLLM is an optional backend with an explicitly routed model ID such as `azure/<deployment>` or `openai/<model>`; do not add such prefixes to native provider model IDs. Generic OpenAI-compatible endpoints need an explicit `base_url` and model. Aitta uses CSC's documented `https://aitta-api.csc.fi/openai/v1` endpoint and may need its 600-second cold-start timeout.
-   - **Endpoints**: From the gaik release after 0.10.0, a client sends its key only to the provider's own host, the address set in that provider's variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`; plain http works for that address, with a warning outside a private network), this machine for a local model server, Docling or Whisper, and hosts listed in `GAIK_ALLOWED_ENDPOINT_HOSTS`. Anything else raises `EndpointNotAllowedError` (a `ValueError`) when the component is built. The generated PoC's `get_stage_config` also allows a stage address on this machine and the hosts in `models.local_endpoints`, over http too. The validated gaik 0.10.0 has none of this. Read service addresses from those variables. When the user's server is not a self-hosted one on their own network, have them list its host in `GAIK_ALLOWED_ENDPOINT_HOSTS` in `.env` (`http://host` for plain http) rather than in `models.local_endpoints`, which also counts it as local processing; never build that list from user input.
+   - **Endpoints**: Since gaik 0.11.0, a client sends its key only to the provider's own host, the address set in that provider's variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`; plain http works for that address, with a warning outside a private network), this machine for a local model server, Docling or Whisper, and hosts listed in `GAIK_ALLOWED_ENDPOINT_HOSTS`. Anything else raises `EndpointNotAllowedError` (a `ValueError`) when the component is built. The generated PoC's `get_stage_config` also allows a stage address on this machine and the hosts in `models.local_endpoints`, over http too. Read service addresses from those variables. When the user's server is not a self-hosted one on their own network, have them list its host in `GAIK_ALLOWED_ENDPOINT_HOSTS` in `.env` (`http://host` for plain http) rather than in `models.local_endpoints`, which also counts it as local processing; never build that list from user input.
    - **Sampling and reasoning**: omit temperature (`temperature: null` for constructor parameters) for the default GPT-6 setup unless explicitly using a supported `reasoning_effort: none`. Recognized GPT-6/GPT-5.6 paths normalize incompatible sampling controls; do not describe every newer model as rejecting temperature unconditionally. GPT-6 supports `low`, `medium`, `high`, `xhigh`, and `max`; Sol/Luna also support `none`, Astra does not. Set `model_family` for a custom Azure deployment alias. PostgresAgent/TabularAgent drop their `0.0` default for GPT-6/GPT-5.6 automatically; pass `temperature=None` only for other reasoning deployments that reject it. For other model families and native Google/Anthropic, verify their own options rather than applying OpenAI rules globally.
    - Omit an unspecified reasoning effort rather than treating omission as guaranteed zero reasoning. With shared `api_config`, VisionExtractor/MultimodalParser read a configured effort from that dictionary; their legacy constructor defaults do not force that effort on the shared client. GPT-6 tool calling with reasoning requires the Responses API; the shared Chat Completions path does not make that combination available automatically.
    If a required provider, model or capability is unavailable, record the gap and resolve that stage's choice with the user before claiming the PoC is runnable.
@@ -696,6 +726,30 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
      `generate_schema.py` as in Phase 4).
    - After wiring, and with the user's yes, confirm that
      `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
+   - **Match documents to a manifest with `document_manifest.py`; do not write your own lookup.**
+     When the package gates documents with a manifest (access control, classification, a
+     catalogue), load it with `DocumentManifest.load(manifest_path)` from the scaffolded
+     `poc/document_manifest.py` and get each document's record with `manifest.require(path)`
+     (or `manifest.entry_for(path)`, which returns None). It matches a full path, the manifest's
+     own relative key (`documents/<name>.pdf`) and a unique bare file name alike, and a miss
+     names the file and the manifest's keys. A hand-written lookup keyed the manifest one way and
+     searched it another in four UC03 packages in a row (5 Oct 2026: every document dropped,
+     refused, or `KeyError: '<name>.pdf'`). When paths are relative to a bundle file, pass its
+     folder: `DocumentManifest.load(manifest_path, search_roots=[bundle_dir])`.
+     **Take the list of documents from `manifest.documents()`** too; do not join the manifest's
+     paths to a folder yourself. They are relative to the manifest, and a package that read the
+     manifest with the helper but joined its paths to the bundle's folder found no file
+     (UC03, 6 Oct 2026).
+   - **Find inputs with `input_bundle.py`; do not list `sample_input/` yourself.** Inputs may sit
+     in subfolders and be named by a bundle file (`poc_input_bundle.json` with
+     `input/<name>.wav`, `poc_input/documents/`). Use `find_input(sample_dir, ".wav", ".mp3",
+     hints=("meeting",))` from the scaffolded `poc/input_bundle.py` for each input: it takes the
+     file the bundle names, else searches `sample_input/` and its subfolders, never returns the
+     bundle file itself, and a miss lists what is there. `load_bundle(sample_dir)` gives the
+     bundle (or None) and `bundle.dir("documents")` a folder it names. When the case says it
+     supplies a bundle, the package must run from that bundle as delivered: a finder that read
+     only the top level of `sample_input/` did not start on the customer's layout (UC05,
+     6 Oct 2026).
 
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to
