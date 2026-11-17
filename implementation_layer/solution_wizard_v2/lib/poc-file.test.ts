@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   editorLanguage,
   isSecretEnvName,
+  pocFileAffectsPackage,
   pocFileFrom,
   pocFileReadOnly,
   pocFileSavedFrom,
@@ -53,6 +54,23 @@ describe("pocFileReadOnly", () => {
     expect(pocFileReadOnly("output/result.json")).toBe("file_read_only");
     expect(pocFileReadOnly("Dockerfile")).toBe("file_type_not_editable");
     expect(pocFileReadOnly("logo.png")).toBe("file_type_not_editable");
+  });
+
+  it("keeps a file in a hidden folder or __pycache__ read-only: the digest leaves those out", () => {
+    expect(pocFileReadOnly(".streamlit/config.toml")).toBe("file_read_only");
+    expect(pocFileReadOnly("helpers/__pycache__/notes.txt")).toBe("file_read_only");
+    expect(pocFileReadOnly(".env.example")).toBeNull();
+  });
+});
+
+describe("pocFileAffectsPackage", () => {
+  it("is every file the editor saves but a README, as wizard_api's digest is", () => {
+    for (const path of ["run_poc.py", "labels.json", ".env.example", "ui/index.html", "notes.txt", "prompts/README.md"]) {
+      expect(pocFileAffectsPackage(path), path).toBe(true);
+    }
+    for (const path of ["README.md", "helpers/Readme.md", "AI-GENERATED.json", "sample_input/a.txt", ".cache/x.py"]) {
+      expect(pocFileAffectsPackage(path), path).toBe(false);
+    }
   });
 });
 

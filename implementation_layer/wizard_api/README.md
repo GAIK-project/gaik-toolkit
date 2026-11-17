@@ -61,25 +61,30 @@ Steps are **1–13** (matches V2 UI phase stepper). Gate keys: `gate_1` … `gat
 read or written: no absolute path, no `..`, no backslash, no symlink on the way
 (`poc_service.package_file_path`, `regular_file`). A save needs an existing file with
 one of the suffixes in `poc_service.EDITABLE_SUFFIXES` (or `.env.example`); the AI
-marker and everything under `sample_input/` and `output/` are read-only
-(`file_read_only`, 403), other types `file_type_not_editable` (422). `.env` and every
-`.env*` name except `.env.example` is refused for reading and writing with 422
-`secrets_not_stored`: the server keeps no keys for a user, the web app adds `poc/.env`
-to the downloaded package in the browser. A save whose `base_digest` is not the file's
-answers 409 `file_changed`, and one sent while the wizard is replying 409
-`wizard_responding`.
+marker, everything under `sample_input/` and `output/` and files in a hidden folder or
+`__pycache__` are read-only (`file_read_only`, 403), other types
+`file_type_not_editable` (422). `.env` and every `.env*` name except `.env.example` is
+refused for reading and writing with 422 `secrets_not_stored`: the server keeps no keys
+for a user, the web app adds `poc/.env` to the downloaded package in the browser. A save
+whose `base_digest` is not the file's answers 409 `file_changed`, and one sent while the
+wizard is replying 409 `wizard_responding`.
 
 A saved edit is a package change like one of the agent's. The package digest
-(`package_digest` in `GET /poc/files`) follows the files a test run is tied to, so an
-edit to one of them makes the earlier run a run of another package, and where Gate 3
-was approved it reopens that gate. An edit to a file outside the digest (the README,
-`.env.example`) does neither.
+(`package_digest` in `GET /poc/files`) covers every file of the package but its README
+files, so an edit to any other file (code, settings, prompts, `.env.example`, a data
+file such as a `labels.json` the run reads) makes the earlier run a run of another
+package, closes `/poc/deployable` until a new run has passed, and where Gate 3 was
+approved it reopens that gate. An edit to a `README.md` (outside `prompts/`) does
+neither: no run reads it, while the prompts are Markdown too and a run reads them.
 
-The digest covers the files a preflight reads by name, every Python file of the
-package and every file in `schemas/` (`poc_service._version_files`), and `prompts/`.
-That includes the test page's and the evaluations' Python (`app.py`, `ui/*.py`,
-`evals/`); `sample_input/`, `output/`, hidden folders and `__pycache__` are outside it.
-The editor says by a file's name whether saving it changes the digest
+The digest (`poc_service._version_files`, `_in_version`; scheme 3) covers every file of
+`poc/` but README files, the AI marker, the wizard's own records, environment files
+with keys, the editor's temporary files, compiled Python, `sample_input/`, `output/`,
+hidden folders and `__pycache__`. It is the preflight's version too, so the PoC tab
+checks the package again after any such change. Scheme 2 covered Python files,
+`schemas/` and `prompts/` only; a session approved under it is re-based on the package
+as it is, and a run recorded under it is asked for again before Gate 3 or the
+download. The editor says by a file's name whether saving it changes the digest
 (`counts_for_package_digest`, held to the digest by a test). Before a save the approved
 content is compared once, so that an approval recorded under an older digest scheme is
 re-based on the package as it was before the edit, not after it.

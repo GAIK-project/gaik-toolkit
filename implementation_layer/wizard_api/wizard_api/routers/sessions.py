@@ -418,9 +418,10 @@ def write_poc_file(
     it is told of an edit only with the next message.
 
     A saved edit is a change to the package like one of the agent's. The
-    package's digest follows the files (``_approved_package_digest``), so the
-    PoC tab checks and tests the new package; where Gate 3 was approved on the
-    old one, that gate reopens exactly as after a chat turn
+    package's digest follows every file but a README
+    (``_approved_package_digest``), so the PoC tab checks the new package and
+    asks for a new test run; where Gate 3 was approved on the old one, that
+    gate reopens exactly as after a chat turn
     (``_reopen_if_approved_content_changed``). The edit is recorded in the
     session's metadata and the agent is told with the next message
     (``_user_edits_note``).
@@ -896,10 +897,11 @@ def _gate_span(session, payload: SessionUpdate) -> Iterator[None]:
         ops_metrics.record_gate_changes(session, changes)
 
 
-#: What the package digest covers. 2: every Python file and every file in
-#: ``schemas/`` (``poc_service._version_files``); before it, a fixed list. A
+#: What the package digest covers. 3: every file of the package but its
+#: README files (``poc_service._in_version``); 2: every Python file and every
+#: file in ``schemas/``, and the prompts; 1: a fixed list and the prompts. A
 #: package approved under another scheme is not comparable with today's digest.
-_PACKAGE_DIGEST_SCHEME = 2
+_PACKAGE_DIGEST_SCHEME = 3
 
 
 def _approved_content(session) -> dict[str, str | int] | None:
@@ -914,23 +916,16 @@ def _approved_content(session) -> dict[str, str | int] | None:
 
 
 def _approved_package_digest(poc: str) -> str:
-    """The package as approved: what a preflight reads, and the prompts the run reads.
+    """The package as approved and tested: every file of it but its README files.
 
-    ``package_version`` covers the code, the settings and the schema. The
-    extraction instructions under ``prompts/`` are read at run time and decide
-    the result as much as the code does, so a change to them after Gate 3 is a
-    change to what was accepted too.
+    ``package_version`` covers the code, the settings, the schema, the
+    extraction instructions under ``prompts/`` and the data files the run
+    reads, so a change to any of them after a test run or Gate 3 is a change
+    to what was tested and accepted.
     """
     from wizard_api.services import poc_service
 
-    digest = hashlib.sha256(poc_service.package_version(poc).encode())
-    prompts = os.path.join(poc, "prompts")
-    if os.path.isdir(prompts) and not os.path.islink(prompts):
-        for name in poc_service.regular_files(prompts):
-            digest.update(name.encode())
-            with open(os.path.join(prompts, name), "rb") as fh:
-                digest.update(fh.read())
-    return digest.hexdigest()[:16]
+    return hashlib.sha256(poc_service.package_version(poc).encode()).hexdigest()[:16]
 
 
 def _gate_reopened_by_turn(db: Session, session) -> str | None:
@@ -2667,8 +2662,8 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
     # Gate 3 asks (``_successful_run_is_of_another_package``). The download was
     # gated on a run having succeeded at all: after it the agent, or the user
     # in the PoC tab's editor, could change run_poc.py and the changed package
-    # was still handed over as the tested one. A change outside the digest (the
-    # README, .env.example) leaves the download open.
+    # was still handed over as the tested one. Only a change to a README, which
+    # the digest leaves out, leaves the download open.
     #
     # Until Gate 3 is approved. From then on the approval is what holds the
     # package: a change to it reopens the gate and takes the run away

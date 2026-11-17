@@ -959,15 +959,46 @@ _VERSION_FILES = (
 
 #: Folders of a package that hold a run's inputs and outputs, not the package.
 _RUN_FOLDERS = frozenset({"sample_input", "output"})
+#: Documentation for people, which no run reads: the one kind of package file
+#: whose change leaves the tested package as it was. Only README files: the
+#: prompts under ``prompts/`` are Markdown too, and a run reads them.
+_README_NAME = "readme.md"
+#: The temporary file a save in the editor writes beside its file, for a moment.
+_EDIT_TEMP_PREFIX = ".edit-"
+_EDIT_TEMP_SUFFIX = ".tmp"
+
+
+def _in_version(parts: list[str]) -> bool:
+    """Whether the package file at ``parts`` (POSIX parts, relative to poc/) counts for its version.
+
+    Every file of the package does, whatever its kind: run_poc.py may read a
+    data file (a root ``labels.json``), a setting or a template as much as a
+    module, so a change to any of them may change what runs. Left out is what
+    no run reads or is not part of the package: README files outside
+    ``prompts/``, the AI marker the download writes, the wizard's own records,
+    environment files with keys, the editor's temporary files, compiled Python,
+    the run's own folders, hidden folders and ``__pycache__``.
+    """
+    folders, name = parts[:-1], parts[-1]
+    if folders and folders[0] in _RUN_FOLDERS:
+        return False
+    if any(folder.startswith(".") or folder == "__pycache__" for folder in folders):
+        return False
+    if name in _HIDDEN_NAMES or name == AI_MARKER_NAME or is_secret_name(name):
+        return False
+    if name.endswith((".pyc", ".pyo")):
+        return False
+    if name.startswith(_EDIT_TEMP_PREFIX) and name.endswith(_EDIT_TEMP_SUFFIX):
+        return False
+    return not (name.lower() == _README_NAME and not (folders and folders[0] == _PROMPTS))
 
 
 def _version_files(poc_dir: str) -> list[str]:
-    """``_VERSION_FILES``, every Python file of the package and every file in ``schemas/``.
+    """``_VERSION_FILES`` and every other file of the package that counts (``_in_version``).
 
-    run_poc.py imports the helpers the scaffolder copies in (``poc_output.py``,
-    ``document_manifest.py``, ``input_bundle.py``) and any module the agent adds, and
-    since gaik 0.11.0 the PoC loads ``schemas/output_schema_model.json``
-    rather than the .py file, so a change to any of them changes what runs.
+    It covered Python files and ``schemas/`` only: an edit to a data file
+    run_poc.py reads, in the PoC tab's editor or by the agent, left a test
+    run and Gate 3's approval standing on a package that had changed.
     """
     names = set(_VERSION_FILES)
     for folder, dirs, files in os.walk(poc_dir):
@@ -983,8 +1014,7 @@ def _version_files(poc_dir: str) -> list[str]:
         for name in files:
             path = os.path.join(folder, name)
             relpath = os.path.normpath(os.path.join(rel, name))
-            in_schemas = relpath.split(os.sep, 1)[0] == "schemas"
-            if (name.endswith(".py") or in_schemas) and regular_file(path, poc_dir):
+            if _in_version(relpath.split(os.sep)) and regular_file(path, poc_dir):
                 names.add(relpath)
     return sorted(names)
 
@@ -1312,9 +1342,16 @@ def _package_file(poc_dir: str, relative: Any) -> tuple[str, str]:
 
 
 def package_file_read_only(normalised: str) -> str | None:
-    """Why the editor may not save this file, as an error code; None when it may."""
+    """Why the editor may not save this file, as an error code; None when it may.
+
+    Nor a file in a hidden folder or ``__pycache__``: those are outside the
+    package digest (``_in_version``), and every saved edit must count as a
+    change to the package a test run is tied to, but a README's.
+    """
     parts = normalised.split("/")
     if parts[-1] == AI_MARKER_NAME or parts[0] in _READ_ONLY_DIRS:
+        return "file_read_only"
+    if any(folder.startswith(".") or folder == "__pycache__" for folder in parts[:-1]):
         return "file_read_only"
     if parts[-1] != ENV_EXAMPLE_NAME and not parts[-1].lower().endswith(EDITABLE_SUFFIXES):
         return "file_type_not_editable"
@@ -1324,23 +1361,13 @@ def package_file_read_only(normalised: str) -> str | None:
 def counts_for_package_digest(normalised: str) -> bool:
     """Whether a change to this file changes the digest a test run is tied to.
 
-    By its name, what ``_version_files`` walks and the sessions router's
-    ``_approved_package_digest`` adds: the files a preflight reads by name,
-    every Python file of the package and every file in ``schemas/`` (outside
-    the run's own folders, hidden folders and ``__pycache__``), and the
-    prompts. A README or ``.env.example`` is none of them.
+    By its name, the rule ``_version_files`` walks by (``_in_version``): every
+    file of the package but a README outside ``prompts/`` and what is not part
+    of the package. So every file the editor saves but a README does.
     """
-    parts = normalised.split("/")
-    folders = parts[:-1]
     if normalised in {name.replace(os.sep, "/") for name in _VERSION_FILES}:
         return True
-    if folders and folders[0] == _PROMPTS:
-        return True
-    if folders and folders[0] in _RUN_FOLDERS:
-        return False
-    if any(folder.startswith(".") or folder == "__pycache__" for folder in folders):
-        return False
-    return parts[-1].endswith(".py") or bool(folders and folders[0] == "schemas")
+    return _in_version(normalised.split("/"))
 
 
 def content_digest(data: bytes) -> str:
@@ -1431,7 +1458,9 @@ def write_package_file(
             "the file was changed after you opened it; open it again to see the new version",
         )
     mode = os.stat(target).st_mode & 0o777
-    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(target), prefix=".edit-", suffix=".tmp")
+    fd, temporary = tempfile.mkstemp(
+        dir=os.path.dirname(target), prefix=_EDIT_TEMP_PREFIX, suffix=_EDIT_TEMP_SUFFIX
+    )
     try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)

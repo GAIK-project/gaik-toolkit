@@ -175,7 +175,7 @@ test.describe("PoC file editor", () => {
       .not.toBe(await content.evaluate((el) => getComputedStyle(el).color));
     // What a save sets off is said before it: this file is one the test run is tied to.
     await expect(editor.getByTestId("poc-file-note")).toHaveText(
-      "Tallennuksen jälkeen paketti tarkistetaan ja testataan uudelleen.",
+      "Tallennus muuttaa pakettia: se tarkistetaan uudelleen, eikä aiempi testiajo enää päde.",
     );
     const save = editor.getByTestId("poc-file-save");
     await expect(save).toBeDisabled();

@@ -570,7 +570,7 @@ export type Dict = {
   pocFileConflictReload: string;
   pocFileWizardBusy: string;
   pocFileSaveFailed: string;
-  /** What saving a file the test run is tied to sets off: before Gate 3, and after it. */
+  /** What saving a file the test run is tied to (every file but a README) sets off: before Gate 3, and after it. */
   pocFileRetest: string;
   pocFileReopens: string;
   // ==== the .env form beside the deployable package ====
@@ -1304,7 +1304,7 @@ const fi: Dict = {
   pocFileConflictReload: "Avaa uusi versio",
   pocFileWizardBusy: "Wizard vastaa vielä ja voi muuttaa pakettia. Tallenna uudelleen, kun vastaus on valmis.",
   pocFileSaveFailed: "Tallennus ei onnistunut. Yritä uudelleen.",
-  pocFileRetest: "Tallennuksen jälkeen paketti tarkistetaan ja testataan uudelleen.",
+  pocFileRetest: "Tallennus muuttaa pakettia: se tarkistetaan uudelleen, eikä aiempi testiajo enää päde.",
   pocFileReopens:
     "Tallennus avaa portin 3 uudelleen: paketti testataan ja hyväksytään uudestaan ennen käyttöönottoa.",
   pocEnvTitle: "Ympäristömuuttujat (.env)",
@@ -2111,7 +2111,7 @@ const en: Dict = {
   pocFileConflictReload: "Open the new version",
   pocFileWizardBusy: "The wizard is still replying and may change the package. Save again when the reply is done.",
   pocFileSaveFailed: "The file could not be saved. Try again.",
-  pocFileRetest: "After a save the package is checked and tested again.",
+  pocFileRetest: "Saving changes the package: it is checked again, and an earlier test run no longer counts.",
   pocFileReopens: "Saving reopens Gate 3: the package is tested and approved again before it is taken into use.",
   pocEnvTitle: "Environment variables (.env)",
   pocEnvNote:

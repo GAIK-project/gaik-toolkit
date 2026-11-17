@@ -15,7 +15,13 @@ import {
 } from "./wizard-state-machine";
 import { REQUIREMENT_POINTS, openingQuestion } from "./requirements-model";
 import type { TargetOutputSpec } from "./target-output-spec";
-import { MAX_POC_FILE_BYTES, isSecretEnvName, pocFileReadOnly, utf8Bytes } from "./poc-file";
+import {
+  MAX_POC_FILE_BYTES,
+  isSecretEnvName,
+  pocFileAffectsPackage,
+  pocFileReadOnly,
+  utf8Bytes,
+} from "./poc-file";
 
 // Re-export the state-machine structure so existing importers keep their path.
 export { GATE_STEPS, isGateStep };
@@ -803,8 +809,6 @@ function mockDigest(content: string): string {
   return `mock-${(hash >>> 0).toString(16).padStart(8, "0")}-${content.length}`;
 }
 
-const MOCK_DIGEST_FILES = ["run_poc.py", "config.yaml", "requirements.txt", "schemas/output_schema.py"];
-
 export type MockPocFileError = { status: number; error: string; message: string };
 
 function mockPocPath(path: string): string | MockPocFileError {
@@ -836,7 +840,7 @@ function mockPocFileAnswer(path: string, content: string) {
     bytes: utf8Bytes(content),
     editable: reason === null,
     read_only_reason: reason,
-    affects_package: MOCK_DIGEST_FILES.includes(path),
+    affects_package: pocFileAffectsPackage(path),
   };
 }
 

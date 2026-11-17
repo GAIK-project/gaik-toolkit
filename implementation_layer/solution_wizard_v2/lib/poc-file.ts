@@ -96,15 +96,34 @@ export function isSecretEnvName(path: string): boolean {
   return name.startsWith(".env") || name.endsWith(".env");
 }
 
-/** Why the editor may not save `path` (relative to `poc/`), as wizard_api's code; null when it may. */
+const outsideDigest = (folder: string) => folder.startsWith(".") || folder === "__pycache__";
+
+/**
+ * Why the editor may not save `path` (relative to `poc/`), as wizard_api's code; null when it may.
+ * Nor in a hidden folder or `__pycache__`: those are outside the package digest.
+ */
 export function pocFileReadOnly(path: string): "file_read_only" | "file_type_not_editable" | null {
   const parts = path.split("/");
   const name = parts[parts.length - 1];
   if (name === AI_MARKER_NAME || READ_ONLY_DIRS.includes(parts[0])) return "file_read_only";
+  if (parts.slice(0, -1).some(outsideDigest)) return "file_read_only";
   if (name !== ENV_EXAMPLE_NAME && !POC_EDITABLE_SUFFIXES.some((s) => name.toLowerCase().endsWith(s))) {
     return "file_type_not_editable";
   }
   return null;
+}
+
+/**
+ * Whether saving `path` changes the package a test run is tied to, as wizard_api
+ * says it (`poc_service.counts_for_package_digest`), for the mock store: every
+ * file the editor saves but a README outside `prompts/`.
+ */
+export function pocFileAffectsPackage(path: string): boolean {
+  const parts = path.split("/");
+  const name = parts[parts.length - 1];
+  if (READ_ONLY_DIRS.includes(parts[0]) || parts.slice(0, -1).some(outsideDigest)) return false;
+  if (name === AI_MARKER_NAME || isSecretEnvName(name)) return false;
+  return !(name.toLowerCase() === "readme.md" && parts[0] !== "prompts");
 }
 
 export type EditorLanguage =

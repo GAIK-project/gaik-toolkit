@@ -140,7 +140,8 @@ def test_an_environment_file_with_keys_is_not_kept(tmp_path, path) -> None:
 def test_the_list_of_variables_is_edited_like_any_text_file(tmp_path) -> None:
     poc = _package(tmp_path)
     read = poc_service.read_package_file(poc, ".env.example")
-    assert read["editable"] is True and read["affects_package"] is False
+    # A run reads its settings by these names: a change is a change to the package.
+    assert read["editable"] is True and read["affects_package"] is True
 
     added = ENV_EXAMPLE + "# Web search\nTAVILY_API_KEY=\n"
     saved = poc_service.write_package_file(poc, ".env.example", added, read["digest"])
@@ -260,12 +261,45 @@ def test_the_wizards_own_records_are_not_files_of_the_package(tmp_path) -> None:
     assert _refusal(lambda: poc_service.read_package_file(poc, hidden)).status == 404
 
 
-def test_which_files_a_test_run_is_tied_to() -> None:
-    assert poc_service.counts_for_package_digest("run_poc.py")
-    assert poc_service.counts_for_package_digest("schemas/output_schema.py")
+def test_every_file_the_editor_saves_but_a_readme_is_one_a_test_run_is_tied_to(tmp_path) -> None:
+    poc = _package(tmp_path)
+    for name in ("labels.json", "settings.toml", "notes.txt", "ui/page.html", "templates/a.md"):
+        os.makedirs(os.path.dirname(os.path.join(poc, name)) or poc, exist_ok=True)
+        with open(os.path.join(poc, name), "w", encoding="utf-8") as fh:
+            fh.write("x\n")
+
+    editable = [
+        path
+        for path in poc_service.package_files(poc)
+        if poc_service.package_file_read_only(path.replace(os.sep, "/")) is None
+    ]
+
+    assert len(editable) >= 9
+    for path in editable:
+        posix = path.replace(os.sep, "/")
+        counts = poc_service.counts_for_package_digest(posix)
+        assert counts is (posix.rsplit("/", 1)[-1].lower() != "readme.md"), posix
     assert poc_service.counts_for_package_digest("prompts/extract.md")
     assert not poc_service.counts_for_package_digest("README.md")
-    assert not poc_service.counts_for_package_digest(".env.example")
+
+
+def test_a_file_in_a_hidden_folder_is_shown_but_not_saved(tmp_path) -> None:
+    """Hidden folders are outside the digest, so a save there would be an edit no test
+    run is tied to: such a file is read-only in the editor."""
+    poc = _package(tmp_path)
+    os.makedirs(os.path.join(poc, ".streamlit"))
+    with open(os.path.join(poc, ".streamlit", "config.toml"), "w", encoding="utf-8") as fh:
+        fh.write("[server]\n")
+
+    read = poc_service.read_package_file(poc, ".streamlit/config.toml")
+    refused = _refusal(
+        lambda: poc_service.write_package_file(
+            poc, ".streamlit/config.toml", "[theme]\n", read["digest"]
+        )
+    )
+
+    assert (read["editable"], read["read_only_reason"]) == (False, "file_read_only")
+    assert (refused.status, refused.code) == (403, "file_read_only")
 
 
 # --- the server line -----------------------------------------------------------
@@ -354,15 +388,19 @@ def test_a_file_is_read_and_saved_over_the_api(client) -> None:
 
 
 @requires_postgres
-def test_a_file_outside_the_digest_leaves_the_package_as_tested(client) -> None:
+def test_a_readme_leaves_the_package_as_tested_and_the_list_of_variables_does_not(client) -> None:
     sid = _session_with_package(client)["id"]
     before = client.get(f"/sessions/{sid}/poc/files").json()["package_digest"]
-    read = _file(client, sid, ".env.example").json()
+    readme = _file(client, sid, "README.md").json()
 
-    saved = _save(client, sid, ".env.example", ENV_EXAMPLE + "TAVILY_API_KEY=\n", read["digest"])
+    saved = _save(client, sid, "README.md", "# PoC, edited\n", readme["digest"])
 
     assert saved.status_code == 200
     assert saved.json()["package_digest"] == before
+    read = _file(client, sid, ".env.example").json()
+    saved = _save(client, sid, ".env.example", ENV_EXAMPLE + "TAVILY_API_KEY=\n", read["digest"])
+    assert saved.status_code == 200
+    assert saved.json()["package_digest"] != before
 
 
 @requires_postgres
@@ -575,17 +613,29 @@ def test_an_edit_to_the_accepted_package_reopens_gate_3_like_the_agents_change(
 
 
 @requires_postgres
-def test_an_edit_outside_what_was_tested_keeps_the_approval(client, db_session) -> None:
+def test_an_edit_to_the_readme_keeps_the_approval(client, db_session) -> None:
     sid = _session_past_gate_3(client, db_session)["id"]
-    read = _file(client, sid, ".env.example").json()
+    read = _file(client, sid, "README.md").json()
 
-    saved = _save(client, sid, ".env.example", ENV_EXAMPLE + "TAVILY_API_KEY=\n", read["digest"])
+    saved = _save(client, sid, "README.md", "# PoC\n\nHow to run it.\n", read["digest"])
 
     assert saved.status_code == 200
     assert saved.json()["gate_reopened"] is None
     detail = client.get(f"/sessions/{sid}").json()
     assert detail["gate_statuses"]["gate_3"] == "approved"
     assert detail["metadata"]["last_successful_run"] == "run-1"
+
+
+@requires_postgres
+def test_an_edit_to_the_list_of_variables_reopens_gate_3(client, db_session) -> None:
+    sid = _session_past_gate_3(client, db_session)["id"]
+    read = _file(client, sid, ".env.example").json()
+
+    saved = _save(client, sid, ".env.example", ENV_EXAMPLE + "TAVILY_API_KEY=\n", read["digest"])
+
+    assert saved.status_code == 200
+    assert saved.json()["gate_reopened"] == "gate_3"
+    assert client.get(f"/sessions/{sid}").json()["gate_statuses"]["gate_3"] == "pending"
 
 
 # --- the deployable package is the one the test run tested ----------------------
@@ -655,19 +705,28 @@ def test_the_agents_change_after_the_run_closes_the_download_too(client, db_sess
 
 
 @requires_postgres
-def test_an_edit_outside_the_digest_leaves_the_download_open(client, db_session) -> None:
+def test_an_edit_to_the_readme_leaves_the_download_open(client, db_session) -> None:
     sid = _tested_session(client, db_session, "outside")["id"]
-    for path, content in (
-        (".env.example", ENV_EXAMPLE + "TAVILY_API_KEY=\n"),
-        ("README.md", "# New\n"),
-    ):
-        digest = _file(client, sid, path).json()["digest"]
-        assert _save(client, sid, path, content, digest).status_code == 200
+    digest = _file(client, sid, "README.md").json()["digest"]
+    assert _save(client, sid, "README.md", "# New\n", digest).status_code == 200
 
     got = client.get(f"/sessions/{sid}/poc/deployable")
 
     assert got.status_code == 200
     assert got.headers["content-type"] == "application/zip"
+
+
+@requires_postgres
+def test_an_edit_to_the_list_of_variables_closes_the_download(client, db_session) -> None:
+    sid = _tested_session(client, db_session, "variables")["id"]
+    digest = _file(client, sid, ".env.example").json()["digest"]
+    saved = _save(client, sid, ".env.example", ENV_EXAMPLE + "TAVILY_API_KEY=\n", digest)
+    assert saved.status_code == 200
+
+    refused = client.get(f"/sessions/{sid}/poc/deployable")
+
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["error"] == "package_changed_since_run"
 
 
 @requires_postgres
