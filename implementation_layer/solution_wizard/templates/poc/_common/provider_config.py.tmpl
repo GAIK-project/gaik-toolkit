@@ -1,4 +1,5 @@
-"""Load independent provider credentials and settings for each PoC stage."""
+"""Load independent provider credentials and settings for each PoC stage, and check
+the package and keys of a service outside GAIK (external_service)."""
 
 import os
 
@@ -145,3 +146,31 @@ def transcription_response_format(api_config: dict, wanted: str = "srt") -> str:
         )
         return "text"
     return wanted
+
+
+def external_service(name: str, module: str, env_vars: tuple = ()):
+    """The package of a service outside GAIK, or None when its step is to be skipped.
+
+    A step that calls a third-party API or framework (README, "External services")
+    imports its package here, never with an import statement of its own: where the
+    package is not installed or one of its variables in .env is empty -- as in the
+    wizard's test run, which installs nothing and holds only the model provider's key --
+    this prints one SKIPPED line and returns None. The step then uses its fallback and
+    the run goes on with the GAIK steps. Read only the service's own variables, never a
+    model provider's key.
+    """
+    import importlib
+
+    problems = []
+    try:
+        package = importlib.import_module(module)
+    except ImportError:
+        package = None
+        problems.append(f"package {module!r} is not installed (pip install -r requirements.txt)")
+    missing = [var for var in env_vars if not os.environ.get(var, "").strip()]
+    if missing:
+        problems.append(f"{', '.join(missing)} not set in .env")
+    if problems:
+        print(f"SKIPPED {name}: {'; '.join(problems)}. The run goes on without it.")
+        return None
+    return package

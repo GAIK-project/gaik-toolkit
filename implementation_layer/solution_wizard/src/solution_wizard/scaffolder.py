@@ -24,8 +24,8 @@ import string
 from pathlib import Path
 from typing import Any
 
-from .blueprint import Blueprint
-from .docs_generator import md_text
+from .blueprint import Blueprint, external_services
+from .docs_generator import external_services_block, md_text
 from .registry import get_registry
 from .schema_designer import nested_row_fields, write_extraction_requirements, write_schema_files
 
@@ -1037,6 +1037,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         "component_imports_placeholder": "\n".join(import_lines),
         "input_instructions": _input_instructions(bc),
         "output_instructions": _output_instructions(bc),
+        # technical_spec.external_services: their keys in .env.example, and the README section
+        "external_services_env": _external_services_env(bc),
+        "external_services_readme": _external_services_readme(bc),
         # _generic template extras
         "generic_pipeline_skeleton": _build_generic_pipeline_skeleton(bc),
         "generic_input_loaders": _build_input_loaders(bc),
@@ -1101,9 +1104,72 @@ def _output_instructions(bp: Blueprint) -> str:
     return f"Results written to `output/<input_stem>{suffix}`."
 
 
+def _comment_text(value: Any, limit: int = 200) -> str:
+    """Text for one comment line of a generated file: no line break or control character."""
+    text = " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", str(value)).split())
+    return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
+
+
+def _external_services_env(blueprint: Blueprint) -> str:
+    """The .env.example lines of the external services: each one's own variables,
+    empty, under a comment naming the service and what it is for. A name two services
+    share is written once."""
+    written: set[str] = set()
+    blocks: list[str] = []
+    for service in external_services(blueprint):
+        names = [name for name in service.env_vars if name not in written]
+        if not names:
+            continue
+        written.update(names)
+        comment = _comment_text(f"{service.name}: {service.purpose}")
+        blocks.append(f"# {comment}\n" + "\n".join(f"{name}=" for name in names))
+    if not blocks:
+        return ""
+    return (
+        "\n# --- External services (outside GAIK) ---\n"
+        "# Without its key the PoC skips the step, says so in its log, and runs the rest.\n"
+        + "\n\n".join(blocks)
+        + "\n"
+    )
+
+
+def _external_services_readme(blueprint: Blueprint) -> str:
+    """The README section on the external services, or "" when the blueprint has none."""
+    block = external_services_block(blueprint)
+    if not block:
+        return ""
+    return (
+        "## External services\n\n"
+        "Some steps use a service outside GAIK, with its own account and key in `.env`. "
+        "Without the key or the package, the PoC skips the step, says so in its log "
+        "(`SKIPPED <service>: ...`), and runs the GAIK steps; a test run without them "
+        "shows those lines.\n\n" + block + "\n\n---\n"
+    )
+
+
 # ---------------------------------------------------------------------------
 # File generators
 # ---------------------------------------------------------------------------
+
+
+def _requirement_name(line: str) -> str:
+    """The normalised project name of a requirement line (PEP 503)."""
+    match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", line)
+    return re.sub(r"[-_.]+", "-", match.group(0)).lower() if match else line
+
+
+def _external_requirements(blueprint: Blueprint, lines: list[str]) -> list[str]:
+    """The external services' packages that ``lines`` does not already name."""
+    seen = {_requirement_name(line) for line in lines}
+    added: list[str] = []
+    for service in external_services(blueprint):
+        package = service.python_package
+        if package and _requirement_name(package) not in seen:
+            seen.add(_requirement_name(package))
+            added.append(package)
+    if not added:
+        return []
+    return ["# Packages of the external services (README, External services)", *added]
 
 
 def _write_requirements_txt(blueprint: Blueprint, poc_dir: Path) -> None:
@@ -1126,6 +1192,8 @@ def _write_requirements_txt(blueprint: Blueprint, poc_dir: Path) -> None:
     lines.append("pyyaml")
     if _wants_pdf(blueprint):
         lines.append("reportlab>=4.0")
+    # After the gaik lines: a third-party package never replaces a gaik requirement.
+    lines.extend(_external_requirements(blueprint, lines))
     (poc_dir / "requirements.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
