@@ -27,7 +27,11 @@ export function StepsDisclosure({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1 rounded text-xs text-text-muted hover:text-text"
+        // The way to the stages on a phone: a button with an edge, not a
+        // line of grey text. Small beside the title, pressed from 44 px:
+        // pointer-coarse:min-h-7 overrides btn-inline's touch min-h-11, and
+        // hit-area gives the 44 px around it.
+        className="btn-inline hit-area min-h-7 gap-1 px-2 py-0.5 font-normal pointer-coarse:min-h-7"
         data-testid="steps-disclosure"
       >
         {summary}

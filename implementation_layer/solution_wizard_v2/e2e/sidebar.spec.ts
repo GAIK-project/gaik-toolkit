@@ -43,6 +43,8 @@ test.describe("the sidebar on a desktop", () => {
     const atGate = card(page, "Gate 2 — pending review");
     await expect(standing(atGate)).toHaveText("Odottaa hyväksyntää");
     await expect(standing(atGate)).toBeVisible();
+    // In the row's own grey, not the blue of a link: the row is the link.
+    await expect(standing(atGate)).toHaveCSS("color", "rgb(51, 61, 79)");
     await expect(atGate).toContainText("Vaihe 9/13");
     await expect(atGate).not.toContainText("Gate 2: ratkaisun rakenne");
     await expect(gates(atGate).locator("span")).toHaveCount(4);

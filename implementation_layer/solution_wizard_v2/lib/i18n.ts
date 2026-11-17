@@ -189,6 +189,8 @@ export type Dict = {
   /** "{name}": the step's name. */
   stepChatAsk: string;
   stepChatButton: string;
+  /** The same button in a narrow list of steps; its full name is stepChatAsk. */
+  stepChatShort: string;
   /** "{n}", "{name}": the chip above the chat's input. */
   stepChatLabel: string;
   /** "{n}", "{id}", "{name}": the line the message to the wizard starts with. */
@@ -564,6 +566,9 @@ export type Dict = {
   approving: string;
   gate1ChecklistTitle: string;
   gate1Answered: string;
+  /** A requirement point's status, read out beside its number or its tick. */
+  pointAnswered: string;
+  pointOpen: string;
   bcNotKnown: string;
   gateApprovedWake: string;
   noticeAgentBusy: string;
@@ -635,9 +640,11 @@ export type Dict = {
   /** Answer fields under a round of questions in the chat. */
   chatQuestions: {
     open: string;
+    title: string;
     send: string;
     close: string;
     placeholder: string;
+    placeholderOther: string;
     skipButton: string;
     skipped: string;
     skipHint: string;
@@ -902,6 +909,7 @@ const fi: Dict = {
   flowViewList: "Lista",
   stepChatAsk: "Pyydä wizardia muuttamaan vaihetta {name}",
   stepChatButton: "Muuta chatissa",
+  stepChatShort: "Muuta",
   stepChatLabel: "Vaihe {n} · {name}",
   stepChatPrefix: 'Koskee prosessin vaihetta {n} (id {id}), lainattuna: "{name}"',
   formUnsavedStepName: "Ei tallennettu: anna vaiheelle nimi",
@@ -1245,6 +1253,8 @@ const fi: Dict = {
   approving: "Hyväksytään…",
   gate1ChecklistTitle: "Kerätyt vaatimukset",
   gate1Answered: "kohtaa vastattu",
+  pointAnswered: "Vastattu",
+  pointOpen: "Vastaamatta",
   bcNotKnown: "Ei vielä tiedossa",
   gateApprovedWake: "Gate {n} hyväksytty paneelista, jatka.",
   noticeAgentBusy: "Wizard työskentelee vielä tässä vaiheessa. Odota sen vastausta chatissa ja yritä sitten uudelleen.",
@@ -1324,9 +1334,11 @@ const fi: Dict = {
   hideChat: "Piilota keskustelu",
   chatQuestions: {
     open: "Vastaa kysymyksiin yksitellen ({count})",
+    title: "Vastaa tässä",
     send: "Lähetä vastaukset",
     close: "Sulje",
     placeholder: "Vastaus",
+    placeholderOther: "Tai kirjoita oma vastaus",
     skipButton: "Ohita",
     skipped: "Ohitettu",
     skipHint: "Tyhjät lähtevät ohitettuina.",
@@ -1666,6 +1678,7 @@ const en: Dict = {
   flowViewList: "List",
   stepChatAsk: "Ask the wizard to change step {name}",
   stepChatButton: "Change in chat",
+  stepChatShort: "Change",
   stepChatLabel: "Step {n} · {name}",
   stepChatPrefix: 'About process step {n} (id {id}), quoted: "{name}"',
   formUnsavedStepName: "Not saved: give the step a name",
@@ -2008,6 +2021,8 @@ const en: Dict = {
   approving: "Approving…",
   gate1ChecklistTitle: "Gathered requirements",
   gate1Answered: "points answered",
+  pointAnswered: "Answered",
+  pointOpen: "Not answered",
   bcNotKnown: "Not known yet",
   gateApprovedWake: "Gate {n} approved in the panel, continue.",
   noticeAgentBusy: "The wizard is still working on this step. Wait for its reply in the chat, then try again.",
@@ -2087,9 +2102,11 @@ const en: Dict = {
   hideChat: "Hide chat",
   chatQuestions: {
     open: "Answer the questions one by one ({count})",
+    title: "Answer here",
     send: "Send answers",
     close: "Close",
     placeholder: "Answer",
+    placeholderOther: "Or write your own answer",
     skipButton: "Skip",
     skipped: "Skipped",
     skipHint: "Empty ones are sent as skipped.",

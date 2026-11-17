@@ -23,8 +23,8 @@ export type ChangeInPlaceLabels = {
 };
 
 /**
- * One item on the page (an assumption, a business-context item) with a quiet
- * control that is always in view, also on a touch screen. It opens a field
+ * One item on the page (an assumption, a business-context item) with a small
+ * button that is always in view, also on a touch screen. It opens a field
  * under the item; what the user writes there goes to the wizard as a chat turn
  * that starts with `prefix`, the line naming the item, exactly as a reference
  * typed under in the chat would. The item is corrected where it is read.
@@ -111,7 +111,8 @@ export function ChangeInPlace({
           setPicked(choices?.selected ?? []);
           setOpen(true);
         }}
-        className="inline-flex shrink-0 items-center gap-1 rounded text-xs font-medium text-text-muted transition-colors duration-150 hover:text-text"
+        // A button with an edge: grey text alone did not say it can be pressed.
+        className="btn-inline"
       >
         <Icon name={add ? "plus" : "pencil"} size={13} />
         {labels.change}

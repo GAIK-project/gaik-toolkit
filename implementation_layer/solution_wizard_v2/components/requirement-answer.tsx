@@ -30,7 +30,7 @@ export function RequirementAnswer({
   number: number;
   question: string;
   labels: RequirementAnswerLabels;
-  /** The first point without an answer: its button is always in view. */
+  /** The first point without an answer: its button is the marked one. */
   next?: boolean;
 }) {
   const n = String(number);
@@ -46,11 +46,8 @@ export function RequirementAnswer({
       }
       aria-label={`${labels.ask}: ${question}`}
       data-testid={`requirement-ask-${number}`}
-      className={`mt-1 inline-flex shrink-0 items-center gap-1 rounded text-xs font-medium text-brand-text transition-opacity duration-150 ease-out hover:underline sm:mt-0.5 ${
-        next
-          ? ""
-          : "sm:pointer-fine:opacity-0 sm:pointer-fine:group-hover/point:opacity-100 sm:pointer-fine:group-focus-within/point:opacity-100"
-      }`}
+      data-tone={next ? "brand" : "quiet"}
+      className="btn-inline mt-1.5 sm:mt-0"
     >
       <Icon name="messageSquareText" size={13} />
       {labels.ask}

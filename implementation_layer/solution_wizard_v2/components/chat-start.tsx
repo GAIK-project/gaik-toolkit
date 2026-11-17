@@ -33,16 +33,6 @@ import { Icon, type IconName } from "./icons";
  * both starts behave alike.
  */
 
-// A chip that puts words into a field and shows whether they are there.
-export function chipClass(on: boolean): string {
-  // Taller under a finger than under a mouse pointer.
-  return `inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-[background-color,border-color,color,transform] duration-150 ease-out active:scale-[0.97] pointer-coarse:py-2 ${
-    on
-      ? "border-brand-soft-border bg-brand-soft text-brand-text"
-      : "border-border-strong text-text-secondary hover:border-brand hover:text-brand-text"
-  }`;
-}
-
 /** When a choice's label gives way to its icon: the width of the tools row it
  *  stands in (components/composer-card), where the two choices and the send
  *  button share one line. The longer label goes first. */
@@ -152,9 +142,9 @@ function ChoiceMenu<T extends string>({
           e.preventDefault();
           show();
         }}
-        className={`inline-flex max-w-full items-center gap-1.5 rounded-full border border-border-strong px-2.5 py-1 text-xs font-medium transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:text-brand-text active:scale-[0.97] pointer-coarse:py-1.5 ${
-          open ? "border-brand bg-brand-soft text-brand-text" : current ? "text-text" : "text-text-secondary"
-        }`}
+        // A chip (globals.css) that opens a menu: filled while the menu is open.
+        className="chip px-2.5"
+        data-empty={current ? undefined : ""}
       >
         <Icon name={current?.icon ?? options[0].icon} size={14} className="shrink-0" />
         <span className={`min-w-0 truncate ${LABEL_HIDDEN[compact]}`}>{current?.label ?? name}</span>
@@ -348,9 +338,10 @@ export function ExampleChips({
             aria-pressed={on}
             title={example.prompt}
             onClick={() => onChoose(i)}
-            className={chipClass(on)}
+            // A chip that puts words into the field and shows whether they are there.
+            className="chip"
           >
-            <Icon name={on ? "check" : (EXAMPLE_ICONS[i] ?? "fileText")} size={12} />
+            <Icon name={on ? "check" : (EXAMPLE_ICONS[i] ?? "fileText")} size={13} className="shrink-0" />
             {example.title}
           </button>
         );

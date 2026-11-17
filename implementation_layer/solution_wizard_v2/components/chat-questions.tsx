@@ -2,16 +2,19 @@
 
 import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { answersMessage, type AnswerTemplate, type Question } from "@/lib/chat-questions";
-import { chipClass } from "./chat-start";
 import { useGrowingField } from "./composer-card";
 import { Icon } from "./icons";
 
 export type ChatQuestionLabels = AnswerTemplate & {
   /** The button under a message with several questions; "{count}" is filled in. */
   open: string;
+  /** The form's heading: this is where the round is answered. */
+  title: string;
   send: string;
   close: string;
   placeholder: string;
+  /** The field's words under a question that offers options. */
+  placeholderOther: string;
   /** The button beside a question that skips it, and what its field then says. */
   skipButton: string;
   skipped: string;
@@ -38,6 +41,11 @@ export type ChatQuestionLabels = AnswerTemplate & {
  * it lists) and the field in one column, with Skip beside the field. A field
  * is one line tall until it is written in, so a round of four questions does
  * not fill the screen.
+ *
+ * The wizard's message above stays as it wrote it, options and all: it is the
+ * record of what was asked. The form is set apart from it as the place to
+ * answer: a heading, and each option a choice (globals.css) right under its
+ * question, marked when it is the answer.
  */
 export function ChatQuestions({
   questions,
@@ -82,7 +90,7 @@ export function ChatQuestions({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-2 inline-flex items-center gap-1.5 rounded text-xs font-medium text-brand-text hover:underline"
+        className="btn-inline mt-2"
         data-testid="chat-questions-open"
       >
         <Icon name="listChecks" size={14} />
@@ -122,13 +130,21 @@ export function ChatQuestions({
 
   return (
     <form
-      className={`mt-3 flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 ${entering ? "reveal-in" : ""}`}
+      className={`mt-3 flex flex-col gap-3 rounded-xl border border-brand-soft-border bg-surface p-3 shadow-sm ${entering ? "reveal-in" : ""}`}
       data-testid="chat-questions"
+      aria-labelledby={`${baseId}-title`}
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
       }}
     >
+      <p
+        id={`${baseId}-title`}
+        className="flex items-center gap-1.5 text-xs font-semibold text-brand-text"
+      >
+        <Icon name="listChecks" size={14} className="shrink-0" />
+        {labels.title}
+      </p>
       <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
         {questions.map((question, i) => (
           <li
@@ -179,9 +195,12 @@ export function ChatQuestions({
                       aria-pressed={on}
                       disabled={sending}
                       onClick={() => choose(i, option)}
-                      className={`${chipClass(on)} max-w-full text-left`}
+                      className="choice"
                     >
-                      {on && <Icon name="check" size={12} className="shrink-0" />}
+                      {/* Empty until the option is the answer, then ticked. */}
+                      <span className="choice-mark" aria-hidden>
+                        <Icon name="check" size={11} strokeWidth={3} />
+                      </span>
                       <span className="min-w-0 [overflow-wrap:anywhere]">{option}</span>
                     </button>
                   );
@@ -202,7 +221,9 @@ export function ChatQuestions({
                   void submit();
                 }
               }}
-              placeholder={skipped[i] ? labels.skipped : labels.placeholder}
+              placeholder={
+                skipped[i] ? labels.skipped : question.options ? labels.placeholderOther : labels.placeholder
+              }
               readOnly={sending}
               disabled={skipped[i]}
             />
@@ -215,13 +236,9 @@ export function ChatQuestions({
               disabled={sending}
               onClick={() => setSkipped((prev) => prev.map((s, j) => (j === i ? !s : s)))}
               data-testid={`chat-question-skip-${i}`}
-              // A quiet text button, as tall as the one-line field beside it;
-              // pressed, it is filled and ticked.
-              className={`col-start-3 inline-flex h-[2.125rem] items-center gap-1 self-start rounded-md px-2 text-xs transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 ${
-                skipped[i]
-                  ? "bg-brand-soft font-medium text-brand-text"
-                  : "text-text-muted hover:bg-surface-muted hover:text-text"
-              }`}
+              // A button of its own beside the field, as tall as the field's
+              // one line; pressed, it is filled and ticked (aria-pressed).
+              className="btn-inline col-start-3 min-h-[2.125rem] self-start pointer-coarse:min-h-11"
             >
               {skipped[i] && <Icon name="check" size={12} />}
               {labels.skipButton}
@@ -247,7 +264,7 @@ export function ChatQuestions({
         </button>
         <button
           type="button"
-          className="btn-ghost px-3 py-1.5 text-xs"
+          className="btn-secondary px-3 py-1.5 text-xs"
           disabled={sending}
           onClick={() => setOpen(false)}
         >

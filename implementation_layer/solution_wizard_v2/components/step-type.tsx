@@ -83,7 +83,7 @@ export function AskStepButton({
   index: number;
   t: Dict;
   className?: string;
-  /** Show "Muuta chatissa" next to the icon (the diagram's properties). */
+  /** Say "Muuta chatissa" in full (the diagram's properties); else the short "Muuta". */
   withLabel?: boolean;
   testId?: string;
 }) {
@@ -91,13 +91,11 @@ export function AskStepButton({
   return (
     <button
       type="button"
-      className={
-        withLabel
-          ? `inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-brand-text transition-colors hover:bg-brand-soft ${className}`
-          : `icon-btn hover:text-brand-text ${className}`
-      }
-      // The icon alone says nothing, so it is named; a visible label names itself.
-      aria-label={withLabel ? undefined : label}
+      // One button wherever a step is listed. In a narrow list it says
+      // "Change" and is named in full; where there is room it says it all.
+      className={`btn-inline ${className}`}
+      // The name starts with the word on the button, so "click Muuta" by voice finds it.
+      aria-label={withLabel ? undefined : `${t.stepChatShort}: ${label}`}
       title={label}
       onClick={(e) => {
         e.stopPropagation();
@@ -105,8 +103,8 @@ export function AskStepButton({
       }}
       data-testid={testId}
     >
-      <Icon name="messageSquareText" size={withLabel ? 14 : 16} />
-      {withLabel && t.stepChatButton}
+      <Icon name="messageSquareText" size={14} />
+      {withLabel ? t.stepChatButton : <span aria-hidden>{t.stepChatShort}</span>}
     </button>
   );
 }

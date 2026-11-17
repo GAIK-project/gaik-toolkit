@@ -149,6 +149,35 @@ test.describe("the chat composer", () => {
     await expect(chip(page)).toHaveCount(0);
   });
 
+  test("every open point has its button in view, and a point's mark is not a control", async ({ page }) => {
+    await newSession(page);
+    const list = page.getByRole("list").filter({ has: page.getByTestId("requirement-ask-1") });
+    const rows = list.getByRole("listitem");
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(5);
+
+    // A button on every row, without the pointer over it; the point the
+    // wizard is on has the marked one.
+    for (const n of [1, 2, count]) {
+      const button = page.getByTestId(`requirement-ask-${n}`);
+      await expect(button).toBeVisible();
+      await expect(button).toHaveCSS("opacity", "1");
+      await expect(button).toHaveCSS("border-top-width", "1px");
+      await expect(button).toHaveCSS("cursor", "pointer");
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+      await expect(button).toHaveText("Vastaa chatissa");
+    }
+    await expect(page.getByTestId("requirement-ask-1")).toHaveAttribute("data-tone", "brand");
+    await expect(page.getByTestId("requirement-ask-2")).toHaveAttribute("data-tone", "quiet");
+
+    // The mark at the start of a row is the point's number and its status in
+    // words: no ring that reads as a radio button, and nothing to press.
+    const mark = rows.nth(1).getByTestId("point-mark");
+    await expect(mark).toHaveText("2.Vastaamatta");
+    await expect(mark.locator("svg")).toHaveCount(0);
+    await expect(mark.getByRole("button")).toHaveCount(0);
+  });
+
   test("an answer the wizard was too busy to take comes back with its chip", async ({ page }) => {
     await newSession(page);
     await page.route("**/api/sessions/*/chat", (route) =>
