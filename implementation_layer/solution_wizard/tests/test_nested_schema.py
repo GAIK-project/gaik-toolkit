@@ -20,6 +20,7 @@ from solution_wizard.schema_designer import (  # noqa: E402
     _model_from_spec,
     build_pydantic_model,
     build_requirements_json,
+    build_requirements_text,
     write_schema_files,
 )
 
@@ -292,3 +293,45 @@ def test_gaik_loads_the_written_schema_of_a_nested_spec(tmp_path):
     model, requirements = loaded
     assert model.model_json_schema() == _model(spec)["PurchaseOrder"].model_json_schema()
     assert requirements.children[0].container_name == "line_items"
+
+
+def test_the_extraction_prompt_lists_the_row_fields():
+    """The prompt is sent with the schema and a schema is regenerated from it: a list
+    of rows described as one string field contradicts both."""
+    text = build_requirements_text(PO_SPEC)
+
+    assert "line_items (list of rows, REQUIRED): One entry per order line. Each row has:" in text
+    assert "   - quantity (int, REQUIRED)" in text
+    assert "   - article_code (string, OPTIONAL)" in text
+    assert "line_items (string" not in text
+
+
+def test_a_flat_prompt_is_written_as_before():
+    spec = dict(
+        FLAT_SPEC,
+        field_types={"severity": "enum"},
+        field_descriptions={"location": "Where it happened"},
+        allowed_values={"severity": ["low", "high"]},
+    )
+
+    lines = [line for line in build_requirements_text(spec).splitlines() if line[:1].isdigit()]
+
+    assert lines == [
+        "1. incident_date (string, REQUIRED)",
+        "2. location (string, OPTIONAL): Where it happened",
+        "3. severity (enum, OPTIONAL) -- allowed values: low, high",
+    ]
+
+
+def test_the_row_blocks_own_description_reaches_every_file(tmp_path):
+    """SKILL.md's example puts the description in the row block, not in
+    field_descriptions; the schema and the requirements carry the same text."""
+    spec = dict(PO_SPEC, field_descriptions={})
+    spec["nested"] = {"line_items": dict(PO_SPEC["nested"]["line_items"], description="Rows")}
+
+    schema = _model(spec)["PurchaseOrder"].model_json_schema()
+    requirements = build_requirements_json(spec)["requirements"]
+
+    assert schema["properties"]["line_items"]["description"] == "Rows"
+    assert requirements["children"][0]["container_description"] == "Rows"
+    assert _model_from_spec(spec, "PurchaseOrder").model_json_schema() == schema

@@ -29,6 +29,7 @@ from .docs_generator import md_text
 from .registry import get_registry
 from .schema_designer import (
     NESTED_KEY,
+    check_schema_names,
     nested_row_fields,
     write_extraction_requirements,
     write_schema_files,
@@ -135,6 +136,12 @@ def _code_values_problems(blueprint: Blueprint) -> list[str]:
                 f"the {container!r} rows have rows of their own; only one level of nested "
                 "rows is supported"
             )
+    if spec.get(NESTED_KEY) and not problems:
+        # Anything else the rows' model would refuse, before a file is written.
+        try:
+            check_schema_names(spec, schema_name or "OutputSchema")
+        except ValueError as exc:
+            problems.append(f"target_output_spec.nested: {exc}")
     return problems
 
 

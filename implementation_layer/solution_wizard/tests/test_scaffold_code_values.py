@@ -247,3 +247,16 @@ def test_rows_inside_rows_stop_the_scaffolding_before_any_file_is_written(tmp_pa
     with pytest.raises(ValueError, match="one level of nested rows"):
         scaffold_poc(bp, tmp_path)
     assert not any((tmp_path / "poc").iterdir())
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [{"fields": [123]}, {"fields": [{"id": "sub"}], "nested": {"sub": {"fields": ["z"]}}}],
+    ids=["number", "section-with-rows"],
+)
+def test_rows_the_schema_cannot_carry_stop_the_scaffolding_first(tmp_path, rows) -> None:
+    bp = _blueprint()
+    bp.target_output_spec["nested"] = {"line_items": rows}
+    with pytest.raises(ValueError, match="target_output_spec.nested"):
+        scaffold_poc(bp, tmp_path)
+    assert not any((tmp_path / "poc").iterdir())

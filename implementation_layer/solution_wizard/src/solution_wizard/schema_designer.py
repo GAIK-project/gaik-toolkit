@@ -172,10 +172,7 @@ def build_requirements_text(target_output_spec: dict[str, Any]) -> str:
     """
     target_output_spec = _normalize_spec(target_output_spec)
     fields: list[str] = target_output_spec.get("fields", [])
-    field_types: dict[str, str] = target_output_spec.get("field_types", {})
     required_fields: list[str] = target_output_spec.get("required_fields", [])
-    field_descriptions: dict[str, str] = target_output_spec.get("field_descriptions", {})
-    allowed_values: dict[str, list[str]] = target_output_spec.get("allowed_values", {})
     missing_value_policy: str = target_output_spec.get(
         "missing_value_policy", 'Return an empty string ("") if the value is not present.'
     )
@@ -185,20 +182,46 @@ def build_requirements_text(target_output_spec: dict[str, Any]) -> str:
         f"If a field cannot be determined, apply this policy: {missing_value_policy}\n",
     ]
 
+    nested = _nested_specs(target_output_spec)
     for i, field in enumerate(fields, 1):
+        req_marker = "REQUIRED" if field in required_fields else "OPTIONAL"
+        if field in nested:
+            # A list of rows: its type is the rows', and each row field is listed.
+            row = _normalize_spec(nested[field])
+            desc = _container_description(target_output_spec, field).rstrip(". ")
+            line = f"{i}. {field} (list of rows, {req_marker})"
+            lines.append(line + (f": {desc}" if desc else "") + ". Each row has:")
+            lines += [f"   {item}" for item in _field_lines(row, "-")]
+            continue
+        lines += [f"{i}. {item}" for item in _field_lines(target_output_spec, None, [field])]
+
+    return "\n".join(lines)
+
+
+def _field_lines(
+    spec: dict[str, Any], marker: str | None, only: list[str] | None = None
+) -> list[str]:
+    """One requirements line per field: name, type, REQUIRED or OPTIONAL, description,
+    allowed values. ``marker`` starts each line (a list bullet), ``only`` picks fields."""
+    field_types: dict[str, str] = spec.get("field_types", {})
+    required_fields: list[str] = spec.get("required_fields", [])
+    field_descriptions: dict[str, str] = spec.get("field_descriptions", {})
+    allowed_values: dict[str, list[str]] = spec.get("allowed_values", {})
+    lines = []
+    for field in only if only is not None else spec.get("fields", []):
         req_marker = "REQUIRED" if field in required_fields else "OPTIONAL"
         type_str = field_types.get(field, "string")
         desc = field_descriptions.get(field, "")
         allowed = allowed_values.get(field, [])
 
-        line = f"{i}. {field} ({type_str}, {req_marker})"
+        line = f"{marker} " if marker else ""
+        line += f"{field} ({type_str}, {req_marker})"
         if desc:
             line += f": {desc}"
         if allowed:
             line += f" -- allowed values: {', '.join(str(v) for v in allowed)}"
         lines.append(line)
-
-    return "\n".join(lines)
+    return lines
 
 
 #: Key under which a spec describes the rows of a repeated child collection.
@@ -225,6 +248,13 @@ def _nested_specs(target_output_spec: dict[str, Any]) -> dict[str, dict[str, Any
         for name, spec in nested.items()
         if name in fields and isinstance(spec, dict) and spec.get("fields")
     }
+
+
+def _container_description(target_output_spec: dict[str, Any], container: str) -> str:
+    """What one list of rows holds: the field's description, else the row block's own."""
+    descriptions = target_output_spec.get("field_descriptions") or {}
+    row = _nested_specs(target_output_spec).get(container) or {}
+    return str(descriptions.get(container) or row.get("description") or "")
 
 
 def nested_row_fields(target_output_spec: dict[str, Any]) -> dict[str, list[str]]:
@@ -323,6 +353,13 @@ def _model_plan(target_output_spec: dict[str, Any], name: str) -> list[dict[str,
     return plans
 
 
+def check_schema_names(target_output_spec: dict[str, Any], name: str) -> None:
+    """Raise ValueError when the spec cannot become a schema module: a class or field
+    name the source cannot carry, or rows inside rows. The scaffolder runs it before it
+    writes any file."""
+    _model_plan(target_output_spec, name)
+
+
 def _safe_enum_member(v: str) -> str:
     """Convert an allowed value to a valid Python identifier for an Enum member."""
     s = re.sub(r"[^a-zA-Z0-9_]", "_", str(v))
@@ -418,6 +455,7 @@ def _model_source(plan: dict[str, Any]) -> tuple[list[str], bool]:
         if field in children:
             # A list of rows, never None: an output without rows has an empty list.
             child = children[field]
+            desc = _container_description(spec, field)
             if field in required_fields:
                 arg = f"Field(description={desc!r})" if desc else "..."
             else:
@@ -647,8 +685,7 @@ def build_requirements_json(
             {
                 "container_name": container,
                 "container_description": (
-                    child_spec.get("description")
-                    or field_descriptions.get(container)
+                    _container_description(target_output_spec, container)
                     or f"One entry per {container.replace('_', ' ').rstrip('s')}"
                 ),
                 "requirements": child["requirements"],
@@ -713,6 +750,8 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
         definitions: dict[str, Any] = {}
         for field in fields:
             desc = descriptions.get(field, "")
+            if field in plan["children"]:
+                desc = _container_description(spec, field)
             required = field in required_fields
             described = {"description": desc} if desc else {}
             if field in plan["children"]:
