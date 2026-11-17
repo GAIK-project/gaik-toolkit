@@ -75,23 +75,34 @@ class CleanedLabel(BaseModel):
     changed: bool
     """True when ``label`` has other words than ``original`` (case, spacing and
     sentence punctuation aside). A page label only cut to 60 characters is not a
-    change."""
+    change; see ``truncated``."""
+    truncated: bool = False
+    """True when ``label`` is the page's own label cut to 60 characters: show
+    ``original`` too, since the cut may drop meaning."""
 
 
 MAX_LABEL_CHARS = 60
-_SENTENCE_PUNCTUATION = re.compile(r"[:.,;!?*]")
+_SENTENCE_PUNCTUATION = re.compile(r"[:;!?]|\.(?=\s|$)")
+
+
+def _visible(text: str) -> str:
+    """``text`` without invisible format characters (soft hyphens, bidi controls).
+
+    They are taken out of every label gaik returns, so the label a person sees is the
+    one that was compared: a bidi control could otherwise show words in another order.
+    """
+    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
 
 
 def _words(text: str) -> str:
     """``text`` without what a cleanup may change: case, spacing, sentence punctuation.
 
-    Unicode is normalised (NFKC) and invisible format characters such as a soft hyphen
-    are dropped, so the same word typed differently compares equal. Symbols that carry
-    meaning (``+ - % € $ < ≥``) are kept, so "-5" and "5" differ.
+    Only canonical Unicode differences are ignored (NFC), so a superscript or a ß stays
+    what it is, and only ``: ; ! ?`` and a sentence-ending ``.`` are dropped, so "1.000"
+    and "1,000", "-5" and "5", or a required-field ``*`` still differ.
     """
-    text = unicodedata.normalize("NFKC", text)
-    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
-    return " ".join(_SENTENCE_PUNCTUATION.sub(" ", text).split()).casefold()
+    text = _visible(unicodedata.normalize("NFC", text))
+    return " ".join(_SENTENCE_PUNCTUATION.sub(" ", text).split()).lower()
 
 
 def _same_words(a: str, b: str) -> bool:
@@ -169,17 +180,18 @@ class FormUnderstander:
         cleaned = self._clean(safe_fields, language_hint)
         described = []
         for f in safe_fields:
-            original = f.raw.strip()
+            original = _visible(f.raw).strip()
             label = cleaned.get(f.id, original[:MAX_LABEL_CHARS])
+            truncated = len(original) > MAX_LABEL_CHARS and _same_words(
+                label, original[:MAX_LABEL_CHARS]
+            )
             described.append(
                 CleanedLabel(
                     id=f.id,
                     label=label,
                     original=original,
-                    changed=not (
-                        _same_words(label, original)
-                        or _same_words(label, original[:MAX_LABEL_CHARS])
-                    ),
+                    changed=not (_same_words(label, original) or truncated),
+                    truncated=truncated,
                 )
             )
         return described
@@ -247,7 +259,7 @@ class FormUnderstander:
         for entry in parsed.entries:
             if entry.id not in known_ids:
                 continue
-            label = entry.label.strip()
+            label = _visible(entry.label).strip()
             if not label:
                 continue
             result[entry.id] = label[:MAX_LABEL_CHARS]
