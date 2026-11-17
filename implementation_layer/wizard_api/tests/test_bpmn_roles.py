@@ -109,6 +109,19 @@ def test_the_rework_loop_is_drawn_and_an_orphaned_one_is_dropped() -> None:
     assert "EndEvent_rejected_approve" in xml
 
 
+def test_an_external_service_the_scaffolder_refuses_leaves_the_diagram_as_it_is() -> None:
+    """The diagram takes only the input and output types from the draft's
+    technical_spec, so an external service entry the blueprint model refuses changes
+    neither the roles nor the diagram."""
+    bad = {"name": "Web search", "python_package": "-e .", "env_vars": ["HTTPS_PROXY"]}
+    draft = {**DRAFT, "technical_spec": {"input_types": ["pdf"], "external_services": [bad]}}
+
+    xml, _, v1 = bpmn_service.generate_bpmn_view(V2, session_id="s", agent_draft=draft)
+
+    assert "external_services" not in v1["technical_spec"]
+    assert set(_lanes(xml)) == {"Accounts clerk", "Controller", "Booking system"}
+
+
 def test_a_draft_that_does_not_fit_falls_back_to_the_stock_lanes() -> None:
     broken = {**DRAFT, "business_process": {"participants": [{"name": "no id"}]}}
     xml = bpmn_service.generate_bpmn_xml(V2, session_id="s", agent_draft=broken)

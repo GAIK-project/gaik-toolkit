@@ -361,10 +361,11 @@ def content_digest(content: dict[str, Any]) -> str:
 
 #: What Gate 2 approves, as the parts of the agent's draft that decide what the
 #: solution does: its output fields, its steps and components, who takes part,
-#: and what goes in and comes out. Wording (descriptions, a step's label, the
-#: reason a component was chosen, the business text, the change log) is left
-#: out on purpose: the agent rewrites it freely, and a reworded sentence is not
-#: a changed solution.
+#: what goes in and comes out, and which external services (third parties) get
+#: data. Wording (descriptions, a step's label, the reason a component was
+#: chosen, a service's purpose and fallback, the business text, the change log)
+#: is left out on purpose: the agent rewrites it freely, and a reworded sentence
+#: is not a changed solution.
 _SOLUTION_PARTS: dict[str, tuple[str, ...]] = {
     "target_output_spec": (
         "fields",
@@ -380,12 +381,16 @@ _SOLUTION_PARTS: dict[str, tuple[str, ...]] = {
         "output_types",
         "model_provider",
         "human_review_required",
+        "external_services",
     ),
     "business_spec": ("reviewers",),
     "business_process": ("participants",),
 }
 _COMPONENT_LISTS = ("selected_modules", "selected_building_blocks", "custom_components")
 _STEP_PARTS = ("id", "type", "component", "parameters", "depends_on")
+#: Of an external service, what says which third party gets what: its name, the
+#: package and keys the PoC installs and reads, and the data it is sent.
+_SERVICE_PARTS = ("name", "python_package", "env_vars", "data_sent")
 
 
 def _names(entries: object) -> list[str]:
@@ -414,6 +419,14 @@ def solution_digest(draft: dict[str, Any] | None) -> str | None:
         value = draft.get(section)
         if isinstance(value, dict):
             picked[section] = {key: value.get(key) for key in keys}
+    services = picked.get("technical_spec", {}).get("external_services")
+    if isinstance(services, list):
+        picked["technical_spec"]["external_services"] = [
+            {key: service.get(key) for key in _SERVICE_PARTS}
+            if isinstance(service, dict)
+            else service
+            for service in services
+        ]
     components = draft.get("components")
     if isinstance(components, dict):
         picked["components"] = {key: _names(components.get(key)) for key in _COMPONENT_LISTS}
