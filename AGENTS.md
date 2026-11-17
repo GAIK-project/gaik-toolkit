@@ -150,6 +150,10 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   `/admin`, for reads too: its agent has shell tools in the API pod. A write to data
   that every visitor shares needs an approved user (`writesSharedData`), and the API
   serves no route that writes the shared video-search index.
+  The Postgres agent's model-written SQL runs on its own read-only role
+  (`POSTGRES_AGENT_DATABASE_URL`, created with `api/scripts/postgres_agent_role.sql`);
+  the API refuses a role that can write, and falls back to `DATABASE_URL` with a
+  warning while the variable is unset.
 
 ## docs site (GitHub Pages)
 

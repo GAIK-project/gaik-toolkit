@@ -4,6 +4,15 @@ Exposes the gaik ``PostgresAgent`` against a fixed, server-side demo database.
 The user only submits a natural-language question -- never a connection string
 -- so there is no SSRF surface. The agent connects read-only and is restricted
 to an isolated demo schema with a table allowlist.
+
+The model writes the SQL, so the agent's connection is its own: set
+``POSTGRES_AGENT_DATABASE_URL`` to a role that can only read the demo tables
+(``api/scripts/postgres_agent_role.sql`` creates one). The agent checks that role
+before it runs a question and refuses one that can write, create, or read a table
+outside the demo schema. ``DATABASE_URL`` (the demo's own connection, which also
+holds the video-search index) only seeds the demo schema. Without the agent's
+variable the agent falls back to ``DATABASE_URL`` and says so in the log and in
+``/status``.
 """
 
 import asyncio
@@ -38,9 +47,95 @@ router = APIRouter()
 
 DEMO_SCHEMA = "gaik_postgres_agent_demo"
 DEMO_TABLES = ["customers", "orders"]
+AGENT_DATABASE_ENV = "POSTGRES_AGENT_DATABASE_URL"
 
 # The demo schema is created + populated once per process.
 _seeded = False
+# The agent role is checked once per process; the problems found, if any.
+_role_checked: list[str] | None = None
+_warned_fallback = False
+
+
+def _agent_database_url() -> tuple[str | None, bool]:
+    """The connection the agent's SQL runs on, and whether it is the agent's own."""
+    own = os.getenv(AGENT_DATABASE_ENV)
+    if own:
+        return own, True
+    global _warned_fallback
+    if not _warned_fallback and os.getenv("DATABASE_URL"):
+        _warned_fallback = True
+        logger.warning(
+            "postgres_agent: %s is not set, so model-written SQL runs on DATABASE_URL; "
+            "create a read-only role with api/scripts/postgres_agent_role.sql",
+            AGENT_DATABASE_ENV,
+        )
+    return os.getenv("DATABASE_URL"), False
+
+
+# What the agent's role may do, read in one query: role attributes, whether it can
+# create in the database or in any schema, the demo tables it can change, and the
+# tables outside the demo schema and the system schemas that it can read.
+_ROLE_FACTS_SQL = """
+SELECT
+    r.rolsuper,
+    r.rolcreaterole,
+    r.rolcreatedb,
+    r.rolbypassrls,
+    has_database_privilege(current_database(), 'CREATE'),
+    EXISTS (SELECT 1 FROM pg_namespace n
+             WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+               AND n.nspname NOT LIKE 'pg\\_%%'
+               AND has_schema_privilege(n.oid, 'CREATE')),
+    (SELECT count(*) FROM pg_tables t
+       WHERE t.schemaname = %(schema)s
+         AND has_table_privilege(
+               format('%%I.%%I', t.schemaname, t.tablename),
+               'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')),
+    (SELECT count(*) FROM pg_tables t
+       WHERE t.schemaname NOT IN (%(schema)s, 'pg_catalog', 'information_schema')
+         AND has_table_privilege(format('%%I.%%I', t.schemaname, t.tablename), 'SELECT'))
+FROM pg_roles r
+WHERE r.rolname = current_user
+"""
+
+
+def _role_problems(facts: tuple | None) -> list[str]:
+    """Why the agent's role is not read-only on the demo schema; empty when it is."""
+    if facts is None:
+        return ["the role was not found"]
+    (superuser, createrole, createdb, bypassrls, db_create, schema_create, writable, elsewhere) = (
+        facts
+    )
+    problems = []
+    if superuser:
+        problems.append("it is a superuser")
+    if createrole or createdb or bypassrls:
+        problems.append("it can create roles or databases, or bypass row security")
+    if db_create or schema_create:
+        problems.append("it can create schemas or objects")
+    if writable:
+        problems.append(f"it can change {writable} demo table(s)")
+    if elsewhere:
+        problems.append(f"it can read {elsewhere} table(s) outside the demo schema")
+    return problems
+
+
+def _check_agent_role(database_url: str) -> list[str]:
+    """Check the agent's own role once per process; the problems found."""
+    global _role_checked
+    if _role_checked is None:
+        import psycopg
+
+        with psycopg.connect(database_url) as conn:
+            facts = conn.execute(_ROLE_FACTS_SQL, {"schema": DEMO_SCHEMA}).fetchone()
+        _role_checked = _role_problems(facts)
+        if _role_checked:
+            logger.error(
+                "postgres_agent: %s is not read-only: %s",
+                AGENT_DATABASE_ENV,
+                "; ".join(_role_checked),
+            )
+    return _role_checked
 
 
 def _llm_config() -> dict | None:
@@ -122,18 +217,26 @@ def _seed_demo_schema(database_url: str) -> None:
     logger.info("postgres_agent demo schema '%s' ready", DEMO_SCHEMA)
 
 
+class AgentRoleError(RuntimeError):
+    """The agent's own database role can do more than read the demo tables."""
+
+
 def _make_agent():
     """Build a fresh read-only PostgresAgent for the demo schema, or None."""
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url:
+    admin_url = os.getenv("DATABASE_URL")
+    agent_url, own = _agent_database_url()
+    if not agent_url:
         return None
-    _seed_demo_schema(db_url)
+    if admin_url:
+        _seed_demo_schema(admin_url)
+    if own and _check_agent_role(agent_url):
+        raise AgentRoleError(AGENT_DATABASE_ENV)
 
     from gaik.software_components.postgres_agent import PostgresAgent
 
     config = _llm_config()
     return PostgresAgent(
-        db_url,
+        agent_url,
         config=config,
         schema_name=DEMO_SCHEMA,
         table_allowlist=DEMO_TABLES,
@@ -190,6 +293,8 @@ class SchemaResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     database_configured: bool
+    own_read_only_role: bool = False
+    """The agent's SQL runs on its own role (POSTGRES_AGENT_DATABASE_URL), not DATABASE_URL."""
     llm_configured: bool
     demo_schema: str
     demo_tables: list[str]
@@ -202,7 +307,8 @@ class StatusResponse(BaseModel):
 async def postgres_agent_status():
     """Report whether the demo database and LLM are configured."""
     return StatusResponse(
-        database_configured=os.getenv("DATABASE_URL") is not None,
+        database_configured=_agent_database_url()[0] is not None,
+        own_read_only_role=bool(os.getenv(AGENT_DATABASE_ENV)),
         llm_configured=bool(os.getenv("AZURE_API_KEY") or os.getenv("OPENAI_API_KEY")),
         demo_schema=DEMO_SCHEMA,
         demo_tables=DEMO_TABLES,
@@ -240,6 +346,13 @@ def _resolve_agent():
     """Build the agent or raise a clean HTTPException."""
     try:
         agent = _make_agent()
+    except AgentRoleError as e:
+        # The reasons are in the log; the page only learns that the demo is off.
+        raise HTTPException(
+            status_code=503,
+            detail="The demo database is not set up for the agent. An administrator "
+            "needs to give it a read-only role.",
+        ) from e
     except ImportError as e:
         raise HTTPException(
             status_code=503,
