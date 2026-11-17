@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Test page</title>
+<!--
+  The solution's test page. One file, no build, nothing loaded from elsewhere.
+  It reads what the solution is from GET /api/solution (ui/solution.json) and runs it
+  with POST /api/run; app.py beside this folder serves both. Every text that comes
+  from the solution or from a run is put on the page as text, never as markup.
+-->
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #1a1f29;
+    --muted: #586170;
+    --line: #dde1e7;
+    --accent: #1d5bb8;
+    --accent-text: #ffffff;
+    --accent-soft: #eaf1fb;
+    --ok: #1a6b3b;
+    --ok-soft: #e8f4ec;
+    --bad: #a3261d;
+    --bad-soft: #fceceb;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171c;
+      --card: #1c2027;
+      --text: #e8ebf0;
+      --muted: #a2abb8;
+      --line: #313743;
+      --accent: #7fb0f5;
+      --accent-text: #10151d;
+      --accent-soft: #223046;
+      --ok: #7fd3a0;
+      --ok-soft: #1b3226;
+      --bad: #f2a29b;
+      --bad-soft: #3a2220;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 48px; }
+  header { margin-bottom: 24px; }
+  .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 0.875rem; }
+  h1 { margin: 0 0 8px; font-size: 1.75rem; line-height: 1.2; font-weight: 650; overflow-wrap: anywhere; }
+  h2 { margin: 0 0 14px; font-size: 1.125rem; font-weight: 650; }
+  h3 { margin: 20px 0 8px; font-size: 1rem; font-weight: 650; }
+  p { margin: 0 0 12px; overflow-wrap: anywhere; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.875rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card:focus { outline: none; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--card); padding: 8px 12px; border-radius: 6px; }
+  .skip:focus { left: 8px; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .drop {
+    border: 1.5px dashed var(--line);
+    border-radius: var(--radius);
+    padding: 22px 16px;
+    text-align: center;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .drop p { margin: 10px 0 0; }
+  input[type="file"]:focus-visible + label { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 44px; padding: 0 18px;
+    border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text);
+    font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn[disabled] { opacity: 0.6; cursor: default; filter: none; }
+  .btn.plain { min-height: 36px; padding: 0 10px; font-weight: 500; font-size: 0.875rem; }
+
+  ul.files { list-style: none; margin: 14px 0 0; padding: 0; }
+  ul.files li {
+    display: flex; align-items: center; gap: 12px; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid var(--line);
+  }
+  ul.files li:last-child { border-bottom: 0; }
+  ul.files .name { overflow-wrap: anywhere; min-width: 0; }
+  ul.files .size { color: var(--muted); font-size: 0.875rem; white-space: nowrap; }
+  ul.files .meta { display: flex; align-items: center; gap: 12px; flex: none; }
+
+  .field { margin-top: 18px; }
+  .field label { display: block; font-weight: 600; margin-bottom: 6px; }
+  textarea {
+    width: 100%; min-height: 84px; padding: 10px 12px; resize: vertical;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--card); color: var(--text); font: inherit;
+  }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 20px; }
+  .progress { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); min-width: 0; }
+  .progress .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
+  .spinner {
+    width: 18px; height: 18px; flex: none; border-radius: 50%;
+    border: 2.5px solid var(--line); border-top-color: var(--accent);
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .spinner { animation: none; border-top-color: var(--line); border-left-color: var(--accent); }
+    .drop { transition: none; }
+  }
+
+  .box { border-radius: 8px; padding: 12px 14px; margin: 0 0 16px; }
+  .box p:last-child { margin-bottom: 0; }
+  .box.bad { background: var(--bad-soft); color: var(--bad); }
+  .box.ok { background: var(--ok-soft); color: var(--ok); }
+  .box.info { background: var(--accent-soft); }
+  .box .detail { color: var(--text); font-size: 0.9375rem; }
+
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+  thead th { font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
+  table.fields > tbody > tr > th { font-weight: 600; width: 24%; }
+  td.value { white-space: pre-wrap; }
+  td.source { width: 30%; font-size: 0.875rem; color: var(--muted); padding-right: 0; }
+  td.source q { color: var(--text); }
+  .verdict { display: inline-block; margin-top: 4px; }
+  .verdict.ok { color: var(--ok); }
+  .verdict.check { color: var(--bad); }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .scroll table { min-width: 420px; }
+  .scroll th, .scroll td { padding: 8px 10px; font-size: 0.875rem; white-space: normal; overflow-wrap: normal; }
+  .scroll th { white-space: nowrap; }
+  .scroll tr:last-child td { border-bottom: 0; }
+  dl.pairs { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+  dl.pairs dt { color: var(--muted); }
+  dl.pairs dd { margin: 0; }
+  ul.plain { margin: 0; padding-left: 18px; }
+  .answer { white-space: pre-wrap; }
+  .qa + .qa { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 4px; }
+
+  details { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  pre {
+    margin: 12px 0 0; padding: 12px; max-height: 360px; overflow: auto;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    font: 0.8125rem/1.5 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  a { color: var(--accent); }
+  footer { color: var(--muted); font-size: 0.875rem; }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 20px 14px 36px; }
+    h1 { font-size: 1.4rem; }
+    .card { padding: 16px; }
+    .btn.primary { width: 100%; }
+    /* The field table stacks; a table of rows inside a value keeps its columns and scrolls. */
+    table.fields > thead { position: absolute; left: -9999px; }
+    table.fields, table.fields > tbody, table.fields > tbody > tr,
+    table.fields > tbody > tr > th, table.fields > tbody > tr > td { display: block; width: auto; }
+    table.fields > tbody > tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+    table.fields > tbody > tr > th, table.fields > tbody > tr > td { border: 0; padding: 2px 0; }
+    table.fields > tbody > tr > th { color: var(--muted); font-size: 0.875rem; font-weight: 600; }
+    table.fields > tbody > tr > td.source:empty { display: none; }
+    .scroll { margin: 4px 0; }
+    .progress .line { max-width: 100%; white-space: normal; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main" id="skip">Skip to content</a>
+<div class="wrap">
+  <header>
+    <p class="eyebrow" id="eyebrow">Test page</p>
+    <h1 id="name">…</h1>
+    <p id="purpose" class="muted"></p>
+  </header>
+
+  <main id="main">
+    <noscript><div class="box bad"><p>This page needs JavaScript.</p></div></noscript>
+    <div id="notice" class="box info" role="status" hidden></div>
+    <div id="load-error" class="box bad" role="alert" hidden></div>
+
+    <form id="form" class="card" novalidate hidden>
+      <h2 id="input-heading">Input</h2>
+      <div id="drop" class="drop">
+        <input type="file" id="files" class="sr-only" multiple>
+        <label for="files" class="btn" id="pick">Choose files</label>
+        <p id="drop-hint" class="muted small"></p>
+        <p id="accepts" class="muted small"></p>
+      </div>
+      <ul id="picked" class="files" aria-live="polite"></ul>
+      <p id="examples" class="muted small" hidden></p>
+
+      <div id="question-field" class="field" hidden>
+        <label for="question" id="question-label">Question</label>
+        <textarea id="question" name="question" rows="3" maxlength="20000"></textarea>
+      </div>
+      <div id="text-field" class="field" hidden>
+        <label for="text" id="text-label">Text</label>
+        <textarea id="text" name="text" rows="5" maxlength="20000"></textarea>
+      </div>
+
+      <div id="form-error" class="box bad" role="alert" hidden style="margin-top:18px"></div>
+      <div class="actions">
+        <button type="submit" id="run" class="btn primary">Run</button>
+        <span id="progress" class="progress" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+
+    <section id="result" class="card" aria-labelledby="result-heading" tabindex="-1" hidden>
+      <h2 id="result-heading">Result</h2>
+      <div id="result-status"></div>
+      <div id="result-body"></div>
+      <div id="outputs-block" hidden>
+        <h3 id="outputs-heading">Files</h3>
+        <ul id="outputs" class="files"></ul>
+      </div>
+      <details id="log-block" hidden>
+        <summary id="log-summary">Run log</summary>
+        <pre id="log" tabindex="0"></pre>
+      </details>
+    </section>
+  </main>
+
+  <footer><p id="footer"></p></footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TEXTS = {
+    en: {
+      eyebrow: "Test page · runs on this computer",
+      skip: "Skip to content",
+      input: "Input",
+      pickOne: "Choose a file",
+      pickMany: "Choose files",
+      dropOne: "or drop a file here",
+      dropMany: "or drop files here",
+      accepts: "Accepted: {list}",
+      acceptsAny: "Any file type",
+      remove: "Remove",
+      removeNamed: "Remove {name}",
+      examples: "No file added: the run uses the package's example material ({list}).",
+      question: "Question",
+      text: "Text",
+      run: "Run",
+      running: "Running · {time}",
+      result: "Result",
+      files: "Files",
+      download: "Download",
+      log: "Run log",
+      field: "Field",
+      value: "Value",
+      source: "Source",
+      noValue: "No value",
+      yes: "Yes",
+      no: "No",
+      resultN: "Result {n}",
+      page: "p. {n}",
+      verified: "Found in the source",
+      check: "Check against the source",
+      done: "Done in {time}.",
+      usedExamples: "The run used the package's example material.",
+      noResult: "The run wrote no result the page can show. See the files and the log.",
+      noEnv: "No .env file in the package folder yet. Copy .env.example to .env and fill in the keys, unless they are set in the environment already.",
+      footer: "The result is produced by an AI model. Check it before you use it. Files you add stay on this computer; the solution sends their content to the model it is configured to use.",
+      kinds: { json: "JSON", text: "Text", table: "Table", document: "Document", image: "Image", audio: "Audio", file: "File" },
+      errors: {
+        needInput: "Add a file first.",
+        needQuestion: "Write a question first.",
+        badType: "{name} is not a file this solution takes. Accepted: {list}.",
+        tooMany: "At most {n} files can be sent at once.",
+        tooLarge: "The files are too large: at most {size} in all.",
+        busy: "A run is already going. Wait for it to finish and try again.",
+        too_large: "The files are too large for the test page.",
+        too_many_files: "Too many files at once.",
+        bad_extension: "One of the files is not a type this solution takes.",
+        text_too_long: "The text is too long. Send it as a file instead.",
+        no_input: "Add a file or a text first.",
+        run_failed: "The run ended with an error. The log below says why.",
+        timeout: "The run took too long and was stopped.",
+        network: "The test page's server is not answering. Is “python app.py” still running?",
+        load: "The solution's description could not be read. Is “python app.py” still running?",
+        other: "Something went wrong on the test page. Its terminal window says more."
+      }
+    },
+    fi: {
+      eyebrow: "Testisivu · toimii tällä koneella",
+      skip: "Siirry sisältöön",
+      input: "Syöte",
+      pickOne: "Valitse tiedosto",
+      pickMany: "Valitse tiedostot",
+      dropOne: "tai pudota tiedosto tähän",
+      dropMany: "tai pudota tiedostot tähän",
+      accepts: "Käyvät tiedostot: {list}",
+      acceptsAny: "Mikä tahansa tiedostotyyppi",
+      remove: "Poista",
+      removeNamed: "Poista {name}",
+      examples: "Ei lisättyä tiedostoa: ajo käyttää paketin esimerkkiaineistoa ({list}).",
+      question: "Kysymys",
+      text: "Teksti",
+      run: "Aja",
+      running: "Ajo käynnissä · {time}",
+      result: "Tulos",
+      files: "Tiedostot",
+      download: "Lataa",
+      log: "Ajon loki",
+      field: "Kenttä",
+      value: "Arvo",
+      source: "Lähde",
+      noValue: "Ei arvoa",
+      yes: "Kyllä",
+      no: "Ei",
+      resultN: "Tulos {n}",
+      page: "s. {n}",
+      verified: "Löytyy lähteestä",
+      check: "Tarkista lähteestä",
+      done: "Valmis, kesto {time}.",
+      usedExamples: "Ajo käytti paketin esimerkkiaineistoa.",
+      noResult: "Ajo ei kirjoittanut tulosta, jonka sivu osaa näyttää. Katso tiedostot ja loki.",
+      noEnv: "Paketin kansiossa ei ole vielä .env-tiedostoa. Kopioi .env.example nimelle .env ja täytä avaimet, ellei niitä ole jo asetettu ympäristöön.",
+      footer: "Tuloksen on tuottanut tekoälymalli. Tarkista se ennen käyttöä. Lisäämäsi tiedostot pysyvät tällä koneella; ratkaisu lähettää niiden sisällön mallille, jota se on määritetty käyttämään.",
+      kinds: { json: "JSON", text: "Teksti", table: "Taulukko", document: "Asiakirja", image: "Kuva", audio: "Ääni", file: "Tiedosto" },
+      errors: {
+        needInput: "Lisää ensin tiedosto.",
+        needQuestion: "Kirjoita ensin kysymys.",
+        badType: "{name} ei ole tiedosto, jota tämä ratkaisu käsittelee. Käyvät: {list}.",
+        tooMany: "Kerralla voi lähettää enintään {n} tiedostoa.",
+        tooLarge: "Tiedostot ovat liian suuria: yhteensä enintään {size}.",
+        busy: "Ajo on jo käynnissä. Odota sen valmistumista ja yritä uudelleen.",
+        too_large: "Tiedostot ovat testisivulle liian suuria.",
+        too_many_files: "Liian monta tiedostoa kerralla.",
+        bad_extension: "Jokin tiedostoista ei ole tyyppiä, jota tämä ratkaisu käsittelee.",
+        text_too_long: "Teksti on liian pitkä. Lähetä se tiedostona.",
+        no_input: "Lisää ensin tiedosto tai teksti.",
+        run_failed: "Ajo päättyi virheeseen. Alla oleva loki kertoo syyn.",
+        timeout: "Ajo kesti liian kauan ja se pysäytettiin.",
+        network: "Testisivun palvelin ei vastaa. Onko ”python app.py” vielä käynnissä?",
+        load: "Ratkaisun kuvausta ei saatu luettua. Onko ”python app.py” vielä käynnissä?",
+        other: "Testisivulla meni jokin vikaan. Sen pääteikkuna kertoo lisää."
+      }
+    }
+  };
+
+  var solution = {};
+  var lang = "en";
+  var t = TEXTS.en;
+  var picked = [];
+  var running = false;
+
+  function $(id) { return document.getElementById(id); }
+  function fill(template, values) {
+    return String(template).replace(/\{(\w+)\}/g, function (_, key) {
+      return values[key] === undefined ? "" : String(values[key]);
+    });
+  }
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+  function show(node, on) { node.hidden = !on; }
+  function isObject(v) { return v !== null && typeof v === "object" && !Array.isArray(v); }
+  function humanize(key) {
+    var words = String(key).replace(/[_\-.]+/g, " ").trim();
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : String(key);
+  }
+  function formatSize(bytes) {
+    var number = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 });
+    if (bytes >= 1024 * 1024) { return number.format(bytes / (1024 * 1024)) + " MB"; }
+    if (bytes >= 1024) { return number.format(bytes / 1024) + " kB"; }
+    return number.format(bytes) + " B";
+  }
+  function formatTime(seconds) {
+    var s = Math.max(0, Math.round(seconds));
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }
+  function suffixOf(name) {
+    var dot = name.lastIndexOf(".");
+    return dot > 0 ? name.slice(dot).toLowerCase() : "";
+  }
+
+  // ---- what the solution takes in ----------------------------------------
+
+  function inputs() { return Array.isArray(solution.inputs) ? solution.inputs.filter(isObject) : []; }
+  function fileInputs() { return inputs().filter(function (i) { return i.kind !== "text"; }); }
+  function takesText() { return inputs().some(function (i) { return i.kind === "text"; }); }
+  function takesMany() { return inputs().some(function (i) { return i.multiple; }) || inputs().length > 1; }
+  function accepted() {
+    // null: no restriction (an input that names no endings takes anything).
+    var all = [];
+    var list = inputs();
+    if (!list.length) { return null; }
+    for (var i = 0; i < list.length; i++) {
+      var endings = list[i].extensions;
+      if (!Array.isArray(endings) || !endings.length) { return null; }
+      endings.forEach(function (e) { all.push(String(e).toLowerCase()); });
+    }
+    return all;
+  }
+  function limits() { return isObject(solution.limits) ? solution.limits : {}; }
+  function samples() { return Array.isArray(solution.sample_files) ? solution.sample_files : []; }
+
+  function describe() {
+    lang = String(solution.language || "en").toLowerCase().slice(0, 2) === "fi" ? "fi" : "en";
+    t = TEXTS[lang];
+    document.documentElement.lang = lang;
+    var name = solution.name ? String(solution.name) : t.eyebrow;
+    document.title = name;
+    $("name").textContent = name;
+    $("purpose").textContent = solution.purpose ? String(solution.purpose) : "";
+    $("eyebrow").textContent = t.eyebrow;
+    $("skip").textContent = t.skip;
+    $("input-heading").textContent = t.input;
+    $("result-heading").textContent = t.result;
+    $("outputs-heading").textContent = t.files;
+    $("log-summary").textContent = t.log;
+    $("run").textContent = t.run;
+    $("footer").textContent = t.footer;
+
+    var many = takesMany();
+    var files = $("files");
+    files.multiple = many;
+    var endings = accepted();
+    if (endings) { files.accept = endings.join(","); }
+    $("pick").textContent = many ? t.pickMany : t.pickOne;
+    $("drop-hint").textContent = many ? t.dropMany : t.dropOne;
+    var labels = fileInputs().map(function (i) { return i.label; }).filter(Boolean);
+    $("accepts").textContent =
+      (labels.length ? labels.join(" · ") + ". " : "") +
+      (endings ? fill(t.accepts, { list: endings.join(", ") }) : t.acceptsAny);
+    show($("drop"), fileInputs().length > 0 || !inputs().length);
+
+    $("question-label").textContent = solution.question_label ? String(solution.question_label) : t.question;
+    show($("question-field"), Boolean(solution.asks_question));
+    $("text-label").textContent = t.text;
+    show($("text-field"), takesText());
+
+    if (solution.env_file === false) {
+      $("notice").textContent = t.noEnv;
+      show($("notice"), true);
+    }
+    renderPicked();
+    show($("form"), true);
+  }
+
+  // ---- the chosen files ---------------------------------------------------
+
+  function formError(message) {
+    var box = $("form-error");
+    box.textContent = message || "";
+    show(box, Boolean(message));
+  }
+
+  function addFiles(list) {
+    var endings = accepted();
+    var problem = "";
+    Array.prototype.forEach.call(list, function (file) {
+      if (endings && endings.indexOf(suffixOf(file.name)) === -1) {
+        problem = fill(t.errors.badType, { name: file.name, list: endings.join(", ") });
+        return;
+      }
+      if (!takesMany()) { picked = []; }
+      picked.push(file);
+    });
+    var max = limits().max_files;
+    if (max && picked.length > max) {
+      picked = picked.slice(0, max);
+      problem = fill(t.errors.tooMany, { n: max });
+    }
+    formError(problem);
+    renderPicked();
+  }
+
+  function renderPicked() {
+    var list = $("picked");
+    list.replaceChildren();
+    picked.forEach(function (file, index) {
+      var item = el("li");
+      item.appendChild(el("span", "name", file.name));
+      var meta = el("span", "meta");
+      meta.appendChild(el("span", "size", formatSize(file.size)));
+      var remove = el("button", "btn plain", t.remove);
+      remove.type = "button";
+      remove.setAttribute("aria-label", fill(t.removeNamed, { name: file.name }));
+      remove.addEventListener("click", function () {
+        picked.splice(index, 1);
+        renderPicked();
+        $("files").focus();
+      });
+      meta.appendChild(remove);
+      item.appendChild(meta);
+      list.appendChild(item);
+    });
+    var examples = $("examples");
+    var names = samples();
+    if (!picked.length && names.length) {
+      var shown = names.slice(0, 3).join(", ") + (names.length > 3 ? ", …" : "");
+      examples.textContent = fill(t.examples, { list: shown });
+      show(examples, true);
+    } else {
+      show(examples, false);
+    }
+  }
+
+  // ---- a run --------------------------------------------------------------
+
+  function check() {
+    var question = $("question").value.trim();
+    var text = $("text").value.trim();
+    if (solution.asks_question && !question) { return t.errors.needQuestion; }
+    if (!picked.length && !text && !samples().length && !(solution.asks_question && !fileInputs().length)) {
+      return t.errors.needInput;
+    }
+    var max = limits().max_upload_bytes;
+    var total = picked.reduce(function (sum, file) { return sum + file.size; }, 0);
+    if (max && total > max) { return fill(t.errors.tooLarge, { size: formatSize(max) }); }
+    return "";
+  }
+
+  function setRunning(on, started) {
+    running = on;
+    var button = $("run");
+    button.disabled = on;
+    button.setAttribute("aria-busy", on ? "true" : "false");
+    var progress = $("progress");
+    progress.replaceChildren();
+    if (!on) { return null; }
+    var spinner = el("span", "spinner");
+    spinner.setAttribute("aria-hidden", "true");
+    var label = el("span", null, fill(t.running, { time: formatTime(0) }));
+    var line = el("span", "line small");
+    progress.appendChild(spinner);
+    progress.appendChild(label);
+    progress.appendChild(line);
+    var clock = setInterval(function () {
+      label.textContent = fill(t.running, { time: formatTime((Date.now() - started) / 1000) });
+    }, 1000);
+    var poll = setInterval(function () {
+      fetch("/api/status").then(function (r) { return r.json(); }).then(function (status) {
+        var lines = String(status.log_tail || "").split("\n").filter(function (l) { return l.trim(); });
+        line.textContent = lines.length ? lines[lines.length - 1].trim() : "";
+      }).catch(function () {});
+    }, 2000);
+    return function stop() { clearInterval(clock); clearInterval(poll); };
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    if (running) { return; }
+    var problem = check();
+    formError(problem);
+    if (problem) { return; }
+
+    var data = new FormData();
+    picked.forEach(function (file) { data.append("files", file, file.name); });
+    if (solution.asks_question) { data.append("question", $("question").value.trim()); }
+    if (takesText() && $("text").value.trim()) { data.append("text", $("text").value.trim()); }
+
+    var started = Date.now();
+    var stop = setRunning(true, started);
+    fetch("/api/run", { method: "POST", body: data })
+      .then(function (response) {
+        return response.json().then(function (answer) { return answer; }, function () {
+          return { ok: false, error: { code: "other" } };
+        });
+      })
+      .catch(function () { return { ok: false, error: { code: "network" } }; })
+      .then(function (answer) {
+        stop();
+        setRunning(false);
+        renderAnswer(isObject(answer) ? answer : { ok: false, error: { code: "other" } });
+      });
+  }
+
+  // ---- the result ---------------------------------------------------------
+
+  function errorText(error) {
+    var code = isObject(error) && error.code ? String(error.code) : "other";
+    return t.errors[code] || t.errors.other;
+  }
+
+  // The line of the log that names the problem, when the run printed one.
+  function errorLine(log) {
+    var lines = String(log || "").split("\n");
+    for (var i = lines.length - 1; i >= 0; i--) {
+      if (/^\s*(ERROR|Error)\b/.test(lines[i])) { return lines[i].trim().slice(0, 400); }
+    }
+    return "";
+  }
+
+  function renderAnswer(answer) {
+    var status = $("result-status");
+    var body = $("result-body");
+    status.replaceChildren();
+    body.replaceChildren();
+
+    var hasRun = answer.exit_code !== undefined || answer.run_id;
+    if (!answer.ok) {
+      var box = el("div", "box bad");
+      box.setAttribute("role", "alert");
+      box.appendChild(el("p", null, errorText(answer.error)));
+      var detail = errorLine(answer.log_tail);
+      if (detail) { box.appendChild(el("p", "detail", detail)); }
+      if (!hasRun) {
+        // Refused before any run: the form is where the user fixes it.
+        formError(errorText(answer.error));
+        show($("result"), false);
+        $("run").focus();
+        return;
+      }
+      status.appendChild(box);
+    } else {
+      var ok = el("div", "box ok");
+      ok.appendChild(el("p", null, fill(t.done, { time: formatTime(answer.duration_seconds || 0) })));
+      status.appendChild(ok);
+    }
+    if (answer.used_examples) { status.appendChild(el("p", "muted small", t.usedExamples)); }
+
+    var result = answer.result;
+    if (isObject(result) && (isObject(result.extracted_fields) || Array.isArray(result.extracted_fields))) {
+      result = result.extracted_fields;
+    }
+    if (result !== null && result !== undefined) {
+      renderResult(body, result, traceIndex(answer.source_trace));
+    } else if (answer.ok) {
+      body.appendChild(el("p", "muted", t.noResult));
+    }
+
+    var outputs = Array.isArray(answer.outputs) ? answer.outputs.filter(isObject) : [];
+    var list = $("outputs");
+    list.replaceChildren();
+    outputs.forEach(function (output) {
+      var item = el("li");
+      var link = el("a", "name", output.name);
+      // Only an address of this server's own files route is made a link.
+      if (/^\/api\/runs\/[0-9a-f]{16}\/files\//.test(String(output.url))) {
+        link.href = String(output.url);
+        link.setAttribute("download", "");
+      }
+      item.appendChild(link);
+      var kind = t.kinds[output.kind] || t.kinds.file;
+      item.appendChild(el("span", "size", kind + " · " + formatSize(Number(output.size) || 0)));
+      list.appendChild(item);
+    });
+    show($("outputs-block"), outputs.length > 0);
+
+    var log = String(answer.log_tail || "");
+    $("log").textContent = log;
+    show($("log-block"), Boolean(log));
+    $("log-block").open = !answer.ok && Boolean(log);
+
+    show($("result"), true);
+    $("result").focus();
+    $("result").scrollIntoView({ block: "start" });
+  }
+
+  function isAnswer(item) {
+    return isObject(item) && typeof item.answer === "string" &&
+      (typeof item.query === "string" || typeof item.question === "string");
+  }
+
+  function renderResult(parent, result, trace) {
+    if (typeof result === "string") {
+      parent.appendChild(el("p", "answer", result));
+    } else if (isAnswer(result)) {
+      parent.appendChild(answerNode(result));
+    } else if (Array.isArray(result) && result.length && result.every(isAnswer)) {
+      result.forEach(function (item) { parent.appendChild(answerNode(item)); });
+    } else if (isObject(result)) {
+      parent.appendChild(fieldTable(result, trace, 0));
+    } else if (Array.isArray(result) && result.length && result.every(isObject)) {
+      result.forEach(function (item, index) {
+        if (result.length > 1) { parent.appendChild(el("h3", null, fill(t.resultN, { n: index + 1 }))); }
+        parent.appendChild(fieldTable(item, trace, index));
+      });
+    } else {
+      parent.appendChild(el("pre", null, JSON.stringify(result, null, 2)));
+    }
+  }
+
+  function answerNode(item) {
+    var block = el("div", "qa");
+    block.appendChild(el("h3", null, item.query || item.question));
+    block.appendChild(el("p", "answer", item.answer));
+    return block;
+  }
+
+  // The source check's findings by "record:field", so a row can show its quote.
+  function traceIndex(trace) {
+    var index = {};
+    var items = isObject(trace) && Array.isArray(trace.sources) ? trace.sources : [];
+    items.forEach(function (item) {
+      if (!isObject(item) || typeof item.field !== "string") { return; }
+      var key = (Number(item.record) || 0) + ":" + item.field;
+      if (!index[key]) { index[key] = item; }
+    });
+    index.any = items.length > 0;
+    return index;
+  }
+
+  function labelOf(key) {
+    var fields = Array.isArray(solution.output_fields) ? solution.output_fields : [];
+    for (var i = 0; i < fields.length; i++) {
+      if (isObject(fields[i]) && fields[i].key === key && fields[i].label) { return String(fields[i].label); }
+    }
+    return humanize(key);
+  }
+
+  function orderedKeys(record) {
+    var known = (Array.isArray(solution.output_fields) ? solution.output_fields : [])
+      .map(function (f) { return isObject(f) ? f.key : null; })
+      .filter(function (key) { return typeof key === "string" && Object.prototype.hasOwnProperty.call(record, key); });
+    var rest = Object.keys(record).filter(function (key) { return known.indexOf(key) === -1; });
+    return known.concat(rest);
+  }
+
+  function fieldTable(record, trace, recordIndex) {
+    var table = el("table", "fields");
+    var head = el("thead");
+    var headRow = el("tr");
+    [t.field, t.value].concat(trace.any ? [t.source] : []).forEach(function (title) {
+      var th = el("th", null, title);
+      th.scope = "col";
+      headRow.appendChild(th);
+    });
+    head.appendChild(headRow);
+    table.appendChild(head);
+    var body = el("tbody");
+    orderedKeys(record).forEach(function (key) {
+      var row = el("tr");
+      var th = el("th", null, labelOf(key));
+      th.scope = "row";
+      row.appendChild(th);
+      var value = el("td", "value");
+      value.appendChild(valueNode(record[key], 0));
+      row.appendChild(value);
+      if (trace.any) {
+        var source = el("td", "source");
+        var found = trace[recordIndex + ":" + key];
+        if (found) { sourceInto(source, found); }
+        row.appendChild(source);
+      }
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    return table;
+  }
+
+  function sourceInto(cell, found) {
+    if (found.quote) { cell.appendChild(el("q", null, String(found.quote).slice(0, 600))); }
+    var where = [];
+    if (found.document) { where.push(String(found.document)); }
+    if (found.page !== null && found.page !== undefined) { where.push(fill(t.page, { n: found.page })); }
+    if (where.length) { cell.appendChild(el("div", null, where.join(", "))); }
+    if (found.verdict) {
+      var verified = found.verdict === "verified";
+      cell.appendChild(el("span", "verdict " + (verified ? "ok" : "check"), verified ? t.verified : t.check));
+    }
+  }
+
+  function valueNode(value, depth) {
+    if (value === null || value === undefined || value === "") { return el("span", "muted", t.noValue); }
+    if (typeof value === "boolean") { return el("span", null, value ? t.yes : t.no); }
+    if (typeof value !== "object") { return el("span", null, value); }
+    if (depth >= 3) { return el("span", null, JSON.stringify(value)); }
+    if (Array.isArray(value)) {
+      if (!value.length) { return el("span", "muted", t.noValue); }
+      if (value.every(isObject)) { return rowsTable(value, depth); }
+      var list = el("ul", "plain");
+      value.forEach(function (item) {
+        var li = el("li");
+        li.appendChild(valueNode(item, depth + 1));
+        list.appendChild(li);
+      });
+      return list;
+    }
+    var pairs = el("dl", "pairs");
+    Object.keys(value).forEach(function (key) {
+      pairs.appendChild(el("dt", null, humanize(key)));
+      var dd = el("dd");
+      dd.appendChild(valueNode(value[key], depth + 1));
+      pairs.appendChild(dd);
+    });
+    return pairs;
+  }
+
+  // A list of rows (line items, for one) as a table of its own that scrolls sideways.
+  function rowsTable(rows, depth) {
+    var columns = [];
+    rows.forEach(function (row) {
+      Object.keys(row).forEach(function (key) {
+        if (columns.indexOf(key) === -1 && columns.length < 12) { columns.push(key); }
+      });
+    });
+    var scroll = el("div", "scroll");
+    scroll.tabIndex = 0;
+    var table = el("table");
+    var head = el("tr");
+    columns.forEach(function (key) {
+      var th = el("th", null, humanize(key));
+      th.scope = "col";
+      head.appendChild(th);
+    });
+    var thead = el("thead");
+    thead.appendChild(head);
+    table.appendChild(thead);
+    var body = el("tbody");
+    rows.forEach(function (row) {
+      var tr = el("tr");
+      columns.forEach(function (key) {
+        var td = el("td");
+        td.appendChild(valueNode(row[key], depth + 1));
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    scroll.appendChild(table);
+    return scroll;
+  }
+
+  // ---- start --------------------------------------------------------------
+
+  var drop = $("drop");
+  ["dragenter", "dragover"].forEach(function (name) {
+    drop.addEventListener(name, function (event) {
+      event.preventDefault();
+      drop.classList.add("over");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (name) {
+    drop.addEventListener(name, function (event) {
+      event.preventDefault();
+      drop.classList.remove("over");
+    });
+  });
+  drop.addEventListener("drop", function (event) {
+    if (event.dataTransfer && event.dataTransfer.files) { addFiles(event.dataTransfer.files); }
+  });
+  $("files").addEventListener("change", function (event) {
+    addFiles(event.target.files);
+    event.target.value = "";
+  });
+  $("form").addEventListener("submit", submit);
+  $("question").addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { $("form").requestSubmit(); }
+  });
+
+  fetch("/api/solution")
+    .then(function (response) {
+      if (!response.ok) { throw new Error("no description"); }
+      return response.json();
+    })
+    .then(function (described) {
+      solution = isObject(described) ? described : {};
+      describe();
+    })
+    .catch(function () {
+      var box = $("load-error");
+      box.textContent = TEXTS.en.errors.load;
+      show(box, true);
+    });
+})();
+</script>
+</body>
+</html>

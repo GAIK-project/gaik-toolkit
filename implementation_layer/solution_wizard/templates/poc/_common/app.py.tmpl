@@ -1,0 +1,726 @@
+"""A small web page for trying this solution on your own computer.
+
+    python app.py            # then open http://127.0.0.1:8000
+    python app.py --port 8080
+
+The page (``ui/index.html``) takes the solution's inputs, starts ``run_poc.py`` and shows
+what it wrote. Another front end can call the same server:
+
+    GET  /api/solution                    what the solution is, takes in and gives out
+    POST /api/run                         multipart form: ``files`` (any number), and the
+                                          optional text fields ``question`` and ``text``
+    GET  /api/status                      whether a run is going, and the end of its log
+    GET  /api/runs/<id>/files/<name>      one output file of a run
+
+``POST /api/run`` answers with JSON: ``ok``, ``exit_code``, ``log_tail``, ``outputs``
+(``name``, ``kind``, ``size``, ``url``), ``result`` (the main JSON output, when there is
+one) and ``source_trace`` (the source check's report, when the solution writes one).
+A refusal is ``{"ok": false, "error": {"code": ..., "message": ...}}``.
+
+Every run gets a working folder of its own in the system's temporary folder: the
+package's code, the files sent with the request in ``sample_input/`` and an empty
+``output/``. The package's own ``sample_input/`` and ``output/`` are never written to.
+A request that sends no file runs on the examples in the package's ``sample_input/``.
+
+There is no sign-in. The server listens on this computer only (127.0.0.1) unless you
+start it with ``--host``; do that only on a network you trust. Standard library only.
+"""
+
+from __future__ import annotations
+
+import argparse
+import atexit
+import json
+import os
+import re
+import secrets
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import traceback
+from email.message import Message
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path, PurePosixPath
+from urllib.parse import quote, unquote, urlsplit
+
+PACKAGE_DIR = Path(__file__).resolve().parent
+
+#: What one request may carry in all, and in how many files.
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_FILES = 20
+#: A question or a pasted text longer than this is a document: send it as a file.
+MAX_TEXT_CHARS = 20_000
+#: How long one run may take before it is stopped, in seconds.
+RUN_TIMEOUT_SECONDS = 900
+#: Working folders of earlier runs kept for their download links.
+KEEP_RUNS = 3
+#: The end of the run's log that goes into an answer.
+LOG_TAIL_LINES = 200
+LOG_TAIL_BYTES = 64 * 1024
+#: A main result larger than this is offered as a download only.
+MAX_RESULT_BYTES = 2 * 1024 * 1024
+MAX_OUTPUT_FILES = 200
+
+ENTRYPOINT = "run_poc.py"
+SAMPLE_DIR = "sample_input"
+OUTPUT_DIR = "output"
+#: The names of the files a user added, one a line; input_bundle.py reads it and
+#: takes those files before the package's examples.
+UPLOADED_NAMES_FILE = ".uploaded"
+#: Never copied into a run's working folder.
+_SKIP_DIRS = {SAMPLE_DIR, OUTPUT_DIR, "ui", "__pycache__", ".venv", "venv", ".git", "node_modules"}
+
+#: Output files the page lists and the server hands out, by kind. Anything else in
+#: output/ (a vector store's own files, for one) stays where it is.
+_OUTPUT_KINDS = {
+    ".json": "json",
+    ".txt": "text",
+    ".md": "text",
+    ".log": "text",
+    ".csv": "table",
+    ".xlsx": "table",
+    ".pdf": "document",
+    ".docx": "document",
+    ".html": "document",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".wav": "audio",
+    ".mp3": "audio",
+}
+_CONTENT_TYPES = {
+    ".json": "application/json; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".md": "text/plain; charset=utf-8",
+    ".log": "text/plain; charset=utf-8",
+    ".csv": "text/csv; charset=utf-8",
+    ".pdf": "application/pdf",
+}
+#: The main result is the first output file with one of these endings, in this order.
+_RESULT_ENDINGS = ("_result.json", "_ticket.json", "query_result.json", "session_results.json")
+_NOT_RESULT_ENDINGS = ("_validation.json", "_source_trace.json")
+_TRACE_ENDING = "_source_trace.json"
+
+_RUN_ID_RE = re.compile(r"[0-9a-f]{16}")
+_LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+}
+#: The page carries its own style and script and loads nothing from elsewhere.
+_PAGE_POLICY = (
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
+    "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; "
+    "frame-ancestors 'none'"
+)
+
+
+class RefusalError(Exception):
+    """A request the server will not carry out; the message is shown to the user."""
+
+    def __init__(self, status: int, code: str, message: str):
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.message = message
+
+
+# ---------------------------------------------------------------------------
+# The request body
+# ---------------------------------------------------------------------------
+
+
+def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, str], list[tuple]]:
+    """The text fields and the files of a ``multipart/form-data`` body.
+
+    Returns ``(fields, files)``; a file is ``(field name, file name, bytes)``. The
+    parts are cut at the boundary as bytes, so a file arrives as it was sent; only
+    each part's few header lines go through the ``email`` package.
+    """
+    header = Message()
+    header["Content-Type"] = content_type
+    if header.get_content_type() != "multipart/form-data":
+        raise RefusalError(415, "not_a_form", "Send the inputs as a multipart form.")
+    boundary = header.get_param("boundary")
+    if not isinstance(boundary, str) or not boundary or len(boundary) > 200:
+        raise RefusalError(400, "bad_form", "The form has no boundary.")
+    delimiter = b"--" + boundary.encode("latin-1", "replace")
+    fields: dict[str, str] = {}
+    files: list[tuple] = []
+    # What comes before the first delimiter and after the closing one is not a part.
+    for chunk in body.split(delimiter)[1:]:
+        if chunk.startswith(b"--"):
+            break
+        chunk = chunk.removeprefix(b"\r\n")
+        raw_headers, separator, content = chunk.partition(b"\r\n\r\n")
+        if not separator:
+            continue
+        content = content.removesuffix(b"\r\n")
+        part = Message()
+        for line in raw_headers.decode("utf-8", "replace").split("\r\n"):
+            name, colon, value = line.partition(":")
+            if colon and name.strip().lower() == "content-disposition":
+                part["Content-Disposition"] = value.strip()
+        field = part.get_param("name", header="content-disposition")
+        if not isinstance(field, str):
+            continue
+        filename = part.get_filename()
+        if filename is None:
+            fields[field] = content.decode("utf-8", "replace")
+        elif filename or content:
+            # A file field left empty comes as an empty name and no bytes.
+            files.append((field, filename, content))
+    return fields, files
+
+
+def safe_name(name: str) -> str:
+    """A file name that stays one name inside the folder it is written to."""
+    name = name.replace("\\", "/").rsplit("/", 1)[-1]
+    name = "".join(ch for ch in name if ch.isprintable() and ch not in '<>:"|?*').strip(" .")
+    if not name:
+        raise RefusalError(400, "bad_name", "A file has no usable name.")
+    stem, dot, suffix = name.rpartition(".")
+    if dot and stem:
+        return stem[:120] + "." + suffix[:16]
+    return name[:120]
+
+
+def _unused_name(name: str, taken: set[str]) -> str:
+    """``name``, or ``name`` with a number before its ending when it is taken."""
+    if name.lower() not in taken:
+        return name
+    stem, dot, suffix = name.rpartition(".")
+    if not dot or not stem:
+        stem, suffix = name, ""
+    for n in range(1, 1000):
+        candidate = f"{stem}-{n}.{suffix}" if suffix else f"{stem}-{n}"
+        if candidate.lower() not in taken:
+            return candidate
+    raise RefusalError(400, "bad_name", "Too many files with the same name.")
+
+
+# ---------------------------------------------------------------------------
+# The solution and its runs
+# ---------------------------------------------------------------------------
+
+
+def _regular_files(folder: Path) -> list[Path]:
+    """The files under ``folder`` that are files of its own: no links, nothing outside."""
+    if not folder.is_dir():
+        return []
+    root = folder.resolve()
+    found = []
+    for current, dirs, names in os.walk(folder, followlinks=False):
+        dirs[:] = sorted(d for d in dirs if not Path(current, d).is_symlink())
+        for name in sorted(names):
+            path = Path(current, name)
+            if path.is_symlink() or not path.is_file():
+                continue
+            if path.resolve().is_relative_to(root):
+                found.append(path)
+    return found
+
+
+def _tail(path: Path, lines: int = LOG_TAIL_LINES) -> str:
+    """The last lines of a log file."""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            fh.seek(max(0, size - LOG_TAIL_BYTES))
+            text = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return ""
+    return "\n".join(text.splitlines()[-lines:])
+
+
+class Solution:
+    """The package this server stands in: what it takes in, and its runs."""
+
+    def __init__(
+        self,
+        package_dir: Path = PACKAGE_DIR,
+        *,
+        timeout: float = RUN_TIMEOUT_SECONDS,
+        max_upload_bytes: int = MAX_UPLOAD_BYTES,
+        max_files: int = MAX_FILES,
+        keep_runs: int = KEEP_RUNS,
+    ):
+        self.package_dir = Path(package_dir).resolve()
+        self.timeout = timeout
+        self.max_upload_bytes = max_upload_bytes
+        self.max_files = max_files
+        self.keep_runs = max(1, keep_runs)
+        self.runs_root = Path(tempfile.mkdtemp(prefix="poc-test-page-"))
+        atexit.register(self.close)
+        self._lock = threading.Lock()
+        self._runs: dict[str, Path] = {}
+        self._started: float | None = None
+        self._log_path: Path | None = None
+
+    def close(self) -> None:
+        """Remove every run's working folder."""
+        shutil.rmtree(self.runs_root, ignore_errors=True)
+
+    # -- what the page reads ------------------------------------------------
+
+    def description(self) -> dict:
+        """ui/solution.json, with what this server allows and what the package has."""
+        try:
+            text = (self.package_dir / "ui" / "solution.json").read_text(encoding="utf-8")
+            described = json.loads(text)
+        except (OSError, ValueError):
+            described = {}
+        if not isinstance(described, dict):
+            described = {}
+        described["limits"] = {
+            "max_upload_bytes": self.max_upload_bytes,
+            "max_files": self.max_files,
+            "max_text_chars": MAX_TEXT_CHARS,
+            "timeout_seconds": self.timeout,
+        }
+        samples = [
+            p.relative_to(self.package_dir / SAMPLE_DIR).as_posix()
+            for p in _regular_files(self.package_dir / SAMPLE_DIR)
+            if p.name != UPLOADED_NAMES_FILE
+        ]
+        described["sample_files"] = samples[:50]
+        described["env_file"] = (self.package_dir / ".env").is_file()
+        return described
+
+    def accepted_suffixes(self) -> set[str] | None:
+        """The file endings the solution takes, or None when it names none."""
+        inputs = self.description().get("inputs")
+        if not isinstance(inputs, list) or not inputs:
+            return None
+        accepted: set[str] = set()
+        for item in inputs:
+            endings = item.get("extensions") if isinstance(item, dict) else None
+            if not isinstance(endings, list) or not endings:
+                return None
+            accepted.update(str(e).lower() for e in endings)
+        return accepted
+
+    def status(self) -> dict:
+        started, log_path = self._started, self._log_path
+        if started is None or log_path is None:
+            return {"busy": False, "elapsed_seconds": 0, "log_tail": ""}
+        return {
+            "busy": True,
+            "elapsed_seconds": round(time.monotonic() - started, 1),
+            "log_tail": _tail(log_path, 12),
+        }
+
+    # -- one run ------------------------------------------------------------
+
+    def run(self, fields: dict[str, str], files: list[tuple]) -> dict:
+        """Run the solution once on what the request carried; one run at a time."""
+        uploads = self._checked_uploads(fields, files)
+        if not self._lock.acquire(blocking=False):
+            raise RefusalError(409, "busy", "A run is already going. Wait for it to finish.")
+        try:
+            return self._run(uploads, sent_files=bool(files))
+        finally:
+            self._started = None
+            self._log_path = None
+            self._lock.release()
+
+    def _checked_uploads(self, fields: dict[str, str], files: list[tuple]) -> list[tuple]:
+        """``(file name, bytes)`` for every file and text of the request, names made safe."""
+        if len(files) > self.max_files:
+            raise RefusalError(
+                413, "too_many_files", f"At most {self.max_files} files can be sent at once."
+            )
+        accepted = self.accepted_suffixes()
+        taken: set[str] = {UPLOADED_NAMES_FILE}
+        uploads: list[tuple] = []
+        for _field, filename, content in files:
+            name = safe_name(filename)
+            suffix = Path(name).suffix.lower()
+            if accepted is not None and suffix not in accepted:
+                raise RefusalError(
+                    400,
+                    "bad_extension",
+                    f"{name} is not a file this solution takes ({', '.join(sorted(accepted))}).",
+                )
+            name = _unused_name(name, taken)
+            taken.add(name.lower())
+            uploads.append((name, content))
+        # The RAG entrypoint reads a text file beside the documents as its questions,
+        # one a line, when the run has no terminal; a pasted text is an input file.
+        for field, filename in (("question", "question.txt"), ("text", "input.txt")):
+            text = fields.get(field, "").strip()
+            if not text:
+                continue
+            if len(text) > MAX_TEXT_CHARS:
+                raise RefusalError(
+                    413, "text_too_long", "The text is too long. Send it as a file instead."
+                )
+            name = _unused_name(filename, taken)
+            taken.add(name.lower())
+            uploads.append((name, (text + "\n").encode("utf-8")))
+        if not uploads and not _regular_files(self.package_dir / SAMPLE_DIR):
+            raise RefusalError(400, "no_input", "Add a file or a text first.")
+        return uploads
+
+    def _run(self, uploads: list[tuple], sent_files: bool) -> dict:
+        if not (self.package_dir / ENTRYPOINT).is_file():
+            raise RefusalError(500, "no_entrypoint", f"{ENTRYPOINT} is missing from the package.")
+        run_id = secrets.token_hex(8)
+        run_dir = self.runs_root / run_id
+        self._copy_package(run_dir)
+        sample_dir = run_dir / SAMPLE_DIR
+        sample_dir.mkdir()
+        (run_dir / OUTPUT_DIR).mkdir()
+        # No file sent (a question or a text at most): the package's own examples
+        # are the material.
+        examples = [] if sent_files else _regular_files(self.package_dir / SAMPLE_DIR)
+        examples = [p for p in examples if p.name != UPLOADED_NAMES_FILE]
+        used_examples = bool(examples)
+        if used_examples:
+            for source in examples:
+                target = sample_dir / source.relative_to(self.package_dir / SAMPLE_DIR)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+        for name, content in uploads:
+            (sample_dir / name).write_bytes(content)
+        if uploads:
+            (sample_dir / UPLOADED_NAMES_FILE).write_text(
+                "".join(f"{name}\n" for name, _ in uploads), encoding="utf-8"
+            )
+
+        log_path = self.runs_root / f"{run_id}.log"
+        self._log_path = log_path
+        self._started = time.monotonic()
+        exit_code, timed_out = self._execute(run_dir, log_path)
+        duration = round(time.monotonic() - self._started, 1)
+        # The keys were needed for the run only; the working folder stays for its downloads.
+        (run_dir / ".env").unlink(missing_ok=True)
+
+        self._runs[run_id] = run_dir
+        self._forget_old_runs()
+        outputs = self._outputs(run_id, run_dir)
+        answer = {
+            "ok": exit_code == 0 and not timed_out,
+            "run_id": run_id,
+            "exit_code": exit_code,
+            "duration_seconds": duration,
+            "used_examples": used_examples,
+            "log_tail": _tail(log_path),
+            "outputs": outputs,
+            "result": self._read_json(run_dir, self._main_result(outputs)),
+            "source_trace": self._read_json(
+                run_dir, next((o["name"] for o in outputs if o["name"].endswith(_TRACE_ENDING)), "")
+            ),
+        }
+        if timed_out:
+            answer["error"] = {
+                "code": "timeout",
+                "message": f"The run was stopped after {int(self.timeout)} seconds.",
+            }
+        elif exit_code != 0:
+            answer["error"] = {
+                "code": "run_failed",
+                "message": "The run ended with an error. The log says why.",
+            }
+        return answer
+
+    def _copy_package(self, run_dir: Path) -> None:
+        """The package's code and settings, without its inputs, results and this page."""
+        for source in _regular_files(self.package_dir):
+            relative = source.relative_to(self.package_dir)
+            if relative.parts[0] in _SKIP_DIRS or "__pycache__" in relative.parts:
+                continue
+            target = run_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+    def _execute(self, run_dir: Path, log_path: Path) -> tuple[int | None, bool]:
+        """Start run_poc.py in ``run_dir``; its output goes to ``log_path``."""
+        env = dict(os.environ)
+        env.update({"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1"})
+        with open(log_path, "wb") as log:
+            # A closed pipe, not the null device: on Windows that one counts as a
+            # terminal, and the entrypoint would wait for a typed question.
+            process = subprocess.Popen(
+                [sys.executable, ENTRYPOINT],
+                cwd=run_dir,
+                env=env,
+                stdin=subprocess.PIPE,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+            )
+            if process.stdin is not None:
+                process.stdin.close()
+            try:
+                return process.wait(timeout=self.timeout), False
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+                return None, True
+
+    def _forget_old_runs(self) -> None:
+        while len(self._runs) > self.keep_runs:
+            run_id = next(iter(self._runs))
+            shutil.rmtree(self._runs.pop(run_id), ignore_errors=True)
+            (self.runs_root / f"{run_id}.log").unlink(missing_ok=True)
+
+    def _outputs(self, run_id: str, run_dir: Path) -> list[dict]:
+        out_dir = run_dir / OUTPUT_DIR
+        outputs = []
+        for path in _regular_files(out_dir):
+            kind = _OUTPUT_KINDS.get(path.suffix.lower())
+            if kind is None:
+                continue
+            name = path.relative_to(out_dir).as_posix()
+            outputs.append(
+                {
+                    "name": name,
+                    "kind": kind,
+                    "size": path.stat().st_size,
+                    "url": f"/api/runs/{run_id}/files/{quote(name)}",
+                }
+            )
+            if len(outputs) >= MAX_OUTPUT_FILES:
+                break
+        return outputs
+
+    @staticmethod
+    def _main_result(outputs: list[dict]) -> str:
+        """The name of the output file that holds the result, or ''."""
+        names = [
+            o["name"]
+            for o in outputs
+            if o["kind"] == "json" and "/" not in o["name"]
+            if not o["name"].endswith(_NOT_RESULT_ENDINGS)
+        ]
+        for ending in _RESULT_ENDINGS:
+            for name in names:
+                if name.endswith(ending):
+                    return name
+        return names[0] if len(names) == 1 else ""
+
+    @staticmethod
+    def _read_json(run_dir: Path, name: str):
+        if not name:
+            return None
+        path = run_dir / OUTPUT_DIR / name
+        try:
+            if path.stat().st_size > MAX_RESULT_BYTES:
+                return None
+            return json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            return None
+
+    def output_file(self, run_id: str, name: str) -> Path:
+        """The output file ``name`` of run ``run_id``; a RefusalError when there is none."""
+        missing = RefusalError(404, "not_found", "No such file.")
+        run_dir = self._runs.get(run_id) if _RUN_ID_RE.fullmatch(run_id) else None
+        if run_dir is None or not name or "\\" in name or "\x00" in name:
+            raise missing
+        parts = PurePosixPath(name).parts
+        if name.startswith("/") or any(part in ("", ".", "..") for part in parts):
+            raise missing
+        if PurePosixPath(name).suffix.lower() not in _OUTPUT_KINDS:
+            raise missing
+        out_dir = (run_dir / OUTPUT_DIR).resolve()
+        path = out_dir.joinpath(*parts)
+        if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(out_dir):
+            raise missing
+        return path
+
+
+# ---------------------------------------------------------------------------
+# HTTP
+# ---------------------------------------------------------------------------
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "PocTestPage"
+    sys_version = ""
+
+    @property
+    def solution(self) -> Solution:
+        return self.server.solution  # type: ignore[attr-defined]
+
+    def log_message(self, format, *args):  # noqa: A002 (the base class's name)
+        if "/api/status" not in (self.path or ""):
+            super().log_message(format, *args)
+
+    # -- answers ------------------------------------------------------------
+
+    def _send(self, status: int, body: bytes, content_type: str, extra: dict | None = None):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        for name, value in {**_SECURITY_HEADERS, **(extra or {})}.items():
+            self.send_header(name, value)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _json(self, status: int, payload: dict):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self._send(status, body, "application/json; charset=utf-8")
+
+    def _refuse(self, refusal: RefusalError):
+        self._json(
+            refusal.status,
+            {"ok": False, "error": {"code": refusal.code, "message": refusal.message}},
+        )
+
+    def _handle(self, action):
+        try:
+            self._check_host()
+            action()
+        except RefusalError as refusal:
+            self._refuse(refusal)
+        except (BrokenPipeError, ConnectionError):
+            pass
+        except Exception:
+            # The terminal gets the details; the answer says only that it went wrong.
+            traceback.print_exc()
+            self._refuse(
+                RefusalError(500, "server_error", "The test page hit an error. See its terminal.")
+            )
+
+    def _check_host(self):
+        """A page on another site must not reach this server through the browser.
+
+        While the server listens on this computer only, its name in the request is
+        localhost or 127.0.0.1; any other name is a foreign page's. A request a page
+        sends carries that page's origin, which must be this server.
+        """
+        host = urlsplit("//" + (self.headers.get("Host") or "")).hostname or ""
+        bound = self.server.server_address[0]
+        if bound in _LOOPBACK_NAMES and host not in _LOOPBACK_NAMES:
+            raise RefusalError(403, "forbidden", "This address is not the test page's own.")
+        origin = self.headers.get("Origin")
+        if origin and urlsplit(origin).netloc != (self.headers.get("Host") or ""):
+            raise RefusalError(403, "forbidden", "The request comes from another site.")
+
+    # -- routes -------------------------------------------------------------
+
+    def do_GET(self):  # noqa: N802 (the base class's name)
+        self._handle(self._get)
+
+    do_HEAD = do_GET  # noqa: N815
+
+    def do_POST(self):  # noqa: N802
+        self._handle(self._post)
+
+    def _get(self):
+        path = urlsplit(self.path).path
+        if path in ("/", "/index.html"):
+            try:
+                page = (self.solution.package_dir / "ui" / "index.html").read_bytes()
+            except OSError:
+                raise RefusalError(404, "not_found", "ui/index.html is missing.") from None
+            self._send(
+                200, page, "text/html; charset=utf-8", {"Content-Security-Policy": _PAGE_POLICY}
+            )
+        elif path == "/api/solution":
+            self._json(200, self.solution.description())
+        elif path == "/api/status":
+            self._json(200, self.solution.status())
+        elif path.startswith("/api/runs/"):
+            run_id, separator, name = path.removeprefix("/api/runs/").partition("/files/")
+            if not separator:
+                raise RefusalError(404, "not_found", "No such address.")
+            self._send_file(self.solution.output_file(run_id, unquote(name)))
+        else:
+            raise RefusalError(404, "not_found", "No such address.")
+
+    def _send_file(self, path: Path):
+        body = path.read_bytes()
+        content_type = _CONTENT_TYPES.get(path.suffix.lower(), "application/octet-stream")
+        # Always a download: an output file is never opened as a page of this server.
+        disposition = f"attachment; filename*=UTF-8''{quote(path.name)}"
+        self._send(200, body, content_type, {"Content-Disposition": disposition})
+
+    def _post(self):
+        if urlsplit(self.path).path != "/api/run":
+            raise RefusalError(404, "not_found", "No such address.")
+        fields, files = parse_multipart(self.headers.get("Content-Type") or "", self._body())
+        answer = self.solution.run(fields, files)
+        self._json(200, answer)
+
+    def _body(self) -> bytes:
+        """The request body, refused before it is read when it is over the limit."""
+        try:
+            length = int(self.headers.get("Content-Length") or "")
+        except ValueError:
+            raise RefusalError(
+                411, "no_length", "The request does not say how long it is."
+            ) from None
+        limit = self.solution.max_upload_bytes
+        if length < 0:
+            raise RefusalError(400, "bad_form", "The request's length is not a size.")
+        if length > limit + 64 * 1024:
+            # Read a moderate overshoot away so the answer reaches the browser;
+            # a far larger body is left unread and the connection closes.
+            if length <= 4 * limit + 1024 * 1024:
+                remaining = length
+                while remaining > 0:
+                    chunk = self.rfile.read(min(remaining, 1024 * 1024))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+            else:
+                self.close_connection = True
+            megabytes = max(1, limit // (1024 * 1024))
+            raise RefusalError(
+                413, "too_large", f"The files are too large: at most {megabytes} MB in all."
+            )
+        return self.rfile.read(length)
+
+
+def create_server(
+    package_dir: Path = PACKAGE_DIR, host: str = "127.0.0.1", port: int = 8000, **limits
+) -> ThreadingHTTPServer:
+    """The server for the package in ``package_dir``; ``limits`` go to :class:`Solution`."""
+    server = ThreadingHTTPServer((host, port), Handler)
+    server.daemon_threads = True
+    server.solution = Solution(package_dir, **limits)  # type: ignore[attr-defined]
+    return server
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="A local web page for trying this solution.")
+    parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--timeout", type=float, default=RUN_TIMEOUT_SECONDS, help="seconds one run may take"
+    )
+    args = parser.parse_args()
+
+    try:
+        server = create_server(PACKAGE_DIR, args.host, args.port, timeout=args.timeout)
+    except OSError as exc:
+        print(f"Cannot listen on {args.host}:{args.port}: {exc}", file=sys.stderr)
+        print("Try another port: python app.py --port 8080", file=sys.stderr)
+        sys.exit(1)
+    shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
+    print(f"Test page: http://{shown_host}:{server.server_address[1]}")
+    if args.host not in _LOOPBACK_NAMES:
+        print(
+            "NOTE: the page has no sign-in, and now other computers on the network can "
+            "reach it and start runs with your model credentials."
+        )
+    print("Stop with Ctrl+C.")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopped.")
+    finally:
+        server.server_close()
+        server.solution.close()  # type: ignore[attr-defined]
+
+
+if __name__ == "__main__":
+    main()
