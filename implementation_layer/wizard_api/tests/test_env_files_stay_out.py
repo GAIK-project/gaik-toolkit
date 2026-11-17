@@ -30,21 +30,45 @@ SECRET_NAMES = [
 ]
 
 
-def _package(poc: str) -> None:
-    """A complete package with every spelling of an environment file in it."""
+def _case_blind(folder: str) -> bool:
+    """Whether the filesystem under ``folder`` takes ``.ENV`` and ``.env`` for one file
+    (macOS and Windows by default)."""
+    probe = os.path.join(folder, "case-probe")
+    with open(probe, "w", encoding="utf-8"):
+        pass
+    try:
+        return os.path.exists(os.path.join(folder, "CASE-PROBE"))
+    finally:
+        os.remove(probe)
+
+
+def _package(poc: str) -> list[str]:
+    """A complete package with every spelling of an environment file in it.
+
+    Returns the spellings written: where the filesystem does not tell case apart,
+    one that differs from an earlier one only in case is the same file, so it is
+    left out.
+    """
     os.makedirs(os.path.join(poc, "schemas"), exist_ok=True)
     os.makedirs(os.path.join(poc, "config"), exist_ok=True)
+    secrets = SECRET_NAMES
+    if _case_blind(poc):
+        kept: dict[str, str] = {}
+        for name in SECRET_NAMES:
+            kept.setdefault(name.lower(), name)
+        secrets = list(kept.values())
     files = {
         "run_poc.py": "from gaik.software_components.extractor import Extractor\n",
         "requirements.txt": "gaik[extract]\n",
         "README.md": "# PoC\n",
         os.path.join("schemas", "output_schema.json"): "{}\n",
         ".env.example": "AZURE_API_KEY=\n",
-        **{name: "NAME=not-for-the-package\n" for name in SECRET_NAMES},
+        **{name: "NAME=not-for-the-package\n" for name in secrets},
     }
     for name, content in files.items():
         with open(os.path.join(poc, name), "w", encoding="utf-8") as fh:
             fh.write(content)
+    return secrets
 
 
 @pytest.mark.parametrize("name", [*SECRET_NAMES, "sub/dir/.Env.Local"])
@@ -68,7 +92,7 @@ def test_the_list_of_variables_and_ordinary_files_are_deployable() -> None:
 
 def test_the_package_listings_leave_them_out(tmp_path) -> None:
     poc = str(tmp_path / "poc")
-    _package(poc)
+    written = _package(poc)
 
     listed = poc_service.package_files(poc)
     deployable = poc_service.deployable_files(poc)
@@ -76,9 +100,9 @@ def test_the_package_listings_leave_them_out(tmp_path) -> None:
     for files in (listed, deployable):
         assert ".env.example" in files and "run_poc.py" in files
         assert not [f for f in files if poc_service.is_secret_name(f)]
-        assert not set(files) & set(SECRET_NAMES)
+        assert not set(files) & set(written)
     # They are still files of the session: only the package's view skips them.
-    assert set(SECRET_NAMES) <= set(poc_service.regular_files(poc))
+    assert set(written) <= set(poc_service.regular_files(poc))
 
 
 def _session(client, db_session) -> dict:
