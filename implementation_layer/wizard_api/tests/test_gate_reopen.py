@@ -755,6 +755,46 @@ def test_a_new_or_changed_external_service_is_a_changed_solution() -> None:
     assert artifact_sync.solution_digest(sends_more) != artifact_sync.solution_digest(added)
 
 
+def _with_service(service: dict) -> dict:
+    return {"technical_spec": {"input_types": ["pdf"], "external_services": [service]}}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"name": "Other web search"},
+        {"python_package": "other-search>=1"},
+        {"env_vars": ["SEARCH_API_KEY", "SEARCH_BASE_URL"]},
+        {"data_sent": "The supplier's company name and business ID"},
+    ],
+)
+def test_another_service_package_key_or_data_sent_is_a_changed_solution(change) -> None:
+    from wizard_api.services import artifact_sync
+
+    approved = artifact_sync.solution_digest(_with_service(_SEARCH))
+
+    assert artifact_sync.solution_digest(_with_service({**_SEARCH, **change})) != approved
+
+
+def test_a_reworded_external_service_is_the_same_solution() -> None:
+    """The purpose, fallback and docs are wording the agent rewrites freely; a reworded
+    sentence does not reopen Gate 2."""
+    from wizard_api.services import artifact_sync
+
+    reworded = {
+        **_SEARCH,
+        "purpose": "Looks up recent public news on the supplier",
+        "fallback": "Without it the news field stays empty",
+        "docs_url": "https://docs.example.com/search",
+        "env_vars": list(reversed(_SEARCH["env_vars"])),
+        "data_sent": f"  {_SEARCH['data_sent']} ",
+    }
+
+    assert artifact_sync.solution_digest(_with_service(reworded)) == (
+        artifact_sync.solution_digest(_with_service(_SEARCH))
+    )
+
+
 @requires_postgres
 def test_a_turn_that_adds_an_external_service_reopens_gate_2(client, db_session) -> None:
     created, session = _session_past_gate_3(client, db_session)
