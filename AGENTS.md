@@ -153,6 +153,8 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   A generated result (PDF, subtitles, tabular session) belongs to the user whose run
   made it: the proxy sends the signed-in user in `X-GAIK-User`, and the API serves the
   result by id only to that user (`api/utils/result_owner.py`).
+  Each run, and each result download, leaves one `gaik.audit` log line with the user id,
+  the route template and the status, never content or file names (`api/utils/audit.py`).
 
 ## docs site (GitHub Pages)
 
