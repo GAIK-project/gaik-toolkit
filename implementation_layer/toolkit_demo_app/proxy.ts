@@ -1,5 +1,6 @@
 import {
   USER_HEADER,
+  namesItsUser,
   WIZARD_USER_HEADER,
   accessRefusal,
   isStateChanging,
@@ -215,8 +216,9 @@ async function route(request: NextRequest): Promise<NextResponse> {
     }
     // A generated result (PDF, subtitles, tabular session) belongs to the user
     // whose run made it; the API serves it only to the same user. Set on every
-    // forwarded request, like the wizard's header, never copied from the browser.
-    {
+    // run and on every result download (namesItsUser), never copied from the browser.
+    // Other reads leave it out, so they do not read the session.
+    if (namesItsUser(request.method, pathname)) {
       const { userId } = await accessState();
       if (userId) headers.set(USER_HEADER, userId);
     }

@@ -336,6 +336,17 @@ test("a signed-in user's request names the user, never the browser's claim", asy
   expect(backendHeaders?.get("x-gaik-user")).toBe("u1");
 });
 
+test("a read that hands out no result names no user", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const read = await proxy(
+    new NextRequest("https://demo.test/api/tabular-agent/status", {
+      headers: { cookie },
+    }),
+  );
+  expect(read.status).toBe(200);
+  expect(backendHeaders?.has("x-gaik-user")).toBe(false);
+});
+
 test("a visitor who is not signed in names no user, whatever the browser sends", async () => {
   const download = await proxy(
     new NextRequest("https://demo.test/api/pipeline/pdf/abc", {

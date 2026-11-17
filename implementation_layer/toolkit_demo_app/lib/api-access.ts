@@ -54,6 +54,26 @@ export const WIZARD_USER_HEADER = "x-gaik-wizard-user";
  */
 export const USER_HEADER = "x-gaik-user";
 
+/** The GET routes that hand out a result made by a user's run (api/utils/result_owner.py). */
+const OWNED_RESULT_READS = [
+  /^\/api\/pipeline\/pdf\/[^/]+$/,
+  /^\/api\/diary\/pdf\/[^/]+$/,
+  /^\/api\/luvata-order\/pdf\/[^/]+$/,
+  /^\/api\/dental-transcribe\/(srt|vtt)\/[^/]+$/,
+];
+
+/**
+ * True for a request the API answers for one user: every state-changing request
+ * (a run records its user, a delete checks it) and the result downloads. Other reads
+ * get no user header, so the proxy does not read the session for them.
+ */
+export function namesItsUser(method: string, pathname: string): boolean {
+  return (
+    isStateChanging(method) ||
+    OWNED_RESULT_READS.some((pattern) => pattern.test(pathname))
+  );
+}
+
 /**
  * Why a first-wizard request is refused, or null when it may go on. Its agent
  * has shell tools and runs in the demo API pod, so approval is not enough: an
