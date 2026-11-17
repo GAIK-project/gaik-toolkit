@@ -111,6 +111,11 @@ When using `transcription_model="whisper_local"`, pass:
 - `local_api_base` (required)
 - `local_api_key` (required)
 
+The audio and the key go only to the address set in `LOCAL_TRANSCRIBER_API_BASE` (plain
+http works for that address), to this machine, or to a host in `GAIK_ALLOWED_ENDPOINT_HOSTS`
+or `api_config["allowed_endpoint_hosts"]`. Any other `local_api_base` raises
+`EndpointNotAllowedError` when the transcriber is built, so read it from that variable.
+
 Optional local parameters:
 - `language="auto"`
 - `diarization=False`

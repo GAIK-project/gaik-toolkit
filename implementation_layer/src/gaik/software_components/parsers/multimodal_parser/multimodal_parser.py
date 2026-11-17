@@ -14,6 +14,7 @@ from typing import Literal
 from markdown_it import MarkdownIt
 
 from gaik.software_components import _http
+from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.source_material import with_source_material_instruction
 
@@ -395,13 +396,19 @@ class MultimodalParser:
         body = _build_google_body(pdf_path, system_prompt, user_prompt, self.reasoning_effort)
 
         if self.config.get("vertex_ai", True):
-            token = get_google_access_token(self.config)
             url = self.config["generate_content_url"]
             # Substitute ``{model}`` placeholder with the active model so one
             # env-configured URL can drive runtime model swaps. URLs without
             # the placeholder are used as-is (backwards compatible).
             if "{model}" in url:
                 url = url.replace("{model}", self.config["model"])
+            check_endpoint(
+                url,
+                provider="vertex",
+                allowed_hosts=self.config.get("allowed_endpoint_hosts"),
+                what="generate_content_url",
+            )
+            token = get_google_access_token(self.config)
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",

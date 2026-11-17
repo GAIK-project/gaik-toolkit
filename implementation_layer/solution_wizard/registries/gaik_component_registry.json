@@ -389,7 +389,8 @@
       "The hosted models (whisper, whisper-1, gpt-4o-transcribe) return plain text only: .segments, .srt_content and .vtt_content stay None, and diarization/speaker_count/min_speakers/max_speakers are silently ignored. Timestamps and speaker labels require transcription_model='whisper_local'.",
       "whisper_local requires a self-hosted transcription endpoint (local_api_base + local_api_key); transcribe() raises ValueError without both. Confirm the user has one before selecting this path.",
       "Speaker labels are exposed on .segments only. .srt_content and .vtt_content are built by segments_to_srt/segments_to_vtt, which read start/end/text and drop every other key.",
-      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. Change a limit with limits=InputLimits(...)."
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. Change a limit with limits=InputLimits(...).",
+      "From the gaik release after 0.10.0, local_api_base must be the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS; otherwise the constructor raises EndpointNotAllowedError. Read it from that variable."
     ],
     "best_for": [
       "audio_to_transcript",
@@ -866,6 +867,7 @@
     ],
     "optional_parameters": [
       "base_url",
+      "allowed_endpoint_hosts",
       "model",
       "timeout",
       "max_retries",
@@ -1141,7 +1143,8 @@
       "Overlap deduplication is SRT-based; use response_format='srt' for the cleanest chunk merging",
       "Produces timestamps but never speaker labels, on any backend. gpt-4o-transcribe-diarize requests diarized output and parses the speaker field, then discards it when building the SRT (and TranscriptionResult exposes only .content, so it cannot be recovered); the whisper_local backend hardcodes diarization=False in its request payload. For speaker attribution use Transcriber(transcription_model='whisper_local', diarization=True).",
       "The whisper_local backend takes its endpoint from api_config['api_base'] (required) and api_config['key'] or ['api_key'] (optional -- the auth header is omitted when empty). This differs from Transcriber, which uses the local_api_base/local_api_key constructor kwargs and requires both.",
-      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend) before audio is extracted or any call is made; whisper_local_max_audio_minutes is a second cap for Whisper Local only. A recording without a length in its header (a WebM recorded in a browser) is measured by decoding its audio, and one whose length cannot be read at all is refused. max_media_bytes is off by default. Change a limit with limits=InputLimits(...)."
+      "From the gaik release after 0.10.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend) before audio is extracted or any call is made; whisper_local_max_audio_minutes is a second cap for Whisper Local only. A recording without a length in its header (a WebM recorded in a browser) is measured by decoding its audio, and one whose length cannot be read at all is refused. max_media_bytes is off by default. Change a limit with limits=InputLimits(...).",
+      "From the gaik release after 0.10.0, api_config['api_base'] for whisper_local follows the same rule as Transcriber's local_api_base (LOCAL_TRANSCRIBER_API_BASE, this machine or GAIK_ALLOWED_ENDPOINT_HOSTS), and an Azure audio endpoint must be an Azure host, the address in AZURE_ENDPOINT or a listed host; otherwise EndpointNotAllowedError (at construction for gpt-4o-transcribe-diarize, when the Whisper client is built otherwise)."
     ],
     "best_for": [
       "long_audio_transcription",
@@ -2809,7 +2812,8 @@
     "optional_parameters": [
       "timeout_seconds",
       "healthcheck_timeout_seconds",
-      "limits"
+      "limits",
+      "allowed_endpoint_hosts"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
@@ -2823,6 +2827,7 @@
     },
     "known_limitations": [
       "Requires access to the Haaga-Helia hosted Docling service. api_base and password are constructor kwargs with NO environment fallback in gaik -- read them from DOCLING_API_BASE / DOCLING_API_PASSWORD in generated code (the convention used by toolkit_demo_app and the OpenShift deployment).",
+      "From the gaik release after 0.10.0, api_base must be the address set in DOCLING_API_BASE or API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS / allowed_endpoint_hosts; otherwise the constructor raises EndpointNotAllowedError.",
       "Raises ValueError at construction when either credential is empty",
       "Sends the document to an external service -- unsuitable when data must not leave the local environment",
       "Returns parsed_markdown (not text_content like the local DoclingParser) and flattens pages -- no page-level provenance",

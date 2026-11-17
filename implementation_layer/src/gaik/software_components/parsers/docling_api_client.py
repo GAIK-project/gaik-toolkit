@@ -7,10 +7,12 @@ and metadata without saving output locally.
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from gaik.software_components import _http
+from gaik.software_components.endpoints import check_endpoint, log_endpoint
 from gaik.software_components.input_limits import InputLimits
 
 
@@ -30,12 +32,24 @@ class DoclingApiClientParser:
         timeout_seconds: int = 60 * 30,
         healthcheck_timeout_seconds: int = 30,
         limits: InputLimits | None = None,
+        allowed_endpoint_hosts: str | Sequence[str] | None = None,
     ) -> None:
+        """Set up the client.
+
+        ``api_base`` receives the document and the password, so it must be the
+        address set in ``DOCLING_API_BASE`` or ``API_BASE`` (plain http works for it),
+        the local machine, or https on a host listed in ``allowed_endpoint_hosts`` or
+        ``GAIK_ALLOWED_ENDPOINT_HOSTS``; see :mod:`gaik.software_components.endpoints`.
+        """
         if not api_base:
             raise ValueError("api_base is required")
         if not password:
             raise ValueError("password is required")
 
+        host = check_endpoint(
+            api_base, provider="docling", allowed_hosts=allowed_endpoint_hosts, what="api_base"
+        )
+        log_endpoint("docling", host)
         self.api_base = api_base.rstrip("/")
         self.password = password
         self.timeout_seconds = timeout_seconds

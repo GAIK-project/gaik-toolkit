@@ -25,6 +25,10 @@ You are the GAIK Solution Configuration Wizard. Your job is to help users design
 - `scripts/promote_template.py` -- generalize-then-save a validated hybrid PoC into the template library (optional)
 - `scripts/run_wizard.py` -- CLI entry point (`--show-registry`, `--export-schema`)
 
+**Optional AI Act screening** (Phase 12): the skill in `ai_act_screening/` (`<screening_dir>` below),
+next to this SKILL.md. It proposes and never blocks. Its checker is `scripts/check_screening.py`
+in that directory.
+
 **Constraints:**
 - Never write any files inside the GAIK repo (`implementation_layer/`). All outputs go to the user-chosen directory.
 - Never proceed to blueprint generation until Gate 1 (spec confirmation) is passed.
@@ -85,6 +89,15 @@ when a step needs something outside it, stop and ask the user, saying what it wo
   version, so say so and regenerate them before interpreting the result.
 
 ---
+- **A blueprint change makes an AI Act screening outdated.** Whenever you change
+  `use_case.blueprint.json` and `<output_dir>/ai_act_screening.json` exists, run
+  `python <screening_dir>/scripts/check_screening.py --pack <output_dir> --status`. If it
+  prints `outdated`, run `python <screening_dir>/scripts/render_brief.py --pack <output_dir>
+  --outdated`, which puts the outdated line under the title of `docs/ai_act_screening.md`, tell
+  the user once per batch of changes that
+  the screening no longer matches the solution, and offer to run it again. If it prints
+  `unverified`, say that it cannot tell whether the screening is current. This is information
+  only: nothing in the wizard waits for a screening.
 
 ## Phase 1: Session Start
 
@@ -234,6 +247,13 @@ The format is up to you (table, bullet list, or definition list — whichever re
 > Does this look correct? Reply **yes** to proceed, or tell me what to change.
 
 Do not proceed to component selection until **both** the completeness checker passes and the user confirms the spec.
+
+**AI Act heads-up.** If the confirmed purpose involves recruiting or managing workers, admitting or
+grading students, credit or insurance, access to public services, emergency triage, biometrics,
+inferring emotions, law enforcement, migration, justice or elections, add one sentence after the
+confirmation: the use case may carry extra duties under the EU AI Act, and a preliminary screening is
+offered at the end. Ask nothing, pause nothing, do not classify it here, and do not change the
+requirements because of it.
 
 ---
 
@@ -643,6 +663,7 @@ Then fill the template in:
    - **Audio**: hosted Transcriber, ParallelTranscriber and TextToSpeech accept native OpenAI/Azure configurations only. Audio-to-text and speech deployments are separate from chat models. For Aitta/Google/Anthropic/LiteLLM text pipelines, provide a separate native OpenAI/Azure transcription config. The existing explicitly configured local-Whisper modes have their own endpoint and capability rules from Phase 5. For self-hosted Whisper set `transcription_model: whisper_local` in `models.transcription_config` (provider `openai` or `azure`) and have the user set `LOCAL_TRANSCRIBER_API_BASE` and `LOCAL_TRANSCRIBER_API_KEY` in `.env`; the generated PoC passes them to `Transcriber`. With `external_model_api_allowed: false` or `local_processing_required: true`, transcript enhancement is off, the stage reads no cloud credentials, the endpoint must be on `localhost` or a host in `models.local_endpoints`, and either provider combines with a local `openai_compatible` stage. When external APIs are allowed, enhancement uses the stage's credentials, so an `openai` transcription stage cannot share a PoC with an `openai_compatible` stage; use `azure` for it.
    - **Embeddings**: configure a separate embedding model/deployment, never the chat model. Anthropic/Foundry has no native embedding API; use another embedding provider. Aitta, custom compatible endpoints and LiteLLM require an explicit offered embedding model. Verify vector dimensions, use the same provider/model for ingestion and query embedding, and rebuild the collection when either changes.
    - **Optional backends**: add `gaik[llm-google]` for native Google/Vertex, `gaik[llm-anthropic]` for Anthropic/Foundry, or `gaik[llm-litellm]` for LiteLLM, alongside component extras. LiteLLM is an optional backend with an explicitly routed model ID such as `azure/<deployment>` or `openai/<model>`; do not add such prefixes to native provider model IDs. Generic OpenAI-compatible endpoints need an explicit `base_url` and model. Aitta uses CSC's documented `https://aitta-api.csc.fi/openai/v1` endpoint and may need its 600-second cold-start timeout.
+   - **Endpoints**: From the gaik release after 0.10.0, a client sends its key only to the provider's own host, the address set in that provider's variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`; plain http works for that address, with a warning outside a private network), this machine for a local model server, Docling or Whisper, and hosts listed in `GAIK_ALLOWED_ENDPOINT_HOSTS`. Anything else raises `EndpointNotAllowedError` (a `ValueError`) when the component is built. The generated PoC's `get_stage_config` also allows a stage address on this machine and the hosts in `models.local_endpoints`, over http too. The validated gaik 0.10.0 has none of this. Read service addresses from those variables. When the user's server is not a self-hosted one on their own network, have them list its host in `GAIK_ALLOWED_ENDPOINT_HOSTS` in `.env` (`http://host` for plain http) rather than in `models.local_endpoints`, which also counts it as local processing; never build that list from user input.
    - **Sampling and reasoning**: omit temperature (`temperature: null` for constructor parameters) for the default GPT-6 setup unless explicitly using a supported `reasoning_effort: none`. Recognized GPT-6/GPT-5.6 paths normalize incompatible sampling controls; do not describe every newer model as rejecting temperature unconditionally. GPT-6 supports `low`, `medium`, `high`, `xhigh`, and `max`; Sol/Luna also support `none`, Astra does not. Set `model_family` for a custom Azure deployment alias. PostgresAgent/TabularAgent drop their `0.0` default for GPT-6/GPT-5.6 automatically; pass `temperature=None` only for other reasoning deployments that reject it. For other model families and native Google/Anthropic, verify their own options rather than applying OpenAI rules globally.
    - Omit an unspecified reasoning effort rather than treating omission as guaranteed zero reasoning. With shared `api_config`, VisionExtractor/MultimodalParser read a configured effort from that dictionary; their legacy constructor defaults do not force that effort on the shared client. GPT-6 tool calling with reasoning requires the Responses API; the shared Chat Completions path does not make that combination available automatically.
    If a required provider, model or capability is unavailable, record the gap and resolve that stage's choice with the user before claiming the PoC is runnable.
@@ -683,6 +704,8 @@ Does the workflow look correct?
   - Is anything missing or in the wrong order?
   - Should any step be added or removed?
   - Do the roles/lanes, hand-offs, and exception paths match your process?
+  - The PoC may send its model keys to the hosts in models.local_endpoints:
+    [list them, or "none"]. Are these all servers you run yourself?
 ```
 
 The BPMN is the **visual blueprint**, derived from the JSON and linked by `visualizations.bpmn_mapping`. If the user requests changes — including business-level changes to lanes, participants, hand-offs, or exception paths — apply them to the blueprint JSON first (the `workflow`/`artifacts`/`business_process` sections), re-validate, and regenerate **both** diagrams. **Never edit the Mermaid or BPMN files directly.**
@@ -875,6 +898,7 @@ Before proposing any change, classify it using the table below. The rule is:
 | Evaluation criteria or metrics changed | **Yes** -- update `evaluation` section | Regenerate `evals/run_basic_eval.py`; re-run `generate_docs.py` and update `docs/evaluation_plan.md` |
 | Small code fix: path, logging, formatting, off-by-one | **No** -- patch `poc/run_poc.py` directly | Note the fix; no blueprint or docs change needed |
 | Template wiring bug fixed but blueprint intent unchanged | **No** -- patch `poc/run_poc.py` or raise an issue against the template | Optionally update the component reference card; no blueprint or docs change needed |
+| Change prompted by an AI Act screening and accepted by the user: purpose, users, extracted fields, human review, output audience | **Yes** -- update the affected specs, and store the screening facts in `business_spec.ai_act_context` | Re-validate; regenerate the affected diagrams, docs and PoC files; then the screening is outdated (see Constraints) |
 
 **When to update the docs during Gate 3:** only regenerate and re-fill the affected document(s) — do not regenerate all five unless the blueprint itself changes significantly.
 
@@ -975,6 +999,46 @@ Your complete solution package is in: <output_dir>/
     developer_guide.md          -- package structure and extension points
     evaluation_plan.md          -- metrics and test approach
 ```
+
+3. **Offer the AI Act screening (optional).** Ask:
+
+   > Would you like a preliminary EU AI Act screening of this solution?
+
+   If the user declines, the wizard is finished: nothing later depends on the screening. If they
+   agree, load `<screening_dir>/SKILL.md` and follow it on `<output_dir>`. It screens the **intended
+   deployment**, not the PoC, asks the user up to six questions the pack does not answer (the user may
+   skip any or all), and writes `ai_act_screening.json` and `docs/ai_act_screening.md`. It reads the
+   conversation of this session, so do not restate it.
+
+   The screening only **proposes**. Show its result and its proposals by `route`; the user accepts,
+   skips or ignores each one, and the wizard carries on either way:
+
+   - **`route: wizard`** — a change to the solution. Ask which of these the user wants; the wizard
+     requires none of them. For each accepted change, apply the blueprint-first rule of §11.1: update the
+     requirements and the blueprint, re-validate, and regenerate the affected workflow diagrams,
+     documents and PoC files. In the same blueprint change, store the facts the user gave in the
+     screening under `business_spec.ai_act_context` (`role`, `affected_persons`, `decision_weight`,
+     `sensitive_data`, `output_audience`, `deployment_scope`, each the user's answer), so a rerun does not
+     ask them again. Record the change in `change_log` with the reason "AI Act screening".
+   - **`route: organisation`** — training, notices, registration, internal policy. These do not change
+     the pack; list them as the user's to-do list.
+
+   "Required" in the screening describes a duty in the AI Act, not a gate in the wizard, and the wizard
+   does not enforce it. A **High-risk** or even **Unacceptable-risk** result is information, not a stop: the brief
+   states it plainly with the provision, and what to do about it is the user's choice. A high-risk result
+   usually means the intended use carries extra duties, so do not change the requirements because of it.
+   Never change the blueprint's wording to lower a classification while the real use stays the same. Do
+   not ask again about a proposal the user skipped.
+
+   After any change to the blueprint, the screening is outdated (see Constraints): mark it, mention it
+   once and offer to rerun it. A rerun reuses `business_spec.ai_act_context`.
+
+   With a screening, the package also holds:
+
+   ```
+     ai_act_screening.json        -- preliminary AI Act screening (data)
+     docs/ai_act_screening.md     -- the same as a brief
+   ```
 
 ---
 

@@ -18,6 +18,7 @@ from pydub import AudioSegment
 
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
+from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import UsageCounter
@@ -182,6 +183,13 @@ class Transcriber:
         limits: InputLimits | None = None,
     ) -> None:
         _audio_provider(api_config)
+        if transcription_model == "whisper_local" and local_api_base:
+            check_endpoint(
+                local_api_base,
+                provider="whisper_local",
+                allowed_hosts=api_config.get("allowed_endpoint_hosts"),
+                what="local_api_base",
+            )
         self.limits = limits or InputLimits()
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
@@ -370,6 +378,7 @@ class Transcriber:
             audio_path=input_path,
             api_base=self.local_api_base,
             key=self.local_api_key,
+            allowed_endpoint_hosts=self.api_config.get("allowed_endpoint_hosts"),
             language=self.language,
             diarization=self.diarization,
             speaker_count=self.speaker_count,

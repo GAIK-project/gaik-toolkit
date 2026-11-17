@@ -912,7 +912,12 @@ def test_local_parsers_read_a_pdf_of_any_length_by_default(tmp_path):
     local = InputLimits.local_parsing()
     assert local.max_pages is None and local.max_file_bytes == input_limits.DEFAULT_MAX_FILE_BYTES
     assert SourceNormalizer().limits == local
-    assert DoclingApiClientParser(api_base="http://docling.test", password="p").limits == local
+    docling = DoclingApiClientParser(
+        api_base="http://docling.test",
+        password="p",
+        allowed_endpoint_hosts=["http://docling.test"],
+    )
+    assert docling.limits == local
 
 
 def test_a_recording_is_limited_by_its_length_not_its_size_by_default(tmp_path, monkeypatch):

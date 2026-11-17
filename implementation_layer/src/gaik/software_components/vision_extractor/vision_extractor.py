@@ -15,6 +15,7 @@ from pydantic_core import PydanticUndefined
 
 from gaik.observability import UsageRecord, build_usage_record
 from gaik.software_components import _http
+from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.extractor import (
     CompositeExtractionRequirements,
     ExtractionRequirements,
@@ -1215,10 +1216,16 @@ class VisionExtractor:
         }
 
         if is_vertex:
-            token = get_google_access_token(self.config)
             url = self.config["generate_content_url"]
             if "{model}" in url:
                 url = url.replace("{model}", self.model)
+            check_endpoint(
+                url,
+                provider="vertex",
+                allowed_hosts=self.config.get("allowed_endpoint_hosts"),
+                what="generate_content_url",
+            )
+            token = get_google_access_token(self.config)
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",

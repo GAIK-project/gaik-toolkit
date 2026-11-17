@@ -29,9 +29,9 @@ except ImportError:
     from api.utils.model_settings import get_request_api_config
 
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import error_detail
@@ -213,8 +213,8 @@ async def parse_document(
 
     # Validate file size and save temporarily
     content = await validate_file_size(file)
-    if (mismatch := content_mismatch(suffix, content)) is not None:
-        raise HTTPException(status_code=415, detail=mismatch)
+    if (problem := await upload_problem(suffix, content)) is not None:
+        raise HTTPException(status_code=problem.status, detail=problem.message)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
