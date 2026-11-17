@@ -27,7 +27,13 @@ from typing import Any
 from .blueprint import Blueprint
 from .docs_generator import md_text
 from .registry import get_registry
-from .schema_designer import write_extraction_requirements, write_schema_files
+from .schema_designer import (
+    NESTED_KEY,
+    check_schema_names,
+    nested_row_fields,
+    write_extraction_requirements,
+    write_schema_files,
+)
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "poc"
 
@@ -38,7 +44,7 @@ _VALIDATED_VERSION_FILE = Path(__file__).parent.parent.parent / "gaik_validated_
 
 
 def _gaik_version_spec() -> str:
-    """Return the pip specifier for gaik, for example ``>=0.10.0,<0.11``."""
+    """Return the pip specifier for gaik, for example ``>=0.11.0,<0.12``."""
     version = _VALIDATED_VERSION_FILE.read_text(encoding="utf-8").strip()
     major, minor = (int(part) for part in version.split(".")[:2])
     return f">={version},<{major}.{minor + 1}"
@@ -120,6 +126,22 @@ def _code_values_problems(blueprint: Blueprint) -> list[str]:
     for field in spec.get("fields", []):
         if isinstance(field, str) and not _is_python_name(field):
             problems.append(f"output field {field!r} must be a Python name")
+    # The rows of a nested collection become a model of their own in the same file.
+    for container, fields in nested_row_fields(spec).items():
+        for field in fields:
+            if not _is_python_name(field):
+                problems.append(f"field {field!r} of the {container!r} rows must be a Python name")
+        if nested_row_fields(spec[NESTED_KEY][container]):
+            problems.append(
+                f"the {container!r} rows have rows of their own; only one level of nested "
+                "rows is supported"
+            )
+    if spec.get(NESTED_KEY) and not problems:
+        # Anything else the rows' model would refuse, before a file is written.
+        try:
+            check_schema_names(spec, schema_name or "OutputSchema")
+        except ValueError as exc:
+            problems.append(f"target_output_spec.nested: {exc}")
     return problems
 
 
@@ -391,8 +413,14 @@ def _is_local_stage(stage: str, settings: dict[str, Any], local_hosts: set[str])
         return True
     if settings.get("provider") not in {"openai_compatible", "litellm"}:
         return False
+    base_url = settings.get("base_url")
+    if isinstance(base_url, str) and base_url.strip()[:4].lower() == "env:":
+        # Wizard v2 names a self-hosted endpoint as env:...BASE_URL (its scaffold guard
+        # refuses a literal http address). The PoC resolves it at run time, and
+        # provider_config.py refuses the stage unless the resolved host is local.
+        return True
     try:
-        host = (urlsplit(str(settings.get("base_url") or "")).hostname or "").lower()
+        host = (urlsplit(str(base_url or "")).hostname or "").lower()
     except ValueError:
         return False
     return bool(host) and host in local_hosts
@@ -844,7 +872,10 @@ def _build_input_loaders(blueprint: Blueprint) -> str:
         else:
             exts = doc_exts
         lines.append(f"    # Load user-upload artifact: {art_id} (type={art.type})")
-        lines.append(f"    {art_id}_path = _find_input(sample_dir, {exts})")
+        # The id's words pick between several inputs. A file type ("pdf" in agenda_pdf)
+        # is in every file name of that type, so it would pick none.
+        hints = tuple(w for w in art_id.lower().split("_") if len(w) > 2 and f'".{w}"' not in exts)
+        lines.append(f"    {art_id}_path = _find_input(sample_dir, {exts}, hints={hints!r})")
         lines.append(f"    print(f'{art_id}: {{{art_id}_path}}')")
         lines.append("")
     if not lines:
@@ -1431,6 +1462,22 @@ def scaffold_poc(
         _read_template("_common", "provider_config.py.tmpl") or "", encoding="utf-8"
     )
     files_created.append(provider_helper)
+
+    # Every package gets it: the agent decides only later whether the package
+    # gates documents with a manifest, and a hand-written lookup missed (#251).
+    manifest_helper = poc_dir / "document_manifest.py"
+    manifest_helper.write_text(
+        _read_template("_common", "document_manifest.py.tmpl") or "", encoding="utf-8"
+    )
+    files_created.append(manifest_helper)
+
+    # Same reason for the inputs: a hand-written finder read only the top level of
+    # sample_input/ and missed the case's bundle layout (UC05, #255).
+    bundle_helper = poc_dir / "input_bundle.py"
+    bundle_helper.write_text(
+        _read_template("_common", "input_bundle.py.tmpl") or "", encoding="utf-8"
+    )
+    files_created.append(bundle_helper)
 
     output_helper = poc_dir / "poc_output.py"
     output_helper.write_text(
