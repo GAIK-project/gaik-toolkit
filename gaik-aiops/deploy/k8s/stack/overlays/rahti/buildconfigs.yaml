@@ -4,8 +4,8 @@
 #   oc start-build aiops-mlflow --follow      # from the branch in spec.source.git.ref
 #   oc start-build aiops-sink --follow
 #
-# To build a branch that is not pushed, upload the folder instead:
-#   oc start-build aiops-mlflow --from-dir=gaik-aiops/deploy/compose/mlflow --follow
+# To build your last local commit instead, upload the repository (from gaik-aiops/):
+#   oc start-build aiops-mlflow --from-repo=.. --follow
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:

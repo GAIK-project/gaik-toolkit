@@ -33,6 +33,10 @@ images:
     newName: quay.io/prometheus/alertmanager
   - name: otel/opentelemetry-collector-contrib
     newName: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib
+  # Grafana has a public Route here, so it runs a patched release; the base's 11.5.2 has known
+  # security fixes missing. Keep this on the newest patch release of the line.
+  - name: grafana/grafana
+    newTag: 11.6.16
 
 configMapGenerator:
   - name: mlflow-auth-nginx

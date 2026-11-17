@@ -11,6 +11,8 @@ its quota.
 | `mlflow-auth.yaml`, `mlflow-auth-nginx.conf` | Basic auth in front of MLflow, which has no sign-in of its own |
 | `routes.yaml` | `https://grafana-gaik-aiops.2.rahtiapp.fi` and `https://mlflow-gaik-aiops.2.rahtiapp.fi` |
 | `patch-rahti-seccomp.yaml` | Drops the base's `RuntimeDefault` seccomp profile, which Rahti refuses since 10 Nov 2026; Rahti applies its own |
+| `patch-rahti-cpu-requests.yaml` | Raises CPU requests to Rahti's limit range: at least 50m, limit at most five times the request |
+| `patch-grafana-public-url.yaml`, `patch-mlflow-public-host.yaml` | Tell Grafana and MLflow their public addresses |
 | `networkpolicy-router.yaml` | Lets the OpenShift router reach Grafana and the MLflow sign-in, nothing else |
 | `create-secrets.sh` | Generates the Secrets on Rahti, once; nothing goes to git |
 | `send-test-event.sh` | Sends one test event and prints its trace id |
@@ -36,18 +38,24 @@ oc get pods -w        # until every pod is Running and ready
 
 After a new build, restart what uses the image: `oc rollout restart deployment/mlflow deployment/otel-collector deployment/grafana-setup`
 for MLflow, `oc rollout restart deployment/sink` for the sink. The builds take the `develop` branch
-(`spec.source.git.ref`); `--from-dir=<folder>` builds from your working tree instead.
+(`spec.source.git.ref`). To build your last local commit instead, upload the repository:
+`oc start-build aiops-mlflow --from-repo=.. --follow` (from `gaik-aiops/`; the BuildConfig's
+`contextDir` then finds the Dockerfile inside it).
 
 ## Signing in
 
+Read passwords in your own terminal: `oc extract` prints them there. Hand them to reviewers outside
+git and outside public channels.
+
 - **Grafana:** user `admin`, password from `oc extract secret/aiops-grafana --keys=admin-password --to=-`.
   Give reviewers their own users (Administration, Users and access, Users, New user) with the Viewer
-  role, and add them to the *Security* organisation too, which holds the audit trail.
-- **MLflow:** one shared reviewer sign-in, from `oc extract secret/aiops-mlflow-auth --keys=username,password --to=-`.
-  To add a user, add a line made with `htpasswd -nB <user>` to the Secret's `htpasswd` key and restart
-  `deployment/mlflow-auth`. OIDC (WP4) replaces this.
-
-Hand passwords to reviewers outside git and outside public channels.
+  role in the main organisation, for the monitoring dashboards. Do not add them to the *Security*
+  organisation: by design only the admin joins it, because any member can run their own queries on
+  the audit store through its datasource. Show the audit trail as admin.
+- **MLflow:** one shared sign-in, from `oc extract secret/aiops-mlflow-auth --keys=username,password --to=-`.
+  It can change and delete as well as read: MLflow's own pages need write requests, so nginx cannot
+  make it read-only. To add a user, add a line made with `htpasswd -nB -C 4 <user>` to the Secret's
+  `htpasswd` key and restart `deployment/mlflow-auth`. OIDC (WP4) replaces this.
 
 ## Test event
 
@@ -62,7 +70,7 @@ record on the same trace, all with a user id, a client IP and prompt and respons
 - **MLflow:** *Experiments*, *Default*, *Traces*: the trace with that id. On the spans,
   `enduser.pseudo.id` is a 64-character hash and `enduser.id` is gone, `client.address` is
   `192.0.2.0`, and the LLM-call span has no `gen_ai.input.messages` or `gen_ai.output.messages`.
-- **Grafana:** switch to the *Security* organisation, *Audit trail* dashboard, *Latest events*: the
+- **Grafana** (as admin): switch to the *Security* organisation, *Audit trail* dashboard, *Latest events*: the
   row with the same `trace_id`, its actor a hash and its client address `192.0.2.0`.
 
 ## The wizard's way in (M2, not deployed)
@@ -86,8 +94,11 @@ label on `gaik` that this project cannot set, so the Route is the way in.
 `create-secrets.sh` never replaces a Secret. The database passwords are set when Postgres first
 starts, so changing `aiops-db` afterwards also needs `ALTER ROLE` in Postgres. A new pseudonym key
 gives every user a new pseudonym and cuts the link to earlier events; change it only on purpose.
-`aiops-grafana` sets the admin password only on Grafana's first start; afterwards change it in
-Grafana. `aiops-mlflow-auth` can change at any time, followed by a restart of `deployment/mlflow-auth`.
+`aiops-grafana` sets the admin password only on Grafana's first start, but `grafana-setup` keeps
+signing in with it. To change it, change it in Grafana (your profile, *Change password*), then put the
+same value in the Secret and run `oc rollout restart deployment/grafana-setup`; otherwise
+`grafana-setup` fails and stops maintaining the *Security* organisation. `aiops-mlflow-auth` can
+change at any time (password and its hash together), followed by a restart of `deployment/mlflow-auth`.
 
 ## Quota
 
@@ -98,7 +109,12 @@ Check with `oc describe appliedclusterresourcequota`.
 ## Not yet covered
 
 - Grafana and the Python base image of the two builds still come from Docker Hub, which limits
-  anonymous pulls.
-- The Route addresses are written into `patch-grafana-public-url.yaml` and
-  `patch-mlflow-public-host.yaml`; a project with another name needs both changed.
+  anonymous pulls. The base and the compose stack still run Grafana 11.5.2; only this overlay runs
+  the patched release.
+- The project name `gaik-aiops` is written into `kustomization.yaml` (the namespace and both image
+  paths), the Route addresses in `patch-grafana-public-url.yaml` and `patch-mlflow-public-host.yaml`,
+  and the default in `create-secrets.sh` (`NAMESPACE`). A project with another name needs all of them
+  changed.
+- The shared MLflow sign-in can delete experiments. The collector's routes hold experiment ids from
+  its start, so a deleted experiment's traces fail until `deployment/otel-collector` restarts.
 - Alertmanager has no receiver on Rahti yet, so alerts show in Grafana only (M2).

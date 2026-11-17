@@ -1,5 +1,5 @@
 # MLflow refuses requests whose Host header or Origin it does not know (DNS rebinding and cross-site
-# protection). Add the public address that mlflow-auth passes on. The test ops fail the render if the
+# protection). Add the public address that mlflow-auth passes on. The test op fails the render if the
 # base's arguments move, instead of replacing the wrong one.
 - op: test
   path: /spec/template/spec/containers/0/args/6

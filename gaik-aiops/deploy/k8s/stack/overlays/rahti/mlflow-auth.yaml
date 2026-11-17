@@ -26,7 +26,8 @@ spec:
         runAsNonRoot: true
       containers:
         - name: nginx
-          image: registry.access.redhat.com/ubi9/nginx-126:1-1777855212
+          # ubi9/nginx-126:1-1777855212, pinned by digest.
+          image: registry.access.redhat.com/ubi9/nginx-126@sha256:06ec47bfc1d8879e597e7a738408fd35353bf5be00aaf3bf432ae42cf7d0c5e7
           command: ["nginx", "-c", "/etc/nginx-proxy/nginx.conf", "-g", "daemon off;"]
           ports: [{containerPort: 8080}]
           volumeMounts:

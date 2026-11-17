@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Creates the stack's Secrets in the Rahti project, once. Every value is generated here and goes to
-# Rahti on stdin: nothing is printed, written to disk or put on a command line.
+# Rahti through a pipe: nothing is printed, written to disk (no here-documents, which older bash keeps
+# in temporary files) or put on a command line (printf is a shell builtin).
 #
 # An existing Secret is never replaced. Postgres takes its passwords when it first starts, and a new
 # pseudonym key would give every user a new pseudonym. To rotate one, see README.md.
@@ -21,7 +22,7 @@ command -v htpasswd >/dev/null || { echo "htpasswd is missing (on Debian/Ubuntu:
 
 rand() { openssl rand -hex 24; }
 
-# create NAME: reads the Secret's stringData lines (key: value) on stdin.
+# create NAME: reads the Secret's stringData lines (  key: "value") on stdin.
 create() {
   local name="$1" data
   data="$(cat)"
@@ -29,49 +30,28 @@ create() {
     echo "kept    $name (it exists)"
     return
   fi
-  oc create -n "$NAMESPACE" -f - >/dev/null <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: $name
-  labels: {app.kubernetes.io/part-of: gaik-aiops}
-type: Opaque
-stringData:
-$data
-EOF
+  printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: %s\n  labels: {app.kubernetes.io/part-of: gaik-aiops}\ntype: Opaque\nstringData:\n%s\n' \
+    "$name" "$data" | oc create -n "$NAMESPACE" -f - >/dev/null
   echo "created $name"
 }
 
-create aiops-db <<EOF
-  owner-password: "$(rand)"
-  admin-password: "$(rand)"
-  writer-password: "$(rand)"
-  reader-password: "$(rand)"
-  mlflow-password: "$(rand)"
-EOF
+printf '  owner-password: "%s"\n  admin-password: "%s"\n  writer-password: "%s"\n  reader-password: "%s"\n  mlflow-password: "%s"\n' \
+  "$(rand)" "$(rand)" "$(rand)" "$(rand)" "$(rand)" | create aiops-db
 
-create aiops-pseudonym <<EOF
-  key: "$(openssl rand -hex 32)"
-EOF
+printf '  key: "%s"\n' "$(openssl rand -hex 32)" | create aiops-pseudonym
 
-create aiops-grafana <<EOF
-  admin-password: "$(rand)"
-EOF
+printf '  admin-password: "%s"\n' "$(rand)" | create aiops-grafana
 
 # The MLflow sign-in: the password in plain text, so it can be handed to reviewers, and its bcrypt hash
-# for nginx.
+# for nginx. Cost 4, bcrypt's lowest: nginx checks the hash on every request, and a 192-bit random
+# password needs no slow hash.
 mlflow_password="$(rand)"
-mlflow_htpasswd="$(printf '%s' "$mlflow_password" | htpasswd -niB -C 10 "$MLFLOW_USER" | head -n 1)"
-create aiops-mlflow-auth <<EOF
-  username: "$MLFLOW_USER"
-  password: "$mlflow_password"
-  htpasswd: '$mlflow_htpasswd'
-EOF
+mlflow_htpasswd="$(printf '%s' "$mlflow_password" | htpasswd -niB -C 4 "$MLFLOW_USER" | head -n 1)"
+printf '  username: "%s"\n  password: "%s"\n  htpasswd: '"'"'%s'"'"'\n' "$MLFLOW_USER" "$mlflow_password" "$mlflow_htpasswd" |
+  create aiops-mlflow-auth
 unset mlflow_password mlflow_htpasswd
 
-cat <<EOF
-
-Read a sign-in when you need it (prints to your terminal only):
-  oc extract secret/aiops-grafana --keys=admin-password --to=-          # Grafana user: admin
-  oc extract secret/aiops-mlflow-auth --keys=username,password --to=-   # MLflow
-EOF
+echo
+echo "Read a sign-in when you need it, in your own terminal (it prints the password there):"
+echo "  oc extract secret/aiops-grafana --keys=admin-password --to=-          # Grafana user: admin"
+echo "  oc extract secret/aiops-mlflow-auth --keys=username,password --to=-   # MLflow"

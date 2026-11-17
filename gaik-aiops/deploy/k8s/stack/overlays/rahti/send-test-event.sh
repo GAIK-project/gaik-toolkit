@@ -20,12 +20,13 @@ T1="$((NOW + 1))000000000"
 USER_ID="test-user@example.com"
 CLIENT_IP="192.0.2.123"   # a documentation address (RFC 5737), never a real client
 
-auth=()
-if [ -n "${OTLP_TOKEN:-}" ]; then auth=(-H "Authorization: Bearer $OTLP_TOKEN"); fi
-
-post() { # path, JSON on stdin
-  curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" ${auth[@]+"${auth[@]}"} \
-    --data-binary @- "$ENDPOINT$1"
+post() { # path, JSON on stdin. The token goes to curl as a header file, never on its command line.
+  if [ -n "${OTLP_TOKEN:-}" ]; then
+    curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" \
+      -H @<(printf 'Authorization: Bearer %s\n' "$OTLP_TOKEN") --data-binary @- "$ENDPOINT$1"
+  else
+    curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" --data-binary @- "$ENDPOINT$1"
+  fi
 }
 
 str() { printf '{"key":"%s","value":{"stringValue":"%s"}}' "$1" "$2"; }
