@@ -73,6 +73,12 @@ python run_wizard_interactive.py
 python run_wizard_interactive.py --output-dir C:/projects/my-use-case
 ```
 
+The output folder must be a folder of its own: not this repository or a folder holding it,
+not your home folder or a folder above it, not a hidden settings folder in your home folder
+(such as `.config`), and not a folder the wizard's Python loads code from (its install,
+virtual environment or site-packages) or one holding such a folder. A folder under your
+home folder, such as `~/projects/my-use-case`, is fine.
+
 Requires Azure Foundry credentials in `../.env` (one level up from this directory) or the
 current shell environment. See `.env.example` for the required variables
 (`CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE`,
@@ -87,7 +93,8 @@ folder and the wizard's own files, writes only the output folder, never reads or
 `scripts/agent_scripts.json` lists. Other tools are refused with the reason, and the agent
 carries on. Your own MCP servers and Claude Code settings are not loaded. The agent's
 environment holds the system basics plus the names the `.env` file sets (without one, the
-provider names `templates/poc/_common/env.example.tmpl` lists, taken from your shell); the
+provider names `templates/poc/_common/env.example.tmpl` lists and every shell name that
+starts with a provider prefix such as `ANTHROPIC_`, `AZURE_` or `OPENAI_`); the
 runner narrows its own environment to these before the CLI starts. Hand on another
 variable with `--pass-env NAME`.
 

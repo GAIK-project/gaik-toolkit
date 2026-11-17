@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import importlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -453,3 +454,80 @@ def test_every_command_skill_md_gives_the_agent_passes_the_guard(guard):
         if reason := guard.check("Bash", {"command": command}):
             refused[command] = reason
     assert not refused
+
+
+# --- folders the agent must not write, path forms, links and case -----------
+
+
+def test_a_protected_folder_inside_the_output_folder_is_not_written(tmp_path):
+    wizard = tmp_path / "solution_wizard"
+    (wizard / "scripts").mkdir(parents=True)
+    out = tmp_path / "out"
+    keep = out / "keep"
+    keep.mkdir(parents=True)
+    g = agent_tool_guard.ToolGuard(wizard, out, scripts={}, protected=[keep])
+    assert g.check("Write", {"file_path": str(keep / "x.py")})
+    assert g.check("Write", {"file_path": str(out / "ok.txt")}) is None
+
+
+def test_where_the_scripts_python_loads_code_from_is_never_written(tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    site_dir = out / "venv" / "site-packages"
+    site_dir.mkdir(parents=True)
+    monkeypatch.setattr(agent_tool_guard, "python_code_dirs", lambda: [site_dir.resolve()])
+    g = agent_tool_guard.ToolGuard(tmp_path / "wizard", out, scripts={})
+    assert g.check("Write", {"file_path": str(site_dir / "sitecustomize.py")})
+    assert g.check("Write", {"file_path": str(out / "notes.md")}) is None
+
+
+def test_the_running_pythons_own_folders_are_protected(guard):
+    import sys
+
+    real_prefix = Path(os.path.realpath(sys.prefix))
+    assert agent_tool_guard.under_any(real_prefix, guard.protected)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["C:out", "out/a:stream", "//?/c:/out", "\\\\server\\share\\out", "out/name.", "out/name "],
+)
+def test_path_forms_windows_reads_differently_are_refused(guard, value):
+    assert agent_tool_guard.odd_path_form(value)
+    if not set(value) & set("?\\ "):  # those the shell check refuses before
+        command = (
+            f"python scripts/generate_schema.py --output-dir {guard.session.as_posix()}/{value}"
+        )
+        assert "output folder" in guard.check("Bash", {"command": command})
+
+
+def test_plain_paths_are_not_odd_forms():
+    for value in ("out/case", "C:/work/case", "C:\\work\\case", "/c/work/case", "./x", "../x"):
+        assert not agent_tool_guard.odd_path_form(value), value
+
+
+def test_a_script_does_not_write_into_an_output_folder_that_holds_a_link(guard, tmp_path):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    bp = guard.session / "use_case.blueprint.json"
+    _blueprint(bp)
+    command = f"python scripts/validate_blueprint.py --blueprint {bp.as_posix()}"
+    assert guard.check("Bash", {"command": command}) is None
+    (guard.session / "poc" / "out").symlink_to(elsewhere, target_is_directory=True)
+    assert "link" in guard.check("Bash", {"command": command})
+
+
+def test_a_folder_search_through_a_link_is_refused(guard, tmp_path):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / ".env").write_text("KEY=x")
+    (guard.session / "poc" / "shared").symlink_to(elsewhere, target_is_directory=True)
+    assert guard.check("Grep", {"pattern": "KEY", "path": str(guard.session)})
+
+
+def test_a_refused_folder_is_matched_in_any_case_where_the_filesystem_ignores_it(tmp_path):
+    keep = tmp_path / "Keep"
+    keep.mkdir()
+    if not agent_tool_guard._ignores_case(keep):
+        pytest.skip("this filesystem tells names apart by case")
+    other_case = Path(str(keep).swapcase())
+    assert agent_tool_guard.under_any(other_case / "x.py", [keep])

@@ -30,6 +30,8 @@ import logging
 import os
 import re
 import shlex
+import site
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -153,11 +155,14 @@ def _has_env_file(folder: Path) -> bool:
     """Whether a search of ``folder`` could read a .env file (True when the
     folder is too large to tell). Grep reads hidden files too."""
     seen = 0
-    for _root, dirs, files in os.walk(folder):
+    for root, dirs, files in os.walk(folder):
         seen += len(dirs) + len(files)
         if seen > _MAX_SEARCHED_ENTRIES:
             return True
         if any(is_env_file(name) for name in files):
+            return True
+        # A link may lead to a folder that has one; the walk does not follow it.
+        if any(_is_link(os.path.join(root, name)) for name in [*dirs, *files]):
             return True
     return False
 
@@ -170,10 +175,106 @@ def _real(path: str, cwd: Path) -> Path:
 
 
 def _inside(path: str, roots: list[Path], cwd: Path) -> bool:
+    """Whether ``path`` opens inside one of ``roots``, compared as written.
+
+    An allow check: a path written in another case is judged outside, so on a
+    case-sensitive filesystem it cannot reach a folder next to the root.
+    """
     if _expands(path):
         return False
     real = _real(path, cwd)
     return any(real == root or root in real.parents for root in roots)
+
+
+def _ignores_case(folder: Path) -> bool:
+    """Whether the filesystem holding ``folder`` opens a name in either case.
+
+    The default filesystems on macOS and Windows do; ``Path`` comparison and
+    ``realpath`` there still compare case, so a check that refuses a folder has
+    to fold it. Judged on the nearest folder that exists.
+    """
+    probe = folder
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    flipped = Path(str(probe).swapcase())
+    if str(flipped) == str(probe):
+        return os.name == "nt" or sys.platform == "darwin"
+    try:
+        return flipped.exists() and os.path.samefile(flipped, probe)
+    except OSError:
+        return False
+
+
+def under_any(path: Path, roots: list[Path]) -> bool:
+    """Whether ``path`` is one of ``roots`` or inside one, the way the filesystem
+    reads names: a refuse check, so names are folded where the filesystem ignores
+    case."""
+    for root in roots:
+        if path == root or root in path.parents:
+            return True
+        if _ignores_case(root):
+            key, root_key = str(path).casefold(), str(root).casefold()
+            sep = os.sep.casefold()
+            if key == root_key or key.startswith(root_key.rstrip(sep) + sep):
+                return True
+    return False
+
+
+def python_code_dirs() -> list[Path]:
+    """Where the scripts' Python loads code from: its install, its site-packages
+    and every folder on ``sys.path`` (an editable install puts the repository's
+    source there). A file written in one of them runs with the next import."""
+    found = {sys.prefix, sys.exec_prefix, sys.base_prefix, sys.base_exec_prefix}
+    try:
+        found.update(site.getsitepackages())
+    except AttributeError:  # some virtualenv builds have no getsitepackages
+        pass
+    user_site = site.getusersitepackages()
+    if isinstance(user_site, str):
+        found.add(user_site)
+    found.update(entry for entry in sys.path if entry and os.path.isabs(entry))
+    dirs = []
+    for entry in found:
+        real = Path(os.path.realpath(entry))
+        if real.is_dir() and real.parent != real:  # never a whole drive
+            dirs.append(real)
+    return sorted(set(dirs))
+
+
+#: Path forms Windows opens as a different file from the one the name shows: a
+#: drive-relative path (``C:out``), a stream (``x:stream``), a device or UNC
+#: path (``//?/``, ``\\server``), and a name ending in a dot or a space, which
+#: Windows drops. Refused on every system, where they are only stricter.
+_DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def odd_path_form(path: str) -> bool:
+    """A path whose meaning differs between the guard and the program it reaches."""
+    if path.startswith(("//", "\\\\")):
+        return True
+    rest = path[2:] if _DRIVE.match(path) else path
+    if ":" in rest:
+        return True
+    parts = [p for p in re.split(r"[\\/]", rest) if p not in ("", ".", "..")]
+    return any(p[-1] in ". " for p in parts)
+
+
+def _is_link(path: str) -> bool:
+    isjunction = getattr(os.path, "isjunction", None)
+    return os.path.islink(path) or bool(isjunction and isjunction(path))
+
+
+def has_link(folder: Path) -> bool:
+    """Whether ``folder`` holds a link or a junction (True when it is too large
+    to tell). A script that writes into the folder would follow it elsewhere."""
+    seen = 0
+    for root, dirs, files in os.walk(folder):
+        seen += len(dirs) + len(files)
+        if seen > _MAX_SEARCHED_ENTRIES:
+            return True
+        if any(_is_link(os.path.join(root, name)) for name in [*dirs, *files]):
+            return True
+    return False
 
 
 class ToolGuard:
@@ -187,11 +288,18 @@ class ToolGuard:
         blueprint_check: BlueprintCheck | None = None,
         scripts: dict[str, dict[str, str]] | None = None,
         extra_tools: frozenset[str] = frozenset(),
+        protected: list[Path] | None = None,
     ) -> None:
         self.cwd = Path(os.path.realpath(wizard_dir))
         self.output = Path(os.path.realpath(output_dir))
         self.readable = [self.output, self.cwd]
         self.writable = [self.output]
+        #: Never written, even when the output folder holds them: the wizard's
+        #: own files, where the scripts' Python loads code from, and the
+        #: caller's own (the runner adds the repository).
+        self.protected = sorted(
+            {self.cwd, *python_code_dirs(), *(Path(os.path.realpath(p)) for p in protected or [])}
+        )
         self.blueprint_check = blueprint_check
         self.scripts = scripts if scripts is not None else load_scripts()
         #: The caller's own tools (v2's in-process gate tools), which check
@@ -215,9 +323,11 @@ class ToolGuard:
         return not _expands(path) and is_env_file(str(_real(path, self.cwd)))
 
     def _writable(self, path: str) -> bool:
-        """In the output folder, and not in the wizard's own files even when the
-        output folder holds them."""
-        return _inside(path, self.writable, self.cwd) and not _inside(path, [self.cwd], self.cwd)
+        """In the output folder, and not in a protected folder even when the
+        output folder holds one."""
+        if odd_path_form(path) or not _inside(path, self.writable, self.cwd):
+            return False
+        return not under_any(_real(path, self.cwd), self.protected)
 
     def check(self, tool: str, tool_input: dict[str, Any]) -> str | None:
         """Why the call is refused, or None when it may run."""
@@ -300,6 +410,11 @@ class ToolGuard:
                     f"{option} must be a provider's own https endpoint; leave it out to use "
                     "the endpoint configured in the environment. " + allowed
                 )
+        if any(options[o] == _PATH for o in given) and has_link(self.output):
+            return (
+                "The output folder holds a link or junction, and a script writing there "
+                "would follow it. Remove the link first. " + allowed
+            )
         if Path(script).name in _SCAFFOLDING_SCRIPTS:
             return self._check_blueprint(given)
         return None

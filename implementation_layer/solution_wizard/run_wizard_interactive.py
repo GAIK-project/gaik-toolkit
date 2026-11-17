@@ -134,7 +134,7 @@ SYSTEM_ENV_VARS = frozenset(
         "VIRTUAL_ENV", "CONDA_PREFIX",
         "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "NODE_EXTRA_CA_CERTS",
         "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
-        "CLAUDE_CONFIG_DIR",
+        "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_GIT_BASH_PATH",
     }
 )  # fmt: skip
 AGENT_ENV_DEFAULTS = {
@@ -159,6 +159,17 @@ RUNNER_ENV_VARS = frozenset(
     | {"AITTA_API_TOKEN", "AITTA_TOKEN", "GEMINI_API_KEY", "GOOGLE_SERVICE_ACCOUNT_JSON"}
 )
 PROVIDER_ENV_TEMPLATE = WIZARD_DIR / "templates" / "poc" / "_common" / "env.example.tmpl"
+#: Without a .env file, every shell name with one of these prefixes goes to the
+#: agent too: gaik reads more provider settings than the template lists.
+PROVIDER_ENV_PREFIXES = (
+    "ANTHROPIC_",
+    "AZURE_",
+    "OPENAI_",
+    "AITTA_",
+    "GOOGLE_",
+    "GEMINI_",
+    "LITELLM_",
+)
 
 # ── ANSI colours (suppressed on non-TTY / Windows without ANSI support) ──────
 
@@ -185,7 +196,13 @@ def agent_environment(
     """The agent's environment: the system basics, the names the .env file
     sets and the names given with --pass-env, taken from ``source``."""
     names = SYSTEM_ENV_VARS | set(env_file_names) | set(pass_env)
-    env = {k: v for k, v in source.items() if k in names}
+    if os.name == "nt":
+        # Windows reads names in any case and os.environ upper-cases them, so a
+        # .env name written as Azure_Api_Key is AZURE_API_KEY in the shell.
+        wanted = {name.upper() for name in names}
+        env = {k: v for k, v in source.items() if k.upper() in wanted}
+    else:
+        env = {k: v for k, v in source.items() if k in names}
     for key, value in AGENT_ENV_DEFAULTS.items():
         env.setdefault(key, value)
     return env
@@ -205,6 +222,7 @@ def load_environment(env_file: Path, pass_env: list[str] | None = None) -> dict[
     else:
         print(f"{DIM}(no .env at {env_file} — using current shell env){RESET}", file=sys.stderr)
         names = set(REQUIRED_ENV_VARS) | RUNNER_ENV_VARS | provider_env_names()
+        names |= {k for k in os.environ if k.upper().startswith(PROVIDER_ENV_PREFIXES)}
 
     missing = [k for k in REQUIRED_ENV_VARS if not (os.getenv(k) or "").strip()]
     if missing:
@@ -362,7 +380,9 @@ def build_session_options(
     output_dir: Path, env: dict[str, str], model: str, **extra: object
 ) -> ClaudeAgentOptions:
     """The agent's options: every tool call goes through the guard's hook."""
-    guard = agent_tool_guard.ToolGuard(WIZARD_DIR, output_dir)
+    # The repository is never written either: with an editable install the
+    # scripts import gaik from it.
+    guard = agent_tool_guard.ToolGuard(WIZARD_DIR, output_dir, protected=[REPO_ROOT])
     return ClaudeAgentOptions(
         cwd=str(WIZARD_DIR),
         add_dirs=[str(output_dir)],
@@ -383,21 +403,61 @@ def build_session_options(
     )
 
 
+def _config_dirs(home: Path) -> list[Path]:
+    """Folders whose files a program loads at start: the hidden folders in the
+    home folder (shell, Python, Claude Code and git settings) and the ones the
+    environment names."""
+    dirs = (
+        [home / name for name in os.listdir(home) if name.startswith(".")] if home.is_dir() else []
+    )
+    for name in ("CLAUDE_CONFIG_DIR", "XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA"):
+        if os.environ.get(name):
+            dirs.append(Path(os.environ[name]))
+    return [Path(os.path.realpath(d)) for d in dirs]
+
+
 def resolve_output_dir(raw: str, cwd: Path) -> Path:
-    """An absolute output folder outside this repository (``scaffold_poc.py``
-    refuses one inside it) and not holding it either, relative paths taken
-    from ``cwd``."""
+    """An absolute output folder of its own, relative paths taken from ``cwd``.
+
+    The agent writes anything there, so the folder must not be, hold or sit in
+    a place whose files something loads later: this repository
+    (``scaffold_poc.py`` refuses one inside it, and an editable install imports
+    gaik from it), the home folder, its hidden settings folders, or where the
+    scripts' Python loads code from. Names are compared the way the filesystem
+    reads them (in any case on macOS and Windows).
+    """
     path = Path(raw.strip().strip('"')).expanduser()
-    path = (path if path.is_absolute() else cwd / path).resolve()
-    if path == REPO_ROOT or REPO_ROOT in path.parents:
+    path = Path(os.path.realpath(path if path.is_absolute() else cwd / path))
+    repo = Path(os.path.realpath(REPO_ROOT))
+    home = Path(os.path.realpath(Path.home()))
+    if agent_tool_guard.under_any(path, [repo]):
         raise ValueError(
             f"the output folder {path.as_posix()} is inside the GAIK repository; "
             "choose one outside it, for example under your home folder"
         )
-    if path in REPO_ROOT.parents:
+    if agent_tool_guard.under_any(repo, [path]):
         raise ValueError(
             f"the output folder {path.as_posix()} holds the GAIK repository; "
             "choose a folder of its own outside it"
+        )
+    if agent_tool_guard.under_any(home, [path]):
+        raise ValueError(
+            f"the output folder {path.as_posix()} is your home folder or holds it; "
+            "choose a folder of its own inside it"
+        )
+    config = _config_dirs(home)
+    if agent_tool_guard.under_any(path, config):
+        raise ValueError(
+            f"the output folder {path.as_posix()} is in a settings folder that programs "
+            "load files from; choose an ordinary folder"
+        )
+    code = agent_tool_guard.python_code_dirs()
+    if agent_tool_guard.under_any(path, code) or any(
+        agent_tool_guard.under_any(d, [path]) for d in code
+    ):
+        raise ValueError(
+            f"the output folder {path.as_posix()} is or holds a folder the wizard's Python "
+            "loads code from; choose a folder of its own"
         )
     return path
 

@@ -347,29 +347,46 @@ def _cli_process_env(options: ClaudeAgentOptions, monkeypatch) -> dict[str, str]
 
 
 def test_the_cli_gets_only_the_env_files_names_and_the_system_basics(
-    tmp_path, output, monkeypatch, shell_env
+    tmp_path, monkeypatch, shell_env
 ) -> None:
+    """``main`` itself narrows the environment before the SDK starts the CLI."""
     env_file = tmp_path / ".env"
     env_file.write_text(
         "CLAUDE_CODE_USE_FOUNDRY=1\nANTHROPIC_FOUNDRY_API_KEY=k\n"
         "ANTHROPIC_FOUNDRY_RESOURCE=r\nDOCLING_API_BASE=https://x\n"
     )
     os.environ["MY_SHELL_VAR"] = "x"
-    for name in (*_FOUNDRY_NAMES, "DOCLING_API_BASE"):
+    for name in (*_FOUNDRY_NAMES, "DOCLING_API_BASE", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"):
         os.environ.pop(name, None)
-
-    env = runner.load_environment(env_file)
-    runner.use_agent_environment(env)
     cli = tmp_path / "claude"
     cli.write_text("")
-    options = runner.build_session_options(output, env, "m", cli_path=str(cli))
-    process_env = _cli_process_env(options, monkeypatch)
+    build = runner.build_session_options
+    monkeypatch.setattr(
+        runner,
+        "build_session_options",
+        lambda *a, **k: build(*a, cli_path=str(cli), **k),
+    )
+    seen: dict[str, str] = {}
 
-    assert process_env["DOCLING_API_BASE"] == "https://x"
-    assert process_env["ANTHROPIC_FOUNDRY_API_KEY"] == "k"
-    assert "MY_SHELL_VAR" not in process_env
-    # Besides env, only the names the SDK itself sets for the CLI.
-    added = set(process_env) - set(env)
+    async def open_process(*_args, env=None, **_kwargs):
+        seen.update(env or {})
+        raise _CLIStartError
+
+    monkeypatch.setattr(anyio, "open_process", open_process)
+    out = tmp_path / "out"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_wizard_interactive.py", "--output-dir", str(out), "--env-file", str(env_file)],
+    )
+    with pytest.raises(SystemExit):
+        runner.main()
+
+    assert seen, "main did not reach the point where the SDK starts the CLI"
+    assert seen["DOCLING_API_BASE"] == "https://x"
+    assert seen["ANTHROPIC_FOUNDRY_API_KEY"] == "k"
+    assert "MY_SHELL_VAR" not in seen
+    added = set(seen) - set(os.environ)
     assert all(name == "PWD" or name.startswith("CLAUDE") for name in added), added
 
 
@@ -512,3 +529,86 @@ def test_a_live_session_sends_every_tool_call_through_the_guard(tmp_path) -> Non
     assert "CANARY-OUTSIDE-0451" not in everything
     assert (out / "probe.txt").exists()
     assert not (WIZARD / "probe.txt").exists()
+
+
+def test_without_an_env_file_every_provider_setting_in_the_shell_reaches_the_agent(
+    tmp_path, shell_env
+) -> None:
+    for name in _FOUNDRY_NAMES:
+        os.environ[name] = "1"
+    os.environ["ANTHROPIC_MAX_TOKENS"] = "100"
+    os.environ["GOOGLE_VERTEXAI_PROJECT"] = "p"
+    os.environ["OPENAI_TTS_MODEL"] = "t"
+    os.environ["GITHUB_TOKEN"] = "x"
+
+    env = runner.load_environment(tmp_path / "missing.env")
+
+    assert env["ANTHROPIC_MAX_TOKENS"] == "100" and env["GOOGLE_VERTEXAI_PROJECT"] == "p"
+    assert env["OPENAI_TTS_MODEL"] == "t" and "GITHUB_TOKEN" not in env
+
+
+def test_git_bash_path_is_a_system_name() -> None:
+    assert "CLAUDE_CODE_GIT_BASH_PATH" in runner.SYSTEM_ENV_VARS
+
+
+def test_on_windows_an_env_files_name_matches_the_shell_name_in_any_case(monkeypatch) -> None:
+    monkeypatch.setattr(runner.os, "name", "nt")
+    env = runner.agent_environment({"AZURE_API_KEY": "k", "OTHER": "x"}, {"Azure_Api_Key"}, [])
+    assert env["AZURE_API_KEY"] == "k" and "OTHER" not in env
+
+
+@pytest.fixture()
+def home(tmp_path, monkeypatch):
+    home = tmp_path / "home" / "me"
+    (home / ".config").mkdir(parents=True)
+    (home / "work").mkdir()
+    monkeypatch.setattr(runner.Path, "home", classmethod(lambda cls: home))
+    for name in ("CLAUDE_CONFIG_DIR", "XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA"):
+        monkeypatch.delenv(name, raising=False)
+    return home
+
+
+def test_an_output_folder_under_home_is_accepted(home) -> None:
+    assert runner.resolve_output_dir(str(home / "work" / "case"), home) == Path(
+        os.path.realpath(home / "work" / "case")
+    )
+
+
+@pytest.mark.parametrize("where", ["home", "above"])
+def test_the_home_folder_and_the_folders_above_it_are_refused(home, where) -> None:
+    folder = home if where == "home" else home.parent
+    with pytest.raises(ValueError, match="home folder"):
+        runner.resolve_output_dir(str(folder), home)
+
+
+def test_a_settings_folder_in_home_is_refused(home) -> None:
+    with pytest.raises(ValueError, match="settings folder"):
+        runner.resolve_output_dir(str(home / ".config" / "case"), home)
+
+
+def test_a_folder_the_scripts_python_loads_code_from_is_refused(
+    home, tmp_path, monkeypatch
+) -> None:
+    venv = tmp_path / "tools" / "venv"
+    venv.mkdir(parents=True)
+    monkeypatch.setattr(
+        agent_tool_guard, "python_code_dirs", lambda: [Path(os.path.realpath(venv))]
+    )
+    with pytest.raises(ValueError, match="loads code from"):
+        runner.resolve_output_dir(str(venv / "out"), home)
+    with pytest.raises(ValueError, match="loads code from"):
+        runner.resolve_output_dir(str(venv.parent), home)
+
+
+def test_the_repository_is_refused_in_any_case_where_the_filesystem_ignores_it() -> None:
+    if not agent_tool_guard._ignores_case(runner.REPO_ROOT):
+        pytest.skip("this filesystem tells names apart by case")
+    other_case = str(runner.REPO_ROOT / "out").swapcase()
+    with pytest.raises(ValueError, match="inside the GAIK repository"):
+        runner.resolve_output_dir(other_case, runner.REPO_ROOT)
+
+
+def test_the_guard_never_writes_the_repository(output) -> None:
+    options = runner.build_session_options(output, {}, "m")
+    guard = options.hooks["PreToolUse"][0].hooks[0].__self__
+    assert agent_tool_guard.under_any(Path(os.path.realpath(runner.REPO_ROOT)), guard.protected)
