@@ -903,7 +903,7 @@
                 "title": "Docs Url"
               },
               "data_sent": {
-                "description": "What leaves for the third party. For a library that runs locally write 'none' (or a wording that starts with it, e.g. 'none: runs locally').",
+                "description": "What leaves for the third party. For a library that runs locally write 'none' and nothing more ('nothing' and 'no data' count the same); any other wording counts as data sent.",
                 "maxLength": 300,
                 "title": "Data Sent",
                 "type": "string"

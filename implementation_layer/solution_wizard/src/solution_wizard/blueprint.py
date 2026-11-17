@@ -264,18 +264,19 @@ RESERVED_ENV_NAMES = frozenset(
     }
 )
 
-#: ``data_sent`` of a service that receives nothing, a library that runs locally:
-#: "none", or a wording that starts with "none", "nothing" or "no data" and names
-#: no exception ("none: it runs locally", "Nothing leaves the machine").
+#: ``data_sent`` of a service that receives nothing, a library that runs locally.
+#: Only these words count, in any case and with an optional full stop. Any other
+#: wording counts as data sent, also one that starts like them: "None of the
+#: documents; the query text goes to Tavily" and "No data beyond the company name"
+#: both name something that leaves.
 NOTHING_SENT = "none"
-_NOTHING_SENT_RE = re.compile(r"(?:none|nothing|no data)\b", re.IGNORECASE)
-_EXCEPT_RE = re.compile(r"\b(?:but|except|other than|apart from|besides)\b", re.IGNORECASE)
+_NOTHING_SENT_WORDINGS = frozenset({"none", "nothing", "no data"})
 
 
 def sends_nothing(data_sent: str) -> bool:
-    """True when ``data_sent`` says that nothing leaves for the third party."""
-    text = data_sent.strip()
-    return bool(_NOTHING_SENT_RE.match(text)) and not _EXCEPT_RE.search(text)
+    """True only when ``data_sent`` is "none", "nothing" or "no data" and nothing more."""
+    text = " ".join(data_sent.split()).lower()
+    return text.removesuffix(".").rstrip() in _NOTHING_SENT_WORDINGS
 
 
 def env_name_problem(name: Any) -> str | None:
@@ -331,7 +332,8 @@ class ExternalService(BaseModel):
         max_length=300,
         description=(
             "What leaves for the third party. For a library that runs locally write "
-            f"'{NOTHING_SENT}' (or a wording that starts with it, e.g. 'none: runs locally')."
+            f"'{NOTHING_SENT}' and nothing more ('nothing' and 'no data' count the same); "
+            "any other wording counts as data sent."
         ),
     )
     user_can_provide: bool = Field(

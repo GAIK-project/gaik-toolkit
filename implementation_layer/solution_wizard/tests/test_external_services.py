@@ -327,16 +327,9 @@ def test_local_processing_refuses_a_service_that_receives_data() -> None:
 
 @pytest.mark.parametrize(
     "said",
-    [
-        "none",
-        "None",
-        "none: it runs locally",
-        "Nothing leaves the machine",
-        "No data is sent",
-        "NO DATA, the library runs in the PoC",
-    ],
+    ["none", "None", "  NONE  ", "none.", "Nothing", "nothing.", "No data", "no  data."],
 )
-def test_a_natural_wording_of_nothing_sent_counts_as_nothing(said) -> None:
+def test_only_a_bare_none_nothing_or_no_data_counts_as_nothing_sent(said) -> None:
     bp = _blueprint({**SEARCH, "name": "Local graph library", "data_sent": said})
     bp.governance.data_handling.local_processing_required = True
 
@@ -349,15 +342,23 @@ def test_a_natural_wording_of_nothing_sent_counts_as_nothing(said) -> None:
 @pytest.mark.parametrize(
     "said",
     [
+        "None of the documents; the query text goes to Tavily",
+        "No data beyond the company name",
         "Nothing but the supplier's name",
         "None except the business ID",
         "nothing other than the query",
+        "none: it runs locally",
+        "Nothing leaves the machine",
+        "No data is sent",
+        "none, none",
         "Nonessential metadata of the invoice",
         "The supplier's company name",
         "Some data, none of it personal",
     ],
 )
-def test_a_wording_that_names_data_counts_as_sent(said) -> None:
+def test_any_other_wording_counts_as_data_sent(said) -> None:
+    """A wording that starts like "none" may still name what leaves, so only the bare
+    words count as nothing: with local processing required the service is refused."""
     bp = _blueprint({**SEARCH, "data_sent": said})
     bp.governance.data_handling.local_processing_required = True
 
