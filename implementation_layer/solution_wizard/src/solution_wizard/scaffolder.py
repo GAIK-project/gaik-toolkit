@@ -27,7 +27,13 @@ from typing import Any
 from .blueprint import Blueprint
 from .docs_generator import md_text
 from .registry import get_registry
-from .schema_designer import nested_row_fields, write_extraction_requirements, write_schema_files
+from .schema_designer import (
+    NESTED_KEY,
+    check_schema_names,
+    nested_row_fields,
+    write_extraction_requirements,
+    write_schema_files,
+)
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "poc"
 
@@ -137,6 +143,17 @@ def _code_values_problems(blueprint: Blueprint) -> list[str]:
         for field in fields:
             if not _is_python_name(field):
                 problems.append(f"field {field!r} of the {container!r} rows must be a Python name")
+        if nested_row_fields(spec[NESTED_KEY][container]):
+            problems.append(
+                f"the {container!r} rows have rows of their own; only one level of nested "
+                "rows is supported"
+            )
+    if spec.get(NESTED_KEY) and not problems:
+        # Anything else the rows' model would refuse, before a file is written.
+        try:
+            check_schema_names(spec, schema_name or "OutputSchema")
+        except ValueError as exc:
+            problems.append(f"target_output_spec.nested: {exc}")
     return problems
 
 
@@ -867,7 +884,9 @@ def _build_input_loaders(blueprint: Blueprint) -> str:
         else:
             exts = doc_exts
         lines.append(f"    # Load user-upload artifact: {art_id} (type={art.type})")
-        hints = tuple(w for w in art_id.lower().split("_") if len(w) > 2)
+        # The id's words pick between several inputs. A file type ("pdf" in agenda_pdf)
+        # is in every file name of that type, so it would pick none.
+        hints = tuple(w for w in art_id.lower().split("_") if len(w) > 2 and f'".{w}"' not in exts)
         lines.append(f"    {art_id}_path = _find_input(sample_dir, {exts}, hints={hints!r})")
         lines.append(f"    print(f'{art_id}: {{{art_id}_path}}')")
         lines.append("")

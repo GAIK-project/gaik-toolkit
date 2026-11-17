@@ -45,6 +45,7 @@ try:
         ClaudeSDKClient,
         HookMatcher,
         ResultMessage,
+        SystemMessage,
         TextBlock,
         ToolUseBlock,
         create_sdk_mcp_server,
@@ -55,7 +56,7 @@ try:
 except ImportError:  # pragma: no cover - exercised only where the SDK is absent
     _SDK_AVAILABLE = False
     AssistantMessage = ClaudeAgentOptions = ClaudeSDKClient = ResultMessage = TextBlock = None  # type: ignore
-    HookMatcher = ToolUseBlock = create_sdk_mcp_server = tool = None  # type: ignore
+    HookMatcher = SystemMessage = ToolUseBlock = create_sdk_mcp_server = tool = None  # type: ignore
 
 # StreamEvent (token-level partials) lives in the types submodule on some SDK
 # versions, the top level on others. Optional.
@@ -722,6 +723,8 @@ async def _stream_turn(
                             if frame:
                                 tool = frame["activity"]["kind"]
                                 yield sse(frame)
+            elif SystemMessage is not None and isinstance(message, SystemMessage):
+                _note_system_message(message)
             elif isinstance(message, ResultMessage):
                 finished = True
                 # Tokens and cost of this query, for the turn's span (telemetry).
@@ -742,8 +745,12 @@ async def _stream_turn(
                         yield frame
                     break
                 if message.is_error:
-                    if getattr(message, "subtype", None) == "error_max_turns":
+                    subtype = getattr(message, "subtype", None)
+                    if subtype == "error_max_turns":
                         yield sse(TURN_LIMIT_FRAME)
+                    elif subtype == "error_max_budget_usd":
+                        for frame in _budget_stop(session, shown or "".join(current), out_parts):
+                            yield frame
                     else:
                         yield sse(_error_frame(message.result or f"stopped: {message.stop_reason}"))
                     break
@@ -786,10 +793,38 @@ async def _stream_turn(
         session["last_active"] = time.time()
 
 
+def _budget_stop(session: dict, reply: str, out_parts: list[str]):
+    """The frames that end a turn the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD.
+
+    The CLI counts the budget for the whole agent process, across messages, so
+    the agent would stop again at once on the next message: it is ended after
+    this turn (stream_turn_for), and the next message resumes it from its
+    transcript, where the CLI counts from zero. No "Please continue." nudge.
+    """
+    from wizard_api import ops_metrics
+
+    ops_metrics.budget_stops.add(1)
+    logger.warning(
+        "agent stopped at its cost limit of %s USD; it is ended and the next message resumes it",
+        config.agent_max_budget_usd(),
+    )
+    session["budget_spent"] = True
+    notice = BUDGET_NOTICE.get(session.get("locale") or "en", BUDGET_NOTICE["en"])
+    if _is_notice(reply):
+        yield sse({"narration_end": True})  # shown while it streamed; not an answer
+        reply = ""
+    reply = reply.strip()
+    yield sse({"delta": f"\n\n{notice}" if reply else notice})
+    out_parts[:] = [f"{reply}\n\n{notice}" if reply else notice]
+    yield sse({"done": True, "limit": "budget"})
+
+
 async def _drain_silent(client):
     """Consume one turn without emitting (used for the bootstrap turn).
     Returns the ResultMessage, whose ``session_id`` names the CLI session."""
     async for message in client.receive_response():
+        if SystemMessage is not None and isinstance(message, SystemMessage):
+            _note_system_message(message)
         if isinstance(message, ResultMessage):
             return message
     return None
@@ -901,7 +936,11 @@ def _build_options(
     *,
     resume: str | None = None,
     session_id: str | None = None,
+    guard: agent_tool_guard.ToolGuard,
 ):
+    """The agent's options. ``guard`` is the session's tool guard, which knows its
+    owner and counts the metered calls of each turn. It has no default, so no
+    agent can be built with a guard that skips its owner's hourly limit."""
     tools = ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
     extra = {}
     if session_id and create_sdk_mcp_server is not None:
@@ -910,21 +949,25 @@ def _build_options(
     if config.agent_bridge_socket():
         # The agent runs in its own container; the SDK starts the bridge's client.
         extra["cli_path"] = agent_cli()
+    budget = config.agent_max_budget_usd()
+    if budget is not None:
+        # Counted by the CLI for this agent process from its start or resume.
+        extra["max_budget_usd"] = budget
+    model = _model()
+    fallback = config.agent_fallback_model()
+    if fallback and fallback != model:
+        extra["fallback_model"] = fallback
     return ClaudeAgentOptions(
         cwd=str(wizard_dir),
         add_dirs=[str(output_dir)],
         env=_agent_env(),
-        model=_model(),
+        model=model,
         allowed_tools=tools,
         **extra,
         permission_mode="bypassPermissions",
         # bypassPermissions lets every tool run; the hook is what limits them to
         # this session's directory and the wizard's own scripts (agent_tool_guard).
-        hooks={
-            "PreToolUse": [
-                HookMatcher(hooks=[agent_tool_guard.ToolGuard(wizard_dir, output_dir).hook])
-            ]
-        },
+        hooks={"PreToolUse": [HookMatcher(hooks=[guard.hook])]},
         setting_sources=[],
         include_partial_messages=True,
         max_turns=config.agent_max_turns(),
@@ -1078,6 +1121,39 @@ TURN_LIMIT_FRAME = {
 }
 
 
+#: Said in the chat when the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD. A text
+#: delta, not an error frame: the chat shows an error frame other than the turn
+#: limit as a failed reply, and this is no failure. The agent is ended after the
+#: turn, so the next message resumes it with a budget of its own (see _stream_turn).
+BUDGET_NOTICE = {
+    "fi": (
+        "⚠︎ Wizard pysähtyi, koska sen kustannusraja tuli täyteen. Tähänastinen työ on "
+        "tallessa. Kirjoita esim. ”jatka”, niin se jatkaa."
+    ),
+    "en": (
+        "⚠︎ The wizard stopped because it reached its cost limit. The work so far is kept. "
+        "Send a message (for example “continue”) and it goes on."
+    ),
+}
+
+
+def _note_system_message(message) -> None:
+    """Log the SDK's report that the agent switched to WIZARD_AGENT_FALLBACK_MODEL.
+
+    The CLI sends it as a ``system`` message of subtype ``model_fallback``; the
+    models are the deployment's own names, the trigger a fixed word.
+    """
+    if getattr(message, "subtype", None) != "model_fallback":
+        return
+    data = getattr(message, "data", None) or {}
+    logger.info(
+        "agent switched from %s to its fallback model %s (trigger %s)",
+        data.get("original_model"),
+        data.get("fallback_model"),
+        data.get("trigger"),
+    )
+
+
 def frame_is_error(frame: str) -> bool:
     """True for an SSE frame carrying ``{"error": true}``."""
     try:
@@ -1169,6 +1245,14 @@ async def _start_session(
     resumed: str | None = None
     sdk_session_id: str | None = None
     turn_results: list = []  # the bootstrap's usage, counted with the first turn
+    # One guard for the agent, whichever client below it ends up with: it counts
+    # this owner's metered tool calls per turn and in their hourly window.
+    if not user_id:
+        # The chat route always names the owner; anything else gets the per-turn cap only.
+        logger.warning(
+            "agent started without an owner: metered tool calls are capped per turn only"
+        )
+    guard = agent_tool_guard.ToolGuard(wizard_dir, out, user_id=user_id)
     if resume_id and transcript_exists(resume_id) is False:
         logger.info("agent session %s has no transcript to resume for %s", resume_id, session_id)
         resume_id = None
@@ -1179,7 +1263,9 @@ async def _start_session(
         # context and nothing has to be re-explained (#174).
         try:
             client = ClaudeSDKClient(
-                options=_build_options(wizard_dir, out, resume=resume_id, session_id=session_id)
+                options=_build_options(
+                    wizard_dir, out, resume=resume_id, session_id=session_id, guard=guard
+                )
             )
             await client.connect()
             resumed = "sdk"
@@ -1194,7 +1280,9 @@ async def _start_session(
                 await _disconnect_quietly(client)  # a process may have started
             client = None
     if client is None:
-        client = ClaudeSDKClient(options=_build_options(wizard_dir, out, session_id=session_id))
+        client = ClaudeSDKClient(
+            options=_build_options(wizard_dir, out, session_id=session_id, guard=guard)
+        )
         try:
             await client.connect()
             # Bootstrap turn: invoke the skill + pin output dir. Drained silently —
@@ -1231,6 +1319,8 @@ async def _start_session(
         "sdk_session_id": sdk_session_id,
         # Whose agent this is, for WIZARD_MAX_LIVE_AGENTS_PER_USER.
         "user_id": user_id,
+        # Its tool guard, told by stream_turn_for when a new message begins.
+        "tool_guard": guard,
         # (purpose, ResultMessage) of each query not yet on a span (telemetry).
         "turn_results": turn_results,
     }
@@ -1428,8 +1518,14 @@ async def stream_turn_for(
     An agent whose process failed during the turn (it cannot be read, or its
     stream ended without a result) is ended when the turn is over, so the next
     message starts a new one instead of meeting the broken one.
+
+    The message, with its quiet "Please continue." nudges, is one turn for
+    ``WIZARD_MAX_METERED_CALLS_PER_TURN``: the guard's count starts here.
     """
     async with session["lock"]:
+        guard = session.get("tool_guard")
+        if guard is not None:
+            guard.start_turn()
         try:
             await session["client"].query(user_message)
             if session.get("stop_requested"):
@@ -1448,7 +1544,9 @@ async def stream_turn_for(
             session["broken"] = True
             raise
         finally:
-            if session.get("broken"):
+            # An agent at its cost limit would stop again at once: the next
+            # message resumes it, and the CLI counts its budget from there.
+            if session.get("broken") or session.get("budget_spent"):
                 await _discard_session(session)
 
 

@@ -164,15 +164,17 @@ def test_the_api_env_is_filtered_to_the_agents_settings() -> None:
 
 def test_the_sdk_starts_the_bridge_client_when_the_socket_is_set(monkeypatch, tmp_path) -> None:
     from wizard_api.services import agent_service
+    from wizard_api.services.agent_tool_guard import ToolGuard
 
     if agent_service.ClaudeAgentOptions is None:
         pytest.skip("claude-agent-sdk is not installed")
     monkeypatch.setenv(agent_bridge.SOCKET_ENV, "/run/wizard-agent/agent.sock")
-    options = agent_service._build_options(tmp_path, tmp_path)
+    guard = ToolGuard(tmp_path, tmp_path)
+    options = agent_service._build_options(tmp_path, tmp_path, guard=guard)
     assert Path(options.cli_path).name == "wizard-agent-cli"
 
     monkeypatch.delenv(agent_bridge.SOCKET_ENV)
-    assert agent_service._build_options(tmp_path, tmp_path).cli_path is None
+    assert agent_service._build_options(tmp_path, tmp_path, guard=guard).cli_path is None
 
 
 def test_only_the_api_container_has_the_service_secrets_and_a_cluster_token() -> None:

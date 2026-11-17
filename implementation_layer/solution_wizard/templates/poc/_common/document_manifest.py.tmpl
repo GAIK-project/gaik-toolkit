@@ -101,12 +101,14 @@ class DocumentManifest:
             if found is None:
                 # Laid out differently than the manifest says (e.g. flat): the bare
                 # name, if exactly one file under the roots has it.
+                # Compared as names: as an rglob pattern, [ ] * ? in a name would match
+                # other files or none.
                 hits = {
                     p.resolve()
                     for root in roots
                     if root.is_dir()
-                    for p in root.rglob(Path(key).name)
-                    if p.is_file() and inside(p.resolve())
+                    for p in root.rglob("*")
+                    if p.name == Path(key).name and p.is_file() and inside(p.resolve())
                 }
                 if len(hits) == 1:
                     found = hits.pop()
