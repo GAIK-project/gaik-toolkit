@@ -42,6 +42,10 @@ printf '  key: "%s"\n' "$(openssl rand -hex 32)" | create aiops-pseudonym
 
 printf '  admin-password: "%s"\n' "$(rand)" | create aiops-grafana
 
+# The bearer token for the OTLP way in from other projects (otlp-ingress.yaml). The producer's own
+# project gets the same value in a Secret of its own (README.md, "The wizard's way in").
+printf '  token: "%s"\n' "$(openssl rand -hex 32)" | create aiops-otlp-ingress
+
 # The MLflow sign-in: the password in plain text, so it can be handed to reviewers, and its bcrypt hash
 # for nginx. Cost 4, bcrypt's lowest: nginx checks the hash on every request, and a 192-bit random
 # password needs no slow hash.

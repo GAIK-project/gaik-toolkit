@@ -1,0 +1,28 @@
+# The collector gets the token-checked receiver: its port, its token and its configuration file.
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+spec:
+  ports:
+    - {name: otlp-ingress, port: 4320, targetPort: 4320}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+spec:
+  template:
+    spec:
+      containers:
+        - name: otel-collector
+          env:
+            - name: OTLP_INGRESS_TOKEN
+              valueFrom: {secretKeyRef: {name: aiops-otlp-ingress, key: token}}
+          ports:
+            - {containerPort: 4320}
+          volumeMounts:
+            - {name: ingress-config, mountPath: /etc/otelcol/ingress, readOnly: true}
+      volumes:
+        - name: ingress-config
+          configMap: {name: otel-collector-ingress}

@@ -17,6 +17,7 @@ its quota.
 | `networkpolicy-router.yaml` | Lets the OpenShift router reach Grafana and the MLflow sign-in, nothing else |
 | `create-secrets.sh` | Generates the Secrets on Rahti, once; nothing goes to git |
 | `send-test-event.sh` | Sends one test event and prints its trace id |
+| `otlp-ingress.yaml`, `otlp-ingress-collector.yaml`, `patch-otlp-ingress.yaml` | The token-checked OTLP way in for producers in other projects (M2) |
 
 ## Deploy
 
@@ -79,21 +80,34 @@ record on the same trace, all with a user id, a client IP and prompt and respons
 - **Grafana** (as admin): switch to the *Security* organisation, *Audit trail* dashboard, *Latest events*: the
   row with the same `trace_id`, its actor a hash and its client address `192.0.2.0`.
 
-## The wizard's way in (M2, not deployed)
+## The wizard's way in (M2)
 
-The staging wizard runs in `gaik`, so its events must cross projects. The design:
+The wizard runs in `gaik`, so its events cross projects. The base's `allow-otlp-from-producers` policy
+(namespace label `gaik-aiops/producer=true`) needs a label on `gaik` that this project cannot set, so
+the way in is a Route:
 
-- A Route `otlp` with edge TLS to the collector's OTLP/HTTP port, and a router NetworkPolicy for that
-  port, the same as `networkpolicy-router.yaml`.
-- A second OTLP receiver on its own port with the collector's `bearertokenauth` extension, so only
-  callers with the token get in; the in-project receiver stays as it is. It goes in as a third
-  `--config` file in this overlay, which the collector merges with the shared configuration. Pipelines'
-  receiver lists are replaced, not merged, so that file repeats them.
-- The token in a Secret here (`create-secrets.sh`) and in the wizard's Secret in `gaik`, set with
-  `oc create secret` by hand. `send-test-event.sh` already sends `OTLP_TOKEN` when set.
+- `otlp-ingress.yaml`: the Route `otlp` (`https://otlp-gaik-aiops.2.rahtiapp.fi`, edge TLS) to the
+  collector's port 4320, and a router NetworkPolicy for that port only. Ports 4317 and 4318 stay
+  inside the project.
+- `otlp-ingress-collector.yaml`: a second OTLP/HTTP receiver on 4320 behind the collector's
+  `bearertokenauth` extension, read as a third `--config` file. Each pipeline's receiver list is given
+  in full there (lists are replaced, not merged), so data from both receivers goes through the same
+  privacy processors. A request without the token gets 401.
+- The token is in the Secret `aiops-otlp-ingress` (`create-secrets.sh`).
 
-The base's `allow-otlp-from-producers` policy (namespace label `gaik-aiops/producer=true`) needs a
-label on `gaik` that this project cannot set, so the Route is the way in.
+A producer gets the same token in a Secret of its own project, as `OTEL_EXPORTER_OTLP_HEADERS`
+(`Authorization=Bearer%20<token>`), copied without printing it:
+
+```bash
+printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: <producer>-otlp\ntype: Opaque\nstringData:\n  OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer%%20%s"\n' \
+  "$(oc extract secret/aiops-otlp-ingress -n gaik-aiops --keys=token --to=-)" | oc create -n <project> -f -
+oc set env deployment/<producer> -n <project> -c <container> --from=secret/<producer>-otlp \
+  OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gaik-aiops.2.rahtiapp.fi
+```
+
+Set it on the wizard's api container only, not on its agent container. The wizard's dashboards read
+`service_name="wizard-v2-api"`, the API's default `OTEL_SERVICE_NAME`, so leave that unset. To test the
+way in: `OTLP_ENDPOINT=https://otlp-gaik-aiops.2.rahtiapp.fi OTLP_TOKEN=... send-test-event.sh`.
 
 ## Changing Secrets
 
