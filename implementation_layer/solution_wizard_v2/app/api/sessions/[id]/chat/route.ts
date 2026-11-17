@@ -13,6 +13,8 @@ import {
 } from "@/lib/wizard-api-client";
 import { withLogging } from "@/lib/with-logging";
 import { chatMessageTooLong } from "@/lib/chat-limits";
+import { STOPPED_NOTE, withStoppedNote } from "@/lib/chat-stopped";
+import { beginMockReply, endMockReply, mockReplyPace } from "@/lib/mock-sessions";
 import { setContextUserId, getTraceId } from "@/lib/request-context";
 import { logger } from "@/lib/logger";
 
@@ -109,16 +111,29 @@ export const POST = withLogging("chat.post", async (
   const fullReply = await resolveChatReply(id, owned.session, userMessage, t);
   const tokens = toStreamTokens(fullReply);
 
+  // The stop route reaches the reply through this handle (lib/mock-sessions).
+  const reply = beginMockReply(id);
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        let written = "";
         for (const token of tokens) {
           if (req.signal.aborted) {
             controller.close();
             return;
           }
+          if (reply.stopped) {
+            // Stopped by the user: what was written so far is the reply, stored
+            // as wizard_api stores a stopped one.
+            const note = STOPPED_NOTE[locale];
+            await postMessage(id, userMessage, withStoppedNote(written, note), note);
+            controller.enqueue(sse({ stopped: true, tool: null }));
+            controller.close();
+            return;
+          }
           controller.enqueue(sse({ delta: token }));
-          await sleep(45);
+          written += token;
+          await sleep(mockReplyPace());
         }
         // Persist the conversation so a reload shows the complete message.
         await postMessage(id, userMessage, fullReply);
@@ -131,6 +146,8 @@ export const POST = withLogging("chat.post", async (
         );
         controller.enqueue(sse({ error: true }));
         controller.close();
+      } finally {
+        endMockReply(id, reply);
       }
     },
   });
