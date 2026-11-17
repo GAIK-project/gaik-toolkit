@@ -27,6 +27,7 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   // the package
   "poc_package_incomplete",
   "no_successful_run",
+  "package_changed_since_run",
   "blueprint_placeholder",
   "blueprint_not_scaffoldable",
   "package_folder",

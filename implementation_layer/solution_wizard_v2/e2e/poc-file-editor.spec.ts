@@ -48,7 +48,19 @@ const PACKAGE_ZIP = zipSync({
 const sse = (events: object[]) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
 
 /** A checked package with no test material, so the steps stay open; `recorded` adds a passed test run. */
-async function fakePackage(page: Page, { recorded = false }: { recorded?: boolean } = {}) {
+async function fakePackage(
+  page: Page,
+  {
+    recorded = false,
+    tested,
+    digest,
+  }: {
+    recorded?: boolean;
+    /** wizard_api's digests: of the package the recorded run tested, and of the package as it is now. */
+    tested?: string;
+    digest?: string;
+  } = {},
+) {
   await page.route(`${API}/poc/files`, (route) =>
     route.fulfill({
       json: {
@@ -59,6 +71,8 @@ async function fakePackage(page: Page, { recorded = false }: { recorded?: boolea
         package_files: PACKAGE_FILES,
         version: "v1",
         ...(recorded ? { recordedRun: "run-1" } : {}),
+        ...(tested ? { testedPackage: tested } : {}),
+        ...(digest ? { package_digest: digest } : {}),
       },
     }),
   );
@@ -228,6 +242,48 @@ test.describe("PoC file editor", () => {
     await expect(editor.locator(".cm-content")).toContainText("tavily-python");
     await expect(editor.locator(".cm-content")).not.toContainText("requests");
     await expect(conflict).toBeHidden();
+  });
+
+  test("the editor is a modal dialog: the page behind is dimmed and out of reach, and focus stays inside", async ({
+    page,
+  }) => {
+    await fakePackage(page);
+    await openPoc(page);
+    const editor = await openFile(page, "AI-GENERATED.json");
+    await expect(editor.locator(".cm-content")).toBeVisible();
+
+    const state = await editor.evaluate((el) => ({
+      modal: el.matches(":modal"),
+      inBody: el.parentElement === document.body,
+      backdrop: getComputedStyle(el, "::backdrop").backgroundColor,
+      focusInside: el.contains(document.activeElement),
+    }));
+    expect(state.modal).toBe(true);
+    expect(state.inBody).toBe(true);
+    expect(state.focusInside).toBe(true);
+    // Dimmed: a colour with some of the page showing through, not none at all.
+    expect(state.backdrop).toMatch(/\/ 0\.4\)$/);
+
+    // The page's own controls cannot be pressed through it.
+    const approve = page.getByTestId("gate3-actions").getByRole("button").first();
+    await expect(approve).toBeVisible();
+    await expect(approve.click({ timeout: 1_000 })).rejects.toThrow();
+    await expect(editor).toBeVisible();
+
+    // Tab goes round inside the dialog, never out to the page.
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press("Tab");
+      const where = await page.evaluate(() => {
+        const dialog = document.querySelector('[data-testid="poc-file-editor"]');
+        const active = document.activeElement;
+        return active === document.body || Boolean(dialog?.contains(active));
+      });
+      expect(where).toBe(true);
+    }
+    await page.keyboard.press("Escape");
+    await expect(editor).toBeHidden();
+    // Focus goes back to the file that was opened.
+    await expect(page.locator('li[data-path="poc/AI-GENERATED.json"] button')).toBeFocused();
   });
 
   test("the AI marker is shown read-only, and what lies beside poc/ is not opened", async ({ page }) => {
@@ -419,6 +475,33 @@ test.describe("The .env form beside the deployable package", () => {
     await own.click();
     const zip = unzipSync(new Uint8Array(await readFile(await (await download).path())));
     expect(strFromU8(zip["poc/.env"])).toContain(`AZURE_API_KEY=${TYPED}`);
+  });
+
+  test("a package changed after the run that passed is not offered for download: a new test run is asked for", async ({
+    page,
+  }) => {
+    await fakePackage(page, { recorded: true, tested: "digest-before", digest: "digest-after" });
+    await openPoc(page);
+
+    const deployable = page.getByTestId("poc-deployable");
+    await expect(deployable).toBeDisabled();
+    await expect(deployable).toHaveAttribute("title", /Pakettia on muutettu onnistuneen testiajon jälkeen/);
+    await expect(page.getByTestId("poc-use-status")).toHaveText(
+      "Pakettia on muutettu onnistuneen testiajon jälkeen. Aja testi uudelleen, niin käyttöönottopaketin voi ladata.",
+    );
+    await expect(page.getByTestId("poc-step-use").locator("[data-mark]")).toHaveAttribute("data-mark", "number");
+    await expect(page.getByTestId("poc-env")).toHaveCount(0);
+    await expect(page.locator(`a[href="/api/sessions/${SESSION}/poc/deployable"]`)).toHaveCount(0);
+  });
+
+  test("a run that tested the package as it is keeps the download open", async ({ page }) => {
+    await fakePackage(page, { recorded: true, tested: "digest-same", digest: "digest-same" });
+    await openPoc(page);
+    await expect(page.getByTestId("poc-deployable")).toHaveAttribute(
+      "href",
+      `/api/sessions/${SESSION}/poc/deployable`,
+    );
+    await expect(page.getByTestId("poc-env-form")).toBeVisible();
   });
 
   test("the form is not offered before a test run has succeeded", async ({ page }) => {

@@ -2527,6 +2527,19 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
     poc = _poc_dir(session.output_dir)
     if not poc or not os.path.isdir(poc):
         raise HTTPException(status_code=404, detail="no PoC generated yet")
+    # The run that passed must have tested the package as it is now, the way
+    # Gate 3 asks (``_successful_run_is_of_another_package``). The download was
+    # gated on a run having succeeded at all: after it the agent, or the user
+    # in the PoC tab's editor, could change run_poc.py and the changed package
+    # was still handed over as the tested one. A change outside the digest (the
+    # README, .env.example) leaves the download open.
+    if _successful_run_is_of_another_package(session):
+        raise api_error(
+            409,
+            "package_changed_since_run",
+            "the package was changed after the test run that passed; "
+            "run the test again before taking the package",
+        )
     problems = poc_service.package_problems(poc)
     if problems:
         raise HTTPException(

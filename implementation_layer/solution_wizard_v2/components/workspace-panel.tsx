@@ -50,6 +50,7 @@ import {
 import {
   handoverState,
   inputsChangedSinceRun,
+  packageChangedSinceRun,
   publishResultStale,
   publishRunWarnings,
   resultIsStale,
@@ -2675,10 +2676,16 @@ export function WorkspacePanel({
   // is not called a success here either: the step says what to do about it,
   // and trying the solution comes before taking the package (which stays
   // possible: warnings inform, they do not block).
-  const handover = handoverState({ packageReady: pocReady, runRecorded, shownRunHasWarnings });
+  // The api hands the package over only when the run that passed tested it as
+  // it is now (409 package_changed_since_run otherwise): after a change to
+  // the package the download waits for a new run, and the step says so.
+  const packageChanged = runRecorded && packageChangedSinceRun(packageDigest, testedDigest);
+  const deployableOpen = runRecorded && !packageChanged;
+  const deployableLockedHint = packageChanged ? t.pocDeployableChanged : t.pocDeployableHint;
+  const handover = handoverState({ packageReady: pocReady, runRecorded: deployableOpen, shownRunHasWarnings });
   // The keys the package needs, asked where the package is taken. Open when
   // .env.example lists variables, until the user folds it.
-  const envSection = pocReady && runRecorded && (
+  const envSection = pocReady && deployableOpen && (
     <details
       className="group @container border-t border-border"
       data-testid="poc-env"
@@ -2726,7 +2733,7 @@ export function WorkspacePanel({
     <StepCard
       n={4}
       title={t.pocStepUse}
-      done={pocReady && runRecorded}
+      done={pocReady && deployableOpen}
       attention={handover === "check"}
       muted={!pocReady}
       testId="poc-step-use"
@@ -2735,7 +2742,7 @@ export function WorkspacePanel({
           {
             {
               no_package: t.pocNeedsPackage,
-              locked: t.pocDeployableHint,
+              locked: deployableLockedHint,
               check: t.pocUseCheck,
               ready: t.pocUseReady,
             }[handover]
@@ -2756,7 +2763,7 @@ export function WorkspacePanel({
             <Icon name="users" size={16} />
             {t.pocOpenCases}
           </a>
-          {runRecorded ? (
+          {deployableOpen ? (
             <a
               href={`/api/sessions/${sessionId}/poc/deployable`}
               download
@@ -2772,7 +2779,7 @@ export function WorkspacePanel({
             <button
               type="button"
               disabled
-              title={t.pocDeployableHint}
+              title={deployableLockedHint}
               className="btn-secondary"
               data-testid="poc-deployable"
             >
@@ -2789,7 +2796,7 @@ export function WorkspacePanel({
   // The package's row in the finished run's card.
   const deployableRow = (
     <li>
-      {runRecorded ? (
+      {deployableOpen ? (
         <a
           href={`/api/sessions/${sessionId}/poc/deployable`}
           download
@@ -2809,7 +2816,7 @@ export function WorkspacePanel({
         <button
           type="button"
           disabled
-          title={t.pocDeployableHint}
+          title={deployableLockedHint}
           className={`${NEXT_ROW} disabled:cursor-not-allowed disabled:opacity-60`}
           data-testid="poc-deployable"
         >

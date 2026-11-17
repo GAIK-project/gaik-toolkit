@@ -559,3 +559,117 @@ def test_an_edit_outside_what_was_tested_keeps_the_approval(client, db_session) 
     detail = client.get(f"/sessions/{sid}").json()
     assert detail["gate_statuses"]["gate_3"] == "approved"
     assert detail["metadata"]["last_successful_run"] == "run-1"
+
+
+# --- the deployable package is the one the test run tested ----------------------
+
+
+def _tested_session(client, db_session, user: str = "tested") -> dict:
+    """A complete package with a successful run recorded on it as it is now."""
+    created = _session_with_package(client, user)
+    poc = os.path.join(created["output_dir"], "poc")
+    os.makedirs(os.path.join(poc, "schemas"), exist_ok=True)
+    with open(os.path.join(poc, "run_poc.py"), "w", encoding="utf-8") as fh:
+        fh.write("from gaik.software_components.extractor import Extractor\n")
+    with open(os.path.join(poc, "requirements.txt"), "w", encoding="utf-8") as fh:
+        fh.write("gaik[extract]\n")
+    with open(os.path.join(poc, "schemas", "output_schema.json"), "w", encoding="utf-8") as fh:
+        fh.write("{}\n")
+    sid = created["id"]
+    digest = client.get(f"/sessions/{sid}/poc/files").json()["package_digest"]
+    session = session_service.get_session(db_session, uuid.UUID(sid))
+    session_service.update_session(
+        db_session,
+        session,
+        SessionUpdate(
+            metadata={
+                "last_successful_run": "run-1",
+                session_service.SUCCESSFUL_RUN_PACKAGE_KEY: digest,
+            }
+        ),
+    )
+    return created
+
+
+@requires_postgres
+def test_the_deployable_package_is_refused_after_an_edit_the_run_did_not_test(
+    client, db_session
+) -> None:
+    sid = _tested_session(client, db_session)["id"]
+    assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
+    read = _file(client, sid, "run_poc.py").json()
+
+    saved = _save(
+        client, sid, "run_poc.py", read["content"] + "print('untested')\n", read["digest"]
+    )
+    refused = client.get(f"/sessions/{sid}/poc/deployable")
+
+    assert saved.status_code == 200
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert detail["error"] == "package_changed_since_run"
+    assert "run the test again" in detail["message"] and detail["trace_id"]
+    # Put back as it was tested, the package is the tested one again.
+    again = _file(client, sid, "run_poc.py").json()
+    _save(client, sid, "run_poc.py", read["content"], again["digest"])
+    assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
+
+
+@requires_postgres
+def test_the_agents_change_after_the_run_closes_the_download_too(client, db_session) -> None:
+    created = _tested_session(client, db_session, "agent-change")
+    with open(os.path.join(created["output_dir"], "poc", "config.yaml"), "w") as fh:
+        fh.write("stages: {}\n")
+
+    refused = client.get(f"/sessions/{created['id']}/poc/deployable")
+
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["error"] == "package_changed_since_run"
+
+
+@requires_postgres
+def test_an_edit_outside_the_digest_leaves_the_download_open(client, db_session) -> None:
+    sid = _tested_session(client, db_session, "outside")["id"]
+    for path, content in (
+        (".env.example", ENV_EXAMPLE + "TAVILY_API_KEY=\n"),
+        ("README.md", "# New\n"),
+    ):
+        digest = _file(client, sid, path).json()["digest"]
+        assert _save(client, sid, path, content, digest).status_code == 200
+
+    got = client.get(f"/sessions/{sid}/poc/deployable")
+
+    assert got.status_code == 200
+    assert got.headers["content-type"] == "application/zip"
+
+
+@requires_postgres
+def test_a_run_recorded_without_a_digest_opens_the_download_as_before(client, db_session) -> None:
+    created = _tested_session(client, db_session, "legacy-run")
+    sid = created["id"]
+    session = session_service.get_session(db_session, uuid.UUID(sid))
+    metadata = {
+        k: v
+        for k, v in session.session_metadata.items()
+        if k != session_service.SUCCESSFUL_RUN_PACKAGE_KEY
+    }
+    session.session_metadata = metadata
+    db_session.commit()
+    with open(os.path.join(created["output_dir"], "poc", "config.yaml"), "w") as fh:
+        fh.write("stages: {}\n")
+
+    assert client.get(f"/sessions/{sid}/poc/deployable").status_code == 200
+
+    # A run recorded since without one proves nothing about this package.
+    session = session_service.get_session(db_session, uuid.UUID(sid))
+    session_service.update_session(
+        db_session,
+        session,
+        SessionUpdate(
+            metadata={
+                session_service.SUCCESSFUL_RUN_PACKAGE_KEY: session_service.UNKNOWN_RUN_PACKAGE
+            }
+        ),
+    )
+    refused = client.get(f"/sessions/{sid}/poc/deployable")
+    assert refused.json()["detail"]["error"] == "package_changed_since_run"

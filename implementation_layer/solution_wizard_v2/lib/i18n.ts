@@ -536,6 +536,8 @@ export type Dict = {
   pocInputFailed: string;
   pocDeployable: string;
   pocDeployableHint: string;
+  /** In its place when a run has passed and the package was changed after it. */
+  pocDeployableChanged: string;
   // ==== the PoC tab's file editor ====
   /** A file in the package's tree, as a button: {name}. */
   pocFileOpen: string;
@@ -1267,6 +1269,8 @@ const fi: Dict = {
   pocOpenCases: "Kokeile ratkaisua omilla tapauksilla",
   pocOpenCasesHint: "Avaa ratkaisun käyttönäkymän: roolit BPMN:stä, tapaus ajetaan sandboxissa omalla syötteellä.",
   pocDeployableHint: "Käyttöönottopaketti avautuu, kun testiajo on onnistunut.",
+  pocDeployableChanged:
+    "Pakettia on muutettu onnistuneen testiajon jälkeen. Aja testi uudelleen, niin käyttöönottopaketin voi ladata.",
   pocFileOpen: "Avaa {name}",
   pocFileLoading: "Avataan tiedostoa…",
   pocFileEditorLabel: "Tiedoston {name} sisältö",
@@ -2068,6 +2072,8 @@ const en: Dict = {
   pocOpenCases: "Try the solution on your own cases",
   pocOpenCasesHint: "Opens the solution in use: roles from the BPMN, each case run in the sandbox on its own input.",
   pocDeployableHint: "The deployment package opens once a test run has succeeded.",
+  pocDeployableChanged:
+    "The package was changed after the test run that passed. Run the test again to download the deployment package.",
   pocFileOpen: "Open {name}",
   pocFileLoading: "Opening the file…",
   pocFileEditorLabel: "Content of {name}",

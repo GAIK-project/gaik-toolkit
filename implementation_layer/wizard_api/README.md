@@ -76,6 +76,11 @@ was approved it reopens that gate. An edit to a file outside the digest (the REA
 `.env.example`) does neither. Each save is recorded in the session's metadata
 (`user_edits`, server-owned) and the agent is told once, with the next chat message.
 
+`GET /sessions/{id}/poc/deployable` hands the package over only when the run recorded as
+successful tested it as it is now: the digest kept with that run against the package's
+digest, the comparison Gate 3 makes. After a change to a file in the digest it answers
+409 `package_changed_since_run` until a new run has succeeded.
+
 ### Errors
 
 Every error answers in one shape (`wizard_api/errors.py`):
