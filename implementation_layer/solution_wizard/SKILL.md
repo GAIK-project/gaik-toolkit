@@ -353,8 +353,10 @@ The PoC does not import `output_schema.py`: `load_schema()` reads
 python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas
 ```
 
-If it exits with an error, nothing was written and the PoC would still run the old schema:
-fix `output_schema.py` (the class name must match `model_name` in the requirements JSON,
+The audio and document PoCs do the same themselves when `output_schema.py` is newer than
+the model file, and stop with the reason when it cannot be done; the script tells you now
+instead of at the next run. If it exits with an error, nothing was written: fix
+`output_schema.py` (the class name must match `model_name` in the requirements JSON,
 the field types must be ones the schema generator produces, and the class adds no
 validators, serializers, methods, private attributes or config options other than
 `extra`; keep the generated `DecimalField` / `OptionalDecimalField` helpers as they are)
