@@ -27,7 +27,7 @@ from gaik.software_components.extractor.saved_schema import (
 )
 from gaik.software_components.extractor.schema import print_pydantic_schema
 from gaik.software_components.transcriber import Transcriber, TranscriptionResult
-from gaik.software_modules._options import checked_options
+from gaik.software_modules._options import EXTRACT_SET_BY_MODULE, checked_options
 
 
 @dataclass
@@ -129,7 +129,7 @@ class AudioToStructuredData:
             extract_options,
             getattr(DataExtractor, "extract", None),
             what="extract_options",
-            set_by_module=("extraction_model", "requirements", "user_requirements", "documents"),
+            set_by_module=EXTRACT_SET_BY_MODULE,
         )
         transcriber_ctor.setdefault("enhanced_transcript", False)
         transcriber = Transcriber(api_config=self.transcription_config, **transcriber_ctor)

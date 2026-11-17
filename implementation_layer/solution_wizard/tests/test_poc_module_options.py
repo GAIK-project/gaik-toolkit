@@ -105,7 +105,7 @@ def _check(found: dict[str, set[str]], targets: dict[str, tuple]) -> None:
         )
 
 
-_EXTRACT_SET = ("extraction_model", "requirements", "user_requirements", "documents")
+_EXTRACT_SET = options.EXTRACT_SET_BY_MODULE
 
 
 def test_audio_poc_options_pass_the_module_check(tmp_path):
@@ -134,11 +134,15 @@ def test_document_poc_options_pass_the_module_check(tmp_path):
     )["poc_dir"]
     found = _run_options(poc)
     assert {"parser_ctor", "extractor_ctor"} <= set(found)
+    # The template sets no parser options today; any it gains must suit every parser.
+    checked = 0
     for parser in ("VisionParser", "PyMuPDFParser", "DocxParser"):
         parser_class = getattr(parsers, parser, None)
         if parser_class is None:
             continue
         _check({"parser_ctor": found["parser_ctor"]}, {"parser_ctor": (parser_class, ())})
+        checked += 1
+    assert checked, "no parser class was available to check against"
     _check(
         {k: v for k, v in found.items() if k not in ("parser_ctor", "parse_options")},
         {

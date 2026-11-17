@@ -3,9 +3,12 @@
 ``DocumentsToStructuredData`` and ``AudioToStructuredData`` take dictionaries
 such as ``parser_ctor`` or ``extract_options`` and pass them on to a parser, the
 transcriber or the extractor. A name must be a parameter of the component it
-goes to, and a stage config (credentials, the endpoint and its allowed hosts)
-comes from the module's own constructor and is never accepted in such a
-dictionary.
+goes to, and a stage config (the provider credentials, the endpoint and its
+allowed hosts) comes from the module's own constructor and is never accepted in
+such a dictionary. Component parameters stay accepted under their own names:
+``transcriber_ctor`` takes ``local_api_base`` / ``local_api_key``, which the
+Transcriber checks against the allowed hosts, and write locations such as
+``output_dir`` or ``json_path`` are not confined by this check.
 """
 
 from __future__ import annotations
@@ -16,6 +19,9 @@ from typing import Any
 
 # A stage config carries the key, the endpoint and the list of allowed hosts.
 STAGE_CONFIG_KEYS = frozenset({"config", "api_config", "openai_config"})
+
+# The arguments a module passes to ``DataExtractor.extract`` itself.
+EXTRACT_SET_BY_MODULE = ("extraction_model", "requirements", "user_requirements", "documents")
 
 
 def checked_options(

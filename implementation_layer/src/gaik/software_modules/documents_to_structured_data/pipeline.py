@@ -24,7 +24,7 @@ from gaik.software_components.extractor.saved_schema import (
     save_model_file,
 )
 from gaik.software_components.extractor.schema import print_pydantic_schema
-from gaik.software_modules._options import checked_options
+from gaik.software_modules._options import EXTRACT_SET_BY_MODULE, checked_options
 
 # Optional parsers
 try:
@@ -38,7 +38,8 @@ except ImportError:  # pragma: no cover - optional deps
     VisionParser = DoclingParser = PyMuPDFParser = DocxParser = None  # type: ignore
 
 
-# The method each parser_choice reads the document with.
+# The method each parser_choice reads the document with: the option check validates
+# parse_options against it and _parse_document calls it, so the two cannot differ.
 _PARSE_METHOD = {
     "vision_parser": "convert_pdf",
     "docling": "parse_document",
@@ -141,7 +142,10 @@ class DocumentsToStructuredData:
         parser_ctor = checked_options(parser_ctor, parser_class, what="parser_ctor")
         parse_method = getattr(parser_class, _PARSE_METHOD[parser_choice.lower()], None)
         path_parameter = (
-            next(name for name in inspect.signature(parse_method).parameters if name != "self")
+            next(
+                (name for name in inspect.signature(parse_method).parameters if name != "self"),
+                None,
+            )
             if parse_method is not None
             else None
         )
@@ -156,7 +160,7 @@ class DocumentsToStructuredData:
             extract_options,
             getattr(DataExtractor, "extract", None),
             what="extract_options",
-            set_by_module=("extraction_model", "requirements", "user_requirements", "documents"),
+            set_by_module=EXTRACT_SET_BY_MODULE,
         )
 
         parser = self._build_parser(parser_choice, parser_ctor)
@@ -238,19 +242,14 @@ class DocumentsToStructuredData:
         self, parser_choice: str, parser, file_path: str | Path, parse_options: dict
     ) -> list[str]:
         choice = parser_choice.lower()
+        if choice not in _PARSE_METHOD:
+            raise ValueError(f"Unsupported parser_choice: {parser_choice}")
+        result = getattr(parser, _PARSE_METHOD[choice])(str(file_path), **parse_options)
         if choice == "vision_parser":
-            pages = parser.convert_pdf(str(file_path), **parse_options)
-            return pages if isinstance(pages, list) else [pages]
-        if choice == "docling":
-            parsed = parser.parse_document(str(file_path), **parse_options)
-            return [_text_of(parsed)]
+            return result if isinstance(result, list) else [result]
         if choice == "pymupdf":
-            text = parser.parse_pdf(str(file_path), **parse_options)
-            return [text]
-        if choice == "docx":
-            parsed = parser.parse_document(str(file_path), **parse_options)
-            return [_text_of(parsed)]
-        raise ValueError(f"Unsupported parser_choice: {parser_choice}")
+            return [result]
+        return [_text_of(result)]
 
     # ------------------------------------------------------------------
     # Schema save/load helpers
