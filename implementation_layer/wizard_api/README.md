@@ -184,6 +184,21 @@ A user is the session's owner (the user named in `X-Wizard-User-Id`).
   before an agent is woken, and only accepted turns are counted (a `409` while
   the agent is still replying does not use one up).
 
+### Stopping a reply
+
+`POST /sessions/{id}/chat/stop` stops the reply that is being written for a
+session of the caller. The agent is interrupted (`ClaudeSDKClient.interrupt()`),
+the turn's stream ends with `{"stopped": true, "tool": <kind or null>}`, and
+what was written so far is stored as the reply with `stopped: true` and a
+short note at the end of its text (`stoppedNote`, "(Pysäytetty)"). It answers
+`202 {"stopping": true}`, or `409 no_reply_running` when no reply is being
+written. A stopped turn is counted as `stopped` in `wizard.turns`, not as
+failed, and is not nudged to continue. The agent keeps its place and takes the
+next message, which tells it in a server line that its previous reply was
+stopped, and whether a tool call was running. An agent that does not take the
+interrupt within 10 seconds, or whose turn has not ended 20 seconds after it,
+is ended instead; the next message starts it again.
+
 The counts live in the API process, as the agents do; with more than one API
 replica each counts its own. The sandbox's run limits (`WIZARD_MAX_ACTIVE_RUNS`,
 `WIZARD_MAX_ACTIVE_RUNS_PER_USER`, `429 sandbox_busy`) follow the same pattern.

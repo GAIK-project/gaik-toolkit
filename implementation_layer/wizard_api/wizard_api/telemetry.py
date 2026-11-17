@@ -290,7 +290,10 @@ def record_turn_usage(
         "gaik.agent.purpose": purpose,
     }
     span.set_attributes({k: v for k, v in attributes.items() if v is not None})
-    if getattr(result, "is_error", False):
+    if getattr(result, "terminal_reason", None) in ("aborted_streaming", "aborted_tools"):
+        # The user stopped the reply: the query ended early, as asked.
+        span.set_attribute("gaik.agent.stopped", True)
+    elif getattr(result, "is_error", False):
         if replaced:
             span.set_attribute("gaik.agent.replaced", True)
         else:
@@ -304,6 +307,7 @@ async def traced_turn(
     agents: Callable[[], Iterable[tuple[dict, bool]]],
     model: str,
     is_error: Callable[[str], bool],
+    is_stopped: Callable[[str], bool] | None = None,
 ) -> AsyncIterator[str]:
     """Pass a chat turn's SSE ``frames`` through, inside one ``wizard.turn`` span.
 
@@ -313,13 +317,16 @@ async def traced_turn(
     at the end of the stream, each with whether a retry replaced it. The turn
     is an error when a frame the user saw was an error. A turn the client left
     before it ended (closed tab, dropped connection) is ``gaik.turn.aborted``;
-    the query it cut short has no ``chat`` span, as its usage never arrived.
+    the query it cut short has no ``chat`` span, as its usage never arrived. A
+    turn the user stopped (a frame ``is_stopped`` knows) is ``gaik.turn.stopped``
+    and counted with the outcome ``stopped``, not as a failure.
     """
     from wizard_api import ops_metrics
 
     turn = tracer.start_span("wizard.turn")
     turn.set_attributes(attributes)
     failed = False
+    stopped = False
     outcome = "completed"
     started = time.monotonic()
     first = True
@@ -329,6 +336,7 @@ async def traced_turn(
                 ops_metrics.turn_first_frame.record(time.monotonic() - started)
                 first = False
             failed = failed or is_error(frame)
+            stopped = stopped or (is_stopped is not None and is_stopped(frame))
             yield frame
     except (asyncio.CancelledError, GeneratorExit):
         turn.set_attribute("gaik.turn.aborted", True)
@@ -341,6 +349,9 @@ async def traced_turn(
     finally:
         if outcome == "completed" and failed:
             outcome = "failed"
+        elif outcome == "completed" and stopped:
+            outcome = "stopped"
+            turn.set_attribute("gaik.turn.stopped", True)
         ops_metrics.turns.add(1, {"outcome": outcome})
         if outcome != "aborted":
             ops_metrics.turn_duration.record(time.monotonic() - started, {"outcome": outcome})
