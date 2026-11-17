@@ -64,6 +64,12 @@ def _write(poc: str, relative: str, content: str) -> None:
 def _package(poc: str) -> None:
     for relative, content in _PACKAGE.items():
         _write(poc, relative, content)
+    # The test page is the scaffolder's template as it is: package_problems reports a
+    # changed copy (#220), and the download waits for a package without problems.
+    templates_dir = getattr(poc_service, "_TEMPLATES_DIR", None)
+    for relative, template in getattr(poc_service, "_TEST_PAGE_TEMPLATES", {}).items():
+        if templates_dir is not None:
+            _write(poc, relative, (templates_dir / template).read_text("utf-8"))
 
 
 _FIXED_LIST = (
