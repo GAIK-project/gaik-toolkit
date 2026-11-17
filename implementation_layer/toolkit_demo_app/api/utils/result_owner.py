@@ -13,6 +13,11 @@ A run that reached the API without the header (a call from inside the pod, such 
 one either. Through the proxy every run is signed in, so this never opens a user's
 result to a visitor.
 
+The API trusts the header because only the proxy can reach it: the network policy
+(``openshift/networkpolicy-api.yaml``) admits only the web app's pods. A pod that the
+policy admits, and anything running inside the API pod itself, can name any user, so
+keep that policy in place wherever the demo runs.
+
 Entries go after ``TTL_SECONDS``, longer than any route keeps its result.
 """
 
