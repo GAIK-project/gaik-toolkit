@@ -200,16 +200,25 @@ print(result.diff_chunks)
 The prompts tell the model not to change digits and not to rewrite the text. The code
 holds each pass to that:
 
-- A pass whose answer changes, adds or removes any digit is refused.
-- A pass that changes more than `max_change_ratio` of its input's words (inserted,
-  deleted or substituted; default `0.25`) is refused.
+- A pass whose answer changes, adds, removes or reorders any digit is refused.
+- A pass that changes more than `max_change_ratio` of its input's letters (default
+  `0.25`) is refused. Case, punctuation, spacing (a merged or split compound) and accents
+  (a/ä, o/ö) do not count, so `tama on hammas laakari` -> `tämä on hammaslääkäri` passes,
+  while a rewritten sentence does not. The ratio is per pass, so two passes together can
+  change more.
 
 A refused pass keeps its input, so the next pass works on it, and it is listed in
 `refused_passes` with its reason. `original_text` always keeps the raw transcript and
 `correction_summary` is always computed (`generate_summary` is kept for older callers).
-Set `TranscriptEnhancer(..., max_change_ratio=None)` to turn the ratio check off; the
-digit check always applies. Names are not checked in code: compare `diff_chunks` with
-the raw transcript when names matter.
+`Transcriber(enhanced_transcript=True)` passes `enhancement_max_change_ratio` on and
+returns the refusals in `TranscriptionResult.enhancement_refused_passes`.
+
+`TranscriptEnhancer(..., max_change_ratio=None)` turns the ratio check off; the digit
+check always applies. What the checks do not catch: a changed decimal separator, sign or
+unit next to the same digits (`2,5 mg` -> `2.5 g`), a magnitude word (`miljoonaa` ->
+`tuhatta`), a number written as words (`kolme` -> `neljä`) and a changed name
+(`Matti` -> `Mikko`). Where figures and names matter, compare `diff_chunks` with the raw
+transcript, or keep the raw transcript as the record.
 
 The transcript reaches the model in its own `<source_material>` block, apart from the
 rules, so a sentence spoken in the recording is data to edit, not an instruction.

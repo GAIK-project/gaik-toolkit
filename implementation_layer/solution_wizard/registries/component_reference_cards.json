@@ -154,6 +154,14 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when recordings can be longer than 6 hours: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "enhancement_max_change_ratio",
+        "type": "float | None",
+        "default": 0.25,
+        "effect": "With enhanced_transcript=True: passed to TranscriptEnhancer as max_change_ratio. A pass that changes digits or more than this share of the letters is refused and the text before it kept; the refusals are in result.enhancement_refused_passes.",
+        "selection_relevant": false,
+        "infer_from": "leave the default; the PoC should report result.enhancement_refused_passes when it is not empty"
       }
     ]
   },
@@ -232,9 +240,9 @@
         "name": "max_change_ratio",
         "type": "float | None",
         "default": 0.25,
-        "effect": "Constructor argument: largest share of a pass's input words one pass may change. A pass over it, or one that changes any digit, is refused: its input is kept and the refusal is listed in result.refused_passes. None turns the ratio check off; the digit check always applies.",
+        "effect": "Constructor argument: largest share of a pass's input letters one pass may change (case, punctuation, compound spacing and a/ä, o/ö accents do not count). A pass over it, or one that changes, adds or removes any digit, is refused: its input is kept and listed in result.refused_passes. Not caught: decimal separators, signs, units, magnitude words, numbers written as words, names. None turns the ratio check off; the digit check always applies.",
         "selection_relevant": true,
-        "infer_from": "transcripts where names and figures matter (medical, legal, inspection) -> keep the default or lower it; heavily garbled ASR where large repairs are wanted -> raise it; the PoC should report result.refused_passes"
+        "infer_from": "keep the default; raise it only for heavily garbled ASR where large repairs are wanted. Where figures and names matter (medical, legal, inspection), keep the raw transcript as the record and have the PoC report result.refused_passes and diff_chunks"
       }
     ],
     "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=True) instead, which calls this internally. Use this standalone only to enhance an already-existing transcript (text input)."

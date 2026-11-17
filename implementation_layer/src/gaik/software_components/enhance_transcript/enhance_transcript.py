@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from collections.abc import Callable
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -51,7 +52,7 @@ can never break the enhancement run.
 """
 
 DEFAULT_MAX_CHANGE_RATIO = 0.25
-"""Largest share of the input's words one pass may change before the pass is refused."""
+"""Largest share of the input's letters one pass may change before the pass is refused."""
 
 DEFAULT_MODEL_AZURE = "gpt-6-luna"
 DEFAULT_MODEL_OPENAI = "gpt-6-luna"
@@ -237,10 +238,41 @@ def _digit_runs(text: str) -> list[str]:
     return _DIGITS.findall(text)
 
 
+_NOT_LETTER = re.compile(r"[\W_]+")
+
+
+def _letters(text: str) -> str:
+    """``text`` as lowercase letters and digits only, with accents folded (ä -> a).
+
+    What an editor is meant to fix leaves this unchanged: case, punctuation, spacing
+    (a split or merged compound) and the a/ä, o/ö an ASR without them writes.
+    """
+    folded = unicodedata.normalize("NFKD", text.lower())
+    folded = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    return _NOT_LETTER.sub("", folded)
+
+
 def _change_ratio(original: str, changed: str) -> float:
-    """Changed words (inserted, deleted or substituted) per word of ``original``."""
-    words = max(1, len(original.split()))
-    return TranscriptEnhancer._summarize_corrections(original, changed).total_changes / words
+    """Changed letters per letter of ``original``, after :func:`_letters`.
+
+    The words are aligned first, so a long transcript costs little; inside each
+    changed span the letters are compared, so a merged compound or a fixed accent
+    counts as nothing and a replaced word counts by how much of it changed.
+    """
+    a, b = original.split(), changed.split()
+    total = max(1, len(_letters(original)))
+    edits = 0
+    for tag, i1, i2, j1, j2 in SequenceMatcher(a=a, b=b).get_opcodes():
+        if tag == "equal":
+            continue
+        x, y = _letters(" ".join(a[i1:i2])), _letters(" ".join(b[j1:j2]))
+        if x == y:
+            continue
+        matched = sum(
+            m.size for m in SequenceMatcher(a=x, b=y, autojunk=False).get_matching_blocks()
+        )
+        edits += max(len(x), len(y)) - matched
+    return edits / total
 
 
 def _refusal(before: str, after: str, max_change_ratio: float | None) -> str | None:
@@ -255,7 +287,7 @@ def _refusal(before: str, after: str, max_change_ratio: float | None) -> str | N
     if max_change_ratio is not None:
         ratio = _change_ratio(before, after)
         if ratio > max_change_ratio:
-            return f"changed {ratio:.0%} of the words, more than {max_change_ratio:.0%}"
+            return f"changed {ratio:.0%} of the letters, more than {max_change_ratio:.0%}"
     return None
 
 
@@ -263,7 +295,7 @@ class TranscriptEnhancer:
     """Enhance Finnish transcripts using a two-pass prompt workflow.
 
     Each pass's answer replaces its input only if it keeps every digit and changes at
-    most ``max_change_ratio`` of the words; otherwise the input is kept and the pass is
+    most ``max_change_ratio`` of the letters; otherwise the input is kept and the pass is
     listed in ``refused_passes``. The original transcript is always in the result.
     """
 
@@ -280,8 +312,9 @@ class TranscriptEnhancer:
     ) -> None:
         """
         Args:
-            max_change_ratio: Largest share of a pass's input words (inserted, deleted
-                or substituted) the pass may change. A pass over it, or one that
+            max_change_ratio: Largest share of a pass's input letters the pass may
+                change; case, punctuation, spacing (merged or split compounds) and
+                accents (a/ä, o/ö) do not count. A pass over it, or one that
                 changes any digit, is refused: its input is kept and the refusal is
                 listed in ``TranscriptEnhancerResult.refused_passes``. ``None`` turns
                 the ratio check off; the digit check always applies.

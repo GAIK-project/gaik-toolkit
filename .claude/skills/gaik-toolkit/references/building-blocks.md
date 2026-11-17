@@ -571,7 +571,7 @@ enhancer = TranscriptEnhancer(
 # From string
 result = enhancer.enhance_text(
     transcript_text="...",
-    generate_summary=False,           # Include change count summary
+    generate_summary=False,           # Kept for older callers: the summary is always set
     diff_chunks=False,                # Include list of changed spans
     additional_instructions=None,     # Extra instructions for Pass 2
     progress_callback=None,           # Optional: Callable[[str, dict], None]
@@ -598,8 +598,10 @@ result = enhancer.enhance_file(
 result.enhanced_text           # Corrected transcript
 result.original_text           # Input transcript
 result.source_file             # File path (if enhance_file was used)
-result.correction_summary      # CorrectionSummary (if generate_summary=True)
+result.correction_summary      # CorrectionSummary (always set)
 result.diff_chunks             # List[DiffChunk] (if diff_chunks=True)
+result.refused_passes          # List[RefusedPass]: passes refused in code (digits changed,
+                               #   or more than max_change_ratio of the letters); input kept
 result.model_dump()            # Serialize to dict
 ```
 
