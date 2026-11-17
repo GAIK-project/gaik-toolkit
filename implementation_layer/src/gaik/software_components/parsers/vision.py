@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from gaik.software_components.endpoints import check_openai_endpoint
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
@@ -33,11 +34,6 @@ from gaik.software_components.source_material import (
     SourceMaterial,
     source_material_messages,
 )
-
-try:  # Optional dependency, documented via extra: gaik[vision]
-    from dotenv import load_dotenv as _load_dotenv  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    _load_dotenv = None
 
 try:
     from openai import AzureOpenAI, OpenAI
@@ -63,10 +59,9 @@ _IMAGE_MIME_TYPES = {".webp": "image/webp"}
 
 
 def _load_env() -> None:
-    """Load environment variables from ``.env`` if python-dotenv is available."""
+    """Load ``.env`` once, as the other configuration helpers do (``env_file``)."""
 
-    if _load_dotenv is not None:
-        _load_dotenv()
+    load_env_file()
 
 
 def _first_env(*keys: str) -> str | None:

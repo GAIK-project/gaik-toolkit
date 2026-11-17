@@ -21,7 +21,6 @@ except ImportError:
     DOCX_AVAILABLE = False
     print("Warning: python-docx not available. Please install: pip install python-docx")
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 _HEADING_LEVELS = {"Title": 1, **{f"Heading {n}": n for n in range(1, 7)}}

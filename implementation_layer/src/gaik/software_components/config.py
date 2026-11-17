@@ -7,13 +7,10 @@ OpenAI/Azure OpenAI clients across different extraction modules.
 
 import os
 
-from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
 from gaik.software_components.endpoints import AITTA_BASE_URL, check_openai_endpoint
-
-# Load environment variables
-load_dotenv()
+from gaik.software_components.env_file import load_env_file
 
 
 def get_openai_config(use_azure: bool = True) -> dict:
@@ -32,6 +29,7 @@ def get_openai_config(use_azure: bool = True) -> dict:
         >>> config = get_openai_config(use_azure=False)
         >>> # Returns OpenAI config with model name
     """
+    load_env_file()
     if use_azure:
         azure_endpoint = os.getenv("AZURE_ENDPOINT")
         return {

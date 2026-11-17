@@ -43,6 +43,8 @@ import threading
 from collections.abc import Iterable
 from urllib.parse import urlsplit
 
+from gaik.software_components.env_file import load_env_file
+
 logger = logging.getLogger(__name__)
 
 ALLOWED_HOSTS_ENV = "GAIK_ALLOWED_ENDPOINT_HOSTS"
@@ -202,6 +204,7 @@ def _allowed_entries(allowed_hosts: str | Iterable[str] | None) -> tuple[list[st
 
     An entry may carry a port (``llm.example.org:8443``); only its host is compared.
     """
+    load_env_file()
     names: list[str] = []
     http_names: list[str] = []
     for entry in _split_entries(os.getenv(ALLOWED_HOSTS_ENV)) + _split_entries(allowed_hosts):
@@ -221,6 +224,7 @@ def _allowed_entries(allowed_hosts: str | Iterable[str] | None) -> tuple[list[st
 
 def _env_hosts(provider: str) -> tuple[list[str], list[str]]:
     """Hosts of the provider's addresses set in the environment, and those set with http://."""
+    load_env_file()
     hosts, http_hosts = [], []
     for name in PROVIDER_ENDPOINT_ENVS.get(provider, ()):
         value = os.getenv(name, "").strip()
@@ -301,6 +305,7 @@ def check_openai_endpoint(config: dict, provider: str) -> str:
     Returns the host, or ``""`` for Azure without an endpoint (the SDK then reports
     the missing endpoint itself, or reads ``AZURE_OPENAI_ENDPOINT``).
     """
+    load_env_file()
     if provider == "azure":
         url = config.get("base_url") or config.get("azure_endpoint")
         what = "base_url" if config.get("base_url") else "azure_endpoint"
