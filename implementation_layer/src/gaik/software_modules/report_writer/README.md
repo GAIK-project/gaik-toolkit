@@ -123,7 +123,8 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `sections` | The template, in report order: `id` (letters, digits, `_`, `-`), `title`, `instructions` |
 | `required_items` | Items a section must cover; each one no source covers becomes `(missing: <item>)` |
 | `depends_on` | Makes a section *derived*: it has no knowledge file and is written from the reviewed texts of these sections |
-| `instructions` | Rules for every section: source hierarchy, citation style, tone |
+| `instructions` | Rules for every section: how each kind of source is worded, citation style, tone |
+| `source_precedence` | Optional source classes, highest first, e.g. `["primary", "secondary"]`. A conflict is resolved in code only when one class of its units ranks above the others; without it every conflict is `Unresolved:` in the report (see the KnowledgeCurator README, Conflicts) |
 | `sources` | Files grouped by class, `primary` and/or `secondary`; file names must be unique |
 | `sample_report` | Optional report whose structure, length and tone the new report follows; never its facts |
 | `models` | Optional model or deployment name per step; `null` uses the model of the config |
@@ -173,7 +174,8 @@ stale `sample_report.md` when the spec has no sample report.
 Every stage reads only files, so a person can correct a stage and rerun from there:
 
 ```python
-# Correct a fact, delete a unit or resolve a conflict in workspace/knowledge/*.json,
+# Correct a fact, delete a unit or resolve a conflict in workspace/knowledge/*.json
+# (status "resolved" and the units to follow in preferred_unit_ids),
 # then write the report again. Normalize and curate are not rerun.
 report = writer.synthesize(spec, "workspace")
 

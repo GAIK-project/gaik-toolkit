@@ -74,8 +74,10 @@ A section's knowledge file looks like this:
 
 - To fix a fact, edit its `summary`, or delete the unit. A `quote` must stay a verbatim passage
   of the cited source.
-- To resolve a conflict, set its `status` to `resolved` and say why in `description`, or delete
-  one of its units.
+- To resolve a conflict, set its `status` to `resolved`, list the units the report follows in
+  `preferred_unit_ids` and put who decided in `resolved_by` (for example `"user"`), or delete one
+  of its units. A `resolved` conflict whose `preferred_unit_ids` is empty, or names a unit that is
+  not in its `unit_ids`, is read as unresolved and the report gives both sides.
 - A new fact the user supplies goes into a **new source file** (for example
   `inputs/clarifications_by_user.txt`) added to the spec; then normalize and curate again. Do not
   type it into a knowledge file: it would have no source to verify.

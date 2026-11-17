@@ -141,7 +141,9 @@ starts once all of its prerequisites are reviewed.
   technical sections and `summary` on everything.
 - The writer uses only the facts in its material, writes `(missing: <item>)` for each
   `missing` entry and each required item the material does not cover, and states both
-  sides of an unresolved conflict, marked `Unresolved:`.
+  sides of an unresolved conflict, marked `Unresolved:`. For a resolved conflict it follows
+  the units in `preferred_unit_ids`, which KnowledgeCurator sets in code or a person sets in
+  the knowledge file; the conflict's description does not choose a side.
 - The section heading is added by the code; a heading the writer emits anyway is
   stripped. An empty writer answer raises `RuntimeError` naming the section.
 - Sections are returned in the order of the `sections` list, not the writing order, so a

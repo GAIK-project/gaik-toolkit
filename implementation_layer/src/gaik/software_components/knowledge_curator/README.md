@@ -46,6 +46,7 @@ knowledge = curator.curate(
     sources,
     sections,
     instructions="Site notes are primary sources. Customer documents are secondary.",
+    source_precedence=["primary", "secondary"],  # decides conflicts; optional
     progress_callback=print,
 )
 knowledge.save("workspace/knowledge")  # one <section_id>.json per section
@@ -57,8 +58,10 @@ knowledge.save("workspace/knowledge")  # one <section_id>.json per section
   after `KnowledgeBase.load`.
 - Derived sections, those with `depends_on`, are not curated: they are written later from
   the drafts they depend on. A template with no other section raises `ValueError`.
-- `instructions` are the report-level rules: source hierarchy, scope and style. The
-  curator uses the hierarchy to mark each conflict as resolved or unresolved.
+- `instructions` are the report-level rules: scope, style and how each kind of source is
+  worded. They do not decide conflicts.
+- `source_precedence` lists source classes, highest first. It decides conflicts in code
+  (see [Conflicts](#conflicts)); without it every conflict is unresolved.
 - `progress_callback` is called when a section starts and ends, possibly from a worker
   thread. An exception it raises stops the run.
 
@@ -106,7 +109,9 @@ Each section's knowledge file looks like this:
       "topic": "attic underlay",
       "description": "The 2012 report says the underlay was renewed; the inspector was unsure.",
       "status": "unresolved",
-      "unit_ids": ["structures-04", "structures-07"]
+      "unit_ids": ["structures-04", "structures-07"],
+      "preferred_unit_ids": [],
+      "resolved_by": null
     }
   ]
 }
@@ -118,9 +123,26 @@ Each section's knowledge file looks like this:
   recordings and plain text.
 - `missing` lists the section's required items that no source covers, phrased as the
   item. The writer turns each into a `(missing: …)` marker.
-- A conflict is `resolved` when the source hierarchy in `instructions` decides it (a clear
-  field observation over an older document, a newer document over an older one), and
-  `unresolved` otherwise. Both sides are present as units.
+- A conflict lists the units of both sides. Its `status` is set in code, not by the
+  model (see [Conflicts](#conflicts)).
+
+## Conflicts
+
+The model records that sources disagree and describes each side; it does not decide which
+side the report follows. The curator decides that in code from `source_precedence`:
+
+- A conflict is `resolved` when every unit's `source_class` is in `source_precedence` and
+  one class among them ranks above the others. `preferred_unit_ids` names the units of
+  that class and `resolved_by` the class; the writer follows those units.
+- It is `unresolved` when the units share one class, when a class is not in
+  `source_precedence`, or when there is no `source_precedence`. The writer gives both
+  sides, marked `Unresolved:`, for a person to settle.
+- A rule the classes cannot express, such as a newer document over an older one, is
+  settled by a person: set `status`, `preferred_unit_ids` and `resolved_by` in the
+  knowledge file before the report is written (see [Editing knowledge files](#editing-knowledge-files)).
+
+A source's text cannot mark a conflict resolved or pick the side the report follows,
+whatever it says.
 
 ## Sources stay data
 
@@ -132,8 +154,8 @@ source id instead, and the citation is turned back into the file name. The rules
 the system message; the source list (one JSON object per source with its label, class
 and type, so a file name cannot set a class), the report instructions and the section
 stay outside the blocks. A sentence in a source cannot close
-its block, and the curator is told that a source does not decide what is extracted, what
-is missing or how a conflict is resolved.
+its block, and the curator is told that a source does not decide what is extracted or
+what is missing; conflicts are decided in code (see [Conflicts](#conflicts)).
 
 This lowers the chance that one source steers the others; it does not remove it. The
 units, `missing` and `conflicts` are model output: the quote check verifies every unit,
@@ -142,10 +164,14 @@ check and edit before the report is written (see below).
 
 ## Quote check
 
-A unit fails when its `source.file` is not one of the sources, or when its `quote` does
-not occur verbatim in that source's text. Only whitespace may differ (`quote_in_text`).
+A unit fails when its `source.file` is not one of the sources, when its `quote` does
+not occur verbatim in that source's text (only whitespace may differ, `quote_in_text`),
+or when its `summary` states a number that neither the quote nor the `time_qualifier`
+gives, such as an age computed from a year. Numbers are compared by their digits, so
+"1 200" supports "1200"; a number written in words is not checked, and the check does not
+confirm that the summary's wording matches the quote.
 If any unit of a section fails, the whole section is requested again once, with the
-failing quotes as feedback. If the second answer still fails, the failing units are
+failing units as feedback. If the second answer still fails, the failing units are
 dropped and the rest of the section is kept, so one bad quote does not stop the run:
 
 ```python
@@ -161,7 +187,7 @@ for unit in knowledge.dropped:  # DroppedUnit: section_id, topic, summary, quote
 - `progress_callback` gets a "Dropped N fact(s) of ..." line, and each drop is logged as a
   warning. `knowledge.dropped` is not saved, so it is empty after `KnowledgeBase.load`.
 - `KnowledgeCurator(config, drop_unverified=False)` restores the strict behaviour:
-  `curate()` raises `ValueError` naming the section and the quotes.
+  `curate()` raises `ValueError` naming the section and the failing units.
 
 A conflict that refers to a unit that does not exist is part of the same retry, with the
 bad positions as feedback. If it still does after the retry, the bad positions are left

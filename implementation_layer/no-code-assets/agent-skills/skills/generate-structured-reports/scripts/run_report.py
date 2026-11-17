@@ -359,8 +359,8 @@ def section_problems(spec) -> tuple[list[str], list[str]]:
                 )
     if not spec.instructions.strip():
         warnings.append(
-            "The report instructions are empty: state the source hierarchy, or that there is none, "
-            "so conflicts are not decided by the curator's own examples"
+            "The report instructions are empty: state the scope and how each kind of source is "
+            "worded; which class outranks which goes in source_precedence"
         )
     return errors, warnings
 

@@ -29,7 +29,8 @@ heading is added automatically.
 item the material does not cover, write the marker (missing: <item>) in the text, e.g. \
 (missing: latest sewer camera inspection). Never fill a gap with a guess.
 - Conflicts: for a conflict with status "unresolved", state both sides and mark it with \
-"Unresolved:". For a "resolved" conflict, follow the side its description gives.
+"Unresolved:". For a "resolved" conflict, follow the units listed in its \
+preferred_unit_ids; the description only says what each source says.
 - Sources: cite and attribute sources as the report instructions say. Each fact unit \
 gives source.file, source.locator, source_class and time_qualifier for this. If the \
 report instructions say nothing about citations, cite the file and locator in \
