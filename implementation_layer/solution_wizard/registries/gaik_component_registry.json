@@ -122,7 +122,8 @@
       "document"
     ],
     "output_artifact_types": [
-      "structured_json"
+      "structured_json",
+      "parsed_text"
     ],
     "knowledge_processes": [
       "knowledge_capture"
@@ -1012,7 +1013,10 @@
       "structured_json",
       "text",
       "transcript",
-      "enhanced_transcript"
+      "enhanced_transcript",
+      "parsed_text",
+      "pdf",
+      "image"
     ],
     "output_artifact_types": [
       "validation_report",
@@ -1794,7 +1798,8 @@
     "type": "software_component",
     "input_artifact_types": [
       "structured_json",
-      "text"
+      "pdf",
+      "image"
     ],
     "output_artifact_types": [
       "validation_report",

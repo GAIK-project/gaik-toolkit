@@ -1092,7 +1092,7 @@
     "import": "from gaik.software_components.validators.llm_judge.llm_judge import LLMJudge",
     "construct": "judge = LLMJudge(config=get_stage_config(config, 'judge'))",
     "call": "report = judge.detect_hallucinations(source_text=source_text, extracted=extracted_fields)\n    # report.flags: list of HallucinationFlag(.field, .value, .severity, .reason)\n    passed = getattr(report, 'passed', not report.flags)  # gaik 0.8.14 has no passed",
-    "returns": "HallucinationReport(.flags, .judge_error, .passed). judge_error is set when the judge's response could not be read; flags is then empty because there is no verdict, not because nothing was wrong. passed is True only for a readable verdict that flags no field. judge_error and passed arrive in the gaik release after 0.8.14; on 0.8.14 an empty flags list is the only signal, so generated code reads them with getattr.",
+    "returns": "HallucinationReport(.flags, .judge_error, .passed). judge_error is set when the judge's response could not be read; flags is then empty because there is no verdict, not because nothing was wrong. passed is True only for a readable verdict that flags no field. judge_error and passed exist since gaik 0.9.0.",
     "install_extra": "llm-judge",
     "options": [
       {
@@ -1163,7 +1163,7 @@
     "import": "from gaik.software_components.validators.llm_judge import LLMJudgePanel",
     "construct": "panel = LLMJudgePanel(judges=[judge_a, judge_b])",
     "call": "result = panel.validate(source_pages=pages, extracted=extracted_fields)\n    flags = result.aggregated_flags",
-    "returns": "JudgePanelResult(.aggregated_flags, .agreement_score, .per_judge, .judge_errors, .passed). A judge whose response could not be read is left out of the aggregation and listed in judge_errors; passed is True only when every judge gave a readable verdict and no key is flagged. agreement_score counts a judge that did not flag a key as ok for it, and is 0.0 with fewer than two readable verdicts, also for a panel of one judge, so a threshold on it needs at least two judges. judge_errors and passed arrive in the gaik release after 0.8.14.",
+    "returns": "JudgePanelResult(.aggregated_flags, .agreement_score, .per_judge, .judge_errors, .passed). A judge whose response could not be read is left out of the aggregation and listed in judge_errors; passed is True only when every judge gave a readable verdict and no key is flagged. agreement_score counts a judge that did not flag a key as ok for it, and is 0.0 with fewer than two readable verdicts, also for a panel of one judge, so a threshold on it needs at least two judges. judge_errors and passed exist since gaik 0.9.0.",
     "install_extra": "llm-judge",
     "options": [
       {
