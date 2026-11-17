@@ -9,12 +9,14 @@ import ast
 import hashlib
 import http.client
 import importlib.util
+import io
 import json
 import os
 import subprocess
 import sys
 import threading
 import time
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -23,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from solution_wizard.blueprint import Blueprint  # noqa: E402
-from solution_wizard.scaffolder import scaffold_poc  # noqa: E402
+from solution_wizard.scaffolder import _artifact_names, scaffold_poc  # noqa: E402
 from test_hybrid_generic import _hybrid_blueprint  # noqa: E402
 
 WIZARD_DIR = Path(__file__).parent.parent
@@ -888,3 +890,320 @@ def test_a_run_that_cannot_be_prepared_leaves_no_folder_and_no_keys(page, step):
     assert list(solution.runs_root.iterdir()) == []
     assert page.get_json("/api/status")[1]["busy"] is False
     assert (page.poc / ".env").is_file()
+
+
+# ---------------------------------------------------------------------------
+# The steps, the page's own files and the source code
+# ---------------------------------------------------------------------------
+
+PAGE_ASSETS = (
+    "ui/fonts/sora-latin-wght-normal.woff2",
+    "ui/fonts/sora-latin-ext-wght-normal.woff2",
+    "ui/fonts/OFL.txt",
+    "ui/gaik.svg",
+)
+
+
+def _described(poc: Path) -> dict:
+    return json.loads((poc / "ui" / "solution.json").read_text(encoding="utf-8"))
+
+
+def _link(link: Path, target: Path) -> None:
+    """A symlink, or a skip where this account may not make one (Windows)."""
+    try:
+        link.symlink_to(target, target_is_directory=target.is_dir())
+    except (OSError, NotImplementedError):
+        pytest.skip("this account cannot make a symlink")
+
+
+def test_the_steps_are_the_workflow_in_the_order_it_runs(tmp_path):
+    bp = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
+    in_order = [step.id for step in bp.workflow.steps]
+    # The order comes from what each step depends on, not from the order they are written in.
+    bp.workflow.steps.reverse()
+    steps = _described(_scaffold(tmp_path, bp))["steps"]
+
+    assert [step["id"] for step in steps] == in_order
+    assert steps[0] == {
+        "id": "record_observation",
+        "title": "Record voice description and optional photo",
+        "kind": "input",
+        "uses": [],
+        "gives": ["incident audio", "incident photo"],
+    }
+    assert steps[1] == {
+        "id": "transcribe_audio",
+        "title": "Transcribe audio recording",
+        "kind": "ai",
+        "component": "Transcriber",
+        "uses": ["incident audio"],
+        "gives": ["raw transcript"],
+    }
+    by_id = {step["id"]: step for step in steps}
+    assert by_id["human_review"]["kind"] == "review"
+    assert "component" not in by_id["human_review"]
+
+
+def test_a_step_kind_follows_the_step_type_and_its_component(tmp_path):
+    bp = Blueprint.from_file(EXAMPLES / "document_extraction_blueprint.json")
+    upload, extract = bp.workflow.steps
+    extract.component = None
+    kinds = [step["kind"] for step in _described(_scaffold(tmp_path / "a", bp))["steps"]]
+    assert kinds == ["input", "auto"]
+
+    upload.type = "decision"
+    extract.type = "something_new"
+    kinds = [step["kind"] for step in _described(_scaffold(tmp_path / "b", bp))["steps"]]
+    assert kinds == ["decision", "step"]
+
+
+def test_hostile_step_text_is_inert_data_in_solution_json(tmp_path):
+    bp = Blueprint.from_file(EXAMPLES / "document_extraction_blueprint.json")
+    step = bp.workflow.steps[1]
+    step.name = HOSTILE + "\nsecond line third"
+    step.component = HOSTILE
+    poc = _scaffold(tmp_path, bp)
+
+    raw = (poc / "ui" / "solution.json").read_text(encoding="utf-8")
+    assert not any(char in raw for char in "<>&  ")
+    shown = json.loads(raw)["steps"][1]
+    assert shown["title"] == HOSTILE + " second line third"
+    assert shown["component"] == HOSTILE
+    assert shown["uses"] == ["source pdf"]
+    assert shown["gives"] == ["purchase order json"]
+    # An artifact name with markup in it never reaches a package (the scaffolder
+    # refuses the blueprint); the names are cut to plain one-line text all the same.
+    assert _artifact_names(["a_b", HOSTILE + "\nx", "", 7]) == ["a b", HOSTILE + " x", "7"]
+    assert _artifact_names(None) == []
+    # The page and the server are still the templates.
+    for written, template in (("ui/index.html", "ui/index.html"), ("app.py", "app.py.tmpl")):
+        assert (poc / written).read_text("utf-8") == (COMMON / template).read_text("utf-8")
+
+
+def test_a_blueprint_without_steps_gives_no_steps_and_the_page_shows_no_strip(tmp_path):
+    bp = Blueprint.from_file(EXAMPLES / "document_extraction_blueprint.json")
+    bp.workflow.steps = []
+    assert _described(_scaffold(tmp_path, bp))["steps"] == []
+
+    page = (COMMON / "ui" / "index.html").read_text(encoding="utf-8")
+    # The strip is hidden in the markup and shown only when there is a step to show.
+    assert '<section id="how" aria-labelledby="how-heading" hidden>' in page
+    assert 'show($("how"), steps.length > 0)' in page
+
+
+def test_the_pages_own_files_are_the_same_in_every_package(tmp_path):
+    result = scaffold_poc(
+        Blueprint.from_file(EXAMPLES / "document_extraction_blueprint.json"), tmp_path
+    )
+    poc = result["poc_dir"]
+
+    for name in PAGE_ASSETS:
+        assert poc / name in result["files"], name
+        assert (poc / name).read_bytes() == (COMMON / name).read_bytes(), name
+    # The font travels with its licence, and both font files are fonts.
+    assert "SIL OPEN FONT LICENSE Version 1.1" in (poc / "ui/fonts/OFL.txt").read_text("utf-8")
+    for name in PAGE_ASSETS[:2]:
+        assert (poc / name).read_bytes()[:4] == b"wOF2", name
+    page = (poc / "ui" / "index.html").read_text(encoding="utf-8")
+    for name in (*PAGE_ASSETS[:2], PAGE_ASSETS[3]):
+        assert f'"{name}"' in page, name
+
+
+def test_the_fonts_and_the_mark_are_served(page):
+    _, headers, _ = page.request("GET", "/")
+    assert "font-src 'self'" in headers["Content-Security-Policy"]
+
+    for name, content_type in (
+        ("ui/fonts/sora-latin-wght-normal.woff2", "font/woff2"),
+        ("ui/fonts/sora-latin-ext-wght-normal.woff2", "font/woff2"),
+        ("ui/gaik.svg", "image/svg+xml"),
+    ):
+        status, headers, body = page.request("GET", "/" + name)
+        assert status == 200, name
+        assert headers["Content-Type"] == content_type
+        assert headers["X-Content-Type-Options"] == "nosniff"
+        # Opened as a document of its own, the file runs nothing.
+        assert "default-src 'none'" in headers["Content-Security-Policy"]
+        assert "script-src" not in headers["Content-Security-Policy"]
+        assert body == (page.poc / name).read_bytes()
+
+    assert page.request("GET", "/ui/gaik.svg", headers={"Host": "attacker.example"})[0] == 403
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "../app.py",
+        "..%2Fapp.py",
+        "%2e%2e/app.py",
+        "..%5Capp.py",
+        "fonts/../../.env",
+        "fonts/..%2F..%2F.env",
+        "fonts%5C..%5C..%5C.env",
+        "fonts/%2e%2e/%2e%2e/config.yaml",
+        "/etc/passwd",
+        "%2Fetc%2Fpasswd",
+        "..%2Fsecret.woff2",
+        "fonts/..%2F..%2Fsecret.woff2",
+        "fonts/.hidden.woff2",
+        "fonts/OFL.txt",
+        "fonts/missing.woff2",
+        "fonts/",
+        "solution.json",
+        "index.html",
+        "",
+    ],
+)
+def test_the_assets_route_serves_the_pages_fonts_and_mark_only(page, name):
+    (page.poc / ".env").write_text("AZURE_OPENAI_API_KEY=not-a-real-key\n", encoding="utf-8")
+    # A file of a served kind outside ui/, and a hidden one inside it.
+    (page.poc / "secret.woff2").write_bytes(b"wOF2 outside ui")
+    (page.poc / "ui" / "fonts" / ".hidden.woff2").write_bytes(b"wOF2 hidden")
+
+    status, _, body = page.request("GET", f"/ui/{name}")
+
+    assert status == 404
+    assert json.loads(body)["error"]["code"] == "not_found"
+    assert b"not-a-real-key" not in body
+
+
+def test_a_link_among_the_fonts_is_not_served(page, tmp_path):
+    outside = tmp_path / "outside.woff2"
+    outside.write_bytes(b"wOF2 from outside the package")
+    _link(page.poc / "ui" / "fonts" / "linked.woff2", outside)
+
+    assert page.request("GET", "/ui/fonts/linked.woff2")[0] == 404
+
+
+def _source(page) -> tuple[dict, dict[str, bytes]]:
+    """The source zip's response headers and its entries by name."""
+    status, headers, body = page.request("GET", "/api/source")
+    assert status == 200
+    with zipfile.ZipFile(io.BytesIO(body)) as archive:
+        assert archive.testzip() is None
+        return headers, {name: archive.read(name) for name in archive.namelist()}
+
+
+def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
+    poc = page.poc
+    secret = "not-a-real-key-7f3a"
+    for name in (".env", ".env.local", ".env.keys", "prod.env", "evals/.env"):
+        (poc / name).write_text(f"AZURE_OPENAI_API_KEY={secret}\n", encoding="utf-8")
+    (poc / "server.pem").write_text(secret, encoding="utf-8")
+    (poc / "sample_input").mkdir(exist_ok=True)
+    (poc / "sample_input" / "customer.pdf").write_bytes(b"%PDF " + secret.encode())
+    (poc / "output" / "earlier_result.json").write_text(f'{{"k": "{secret}"}}', encoding="utf-8")
+    for folder in ("__pycache__", "schemas/__pycache__", ".venv/Lib", "tryout", ".git", "venv"):
+        (poc / folder).mkdir(parents=True, exist_ok=True)
+    (poc / "__pycache__" / "run_poc.cpython-312.pyc").write_bytes(b"\x00")
+    (poc / "schemas" / "__pycache__" / "output_schema.cpython-312.pyc").write_bytes(b"\x00")
+    (poc / "schemas" / "stray.pyc").write_bytes(b"\x00")
+    (poc / ".venv" / "pyvenv.cfg").write_text("home = x\n", encoding="utf-8")
+    (poc / ".venv" / "Lib" / "site.py").write_text("# an environment's file\n", encoding="utf-8")
+    # A virtual environment under a name of the user's own.
+    (poc / "tryout" / "pyvenv.cfg").write_text("home = x\n", encoding="utf-8")
+    (poc / "tryout" / "site.py").write_text("# an environment's file\n", encoding="utf-8")
+    (poc / "venv" / "site.py").write_text("# an environment's file\n", encoding="utf-8")
+    (poc / ".git" / "config").write_text("[core]\n", encoding="utf-8")
+    (poc / "notes.md").write_text("The user's own note, part of the package.\n", encoding="utf-8")
+    # A run before the download: its working folder and uploads are not the package's.
+    assert page.run(files=[("order.pdf", b"%PDF " + secret.encode())])[0] == 200
+
+    headers, files = _source(page)
+
+    assert headers["Content-Type"] == "application/zip"
+    assert (
+        headers["Content-Disposition"]
+        == 'attachment; filename="purchase_order_extraction-source.zip"'
+    )
+    assert headers["X-Content-Type-Options"] == "nosniff"
+    folder = "purchase_order_extraction-source/"
+    assert all(name.startswith(folder) for name in files)
+    assert {name.removeprefix(folder) for name in files} == {
+        ".env.example",
+        "README.md",
+        "app.py",
+        "config.yaml",
+        "document_manifest.py",
+        "input_bundle.py",
+        "provider_config.py",
+        "requirements.txt",
+        "run_poc.py",
+        "notes.md",
+        "evals/run_basic_eval.py",
+        "evals/ground_truth/.gitkeep",
+        "prompts/extraction_requirements.md",
+        "schemas/output_schema.json",
+        "schemas/output_schema.py",
+        "schemas/output_schema_requirements.json",
+        "ui/index.html",
+        "ui/solution.json",
+        *PAGE_ASSETS,
+    }
+    assert not any(secret.encode() in content for content in files.values())
+    # What is in the zip is the package's files, byte for byte.
+    for name in ("app.py", "run_poc.py", "ui/index.html", "ui/fonts/sora-latin-wght-normal.woff2"):
+        assert files[folder + name] == (poc / name).read_bytes(), name
+
+
+def test_a_link_in_the_package_is_not_in_the_source_zip(page, tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "id_rsa.txt").write_text("a file outside the package", encoding="utf-8")
+    _link(page.poc / "linked.txt", outside / "id_rsa.txt")
+    _link(page.poc / "linked_folder", outside)
+    _link(page.poc / "prompts" / "linked.md", outside / "id_rsa.txt")
+
+    _, files = _source(page)
+
+    assert any(name.endswith("/run_poc.py") for name in files)
+    assert not any("linked" in name or "id_rsa" in name for name in files)
+    assert not any(b"outside the package" in content for content in files.values())
+
+
+def test_a_file_too_large_to_be_source_code_is_left_out(page):
+    (page.poc / "model.bin").write_bytes(b"\x00" * (page.app.MAX_SOURCE_FILE_BYTES + 1))
+
+    _, files = _source(page)
+
+    assert not any(name.endswith("model.bin") for name in files)
+    assert any(name.endswith("/run_poc.py") for name in files)
+
+
+@pytest.mark.parametrize(
+    ("solution_id", "name"),
+    [
+        ('../..\\evil"\r\nSet-Cookie: x=1', "evil-Set-Cookie-x-1-source.zip"),
+        ("työ aika", "ty-aika-source.zip"),
+        ("", "solution-source.zip"),
+        (None, "solution-source.zip"),
+    ],
+)
+def test_the_source_zip_is_named_after_the_solution_in_safe_characters(page, solution_id, name):
+    described = _described(page.poc)
+    described["id"] = solution_id
+    (page.poc / "ui" / "solution.json").write_text(json.dumps(described), encoding="utf-8")
+
+    headers, files = _source(page)
+
+    assert headers["Content-Disposition"] == f'attachment; filename="{name}"'
+    assert "Set-Cookie" not in headers
+    assert all(entry.startswith(name.removesuffix(".zip") + "/") for entry in files)
+
+
+def test_a_page_on_another_site_cannot_take_the_source(page):
+    assert page.request("GET", "/api/source", headers={"Host": "attacker.example"})[0] == 403
+    foreign = {"Origin": "https://attacker.example"}
+    assert page.request("GET", "/api/source", headers=foreign)[0] == 403
+    own = {"Origin": f"http://127.0.0.1:{page.port}"}
+    assert page.request("GET", "/api/source", headers=own)[0] == 200
+
+
+def test_the_page_links_the_source_download_and_the_readme_names_it(tmp_path):
+    page = (COMMON / "ui" / "index.html").read_text(encoding="utf-8")
+    assert 'href="/api/source" download' in page
+    assert "Download source code" in page
+    assert "Lataa lähdekoodi" in page
+
+    readme = (_scaffold(tmp_path) / "README.md").read_text(encoding="utf-8")
+    assert "GET /api/source" in readme

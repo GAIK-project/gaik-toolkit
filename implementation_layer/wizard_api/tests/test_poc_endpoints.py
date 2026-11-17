@@ -292,9 +292,14 @@ def test_generate_produces_the_v1_scaffolder_file_set(client, db_session) -> Non
         "schemas/output_schema.json",
         "schemas/output_schema.py",
         "schemas/output_schema_requirements.json",
-        # The package's test page: its server, the page and the blueprint's facts as data.
+        # The package's test page: its server, the page and the blueprint's facts as data,
+        # and the page's own files (its font with the licence, the GAIK mark).
         "ui/index.html",
         "ui/solution.json",
+        "ui/fonts/sora-latin-wght-normal.woff2",
+        "ui/fonts/sora-latin-ext-wght-normal.woff2",
+        "ui/fonts/OFL.txt",
+        "ui/gaik.svg",
     }
 
     # And the package is immediately visible to the endpoints that serve it.
