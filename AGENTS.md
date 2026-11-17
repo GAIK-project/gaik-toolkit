@@ -138,8 +138,10 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   (`lib/trial.ts`, counted in Upstash Redis, off without it). The first Solution
   Wizard's API, `/api/wizard`, also needs the per-user `wizard_access` grant from
   `/admin`, for reads too: its agent has shell tools in the API pod. A write to data
-  that every visitor shares needs an approved user (`writesSharedData`), and the API
-  serves no route that writes the shared video-search index.
+  that every visitor shares needs a signed-in user with the `/admin` session
+  (`writesSharedData`), and the API serves no route that writes the shared
+  video-search index. A video's playback and thumbnail links go to signed-in users
+  only (`handsOutStorageLink`, checked again in `api/routers/video_search.py`).
 
 ## docs site (GitHub Pages)
 

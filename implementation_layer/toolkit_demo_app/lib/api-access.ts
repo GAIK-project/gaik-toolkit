@@ -7,7 +7,8 @@
 //
 // A user waiting for approval runs on the daily trial (lib/trial.ts) or on their
 // own model key. Both cover a run on the user's own input, never a write to data
-// that every visitor shares: that needs an approved user.
+// that every visitor shares: that needs a signed-in user with the admin session
+// of /admin (lib/admin/session.ts). Approval alone lets a user search it.
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -23,13 +24,13 @@ export function needsApprovedUser(method: string): boolean {
 // The video-search index is one table that every visitor searches. The API no
 // longer serves a route that clears or writes it (the index is seeded with
 // api/scripts/seed_dental_demo.py, and api/tests/test_video_search_router.py
-// fails when the router gains one); this keeps such a route off the trial.
+// fails when the router gains one); this keeps such a route to administrators.
 const SHARED_DATA_PATHS = [
   "/api/video-search/clear",
   "/api/video-search/ingest",
 ];
 
-/** True for a write to data that every visitor shares: approved users only. */
+/** True for a write to data that every visitor shares: administrators only. */
 export function writesSharedData(method: string, pathname: string): boolean {
   return (
     isStateChanging(method) &&
@@ -38,6 +39,19 @@ export function writesSharedData(method: string, pathname: string): boolean {
     )
   );
 }
+
+// A video's playback and thumbnail routes hand out signed storage links, which
+// work for anyone holding them until they expire. They are issued to a signed-in
+// user only; the list of videos and the index status stay open to look at.
+const STORAGE_LINK_PREFIX = "/api/video-search/videos/";
+
+/** True for a read that hands out a signed storage link: signed-in users only. */
+export function handsOutStorageLink(method: string, pathname: string): boolean {
+  return !isStateChanging(method) && pathname.startsWith(STORAGE_LINK_PREFIX);
+}
+
+/** Sent by the proxy to the API, never by the browser: a signed-in user asked. */
+export const SIGNED_IN_HEADER = "x-gaik-signed-in";
 
 /** The first Solution Wizard's API: the paths under /api/wizard. */
 export function isWizardApiPath(pathname: string): boolean {
@@ -90,7 +104,7 @@ export const PENDING_DENIAL: Refusal = {
 
 export const SHARED_DATA_DENIAL: Refusal = {
   status: 403,
-  error: "Only an approved account can change the shared demo data.",
+  error: "Only an administrator can change the shared demo data.",
 };
 
 export const EMAIL_UNCONFIRMED: Refusal = {
@@ -113,6 +127,8 @@ export interface GatedRequest {
   noTrialRun?: boolean;
   /** Writes data that every visitor shares (`writesSharedData`). */
   sharedData?: boolean;
+  /** The request carries a valid admin session (lib/admin/session.ts). */
+  admin?: boolean;
 }
 
 /**
@@ -120,19 +136,20 @@ export interface GatedRequest {
  * An approved user runs freely; a pending one with a confirmed e-mail address
  * spends a trial run, unless the request spends none (`noTrialRun`, such as a
  * run on their own model key), which needs the account but no trial run. A
- * write to shared data runs for an approved user only.
+ * write to shared data runs for a signed-in administrator only, and spends no
+ * trial run.
  */
 export async function accessRefusal(
   state: GateState,
   takeTrialRun: (
     userId: string,
   ) => Promise<{ ok: true } | ({ ok: false } & Refusal)>,
-  { noTrialRun = false, sharedData = false }: GatedRequest = {},
+  { noTrialRun = false, sharedData = false, admin = false }: GatedRequest = {},
 ): Promise<Refusal | null> {
   if (!state.loggedIn)
     return { status: 401, error: "Sign in to use this feature." };
+  if (sharedData) return admin ? null : SHARED_DATA_DENIAL;
   if (state.approved) return null;
-  if (sharedData) return SHARED_DATA_DENIAL;
   if (!state.pending || !state.userId) return PENDING_DENIAL;
   if (noTrialRun) return null;
   if (!state.emailConfirmed) return EMAIL_UNCONFIRMED;
