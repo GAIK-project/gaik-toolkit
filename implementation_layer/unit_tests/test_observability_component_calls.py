@@ -794,7 +794,9 @@ def _whisper_local(mp, tmp_path, error):
     }
 
 
-class _Invoice(BaseModel):
+# A name OpenAI takes as a schema name as it is: VisionExtractor sends any other
+# name (a leading underscore too) as a renamed subclass, not this class.
+class InvoiceRecord(BaseModel):
     total: str
 
 
@@ -909,17 +911,17 @@ def _vision_extractor(provider):
             extractor.config = {"provider": "openai", "model": "gpt-4.1"}
             extractor.model = "gpt-4.1"
             extractor.model_provider = "openai"
-            fake, client = _provider_client(error, _Invoice(total="12"))
+            fake, client = _provider_client(error, InvoiceRecord(total="12"))
             mp.setattr(llm_package, "create_llm_client", lambda config: client)
             call = extractor._call_shared
             expected |= {
                 # The parsed record, measured as Pydantic's compact JSON.
-                "lengths": (ANY, len(_Invoice(total="12").model_dump_json())),
+                "lengths": (ANY, len(InvoiceRecord(total="12").model_dump_json())),
                 "calls": fake.calls,
-                "requests": [{"response_format": _Invoice, "max_tokens": 32768}],
+                "requests": [{"response_format": InvoiceRecord, "max_tokens": 32768}],
             }
 
-        run = lambda: call([page], "system", SECRET, _Invoice)[0]  # noqa: E731
+        run = lambda: call([page], "system", SECRET, InvoiceRecord)[0]  # noqa: E731
         return run, expected
 
     return case

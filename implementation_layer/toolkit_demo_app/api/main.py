@@ -45,6 +45,7 @@ except ImportError:
 try:
     # Docker: routers/ is in same directory as main.py
     from routers import (
+        ai_act_screening,
         classifier,
         dental_transcription,
         diary,
@@ -71,6 +72,7 @@ try:
 except ImportError:
     # Local dev: running from project root with api.main:app
     from api.routers import (
+        ai_act_screening,
         classifier,
         dental_transcription,
         diary,
@@ -171,6 +173,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(model_settings.router, prefix="/model-settings", tags=["Model settings"])
 app.include_router(parser.router, prefix="/parse", tags=["Parser"])
+app.include_router(ai_act_screening.router, prefix="/ai-act-screening", tags=["AI Act screening"])
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])
 app.include_router(

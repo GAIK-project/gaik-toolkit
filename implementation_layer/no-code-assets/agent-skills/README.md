@@ -23,12 +23,13 @@ vector-only — rather than restating the API reference.
 | [`searching-documents`](skills/searching-documents) | Adding semantic or hybrid (pgvector + full-text) search over documents; Finnish text; deciding whether a search found anything; measuring retrieval |
 | [`generate-structured-reports`](skills/generate-structured-reports) | Writing a source-cited report from mixed files (PDF, Word, spreadsheets, recordings, images) with the gaik report writer, following a template or proposing one; every statement traced to a verified quote, with gaps and conflicts shown |
 
-**Ready-to-run use cases.** No code needed. `brief-to-slides` runs in any agent that can run Python and bash; the other four
+**Ready-to-run use cases.** No code needed. `brief-to-slides` and `ai-act-use-case-screening` run in any agent that can run Python and bash; the other four
 are written for Claude Desktop and need a local MCP server, which each skill's README sets up.
 
 | Skill | What it does | Needs |
 |---|---|---|
 | [`brief-to-slides`](skills/brief-to-slides) | Builds an editable PowerPoint deck with speaker notes, exact timing and citations from a topic, an audience and a length | Python, bash; LibreOffice and poppler for previews |
+| [`ai-act-use-case-screening`](skills/ai-act-use-case-screening) | Screens any AI use case, planned or in use, against the EU AI Act through short batches of questions: the risk class, what you must do and by when, recommendations, and a plain-language report | Python (standard library) for the check script |
 | [`incident-report-writing`](skills/incident-report-writing) | Turns a spoken incident or safety observation into a Word report | gaik-transcriber MCP server |
 | [`construction-diary-creation`](skills/construction-diary-creation) | Turns a site manager's spoken day into a Työmaapäiväkirja | gaik-transcriber MCP server |
 | [`purchase-order-processing`](skills/purchase-order-processing) | Matches a purchase order and its BOMs against a price list and writes a priced sales order | Filesystem MCP server |
@@ -58,10 +59,11 @@ Each one receives the user's own content, under that provider's terms.
 | `generate-structured-reports` | The configured LLM provider; OpenAI or Azure OpenAI for recordings | Text of the user's source files, transcribed audio and the report draft | As above |
 | `incident-report-writing`, `construction-diary-creation`, `report-writing` | OpenAI or Azure OpenAI (transcription and GPT models) through the local `gaik-transcriber` MCP server | The audio or video file the user names, and only one inside the folders the user approved in setup (`--folder`); other files are refused before anything is sent | `OPENAI_API_KEY`, or `AZURE_API_KEY` with `AZURE_ENDPOINT`. `setup.bat` saves the key as a Windows user environment variable, not in a file in the skill folder; a `.env` file an older setup wrote beside the server is read only when no key is set |
 | `purchase-order-processing` | Nothing outside the machine; Claude reads the files through the local filesystem MCP server | — | — |
+| `ai-act-use-case-screening` | Nothing by itself; with web access the agent may check the official EU sources named in its reference when the reference is more than six months old | Search queries and page addresses | — |
 | `brief-to-slides` | Web pages the user links or the agent researches; the browser fetches Google Fonts when an HTML preview opens | Search queries and page addresses | — |
 
 **Installs.** Skills that run code install packages from public registries: gaik and
-its dependencies from PyPI (`gaik==0.10.0` with the extra the task needs), `mcp`,
+its dependencies from PyPI (`gaik==0.11.0` with the extra the task needs), `mcp`,
 `python-dotenv`, `python-pptx`, `pillow`, `cairosvg`, `lxml` and `playwright` from PyPI,
 Playwright's Chromium build, the font packages and `lucide-static` from npm for
 `brief-to-slides`, and `@modelcontextprotocol/server-filesystem` from npm for the Claude
