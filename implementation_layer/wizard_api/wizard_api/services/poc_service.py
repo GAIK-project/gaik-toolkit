@@ -33,6 +33,13 @@ try:
 except ImportError:  # pragma: no cover - optional in minimal installs
     _SOLUTION_WIZARD_AVAILABLE = False
 
+try:
+    from solution_wizard.scaffolder import TEMPLATES_DIR as _TEMPLATES_DIR
+    from solution_wizard.scaffolder import TEST_PAGE_TEMPLATES as _TEST_PAGE_TEMPLATES
+except ImportError:  # pragma: no cover - without solution_wizard there is nothing to compare
+    _TEMPLATES_DIR = None
+    _TEST_PAGE_TEMPLATES = {}
+
 logger = logging.getLogger(__name__)
 
 
@@ -511,6 +518,52 @@ def package_problems(poc_dir: str) -> list[str]:
 
     problems.extend(_schema_problems(poc_dir))
     problems.extend(_transcription_problems(poc_dir))
+    problems.extend(_test_page_problems(poc_dir))
+    return problems
+
+
+def _same_text(data: bytes, other: bytes) -> bool:
+    """Whether two files have the same content, whichever line ends they were written with."""
+    return data.replace(b"\r\n", b"\n") == other.replace(b"\r\n", b"\n")
+
+
+def _test_page_problems(poc_dir: str) -> list[str]:
+    """A test page file (``app.py``, ``ui/index.html``) that is not the one the wizard writes.
+
+    The README tells the user to start ``app.py``, with the package's keys beside
+    it, and the page and its server are the same files in every package. A copy
+    that differs from both the template as it is now and the file the scaffolder
+    wrote for this package (its hash in the scaffold manifest, which keeps a
+    package from an earlier template ready) was changed after generation, and
+    nobody reviewed the change. A package without the page (one the agent built,
+    or one from before the page) has nothing to compare.
+    """
+    if _TEMPLATES_DIR is None or not _TEST_PAGE_TEMPLATES:
+        return []
+    manifest = None
+    problems: list[str] = []
+    for relative, template in _TEST_PAGE_TEMPLATES.items():
+        native = os.path.join(*relative.split("/"))
+        path = os.path.join(poc_dir, native)
+        if not regular_file(path, poc_dir):
+            continue
+        try:
+            with open(path, "rb") as fh:
+                data = fh.read()
+            expected = (_TEMPLATES_DIR / template).read_bytes()
+        except OSError:
+            continue
+        if _same_text(data, expected):
+            continue
+        if manifest is None:
+            manifest = _read_manifest(Path(poc_dir).parent) or {}
+        written = manifest.get("hashes", {})
+        if hashlib.sha256(data).hexdigest() in (written.get(native), written.get(relative)):
+            continue
+        problems.append(
+            f"{relative} is not the test page the wizard wrote: it was changed after the "
+            "package was generated. Generate the package again to put it back"
+        )
     return problems
 
 

@@ -1470,6 +1470,13 @@ _INPUT_LABELS = {
     },
 }
 _QUESTION_LABELS = {"en": "Your question", "fi": "Kysymyksesi"}
+#: The test page's fixed files: their place in the package and their template under
+#: TEMPLATES_DIR. They are the same in every package, so wizard_api's package check
+#: (``poc_service.package_problems``) can tell a changed copy from the one written here.
+TEST_PAGE_TEMPLATES = {
+    "app.py": "_common/app.py.tmpl",
+    "ui/index.html": "_common/ui/index.html",
+}
 
 
 def _short(value: Any, limit: int) -> str:
@@ -1582,21 +1589,21 @@ def _write_test_page(
 ) -> list[Path]:
     """Write the package's own test page: app.py, ui/index.html and ui/solution.json.
 
-    The server and the page are the same files in every package; only
-    ``ui/solution.json`` comes from the blueprint, and as data. No blueprint value
-    is written into the code or the markup.
+    The server and the page are the same files in every package
+    (:data:`TEST_PAGE_TEMPLATES`); only ``ui/solution.json`` comes from the
+    blueprint, and as data. No blueprint value is written into the code or the markup.
     """
-    ui_dir = poc_dir / "ui"
-    ui_dir.mkdir(parents=True, exist_ok=True)
-    app_path = poc_dir / "app.py"
-    app_path.write_text(_read_template("_common", "app.py.tmpl") or "", encoding="utf-8")
-    page_path = ui_dir / "index.html"
-    page_path.write_text(_read_template("_common/ui", "index.html") or "", encoding="utf-8")
-    data_path = ui_dir / "solution.json"
+    written = []
+    for relative, template in TEST_PAGE_TEMPLATES.items():
+        target = poc_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_read_template(*template.rsplit("/", 1)) or "", encoding="utf-8")
+        written.append(target)
+    data_path = poc_dir / "ui" / "solution.json"
     data_path.write_text(
         _json_for_page(_solution_description(blueprint, variables, pattern)), encoding="utf-8"
     )
-    return [app_path, page_path, data_path]
+    return [*written, data_path]
 
 
 # ---------------------------------------------------------------------------
