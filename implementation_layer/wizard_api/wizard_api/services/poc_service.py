@@ -532,15 +532,16 @@ def _test_page_problems(poc_dir: str) -> list[str]:
 
     The README tells the user to start ``app.py``, with the package's keys beside
     it, and the page and its server are the same files in every package. A copy
-    that differs from both the template as it is now and the file the scaffolder
-    wrote for this package (its hash in the scaffold manifest, which keeps a
-    package from an earlier template ready) was changed after generation, and
-    nobody reviewed the change. A package without the page (one the agent built,
-    or one from before the page) has nothing to compare.
+    that differs from the template as it is on this server was changed after
+    generation, and nobody reviewed the change. Only the template counts: the
+    scaffold manifest lives in the session folder, which the agent can write, so
+    a hash recorded there could be made to match any file. A package generated
+    from an earlier template is reported too; generating it again brings the
+    current page. A package without the page (one the agent built, or one from
+    before the page) has nothing to compare.
     """
     if _TEMPLATES_DIR is None or not _TEST_PAGE_TEMPLATES:
         return []
-    manifest = None
     problems: list[str] = []
     for relative, template in _TEST_PAGE_TEMPLATES.items():
         native = os.path.join(*relative.split("/"))
@@ -554,11 +555,6 @@ def _test_page_problems(poc_dir: str) -> list[str]:
         except OSError:
             continue
         if _same_text(data, expected):
-            continue
-        if manifest is None:
-            manifest = _read_manifest(Path(poc_dir).parent) or {}
-        written = manifest.get("hashes", {})
-        if hashlib.sha256(data).hexdigest() in (written.get(native), written.get(relative)):
             continue
         problems.append(
             f"{relative} is not the test page the wizard wrote: it was changed after the "
