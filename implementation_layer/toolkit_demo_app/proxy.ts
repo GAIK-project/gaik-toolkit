@@ -5,6 +5,7 @@ import {
   isWizardApiPath,
   needsApprovedUser,
   wizardRefusal,
+  writesSharedData,
 } from "@/lib/api-access";
 import {
   MODEL_SETTINGS_HEADER,
@@ -20,6 +21,7 @@ import {
   MODEL_TIER_HEADER,
   isModelStaff,
 } from "@/lib/model-tier";
+import { isAnalyticsPath } from "@/lib/analytics-path";
 import { backendTarget, isApiPath } from "@/lib/backend-target";
 import { routedPath } from "@/lib/request-path";
 import { clientIp } from "@/lib/client-ip";
@@ -63,6 +65,15 @@ async function route(request: NextRequest): Promise<NextResponse> {
   const pathname = routedPath(rawPath);
   if (pathname === null)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Analytics requests go on to PostHog (lib/analytics-path.ts). Hand them on
+  // without this site's cookies, and before the session is read or refreshed:
+  // nothing here needs it, and a refresh would put new tokens in the request.
+  if (isAnalyticsPath(pathname)) {
+    const headers = new Headers(request.headers);
+    headers.delete("cookie");
+    return NextResponse.next({ request: { headers } });
+  }
 
   // Read at most once per request, by the API gates. Reading it can refresh the
   // session, and every response below carries the new cookies.
@@ -119,11 +130,12 @@ async function route(request: NextRequest): Promise<NextResponse> {
     }
 
     // Require login + approval for every backend request that changes state,
-    // not just POST: DELETE /video-search/clear empties a table.
+    // not just POST: a DELETE clears data.
     // A user still waiting for approval runs on the daily trial allowance
     // (lib/trial.ts). A request that carries the user's own model key on a
     // supported route runs on their credential: it still needs a signed-in
-    // account, approved or pending, but spends no trial run.
+    // account, approved or pending, but spends no trial run. Neither covers a
+    // write to data that every visitor shares.
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
@@ -136,7 +148,10 @@ async function route(request: NextRequest): Promise<NextResponse> {
         pathname === "/api/model-settings/aitta/warm" ||
         (request.method === "DELETE" &&
           pathname.startsWith("/api/wizard/end/"));
-      const refusal = await accessRefusal(state, takeTrialRun, noTrialRun);
+      const refusal = await accessRefusal(state, takeTrialRun, {
+        noTrialRun,
+        sharedData: writesSharedData(request.method, pathname),
+      });
       if (refusal) {
         // Why a run was refused, without who: the page shows the same text.
         console.warn(

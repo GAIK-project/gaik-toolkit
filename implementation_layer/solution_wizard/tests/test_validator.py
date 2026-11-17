@@ -471,3 +471,242 @@ def test_rag_workflow_alone_has_no_redundancy_warning():
     bp = Blueprint.model_validate(_rag_workflow_data(separate_store=False))
     result = validate(bp)
     assert not [w for w in result.warnings if w.rule == 12]
+
+
+# ---------------------------------------------------------------------------
+# Rule 14: declared hallucination check must receive grounding evidence
+# (rule 13 is the governance rule, tested in test_governance_and_poc_output.py)
+# ---------------------------------------------------------------------------
+
+
+def _judge_blueprint(judge_inputs, hallucination_check=True) -> Blueprint:
+    """Transcribe -> extract -> LLMJudge, with the judge's inputs parameterised."""
+    return _base_blueprint(
+        artifacts={
+            "input_audio": Artifact(
+                type="audio", source=ArtifactSource.USER_UPLOAD, optional=False
+            ),
+            "transcript": Artifact(
+                type="transcript",
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="step_a",
+            ),
+            "extracted": Artifact(
+                type="structured_json",
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="step_b",
+                final_output=True,
+            ),
+            "report": Artifact(
+                type="validation_report",
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="step_c",
+            ),
+        },
+        components=Components(selected_building_blocks=["Transcriber", "Extractor", "LLMJudge"]),
+        workflow=Workflow(
+            steps=[
+                WorkflowStep(
+                    id="step_a",
+                    name="Transcribe",
+                    type="automated_task",
+                    component="Transcriber",
+                    inputs=["input_audio"],
+                    outputs=["transcript"],
+                ),
+                WorkflowStep(
+                    id="step_b",
+                    name="Extract",
+                    type="automated_task",
+                    component="Extractor",
+                    inputs=["transcript"],
+                    outputs=["extracted"],
+                    depends_on=["step_a"],
+                ),
+                WorkflowStep(
+                    id="step_c",
+                    name="Validate",
+                    type="automated_task",
+                    component="LLMJudge",
+                    inputs=judge_inputs,
+                    outputs=["report"],
+                    depends_on=["step_b"],
+                ),
+            ]
+        ),
+        validation={"hallucination_check": hallucination_check},
+    )
+
+
+def test_rule14_judge_without_grounding_input_is_an_error():
+    """Dropping the source artifact must not pass silently."""
+    result = validate(_judge_blueprint(["extracted"]))
+    assert not result.ok
+    assert any(e.rule == 14 and e.step_id == "step_c" for e in result.errors)
+
+
+def test_rule14_judge_with_grounding_input_passes():
+    result = validate(_judge_blueprint(["transcript", "extracted"]))
+    assert not [e for e in result.errors if e.rule == 14]
+
+
+def test_rule14_not_applied_when_hallucination_check_is_off():
+    result = validate(_judge_blueprint(["extracted"], hallucination_check=False))
+    assert not [e for e in result.errors if e.rule == 14]
+
+
+def test_rule14_warns_when_check_declared_but_no_validator_step():
+    result = validate(_base_blueprint(validation={"hallucination_check": True}))
+    assert any(w.rule == 14 and "hallucination_check" in w.message for w in result.warnings)
+
+
+def test_rule14_says_nothing_about_a_draft_without_steps():
+    """The draft blueprint of the specification phase has no workflow yet."""
+    result = validate(
+        _base_blueprint(workflow=Workflow(steps=[]), validation={"hallucination_check": True})
+    )
+    assert not [i for i in result.errors + result.warnings if i.rule == 14]
+
+
+@pytest.mark.parametrize(
+    ("module", "upload_type", "source_type"),
+    [
+        ("AudioToStructuredData", "audio", "transcript"),
+        ("AudioToStructuredData", "audio", "enhanced_transcript"),
+        ("DocumentsToStructuredData", "pdf", "parsed_text"),
+    ],
+)
+def test_rule14_a_module_hands_the_judge_the_text_it_read(module, upload_type, source_type):
+    """A module returns the transcript or parsed text with the extracted record
+    (PipelineResult.transcription, .parsed_documents), so a module step may produce
+    it (rule 4) and the judge step can take it as its grounding evidence."""
+    bp = _base_blueprint(
+        artifacts={
+            "upload": Artifact(type=upload_type, source=ArtifactSource.USER_UPLOAD, optional=False),
+            "source": Artifact(
+                type=source_type,
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="extract",
+            ),
+            "record": Artifact(
+                type="structured_json",
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="extract",
+                final_output=True,
+            ),
+            "report": Artifact(
+                type="validation_report",
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="judge",
+            ),
+        },
+        components=Components(selected_building_blocks=[module, "LLMJudge"]),
+        workflow=Workflow(
+            steps=[
+                WorkflowStep(
+                    id="extract",
+                    name="Extract",
+                    type="automated_task",
+                    component=module,
+                    inputs=["upload"],
+                    outputs=["record", "source"],
+                ),
+                WorkflowStep(
+                    id="judge",
+                    name="Validate",
+                    type="automated_task",
+                    component="LLMJudge",
+                    inputs=["source", "record"],
+                    outputs=["report"],
+                    depends_on=["extract"],
+                ),
+            ]
+        ),
+        validation={"hallucination_check": True},
+    )
+
+    result = validate(bp)
+
+    assert not [e for e in result.errors if e.rule in (4, 14)], result.errors
+
+
+def _source_and_judge(source_type: str, judge: str, upload: str = "pdf") -> Blueprint:
+    """upload -> VisionExtractor -> judge, the judge reading ``source_type`` beside the record."""
+    artifacts = {
+        "upload": Artifact(type=upload, source=ArtifactSource.USER_UPLOAD, optional=False),
+        "record": Artifact(
+            type="structured_json",
+            source=ArtifactSource.GENERATED,
+            optional=False,
+            produced_by="extract",
+            final_output=True,
+        ),
+        "report": Artifact(
+            type="validation_report",
+            source=ArtifactSource.GENERATED,
+            optional=False,
+            produced_by="judge",
+        ),
+    }
+    judge_inputs = ["record"] + (["upload"] if source_type == upload else [])
+    return _base_blueprint(
+        artifacts=artifacts,
+        components=Components(selected_building_blocks=["VisionExtractor", judge]),
+        workflow=Workflow(
+            steps=[
+                WorkflowStep(
+                    id="extract",
+                    name="Extract",
+                    type="automated_task",
+                    component="VisionExtractor",
+                    inputs=["upload"],
+                    outputs=["record"],
+                ),
+                WorkflowStep(
+                    id="judge",
+                    name="Validate",
+                    type="automated_task",
+                    component=judge,
+                    inputs=judge_inputs,
+                    outputs=["report"],
+                    depends_on=["extract"],
+                ),
+            ]
+        ),
+        validation={"hallucination_check": True},
+    )
+
+
+@pytest.mark.parametrize("judge", ["LLMJudge", "LLMJudgePanel"])
+@pytest.mark.parametrize("upload", ["pdf", "image"])
+def test_rule14_a_judge_may_check_against_the_pages_themselves(judge, upload):
+    """VisionExtractor returns no text; the judges' validate(source_pages=...) reads the
+    PDF's or image's pages, so the upload itself is the grounding evidence."""
+    result = validate(_source_and_judge(upload, judge, upload=upload))
+
+    assert not [e for e in result.errors if e.rule in (4, 14)], result.errors
+
+
+@pytest.mark.parametrize("judge", ["LLMJudge", "llm_judge", "LLMJudgePanel", "llm_judge_panel"])
+def test_rule14_a_judge_named_by_its_registry_id_is_checked_too(judge):
+    result = validate(_source_and_judge("none", judge))
+
+    assert any(e.rule == 14 and e.step_id == "judge" for e in result.errors)
+
+
+def test_rule14_a_panel_cannot_check_against_text():
+    """LLMJudgePanel.validate reads page images only; a text source is refused (rule 4)
+    and does not satisfy the declared check (rule 14)."""
+    bp = _judge_blueprint(["transcript", "extracted"])
+    bp.workflow.steps[2].component = "LLMJudgePanel"
+
+    result = validate(bp)
+
+    assert any(e.rule == 4 and e.step_id == "step_c" for e in result.errors)
+    assert any(e.rule == 14 and e.step_id == "step_c" for e in result.errors)

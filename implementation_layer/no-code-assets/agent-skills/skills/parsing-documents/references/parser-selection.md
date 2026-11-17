@@ -54,7 +54,7 @@ from `gaik.software_components.llm`. Supply it through `VisionParser(openai_conf
 
 Explicit `api_key`, `base_url`, `model`, and other overrides are applied before
 validation. Do not copy one provider's credentials into another provider's config.
-From the gaik release after 0.10.0, a `base_url` must be the provider's own host, the
+Since gaik 0.11.0, a `base_url` must be the provider's own host, the
 address set in the provider's variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, ...; plain
 http works for that address) or a host named in `allowed_endpoint_hosts=` or
 `GAIK_ALLOWED_ENDPOINT_HOSTS`; anything else raises `EndpointNotAllowedError` before a
@@ -90,7 +90,7 @@ An explicit shared `api_config` supersedes these routing flags.
 the required keyword arguments `api_base=` and `password=`. It does not read them from the
 environment, so load them in your own code, from `DOCLING_API_BASE` (or the older
 `API_BASE`) and `DOCLING_API_PASSWORD`. `api_base` receives the document and the password,
-so from the gaik release after 0.10.0 the constructor accepts only the address set in
+so since gaik 0.11.0 the constructor accepts only the address set in
 `DOCLING_API_BASE` or `API_BASE` (plain http works for that address), this machine, or a
 host listed in `GAIK_ALLOWED_ENDPOINT_HOSTS` or passed as `allowed_endpoint_hosts=` (an
 `http://<host>` entry for plain http). Anything else raises `EndpointNotAllowedError`.
