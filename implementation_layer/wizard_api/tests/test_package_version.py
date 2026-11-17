@@ -4,7 +4,7 @@ The approved-package digest (Gate 3) and the reuse of a passed preflight both re
 on ``package_version``. It covered a fixed list of files, so a change to a helper
 the entrypoint imports (``poc_output.py``, ``document_manifest.py``,
 ``input_bundle.py``) or to ``schemas/output_schema_model.json``, which gaik loads
-from the release after 0.10.0, did not count as a change to the approved package.
+since 0.11.0, did not count as a change to the approved package.
 """
 
 import pytest
