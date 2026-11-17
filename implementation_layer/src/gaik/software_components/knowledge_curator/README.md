@@ -132,9 +132,10 @@ The model records that sources disagree and describes each side; it does not dec
 side the report follows. The curator decides that in code from `source_precedence`:
 
 - A conflict is `resolved` when every unit's `source_class` is in `source_precedence` and
-  one class among them ranks above the others. `preferred_unit_ids` names the units of
-  that class and `resolved_by` the class; the writer follows those units.
-- It is `unresolved` when the units share one class, when a class is not in
+  exactly one unit has the highest-ranked class among them. `preferred_unit_ids` names
+  that unit and `resolved_by` its class; the writer follows it.
+- It is `unresolved` when two or more units share the top class (they may disagree with
+  each other), when the units share one class, when a class is not in
   `source_precedence`, or when there is no `source_precedence`. The writer gives both
   sides, marked `Unresolved:`, for a person to settle.
 - A rule the classes cannot express, such as a newer document over an older one, is
@@ -167,8 +168,9 @@ check and edit before the report is written (see below).
 A unit fails when its `source.file` is not one of the sources, when its `quote` does
 not occur verbatim in that source's text (only whitespace may differ, `quote_in_text`),
 or when its `summary` states a number that neither the quote nor the `time_qualifier`
-gives, such as an age computed from a year. Numbers are compared by their digits, so
-"1 200" supports "1200"; a number written in words is not checked, and the check does not
+(where the cited source has that number too) gives, such as an age computed from a year. Numbers are compared by their digits, so
+"1 200" supports "1200" and also "1" and "200", and a digit glued to letters (the 2 of
+m2) is not a figure; a number written in words is not checked, and the check does not
 confirm that the summary's wording matches the quote.
 If any unit of a section fails, the whole section is requested again once, with the
 failing units as feedback. If the second answer still fails, the failing units are

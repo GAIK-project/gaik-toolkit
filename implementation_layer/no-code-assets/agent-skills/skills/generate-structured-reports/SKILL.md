@@ -74,7 +74,8 @@ Then ask only what changes the report:
   so put whatever must shape the text into `instructions`.
 - **Source priority.** Do not invent one. Without one, put every source in `primary` and
   write the no-hierarchy instruction from `references/report-spec.md`. With one, map it to
-  `primary`/`secondary` and also state it in `instructions`. Add the gap-marker sentences from
+  `primary`/`secondary` and set `source_precedence` in that order; conflicts are decided from
+  it in code, not from `instructions`. Add the gap-marker sentences from
   the same reference too. If the user gives a sample and an instruction of theirs (such as
   covering everything) conflicts with the sample's length, point it out and ask which wins.
 - **Citations.** Ask whether the report should cite, for each fact, its source file and place.
@@ -201,8 +202,8 @@ Then edit `spec_proposal.json` so that every field holds your proposal, as follo
     once what it means, and give a one-line, generic reason for each non-obvious choice.
 - **`instructions` (report-wide)**: a bulleted list (`"- …\n- …"`) of the user's style rules
   (language level, length, voice, what the text must never refer to, such as "the meeting" or
-  "the experts"), followed by the required sentences from `references/report-spec.md`: source
-  priority or no hierarchy, gap markers, and the citation sentence when citations are on. Mark
+  "the experts"), followed by the required sentences from `references/report-spec.md`: the
+  no-hierarchy sentence when there is no `source_precedence`, gap markers, and the citation sentence when citations are on. Mark
   which bullets are the user's and which the skill adds; the user may change any of them, but say
   what is lost if they drop a required one.
 - **`sources`**: every evidence file under `primary`, or split into `primary`/`secondary` by the

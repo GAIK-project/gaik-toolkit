@@ -152,7 +152,9 @@ def _as_cited(answer: CurationResponse, cited: _Cited) -> CurationResponse:
 # A number: a digit run, or groups of three digits with a thousands separator between
 # them ("1 200", "1,200", "1.200"). Any other separator splits numbers, so a date such
 # as 14.3.2026 is 14, 3 and 2026, and a decimal 1,5 is 1 and 5, however a source writes it.
-_NUMBER = re.compile(r"\d{1,3}(?:[.,\u00a0\u202f ]\d{3})+(?!\d)|\d+")
+_NUMBER = re.compile(r"(?<![^\W\d_])(?:\d{1,3}(?:[.,\u00a0\u202f ]\d{3})+(?!\d)|\d+)")
+# A number glued to letters before it, such as the 2 in m2 or CO2, is part of a unit or
+# a name, not a figure of the fact: the lookbehind above leaves it out.
 _SEPARATORS = re.compile(r"[.,\u00a0\u202f ]")
 
 
@@ -161,7 +163,19 @@ def _digits(number: str) -> str:
     return _SEPARATORS.sub("", number).lstrip("0") or "0"
 
 
-def _unsupported_numbers(unit: CuratedUnit) -> list[str]:
+def _given_numbers(text: str) -> set[str]:
+    """The digits of every number in ``text``, and of each group of a grouped one.
+
+    "4 120" may be one figure or two (a count and an area), so both readings count.
+    """
+    given = set()
+    for n in _NUMBER.findall(text):
+        given.add(_digits(n))
+        given.update(_digits(part) for part in _SEPARATORS.split(n) if part)
+    return given
+
+
+def _unsupported_numbers(unit: CuratedUnit, source_text: str | None = None) -> list[str]:
     """The numbers of the summary that neither the quote nor the time qualifier gives.
 
     The quote check confirms only that the quote is in its source; this confirms that the
@@ -170,7 +184,13 @@ def _unsupported_numbers(unit: CuratedUnit) -> list[str]:
     "1 200" in the quote supports "1200" in the summary and "03" supports "3"; a number
     written in words is not checked.
     """
-    given = {_digits(n) for n in _NUMBER.findall(f"{unit.quote} {unit.time_qualifier or ''}")}
+    given = _given_numbers(unit.quote)
+    # The time qualifier is the model's own text: its numbers count only where the
+    # cited source has them too.
+    qualifier = _given_numbers(unit.time_qualifier or "")
+    if source_text is not None:
+        qualifier &= _given_numbers(source_text)
+    given |= qualifier
     return [n for n in _NUMBER.findall(unit.summary) if _digits(n) not in given]
 
 
@@ -199,7 +219,7 @@ def _failing_units(answer: CurationResponse, cited: _Cited) -> list[tuple[int, s
                     f'"{cited.label(unit.source.file)}"',
                 )
             )
-        elif unsupported := _unsupported_numbers(unit):
+        elif unsupported := _unsupported_numbers(unit, cited.texts[unit.source.file]):
             failures.append(
                 (
                     n,
@@ -287,10 +307,11 @@ def _decide(
 ) -> tuple[Literal["resolved", "unresolved"], list[str], str | None]:
     """``(status, preferred_unit_ids, resolved_by)`` of one conflict, decided in code.
 
-    Resolved only when every unit's source class is in ``source_precedence`` and the
-    highest-ranked class among them is not shared by every unit: the units of that class
-    are the side the report follows. Units of one class only, a class the precedence does
-    not name, or no precedence at all leave the conflict unresolved, for a person to decide.
+    Resolved only when every unit's source class is in ``source_precedence`` and exactly
+    one unit has the highest-ranked class among them: that unit is the side the report
+    follows. Two units of the top class may disagree with each other, so they leave the
+    conflict unresolved, as do units of one class only, a class the precedence does not
+    name, or no precedence at all: a person decides.
     """
     if not source_precedence:
         return "unresolved", [], None
@@ -300,7 +321,7 @@ def _decide(
         return "unresolved", [], None
     top = min(classes, key=rank.__getitem__)
     preferred = [u.id for u in units if u.source_class == top]
-    if len(preferred) == len(units):
+    if len(preferred) != 1 or len(units) < 2:
         return "unresolved", [], None
     return "resolved", preferred, top
 
@@ -384,7 +405,7 @@ class KnowledgeCurator:
                 words each kind of source. They do not decide conflicts.
             source_precedence: Source classes, highest first, e.g.
                 ``["primary", "secondary"]``. A conflict is resolved in code when one
-                class of its units ranks above every other class among them; the report
+                unit of the conflict has the highest-ranked class among them; the report
                 then follows that side. Without it, or when the classes do not decide,
                 every conflict is unresolved and the report gives both sides.
             progress_callback: Called with a status line when a section starts and ends,

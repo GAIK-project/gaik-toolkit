@@ -124,7 +124,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `required_items` | Items a section must cover; each one no source covers becomes `(missing: <item>)` |
 | `depends_on` | Makes a section *derived*: it has no knowledge file and is written from the reviewed texts of these sections |
 | `instructions` | Rules for every section: how each kind of source is worded, citation style, tone |
-| `source_precedence` | Optional source classes, highest first, e.g. `["primary", "secondary"]`. A conflict is resolved in code only when one class of its units ranks above the others; without it every conflict is `Unresolved:` in the report (see the KnowledgeCurator README, Conflicts) |
+| `source_precedence` | Optional source classes, highest first, e.g. `["primary", "secondary"]`. A conflict is resolved in code only when exactly one of its units has the highest-ranked class; without it every conflict is `Unresolved:` in the report (see the KnowledgeCurator README, Conflicts) |
 | `sources` | Files grouped by class, `primary` and/or `secondary`; file names must be unique |
 | `sample_report` | Optional report whose structure, length and tone the new report follows; never its facts |
 | `models` | Optional model or deployment name per step; `null` uses the model of the config |

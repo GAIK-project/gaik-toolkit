@@ -163,7 +163,8 @@ def build_review_checks(section: SectionSpec, instructions: str, citations: bool
         if section.derived
         else '- Every item in the knowledge\'s "missing" list must carry a (missing: <item>) '
         'marker. A conflict with status "unresolved" must give both sides and be marked '
-        '"Unresolved:".\n'
+        '"Unresolved:". A conflict with status "resolved" must state the side of the units '
+        "in its preferred_unit_ids, not the other side.\n"
     )
     return f"""\
 - Every factual claim must be supported by the reference material. Correct or remove \

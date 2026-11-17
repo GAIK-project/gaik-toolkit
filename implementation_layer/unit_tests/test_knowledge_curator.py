@@ -821,6 +821,7 @@ def test_knowledge_saved_before_the_change_still_loads(tmp_path):
         ("resolved", ["a-02"], ("resolved", ["a-02"], "person")),
         ("resolved", ["a-09"], ("unresolved", [], None)),  # not one of the conflict's units
         ("resolved", [], ("unresolved", [], None)),
+        ("resolved", ["a-01", "a-02"], ("unresolved", [], None)),  # every unit is no side
         ("unresolved", ["a-02"], ("unresolved", [], None)),
     ],
 )
@@ -860,6 +861,8 @@ def _summarised(summary: str, quote: str, time_qualifier: str | None = None, fil
         ("Seen on 14.3.2026.", "The supply-air unit vibrates", "site visit, 2026-03-14"),
         ("Cost 1200 euros.", "Cost 1 200 euros.", None),
         ("Seen on 3 March.", "seen 03 March", None),
+        ("The flat is 120 m2.", "Area 120 m\u00b2", None),
+        ("4 rooms, 120 m2.", "Room count: 4 120 m2", None),
     ],
 )
 def test_a_summary_with_only_the_quotes_numbers_passes(summary, quote, time_qualifier):
@@ -875,6 +878,7 @@ def test_a_summary_with_only_the_quotes_numbers_passes(summary, quote, time_qual
         ("Installed in 1989.", "Mechanical ventilation installed in 1998.", ["1989"]),
         ("Design life 25 years, 3 years left.", "Design life 25 years.", ["3"]),
         ("Cost 12 euros.", "Cost 1 200 euros.", ["12"]),
+        ("Built in 1998.", "Built in 1989.", ["1998"]),
     ],
 )
 def test_a_summary_number_the_quote_does_not_give_is_found(summary, quote, unsupported):
@@ -907,3 +911,33 @@ def test_a_computed_number_raises_when_not_dropping(fake):
 
     with pytest.raises(ValueError, match="failed the quote check"):
         _curate([SectionSpec(id="a", title="Alpha")], drop_unverified=False)
+
+
+def test_two_units_of_the_top_class_leave_the_conflict_unresolved(fake):
+    # The two primary units may disagree with each other: a person decides.
+    other_note = _unit("the housing is rusty")
+    fake({"a": [_conflicting(NOTE, other_note, DOC)]})
+
+    conflict = _one_conflict(None, source_precedence=["primary", "secondary"])
+
+    assert (conflict.status, conflict.preferred_unit_ids) == ("unresolved", [])
+
+
+def test_a_number_in_the_time_qualifier_counts_only_if_the_source_has_it():
+    unit = _summarised(
+        "The system is 28 years old.",
+        "Mechanical ventilation installed in 1998.",
+        time_qualifier="2026, 28 years after 1998",
+    )
+
+    assert kc._unsupported_numbers(unit, source_text=REPORT) == ["28"]
+    assert kc._unsupported_numbers(unit) == []  # without the source, as before
+
+
+def test_the_reviewer_checks_the_side_of_a_resolved_conflict():
+    from gaik.software_components.report_synthesizer.prompts import build_review_checks
+
+    checks = build_review_checks(SectionSpec(id="a", title="Alpha"), "")
+
+    assert "preferred_unit_ids" in checks
+    assert 'status "resolved" must state the side' in checks

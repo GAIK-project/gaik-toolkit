@@ -628,7 +628,7 @@ def test_the_spec_passes_its_source_precedence_to_the_curator(tmp_path, rec):
 
 @pytest.mark.parametrize(
     ("precedence", "message"),
-    [(["primary", "notes"], "no sources for: \\['notes'\\]"), (["primary"] * 2, "more than once")],
+    [(["primary", "notes"], "cannot have: \\['notes'\\]"), (["primary"] * 2, "more than once")],
 )
 def test_the_spec_refuses_a_source_precedence_it_cannot_use(tmp_path, precedence, message):
     data = make_spec(tmp_path).model_dump()

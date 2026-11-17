@@ -78,9 +78,10 @@ class Conflict(BaseModel):
     other class among them, and then ``preferred_unit_ids`` names the units of that class.
     A person can resolve a conflict by hand in the saved knowledge file the same way.
 
-    A conflict marked ``resolved`` without ``preferred_unit_ids``, or with an id that is
-    not one of its ``unit_ids``, is read as ``unresolved``: no side is chosen, so the
-    report gives both. This also covers knowledge files saved before the side was named.
+    A conflict marked ``resolved`` without ``preferred_unit_ids``, with an id that is not
+    one of its ``unit_ids``, or naming every one of them, is read as ``unresolved``: no
+    side is chosen, so the report gives both. This also covers knowledge files saved
+    before the side was named.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -100,6 +101,7 @@ class Conflict(BaseModel):
         if self.status == "resolved" and (
             not self.preferred_unit_ids
             or any(i not in self.unit_ids for i in self.preferred_unit_ids)
+            or set(self.unit_ids) <= set(self.preferred_unit_ids)
         ):
             self.status = "unresolved"
             self.preferred_unit_ids = []

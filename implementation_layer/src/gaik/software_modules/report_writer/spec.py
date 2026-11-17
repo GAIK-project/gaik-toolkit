@@ -77,7 +77,7 @@ class ReportSpec(BaseModel):
     """Rules for every section, such as how each kind of source is worded, and style."""
     source_precedence: list[str] = []
     """Source classes, highest first, e.g. ``["primary", "secondary"]``. A conflict between
-    sources is resolved in code only when one class of its units ranks above the others;
+    sources is resolved in code only when exactly one of its units has the top class;
     without it every conflict stays unresolved and the report gives both sides."""
     sources: dict[Literal["primary", "secondary"], list[Path]]
     sample_report: Path | None = None
@@ -93,7 +93,7 @@ class ReportSpec(BaseModel):
         unknown = [c for c in self.source_precedence if c not in ("primary", "secondary")]
         if unknown:
             raise ValueError(
-                f"source_precedence names classes the spec has no sources for: {unknown}; "
+                f"source_precedence names classes a spec cannot have: {unknown}; "
                 "use 'primary' and 'secondary'"
             )
         if len(set(self.source_precedence)) != len(self.source_precedence):
