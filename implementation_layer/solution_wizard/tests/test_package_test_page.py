@@ -433,6 +433,16 @@ def test_a_file_name_cannot_leave_the_input_folder(page):
     assert not (page.poc.parent / "evil.pdf").exists()
 
 
+def test_a_finnish_file_name_arrives_as_written(page):
+    status, answer = page.run(files=[("tilaus ääkköset (1).pdf", b"%PDF")])
+
+    assert status == 200
+    assert answer["result"]["uploaded"] == ["tilaus ääkköset (1).pdf"]
+    name = "tilaus ääkköset (1)_result.json"
+    assert [o["name"] for o in answer["outputs"]][0] == name
+    assert page.request("GET", answer["outputs"][0]["url"])[0] == 200
+
+
 def test_two_files_of_one_name_are_both_kept(page):
     status, answer = page.run(files=[("a.pdf", b"one"), ("A.pdf", b"two")])
 

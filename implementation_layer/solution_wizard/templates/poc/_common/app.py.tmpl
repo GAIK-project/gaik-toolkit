@@ -396,10 +396,16 @@ class Solution:
         log_path = self.runs_root / f"{run_id}.log"
         self._log_path = log_path
         self._started = time.monotonic()
-        exit_code, timed_out = self._execute(run_dir, log_path)
+        try:
+            exit_code, timed_out = self._execute(run_dir, log_path)
+        finally:
+            # The keys were needed for the run only, also when it could not start;
+            # the working folder stays for its downloads.
+            try:
+                (run_dir / ".env").unlink(missing_ok=True)
+            except OSError:
+                pass
         duration = round(time.monotonic() - self._started, 1)
-        # The keys were needed for the run only; the working folder stays for its downloads.
-        (run_dir / ".env").unlink(missing_ok=True)
 
         self._runs[run_id] = run_dir
         self._forget_old_runs()
