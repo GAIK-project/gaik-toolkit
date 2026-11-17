@@ -25,7 +25,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
 import { BpmnZoomControls } from "@/components/bpmn-viewer-toolbar";
-import { FlowLockedNote, FlowUpdatedLine } from "@/components/flow-status";
+import { FlowEditingNote, FlowLockedNote, FlowUpdatedLine } from "@/components/flow-status";
 import { Icon, type IconName } from "@/components/icons";
 import { STEP_TYPE_ICON, STEP_TYPE_TEXT, StepNumber, StepTypeTag, stepTypeLabels } from "@/components/step-type";
 import {
@@ -300,6 +300,7 @@ export function WorkflowFlowView({
   bpmnXml,
   locked,
   onUnlock,
+  onLock,
   update = null,
   pocNoteLabel = null,
   selectedStepId,
@@ -317,6 +318,8 @@ export function WorkflowFlowView({
   /** Edits are off, and the canvas says why; "ask the wizard" stays. */
   locked: boolean;
   onUnlock: () => void;
+  /** Closes the flow for edits again after "Muokkaa kaaviota"; only where it was locked. */
+  onLock?: () => void;
   /** The blueprint is one the page brought, not a save made here: from the chat, or from elsewhere. */
   update?: BlueprintUpdate | null;
   /** Shown while saved changes are not in the PoC package yet. */
@@ -906,6 +909,19 @@ export function WorkflowFlowView({
         </p>
       )}
       {locked && <FlowLockedNote onUnlock={onUnlock} testId="simple-flow" t={t} />}
+      {!locked && onLock && (
+        <FlowEditingNote
+          help={t.flowEditHelp}
+          // "Kumoa" after a removal is an edit too: it goes with the lock.
+          onLock={() => {
+            setStatus({ kind: "idle" });
+            onLock();
+          }}
+          lockWaits={status.kind === "saving"}
+          testId="simple-flow"
+          t={t}
+        />
+      )}
     </section>
   );
 }

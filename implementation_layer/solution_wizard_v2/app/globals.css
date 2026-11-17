@@ -518,6 +518,17 @@ body {
   --context-pad-entry-hover-background-color: var(--color-surface-muted);
 }
 
+/* bpmn-js focuses the canvas on a click, for its keys (Delete, Ctrl+Z), and the
+   browser drew its own thick outline round the whole diagram. A click shows
+   nothing; keyboard focus shows the brand ring the rest of the page uses. */
+.bpmn-viewer-themed .djs-container svg:focus {
+  outline: none;
+}
+.bpmn-viewer-themed .djs-container svg:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -2px;
+}
+
 /* The palette holds the two tools a save keeps ("Lisää tehtävä", "Yhdistä"): a small
    bar in the canvas's corner, like the zoom controls opposite it. */
 .bpmn-editable .djs-palette {

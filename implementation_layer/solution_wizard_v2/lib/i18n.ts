@@ -31,8 +31,13 @@ export type Dict = {
    * "{json}" and "{poc}" are filled with the workspace tab names.
    */
   nowSteps: string[];
-  /** Gate 3 once a test run has succeeded; nowSteps has the line before one. */
+  /**
+   * Gate 3 once a test run has succeeded; nowSteps has the line before one.
+   * "{approve}" and "{request}" are the decision bar's two buttons.
+   */
   nowGate3Run: string;
+  /** Gate 3 when the package changed after the run that succeeded: a new run comes first. */
+  nowGate3Changed: string;
   /** The last step once Gate 4 is approved, and the same before any test run has succeeded. */
   nowDone: string;
   nowDoneNoRun: string;
@@ -180,6 +185,14 @@ export type Dict = {
   /** "{names}": the tasks no flow from the start reaches. */
   bpmnUnconnected: string;
   bpmnUnnamed: string;
+  /** What the unconnected-task line calls a task that has no name yet. */
+  bpmnUnnamedTask: string;
+  /** Puts the canvas back to the diagram last saved. */
+  bpmnDiscard: string;
+  /** Under an editable canvas, on one line: what saves by itself, what waits for the button, and the undo. */
+  bpmnEditHelp: string;
+  /** After a save of the diagram: saved, and when the wizard hears of it. */
+  bpmnSaved: string;
   /** "{n}": the step's number in the process. */
   bpmnStepTitle: string;
   editorRetry: string;
@@ -228,6 +241,12 @@ export type Dict = {
   flowOutcomeReturns: string;
   /** On the canvas when editing is off: why, and what to do instead. */
   flowLocked: string;
+  /** Closes the diagram for edits again after "Muokkaa kaaviota". */
+  flowEditDone: string;
+  /** Why "Lopeta muokkaus" waits. */
+  flowEditDoneWaits: string;
+  /** Under the simple flow once "Muokkaa kaaviota" has opened it: how its edits are kept. */
+  flowEditHelp: string;
   flowChangedElsewhere: string;
   /** The diagram was drawn again from a version the wizard wrote in the chat. */
   flowUpdatedFromChat: string;
@@ -770,7 +789,8 @@ const fi: Dict = {
     "Wizard päivittää dokumentaation ja kertoo chatissa, mitä paketissa on.",
     "Lataa käyttöönottopaketti {poc}-välilehdeltä ja tarkista sen dokumentaatio.",
   ],
-  nowGate3Run: "Testi onnistui. Tarkista tulos {poc}-välilehdellä.",
+  nowGate3Run: "Testi onnistui. Tarkista tulos {poc}-välilehdellä ja valitse sitten alareunasta {approve} tai {request}.",
+  nowGate3Changed: "PoC-paketti muuttui onnistuneen testiajon jälkeen. Aja testi uudelleen {poc}-välilehdellä, niin testiajon voi hyväksyä.",
   nowDone: "Kaikki gatet on hyväksytty. Lataa käyttöönottopaketti tai kokeile ratkaisua omilla tapauksillasi.",
   nowDoneNoRun: "Kaikki gatet on hyväksytty. Aja vielä testi {poc}-välilehdellä, niin käyttöönottopaketin voi ladata.",
   nowGateApproved: "Gate {n} on jo hyväksytty. Jatka seuraavaan vaiheeseen.",
@@ -902,6 +922,10 @@ const fi: Dict = {
   bpmnUnsaved: "Muutoksia ei ole tallennettu",
   bpmnUnconnected: "Yhdistä nuolella prosessiin ennen tallennusta: {names}",
   bpmnUnnamed: "Anna tehtävälle nimi ennen tallennusta.",
+  bpmnUnnamedTask: "nimetön tehtävä",
+  bpmnDiscard: "Hylkää muutokset",
+  bpmnEditHelp: "Nimi tallentuu itsestään, muut muutokset Tallenna-napista. Ctrl+Z peruu.",
+  bpmnSaved: "Tallennettu. Wizard näkee muutoksen seuraavasta chat-viestistäsi.",
   bpmnStepTitle: "Vaihe {n}",
   editorRetry: "Yritä uudelleen",
   flowViewLabel: "Näkymä",
@@ -938,6 +962,9 @@ const fi: Dict = {
   flowOutcomeEnds: "Hylkää: käsittely päättyy",
   flowOutcomeReturns: "Hylkää: palaa vaiheeseen {n}",
   flowLocked: "Vain luku: muutos vaatii uuden paketin ja testiajon. Valitse vaihe ja pyydä muutosta wizardilta.",
+  flowEditDone: "Lopeta muokkaus",
+  flowEditDoneWaits: "Tallenna tai hylkää muutokset ensin.",
+  flowEditHelp: "Jokainen muutos tallentuu heti, ja wizard näkee sen seuraavasta chat-viestistäsi.",
   flowChangedElsewhere: "Blueprint muuttui muualla, joten muutostasi ei tallennettu. Kaaviossa on nyt uusi versio.",
   flowUpdatedFromChat: "Päivitetty chatista",
   flowUpdatedElsewhere: "Päivitetty uusimpaan versioon",
@@ -1539,7 +1566,8 @@ const en: Dict = {
     "The wizard updates the documentation and tells you in the chat what the package holds.",
     "Download the deployment package from the {poc} tab and check its documentation.",
   ],
-  nowGate3Run: "The test succeeded. Check the result on the {poc} tab.",
+  nowGate3Run: "The test succeeded. Check the result on the {poc} tab, then choose {approve} or {request} at the bottom.",
+  nowGate3Changed: "The PoC package changed after the test that succeeded. Run the test again on the {poc} tab, and the test run can be approved.",
   nowDone: "Every gate is approved. Download the deployment package, or try the solution on your own cases.",
   nowDoneNoRun: "Every gate is approved. Run a test on the {poc} tab, and the deployment package can be downloaded.",
   nowGateApproved: "Gate {n} is already approved. Move on to the next step.",
@@ -1671,6 +1699,10 @@ const en: Dict = {
   bpmnUnsaved: "Unsaved changes",
   bpmnUnconnected: "Connect to the process with an arrow before saving: {names}",
   bpmnUnnamed: "Name the task before saving.",
+  bpmnUnnamedTask: "unnamed task",
+  bpmnDiscard: "Discard changes",
+  bpmnEditHelp: "A name saves by itself, other changes with Save changes. Ctrl+Z undoes.",
+  bpmnSaved: "Saved. The wizard sees the change from your next chat message.",
   bpmnStepTitle: "Step {n}",
   editorRetry: "Try again",
   flowViewLabel: "View",
@@ -1707,6 +1739,9 @@ const en: Dict = {
   flowOutcomeEnds: "Rejects: the process ends",
   flowOutcomeReturns: "Rejects: back to step {n}",
   flowLocked: "Read-only: a change needs a new package and test run. Pick a step and ask the wizard to change it.",
+  flowEditDone: "Done editing",
+  flowEditDoneWaits: "Save or discard the changes first.",
+  flowEditHelp: "Each change is saved at once, and the wizard sees it from your next chat message.",
   flowChangedElsewhere: "The blueprint changed elsewhere, so your change was not saved. The diagram now shows the new version.",
   flowUpdatedFromChat: "Updated from the chat",
   flowUpdatedElsewhere: "Updated to the latest version",

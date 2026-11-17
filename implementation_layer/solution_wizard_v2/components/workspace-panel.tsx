@@ -358,7 +358,9 @@ function WorkflowFlowTab({
   // After Gate 2 the flow opens read-only, as the Blueprint tab does; "Muokkaa" opens it for this visit.
   // The Blueprint tab's rule: a change then no longer matches the tested package. One lock for both diagrams.
   const [flowUnlocked, setFlowUnlocked] = useState(false);
-  const locked = wizardStep >= POC_STEP && !flowUnlocked;
+  // "Lopeta muokkaus" closes it again: the way back to the read-only view it opened in.
+  const lockable = wizardStep >= POC_STEP;
+  const locked = lockable && !flowUnlocked;
   const [diagramShown, setDiagramShown] = useState(false);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ stepId: string; seq: number } | null>(null);
@@ -572,6 +574,7 @@ function WorkflowFlowTab({
                 bpmnXml={bpmnXml}
                 locked={locked}
                 onUnlock={() => setFlowUnlocked(true)}
+                onLock={lockable ? () => setFlowUnlocked(false) : undefined}
                 update={blueprintUpdate}
                 pocNoteLabel={pocNoteLabel}
                 selectedStepId={selectedStepId}
@@ -609,6 +612,7 @@ function WorkflowFlowTab({
               reloading={loading}
               locked={locked}
               onUnlock={() => setFlowUnlocked(true)}
+              onLock={lockable ? () => setFlowUnlocked(false) : undefined}
               update={blueprintUpdate}
               focusRequest={focusRequest}
               onSelectedStepChange={setSelectedStepId}
