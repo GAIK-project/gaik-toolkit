@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Literal
 
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 LanguageHint = Literal["fi", "en"]
 
@@ -53,6 +55,33 @@ class LabelMapping(BaseModel):
     """LLM response schema."""
 
     entries: list[LabelEntry] = Field(default_factory=list)
+
+
+class CleanedLabel(BaseModel):
+    """The label a person sees, with the label the page itself gave the field.
+
+    The page's labels and HTML steer the names the model returns, so a field can be
+    shown as something it is not. Show ``original`` next to ``label`` when ``changed``
+    is true, so the person can tell what the page said.
+    """
+
+    id: str
+    label: str
+    """The cleaned label; the page's own label when the model returned none for the id."""
+    original: str
+    """The raw label as the page gave it, trimmed."""
+    changed: bool
+    """True when ``label`` has other words than ``original`` (case, spacing and
+    punctuation aside)."""
+
+
+def _words(text: str) -> str:
+    return re.sub(r"[\W_]+", " ", text).strip().casefold()
+
+
+def _same_words(a: str, b: str) -> bool:
+    """The same words, case, spacing and punctuation aside ("Name:" and "name")."""
+    return _words(a) == _words(b)
 
 
 def _with_retries(call, tries: int = 3):
@@ -99,8 +128,44 @@ class FormUnderstander:
 
         Unknown ids in the LLM response are dropped; empty labels are dropped;
         labels longer than 60 chars are truncated so the caller can rely on
-        a bounded payload size.
+        a bounded payload size. To show the page's own label beside the cleaned
+        one, use :meth:`describe_labels`.
         """
+        return self._clean(fields, language_hint)
+
+    def describe_labels(
+        self,
+        fields: list[dict] | list[InputField],
+        language_hint: LanguageHint | None = None,
+    ) -> list[CleanedLabel]:
+        """Each field's cleaned label next to the label the page gave it, in input order.
+
+        The page's labels and HTML steer the names the model returns, so a field can be
+        shown as something it is not. ``changed`` tells which labels the model rewrote;
+        show their ``original`` beside them. A field the model returned no label for
+        keeps its page label (``changed`` false).
+        """
+        safe_fields = [f if isinstance(f, InputField) else InputField(**f) for f in fields]
+        cleaned = self._clean(safe_fields, language_hint)
+        described = []
+        for f in safe_fields:
+            original = f.raw.strip()
+            label = cleaned.get(f.id, original)
+            described.append(
+                CleanedLabel(
+                    id=f.id,
+                    label=label,
+                    original=original,
+                    changed=not _same_words(label, original),
+                )
+            )
+        return described
+
+    def _clean(
+        self,
+        fields: list[dict] | list[InputField],
+        language_hint: LanguageHint | None,
+    ) -> dict[str, str]:
         safe_fields: list[InputField] = []
         for f in fields:
             if isinstance(f, InputField):
@@ -110,13 +175,9 @@ class FormUnderstander:
         if not safe_fields:
             return {}
 
-        # Compose the user message. System prompt ships as-is; the user
-        # message contains the language hint (if any) plus a compact listing
-        # of the fields.
+        # The labels and HTML come from the page, so the listing goes in a data block,
+        # apart from the rules; the language hint is the caller's and stays outside.
         lines: list[str] = []
-        if language_hint:
-            lines.append(f"Output language hint: {language_hint}.")
-        lines.append("Fields:")
         for f in safe_fields:
             chunks = [f"- id={f.id!r}", f"label={f.raw!r}"]
             if f.type:
@@ -128,11 +189,11 @@ class FormUnderstander:
                 snippet = f.parent if len(f.parent) <= 200 else f.parent[:200]
                 chunks.append(f"parent={snippet!r}")
             lines.append(" ".join(chunks))
-        user_prompt = "\n".join(lines)
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
+        material = SourceMaterial()
+        hint = f"Output language hint: {language_hint}.\n" if language_hint else ""
+        messages = source_material_messages(
+            SYSTEM_PROMPT, hint + "Fields:\n" + material.wrap("\n".join(lines), label="form fields")
+        )
 
         def _call():
             if isinstance(self.client, ProviderClient):
