@@ -2631,6 +2631,14 @@ export function WorkspacePanel({
           )}
         </div>
       )}
+      {pocReady && (
+        <p
+          className="border-t border-border px-4 py-3 text-xs text-text-muted"
+          data-testid="poc-test-page-hint"
+        >
+          {t.pocTestPageHint} <code className="font-mono text-text">python app.py</code>
+        </p>
+      )}
     </StepCard>
   );
 
