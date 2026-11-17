@@ -3,250 +3,459 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark">
 <title>Test page</title>
 <!--
-  The solution's test page. One file, no build, nothing loaded from elsewhere.
-  It reads what the solution is from GET /api/solution (ui/solution.json) and runs it
-  with POST /api/run; app.py beside this folder serves both. Every text that comes
-  from the solution or from a run is put on the page as text, never as markup.
+  The solution's test page. One file, no build, nothing loaded from elsewhere: the
+  font files and the GAIK mark beside it (fonts/, gaik.svg) come from app.py.
+  It reads what the solution is from GET /api/solution (ui/solution.json), runs it
+  with POST /api/run and hands out the package's source with GET /api/source; app.py
+  beside this folder serves them. Every text that comes from the solution or from a
+  run is put on the page as text, never as markup.
 -->
 <style>
+  /*
+    Sora, by the Sora Project Authors, SIL Open Font License 1.1 (fonts/OFL.txt).
+    The two variable files (weights 100 to 800; latin and latin-ext) are those of the
+    npm package @fontsource-variable/sora 5.3.0, unchanged.
+  */
+  @font-face {
+    font-family: "Sora";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 100 800;
+    src: url("ui/fonts/sora-latin-ext-wght-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+      U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+      U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: "Sora";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 100 800;
+    src: url("ui/fonts/sora-latin-wght-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+      U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  /*
+    One dark stage. The only light is the GAIK gradient behind the input card; every
+    other surface is flat. One accent; green, amber and red say a state and nothing else.
+  */
   :root {
-    --bg: #f5f6f8;
-    --card: #ffffff;
-    --text: #1a1f29;
-    --muted: #586170;
-    --line: #dde1e7;
-    --accent: #1d5bb8;
-    --accent-text: #ffffff;
-    --accent-soft: #eaf1fb;
-    --ok: #1a6b3b;
-    --ok-soft: #e8f4ec;
-    --bad: #a3261d;
-    --bad-soft: #fceceb;
-    --radius: 10px;
+    --bg: #090d18;
+    --surface: #10162a;
+    --surface-2: #182038;
+    --line: #27304c;
+    --fg: #f2f4fa;
+    --muted: #a4adc6;
+    --accent: #62b6f7;
+    --accent-fg: #06101f;
+    --accent-soft: #11243c;
+    --brand-a: #0079c2;
+    --brand-b: #8a2387;
+    --ok: #62d9a4;
+    --warn: #f1c45c;
+    --danger: #ff8479;
+    --danger-soft: #331a22;
+    --radius-card: 16px;
+    --radius-control: 10px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --sans: "Sora", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #14171c;
-      --card: #1c2027;
-      --text: #e8ebf0;
-      --muted: #a2abb8;
-      --line: #313743;
-      --accent: #7fb0f5;
-      --accent-text: #10151d;
-      --accent-soft: #223046;
-      --ok: #7fd3a0;
-      --ok-soft: #1b3226;
-      --bad: #f2a29b;
-      --bad-soft: #3a2220;
-    }
-  }
+
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; background: var(--bg); }
   body {
     margin: 0;
     background: var(--bg);
-    color: var(--text);
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    font: 400 1rem/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
   }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 32px 20px 48px; }
-  header { margin-bottom: 24px; }
-  .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 0.875rem; }
-  h1 { margin: 0 0 8px; font-size: 1.75rem; line-height: 1.2; font-weight: 650; overflow-wrap: anywhere; }
-  h2 { margin: 0 0 14px; font-size: 1.125rem; font-weight: 650; }
-  h3 { margin: 20px 0 8px; font-size: 1rem; font-weight: 650; }
-  p { margin: 0 0 12px; overflow-wrap: anywhere; }
+  ::selection { background: #2b5f8f; color: var(--fg); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  h1, h2, h3, p { margin: 0; overflow-wrap: anywhere; }
+  a { color: var(--accent); }
   .muted { color: var(--muted); }
   .small { font-size: 0.875rem; }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  .card:focus { outline: none; }
+  .mono { font-family: var(--mono); font-size: 0.8125rem; }
+  .icon { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .sr-only {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
-  .skip { position: absolute; left: -999px; top: 8px; background: var(--card); padding: 8px 12px; border-radius: 6px; }
+  .skip {
+    position: absolute; left: -999px; top: 8px; z-index: 2;
+    background: var(--surface-2); color: var(--fg); padding: 8px 12px; border-radius: var(--radius-control);
+  }
   .skip:focus { left: 8px; }
-  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-  .drop {
-    border: 1.5px dashed var(--line);
-    border-radius: var(--radius);
-    padding: 22px 16px;
-    text-align: center;
-    transition: border-color 0.15s, background-color 0.15s;
-  }
-  .drop.over { border-color: var(--accent); background: var(--accent-soft); }
-  .drop p { margin: 10px 0 0; }
-  input[type="file"]:focus-visible + label { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px 40px; }
+  .narrow { max-width: 720px; margin-left: auto; margin-right: auto; }
 
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    min-height: 44px; padding: 0 18px;
-    border-radius: 8px; border: 1px solid var(--line);
-    background: var(--card); color: var(--text);
-    font: inherit; font-weight: 600; cursor: pointer;
-  }
-  .btn:hover { border-color: var(--accent); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  .btn.primary:hover { filter: brightness(1.08); }
-  .btn[disabled] { opacity: 0.6; cursor: default; filter: none; }
-  .btn.plain { min-height: 36px; padding: 0 10px; font-weight: 500; font-size: 0.875rem; }
+  /* ---- the hero: the solution's name, and the card where it is tried ---- */
 
-  ul.files { list-style: none; margin: 14px 0 0; padding: 0; }
-  ul.files li {
-    display: flex; align-items: center; gap: 12px; justify-content: space-between;
-    padding: 8px 0; border-bottom: 1px solid var(--line);
+  .hero { padding: 76px 0 36px; text-align: center; }
+  h1 {
+    font-size: clamp(2rem, 1.25rem + 3.1vw, 3.25rem);
+    font-weight: 300; line-height: 1.12; letter-spacing: -0.02em;
+    text-wrap: balance;
   }
-  ul.files li:last-child { border-bottom: 0; }
-  ul.files .name { overflow-wrap: anywhere; min-width: 0; }
-  ul.files .size { color: var(--muted); font-size: 0.875rem; white-space: nowrap; }
-  ul.files .meta { display: flex; align-items: center; gap: 12px; flex: none; }
+  .hero p { margin: 16px auto 0; max-width: 58ch; color: var(--muted); font-size: 1.0625rem; text-wrap: pretty; }
+
+  .focal { position: relative; isolation: isolate; }
+  .focal::before {
+    /* The one light on the page: the logo's gradient, blurred, behind the card. */
+    content: ""; position: absolute; z-index: -1; inset: 10% 3% -7%;
+    background: linear-gradient(100deg, var(--brand-a), var(--brand-b));
+    border-radius: 40%; filter: blur(56px); opacity: 0.62;
+    transition: opacity 400ms var(--ease);
+  }
+  .focal.busy::before { opacity: 0.95; animation: breathe 2.8s ease-in-out infinite alternate; }
+  @keyframes breathe { from { transform: scale(0.96); } to { transform: scale(1.04); } }
+
+  .card {
+    position: relative; overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    padding: 20px;
+  }
+  /* A run in progress: a line of the gradient travels along the card's top edge. */
+  .card::after {
+    content: ""; position: absolute; left: 0; top: 0; width: 40%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--brand-b), transparent);
+    opacity: 0; transform: translateX(-100%);
+  }
+  .focal.busy .card::after { opacity: 1; animation: travel 1.6s linear infinite; }
+  @keyframes travel { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+  .drop { border-radius: var(--radius-control); }
+  .drop-target {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 30px 16px 26px; text-align: center; cursor: pointer;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    transition: border-color 160ms var(--ease), background-color 160ms var(--ease);
+  }
+  .drop-target:hover { border-color: #3a4770; }
+  .drop.over .drop-target { border-color: var(--accent); background: var(--accent-soft); }
+  #files:focus-visible + .drop-target { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .drop-target .icon { width: 26px; height: 26px; color: var(--muted); margin-bottom: 4px; transition: transform 200ms var(--ease); }
+  .drop.over .drop-target .icon { transform: translateY(-3px); color: var(--accent); }
+  .drop-title { font-weight: 500; }
+  .pick { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .accepts { margin-top: 6px; color: var(--muted); font-size: 0.8125rem; max-width: 52ch; }
+  .accepts .mono { display: block; margin-top: 2px; font-size: 0.75rem; word-spacing: 0.3em; }
+
+  ul.rows { list-style: none; margin: 0; padding: 0; }
+  ul.rows li {
+    display: flex; align-items: center; gap: 12px; min-height: 48px;
+    padding: 4px 4px 4px 12px; margin-top: 8px;
+    background: var(--surface-2); border-radius: var(--radius-control);
+  }
+  ul.rows .icon { color: var(--muted); }
+  ul.rows .name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 0.9375rem; }
+  ul.rows .size { color: var(--muted); font-size: 0.8125rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .enter { animation: rise 320ms var(--ease) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 40px; height: 40px; padding: 0;
+    border: 0; border-radius: var(--radius-control); background: transparent; color: var(--muted);
+    cursor: pointer; transition: color 160ms var(--ease), background-color 160ms var(--ease), transform 160ms var(--ease);
+  }
+  .icon-btn:hover { color: var(--fg); background: var(--line); }
+  .icon-btn:active { transform: scale(0.94); }
+
+  .note { margin-top: 12px; color: var(--muted); font-size: 0.8125rem; }
 
   .field { margin-top: 18px; }
-  .field label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .field label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 8px; }
   textarea {
-    width: 100%; min-height: 84px; padding: 10px 12px; resize: vertical;
-    border: 1px solid var(--line); border-radius: 8px;
-    background: var(--card); color: var(--text); font: inherit;
+    display: block; width: 100%; min-height: 88px; padding: 12px 14px; resize: vertical;
+    border: 1px solid var(--line); border-radius: var(--radius-control);
+    background: var(--bg); color: var(--fg); font: inherit;
+    transition: border-color 160ms var(--ease);
   }
-  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 20px; }
-  .progress { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); min-width: 0; }
-  .progress .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46ch; }
+  textarea:hover { border-color: #3a4770; }
+  textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+
+  .actions { display: flex; align-items: center; gap: 16px; margin-top: 20px; }
+  .progress { flex: 1 1 auto; min-width: 0; color: var(--muted); }
+  .progress .line {
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--mono); font-size: 0.8125rem;
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px; flex: none;
+    min-height: 44px; padding: 0 18px;
+    border: 1px solid var(--line); border-radius: var(--radius-control);
+    background: var(--surface-2); color: var(--fg);
+    font: inherit; font-size: 0.9375rem; font-weight: 500; text-decoration: none; cursor: pointer;
+    transition: transform 160ms var(--ease), background-color 160ms var(--ease), border-color 160ms var(--ease);
+  }
+  .btn:hover { border-color: #46557f; background: #1e2846; }
+  .btn:active { transform: scale(0.98); }
+  .btn.primary { min-width: 132px; background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  .btn.primary:hover { background: #7ac2f9; border-color: #7ac2f9; }
+  .btn.primary .icon { transition: transform 200ms var(--ease); }
+  .btn.primary:hover .icon { transform: translateX(3px); }
+  .btn[disabled] { cursor: default; transform: none; }
+  .btn.primary[disabled] { background: var(--surface-2); border-color: var(--line); color: var(--fg); font-weight: 500; }
+  .btn .time { font-variant-numeric: tabular-nums; }
   .spinner {
-    width: 18px; height: 18px; flex: none; border-radius: 50%;
-    border: 2.5px solid var(--line); border-top-color: var(--accent);
-    animation: spin 0.9s linear infinite;
+    width: 16px; height: 16px; flex: none; border-radius: 50%;
+    border: 2px solid var(--line); border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) {
-    .spinner { animation: none; border-top-color: var(--line); border-left-color: var(--accent); }
-    .drop { transition: none; }
+
+  .msg {
+    display: flex; gap: 10px; align-items: flex-start;
+    border-radius: var(--radius-control); padding: 12px 14px; font-size: 0.9375rem;
   }
+  .msg .icon { margin-top: 1px; }
+  .msg p + p { margin-top: 4px; }
+  .msg.bad { background: var(--danger-soft); color: var(--danger); }
+  .msg.bad .detail { color: var(--fg); font-family: var(--mono); font-size: 0.8125rem; }
+  .msg.info { background: var(--surface); border: 1px solid var(--line); color: var(--muted); margin-bottom: 16px; }
+  .msg.info .icon { color: var(--warn); }
+  #form-error { margin-top: 16px; }
 
-  .box { border-radius: 8px; padding: 12px 14px; margin: 0 0 16px; }
-  .box p:last-child { margin-bottom: 0; }
-  .box.bad { background: var(--bad-soft); color: var(--bad); }
-  .box.ok { background: var(--ok-soft); color: var(--ok); }
-  .box.info { background: var(--accent-soft); }
-  .box .detail { color: var(--text); font-size: 0.9375rem; }
+  /* ---- the result ---- */
 
-  table { border-collapse: collapse; width: 100%; }
-  th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-  thead th { font-size: 0.8125rem; font-weight: 600; color: var(--muted); }
-  table.fields > tbody > tr > th { font-weight: 600; width: 24%; }
-  td.value { white-space: pre-wrap; }
-  td.source { width: 30%; font-size: 0.875rem; color: var(--muted); padding-right: 0; }
-  td.source q { color: var(--text); }
-  .verdict { display: inline-block; margin-top: 4px; }
+  section { margin-top: 56px; }
+  h2 { font-size: 1.25rem; font-weight: 500; letter-spacing: -0.01em; }
+  h3 { font-size: 0.9375rem; font-weight: 500; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius-card); padding: 24px;
+  }
+  .panel:focus { outline: none; }
+  #result { margin-top: 40px; scroll-margin-top: 16px; }
+  .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-bottom: 8px; }
+  .state { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  .state::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  #result-alert { margin: 12px 0 4px; }
+
+  dl.fields { margin: 0; }
+  .frow {
+    display: grid; grid-template-columns: minmax(120px, 200px) minmax(0, 1fr); gap: 4px 28px;
+    padding: 16px 0; border-top: 1px solid var(--line);
+  }
+  dl.fields.traced .frow { grid-template-columns: minmax(120px, 200px) minmax(0, 1fr) minmax(0, 300px); }
+  .frow:first-child { border-top: 0; }
+  .frow dt { color: var(--muted); font-size: 0.875rem; padding-top: 2px; }
+  .frow dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  dd.value { white-space: pre-wrap; }
+  /* A table of rows takes the source column's room as well. */
+  dl.fields.traced dd.value.wide { grid-column: 2 / -1; }
+  dd.value.wide + dd.source { display: none; }
+  dd.source { color: var(--muted); font-size: 0.8125rem; line-height: 1.5; }
+  dd.source q { display: block; color: var(--fg); quotes: "\201C" "\201D"; }
+  dd.source .where { display: block; margin-top: 4px; }
+  .verdict { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .verdict::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .verdict.ok { color: var(--ok); }
-  .verdict.check { color: var(--bad); }
-  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
-  .scroll table { min-width: 420px; }
-  .scroll th, .scroll td { padding: 8px 10px; font-size: 0.875rem; white-space: normal; overflow-wrap: normal; }
-  .scroll th { white-space: nowrap; }
-  .scroll tr:last-child td { border-bottom: 0; }
+  .verdict.check { color: var(--warn); }
+  .record-title { margin: 20px 0 0; color: var(--muted); }
+
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--bg); }
+  table { border-collapse: collapse; width: 100%; min-width: 420px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; font-size: 0.875rem; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-size: 0.8125rem; font-weight: 400; white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td { font-variant-numeric: tabular-nums; }
   dl.pairs { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
   dl.pairs dt { color: var(--muted); }
   dl.pairs dd { margin: 0; }
   ul.plain { margin: 0; padding-left: 18px; }
-  .answer { white-space: pre-wrap; }
-  .qa + .qa { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 4px; }
 
-  details { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 14px; }
-  summary { cursor: pointer; font-weight: 600; }
+  .qa { padding: 16px 0 4px; }
+  .qa + .qa { border-top: 1px solid var(--line); margin-top: 16px; }
+  .qa h3 { color: var(--muted); font-weight: 400; margin-bottom: 10px; }
+  .answer { white-space: pre-wrap; font-size: 1.0625rem; line-height: 1.7; max-width: 72ch; }
+
+  .block { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .block h3 { margin-bottom: 4px; }
+  ul.rows a.file {
+    display: flex; align-items: center; gap: 12px; flex: 1 1 auto; min-width: 0; min-height: 40px;
+    color: var(--fg); text-decoration: none;
+  }
+  ul.rows li.out { padding-right: 12px; transition: background-color 160ms var(--ease); }
+  ul.rows li.out:hover { background: #1e2846; }
+  ul.rows li.out:hover .get { color: var(--accent); transform: translateY(2px); }
+  ul.rows .get { transition: transform 200ms var(--ease), color 160ms var(--ease); }
+  ul.rows a.file .name { font-family: var(--mono); font-size: 0.8125rem; }
+
+  details { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+  summary { cursor: pointer; font-size: 0.9375rem; font-weight: 500; border-radius: 6px; }
   pre {
-    margin: 12px 0 0; padding: 12px; max-height: 360px; overflow: auto;
-    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
-    font: 0.8125rem/1.5 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    margin: 12px 0 0; padding: 14px; max-height: 360px; overflow: auto;
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-control);
+    font: 0.8125rem/1.6 var(--mono); color: var(--muted);
     white-space: pre-wrap; overflow-wrap: anywhere;
   }
-  a { color: var(--accent); }
-  footer { color: var(--muted); font-size: 0.875rem; }
 
-  @media (max-width: 560px) {
-    .wrap { padding: 20px 14px 36px; }
-    h1 { font-size: 1.4rem; }
+  /* ---- how it works: the solution's steps in the order they run ---- */
+
+  ol.steps {
+    list-style: none; margin: 20px 0 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 1px;
+    background: var(--line); border: 1px solid var(--line);
+    border-radius: var(--radius-card); overflow: hidden;
+  }
+  ol.steps li { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 18px 20px 20px; background: var(--bg); }
+  .step-top { display: flex; align-items: baseline; gap: 10px; color: var(--muted); font-size: 0.8125rem; }
+  .step-top .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .step-top .kind.ai { color: var(--accent); }
+  .step-title { font-size: 1rem; font-weight: 500; line-height: 1.35; }
+  .step-line { color: var(--muted); font-size: 0.8125rem; }
+  .step-component { margin-top: auto; padding-top: 8px; font-family: var(--mono); font-size: 0.8125rem; overflow-wrap: anywhere; }
+
+  /* ---- the source code ---- */
+
+  .takeaway { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 40px; }
+  .takeaway p { margin-top: 8px; color: var(--muted); font-size: 0.9375rem; max-width: 60ch; }
+  .takeaway .text { flex: 1 1 320px; min-width: 0; }
+
+  footer {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 40px;
+    margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.8125rem;
+  }
+  footer p { flex: 1 1 320px; max-width: 72ch; }
+  .made { display: inline-flex; align-items: center; gap: 12px; flex: none; white-space: nowrap; }
+  .made img { display: block; height: 48px; width: auto; }
+
+  @media (max-width: 720px) {
+    .wrap { padding: 0 16px 32px; }
+    .hero { padding: 44px 0 28px; }
+    .hero p { font-size: 1rem; }
     .card { padding: 16px; }
-    .btn.primary { width: 100%; }
-    /* The field table stacks; a table of rows inside a value keeps its columns and scrolls. */
-    table.fields > thead { position: absolute; left: -9999px; }
-    table.fields, table.fields > tbody, table.fields > tbody > tr,
-    table.fields > tbody > tr > th, table.fields > tbody > tr > td { display: block; width: auto; }
-    table.fields > tbody > tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
-    table.fields > tbody > tr > th, table.fields > tbody > tr > td { border: 0; padding: 2px 0; }
-    table.fields > tbody > tr > th { color: var(--muted); font-size: 0.875rem; font-weight: 600; }
-    table.fields > tbody > tr > td.source:empty { display: none; }
-    .scroll { margin: 4px 0; }
-    .progress .line { max-width: 100%; white-space: normal; }
+    .panel { padding: 18px 16px; }
+    .actions { flex-direction: column-reverse; align-items: stretch; gap: 12px; }
+    .btn.primary, .takeaway .btn { width: 100%; }
+    .progress .line { white-space: normal; }
+    section { margin-top: 44px; }
+    .frow, dl.fields.traced .frow { grid-template-columns: minmax(0, 1fr); padding: 14px 0; }
+    dd.source { margin-top: 6px; padding-left: 12px; border-left: 1px solid var(--line); }
+    dd.source:empty { display: none; }
+    dl.fields.traced dd.value.wide { grid-column: auto; }
+    ol.steps li { flex-basis: 100%; }
+    footer { margin-top: 48px; }
+  }
+
+  /* Reduced motion: every state is shown as it ends, and nothing travels. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .spinner { border-top-color: var(--line); border-left-color: var(--accent); }
+    .focal.busy .card::after { width: 100%; transform: none; }
   }
 </style>
 </head>
 <body>
 <a class="skip" href="#main" id="skip">Skip to content</a>
+
+<!-- The page's icons, drawn once here and copied where a row needs one. -->
+<template id="icon-file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></template>
+<template id="icon-close"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></template>
+<template id="icon-download"><svg class="icon get" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg></template>
+<template id="icon-arrow"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></template>
+<template id="icon-alert"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg></template>
+
 <div class="wrap">
-  <header>
-    <p class="eyebrow" id="eyebrow">Test page</p>
-    <h1 id="name">…</h1>
-    <p id="purpose" class="muted"></p>
+  <header class="hero narrow">
+    <h1 id="name"></h1>
+    <p id="purpose"></p>
   </header>
 
   <main id="main">
-    <noscript><div class="box bad"><p>This page needs JavaScript.</p></div></noscript>
-    <div id="notice" class="box info" role="status" hidden></div>
-    <div id="load-error" class="box bad" role="alert" hidden></div>
+    <noscript><div class="msg bad narrow"><p>This page needs JavaScript.</p></div></noscript>
+    <div id="notice" class="msg info narrow" role="status" hidden>
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+      <p id="notice-text"></p>
+    </div>
+    <div id="load-error" class="msg bad narrow" role="alert" hidden></div>
 
-    <form id="form" class="card" novalidate hidden>
-      <h2 id="input-heading">Input</h2>
-      <div id="drop" class="drop">
-        <input type="file" id="files" class="sr-only" multiple>
-        <label for="files" class="btn" id="pick">Choose files</label>
-        <p id="drop-hint" class="muted small"></p>
-        <p id="accepts" class="muted small"></p>
-      </div>
-      <ul id="picked" class="files" aria-live="polite"></ul>
-      <p id="examples" class="muted small" hidden></p>
+    <div class="focal narrow" id="focal">
+      <form id="form" class="card" novalidate hidden>
+        <h2 id="input-heading" class="sr-only">Input</h2>
+        <div id="drop" class="drop">
+          <input type="file" id="files" class="sr-only" multiple aria-describedby="accepts">
+          <label for="files" class="drop-target">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5M7 9.5l5-5 5 5M5 19.5h14"/></svg>
+            <span class="drop-title" id="drop-hint"></span>
+            <span class="pick" id="pick"></span>
+            <span class="accepts" id="accepts"></span>
+          </label>
+        </div>
+        <ul id="picked" class="rows" aria-live="polite"></ul>
+        <p id="examples" class="note" hidden></p>
 
-      <div id="question-field" class="field" hidden>
-        <label for="question" id="question-label">Question</label>
-        <textarea id="question" name="question" rows="3" maxlength="20000"></textarea>
-      </div>
-      <div id="text-field" class="field" hidden>
-        <label for="text" id="text-label">Text</label>
-        <textarea id="text" name="text" rows="5" maxlength="20000"></textarea>
-      </div>
+        <div id="question-field" class="field" hidden>
+          <label for="question" id="question-label">Question</label>
+          <textarea id="question" name="question" rows="3" maxlength="20000"></textarea>
+        </div>
+        <div id="text-field" class="field" hidden>
+          <label for="text" id="text-label">Text</label>
+          <textarea id="text" name="text" rows="5" maxlength="20000"></textarea>
+        </div>
 
-      <div id="form-error" class="box bad" role="alert" hidden style="margin-top:18px"></div>
-      <div class="actions">
-        <button type="submit" id="run" class="btn primary">Run</button>
-        <span id="progress" class="progress" role="status" aria-live="polite"></span>
-      </div>
-    </form>
+        <div id="form-error" class="msg bad" role="alert" hidden></div>
+        <div class="actions">
+          <span id="progress" class="progress" role="status" aria-live="polite"></span>
+          <button type="submit" id="run" class="btn primary"></button>
+        </div>
+      </form>
+    </div>
 
-    <section id="result" class="card" aria-labelledby="result-heading" tabindex="-1" hidden>
-      <h2 id="result-heading">Result</h2>
-      <div id="result-status"></div>
+    <section id="result" class="panel" aria-labelledby="result-heading" tabindex="-1" hidden>
+      <div class="head">
+        <h2 id="result-heading">Result</h2>
+        <p id="result-status"></p>
+      </div>
+      <div id="result-alert"></div>
       <div id="result-body"></div>
-      <div id="outputs-block" hidden>
+      <div id="outputs-block" class="block" hidden>
         <h3 id="outputs-heading">Files</h3>
-        <ul id="outputs" class="files"></ul>
+        <ul id="outputs" class="rows"></ul>
       </div>
       <details id="log-block" hidden>
         <summary id="log-summary">Run log</summary>
         <pre id="log" tabindex="0"></pre>
       </details>
     </section>
+
+    <section id="how" aria-labelledby="how-heading" hidden>
+      <h2 id="how-heading">How it works</h2>
+      <ol id="steps" class="steps"></ol>
+    </section>
+
+    <section id="source" class="takeaway" aria-labelledby="source-heading" hidden>
+      <div class="text">
+        <h2 id="source-heading">Take the source code with you</h2>
+        <p id="source-text"></p>
+      </div>
+      <a id="source-link" class="btn" href="/api/source" download>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>
+        <span id="source-label">Download source code</span>
+      </a>
+    </section>
   </main>
 
-  <footer><p id="footer"></p></footer>
+  <footer id="footer-block" hidden>
+    <p id="footer"></p>
+    <span class="made"><span id="made-with">Made with</span><img src="ui/gaik.svg" alt="GAIK" width="94" height="48"></span>
+  </footer>
 </div>
 
 <script>
@@ -255,29 +464,24 @@
 
   var TEXTS = {
     en: {
-      eyebrow: "Test page · runs on this computer",
+      title: "Test page",
       skip: "Skip to content",
       input: "Input",
-      pickOne: "Choose a file",
-      pickMany: "Choose files",
-      dropOne: "or drop a file here",
-      dropMany: "or drop files here",
-      accepts: "Accepted: {list}",
+      dropOne: "Drop a file here",
+      dropMany: "Drop files here",
+      pickOne: "or choose one from this computer",
+      pickMany: "or choose them from this computer",
       acceptsAny: "Any file type",
-      remove: "Remove",
       removeNamed: "Remove {name}",
       examples: "No file added: the run uses the package's example material ({list}).",
       question: "Question",
       text: "Text",
       run: "Run",
-      running: "Running · {time}",
+      running: "Running",
       result: "Result",
       files: "Files",
-      download: "Download",
+      downloadNamed: "Download {name}",
       log: "Run log",
-      field: "Field",
-      value: "Value",
-      source: "Source",
       noValue: "No value",
       yes: "Yes",
       no: "No",
@@ -285,10 +489,16 @@
       page: "p. {n}",
       verified: "Found in the source",
       check: "Check against the source",
-      done: "Done in {time}.",
+      done: "Done in {time}",
       usedExamples: "The run used the package's example material.",
       noResult: "The run wrote no result the page can show. See the files and the log.",
       noEnv: "No .env file in the package folder yet. Copy .env.example to .env and fill in the keys, unless they are set in the environment already.",
+      how: "How it works",
+      stepKinds: { input: "Input", ai: "AI", auto: "Automated", review: "Human review", decision: "Decision", step: "Step" },
+      sourceHeading: "Take the source code with you",
+      sourceText: "The pipeline, its configuration, prompts and schemas, and this page, as one zip. Your keys and the files you add are not in it.",
+      sourceLabel: "Download source code",
+      madeWith: "Made with",
       footer: "The result is produced by an AI model. Check it before you use it. Files you add stay on this computer; the solution sends their content to the model it is configured to use.",
       kinds: { json: "JSON", text: "Text", table: "Table", document: "Document", image: "Image", audio: "Audio", file: "File" },
       errors: {
@@ -312,29 +522,24 @@
       }
     },
     fi: {
-      eyebrow: "Testisivu · toimii tällä koneella",
+      title: "Testisivu",
       skip: "Siirry sisältöön",
       input: "Syöte",
-      pickOne: "Valitse tiedosto",
-      pickMany: "Valitse tiedostot",
-      dropOne: "tai pudota tiedosto tähän",
-      dropMany: "tai pudota tiedostot tähän",
-      accepts: "Käyvät tiedostot: {list}",
+      dropOne: "Pudota tiedosto tähän",
+      dropMany: "Pudota tiedostot tähän",
+      pickOne: "tai valitse se tältä koneelta",
+      pickMany: "tai valitse ne tältä koneelta",
       acceptsAny: "Mikä tahansa tiedostotyyppi",
-      remove: "Poista",
       removeNamed: "Poista {name}",
       examples: "Ei lisättyä tiedostoa: ajo käyttää paketin esimerkkiaineistoa ({list}).",
       question: "Kysymys",
       text: "Teksti",
       run: "Aja",
-      running: "Ajo käynnissä · {time}",
+      running: "Ajo käynnissä",
       result: "Tulos",
       files: "Tiedostot",
-      download: "Lataa",
+      downloadNamed: "Lataa {name}",
       log: "Ajon loki",
-      field: "Kenttä",
-      value: "Arvo",
-      source: "Lähde",
       noValue: "Ei arvoa",
       yes: "Kyllä",
       no: "Ei",
@@ -342,10 +547,16 @@
       page: "s. {n}",
       verified: "Löytyy lähteestä",
       check: "Tarkista lähteestä",
-      done: "Valmis, kesto {time}.",
+      done: "Valmis, kesto {time}",
       usedExamples: "Ajo käytti paketin esimerkkiaineistoa.",
       noResult: "Ajo ei kirjoittanut tulosta, jonka sivu osaa näyttää. Katso tiedostot ja loki.",
       noEnv: "Paketin kansiossa ei ole vielä .env-tiedostoa. Kopioi .env.example nimelle .env ja täytä avaimet, ellei niitä ole jo asetettu ympäristöön.",
+      how: "Näin se toimii",
+      stepKinds: { input: "Syöte", ai: "Tekoäly", auto: "Automaattinen", review: "Ihmisen tarkistus", decision: "Päätös", step: "Vaihe" },
+      sourceHeading: "Ota lähdekoodi mukaasi",
+      sourceText: "Putki, sen asetukset, kehotteet ja skeemat sekä tämä sivu yhtenä zip-tiedostona. Avaimesi ja lisäämäsi tiedostot eivät ole mukana.",
+      sourceLabel: "Lataa lähdekoodi",
+      madeWith: "Tehty työkalulla",
       footer: "Tuloksen on tuottanut tekoälymalli. Tarkista se ennen käyttöä. Lisäämäsi tiedostot pysyvät tällä koneella; ratkaisu lähettää niiden sisällön mallille, jota se on määritetty käyttämään.",
       kinds: { json: "JSON", text: "Teksti", table: "Taulukko", document: "Asiakirja", image: "Kuva", audio: "Ääni", file: "Tiedosto" },
       errors: {
@@ -375,6 +586,7 @@
   var t = TEXTS.en;
   var picked = [];
   var running = false;
+  var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   function $(id) { return document.getElementById(id); }
   function fill(template, values) {
@@ -388,7 +600,15 @@
     if (text !== undefined && text !== null) { node.textContent = String(text); }
     return node;
   }
+  // One of the icons drawn in the page's <template> elements.
+  function icon(name) { return $("icon-" + name).content.cloneNode(true); }
   function show(node, on) { node.hidden = !on; }
+  // The entrance of something an action brought: a short rise, one after another.
+  function enter(node, order) {
+    node.classList.add("enter");
+    if (order) { node.style.animationDelay = Math.min(order, 12) * 35 + "ms"; }
+    return node;
+  }
   function isObject(v) { return v !== null && typeof v === "object" && !Array.isArray(v); }
   function humanize(key) {
     var words = String(key).replace(/[_\-.]+/g, " ").trim();
@@ -437,36 +657,46 @@
     return names.filter(function (name) { return endings.indexOf(suffixOf(String(name))) !== -1; });
   }
 
+  function runLabel() {
+    var button = $("run");
+    button.replaceChildren(el("span", null, t.run), icon("arrow"));
+  }
+
   function describe() {
     lang = String(solution.language || "en").toLowerCase().slice(0, 2) === "fi" ? "fi" : "en";
     t = TEXTS[lang];
     document.documentElement.lang = lang;
-    var name = solution.name ? String(solution.name) : t.eyebrow;
+    var name = solution.name ? String(solution.name) : t.title;
     document.title = name;
     $("name").textContent = name;
     $("purpose").textContent = solution.purpose ? String(solution.purpose) : "";
-    $("eyebrow").textContent = t.eyebrow;
+    show($("purpose"), Boolean(solution.purpose));
     $("skip").textContent = t.skip;
     $("input-heading").textContent = t.input;
     $("result-heading").textContent = t.result;
     $("outputs-heading").textContent = t.files;
     $("log-summary").textContent = t.log;
-    $("run").textContent = t.run;
+    runLabel();
     $("footer").textContent = t.footer;
+    $("made-with").textContent = t.madeWith;
+    $("source-heading").textContent = t.sourceHeading;
+    $("source-text").textContent = t.sourceText;
+    $("source-label").textContent = t.sourceLabel;
 
     var many = takesMany();
     var files = $("files");
     files.multiple = many;
     var endings = accepted();
     if (endings) { files.accept = endings.join(","); }
-    $("pick").textContent = many ? t.pickMany : t.pickOne;
     $("drop-hint").textContent = many ? t.dropMany : t.dropOne;
+    $("pick").textContent = many ? t.pickMany : t.pickOne;
     // Every input takes a file, a text input too: its text can come as .txt or .md,
     // and a text too long for the field has to.
     var labels = inputs().map(function (i) { return i.label; }).filter(Boolean);
-    $("accepts").textContent =
-      (labels.length ? labels.join(" · ") + ". " : "") +
-      (endings ? fill(t.accepts, { list: endings.join(", ") }) : t.acceptsAny);
+    var accepts = $("accepts");
+    accepts.replaceChildren();
+    if (labels.length) { accepts.appendChild(el("span", null, labels.join(" · "))); }
+    accepts.appendChild(el("span", endings ? "mono" : null, endings ? endings.join(" ") : t.acceptsAny));
 
     $("question-label").textContent = solution.question_label ? String(solution.question_label) : t.question;
     show($("question-field"), Boolean(solution.asks_question));
@@ -474,30 +704,66 @@
     show($("text-field"), takesText());
 
     if (solution.env_file === false) {
-      $("notice").textContent = t.noEnv;
+      $("notice-text").textContent = t.noEnv;
       show($("notice"), true);
     }
     renderPicked();
+    renderSteps();
     show($("form"), true);
+    show($("source"), true);
+    show($("footer-block"), true);
+  }
+
+  // ---- how it works -------------------------------------------------------
+
+  // The solution's steps in the order they run. No steps in the description: no strip.
+  function renderSteps() {
+    var steps = (Array.isArray(solution.steps) ? solution.steps : []).filter(function (step) {
+      return isObject(step) && step.title;
+    });
+    var list = $("steps");
+    list.replaceChildren();
+    $("how-heading").textContent = t.how;
+    steps.forEach(function (step, index) {
+      var item = el("li");
+      var top = el("div", "step-top");
+      top.appendChild(el("span", "num", index + 1));
+      var kind = Object.prototype.hasOwnProperty.call(t.stepKinds, step.kind) ? String(step.kind) : "step";
+      top.appendChild(el("span", "kind " + kind, t.stepKinds[kind]));
+      item.appendChild(top);
+      item.appendChild(el("h3", "step-title", step.title));
+      var uses = Array.isArray(step.uses) ? step.uses.map(String).join(", ") : "";
+      var gives = Array.isArray(step.gives) ? step.gives.map(String).join(", ") : "";
+      var line = uses && gives ? uses + " → " + gives : uses || gives;
+      if (line) { item.appendChild(el("p", "step-line", line)); }
+      if (step.component) { item.appendChild(el("p", "step-component", step.component)); }
+      list.appendChild(item);
+    });
+    show($("how"), steps.length > 0);
   }
 
   // ---- the chosen files ---------------------------------------------------
 
   function formError(message) {
     var box = $("form-error");
-    box.textContent = message || "";
+    box.replaceChildren();
+    if (message) {
+      box.appendChild(icon("alert"));
+      box.appendChild(el("p", null, message));
+    }
     show(box, Boolean(message));
   }
 
   function addFiles(list) {
     var endings = accepted();
     var problem = "";
+    var before = picked.length;
     Array.prototype.forEach.call(list, function (file) {
       if (endings && endings.indexOf(suffixOf(file.name)) === -1) {
         problem = fill(t.errors.badType, { name: file.name, list: endings.join(", ") });
         return;
       }
-      if (!takesMany()) { picked = []; }
+      if (!takesMany()) { picked = []; before = 0; }
       picked.push(file);
     });
     var max = limits().max_files;
@@ -506,27 +772,29 @@
       problem = fill(t.errors.tooMany, { n: max });
     }
     formError(problem);
-    renderPicked();
+    renderPicked(before);
   }
 
-  function renderPicked() {
+  // ``fresh``: the rows from this index on were just added, and rise into place.
+  function renderPicked(fresh) {
     var list = $("picked");
     list.replaceChildren();
     picked.forEach(function (file, index) {
       var item = el("li");
+      item.appendChild(icon("file"));
       item.appendChild(el("span", "name", file.name));
-      var meta = el("span", "meta");
-      meta.appendChild(el("span", "size", formatSize(file.size)));
-      var remove = el("button", "btn plain", t.remove);
+      item.appendChild(el("span", "size", formatSize(file.size)));
+      var remove = el("button", "icon-btn");
       remove.type = "button";
       remove.setAttribute("aria-label", fill(t.removeNamed, { name: file.name }));
+      remove.appendChild(icon("close"));
       remove.addEventListener("click", function () {
         picked.splice(index, 1);
         renderPicked();
         $("files").focus();
       });
-      meta.appendChild(remove);
-      item.appendChild(meta);
+      item.appendChild(remove);
+      if (fresh !== undefined && index >= fresh) { enter(item, index - fresh); }
       list.appendChild(item);
     });
     var examples = $("examples");
@@ -559,26 +827,34 @@
     var button = $("run");
     button.disabled = on;
     button.setAttribute("aria-busy", on ? "true" : "false");
+    $("focal").classList.toggle("busy", on);
     var progress = $("progress");
     progress.replaceChildren();
-    if (!on) { return null; }
+    if (!on) { runLabel(); return null; }
     var spinner = el("span", "spinner");
     spinner.setAttribute("aria-hidden", "true");
-    var label = el("span", null, fill(t.running, { time: formatTime(0) }));
-    var line = el("span", "line small");
-    progress.appendChild(spinner);
-    progress.appendChild(label);
+    var time = el("span", "time", formatTime(0));
+    button.replaceChildren(spinner, el("span", null, t.running), time);
+    var line = el("span", "line");
     progress.appendChild(line);
     var clock = setInterval(function () {
-      label.textContent = fill(t.running, { time: formatTime((Date.now() - started) / 1000) });
+      time.textContent = formatTime((Date.now() - started) / 1000);
     }, 1000);
-    var poll = setInterval(function () {
+    function latest() {
       fetch("/api/status").then(function (r) { return r.json(); }).then(function (status) {
         var lines = String(status.log_tail || "").split("\n").filter(function (l) { return l.trim(); });
-        line.textContent = lines.length ? lines[lines.length - 1].trim() : "";
+        var text = lines.length ? lines[lines.length - 1].trim() : "";
+        if (text === line.textContent) { return; }
+        line.textContent = text;
+        // The new line rises into the old one's place.
+        line.classList.remove("enter");
+        void line.offsetWidth;
+        line.classList.add("enter");
       }).catch(function () {});
-    }, 2000);
-    return function stop() { clearInterval(clock); clearInterval(poll); };
+    }
+    var first = setTimeout(latest, 600);
+    var poll = setInterval(latest, 1500);
+    return function stop() { clearInterval(clock); clearInterval(poll); clearTimeout(first); };
   }
 
   function submit(event) {
@@ -627,17 +903,14 @@
 
   function renderAnswer(answer) {
     var status = $("result-status");
+    var alert = $("result-alert");
     var body = $("result-body");
     status.replaceChildren();
+    alert.replaceChildren();
     body.replaceChildren();
 
     var hasRun = answer.exit_code !== undefined || answer.run_id;
     if (!answer.ok) {
-      var box = el("div", "box bad");
-      box.setAttribute("role", "alert");
-      box.appendChild(el("p", null, errorText(answer.error)));
-      var detail = errorLine(answer.log_tail);
-      if (detail) { box.appendChild(el("p", "detail", detail)); }
       if (!hasRun) {
         // Refused before any run: the form is where the user fixes it.
         formError(errorText(answer.error));
@@ -645,13 +918,19 @@
         $("run").focus();
         return;
       }
-      status.appendChild(box);
+      var box = el("div", "msg bad");
+      box.setAttribute("role", "alert");
+      box.appendChild(icon("alert"));
+      var words = el("div");
+      words.appendChild(el("p", null, errorText(answer.error)));
+      var detail = errorLine(answer.log_tail);
+      if (detail) { words.appendChild(el("p", "detail", detail)); }
+      box.appendChild(words);
+      alert.appendChild(box);
     } else {
-      var ok = el("div", "box ok");
-      ok.appendChild(el("p", null, fill(t.done, { time: formatTime(answer.duration_seconds || 0) })));
-      status.appendChild(ok);
+      status.appendChild(el("span", "state", fill(t.done, { time: formatTime(answer.duration_seconds || 0) })));
     }
-    if (answer.used_examples) { status.appendChild(el("p", "muted small", t.usedExamples)); }
+    if (answer.used_examples) { body.appendChild(el("p", "note", t.usedExamples)); }
 
     var result = answer.result;
     if (isObject(result) && (isObject(result.extracted_fields) || Array.isArray(result.extracted_fields))) {
@@ -667,16 +946,20 @@
     var list = $("outputs");
     list.replaceChildren();
     outputs.forEach(function (output) {
-      var item = el("li");
-      var link = el("a", "name", output.name);
+      var item = el("li", "out");
+      var link = el("a", "file");
+      link.appendChild(icon("file"));
+      link.appendChild(el("span", "name", output.name));
+      var kind = t.kinds[output.kind] || t.kinds.file;
+      link.appendChild(el("span", "size", kind + " · " + formatSize(Number(output.size) || 0)));
       // Only an address of this server's own files route is made a link.
       if (/^\/api\/runs\/[0-9a-f]{16}\/files\//.test(String(output.url))) {
         link.href = String(output.url);
         link.setAttribute("download", "");
+        link.setAttribute("aria-label", fill(t.downloadNamed, { name: output.name }));
+        link.appendChild(icon("download"));
       }
       item.appendChild(link);
-      var kind = t.kinds[output.kind] || t.kinds.file;
-      item.appendChild(el("span", "size", kind + " · " + formatSize(Number(output.size) || 0)));
       list.appendChild(item);
     });
     show($("outputs-block"), outputs.length > 0);
@@ -686,9 +969,13 @@
     show($("log-block"), Boolean(log));
     $("log-block").open = !answer.ok && Boolean(log);
 
-    show($("result"), true);
-    $("result").focus();
-    $("result").scrollIntoView({ block: "start" });
+    var panel = $("result");
+    show(panel, true);
+    panel.classList.remove("enter");
+    void panel.offsetWidth;
+    panel.classList.add("enter");
+    panel.focus({ preventScroll: true });
+    panel.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
   }
 
   function isAnswer(item) {
@@ -704,11 +991,11 @@
     } else if (Array.isArray(result) && result.length && result.every(isAnswer)) {
       result.forEach(function (item) { parent.appendChild(answerNode(item)); });
     } else if (isObject(result)) {
-      parent.appendChild(fieldTable(result, trace, 0));
+      parent.appendChild(fieldList(result, trace, 0));
     } else if (Array.isArray(result) && result.length && result.every(isObject)) {
       result.forEach(function (item, index) {
-        if (result.length > 1) { parent.appendChild(el("h3", null, fill(t.resultN, { n: index + 1 }))); }
-        parent.appendChild(fieldTable(item, trace, index));
+        if (result.length > 1) { parent.appendChild(el("h3", "record-title", fill(t.resultN, { n: index + 1 }))); }
+        parent.appendChild(fieldList(item, trace, index));
       });
     } else {
       parent.appendChild(el("pre", null, JSON.stringify(result, null, 2)));
@@ -751,36 +1038,26 @@
     return known.concat(rest);
   }
 
-  function fieldTable(record, trace, recordIndex) {
-    var table = el("table", "fields");
-    var head = el("thead");
-    var headRow = el("tr");
-    [t.field, t.value].concat(trace.any ? [t.source] : []).forEach(function (title) {
-      var th = el("th", null, title);
-      th.scope = "col";
-      headRow.appendChild(th);
-    });
-    head.appendChild(headRow);
-    table.appendChild(head);
-    var body = el("tbody");
-    orderedKeys(record).forEach(function (key) {
-      var row = el("tr");
-      var th = el("th", null, labelOf(key));
-      th.scope = "row";
-      row.appendChild(th);
-      var value = el("td", "value");
+  // One record as a list: the field's name, its value and, where the solution
+  // traces sources, the quote the value came from with its page and verdict.
+  function fieldList(record, trace, recordIndex) {
+    var list = el("dl", trace.any ? "fields traced" : "fields");
+    orderedKeys(record).forEach(function (key, order) {
+      var row = el("div", "frow");
+      row.appendChild(el("dt", null, labelOf(key)));
+      var value = el("dd", "value");
       value.appendChild(valueNode(record[key], 0));
       row.appendChild(value);
+      var found = trace[recordIndex + ":" + key];
+      if (value.firstChild.className === "scroll" && !found) { value.className = "value wide"; }
       if (trace.any) {
-        var source = el("td", "source");
-        var found = trace[recordIndex + ":" + key];
+        var source = el("dd", "source");
         if (found) { sourceInto(source, found); }
         row.appendChild(source);
       }
-      body.appendChild(row);
+      list.appendChild(enter(row, order + 1));
     });
-    table.appendChild(body);
-    return table;
+    return list;
   }
 
   function sourceInto(cell, found) {
@@ -788,7 +1065,7 @@
     var where = [];
     if (found.document) { where.push(String(found.document)); }
     if (found.page !== null && found.page !== undefined) { where.push(fill(t.page, { n: found.page })); }
-    if (where.length) { cell.appendChild(el("div", null, where.join(", "))); }
+    if (where.length) { cell.appendChild(el("span", "where", where.join(", "))); }
     if (found.verdict) {
       var verified = found.verdict === "verified";
       cell.appendChild(el("span", "verdict " + (verified ? "ok" : "check"), verified ? t.verified : t.check));
