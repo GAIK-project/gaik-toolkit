@@ -9,10 +9,11 @@ its quota.
 | `kustomization.yaml` | The base, plus Rahti's images, Routes and sign-in |
 | `buildconfigs.yaml` | Builds the MLflow and sink images on Rahti from this repository |
 | `mlflow-auth.yaml`, `mlflow-auth-nginx.conf` | Basic auth in front of MLflow, which has no sign-in of its own |
-| `routes.yaml` | `https://grafana-gaik-aiops.2.rahtiapp.fi` and `https://mlflow-gaik-aiops.2.rahtiapp.fi` |
-| `patch-rahti-seccomp.yaml` | Drops the base's `RuntimeDefault` seccomp profile, which Rahti refuses since 10 Nov 2026; Rahti applies its own |
+| `routes.yaml` | `https://grafana-gaik-aiops.2.rahtiapp.fi` and `https://mlflow-gaik-aiops.2.rahtiapp.fi`, the only place the host names are written |
+| `patch-rahti-seccomp.yaml` | Drops the base's `RuntimeDefault` seccomp request; Rahti's SCC gives every pod its own profile anyway |
 | `patch-rahti-cpu-requests.yaml` | Raises CPU requests to Rahti's limit range: at least 50m, limit at most five times the request |
-| `patch-grafana-public-url.yaml`, `patch-mlflow-public-host.yaml` | Tell Grafana and MLflow their public addresses |
+| `patch-grafana-public-url.yaml`, `patch-mlflow-public-host.yaml` | Tell Grafana and MLflow their public addresses, copied from the Routes' `spec.host` |
+| `patch-image-triggers.yaml` | Pins the MLflow and sink Deployments to the digest of the last build and rolls them out after a build |
 | `networkpolicy-router.yaml` | Lets the OpenShift router reach Grafana and the MLflow sign-in, nothing else |
 | `create-secrets.sh` | Generates the Secrets on Rahti, once; nothing goes to git |
 | `send-test-event.sh` | Sends one test event and prints its trace id |
@@ -36,9 +37,12 @@ oc get pods -w        # until every pod is Running and ready
 `deploy/compose`. Apply the rendered output as above. To preview a change, add `--dry-run=server` to
 `oc apply`.
 
-After a new build, restart what uses the image: `oc rollout restart deployment/mlflow deployment/otel-collector deployment/grafana-setup`
-for MLflow, `oc rollout restart deployment/sink` for the sink. The builds take the `develop` branch
-(`spec.source.git.ref`). To build your last local commit instead, upload the repository:
+A finished build is a rollout: OpenShift writes the new image's digest into every Deployment that uses
+it (`patch-image-triggers.yaml`; MLflow's image also serves `otel-collector`'s init container and
+`grafana-setup`) and rolls them out. Between builds, every pod runs the digest it was rolled out with,
+also after a reschedule. Start a build only when you mean to roll out what `develop` holds now: the
+builds take the `develop` branch (`spec.source.git.ref`). After `oc apply`, the Deployments briefly show
+`:latest` until the trigger writes the digest back. To build your last local commit instead, upload the repository:
 `oc start-build aiops-mlflow --from-repo=.. --follow` (from `gaik-aiops/`; the BuildConfig's
 `contextDir` then finds the Dockerfile inside it).
 
@@ -53,9 +57,11 @@ git and outside public channels.
   organisation: by design only the admin joins it, because any member can run their own queries on
   the audit store through its datasource. Show the audit trail as admin.
 - **MLflow:** one shared sign-in, from `oc extract secret/aiops-mlflow-auth --keys=username,password --to=-`.
-  It can change and delete as well as read: MLflow's own pages need write requests, so nginx cannot
-  make it read-only. To add a user, add a line made with `htpasswd -nB -C 4 <user>` to the Secret's
-  `htpasswd` key and restart `deployment/mlflow-auth`. OIDC (WP4) replaces this.
+  It can read and change, but not delete: the proxy answers 403 to the `DELETE` method and to MLflow's
+  `…/delete` and `…/delete-<what>` endpoints. MLflow's own pages need other write requests, so it cannot
+  be made read-only. Delete as a project member instead, through
+  `oc port-forward svc/mlflow 5000:5000`. To add a user, add a line made with `htpasswd -nB -C 4 <user>`
+  to the Secret's `htpasswd` key and restart `deployment/mlflow-auth`. OIDC (WP4) replaces this.
 
 ## Test event
 
@@ -112,9 +118,10 @@ Check with `oc describe appliedclusterresourcequota`.
   anonymous pulls. The base and the compose stack still run Grafana 11.5.2; only this overlay runs
   the patched release.
 - The project name `gaik-aiops` is written into `kustomization.yaml` (the namespace and both image
-  paths), the Route addresses in `patch-grafana-public-url.yaml` and `patch-mlflow-public-host.yaml`,
-  and the default in `create-secrets.sh` (`NAMESPACE`). A project with another name needs all of them
-  changed.
-- The shared MLflow sign-in can delete experiments. The collector's routes hold experiment ids from
-  its start, so a deleted experiment's traces fail until `deployment/otel-collector` restarts.
+  paths), the Routes' `spec.host` in `routes.yaml`, the image stream names in
+  `patch-image-triggers.yaml`, and the default in `create-secrets.sh` (`NAMESPACE`). A project with
+  another name needs all of them changed.
+- The collector's routes hold experiment ids from its start, so if a project member deletes an
+  experiment, its traces fail until `deployment/otel-collector` restarts. The shared sign-in cannot
+  delete.
 - Alertmanager has no receiver on Rahti yet, so alerts show in Grafana only (M2).

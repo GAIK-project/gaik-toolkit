@@ -36,6 +36,11 @@ spec:
           readinessProbe:
             httpGet: {path: /healthz, port: 8080}
             periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
           resources:
             # Rahti: at least 50m CPU per container, limit at most five times the request.
             requests: {cpu: 50m, memory: 32Mi}

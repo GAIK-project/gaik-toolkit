@@ -26,17 +26,23 @@ images:
   - name: gaik-aiops/collection-sink
     newName: image-registry.openshift-image-registry.svc:5000/gaik-aiops/aiops-sink
     newTag: latest
-  # The same versions as the base, from the registries their projects publish to besides Docker Hub.
+  # The same versions as the base, from the registries their projects publish to besides Docker Hub,
+  # pinned by the digest of the multi-arch image (the tag in each comment), so a re-pushed tag changes
+  # nothing here. To update: docker buildx imagetools inspect <image>:<tag>, then the Digest line.
   - name: prom/prometheus
     newName: quay.io/prometheus/prometheus
+    digest: sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62  # v3.2.1
   - name: prom/alertmanager
     newName: quay.io/prometheus/alertmanager
+    digest: sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba  # v0.28.1
   - name: otel/opentelemetry-collector-contrib
     newName: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib
+    digest: sha256:85ac41c2db88d0df9bd6145e608a3cb023f5d8443868adbfbbf66efb51087917  # 0.120.0
   # Grafana has a public Route here, so it runs a patched release; the base's 11.5.2 has known
   # security fixes missing. Keep this on the newest patch release of the line.
   - name: grafana/grafana
-    newTag: 11.6.16
+    newName: docker.io/grafana/grafana
+    digest: sha256:d67af92050b8d93b393dc741864752a69c9da1ffa39c1bb9af49ad5d9e47d2c3  # 11.6.16
 
 configMapGenerator:
   - name: mlflow-auth-nginx
@@ -52,6 +58,7 @@ patches:
   - path: patch-grafana-public-url.yaml
   - path: patch-mlflow-public-host.yaml
     target: {kind: Deployment, name: mlflow}
+  - path: patch-image-triggers.yaml
   # grafana-setup needs only Python's standard library; the MLflow image has it, so no Docker Hub pull.
   - target: {kind: Deployment, name: grafana-setup}
     patch: |-
@@ -61,3 +68,20 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/image
         value: gaik-aiops/mlflow
+
+# The public host names are set once, in routes.yaml (spec.host), and copied from there into Grafana's
+# root URL and MLflow's allowed hosts and origins, which the patches above leave as ROUTE_HOST.
+replacements:
+  - source: {kind: Route, name: grafana, fieldPath: spec.host}
+    targets:
+      - select: {kind: Deployment, name: grafana}
+        fieldPaths: ["spec.template.spec.containers.[name=grafana].env.[name=GF_SERVER_ROOT_URL].value"]
+        options: {delimiter: "/", index: 2}
+  - source: {kind: Route, name: mlflow, fieldPath: spec.host}
+    targets:
+      - select: {kind: Deployment, name: mlflow}
+        fieldPaths: ["spec.template.spec.containers.[name=mlflow].args.6"]
+        options: {delimiter: ",", index: 3}
+      - select: {kind: Deployment, name: mlflow}
+        fieldPaths: ["spec.template.spec.containers.[name=mlflow].args.8"]
+        options: {delimiter: "/", index: 2}

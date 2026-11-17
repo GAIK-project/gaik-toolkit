@@ -1,8 +1,8 @@
-# Public HTTPS addresses. spec.host is left out, so Rahti assigns <route>-<project>.2.rahtiapp.fi:
+# Public HTTPS addresses, the names Rahti would assign anyway (<route>-<project>.2.rahtiapp.fi):
 #   grafana -> https://grafana-gaik-aiops.2.rahtiapp.fi  (Grafana's own sign-in)
 #   mlflow  -> https://mlflow-gaik-aiops.2.rahtiapp.fi   (basic auth in mlflow-auth, then MLflow)
-# Both names also appear in patch-grafana-public-url.yaml and patch-mlflow-public-host.yaml; change
-# them together. The collector's OTLP port gets no Route yet (M2, see README.md).
+# spec.host is the one place they are written: kustomization.yaml copies them into Grafana's root URL
+# and MLflow's allowed hosts. The collector's OTLP port gets no Route yet (M2, see README.md).
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -11,6 +11,7 @@ metadata:
   annotations:
     haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
 spec:
+  host: grafana-gaik-aiops.2.rahtiapp.fi
   to: {kind: Service, name: grafana, weight: 100}
   port: {targetPort: 3000}
   tls:
@@ -26,6 +27,7 @@ metadata:
     haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
     haproxy.router.openshift.io/timeout: 5m
 spec:
+  host: mlflow-gaik-aiops.2.rahtiapp.fi
   to: {kind: Service, name: mlflow-auth, weight: 100}
   port: {targetPort: 8080}
   tls:

@@ -1,4 +1,5 @@
 # Grafana builds its links and redirects from its public address, and sends its cookie over HTTPS only.
+# ROUTE_HOST is replaced with the grafana Route's spec.host (kustomization.yaml, replacements).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,5 +10,5 @@ spec:
       containers:
         - name: grafana
           env:
-            - {name: GF_SERVER_ROOT_URL, value: "https://grafana-gaik-aiops.2.rahtiapp.fi/"}
+            - {name: GF_SERVER_ROOT_URL, value: "https://ROUTE_HOST/"}
             - {name: GF_SECURITY_COOKIE_SECURE, value: "true"}

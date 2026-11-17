@@ -1,5 +1,7 @@
-# Rahti sets its own seccomp profile (Localhost rahti-custom-seccomp.json) on every new pod and, since
-# 10 Nov 2026, refuses pods that ask for RuntimeDefault. The base asks for RuntimeDefault, which other
-# clusters need, so this overlay removes it and lets Rahti apply its profile.
+# Rahti's rahti-restricted-v2 SCC gives every pod its own seccomp profile (Localhost
+# rahti-custom-seccomp.json), whatever the pod asks for: in project gaik, the wizard's scanner asks for
+# RuntimeDefault and runs with Rahti's profile (checked 17 Nov 2026). The base asks for RuntimeDefault,
+# which other clusters need; this overlay drops the request so that the spec states the profile the
+# pods actually run with.
 - op: remove
   path: /spec/template/spec/securityContext/seccompProfile
