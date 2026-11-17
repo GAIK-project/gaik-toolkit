@@ -391,10 +391,15 @@ def test_every_file_the_editor_saves_but_a_readme_is_one_a_test_run_is_tied_to(t
 
 # --- code is saved only when the test runs use their own runner key ---------------
 
-_CODE = ("run_poc.py", "helpers/dates.py", "schemas/output_schema.py", "requirements.txt")
+_CODE = (
+    "run_poc.py",
+    "helpers/dates.py",
+    "schemas/output_schema.py",
+    "requirements.txt",
+    "config.yaml",
+)
 _NOT_CODE = (
     ".env.example",
-    "config.yaml",
     "prompts/extract.md",
     "schemas/output_schema.json",
     "labels.json",
@@ -439,7 +444,7 @@ def test_with_the_shared_runner_key_code_is_shown_but_not_saved(
         )
         assert (refused.status, refused.code) == (403, "code_edit_needs_own_runner_key"), path
         assert poc_service.read_package_file(poc, path)["content"] == read["content"]
-    # The prompts, the schema's JSON, the settings and the list of variables stay editable.
+    # The prompts, the schema's JSON and the list of variables stay editable.
     for path in _NOT_CODE:
         read = poc_service.read_package_file(poc, path)
         assert read["editable"] is True, path

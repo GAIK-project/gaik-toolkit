@@ -59,8 +59,9 @@ cp secrets.yaml.example secrets.yaml     # secrets.yaml is gitignored
 > spending cap: set `WIZARD_POC_RUNNER_SECRET=<secret name>` on the api
 > Deployment. The api and the agent keep the shared Secret. Setting it to a
 > Secret with its own capped key also turns on code editing in the PoC tab's
-> editor: user-written code (`.py`, `requirements.txt`) runs only with a
-> separate runner key, so with the shared Secret those files stay read-only.
+> editor: user-written code (`.py`, `requirements.txt`) and `config.yaml` run
+> only with a separate runner key, so with the shared Secret those files stay
+> read-only.
 
 ## Deploy
 

@@ -65,13 +65,14 @@ marker, everything under `sample_input/` and `output/`, files in a hidden folder
 `__pycache__`, and the package's test page (`app.py` at the root and everything under
 `ui/`, the scaffolder's templates) are read-only (`file_read_only`, 403), other types
 `file_type_not_editable` (422). The package's code (every `.py` file and
-`requirements.txt`, `poc_service.is_package_code`) is saved only when the test runs use
+`requirements.txt`) and `config.yaml`, which names the model endpoints a run calls
+(`poc_service.is_package_code`), are saved only when the test runs use
 a runner key of their own (`WIZARD_POC_RUNNER_SECRET` names a Secret other than the
 shared `gaik-demo-api-keys`, `sandbox_runner.runs_use_shared_key`): user-written code
 runs only with a separate runner key. With the shared key those files are read-only
 with `read_only_reason` `code_edit_needs_own_runner_key` and a save answers 403 with that
-code; the prompts, the schema's JSON files, `config.yaml`, `.env.example` and the
-package's other files stay editable. `.env` and every `.env*` name except `.env.example` is
+code; the prompts, the schema's JSON files, `.env.example` and the package's other
+files stay editable. `.env` and every `.env*` name except `.env.example` is
 refused for reading and writing with 422 `secrets_not_stored`: the server keeps no keys
 for a user, the web app adds `poc/.env` to the downloaded package in the browser. For
 the same reason a save of `.env.example` that gives a credential a value answers 422

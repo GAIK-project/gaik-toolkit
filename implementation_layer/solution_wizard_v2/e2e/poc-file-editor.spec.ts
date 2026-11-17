@@ -339,7 +339,7 @@ test.describe("PoC file editor", () => {
     const editor = await openFile(page, "run_poc.py");
 
     await expect(editor.getByTestId("poc-file-note")).toHaveText(
-      "Vain luku: koodia voi muokata täällä, kun testiajot käyttävät omaa avaintaan.",
+      "Vain luku: koodia ja config.yaml-tiedostoa voi muokata täällä, kun testiajot käyttävät omaa avaintaan.",
     );
     await expect(editor.getByTestId("poc-file-save")).toHaveCount(0);
     await expect(editor.locator(".cm-content")).toHaveAttribute("contenteditable", "false");

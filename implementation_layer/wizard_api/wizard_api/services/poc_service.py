@@ -1432,9 +1432,10 @@ def package_file_read_only(normalised: str) -> str | None:
     change to the package a test run is tied to, but a README's. Nor the test
     page (``app.py`` at the root and everything under ``ui/``), which is the
     scaffolder's template as it is. Nor, while the test runs use the project's
-    shared runner key, the package's code (``is_package_code``,
-    ``code_edit_needs_own_runner_key``): user-written code runs only with a
-    runner key of its own. The other files stay editable.
+    shared runner key, the package's code and ``config.yaml``
+    (``is_package_code``, ``code_edit_needs_own_runner_key``): user-written code
+    and endpoints run only with a runner key of its own. The other files stay
+    editable.
     """
     parts = normalised.split("/")
     if parts[-1] == AI_MARKER_NAME or parts[0] in _READ_ONLY_DIRS:
@@ -1452,21 +1453,23 @@ def package_file_read_only(normalised: str) -> str | None:
 
 #: Why code is not saved: the test runs use the project's shared runner key.
 CODE_NEEDS_OWN_RUNNER_KEY = "code_edit_needs_own_runner_key"
-#: Besides every Python file, what decides what a run installs.
-_INSTALL_NAMES = frozenset({"requirements.txt"})
+#: Besides every Python file, what decides what a run installs (requirements.txt)
+#: and where it sends its model calls, with the runner's key (config.yaml).
+_CODE_LIKE_NAMES = frozenset({"requirements.txt", "config.yaml", "config.yml"})
 
 
 def is_package_code(normalised: str) -> bool:
-    """Whether a package file is code: what a run executes or what decides what it installs.
+    """Whether a package file is code, or settings that decide where the key goes.
 
     Every Python file (the run imports the package's modules and loads
-    ``schemas/output_schema.py`` with importlib) and ``requirements.txt``. The
-    other files a run reads are data to it: ``config.yaml`` is read with
-    ``yaml.safe_load``, the prompts as text and the schema's JSON files as
-    JSON, and the run installs nothing (the runner image has its packages).
+    ``schemas/output_schema.py`` with importlib), ``requirements.txt``, and
+    ``config.yaml``, which names the model endpoints the run calls with the
+    runner's key. The other files a run reads are data to it: the prompts as
+    text and the schema's JSON files as JSON, and the run installs nothing
+    (the runner image has its packages).
     """
     name = normalised.rsplit("/", 1)[-1].lower()
-    return name.endswith(".py") or name in _INSTALL_NAMES
+    return name.endswith(".py") or name in _CODE_LIKE_NAMES
 
 
 def _code_edits_wait() -> bool:
@@ -1562,7 +1565,8 @@ def write_package_file(
         raise PackageFileError(
             403,
             reason,
-            "the package's code can be edited here once the test runs use their own key",
+            "the package's code and config.yaml can be edited here once the test runs use "
+            "their own key",
         )
     if reason is not None:
         raise PackageFileError(422, reason, "files of this type cannot be edited here")
