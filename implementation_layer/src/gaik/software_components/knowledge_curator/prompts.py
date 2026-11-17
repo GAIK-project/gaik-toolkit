@@ -163,7 +163,10 @@ def build_retry_prompt(failures: list[str], conflict_failures: Sequence[str] = (
     the check."""
     parts = []
     if failures:
-        listed = "\n".join(f"- {failure}" for failure in failures)
+        # The messages quote the sources: they go in a data block, apart from the rules.
+        listed = SourceMaterial().wrap(
+            "\n".join(f"- {failure}" for failure in failures), label="failed checks"
+        )
         parts.append(f"""These units failed the quote check:
 {listed}
 

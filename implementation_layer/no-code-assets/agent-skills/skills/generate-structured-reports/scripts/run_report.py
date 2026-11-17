@@ -225,7 +225,10 @@ def install_provider_extra(provider: str, module: str, extra: str) -> None:
     commands = [[sys.executable, "-m", "pip", "install", requirement]]
     if shutil.which("uv"):
         commands.append(["uv", "pip", "install", "--python", sys.executable, requirement])
-    print(f"The {provider} provider needs the {module} package; installing {requirement}", file=sys.stderr)
+    print(
+        f"The {provider} provider needs the {module} package; installing {requirement}",
+        file=sys.stderr,
+    )
     for command in commands:
         code = subprocess.call(command, stdout=sys.stderr, stderr=sys.stderr)
         if code == 0:
@@ -363,6 +366,30 @@ def section_problems(spec) -> tuple[list[str], list[str]]:
             "worded; which class outranks which goes in source_precedence"
         )
     return errors, warnings
+
+
+def _resolved(conflict, section) -> dict:
+    """A resolved conflict with the side the report follows and the side it drops.
+
+    The code picks the side from the source each unit cites, so the person checks the
+    quotes of both sides at the evidence checkpoint.
+    """
+    units = {u.id: u for u in section.units}
+
+    def side(ids):
+        return [
+            {"id": i, "source": units[i].source.file, "quote": units[i].quote}
+            for i in ids
+            if i in units
+        ]
+
+    kept = set(getattr(conflict, "preferred_unit_ids", []) or [])
+    return {
+        "topic": conflict.topic,
+        "resolved_by": getattr(conflict, "resolved_by", None),
+        "follows": side([i for i in conflict.unit_ids if i in kept]),
+        "drops": side([i for i in conflict.unit_ids if i not in kept]),
+    }
 
 
 def pandoc_problem() -> str | None:
@@ -771,7 +798,7 @@ def knowledge_problems(ws: Path) -> tuple[list[str], dict]:
             "units": len(s.units),
             "missing": s.missing,
             "unresolved_conflicts": [c.topic for c in s.conflicts if c.status == "unresolved"],
-            "resolved_conflicts": [c.topic for c in s.conflicts if c.status == "resolved"],
+            "resolved_conflicts": [_resolved(c, s) for c in s.conflicts if c.status == "resolved"],
         }
         for s in knowledge.sections
     }
@@ -910,7 +937,9 @@ def cmd_curate(args) -> dict:
                     for c in s.conflicts
                     if c.status == "unresolved"
                 ],
-                "resolved_conflicts": [c.topic for c in s.conflicts if c.status == "resolved"],
+                "resolved_conflicts": [
+                    _resolved(c, s) for c in s.conflicts if c.status == "resolved"
+                ],
             }
             for s in knowledge.sections
         },
@@ -1399,7 +1428,9 @@ def proposal_problems(raw: dict) -> tuple[list[str], list[str]]:
             if dep == s.get("id"):
                 errors.append(f"sections[{n}] ({s.get('title')!r}) cannot depend on itself")
             elif dep not in ids:
-                errors.append(f"sections[{n}] ({s.get('title')!r}) depends on {dep!r}, not a section")
+                errors.append(
+                    f"sections[{n}] ({s.get('title')!r}) depends on {dep!r}, not a section"
+                )
     names = [Path(p).name for paths in (raw.get("sources") or {}).values() for p in paths or []]
     sample = raw.get("sample_report")
     if sample and Path(sample).name in names:
@@ -1410,7 +1441,10 @@ def proposal_problems(raw: dict) -> tuple[list[str], list[str]]:
     if all(isinstance(s, dict) and s.get("id") == "draft" for s in sections):
         return errors, warnings  # step 2: the instructions are written with the sections
     settings = raw.get("settings") or {}
-    if settings.get("citations") is False and "cite each fact" in str(raw.get("instructions", "")).lower():
+    if (
+        settings.get("citations") is False
+        and "cite each fact" in str(raw.get("instructions", "")).lower()
+    ):
         warnings.append(
             "Citations are off but the instructions still ask to cite each fact; remove that sentence"
         )
@@ -1553,7 +1587,9 @@ def cmd_apply_spec(args) -> dict:
     try:
         new = json.loads(proposal_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise HelperError(EXIT_INPUT, "proposal", f"{proposal_path.name}: not valid JSON ({exc})") from exc
+        raise HelperError(
+            EXIT_INPUT, "proposal", f"{proposal_path.name}: not valid JSON ({exc})"
+        ) from exc
     provider = provider_name(args.provider)
     old = read_json(path, {}) if path.is_file() else {}
     errors, warnings = proposal_problems(new)

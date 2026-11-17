@@ -142,8 +142,11 @@ side the report follows. The curator decides that in code from `source_precedenc
   settled by a person: set `status`, `preferred_unit_ids` and `resolved_by` in the
   knowledge file before the report is written (see [Editing knowledge files](#editing-knowledge-files)).
 
-A source's text cannot mark a conflict resolved or pick the side the report follows,
-whatever it says.
+The model no longer marks a conflict resolved, and a description cannot pick the side.
+The code decides from the model's own work, though: which source each unit cites and which
+units form a conflict. A source can still steer those (a unit citing the wrong file with a
+generic quote, or a conflict left out), so a person checks the resolved conflicts and the
+side each follows at the evidence checkpoint before the report is written.
 
 ## Sources stay data
 
@@ -171,7 +174,9 @@ or when its `summary` states a number that neither the quote nor the `time_quali
 (where the cited source has that number too) gives, such as an age computed from a year. Numbers are compared by their digits, so
 "1 200" supports "1200" and also "1" and "200", and a digit glued to letters (the 2 of
 m2) is not a figure; a number written in words is not checked, and the check does not
-confirm that the summary's wording matches the quote.
+confirm that the summary's wording matches the quote. It is a sanity check, not a
+verification of figures: digits are compared as a set, so their order (1,5 and 5,1) and
+a sign (-1,5) are not checked.
 If any unit of a section fails, the whole section is requested again once, with the
 failing units as feedback. If the second answer still fails, the failing units are
 dropped and the rest of the section is kept, so one bad quote does not stop the run:

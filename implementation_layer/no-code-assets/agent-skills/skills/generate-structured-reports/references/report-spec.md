@@ -122,7 +122,7 @@ fact the curator filed under the section; the added wording stops that.
 ## Source classes and priority
 
 `sources` accepts only `primary` and `secondary`. The curator copies the class onto every fact.
-Conflicts are decided in code, never by the model: a conflict is resolved only when
+Conflicts are decided in code from the model's citations, not by the model's own verdict: a conflict is resolved only when
 `source_precedence` ranks the class of one side above the other's, and the report then follows
 that side. Without `source_precedence`, or when both sides have the same class, the conflict stays
 unresolved and the report states both sides, marked `Unresolved:`, for the user to settle in the

@@ -34,7 +34,7 @@ and use it only when the user's request covers that.
 | File | Holds | Why the helper keeps it |
 |---|---|---|
 | `normalization.json` | Each source's converter, class and text length; usage of transcription and vision; every `update-sample` | Usage is not saved by gaik |
-| `curation.json` | Per section: fact count, missing items, resolved and unresolved conflicts; the **dropped** facts and why; usage | `dropped` and usage are lost once the knowledge is saved |
+| `curation.json` | Per section: fact count, missing items, unresolved conflicts, and resolved ones with the units they follow and drop; the **dropped** facts and why; usage | `dropped` and usage are lost once the knowledge is saved |
 | `synthesis.json` | Usage; `(missing: …)` count; applied and unresolved reviewer edits; the Word export as `ok`, `off` or `failed` | Usage is lost if export fails inside synthesis |
 | `run_record.json` | What each stage was built from (below) | To tell a current report from a stale one |
 

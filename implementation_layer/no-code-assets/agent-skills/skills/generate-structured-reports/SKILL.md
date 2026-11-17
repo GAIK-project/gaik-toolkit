@@ -340,8 +340,10 @@ list read back from the knowledge files proves nothing.
 
 ### 7. Evidence checkpoint
 
-Show a short summary per section: required items no source covers, unresolved conflicts, and
-dropped facts. Then:
+Show a short summary per section: required items no source covers, unresolved conflicts,
+dropped facts, and each resolved conflict with the side it follows and the side it drops
+(`resolved_conflicts` in the curation summary: source and quote of each). The code picks
+that side from the source each unit cites, so ask the user to check those quotes. Then:
 
 - If nothing material is open and the user already agreed to proceed, continue.
 - If the user wants corrections, edit `workspace/knowledge/<section>.json` or the normalized
