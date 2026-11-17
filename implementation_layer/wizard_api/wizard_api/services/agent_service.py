@@ -791,7 +791,10 @@ def _build_options(
     *,
     resume: str | None = None,
     session_id: str | None = None,
+    guard: agent_tool_guard.ToolGuard | None = None,
 ):
+    """The agent's options. ``guard`` is the session's tool guard, which knows its
+    owner and counts the metered calls of each turn; one without an owner otherwise."""
     tools = ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
     extra = {}
     if session_id and create_sdk_mcp_server is not None:
@@ -812,7 +815,9 @@ def _build_options(
         # this session's directory and the wizard's own scripts (agent_tool_guard).
         hooks={
             "PreToolUse": [
-                HookMatcher(hooks=[agent_tool_guard.ToolGuard(wizard_dir, output_dir).hook])
+                HookMatcher(
+                    hooks=[(guard or agent_tool_guard.ToolGuard(wizard_dir, output_dir)).hook]
+                )
             ]
         },
         setting_sources=[],
@@ -1059,6 +1064,9 @@ async def _start_session(
     resumed: str | None = None
     sdk_session_id: str | None = None
     turn_results: list = []  # the bootstrap's usage, counted with the first turn
+    # One guard for the agent, whichever client below it ends up with: it counts
+    # this owner's metered tool calls per turn and in their hourly window.
+    guard = agent_tool_guard.ToolGuard(wizard_dir, out, user_id=user_id)
     if resume_id and transcript_exists(resume_id) is False:
         logger.info("agent session %s has no transcript to resume for %s", resume_id, session_id)
         resume_id = None
@@ -1069,7 +1077,9 @@ async def _start_session(
         # context and nothing has to be re-explained (#174).
         try:
             client = ClaudeSDKClient(
-                options=_build_options(wizard_dir, out, resume=resume_id, session_id=session_id)
+                options=_build_options(
+                    wizard_dir, out, resume=resume_id, session_id=session_id, guard=guard
+                )
             )
             await client.connect()
             resumed = "sdk"
@@ -1084,7 +1094,9 @@ async def _start_session(
                 await _disconnect_quietly(client)  # a process may have started
             client = None
     if client is None:
-        client = ClaudeSDKClient(options=_build_options(wizard_dir, out, session_id=session_id))
+        client = ClaudeSDKClient(
+            options=_build_options(wizard_dir, out, session_id=session_id, guard=guard)
+        )
         try:
             await client.connect()
             # Bootstrap turn: invoke the skill + pin output dir. Drained silently —
@@ -1121,6 +1133,8 @@ async def _start_session(
         "sdk_session_id": sdk_session_id,
         # Whose agent this is, for WIZARD_MAX_LIVE_AGENTS_PER_USER.
         "user_id": user_id,
+        # Its tool guard, told by stream_turn_for when a new message begins.
+        "tool_guard": guard,
         # (purpose, ResultMessage) of each query not yet on a span (telemetry).
         "turn_results": turn_results,
     }
@@ -1256,8 +1270,14 @@ async def stream_turn_for(
     An agent whose process failed during the turn (it cannot be read, or its
     stream ended without a result) is ended when the turn is over, so the next
     message starts a new one instead of meeting the broken one.
+
+    The message, with its quiet "Please continue." nudges, is one turn for
+    ``WIZARD_MAX_METERED_CALLS_PER_TURN``: the guard's count starts here.
     """
     async with session["lock"]:
+        guard = session.get("tool_guard")
+        if guard is not None:
+            guard.start_turn()
         try:
             await session["client"].query(user_message)
             async for chunk in _stream_turn(session, out_parts):
