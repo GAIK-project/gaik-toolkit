@@ -532,8 +532,9 @@ def _test_page_problems(poc_dir: str) -> list[str]:
 
     The README tells the user to start ``app.py``, with the package's keys beside
     it, and the page and its server are the same files in every package. A copy
-    that differs from the template as it is on this server was changed after
-    generation, and nobody reviewed the change. Only the template counts: the
+    that differs from the template as it is on this server is either from an
+    earlier template or was changed after generation, a change nobody reviewed;
+    the message names both, as the server cannot tell them apart. Only the template counts: the
     scaffold manifest lives in the session folder, which the agent can write, so
     a hash recorded there could be made to match any file. A package generated
     from an earlier template is reported too; generating it again brings the
@@ -557,8 +558,9 @@ def _test_page_problems(poc_dir: str) -> list[str]:
         if _same_text(data, expected):
             continue
         problems.append(
-            f"{relative} is not the test page the wizard wrote: it was changed after the "
-            "package was generated. Generate the package again to put it back"
+            f"{relative} is not the wizard's current test page: the package was generated "
+            "with an earlier version of it, or the file was changed afterwards. Generate the "
+            "package again to update it"
         )
     return problems
 
