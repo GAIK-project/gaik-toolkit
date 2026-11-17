@@ -63,6 +63,10 @@ def _allowed_hosts(config: dict, settings: dict) -> list[str]:
     return hosts
 
 
+#: The unset env: variables a warning has already named.
+_UNSET_WARNED: set[str] = set()
+
+
 def _resolve_env_values(node):
     """Replace ``ENV:NAME`` / ``env:NAME`` string values with the variable's value.
 
@@ -77,13 +81,16 @@ def _resolve_env_values(node):
         for key, value in node.items():
             if isinstance(value, str) and value.strip()[:4].lower() == "env:":
                 name = value.strip()[4:].strip()
-                resolved = os.environ.get(name)
+                resolved = (os.environ.get(name) or "").strip()
                 if resolved:
                     out[key] = resolved
-                else:
+                elif name not in _UNSET_WARNED:
+                    # Every stage reads the whole config: say it once.
+                    _UNSET_WARNED.add(name)
                     print(
                         f"WARNING: {key} = {value!r} names the environment variable {name}, "
-                        "which is not set here; using the provider default."
+                        "which is not set here; using the provider default.",
+                        file=sys.stderr,
                     )
                 continue
             out[key] = _resolve_env_values(value)
@@ -121,11 +128,20 @@ def _stage_provider(config: dict, stage: str, settings: dict, *, warn: bool = Tr
     return resolve_provider(provider)
 
 
-def _same_provider(config: dict, stage: str, settings: dict, provider: str) -> bool:
+#: Settings that name the chat endpoint a model or deployment name belongs to.
+_CHAT_ADDRESS_SETTINGS = ("base_url", "azure_endpoint")
+
+
+def _same_chat_endpoint(
+    config: dict, stage: str, settings: dict, other: dict, provider: str
+) -> bool:
+    """Whether ``other``'s stage settings name the same provider and chat endpoint."""
     try:
-        return _stage_provider(config, stage, settings, warn=False) == provider
+        if _stage_provider(config, stage, other, warn=False) != provider:
+            return False
     except ValueError:
         return False
+    return all(settings.get(key) == other.get(key) for key in _CHAT_ADDRESS_SETTINGS)
 
 
 def get_stage_config(config: dict, stage: str) -> dict:
@@ -143,22 +159,29 @@ def get_stage_config(config: dict, stage: str) -> dict:
         raise ValueError("Native Anthropic has no embeddings; configure stages.embedding.")
     if stage == "transcription":
         # `model` is the chat model gaik uses to enhance the transcript. An audio deployment
-        # written there (e.g. gpt-4o-transcribe) is sent to chat completions and fails with
-        # a 400, so it belongs in `transcription_model`. Only a name that reads as an audio
-        # model moves: a scaffolded stage carries the shared chat model in `model`, and
-        # gaik's default (AZURE_/OPENAI_TRANSCRIPTION_MODEL) then names the audio model.
+        # written there instead of `transcription_model` (e.g. gpt-4o-transcribe) is sent to
+        # chat completions and fails with a 400, so it moves. Only a name that reads as an
+        # audio model moves: a scaffolded stage carries the shared chat model in `model`,
+        # and gaik's default (AZURE_/OPENAI_TRANSCRIPTION_MODEL) then names the audio model.
         model = settings.get("model")
-        if isinstance(model, str) and _AUDIO_MODEL.search(model):
-            del settings["model"]
-            if not settings.get("transcription_model"):
-                settings["transcription_model"] = model
+        if (
+            isinstance(model, str)
+            and _AUDIO_MODEL.search(model)
+            and not settings.get("transcription_model")
+        ):
+            settings["transcription_model"] = settings.pop("model")
         if not settings.get("model"):
-            # The enhancement then uses the extraction stage's chat model, when that stage
-            # is on the same provider.
-            models = config.get("models") or {}
-            extraction = (config.get("stages") or {}).get("extraction") or {}
-            chat_model = extraction.get("model") or models.get("extraction")
-            if chat_model and _same_provider(config, "extraction", extraction, provider):
+            # The enhancement then uses the extraction stage's chat model, when that
+            # stage names the same provider and chat endpoint.
+            if config.get("stages"):
+                extraction = config["stages"].get("extraction") or {}
+                chat_model = extraction.get("model")
+            else:
+                extraction = {}
+                chat_model = (config.get("models") or {}).get("extraction")
+            if chat_model and _same_chat_endpoint(
+                config, "extraction", settings, extraction, provider
+            ):
                 settings["model"] = chat_model
     if stage not in (config.get("stages") or {}):
         models = config.get("models") or {}

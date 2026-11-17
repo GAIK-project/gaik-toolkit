@@ -62,14 +62,39 @@ def test_unset_env_value_is_dropped_with_a_warning(provider_config, monkeypatch,
 
     # The literal text must never reach the model API as a deployment name.
     assert "model" not in result
-    assert "ANSWER_DEPLOYMENT" in capsys.readouterr().out
+    assert "ANSWER_DEPLOYMENT" in capsys.readouterr().err
 
 
-def test_env_value_in_the_models_block_is_resolved_too(provider_config, monkeypatch):
-    monkeypatch.delenv("CHAT_DEPLOYMENT", raising=False)
+def test_an_unset_env_value_is_named_once_however_many_stages_read_it(
+    provider_config, monkeypatch, capsys
+):
+    monkeypatch.setenv("ANSWER_DEPLOYMENT", "   ")  # blank counts as unset
+    config = {
+        "stages": {
+            "answer": {"provider": "azure", "model": "env:ANSWER_DEPLOYMENT"},
+            "extraction": {"provider": "azure", "model": "chat-model"},
+        }
+    }
+
+    assert "model" not in provider_config.get_stage_config(config, "answer")
+    provider_config.get_stage_config(config, "extraction")
+
+    assert capsys.readouterr().err.count("WARNING") == 1
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [("chat-deployment", "chat-deployment"), (None, None)]
+)
+def test_env_value_in_the_models_block_is_resolved_too(
+    provider_config, monkeypatch, value, expected
+):
+    if value is None:
+        monkeypatch.delenv("CHAT_DEPLOYMENT", raising=False)
+    else:
+        monkeypatch.setenv("CHAT_DEPLOYMENT", value)
     config = {"provider": "azure", "models": {"extraction": "env:CHAT_DEPLOYMENT"}}
 
-    assert "model" not in provider_config.get_stage_config(config, "extraction")
+    assert provider_config.get_stage_config(config, "extraction").get("model") == expected
 
 
 def test_plain_values_are_left_alone_and_the_config_is_not_changed(provider_config):
@@ -134,13 +159,15 @@ def test_a_scaffolded_audio_stage_keeps_its_chat_model(provider_config, tmp_path
     assert "transcription_model" not in result
 
 
-def test_an_explicit_enhancement_model_is_kept(provider_config):
+@pytest.mark.parametrize("enhancer", ["enhancer-model", "transcript-enhancer"])
+def test_an_explicit_enhancement_model_is_kept(provider_config, enhancer):
+    """Beside a transcription_model, `model` is the enhancement model whatever its name."""
     config = {
         "stages": {
             "transcription": {
                 "provider": "azure",
                 "transcription_model": "whisper",
-                "model": "enhancer-model",
+                "model": enhancer,
             },
             "extraction": {"provider": "azure", "model": "chat-model"},
         }
@@ -149,7 +176,44 @@ def test_an_explicit_enhancement_model_is_kept(provider_config):
     result = provider_config.get_stage_config(config, "transcription")
 
     assert result["transcription_model"] == "whisper"
-    assert result["model"] == "enhancer-model"
+    assert result["model"] == enhancer
+
+
+@pytest.mark.parametrize(
+    "addresses",
+    [
+        {"azure_endpoint": "https://chat-resource.example/"},
+        {"base_url": "https://chat-resource.example/openai/v1"},
+    ],
+)
+def test_the_chat_model_of_another_endpoint_is_not_borrowed(provider_config, addresses):
+    """A deployment name belongs to one resource: the extraction stage's may not exist
+    where the transcription stage sends the enhancement."""
+    config = {
+        "stages": {
+            "transcription": {"provider": "azure", "model": "gpt-4o-transcribe"},
+            "extraction": {"provider": "azure", "model": "chat-model", **addresses},
+        }
+    }
+
+    result = provider_config.get_stage_config(config, "transcription")
+
+    assert result["transcription_model"] == "gpt-4o-transcribe"
+    assert "model" not in result
+
+
+def test_the_models_block_is_not_read_when_the_config_has_stages(provider_config):
+    """With stages, models.extraction is a summary; an extraction stage without a model
+    uses the provider default, so the enhancement does not get the summary's model."""
+    config = {
+        "models": {"extraction": "old-chat-model"},
+        "stages": {
+            "transcription": {"provider": "azure", "model": "gpt-4o-transcribe"},
+            "extraction": {"provider": "azure"},
+        },
+    }
+
+    assert "model" not in provider_config.get_stage_config(config, "transcription")
 
 
 def test_a_config_without_stages_uses_the_models_block(provider_config):
@@ -177,7 +241,14 @@ def test_the_chat_model_of_another_provider_is_not_borrowed(provider_config):
     assert "model" not in result
 
 
-def test_self_hosted_whisper_keeps_its_own_path(provider_config):
+def test_self_hosted_whisper_written_as_model_reads_no_credentials(provider_config):
+    """With no external model API, whisper_local needs no OpenAI/Azure key: the stage
+    is built without get_llm_config, also when the name was written as `model`."""
+
+    def get_llm_config(provider, **settings):
+        raise ValueError("OPENAI_API_KEY not found in environment")
+
+    provider_config.get_stage_config.__globals__["get_llm_config"] = get_llm_config
     config = {
         "governance": {"external_model_api_allowed": False},
         "stages": {"transcription": {"provider": "openai", "model": "whisper_local"}},
@@ -185,5 +256,8 @@ def test_self_hosted_whisper_keeps_its_own_path(provider_config):
 
     result = provider_config.get_stage_config(config, "transcription")
 
-    assert result["transcription_model"] == "whisper_local"
-    assert result["provider"] == "openai"
+    assert result == {
+        "transcription_model": "whisper_local",
+        "provider": "openai",
+        "use_azure": False,
+    }
