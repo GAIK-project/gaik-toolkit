@@ -70,8 +70,10 @@ _SCRIPTS: dict[str, dict[str, str]] = {
         "--skip-validation": _FLAG,
     },
     "validate_blueprint.py": {"--blueprint": _PATH},
-    # Step 4.5 of SKILL.md: rewrites output_schema_model.json from output_schema.py.
-    "refresh_schema_model.py": {"--schemas-dir": _PATH},
+    # refresh_schema_model.py (SKILL.md Step 4.5) is left out: it imports the
+    # session's output_schema.py, and every script here runs the wizard's own code
+    # only. With gaik 0.10.0 the step changes nothing; how the model file is
+    # refreshed from the next gaik pin is open.
 }
 #: Scripts that turn the blueprint into code, so they get its text checked first.
 _SCAFFOLDING_SCRIPTS = frozenset({"scaffold_poc.py"})

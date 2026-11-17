@@ -111,15 +111,12 @@ def test_a_script_path_option_the_shell_would_expand_is_refused(guard) -> None:
     assert guard.check("Bash", {"command": command})
 
 
-def test_the_schema_refresh_step_runs_on_the_sessions_schemas_only(guard) -> None:
-    # SKILL.md Step 4.5 runs it after every edit to output_schema.py.
-    inside = guard.session / "poc" / "schemas"
-    command = f"python scripts/refresh_schema_model.py --schemas-dir {inside.as_posix()}"
-    assert guard.check("Bash", {"command": command}) is None
-    outside = (guard.other).as_posix()
-    assert guard.check(
-        "Bash", {"command": f"python scripts/refresh_schema_model.py --schemas-dir {outside}"}
-    )
+def test_the_schema_refresh_script_is_refused_even_on_the_sessions_schemas(guard) -> None:
+    # SKILL.md Step 4.5 asks for it, but it imports the session's output_schema.py,
+    # and the guard runs only scripts that run the wizard's own code.
+    for target in (guard.session / "poc" / "schemas", guard.other):
+        command = f"python scripts/refresh_schema_model.py --schemas-dir {target.as_posix()}"
+        assert guard.check("Bash", {"command": command})
 
 
 def test_a_session_path_with_a_tilde_later_in_it_is_still_readable(guard) -> None:
