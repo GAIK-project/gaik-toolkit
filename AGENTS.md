@@ -137,7 +137,9 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   (`lib/api-access.ts`), or a pending one within the daily trial allowance
   (`lib/trial.ts`, counted in Upstash Redis, off without it). The first Solution
   Wizard's API, `/api/wizard`, also needs the per-user `wizard_access` grant from
-  `/admin`, for reads too: its agent has shell tools in the API pod.
+  `/admin`, for reads too: its agent has shell tools in the API pod. A write to data
+  that every visitor shares needs an approved user (`writesSharedData`), and the API
+  serves no route that writes the shared video-search index.
 
 ## docs site (GitHub Pages)
 

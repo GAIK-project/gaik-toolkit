@@ -101,6 +101,51 @@ def exportable_record(record: logging.LogRecord) -> logging.LogRecord:
     return copy
 
 
+#: The API's own loggers: ``wizard_api`` and everything under it.
+API_LOGGER = "wizard_api"
+_LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+
+def log_level() -> int:
+    """``WIZARD_LOG_LEVEL`` as a level (DEBUG, INFO, WARNING, ERROR); INFO unless set."""
+    level = logging.getLevelName(os.getenv("WIZARD_LOG_LEVEL", "").strip().upper() or "INFO")
+    return level if isinstance(level, int) else logging.INFO
+
+
+def _let_through(level: int) -> None:
+    """Let the API's loggers pass records at ``level`` on to their handlers."""
+    tree = logging.getLogger(API_LOGGER)
+    if tree.getEffectiveLevel() > level:
+        tree.setLevel(level)
+
+
+def configure_logging(stream: Any = None) -> None:
+    """Print the API's own log lines in the pod, from ``WIZARD_LOG_LEVEL``. Idempotent.
+
+    Uvicorn configures its own loggers only, so the API's were left at the root's
+    WARNING: an INFO line, such as each tool call the agent's guard decides, was
+    dropped before any handler saw it. The ``wizard_api`` loggers get their level
+    here and a handler that prints to stderr (``stream`` in tests), unless one
+    that writes to a stream is already on them or on the root, which would print
+    each line twice.
+
+    Records still go on to the root, where the collector's handler keeps its own
+    level (``WIZARD_OTEL_LOG_LEVEL``, WARNING unless set): an INFO line reaches the
+    collector only when that asks for it, and once.
+    """
+    level = log_level()
+    tree = logging.getLogger(API_LOGGER)
+    tree.setLevel(level)
+    if any(
+        isinstance(h, logging.StreamHandler) for h in tree.handlers + logging.getLogger().handlers
+    ):
+        return
+    handler = logging.StreamHandler(stream)
+    handler.setLevel(level)
+    handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+    tree.addHandler(handler)
+
+
 class _NotOwnExporter(logging.Filter):
     """Keep the exporter's own complaints out of the records it exports."""
 
@@ -137,6 +182,9 @@ def _setup_logs(resource: Any) -> None:
     handler = _ExportHandler(level=level, logger_provider=provider)
     handler.addFilter(_NotOwnExporter())
     logging.getLogger().addHandler(handler)
+    # WIZARD_OTEL_LOG_LEVEL=INFO must reach the API's INFO lines even where the
+    # pod prints only warnings; the pod's handler keeps WIZARD_LOG_LEVEL.
+    _let_through(level)
     _log_provider = provider
 
 
@@ -290,7 +338,10 @@ def record_turn_usage(
         "gaik.agent.purpose": purpose,
     }
     span.set_attributes({k: v for k, v in attributes.items() if v is not None})
-    if getattr(result, "is_error", False):
+    if getattr(result, "terminal_reason", None) in ("aborted_streaming", "aborted_tools"):
+        # The user stopped the reply: the query ended early, as asked.
+        span.set_attribute("gaik.agent.stopped", True)
+    elif getattr(result, "is_error", False):
         if replaced:
             span.set_attribute("gaik.agent.replaced", True)
         else:
@@ -304,6 +355,7 @@ async def traced_turn(
     agents: Callable[[], Iterable[tuple[dict, bool]]],
     model: str,
     is_error: Callable[[str], bool],
+    is_stopped: Callable[[str], bool] | None = None,
 ) -> AsyncIterator[str]:
     """Pass a chat turn's SSE ``frames`` through, inside one ``wizard.turn`` span.
 
@@ -313,13 +365,16 @@ async def traced_turn(
     at the end of the stream, each with whether a retry replaced it. The turn
     is an error when a frame the user saw was an error. A turn the client left
     before it ended (closed tab, dropped connection) is ``gaik.turn.aborted``;
-    the query it cut short has no ``chat`` span, as its usage never arrived.
+    the query it cut short has no ``chat`` span, as its usage never arrived. A
+    turn the user stopped (a frame ``is_stopped`` knows) is ``gaik.turn.stopped``
+    and counted with the outcome ``stopped``, not as a failure.
     """
     from wizard_api import ops_metrics
 
     turn = tracer.start_span("wizard.turn")
     turn.set_attributes(attributes)
     failed = False
+    stopped = False
     outcome = "completed"
     started = time.monotonic()
     first = True
@@ -329,6 +384,7 @@ async def traced_turn(
                 ops_metrics.turn_first_frame.record(time.monotonic() - started)
                 first = False
             failed = failed or is_error(frame)
+            stopped = stopped or (is_stopped is not None and is_stopped(frame))
             yield frame
     except (asyncio.CancelledError, GeneratorExit):
         turn.set_attribute("gaik.turn.aborted", True)
@@ -341,6 +397,9 @@ async def traced_turn(
     finally:
         if outcome == "completed" and failed:
             outcome = "failed"
+        elif outcome == "completed" and stopped:
+            outcome = "stopped"
+            turn.set_attribute("gaik.turn.stopped", True)
         ops_metrics.turns.add(1, {"outcome": outcome})
         if outcome != "aborted":
             ops_metrics.turn_duration.record(time.monotonic() - started, {"outcome": outcome})

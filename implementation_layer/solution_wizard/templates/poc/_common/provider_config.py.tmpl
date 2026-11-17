@@ -1,6 +1,7 @@
 """Load independent provider credentials and settings for each PoC stage."""
 
 import os
+import re
 import sys
 from urllib.parse import urlsplit
 
@@ -10,6 +11,14 @@ from gaik.software_components.llm.providers import resolve_provider
 # Settings in this PoC's own config that name a provider address.
 _ADDRESS_SETTINGS = ("base_url", "azure_endpoint", "azure_audio_endpoint")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+#: A transcription model or deployment name (gpt-4o-transcribe, whisper-1), as opposed to
+#: the chat model that enhances the transcript.
+_AUDIO_MODEL = re.compile(r"transcribe|whisper", re.IGNORECASE)
+#: An env: reference names a setting, never a credential: its value would be sent and
+#: printed as a model name or address (the scaffolder refuses the same names).
+_CREDENTIAL_NAME = re.compile(
+    r"KEY|TOKEN|SECRET|PASSW|CREDENTIAL|DATABASE|DSN|PRIVATE|CERT", re.IGNORECASE
+)
 
 
 def _local_host(url: str, governance: dict) -> bool:
@@ -44,9 +53,8 @@ def _allowed_hosts(config: dict, settings: dict) -> list[str]:
     """Hosts gaik may send this stage's key to beyond its own provider hosts.
 
     These are a stage address on this machine and the self-hosted servers the approved
-    blueprint lists in models.local_endpoints, over http too. From the gaik release
-    after 0.10.0, any other address goes through gaik's own check: name it in
-    GAIK_ALLOWED_ENDPOINT_HOSTS. gaik 0.10.0 ignores the list.
+    blueprint lists in models.local_endpoints, over http too. Any other address goes
+    through gaik's own check: name it in GAIK_ALLOWED_ENDPOINT_HOSTS.
     """
     listed = settings.get("allowed_endpoint_hosts") or []
     hosts = listed.split(",") if isinstance(listed, str) else list(listed)
@@ -57,6 +65,10 @@ def _allowed_hosts(config: dict, settings: dict) -> list[str]:
         if host and host.lower() in _LOCAL_HOSTS:
             hosts.append(host)
     return hosts
+
+
+#: The unset env: variables a warning has already named.
+_UNSET_WARNED: set[str] = set()
 
 
 def _resolve_env_values(node):
@@ -73,13 +85,21 @@ def _resolve_env_values(node):
         for key, value in node.items():
             if isinstance(value, str) and value.strip()[:4].lower() == "env:":
                 name = value.strip()[4:].strip()
-                resolved = os.environ.get(name)
+                if _CREDENTIAL_NAME.search(name):
+                    raise ValueError(
+                        f"{key} = {value!r} names a credential; env: names a setting such as "
+                        "a deployment or an endpoint. Keep keys in the provider's own variables."
+                    )
+                resolved = (os.environ.get(name) or "").strip()
                 if resolved:
                     out[key] = resolved
-                else:
+                elif name not in _UNSET_WARNED:
+                    # Every stage reads the whole config: say it once.
+                    _UNSET_WARNED.add(name)
                     print(
                         f"WARNING: {key} = {value!r} names the environment variable {name}, "
-                        "which is not set here; using the provider default."
+                        "which is not set here; using the provider default.",
+                        file=sys.stderr,
                     )
                 continue
             out[key] = _resolve_env_values(value)
@@ -154,11 +174,23 @@ def _on_azure(stage: str, provider: str, settings: dict) -> dict:
     return get_llm_config("azure", **kept)
 
 
-def _same_provider(config: dict, stage: str, settings: dict, provider: str) -> bool:
+#: Settings that name the chat endpoint a model or deployment name belongs to.
+_CHAT_ADDRESS_SETTINGS = ("base_url", "azure_endpoint")
+#: Settings that describe a borrowed chat model: a custom Azure deployment name needs its
+#: model_family for gaik to build valid request options.
+_CHAT_MODEL_SETTINGS = ("model", "model_family")
+
+
+def _same_chat_endpoint(
+    config: dict, stage: str, settings: dict, other: dict, provider: str
+) -> bool:
+    """Whether ``other``'s stage settings name the same provider and chat endpoint."""
     try:
-        return _stage_provider(config, stage, settings, warn=False) == provider
+        if _stage_provider(config, stage, other, warn=False) != provider:
+            return False
     except ValueError:
         return False
+    return all(settings.get(key) == other.get(key) for key in _CHAT_ADDRESS_SETTINGS)
 
 
 def get_stage_config(config: dict, stage: str) -> dict:
@@ -176,18 +208,30 @@ def get_stage_config(config: dict, stage: str) -> dict:
         raise ValueError("Native Anthropic has no embeddings; configure stages.embedding.")
     if stage == "transcription":
         # `model` is the chat model gaik uses to enhance the transcript. An audio deployment
-        # written there (e.g. gpt-4o-transcribe) is sent to chat completions and fails with
-        # a 400, so it belongs in `transcription_model`.
-        audio_model = settings.pop("model", None)
-        if audio_model and not settings.get("transcription_model"):
-            settings["transcription_model"] = audio_model
-        models = config.get("models") or {}
-        if not settings.get("transcription_model") and models.get("transcription"):
-            settings["transcription_model"] = models["transcription"]
-        extraction = (config.get("stages") or {}).get("extraction") or {}
-        chat_model = extraction.get("model") or models.get("extraction")
-        if chat_model and _same_provider(config, "extraction", extraction, provider):
-            settings["model"] = chat_model
+        # written there instead of `transcription_model` (e.g. gpt-4o-transcribe) is sent to
+        # chat completions and fails with a 400, so it moves. Only a name that reads as an
+        # audio model moves: a scaffolded stage carries the shared chat model in `model`,
+        # and gaik's default (AZURE_/OPENAI_TRANSCRIPTION_MODEL) then names the audio model.
+        model = settings.get("model")
+        if (
+            isinstance(model, str)
+            and _AUDIO_MODEL.search(model)
+            and not settings.get("transcription_model")
+        ):
+            settings["transcription_model"] = settings.pop("model")
+        if not settings.get("model"):
+            # The enhancement then uses the extraction stage's chat model, when that
+            # stage names the same provider and chat endpoint.
+            if config.get("stages"):
+                extraction = config["stages"].get("extraction") or {}
+                borrowed = {k: extraction[k] for k in _CHAT_MODEL_SETTINGS if extraction.get(k)}
+            else:
+                extraction = {}
+                borrowed = {"model": (config.get("models") or {}).get("extraction")}
+            if borrowed.get("model") and _same_chat_endpoint(
+                config, "extraction", settings, extraction, provider
+            ):
+                settings.update(borrowed)
     if stage not in (config.get("stages") or {}):
         models = config.get("models") or {}
         if stage == "transcription":

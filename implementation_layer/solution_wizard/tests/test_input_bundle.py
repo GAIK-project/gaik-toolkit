@@ -82,8 +82,9 @@ def test_hints_pick_between_several_and_a_tie_is_an_error_that_lists_them(ib, tm
     _write(tmp_path / "minutes.pdf")
 
     assert ib.find_input(tmp_path, ".pdf", hints=("agenda",)).name == "agenda.pdf"
-    with pytest.raises(ib.InputNotFound, match="2 inputs"):
+    with pytest.raises(ib.InputNotFound, match="2 inputs") as raised:
         ib.find_input(tmp_path, ".pdf")
+    assert "agenda.pdf" in str(raised.value) and "minutes.pdf" in str(raised.value)
     assert ib.find_input(tmp_path, ".pdf", pick_first=True).name == "agenda.pdf"
 
 
@@ -204,10 +205,10 @@ def test_a_missing_manifest_document_is_an_error_unless_not_strict(dm, tmp_path)
 
 
 @pytest.mark.parametrize(
-    "pattern", ["_generic", "audio_to_structured", "document_to_structured", "rag"]
+    "template", sorted(TEMPLATES.glob("*/run_poc.py.tmpl")), ids=lambda path: path.parent.name
 )
-def test_no_template_lists_only_the_top_level_of_sample_input(pattern):
-    source = (TEMPLATES / pattern / "run_poc.py.tmpl").read_text(encoding="utf-8")
+def test_no_template_lists_only_the_top_level_of_sample_input(template):
+    source = template.read_text(encoding="utf-8")
 
     assert "sample_dir.iterdir()" not in source
 
@@ -290,7 +291,10 @@ def test_links_out_of_the_sample_folder_are_not_inputs(ib, tmp_path):
     sample = tmp_path / "sample_input"
     target = _write(tmp_path / "elsewhere" / "meeting.wav")
     sample.mkdir()
-    (sample / "meeting.wav").symlink_to(target)
+    try:
+        (sample / "meeting.wav").symlink_to(target)
+    except OSError:  # Windows without the symlink privilege
+        pytest.skip("this account cannot create symbolic links")
     _write(sample / "poc_input_bundle.json", {"inputs": {"meeting_audio": "meeting.wav"}})
 
     with pytest.raises(ib.InputNotFound):
@@ -324,3 +328,94 @@ def test_manifest_in_a_subfolder_of_sample_input_finds_sibling_documents(dm, tmp
     manifest = dm.DocumentManifest.load(manifest_path)
 
     assert [p.name for p in manifest.documents(strict=False)] == ["a.pdf"]
+
+
+def _link(link: Path, target: Path) -> None:
+    link.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        link.symlink_to(target)
+    except OSError:  # Windows without the symlink privilege
+        pytest.skip("this account cannot create symbolic links")
+
+
+def test_a_bundle_file_linked_from_elsewhere_is_not_read(ib, tmp_path):
+    sample = tmp_path / "sample_input"
+    _write(sample / "input" / "meeting.wav")
+    outside = _write(tmp_path / "elsewhere" / "bundle.json", {"inputs": {"a": "input/meeting.wav"}})
+    _link(sample / "poc_input_bundle.json", outside)
+
+    assert ib.load_bundle(sample) is None
+
+
+def test_an_uploads_list_linked_from_elsewhere_is_not_read(ib, tmp_path):
+    sample = tmp_path / "sample_input"
+    sample.mkdir()
+    outside = _write(tmp_path / "elsewhere" / "names.txt", "lahete.txt\n")
+    _link(sample / ib.UPLOADED_NAMES_FILE, outside)
+
+    assert ib.uploaded_names(sample) == set()
+
+
+def test_a_bundle_path_written_with_backslashes_is_found(ib, tmp_path):
+    _write(tmp_path / "input" / "meeting.wav")
+    _write(tmp_path / "poc_input_bundle.json", {"inputs": {"audio": "input\\meeting.wav"}})
+
+    assert ib.find_input(tmp_path, ".wav").name == "meeting.wav"
+
+
+def test_the_rag_poc_reads_no_pdf_linked_from_outside(tmp_path):
+    source = (TEMPLATES / "rag" / "run_poc.py.tmpl").read_text(encoding="utf-8")
+    start = source.index("def find_documents")
+    end = source.index("\ndef ", start + 1)
+    namespace = {"Path": Path, "__file__": str(tmp_path / "run_poc.py")}
+    exec(source[start:end], namespace)
+    sample = tmp_path / "sample_input"
+    _write(sample / "docs" / "inside.pdf")
+    _link(sample / "docs" / "outside.pdf", _write(tmp_path / "elsewhere" / "outside.pdf"))
+
+    found = namespace["find_documents"]({"paths": {"sample_input": str(sample)}})
+
+    assert [p.name for p in found] == ["inside.pdf"]
+
+
+def test_a_file_type_in_the_artifact_id_is_no_hint(tmp_path):
+    """agenda_pdf's hint is "agenda": "pdf" is in every PDF's name and would pick none."""
+    from solution_wizard.blueprint import Artifact, ArtifactSource, Blueprint
+    from solution_wizard.scaffolder import _build_input_loaders
+
+    blueprint = Blueprint.model_validate(
+        {"use_case": {"id": "uc", "name": "N", "description": "d", "domain": "t"}}
+    )
+    blueprint.artifacts = {
+        "agenda_pdf": Artifact(type="pdf", source=ArtifactSource.USER_UPLOAD, optional=False),
+        "meeting_audio": Artifact(type="audio", source=ArtifactSource.USER_UPLOAD, optional=False),
+    }
+
+    loaders = _build_input_loaders(blueprint)
+
+    assert "hints=('agenda',)" in loaders
+    assert "hints=('meeting', 'audio')" in loaders
+
+
+@pytest.mark.parametrize("content", ["not json", '{"participants": ["Ann", "Bo"]}'])
+def test_a_file_named_like_a_bundle_that_is_not_one_is_an_input(ib, tmp_path, content):
+    """bundle.json may be the case's own JSON input: not JSON, or naming no file there."""
+    _write(tmp_path / "bundle.json", content)
+    _write(tmp_path / "agenda.pdf")
+
+    assert ib.load_bundle(tmp_path) is None
+    assert ib.find_input(tmp_path, ".pdf").name == "agenda.pdf"
+    if content.startswith("{"):
+        assert ib.find_input(tmp_path, ".json").name == "bundle.json"
+
+
+def test_a_manifest_name_with_glob_characters_is_found_by_name(dm, tmp_path):
+    manifest_path = _write(
+        tmp_path / "manifest.json", {"documents": [{"file": "documents/report[2024].pdf"}]}
+    )
+    _write(tmp_path / "docs" / "report[2024].pdf")
+    _write(tmp_path / "docs" / "report2.pdf")
+
+    manifest = dm.DocumentManifest.load(manifest_path)
+
+    assert [p.name for p in manifest.documents()] == ["report[2024].pdf"]

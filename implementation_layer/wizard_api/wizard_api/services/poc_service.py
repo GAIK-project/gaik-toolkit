@@ -966,7 +966,7 @@ def _version_files(poc_dir: str) -> list[str]:
 
     run_poc.py imports the helpers the scaffolder copies in (``poc_output.py``,
     ``document_manifest.py``, ``input_bundle.py``) and any module the agent adds, and
-    from the gaik release after 0.10.0 the PoC loads ``schemas/output_schema_model.json``
+    since gaik 0.11.0 the PoC loads ``schemas/output_schema_model.json``
     rather than the .py file, so a change to any of them changes what runs.
     """
     names = set(_VERSION_FILES)
