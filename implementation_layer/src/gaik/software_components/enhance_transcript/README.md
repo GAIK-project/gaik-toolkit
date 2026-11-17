@@ -203,9 +203,16 @@ holds each pass to that:
 - A pass whose answer changes, adds, removes or reorders any digit is refused.
 - A pass that changes more than `max_change_ratio` of its input's letters (default
   `0.25`) is refused. Case, punctuation, spacing (a merged or split compound) and accents
-  (a/ä, o/ö) do not count, so `tama on hammas laakari` -> `tämä on hammaslääkäri` passes,
-  while a rewritten sentence does not. The ratio is per pass, so two passes together can
-  change more.
+  (a/ä, o/ö) do not count, so `tama on hammas laakari` -> `tämä on hammaslääkäri` passes.
+  The result as a whole is held to the same limit against the original, so the two
+  passes cannot add up past it.
+
+What this does and does not protect: the ratio stops a wholesale rewrite, such as a
+translation or a summary in place of the transcript. It does not stop a small, targeted
+change: on a transcript of any length, a dropped negation ("ei vaihdettu" ->
+"vaihdettu"), a changed name, a deleted short sentence or a number word changed
+(`yhdeksän` -> `kahdeksan`) are well under 25% and pass. The digit check also covers
+superscripts, full-width digits and number characters such as ½ and Ⅸ.
 
 A refused pass keeps its input, so the next pass works on it, and it is listed in
 `refused_passes` with its reason. `original_text` always keeps the raw transcript and
@@ -221,7 +228,9 @@ unit next to the same digits (`2,5 mg` -> `2.5 g`), a magnitude word (`miljoonaa
 transcript, or keep the raw transcript as the record.
 
 The transcript reaches the model in its own `<source_material>` block, apart from the
-rules, so a sentence spoken in the recording is data to edit, not an instruction.
+rules, which lowers the chance that a sentence spoken in the recording is taken as an
+instruction; it does not remove it, and the checks above catch only large or numeric
+changes.
 
 ## Environment Variables
 

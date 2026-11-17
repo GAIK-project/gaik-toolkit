@@ -14,6 +14,7 @@ import re
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 from gaik.software_components.enhance_transcript.enhance_transcript import (
     PASS1_SYSTEM_PROMPT,
     PASS2_SYSTEM_PROMPT,
@@ -416,3 +417,62 @@ def test_reasoning_effort_forwarded_through_provider_client_path():
     assert call_kwargs.get("reasoning_effort") == "medium"
     assert call_kwargs.get("model") == "gpt-test"
     assert call_kwargs.get("temperature") == 0.0
+
+
+def test_a_long_rewritten_answer_is_refused_quickly():
+    import time as _time
+
+    from gaik.software_components.enhance_transcript import enhance_transcript as et
+
+    def word(i: int, letters: str) -> str:  # no digits, so only the ratio decides
+        return "".join(letters[int(d)] for d in str(i))
+
+    long_text = " ".join(word(i, "abcdefghij") + "sana" for i in range(9000))
+    rewritten = " ".join(word(i, "klmnopqrst") + "word" for i in range(9000))
+
+    started = _time.monotonic()
+    reason = et._refusal(long_text, rewritten, 0.25)
+    took = _time.monotonic() - started
+
+    assert reason is not None and "more than 25%" in reason
+    assert took < 5
+
+
+@pytest.mark.parametrize("added", ["½", "Ⅸ", "⁹", "９"])
+def test_a_number_character_that_is_not_a_plain_digit_counts(added):
+    from gaik.software_components.enhance_transcript import enhance_transcript as et
+
+    assert et._refusal("9 suodatinta", f"9{added} suodatinta", None) == "digits changed"
+
+
+def test_an_answer_that_is_only_echoed_tags_keeps_the_transcript(monkeypatch):
+    monkeypatch.setattr(
+        "gaik.software_components.enhance_transcript.enhance_transcript.build_compat_client",
+        lambda config: object(),
+    )
+    enhancer = TranscriptEnhancer({"provider": "aitta", "api_key": "k"}, max_change_ratio=None)
+
+    def only_tags(messages, *, fallback):
+        user = messages[1]["content"]
+        start = user.index("<source_material")
+        opening_end = user.index(">", start) + 1
+        closing = user[user.index("</source_material", opening_end) :]
+        return user[start:opening_end] + "\n" + closing
+
+    enhancer._chat_text = only_tags  # type: ignore[method-assign]
+    text = "ei numeroita tässä tekstissä ollenkaan"
+
+    assert enhancer.enhance_text(text).enhanced_text == text
+
+
+def test_two_passes_cannot_add_up_past_the_limit():
+    words = "yksi kaksi kolme neljä viisi kuusi seitsemän kahdeksan yhdeksän kymmenen".split()
+    original = " ".join(words * 4)
+    first = original.replace("yksi", "uno").replace("kaksi", "dos")
+    second = first.replace("kolme", "tres").replace("neljä", "cuatro")
+    enhancer = _with_answers(first, second)
+
+    result = enhancer.enhance_text(original)
+
+    assert [r.pass_name for r in result.refused_passes] in (["pass2"], ["pass1", "pass2"])
+    assert result.enhanced_text in (first, original)

@@ -235,10 +235,19 @@ _DIGITS = re.compile(r"\d+")
 
 
 def _digit_runs(text: str) -> list[str]:
-    return _DIGITS.findall(text)
+    """The digit runs of ``text``, and every other number character, in order.
+
+    NFKD turns superscripts and full-width digits into plain ones; characters Unicode
+    counts as numbers but not digits (½, Ⅸ) are listed too, so adding one is seen.
+    """
+    folded = unicodedata.normalize("NFKD", text)
+    runs = _DIGITS.findall(folded)
+    others = [ch for ch in text if unicodedata.category(ch) in ("Nl", "No")]
+    return runs + others
 
 
 _NOT_LETTER = re.compile(r"[\W_]+")
+_MAX_SPAN_LETTERS = 2000
 
 
 def _letters(text: str) -> str:
@@ -267,6 +276,11 @@ def _change_ratio(original: str, changed: str) -> float:
             continue
         x, y = _letters(" ".join(a[i1:i2])), _letters(" ".join(b[j1:j2]))
         if x == y:
+            continue
+        if max(len(x), len(y)) > _MAX_SPAN_LETTERS:
+            # A span this long means the words no longer line up: a rewrite. Comparing
+            # its letters would take minutes on a long transcript; count it all.
+            edits += max(len(x), len(y))
             continue
         matched = sum(
             m.size for m in SequenceMatcher(a=x, b=y, autojunk=False).get_matching_blocks()
@@ -373,6 +387,14 @@ class TranscriptEnhancer:
             ),
             refused,
         )
+        # Each pass is checked against its own input; the result as a whole is held to
+        # the same limit against the original, so two passes cannot add up past it.
+        if enhanced_text != pass1_text:
+            whole = _refusal(transcript_text, enhanced_text, self.max_change_ratio)
+            if whole is not None:
+                logger.warning("TranscriptEnhancer pass2 refused (%s with pass1)", whole)
+                refused.append(RefusedPass(pass_name="pass2", reason=f"{whole}, with pass1"))
+                enhanced_text = pass1_text
         self._notify(progress_callback, "pass2_completed", {"chars": len(enhanced_text)})
 
         # ``generate_summary`` is kept for callers; the summary is always computed now,
@@ -461,7 +483,10 @@ class TranscriptEnhancer:
             "Edit this Finnish transcript for spelling consistency:\n\n"
             + material.wrap(transcript_text, label="transcript"),
         )
-        return material.strip_echo(self._chat_text(messages, fallback=transcript_text))
+        # An answer that was only the echoed tags is empty: keep the input.
+        return material.strip_echo(self._chat_text(messages, fallback=transcript_text)) or (
+            transcript_text
+        )
 
     def _enhance_pass2(
         self,
@@ -480,7 +505,10 @@ class TranscriptEnhancer:
         messages = source_material_messages(
             apply_domain_rules(PASS2_SYSTEM_PROMPT, domain_rules), user_prompt
         )
-        return material.strip_echo(self._chat_text(messages, fallback=transcript_text))
+        # An answer that was only the echoed tags is empty: keep the input.
+        return material.strip_echo(self._chat_text(messages, fallback=transcript_text)) or (
+            transcript_text
+        )
 
     def _chat_text(self, messages: list[dict], *, fallback: str) -> str:
         # ``reasoning_effort`` is omitted unless explicitly configured so we
