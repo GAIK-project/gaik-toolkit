@@ -61,13 +61,16 @@ Before setting up, please install:
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\Users\\you\\Documents\\GAIK"]
     }
   }
 }
 ```
 
-3. Save and close the file
+3. Replace `C:\\Users\\you\\Documents\\GAIK` with the folder that holds your purchase orders,
+   BOMs and price lists. The server can read and write only there; never give a whole drive
+   such as `C:\\`.
+4. Save and close the file
 
 **Step 2: Restart Claude Desktop**
 
@@ -115,13 +118,7 @@ My-Order/
 
 ### Step 2: Ask Claude to Process the Order
 
-In Claude Desktop, upload the .zip file of the documents (same structure) and say:
-
-```
-Process these documents using purchase-order-processing skill
-```
-
-Or provide the local path of the documents:
+Give Claude the local path of the folder:
 
 ```
 Generate sales order from C:\Orders\NewCustomer using purchase-order-processing skill
@@ -221,7 +218,7 @@ The skill automatically calculates and includes:
 | **Testing Fees** | Testing Fee × Test Lots | Price List × BOM field |
 | **Certification Fees** | Cert Fee × Certificates | Price List × BOM field |
 | **Volume Discount** | Tiered discount on materials | Based on subtotal |
-| **Tax** | Tax on materials + fees | Configurable rate (default 6%) |
+| **Tax** | Tax on materials + fees + shipping | Configurable rate (default 6%) |
 | **Grand Total** | All components combined | Complete pricing |
 
 **Important:** The skill ALWAYS uses Price List prices, NEVER the prices from the customer's PO.
@@ -234,7 +231,7 @@ The skill is highly customizable to match your business processes. Here's what y
 
 ### 1. Price List Structure
 
-**File to edit:** `reference/EXTRACTION_FIELDS.md` (Lines 137-135)
+**File to edit:** `reference/EXTRACTION_FIELDS.md` ("Price List Fields" section)
 
 **What to change:** Column names in your price list
 
@@ -249,7 +246,7 @@ The skill is highly customizable to match your business processes. Here's what y
 
 **Example customization:**
 If your price list uses "Product Name" instead of "Type/Part Designation":
-1. Edit line 126 in EXTRACTION_FIELDS.md
+1. Find the `PL_Type_Part_Designation` row under "Price List Fields" in EXTRACTION_FIELDS.md and under "Price List Column Mapping" in PRICING_RULES.md
 2. Change `PL_Type_Part_Designation` mapping to your column name
 
 ---
@@ -329,7 +326,7 @@ The skill already recognizes variations like:
 
 ### 5. Tax Rate
 
-**File to edit:** `reference/CALCULATION_LOGIC.md` (Line 233)
+**File to edit:** `reference/CALCULATION_LOGIC.md` ("Default Tax Rate" under Tax Calculation)
 
 **What to change:** Default tax rate
 
@@ -370,7 +367,7 @@ Process this order with 8% tax rate using purchase-order-processing skill
    - Company information
 
 **C) Change Section Content:**
-Edit `OUTPUT_FORMAT.md` lines 199-240 to:
+Edit the "Sales Order Sections" part of `OUTPUT_FORMAT.md` to:
 - Add new sections
 - Remove optional sections
 - Change field order
@@ -415,18 +412,17 @@ To extract "Supplier Code" from BOM:
 **Common customizations:**
 
 **Change tax calculation base:**
-- Default: Tax on (Materials + Fees), NOT on shipping
-- To include shipping in tax:
+- Default: Tax on (Net Materials + Fees + Shipping)
+- To exclude shipping from tax, change the "Taxable Amount" formula to:
   ```
-  Line 223: Change to:
-  Taxable_Amount = Net_Material_Cost + Total_Fees + Shipping
+  Taxable_Amount = Net_Material_Cost + Total_Fees
   ```
 
 **Change discount application:**
 - Default: Discount on materials only
 - To discount everything:
   ```
-  Line 139: Change to:
+  Under "Volume Discount Calculation", Step 2: Change to:
   Total_Before_Discount = Subtotal + Total_Fees
   Volume_Discount = Total_Before_Discount × Discount_Rate
   ```
@@ -440,7 +436,7 @@ To extract "Supplier Code" from BOM:
 
 ### 9. Validation Rules
 
-**File to edit:** `SKILL.md` (Lines 243-247)
+**File to edit:** `SKILL.md` ("Validation Rules" table in Step 3)
 
 **What to change:** Validation checks performed
 
@@ -612,8 +608,8 @@ does not download PDFs and Office files. Download
 The skill generates two files:
 
 ### 1. Sales Order Document
-**Format:** `.docx` (Word document)
-**Filename:** `SO-{number}_{Customer}_{Date}.docx`
+**Format:** `.docx` with a sample sales order, otherwise plain text (`.txt`)
+**Filename:** `SO-{number}_{Customer}_{Date}.docx` or `.txt`
 
 Contains:
 - Order header (SO number, date, PO reference)

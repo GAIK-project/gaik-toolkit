@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import inspect
 import logging
 import queue
 import re
@@ -26,12 +27,18 @@ from pydantic import TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
     from utils.model_settings import unsupported_option_detail
     from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.model_settings import unsupported_option_detail
     from api.utils.report_runs import require_report_run_grant
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import component_error
@@ -97,7 +104,15 @@ def _example(example_id: str):
     """Load an example spec, whose files must all exist under distinct names."""
     if example_id not in _example_ids():
         raise HTTPException(404, f"Unknown example: {example_id}")
-    spec = _gaik()[1].load(_examples_root() / example_id / "report_spec.json")
+    spec_class = _gaik()[1]
+    path = _examples_root() / example_id / "report_spec.json"
+    # An example may read files of a sibling example (project_meeting reads
+    # ../../multi_source_report_generator/), so its paths may reach anywhere under the
+    # examples' parent folder. A gaik before `root` reads them without that check.
+    if "root" in inspect.signature(spec_class.load).parameters:
+        spec = spec_class.load(path, root=_examples_root().parent)
+    else:
+        spec = spec_class.load(path)
     missing = [str(p.resolve()) for p in _paths(spec) if not p.is_file()]
     if missing:
         raise HTTPException(500, f"Example {example_id} is missing files: {', '.join(missing)}")
@@ -178,6 +193,20 @@ async def get_example_file(example_id: str, name: str):
 # ---------------------------------------------------------------------------
 
 
+def _check_spec_models(models) -> None:
+    """Each step's model must be one the demo offers (utils/model_allow_list.py)."""
+    if models is None:
+        return
+    chat = chat_models()
+    for step in ("vision", "curator", "writer", "reviewer"):
+        check_model(getattr(models, step, None), chat, f"{step} model")
+    check_model(
+        getattr(models, "transcription", None),
+        transcription_models(),
+        "transcription model",
+    )
+
+
 @router.post("/run", dependencies=[Depends(require_report_run_grant)])
 async def run_stage(
     stage: str = Form(...),
@@ -200,6 +229,7 @@ async def run_stage(
         parsed = spec_class.model_validate_json(spec)
     except ValidationError as exc:
         raise HTTPException(400, f"Invalid spec: {_errors(exc)}") from exc
+    _check_spec_models(getattr(parsed, "models", None))
     names = [str(p) for p in _paths(parsed)]
     if bad := [n for n in names if _not_a_file_name(n)]:
         raise HTTPException(400, f"Spec files must be file names, not paths: {bad}")
@@ -238,11 +268,15 @@ async def run_stage(
         report_spec = spec_class.load(inputs / "report_spec.json")
         (inputs / "report_spec.json").unlink()  # a source may have the same name
         for name, upload in zip(names, uploads):
+            data = await upload.read()
+            problem = await upload_problem(Path(name).suffix, data, check_type=False)
+            if problem is not None:
+                raise HTTPException(problem.status, f"{name}: {problem.message}")
             try:
                 # "x" refuses to overwrite: names that differ only in case collide on a
                 # case-insensitive dev machine.
                 with (inputs / name).open("xb") as out:
-                    out.write(await upload.read())
+                    out.write(data)
             except OSError as exc:
                 logger.warning("Cannot store an uploaded file name: %s", type(exc).__name__)
                 raise HTTPException(

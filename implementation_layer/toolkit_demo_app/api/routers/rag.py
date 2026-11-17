@@ -13,9 +13,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 try:
-    from utils import get_api_config, sse_event
+    from utils import get_rag_api_config, require_vision, sse_event
+    from utils.model_settings import request_server_model
 except ImportError:
-    from api.utils import get_api_config, sse_event
+    from api.utils import get_rag_api_config, require_vision, sse_event
+    from api.utils.model_settings import request_server_model
 import requests
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
@@ -23,9 +25,9 @@ from langchain_core.documents import Document
 from pydantic import BaseModel
 
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import error_detail
@@ -290,20 +292,61 @@ class DoclingRagApiClient:
         }
 
 
+# E5 reads 512 tokens, and Aitta answers a longer input with HTTP 500 instead of
+# truncating it. Dense text (tables, numbers) reached that at about 1000
+# characters, so a passage is cut to the first limit and, if Aitta still refuses
+# the batch, to the next. The stored chunk keeps its full text; only its vector
+# covers the start.
+E5_CHAR_LIMITS = (700, 350)
+
+
+def _demo_embedder(config: dict):
+    """The embedder of a collection: E5 models get their query and passage prefixes."""
+    from gaik.software_components.RAG.embedder import Embedder
+
+    model = EXAMPLE_EMBEDDING_MODEL if config.get("provider") in {"openai", "azure"} else None
+    if "e5" not in str(model or config.get("embedding_model") or "").lower():
+        return Embedder(config=config, model=model)
+
+    class E5Embedder(Embedder):
+        """E5 is trained on "query: " and "passage: " prefixes and retrieves worse without."""
+
+        def embed(self, documents, *, batch_size=None):
+            if not documents:
+                return [], []
+            docs = [
+                d if isinstance(d, Document) else Document(page_content=d, metadata={})
+                for d in documents
+            ]
+            for limit in E5_CHAR_LIMITS:
+                try:
+                    vectors, _ = super().embed(
+                        [f"passage: {d.page_content[:limit]}" for d in docs],
+                        batch_size=batch_size,
+                    )
+                    return vectors, docs
+                except Exception:
+                    if limit == E5_CHAR_LIMITS[-1]:
+                        raise
+            return [], docs
+
+        def embed_query(self, query: str) -> list[float]:
+            vectors, _ = Embedder.embed(
+                self, [f"query: {query[: E5_CHAR_LIMITS[0]]}"], batch_size=1
+            )
+            return vectors[0] if vectors else []
+
+    return E5Embedder(config=config, model=model)
+
+
 class DemoRagWorkflow:
     def __init__(self, *, config: dict, collection_name: str) -> None:
         from gaik.software_components.RAG.answer_generator import AnswerGenerator
-        from gaik.software_components.RAG.embedder import Embedder
         from gaik.software_components.RAG.retriever import Retriever
         from gaik.software_components.RAG.vector_store import VectorStore
 
         self.api_config = config
-        self.embedder = Embedder(
-            config=config,
-            model=(
-                EXAMPLE_EMBEDDING_MODEL if config.get("provider") in {"openai", "azure"} else None
-            ),
-        )
+        self.embedder = _demo_embedder(config)
         self.vector_store = VectorStore(
             persist=False,
             collection_name=collection_name,
@@ -448,6 +491,18 @@ class IndexResponse(BaseModel):
     documents: list[IndexedDocument]
     status: Literal["success", "error"]
     error: str | None = None
+    # The models this collection was built with; its questions run on them too.
+    embedding_model: str | None = None
+    answer_model: str | None = None
+
+
+def _collection_models(workflow: object) -> dict[str, str | None]:
+    api_config = getattr(workflow, "api_config", None)
+    models = {
+        "embedding_model": getattr(getattr(workflow, "embedder", None), "model", None),
+        "answer_model": api_config.get("model") if isinstance(api_config, dict) else None,
+    }
+    return {name: value if isinstance(value, str) else None for name, value in models.items()}
 
 
 class QueryResponse(BaseModel):
@@ -577,8 +632,10 @@ async def index_documents(
                 request_start = time.perf_counter()
                 workflow = RAG_INSTANCES.get(coll_id)
                 if workflow is None:
-                    workflow = _build_demo_workflow(get_api_config(), coll_id)
+                    workflow = _build_demo_workflow(get_rag_api_config(), coll_id)
                     RAG_INSTANCES[coll_id] = workflow
+                if parser_choice == "vision_plus":
+                    require_vision(workflow.api_config)
                 indexed_docs: list[IndexedDocument] = []
                 total_chunks = 0
 
@@ -586,8 +643,8 @@ async def index_documents(
                     # Save uploaded file temporarily
                     suffix = Path(file.filename).suffix.lower()
                     content = await file.read()
-                    if (mismatch := content_mismatch(suffix, content)) is not None:
-                        raise HTTPException(status_code=415, detail=mismatch)
+                    if (problem := await upload_problem(suffix, content)) is not None:
+                        raise HTTPException(status_code=problem.status, detail=problem.message)
                     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                         tmp.write(content)
                         tmp_path = tmp.name
@@ -627,6 +684,7 @@ async def index_documents(
                 )
 
                 return IndexResponse(
+                    **_collection_models(workflow),
                     collection_id=coll_id,
                     document_count=len(files),
                     chunk_count=total_chunks,
@@ -894,9 +952,12 @@ async def clear_collections(collection_ids: list[str] = Query(..., min_length=1)
     return {"status": "success", "message": f"Cleared {cleared} collections"}
 
 
-def _example_index_response(collection_id: str, chunk_counts: dict[str, int]) -> IndexResponse:
+def _example_index_response(
+    collection_id: str, chunk_counts: dict[str, int], workflow: object = None
+) -> IndexResponse:
     """Build a standard IndexResponse for the example documents (chunks per file name)."""
     return IndexResponse(
+        **_collection_models(workflow),
         collection_id=collection_id,
         document_count=len(chunk_counts),
         chunk_count=sum(chunk_counts.values()),
@@ -929,13 +990,24 @@ async def load_example_document(
     Both documents are parsed with the chosen parser and indexed into one collection, which is
     kept in memory, so the next request for the same parser returns at once.
     """
+    config = get_rag_api_config()
+    if parser_choice == "vision_plus":
+        require_vision(config)
+    # One shared example collection per parser and per model pair: vectors of one
+    # embedding model cannot be searched with another.
     example_collection_id = f"{EXAMPLE_COLLECTION_PREFIX}-{parser_choice}"
+    chosen = request_server_model()
+    if chosen is not None and config.get("model") == chosen.model:
+        slug = re.sub(r"[^a-z0-9]+", "-", chosen.id.lower()).strip("-")
+        example_collection_id += f"-{slug}"
 
     # If already loaded, return existing collection
     if example_collection_id in RAG_INSTANCES:
         workflow = RAG_INSTANCES[example_collection_id]
         _usage(example_collection_id)[0] = time.monotonic()
-        return _example_index_response(example_collection_id, _loaded_example_counts(workflow))
+        return _example_index_response(
+            example_collection_id, _loaded_example_counts(workflow), workflow
+        )
 
     # Acquire lock
     lock = await _get_collection_lock(example_collection_id)
@@ -944,7 +1016,9 @@ async def load_example_document(
         # Double-check after acquiring lock
         if example_collection_id in RAG_INSTANCES:
             workflow = RAG_INSTANCES[example_collection_id]
-            return _example_index_response(example_collection_id, _loaded_example_counts(workflow))
+            return _example_index_response(
+                example_collection_id, _loaded_example_counts(workflow), workflow
+            )
 
         try:
             missing = [
@@ -959,7 +1033,6 @@ async def load_example_document(
                 )
 
             evict_collections(make_room=True)
-            config = get_api_config()
             workflow = _build_demo_workflow(config, example_collection_id)
 
             chunk_counts: dict[str, int] = {}
@@ -979,7 +1052,7 @@ async def load_example_document(
             RAG_INSTANCES[example_collection_id] = workflow
             _usage(example_collection_id)[0] = time.monotonic()
 
-            return _example_index_response(example_collection_id, chunk_counts)
+            return _example_index_response(example_collection_id, chunk_counts, workflow)
 
         except HTTPException:
             raise

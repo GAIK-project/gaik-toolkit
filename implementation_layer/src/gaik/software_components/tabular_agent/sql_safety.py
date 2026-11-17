@@ -27,8 +27,10 @@ from __future__ import annotations
 from collections.abc import Callable
 
 try:
-    import sqlglot
     from sqlglot import exp
+    from sqlglot.errors import ErrorLevel, UnsupportedError
+
+    from gaik.software_components import _sql_parse
 except ImportError as exc:
     raise ImportError(
         "tabular_agent requires 'sqlglot'. Install extras with 'pip install gaik[tabular-agent]'"
@@ -94,7 +96,7 @@ def validate_read_only(sql: str, *, allowed_tables: list[str] | None = None) -> 
         raise UnsafeSQLError("Empty SQL statement.")
 
     try:
-        parsed = sqlglot.parse(sql, read="duckdb")
+        parsed = _sql_parse.parse(sql, "duckdb")
     except Exception as exc:
         raise UnsafeSQLError(f"Could not parse SQL: {exc}") from exc
 
@@ -103,7 +105,8 @@ def validate_read_only(sql: str, *, allowed_tables: list[str] | None = None) -> 
         raise UnsafeSQLError(f"Expected exactly one SQL statement, found {len(statements)}.")
     statement = statements[0]
 
-    if not isinstance(statement, (exp.Select, exp.Union)):
+    # UNION, EXCEPT and INTERSECT; newer sqlglot no longer derives the last two from Union.
+    if not isinstance(statement, (exp.Select, exp.Union, exp.Except, exp.Intersect)):
         raise UnsafeSQLError(
             f"Only read-only SELECT queries are allowed (got {type(statement).__name__})."
         )
@@ -150,7 +153,22 @@ def validate_read_only(sql: str, *, allowed_tables: list[str] | None = None) -> 
 
     _walk_tables(statement, frozenset(), check_table)
 
-    return statement.sql(dialect="duckdb")
+    # sqlglot ignores an argument it has no slot for, so the tree would run a
+    # different query than the one written.
+    lossy = _sql_parse.dropped_argument(statement)
+    if lossy is not None:
+        raise UnsafeSQLError(
+            "The query cannot be checked as written: a function call loses one of its "
+            f"arguments and would run as {lossy.sql(dialect='duckdb')}. "
+            "Write that call another way."
+        )
+
+    # Rendered from the checked tree, so nothing sqlglot did not parse reaches
+    # DuckDB; a render that would drop part of the query is refused instead.
+    try:
+        return statement.sql(dialect="duckdb", unsupported_level=ErrorLevel.RAISE)
+    except UnsupportedError as exc:
+        raise UnsafeSQLError(f"The query cannot be checked as written: {exc}") from exc
 
 
 def _walk_tables(

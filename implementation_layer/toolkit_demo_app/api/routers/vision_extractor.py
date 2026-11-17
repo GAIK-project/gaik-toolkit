@@ -18,6 +18,7 @@ try:
     from utils import (
         MODEL,
         get_api_config,
+        require_vision,
         get_model_options,
         load_saved_requirements,
         load_saved_schema,
@@ -28,6 +29,7 @@ except ImportError:
     from api.utils import (
         MODEL,
         get_api_config,
+        require_vision,
         get_model_options,
         load_saved_requirements,
         load_saved_schema,
@@ -63,14 +65,16 @@ except ImportError:
     from api.utils.schema_view import describe_fields, specs_by_name, structure_of
 
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import error_detail
+    from utils.model_allow_list import check_team_tier, offered_to
 except ImportError:
     from api.utils.errors import error_detail
+    from api.utils.model_allow_list import check_team_tier, offered_to
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -517,10 +521,13 @@ async def extract_vision(
     model = model or _server_model()
     request_config = get_request_api_config()
     if request_config is not None:
+        require_vision(request_config)
         model = request_config["model"]
         lib_provider, use_azure, vertex_ai = "openai", request_config["provider"] == "azure", False
     else:
         lib_provider, use_azure, vertex_ai = _provider_settings(model_provider, model)
+        # A team-only model needs the team tier (utils/model_allow_list.py).
+        check_team_tier(model)
 
     for uploaded_file in files:
         _validate_suffix(uploaded_file.filename)
@@ -531,8 +538,8 @@ async def extract_vision(
         for uploaded_file in files:
             content = await validate_file_size(uploaded_file)
             suffix = Path(uploaded_file.filename or "").suffix.lower()
-            if (mismatch := content_mismatch(suffix, content)) is not None:
-                raise HTTPException(status_code=415, detail=mismatch)
+            if (problem := await upload_problem(suffix, content)) is not None:
+                raise HTTPException(status_code=problem.status, detail=problem.message)
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(content)
                 temp_paths.append(Path(tmp.name))
@@ -620,7 +627,8 @@ async def extract_vision(
 
 @router.get("/models")
 async def model_catalogue():
+    # Team-only models are listed only for the team, like the server model menu.
     return {
-        "models": {name: list(_offered_models(name)) for name in PROVIDER_MODELS},
+        "models": {name: offered_to(_offered_models(name)) for name in PROVIDER_MODELS},
         "default": _server_model(),
     }

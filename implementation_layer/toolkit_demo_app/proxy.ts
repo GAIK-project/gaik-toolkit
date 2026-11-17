@@ -1,7 +1,11 @@
 import {
+  WIZARD_USER_HEADER,
   accessRefusal,
   isStateChanging,
+  isWizardApiPath,
   needsApprovedUser,
+  wizardRefusal,
+  writesSharedData,
 } from "@/lib/api-access";
 import {
   MODEL_SETTINGS_HEADER,
@@ -10,16 +14,18 @@ import {
   encodeModelSettings,
   parseModelSettingsHeader,
   supportsModelSettings,
+  supportsServerModel,
 } from "@/lib/model-settings";
 import {
   ADMIN_COOKIE_NAME,
   MODEL_TIER_HEADER,
   isModelStaff,
 } from "@/lib/model-tier";
+import { isAnalyticsPath } from "@/lib/analytics-path";
 import { backendTarget, isApiPath } from "@/lib/backend-target";
 import { routedPath } from "@/lib/request-path";
 import { clientIp } from "@/lib/client-ip";
-import { ratelimit } from "@/lib/rate-limit";
+import { checkRateLimit, ratelimit } from "@/lib/rate-limit";
 import {
   type AccessState,
   getAccessState,
@@ -27,6 +33,7 @@ import {
   withSessionCookies,
 } from "@/lib/supabase/proxy";
 import { takeTrialRun } from "@/lib/trial";
+import { recordWizardUse, wizardUseKind } from "@/lib/wizard-usage";
 import { attachCsp, isPagePath, setCsp } from "@/lib/csp";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -59,13 +66,16 @@ async function route(request: NextRequest): Promise<NextResponse> {
   if (pathname === null)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // The old Solution Wizard API is gone: the wizard runs as Wizard V2 and the
-  // demo API serves no /wizard routes, so nothing is forwarded there. The
-  // /solution-wizard page is a notice that links to Wizard V2, open to everyone.
-  if (pathname === "/api/wizard" || pathname.startsWith("/api/wizard/"))
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // Analytics requests go on to PostHog (lib/analytics-path.ts). Hand them on
+  // without this site's cookies, and before the session is read or refreshed:
+  // nothing here needs it, and a refresh would put new tokens in the request.
+  if (isAnalyticsPath(pathname)) {
+    const headers = new Headers(request.headers);
+    headers.delete("cookie");
+    return NextResponse.next({ request: { headers } });
+  }
 
-  // Read at most once per request, by the API gate. Reading it can refresh the
+  // Read at most once per request, by the API gates. Reading it can refresh the
   // session, and every response below carries the new cookies.
   let access: AccessState | undefined;
   const accessState = async () => (access ??= await getAccessState(request));
@@ -81,48 +91,67 @@ async function route(request: NextRequest): Promise<NextResponse> {
     pathname === "/api/source-normalizer/run" || // likewise
     pathname === "/api/knowledge-curator/run" || // likewise
     pathname === "/api/knowledge-synthesis/run" || // likewise
-    pathname === "/api/helpdesk-chat"; // runs its model in Next.js
+    pathname === "/api/helpdesk-chat" || // runs its model in Next.js
+    pathname === "/api/ai-act-screening"; // likewise
   if (isApiPath(pathname) && !isNextApiRoute) {
-    // Rate limit requests that change state (heavy processing, deletes)
-    if (ratelimit && isStateChanging(request.method)) {
-      try {
-        const ip = clientIp(request.headers);
+    // Rate limit requests that change state (heavy processing, deletes). While
+    // the configured Redis does not answer, the limiter refuses them (503).
+    if (isStateChanging(request.method)) {
+      const limited = await checkRateLimit(
+        ratelimit,
+        clientIp(request.headers),
+        "Liian monta pyyntöä. Yritä hetken päästä uudelleen.",
+        "[rate-limit]",
+      );
+      if (limited) {
+        return NextResponse.json(
+          { error: limited.error },
+          { status: limited.status, headers: limited.headers },
+        );
+      }
+    }
 
-        const { success, limit, remaining, reset } = await ratelimit.limit(ip);
-
-        if (!success) {
-          return NextResponse.json(
-            { error: "Liian monta pyyntöä. Yritä hetken päästä uudelleen." },
-            {
-              status: 429,
-              headers: {
-                "X-RateLimit-Limit": limit.toString(),
-                "X-RateLimit-Remaining": remaining.toString(),
-                "X-RateLimit-Reset": reset.toString(),
-              },
-            },
-          );
-        }
-      } catch (error) {
+    // The first Solution Wizard has a gate of its own on top of the one below,
+    // for every method: the per-user grant (lib/api-access.ts, wizardRefusal).
+    const wizardApi = isWizardApiPath(pathname);
+    if (wizardApi) {
+      const refusal = wizardRefusal(await accessState());
+      if (refusal) {
         console.warn(
-          "[rate-limit] Redis unavailable, skipping rate limit:",
-          error instanceof Error ? error.message : error,
+          `[wizard-gate] ${refusal.status} ${request.method} ${pathname}`,
+        );
+        return reply(
+          NextResponse.json(
+            { error: refusal.error },
+            { status: refusal.status },
+          ),
         );
       }
     }
 
     // Require login + approval for every backend request that changes state,
-    // not just POST: DELETE /video-search/clear empties a table.
+    // not just POST: a DELETE clears data.
     // A user still waiting for approval runs on the daily trial allowance
     // (lib/trial.ts). A request that carries the user's own model key on a
     // supported route runs on their credential: it still needs a signed-in
-    // account, approved or pending, but spends no trial run.
+    // account, approved or pending, but spends no trial run. Neither covers a
+    // write to data that every visitor shares.
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
     if (needsApprovedUser(request.method)) {
       const state = await accessState();
-      const refusal = await accessRefusal(state, takeTrialRun, ownModelKey);
+      // Starting Aitta's idle models is no demo run, and neither is ending a
+      // wizard session: they spend no trial run.
+      const noTrialRun =
+        ownModelKey ||
+        pathname === "/api/model-settings/aitta/warm" ||
+        (request.method === "DELETE" &&
+          pathname.startsWith("/api/wizard/end/"));
+      const refusal = await accessRefusal(state, takeTrialRun, {
+        noTrialRun,
+        sharedData: writesSharedData(request.method, pathname),
+      });
       if (refusal) {
         // Why a run was refused, without who: the page shows the same text.
         console.warn(
@@ -176,19 +205,31 @@ async function route(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // A wizard session belongs to the user who started it. The API takes the
+    // user from this header, which only the proxy sets: the headers sent to the
+    // backend are built here, not copied from the browser's request.
+    if (wizardApi) {
+      const { userId } = await accessState();
+      if (userId) headers.set(WIZARD_USER_HEADER, userId);
+    }
+
     // A server model the user picked. The API checks it against its own list.
     const serverModel = request.headers.get(SERVER_MODEL_HEADER);
     if (
       !modelSettings &&
       isServerModelId(serverModel) &&
-      supportsModelSettings(pathname, request.method)
+      supportsServerModel(pathname, request.method)
     ) {
       headers.set(SERVER_MODEL_HEADER, serverModel);
     }
-    // Tell the API whether this user may run the team-only models.
+    // Tell the API whether this user may run the team-only models, from the
+    // session (lib/model-tier.ts): on every run, which may name a model, and on
+    // the two catalogues that list the models. The browser's own copy of this
+    // header is never forwarded: `headers` starts empty.
     if (
-      headers.has(SERVER_MODEL_HEADER) ||
-      backendPath === "/model-settings/server"
+      isStateChanging(request.method) ||
+      backendPath === "/model-settings/server" ||
+      backendPath === "/extract-vision/models"
     ) {
       const { email } = await accessState();
       if (isModelStaff(email, request.cookies.get(ADMIN_COOKIE_NAME)?.value))
@@ -210,6 +251,17 @@ async function route(request: NextRequest): Promise<NextResponse> {
         body,
         ...(modelSettings ? { redirect: "error" as const } : {}),
       });
+
+      // A wizard session the API started, or a message it took, is counted
+      // for the user, for /admin (lib/wizard-usage.ts). Not awaited: the count
+      // must not hold the reply.
+      const wizardUse = wizardApi
+        ? wizardUseKind(request.method, pathname)
+        : null;
+      if (wizardUse && response.ok) {
+        const { userId } = await accessState();
+        if (userId) void recordWizardUse(userId, wizardUse);
+      }
 
       // For SSE streaming responses, pass through directly
       if (response.headers.get("content-type")?.includes("text/event-stream")) {

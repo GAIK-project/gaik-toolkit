@@ -6,6 +6,7 @@ dependency never breaks ``import gaik.software_components``.
 
 __all__ = [
     "config",
+    "input_limits",
     "llm",
     "extractor",
     "schema_generator",
@@ -29,5 +30,6 @@ __all__ = [
     "report_synthesizer",
     "web_scraper",
     "source_tracing",
+    "source_material",
     "fields_to_docx",
 ]

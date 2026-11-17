@@ -84,6 +84,44 @@ The same configuration shape works with `VisionPlusParser(vision_config=...)` an
 
 ---
 
+## Input limits
+
+A file over a limit is refused with `InputLimitError` (a `ValueError`) before it is
+parsed or sent to a model. Every parser takes `limits=InputLimits(...)`; a field set to
+`None` switches that limit off. Defaults: 100 MiB per file (a DOCX or XLSX may unpack to
+10 × that), 1,000,000 data rows per sheet or CSV, 89,478,485 pixels per image or rendered
+page, and 500 embedded images described per document (`VisionPlusParser`). The 500-page
+limit applies where every page becomes a model call (`VisionParser`, `MultimodalParser`);
+the parsers that read pages locally (`PyMuPDFParser`, `DoclingParser`,
+`DoclingApiClientParser`, `VisionPlusParser`) default to `InputLimits.local_parsing()`,
+which has no page limit.
+
+```python
+from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.parsers import VisionParser
+
+parser = VisionParser(config, limits=InputLimits(max_pages=30))
+first_page = parser.convert_pdf("scan.pdf", clean_output=False, first_pages=1)
+```
+
+`convert_pdf(..., first_pages=N)` renders and sends only the first `N` pages; the page
+limit then applies to those pages.
+
+## Source material as data
+
+The parsers that send a document to a model (`VisionParser`, `VisionPlusParser`
+through it, and `MultimodalParser`) treat the document as material, never as
+instructions ([`gaik.software_components.source_material`](../source_material.py)).
+Each call states the rule in `SOURCE_MATERIAL_INSTRUCTION`: in the system message
+of `MultimodalParser` and of the `VisionParser` clean-up call, and at the start of
+the user message of a `VisionParser` page call, since some served vision models
+refuse a system message next to an image. The end of the previous page
+(`VisionParser` with `use_context=True`), the pages given to the clean-up call
+and a PDF's text layer travel in the user message, each inside a
+`<source_material>` block with a random id for each call; the clean-up answer
+loses those tags if the model repeats them. The local parsers (`PyMuPDFParser`,
+`DocxParser`, `DoclingParser`, `SpreadsheetParser`) call no model.
+
 ## Environment Variables
 
 For MultimodalParser (see [multimodal_parser/README.md](multimodal_parser/README.md) for full details):
@@ -113,8 +151,13 @@ For DoclingApiClientParser (Haaga-Helia service):
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `API_BASE` | Yes | Service base URL provided by Haaga-Helia |
+| `API_BASE` | Yes | Service base URL provided by Haaga-Helia (the demo app and generated PoCs read `DOCLING_API_BASE`) |
 | `PASSWORD` | Yes | Service password provided by Haaga-Helia |
+
+The client sends the document and the password only to the address set in `DOCLING_API_BASE`
+or `API_BASE` (plain http works for that address), to this machine, or to a host in
+`GAIK_ALLOWED_ENDPOINT_HOSTS` or `allowed_endpoint_hosts`. Any other `api_base` raises
+`EndpointNotAllowedError` when the client is built.
 
 ---
 
@@ -128,10 +171,10 @@ See [implementation_layer/examples/software_components/parsers/](../../../../exa
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **Examples**: [implementation_layer/examples/software_components/parsers/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/parsers)
-- **Contributing**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
+- **Contributing**: [CONTRIBUTING.md](../../../../../guidance_layer/CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
-MIT - see [LICENSE](../../LICENSE)
+MIT - see [LICENSE](../../../../../LICENSE)
 

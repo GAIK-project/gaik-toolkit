@@ -6,14 +6,20 @@ of documents and categorizing them using LLM-based classification.
 """
 
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    source_material_messages,
+)
 
 from ..parsers.docx_parser import DocxParser
 from ..parsers.pymypdf import PyMuPDFParser
@@ -63,19 +69,27 @@ class DocumentClassifier:
     This classifier extracts the first page from documents (PDF, DOCX, or images)
     and uses an LLM to categorize them into user-provided classes.
 
+    A file over ``limits`` (size, image pixels; pages for the vision parser) is
+    refused with :class:`~gaik.software_components.input_limits.InputLimitError`
+    before it is parsed. The vision parser reads only the first page of a PDF.
+
     Attributes:
         config: OpenAI configuration dictionary
         model: Model name to use for classification
         client: OpenAI client instance
     """
 
-    def __init__(self, config: dict, model: str | None = None):
+    def __init__(
+        self, config: dict, model: str | None = None, *, limits: InputLimits | None = None
+    ):
         """
         Initialize document classifier.
 
         Args:
             config: OpenAI config from get_openai_config()
             model: Optional model override. If not provided, uses config['model']
+            limits: Input limits passed to the parsers; defaults to
+                :class:`~gaik.software_components.input_limits.InputLimits`.
 
         Example:
             >>> from gaik.software_components.doc_classifier import (
@@ -87,6 +101,7 @@ class DocumentClassifier:
         self.config = config
         self.model = model or config["model"]
         self.client = build_compat_client(config)
+        self.limits = limits or InputLimits()
 
     def classify(self, file_or_dir: str, classes: list[str], parser: str | None = None) -> dict:
         """
@@ -162,6 +177,7 @@ class DocumentClassifier:
 
         Raises:
             ValueError: If file format is unsupported or corrupt
+            InputLimitError: If the file is over one of ``limits``
         """
         logger.info(f"Classifying file: {Path(file_path).name}")
 
@@ -192,6 +208,8 @@ class DocumentClassifier:
             result = self._classify_with_llm(text, classes)
             return result
 
+        except InputLimitError:
+            raise
         except Exception as e:
             logger.error(f"Error classifying {file_path}: {e}")
             raise ValueError(f"Failed to classify {file_path}: {str(e)}")
@@ -263,34 +281,42 @@ class DocumentClassifier:
         """
         if parser_type == "pymupdf":
             try:
-                parser = PyMuPDFParser()
+                # Only the start of the text is used, so the page limit does not
+                # apply here; the size limit does.
+                parser = PyMuPDFParser(limits=replace(self.limits, max_pages=None))
                 result = parser.parse_document(file_path)
                 full_text = result["text_content"]
                 # Return first 1000 characters
                 return full_text[:1000]
+            except InputLimitError:
+                raise
             except Exception as e:
                 raise ValueError(f"PyMuPDF extraction failed: {str(e)}")
 
         elif parser_type == "docx":
             try:
-                parser = DocxParser()
+                parser = DocxParser(limits=self.limits)
                 result = parser.parse_document(file_path)
                 full_text = result["text_content"]
                 # Return first 1000 characters
                 return full_text[:1000]
+            except InputLimitError:
+                raise
             except Exception as e:
                 raise ValueError(f"DOCX extraction failed: {str(e)}")
 
         elif parser_type == "vision":
             try:
-                parser = VisionParser(openai_config=self.config)
+                parser = VisionParser(openai_config=self.config, limits=self.limits)
 
                 # Check if file is PDF or image
                 file_type = self._detect_file_type(file_path)
 
                 if file_type == "pdf":
-                    # For PDFs via vision: convert and get first page
-                    pages = parser.convert_pdf(file_path, dpi=200)
+                    # For PDFs via vision: convert the first page only
+                    pages = parser.convert_pdf(
+                        file_path, dpi=200, clean_output=False, first_pages=1
+                    )
                     return pages[0] if pages else ""
 
                 elif file_type == "image":
@@ -299,6 +325,8 @@ class DocumentClassifier:
                 else:
                     raise ValueError(f"Vision parser received unexpected file type: {file_type}")
 
+            except InputLimitError:
+                raise
             except Exception as e:
                 raise ValueError(f"Vision extraction failed: {str(e)}")
 
@@ -322,16 +350,16 @@ class DocumentClassifier:
         # Create prompt
         classes_str = ", ".join(f"'{c}'" for c in classes if c != "unknown")
 
-        # Truncate to 4000 chars (~1000 tokens) to prevent token limit errors
+        # Truncate to 4000 chars (~1000 tokens) to prevent token limit errors.
+        # The document is material, apart from the task: it cannot pick its class.
+        document_block = SourceMaterial().wrap(text[:4000], label="document")
         user_prompt = f"""Classify the following document into one of \
 these categories: {classes_str}
 
 If the document does not clearly fit any category, classify it as 'unknown'.
 
 Document content:
-```
-{text[:4000]}
-```
+{document_block}
 
 Provide your classification with:
 1. The category that best matches
@@ -339,10 +367,7 @@ Provide your classification with:
 3. Brief reasoning (max 200 characters)
 """
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = source_material_messages(SYSTEM_PROMPT, user_prompt)
 
         try:
             if isinstance(self.client, ProviderClient):

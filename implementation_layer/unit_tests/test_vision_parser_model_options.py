@@ -93,6 +93,7 @@ def test_explicit_non_azure_provider_uses_configured_endpoint(monkeypatch, provi
             "model": "vision-model",
             "api_key": "test",
             "base_url": "https://inference.example.test/v1",
+            "allowed_endpoint_hosts": "inference.example.test",
             "timeout": 300.0,
             "max_retries": 0,
             "http_client": http_client,
@@ -190,7 +191,7 @@ def test_native_provider_uses_shared_client_for_image_and_cleanup(monkeypatch, p
     assert parser._clean_markdown(["first", "second"]) == "parsed"
     assert configs == [config]
     assert client.calls[0][0][0]["content"][1]["type"] == "image_url"
-    assert "first" in client.calls[1][0][0]["content"]
+    assert "first" in client.calls[1][0][-1]["content"]
     assert client.calls[0][1]["max_tokens"] == 16000
     assert parser.usage.snapshot() == {"prompt_tokens": 6}
 

@@ -25,10 +25,16 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model, transcription_models
     from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.report_runs import require_report_run_grant
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import component_error
@@ -115,17 +121,29 @@ async def run(manifest: str = Form(...), files: list[UploadFile] = File(...)):
             f"got {len(files)}",
         )
 
+    options = parsed.options
+    check_model(
+        options.transcription_model,
+        transcription_models(),
+        "transcription model",
+    )
+    check_model(options.vision_model, chat_models(), "vision model")
+
     config = get_api_config()
     tmp = Path(tempfile.mkdtemp(prefix="source_normalizer_"))
     inputs, out = tmp / "inputs", tmp / "normalized"
     try:
         inputs.mkdir()
         for name, upload in zip(names, files):
+            data = await upload.read()
+            problem = await upload_problem(Path(name).suffix, data, check_type=False)
+            if problem is not None:
+                raise HTTPException(problem.status, f"{name}: {problem.message}")
             try:
                 # "x" refuses to overwrite: names that differ only in case collide on a
                 # case-insensitive dev machine.
                 with (inputs / name).open("xb") as target:
-                    target.write(await upload.read())
+                    target.write(data)
             except OSError as exc:
                 logger.warning("Cannot store an uploaded file name: %s", type(exc).__name__)
                 raise HTTPException(

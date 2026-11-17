@@ -13,7 +13,7 @@ first in a separate one-question call; it does not count toward the 10.
 ## Step 1: the user's own material (always first)
 | # | Header | Question | Options |
 |---|---|---|---|
-| Q1 | Your material | Do you have your own data, files or sources (links) for this presentation? | No, research it for me · Yes, files · Yes, links · Yes, files and links |
+| Q1 | Own material | Do you have your own data, files or sources (links) for this presentation? | No, research it for me · Yes, files · Yes, links · Yes, files and links |
 
 **If yes → upload step (plain message, not a question; it does not count toward the 10).** Send:
 

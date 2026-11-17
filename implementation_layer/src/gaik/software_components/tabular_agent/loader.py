@@ -17,6 +17,11 @@ rows in the middle, a "Notes:" block at the bottom. Two tiers handle that:
 
 Normalized sheets are written to a temporary CSV and read back through DuckDB,
 so Excel and CSV inputs end up with identical type inference.
+
+Every file is checked against :class:`~gaik.software_components.input_limits.InputLimits`
+first: its size (and the unpacked size of an .xlsx) before it is opened, and the
+rows of each sheet or file while they are read. A file over a limit raises
+:class:`~gaik.software_components.input_limits.InputLimitError`.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from ..input_limits import InputLimits, count_table_rows
 from .models import SheetLayout
 
 logger = logging.getLogger(__name__)
@@ -87,11 +93,14 @@ def _unique(name: str, taken: set[str]) -> str:
 
 def normalize_sources(
     source: str | Path | Sequence[str | Path] | Mapping[str, str | Path],
+    *,
+    limits: InputLimits | None = None,
 ) -> list[tuple[str | None, Path]]:
     """Normalize the constructor's ``source`` into ``(explicit_name, path)`` pairs.
 
     Args:
         source: A path, a sequence of paths, or a ``{table_name: path}`` mapping.
+        limits: Size limits checked for every file; defaults to ``InputLimits()``.
 
     Returns:
         Pairs whose first element is the caller's chosen table name, or ``None``
@@ -99,7 +108,10 @@ def normalize_sources(
 
     Raises:
         TableLoadError: If ``source`` is empty, or a path does not exist.
+        InputLimitError: If a file is over ``max_file_bytes`` (or an .xlsx unpacks
+            to more than ten times that).
     """
+    limits = limits or InputLimits()
     pairs: list[tuple[str | None, Path]] = []
     if isinstance(source, Mapping):
         pairs = [(str(name), Path(path)) for name, path in source.items()]
@@ -121,6 +133,7 @@ def normalize_sources(
                 f"Unsupported file type '{path.suffix}' for {path.name}. "
                 f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
             )
+        limits.check_document(path)
     return pairs
 
 
@@ -130,6 +143,7 @@ def load_sources(
     *,
     layout_inference: str = "auto",
     infer_layout: LayoutInferrer | None = None,
+    limits: InputLimits | None = None,
 ) -> dict[str, str]:
     """Load every source file into ``con`` as a table.
 
@@ -140,13 +154,17 @@ def load_sources(
             may be asked to work out a messy sheet's layout.
         infer_layout: Callback invoked for that inference. When ``None``, the
             deterministic heuristics are used no matter what.
+        limits: Row limit per sheet or file (``max_table_rows``); defaults to
+            ``InputLimits()``.
 
     Returns:
         A ``{table_name: human-readable source description}`` mapping.
 
     Raises:
         TableLoadError: If a file cannot be read or produces no usable table.
+        InputLimitError: If a sheet or file has more than ``max_table_rows`` rows.
     """
+    limits = limits or InputLimits()
     created: dict[str, str] = {}
     taken: set[str] = set()
 
@@ -160,13 +178,14 @@ def load_sources(
                 taken=taken,
                 layout_inference=layout_inference,
                 infer_layout=infer_layout,
+                limits=limits,
             )
             created.update(sheets)
         else:
             base = sanitize_identifier(explicit_name or path.stem)
             name = _unique(base, taken)
             taken.add(name)
-            _load_flat_file(con, path, name)
+            _load_flat_file(con, path, name, limits)
             created[name] = path.name
 
     if not created:
@@ -174,8 +193,16 @@ def load_sources(
     return created
 
 
-def _load_flat_file(con: Any, path: Path, table_name: str) -> None:
-    """Create a table from a CSV/TSV/Parquet/JSON file using DuckDB's readers."""
+def _load_flat_file(
+    con: Any, path: Path, table_name: str, limits: InputLimits | None = None
+) -> None:
+    """Create a table from a CSV/TSV/Parquet/JSON file using DuckDB's readers.
+
+    At most one row more than ``max_table_rows`` goes into the table, so a longer
+    file is refused without holding all of it. DuckDB still scans the whole file
+    to infer the column types; ``max_file_bytes`` bounds that.
+    """
+    limits = limits or InputLimits()
     suffix = path.suffix.lower()
     posix = path.resolve().as_posix()
     if suffix in PARQUET_EXTENSIONS:
@@ -184,10 +211,18 @@ def _load_flat_file(con: Any, path: Path, table_name: str) -> None:
         reader = f"read_json_auto('{_escape(posix)}')"
     else:
         reader = f"read_csv('{_escape(posix)}', auto_detect=true, sample_size=-1)"
+    row_cap = "" if limits.max_table_rows is None else f" LIMIT {limits.max_table_rows + 1}"
     try:
-        con.execute(f'CREATE TABLE "{table_name}" AS SELECT * FROM {reader}')
+        con.execute(f'CREATE TABLE "{table_name}" AS SELECT * FROM {reader}{row_cap}')
     except Exception as exc:
         raise TableLoadError(f"Could not read {path.name}: {exc}") from exc
+    if row_cap:
+        (rows,) = con.execute(f'SELECT count(*) FROM "{table_name}"').fetchone()
+        try:
+            limits.check_table_rows(rows, path.name)
+        except ValueError:
+            con.execute(f'DROP TABLE "{table_name}"')
+            raise
     if suffix not in PARQUET_EXTENSIONS:
         repair_european_decimals(con, table_name)
 
@@ -259,8 +294,10 @@ def _load_excel(
     taken: set[str],
     layout_inference: str,
     infer_layout: LayoutInferrer | None,
+    limits: InputLimits | None = None,
 ) -> dict[str, str]:
     """Create one table per non-empty worksheet in an Excel workbook."""
+    limits = limits or InputLimits()
     try:
         from openpyxl import load_workbook
     except ImportError as exc:
@@ -279,7 +316,7 @@ def _load_excel(
         sheet_names = list(workbook.sheetnames)
         for sheet_name in sheet_names:
             worksheet = workbook[sheet_name]
-            grid = _read_grid(worksheet)
+            grid = _read_grid(worksheet, limits, f"{path.name} / {sheet_name}")
             grid = _trim_grid(grid)
             if len(grid) < 2:
                 logger.info("Skipping empty sheet '%s' in %s", sheet_name, path.name)
@@ -319,9 +356,16 @@ def _load_excel(
     return created
 
 
-def _read_grid(worksheet: Any) -> list[list[Any]]:
-    """Read a worksheet into a rectangular list-of-lists of raw cell values."""
-    grid = [list(row) for row in worksheet.iter_rows(values_only=True)]
+def _read_grid(
+    worksheet: Any, limits: InputLimits | None = None, name: str = "sheet"
+) -> list[list[Any]]:
+    """Read a worksheet into a rectangular list-of-lists of raw cell values.
+
+    Stops with ``InputLimitError`` once the sheet has more than ``max_table_rows``.
+    """
+    limits = limits or InputLimits()
+    rows = count_table_rows(worksheet.iter_rows(values_only=True), limits, name)
+    grid = [list(row) for row in rows]
     width = max((len(r) for r in grid), default=0)
     return [list(r) + [None] * (width - len(r)) for r in grid]
 
@@ -489,7 +533,9 @@ def _layout_is_sane(layout: SheetLayout, grid: list[list[Any]]) -> bool:
     return True
 
 
-def read_sheet_grid(path: str | Path, sheet_name: str | None = None) -> list[list[Any]]:
+def read_sheet_grid(
+    path: str | Path, sheet_name: str | None = None, *, limits: InputLimits | None = None
+) -> list[list[Any]]:
     """Read one worksheet as the trimmed cell grid the loader works from.
 
     Useful for inspecting what a spreadsheet actually contains before the
@@ -498,10 +544,15 @@ def read_sheet_grid(path: str | Path, sheet_name: str | None = None) -> list[lis
     Args:
         path: Path to an Excel workbook.
         sheet_name: Which sheet to read; defaults to the first one.
+        limits: Size and row limits; defaults to ``InputLimits()``.
 
     Returns:
         The grid with fully blank edge rows and blank columns removed.
+
+    Raises:
+        InputLimitError: If the file or the sheet is over one of ``limits``.
     """
+    limits = limits or InputLimits()
     try:
         from openpyxl import load_workbook
     except ImportError as exc:
@@ -510,10 +561,12 @@ def read_sheet_grid(path: str | Path, sheet_name: str | None = None) -> list[lis
             "Install extras with 'pip install gaik[tabular-agent]'"
         ) from exc
 
-    workbook = load_workbook(Path(path), read_only=True, data_only=True)
+    path = Path(path)
+    limits.check_zip_container(path)
+    workbook = load_workbook(path, read_only=True, data_only=True)
     try:
         worksheet = workbook[sheet_name] if sheet_name else workbook[workbook.sheetnames[0]]
-        return _trim_grid(_read_grid(worksheet))
+        return _trim_grid(_read_grid(worksheet, limits, f"{path.name} / {worksheet.title}"))
     finally:
         workbook.close()
 

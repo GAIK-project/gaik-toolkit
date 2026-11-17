@@ -45,6 +45,7 @@ except ImportError:
 try:
     # Docker: routers/ is in same directory as main.py
     from routers import (
+        ai_act_screening,
         classifier,
         dental_transcription,
         diary,
@@ -71,6 +72,7 @@ try:
 except ImportError:
     # Local dev: running from project root with api.main:app
     from api.routers import (
+        ai_act_screening,
         classifier,
         dental_transcription,
         diary,
@@ -95,6 +97,18 @@ except ImportError:
         web_scraper,
     )
 
+# The first Solution Wizard's router imports the optional `claude_agent_sdk` at
+# module load. Import it defensively, so a load failure turns off only the
+# wizard and not the whole API with every other demo.
+try:
+    try:
+        from routers import solution_wizard
+    except ImportError:
+        from api.routers import solution_wizard
+except Exception as exc:  # noqa: BLE001
+    solution_wizard = None
+    logger.warning("Solution Wizard router unavailable; disabling it (%s)", type(exc).__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -104,12 +118,19 @@ async def lifespan(app: FastAPI):
     pdf_cleanup_task = asyncio.create_task(pipeline.cleanup_old_pdfs())
     rag_cleanup_task = asyncio.create_task(rag.cleanup_idle_collections())
     tabular_cleanup_task = asyncio.create_task(tabular_agent.cleanup_idle_sessions())
+    wizard_cleanup_task = (
+        asyncio.create_task(solution_wizard.cleanup_idle_sessions())
+        if solution_wizard is not None
+        else None
+    )
     yield
     # Shutdown
     cleanup_task.cancel()
     pdf_cleanup_task.cancel()
     rag_cleanup_task.cancel()
     tabular_cleanup_task.cancel()
+    if wizard_cleanup_task is not None:
+        wizard_cleanup_task.cancel()
     logger.info("GAIK Demo API shutting down...")
 
 
@@ -152,6 +173,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(model_settings.router, prefix="/model-settings", tags=["Model settings"])
 app.include_router(parser.router, prefix="/parse", tags=["Parser"])
+app.include_router(ai_act_screening.router, prefix="/ai-act-screening", tags=["AI Act screening"])
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])
 app.include_router(
@@ -191,12 +213,22 @@ app.include_router(
     knowledge_synthesis.router, prefix="/knowledge-synthesis", tags=["Knowledge Synthesis"]
 )
 app.include_router(web_scraper.router, prefix="/web-scraper", tags=["Web Scraper"])
+if solution_wizard is not None:
+    app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "ok", "service": "gaik-demo-api"}
+    """Health check endpoint; ``uploads_scanned`` says whether uploads pass the malware check."""
+    try:
+        from utils import malware_scan
+    except ImportError:
+        from api.utils import malware_scan
+    return {
+        "status": "ok",
+        "service": "gaik-demo-api",
+        "uploads_scanned": malware_scan.enabled(),
+    }
 
 
 @app.get("/")

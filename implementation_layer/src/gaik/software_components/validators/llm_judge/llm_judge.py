@@ -11,12 +11,13 @@ from typing import Any, Literal
 
 from gaik.software_components.llm import create_llm_client, get_llm_config, resolve_provider
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import SourceMaterial
 
 from .pricing import compute_judge_cost_usd
 from .prompts import (
-    HALLUCINATION_SYSTEM_PROMPT,
     TEXT_PAIR_SYSTEM_PROMPT,
     build_hallucination_prompt,
+    build_hallucination_system_prompt,
     build_system_prompt,
     build_text_pair_prompt,
     build_user_prompt,
@@ -137,8 +138,10 @@ class LLMJudge:
             raise ValueError("source_pages must contain at least one page image")
 
         rubric = rubric or ValidationRubric()
-        system_prompt = build_system_prompt(rubric.scoring_mode)
-        user_prompt = build_user_prompt(extracted, rubric)
+        # The rubric is the caller's instruction and goes in the system message;
+        # the extractor output is judged material and goes in a block.
+        system_prompt = build_system_prompt(rubric.scoring_mode, rubric=rubric)
+        user_prompt = build_user_prompt(extracted, material=SourceMaterial())
 
         t0 = time.perf_counter()
         raw_text, input_tokens, output_tokens = self._dispatch(
@@ -212,13 +215,12 @@ class LLMJudge:
         user_prompt = build_hallucination_prompt(
             source_text=source_text,
             extracted=non_empty,
-            field_descriptions=field_descriptions,
+            material=SourceMaterial(),
         )
+        system_prompt = build_hallucination_system_prompt(field_descriptions)
 
         t0 = time.perf_counter()
-        raw_text, input_tokens, output_tokens = self._dispatch_text(
-            user_prompt, HALLUCINATION_SYSTEM_PROMPT
-        )
+        raw_text, input_tokens, output_tokens = self._dispatch_text(user_prompt, system_prompt)
         duration_s = time.perf_counter() - t0
 
         flags, judge_error = _hallucination_flags_and_error(raw_text)
@@ -276,6 +278,7 @@ class LLMJudge:
             expected_text=expected_text,
             field_name=field_name,
             context=context,
+            material=SourceMaterial(),
         )
 
         t0 = time.perf_counter()
@@ -466,11 +469,33 @@ class LLMJudge:
         from google import genai
         from google.genai import types
 
+        from gaik.software_components.llm.base import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS
+
+        # The SDK waits without a limit unless it is given one.
+        limited = types.HttpOptions(
+            timeout=int(DEFAULT_TIMEOUT_SECONDS * 1000),
+            retry_options=types.HttpRetryOptions(attempts=DEFAULT_MAX_RETRIES + 1),
+        )
         if self.use_vertexai:
+            # The EU multi-region unless a location is set (llm/config.py). A model
+            # the EU does not serve is retried on the global endpoint below.
+            location = os.environ.get("GOOGLE_VERTEXAI_LOCATION")
+            # The default location is asked once and for at most two minutes: the
+            # SDK otherwise waits without a limit and would never reach the fallback.
+            bounded = (
+                {"http_options": limited}
+                if location
+                else {
+                    "http_options": types.HttpOptions(
+                        timeout=120_000, retry_options=types.HttpRetryOptions(attempts=1)
+                    )
+                }
+            )
             client = genai.Client(
                 vertexai=True,
                 project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
-                location=os.environ.get("GOOGLE_VERTEXAI_LOCATION", "global"),
+                location=location or "eu",
+                **bounded,
             )
         else:
             api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -480,21 +505,50 @@ class LLMJudge:
                     "GOOGLE_APPLICATION_CREDENTIALS) and use_vertexai=True, "
                     "or set GOOGLE_GEMINI_API_KEY."
                 )
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=api_key, http_options=limited)
 
         parts: list[Any] = [user_prompt]
         for page in source_pages:
             parts.append(types.Part.from_bytes(data=page, mime_type="image/png"))
 
-        resp = client.models.generate_content(
-            model=self.model,
-            contents=parts,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-                max_output_tokens=self.max_tokens,
-            ),
-        )
+        def generate(with_client):
+            return with_client.models.generate_content(
+                model=self.model,
+                contents=parts,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    response_mime_type="application/json",
+                    max_output_tokens=self.max_tokens,
+                ),
+            )
+
+        try:
+            resp = generate(client)
+        except Exception as exc:
+            # The default location falls back when it does not serve the model
+            # (404) or does not answer; one set in the environment does not.
+            code = getattr(exc, "code", None)
+            moves = (
+                isinstance(exc, genai.errors.ServerError)
+                or (isinstance(exc, genai.errors.ClientError) and code in {404, 429})
+                or "Timeout" in type(exc).__name__
+            )
+            if not self.use_vertexai or os.environ.get("GOOGLE_VERTEXAI_LOCATION") or not moves:
+                raise
+            logger.warning(
+                "Vertex AI location 'eu' did not serve %s (%s). Using 'global', which is "
+                "not tied to a region. Set GOOGLE_VERTEXAI_LOCATION to choose the location.",
+                self.model,
+                type(exc).__name__,
+            )
+            resp = generate(
+                genai.Client(
+                    vertexai=True,
+                    project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
+                    location="global",
+                    http_options=limited,
+                )
+            )
         text = resp.text or ""
         meta = getattr(resp, "usage_metadata", None)
         return (

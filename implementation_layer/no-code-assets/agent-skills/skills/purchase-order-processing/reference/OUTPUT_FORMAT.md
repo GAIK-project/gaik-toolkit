@@ -344,30 +344,32 @@ Example: SO-2025-08472
 ### Summary Fields
 | Field | Label | Source | Format |
 |-------|-------|--------|--------|
-| Subtotal | Subtotal: | Calculated.Subtotal | $XX,XXX.XX |
+| Subtotal | Material Subtotal: | Calculated.Subtotal | $XX,XXX.XX |
 | Volume_Discount | Volume Discount (X%): | Calculated | -$X,XXX.XX |
-| Total_Testing_Cert | Total Testing/Cert: | Calculated (Testing + Cert) | $XXX.XX |
-| Shipping | Total Shipping Cost: | Calculated or PO | $XXX.XX |
+| Net_Material_Cost | Net Material Cost: | Calculated (Subtotal - Discount) | $XX,XXX.XX |
+| Total_Testing_Cert | Total Testing/Cert Fees: | Calculated (Testing + Cert) | $XXX.XX |
+| Shipping | Shipping: | Calculated or PO | $XXX.XX |
 | Tax_Amount | Tax (X%): | Calculated | $X,XXX.XX |
 | Grand_Total | **TOTAL:** | Calculated | **$XX,XXX.XX** |
 
 ### Layout Example (Matching Sample Format)
 ```
-                                           ┌────────────────────────────────┐
-                                           │ Subtotal:          $25,567.50 │
-                                           │ Volume Discount (5%): -$1,278.38│
-                                           │ Total Testing/Cert:   $165.00 │
-                                           │ Total Shipping Cost:  $450.00 │
-                                           │ Tax (6%):           $1,494.25 │
-                                           ╞════════════════════════════════╡
-                                           │ TOTAL:             $26,398.37 │
-                                           └────────────────────────────────┘
+                                           ┌────────────────────────────────────┐
+                                           │ Material Subtotal:      $25,567.50 │
+                                           │ Volume Discount (5%):   -$1,278.38 │
+                                           │ Net Material Cost:      $24,289.12 │
+                                           │ Total Testing/Cert Fees:   $165.00 │
+                                           │ Shipping:                  $450.00 │
+                                           │ Tax (6%):                $1,494.25 │
+                                           ╞════════════════════════════════════╡
+                                           │ TOTAL:                  $26,398.37 │
+                                           └────────────────────────────────────┘
 ```
 
 ### Conditional Display
 - Hide "Volume Discount" line if discount is 0%
-- Combine Testing + Certification fees into single "Total Testing/Cert" line
-- Use "Total Shipping Cost:" label for consistency with sample format
+- Combine Testing + Certification fees into single "Total Testing/Cert Fees" line
+- Use the labels above; the shipped sample_order.docx uses them
 
 ---
 
@@ -441,8 +443,8 @@ SO-[number]_[customer]_[date].[ext]
 
 ### Examples
 ```
-SO-2025-08472_AutoTech-Manufacturing_2025-11-15.docx
-SO-2025-08472_AutoTech-Manufacturing_2025-11-15.md
+SO-2025-08472_AutoTech_Manufacturing_2025-11-15.docx
+SO-2025-08472_AutoTech_Manufacturing_2025-11-15.txt
 ```
 
 ---
@@ -478,7 +480,7 @@ Price Comparison (PO vs Calculated):
   Item 3: PO $10,080.00 vs Calculated $10,080.00 ✓
 
 Output Generated:
-  SO-2025-08472_AutoTech-Manufacturing_2025-11-15.docx
+  SO-2025-08472_AutoTech_Manufacturing_2025-11-15.docx
 
 ═══════════════════════════════════════════════════════════════
 ```
@@ -530,7 +532,7 @@ This document provides a detailed, step-by-step breakdown of how each item's pri
 | Option | Description |
 |--------|-------------|
 | Print to CLI | Display in console/terminal during processing |
-| Save as file | `Calculation_Breakdown_[SO-Number].md` |
+| Save as file | `Calculation_Breakdown.txt` (layout in CALCULATION_BREAKDOWN_TEMPLATE.md) |
 | Both | Print AND save |
 
 ### Format: 2-Column Table
@@ -562,7 +564,7 @@ For EACH line item, generate a breakdown table:
 │  Lookup Key                        │ "Aluminum Angle - L Profile"            │
 │  Price List File                   │ price_list.xlsx                         │
 │  Matched Row                       │ Row 2: AL-001                           │
-│  Match Method                      │ CONTAINS match on Type/Part Designation │
+│  Match Method                      │ Exact match on Type/Part Designation    │
 │  Unit Price Found                  │ $28.50                                  │
 │  Cutting Fee                       │ $5.00                                   │
 │  Testing Fee                       │ $15.00                                  │
@@ -620,19 +622,19 @@ After all items, show the order-level calculations:
 ╠════════════════════════════════════╪═════════════════════════════════════════╣
 ║  TAX CALCULATION                   │                                         ║
 ├────────────────────────────────────┼─────────────────────────────────────────┤
-│  Taxable Base                      │ Net Material + Fees                     │
-│  Taxable Amount                    │ $24,289.12 + $165.00 = $24,454.12       │
+│  Taxable Base                      │ Net Material + Fees + Shipping          │
+│  Taxable Amount                    │ $24,289.12 + $165 + $450 = $24,904.12   │
 │  Tax Rate                          │ 6% (from PO)                            │
-│  Tax Calculation                   │ $24,454.12 × 6% = $1,467.25             │
+│  Tax Calculation                   │ $24,904.12 × 6% = $1,494.25             │
 ╠════════════════════════════════════╪═════════════════════════════════════════╣
 ║  GRAND TOTAL                       │                                         ║
 ├────────────────────────────────────┼─────────────────────────────────────────┤
 │  Net Material Cost                 │ $24,289.12                              │
 │  + Total Fees                      │ $165.00                                 │
 │  + Shipping                        │ $450.00                                 │
-│  + Tax                             │ $1,467.25                               │
+│  + Tax                             │ $1,494.25                               │
 │  ═══════════════════════════════════════════════════════════════════════════ │
-│  GRAND TOTAL                       │ $26,371.37                              │
+│  GRAND TOTAL                       │ $26,398.37                              │
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
@@ -680,9 +682,9 @@ ORDER TOTALS:
 │ Net Material Cost           │ $24,289.12                             │
 │ Total Fees                  │ $40 + $75 + $50 = $165.00              │
 │ Shipping                    │ $450.00 (from PO)                      │
-│ Tax (6%)                    │ $24,454.12 × 6% = $1,467.25            │
+│ Tax (6%)                    │ $24,904.12 × 6% = $1,494.25            │
 ├─────────────────────────────┼────────────────────────────────────────┤
-│ GRAND TOTAL                 │ $26,371.37                             │
+│ GRAND TOTAL                 │ $26,398.37                             │
 └─────────────────────────────┴────────────────────────────────────────┘
 ```
 

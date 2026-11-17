@@ -7,6 +7,7 @@ hand-edited.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from enum import Enum
 from pathlib import Path
@@ -315,6 +316,23 @@ class Blueprint(BaseModel):
 
     def to_file(self, path: str | Path) -> None:
         Path(path).write_text(self.model_dump_json(indent=2), encoding="utf-8")
+
+    def fingerprint(self) -> Dict[str, str]:
+        """Which blueprint an output came from: its id, version and content hash.
+
+        The hash is the SHA-256 of the blueprint's canonical JSON (sorted keys, no
+        spaces), leaving out ``visualizations``: generate_bpmn.py writes its mapping
+        there, and redrawing a diagram does not change what the blueprint asks for.
+        Any other change gives another hash, so a PoC or document whose hash differs
+        from the current blueprint's was generated from an earlier version.
+        """
+        data = self.model_dump(mode="json", exclude={"visualizations"})
+        canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return {
+            "blueprint_id": self.metadata.blueprint_id or self.use_case.id,
+            "blueprint_version": self.blueprint_version,
+            "blueprint_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+        }
 
     @classmethod
     def export_json_schema(cls, path: str | Path) -> None:

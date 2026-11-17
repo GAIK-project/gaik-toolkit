@@ -446,7 +446,7 @@ export default function SourceNormalizerPage() {
       <DemoPageHeader
         icon={FileStack}
         title="Source Normalizer"
-        description="Transform data (PDFs, Word files, spreadsheets, text, recordings and images) in a uniform Markdown format."
+        description="Turn PDFs, Word files, spreadsheets, recordings and images into Markdown that keeps each file's name"
         className="mb-6"
       />
 

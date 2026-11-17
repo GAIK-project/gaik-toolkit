@@ -32,10 +32,16 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model
     from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model
     from api.utils.report_runs import require_report_run_grant
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
 
 try:
     from utils.errors import component_error, error_detail
@@ -160,6 +166,8 @@ async def _sample_markdown(upload: UploadFile, gaik) -> str:
     """The sample report as Markdown: text files as they are, DOCX and PDF converted locally."""
     suffix = Path(upload.filename or "").suffix.lower()
     data = await upload.read()
+    if (problem := await upload_problem(suffix, data, check_type=False)) is not None:
+        raise HTTPException(problem.status, f"The sample report: {problem.message}")
     if suffix in _SAMPLE_TEXT:
         try:
             return data.decode("utf-8-sig")
@@ -229,6 +237,9 @@ async def run(
     ids = [s.id for s in parsed.sections]
     if len(set(ids)) != len(ids):
         raise HTTPException(400, f"Section ids must be distinct: {ids}")
+    offered = chat_models()
+    check_model(parsed.options.writer_model, offered, "writer model")
+    check_model(parsed.options.reviewer_model, offered, "reviewer model")
     try:
         files = _FILES.validate_json(await artifacts.read())
     except ValidationError as exc:

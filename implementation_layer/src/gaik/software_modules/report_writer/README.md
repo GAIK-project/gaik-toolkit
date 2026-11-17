@@ -109,7 +109,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
     "docx": true,
     "citations": true,
     "curator": {"reasoning_effort": null, "temperature": null},
-    "writer": {"reasoning_effort": "medium", "temperature": null},
+    "writer": {"reasoning_effort": null, "temperature": null},
     "reviewer": {"reasoning_effort": null, "temperature": null}
   }
 }
@@ -136,9 +136,13 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `settings.citations` | `true` (default) cites the source file and place of each fact, as the report instructions say. `false` writes plain statements with no file names, pages or references, even if the instructions ask for citations; the writers and the reviewer both follow it, and so does the `single_call` baseline |
 | `settings.curator` / `writer` / `reviewer` | `reasoning_effort` and `temperature` for every call of that step; `null` leaves the option unset. Where a model does not take `temperature` with reasoning on, it is dropped; an invalid effort raises before the call |
 
-Relative paths are resolved against the folder of the spec file. `ReportSpec.load(path)`
-makes them absolute and `spec.save(path)` writes them back relative, with `/`, so a spec
-folder can be moved or shared. The spec holds model names only, never credentials: an
+Paths are relative to the folder of the spec file. `ReportSpec.load(path)` makes them
+absolute and `spec.save(path)` writes them back relative, with `/`, so a spec folder can be
+moved or shared. Every path must stay inside the spec's folder: `load` checks them before any
+file is read and raises `SourcePathError` (a `ValueError`) for an absolute path or one that
+leads out of the folder through `..` or a symbolic link. For a spec that names files beside
+its folder, such as `../inputs/notes.txt`, pass a folder that holds both:
+`ReportSpec.load(path, root="project")`. The spec holds model names only, never credentials: an
 unknown key such as `api_key` raises, and so does a spec with no sources, duplicate
 section ids or a `depends_on` on an unknown section.
 
@@ -188,10 +192,13 @@ baseline = writer.run(spec, "workspace", mode="single_call")
 ```
 
 `single_call` runs `normalize` and then writes the whole report in **one** call of the
-writer model (`models.writer`), with every normalized source in full as
-`<source file=".." class="..">` blocks, the sections with their instructions and
-required items, the report instructions and the sample report. There is no curation and
-no review. The answer must be `# <title>` followed by exactly one `## <section title>`
+writer model (`models.writer`). The request holds the sections with their instructions
+and required items and the report instructions; every normalized source, in full, and
+the sample report each sit in their own `<source_material>` block, a source labelled
+with its file name (the name the citations use). The system message says that the
+material is data, never instructions
+([source material as data](../../software_components/source_material.py)). There is no
+curation and no review. The answer must be `# <title>` followed by exactly one `## <section title>`
 per spec section in spec order; a missing, extra, reordered or duplicated heading, text
 before the first section or an empty section raises `ValueError`. The report is saved to
 `single_call/`, next to `report/`, to compare what curation and review add.

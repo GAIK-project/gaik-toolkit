@@ -20,10 +20,17 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS
+
 from .config import TranscriptionConfig
 from .models import ChunkSpec
 
 logger = logging.getLogger(__name__)
+
+# The same ffprobe timeout as the input limit checks.
+FFPROBE_TIMEOUT_SECONDS = PROBE_TIMEOUT_SECONDS
+# Decoding reads the whole recording; six hours of audio decode in well under this.
+DECODE_TIMEOUT_SECONDS = 600
 
 
 # ---------------------------------------------------------------------------
@@ -44,12 +51,24 @@ def check_ffmpeg_available() -> bool:
 # ---------------------------------------------------------------------------
 
 
-def get_audio_duration(file_path: str | Path) -> float:
+def get_audio_duration(
+    file_path: str | Path,
+    *,
+    timeout: float = FFPROBE_TIMEOUT_SECONDS,
+    decode_timeout: float = DECODE_TIMEOUT_SECONDS,
+) -> float:
     """Get duration in seconds using ``ffprobe``.
+
+    A file whose container holds no duration (ffprobe prints ``N/A``), such as a
+    WebM that a browser wrote while it recorded, is measured by decoding its audio.
 
     Raises:
         FileNotFoundError: If *file_path* does not exist.
-        subprocess.CalledProcessError: If ffprobe fails.
+        subprocess.CalledProcessError: If ffprobe fails, or ffmpeg cannot decode
+            a file without a duration.
+        subprocess.TimeoutExpired: If ffprobe runs longer than *timeout* seconds,
+            or decoding longer than *decode_timeout* seconds.
+        ValueError: If neither ffprobe nor decoding gives a length.
     """
     file_path = str(file_path)
     if not os.path.exists(file_path):
@@ -69,8 +88,53 @@ def get_audio_duration(file_path: str | Path) -> float:
         capture_output=True,
         text=True,
         check=True,
+        timeout=timeout,
     )
-    return float(result.stdout.strip())
+    try:
+        return float(result.stdout.strip())
+    except ValueError:
+        logger.info("%s has no duration in its header; decoding it", Path(file_path).name)
+        return decoded_audio_seconds(file_path, timeout=decode_timeout)
+
+
+def decoded_audio_seconds(
+    file_path: str | Path, *, timeout: float = DECODE_TIMEOUT_SECONDS
+) -> float:
+    """Length in seconds of the first audio stream, measured by decoding all of it.
+
+    Raises:
+        subprocess.CalledProcessError: If ffmpeg cannot open or decode the file.
+        subprocess.TimeoutExpired: If decoding runs longer than *timeout* seconds.
+        ValueError: If ffmpeg decodes no audio.
+    """
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-i",
+            str(file_path),
+            "-map",
+            "0:a:0",
+            "-f",
+            "null",
+            "-progress",
+            "pipe:1",
+            "-nostats",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=timeout,
+    )
+    # -progress ends with the position of the last decoded sample.
+    for line in reversed(result.stdout.splitlines()):
+        key, _, value = line.partition("=")
+        if key == "out_time_us" and value.strip().isdigit() and int(value) > 0:
+            return int(value) / 1_000_000
+    raise ValueError(f"No audio could be decoded from {Path(file_path).name}")
 
 
 def has_video_stream(file_path: str | Path) -> bool:

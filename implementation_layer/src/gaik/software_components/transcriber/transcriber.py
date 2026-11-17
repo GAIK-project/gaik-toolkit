@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -17,7 +18,9 @@ from pydub import AudioSegment
 
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
+from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
@@ -146,7 +149,16 @@ class TranscriptionResult:
 
 
 class Transcriber:
-    """High-level transcription workflow with optional transcript error fixing."""
+    """High-level transcription workflow with optional transcript error fixing.
+
+    A long recording is split into several paid transcription calls, so a file
+    over ``limits`` (``max_media_seconds``, default 6 hours; ``max_media_bytes``,
+    off by default) is refused with
+    :class:`~gaik.software_components.input_limits.InputLimitError` before the
+    first call. The duration is read with ffprobe (with a timeout) or, when
+    ffprobe cannot read it, from the decoded audio. ``max_size_mb`` and
+    ``max_duration_seconds`` only decide when a file is split into chunks.
+    """
 
     def __init__(
         self,
@@ -168,8 +180,17 @@ class Transcriber:
         initial_prompt: str | None = None,
         local_api_base: str | None = None,
         local_api_key: str | None = None,
+        limits: InputLimits | None = None,
     ) -> None:
         _audio_provider(api_config)
+        if transcription_model == "whisper_local" and local_api_base:
+            check_endpoint(
+                local_api_base,
+                provider="whisper_local",
+                allowed_hosts=api_config.get("allowed_endpoint_hosts"),
+                what="local_api_base",
+            )
+        self.limits = limits or InputLimits()
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
@@ -202,6 +223,7 @@ class Transcriber:
         input_path = Path(file_path)
         if not input_path.exists():
             raise FileNotFoundError(f"Input file not found: {input_path}")
+        self.limits.check_media(input_path)
 
         job_id = self._generate_job_id(input_path)
 
@@ -219,6 +241,8 @@ class Transcriber:
 
         effective_model = self._resolve_transcription_model()
         self._warn_ignored_local_options(effective_model)
+        if effective_model != "whisper_local":
+            _check_cloud_language(self.language)
 
         # Best-effort input audio duration. PyDub can decode both audio and
         # video containers; if it fails (corrupt file, unsupported codec)
@@ -228,6 +252,8 @@ class Transcriber:
             audio_duration_s = round(len(AudioSegment.from_file(str(input_path))) / 1000.0, 3)
         except Exception as exc:
             print(f"Could not read audio duration: {exc}")
+        if audio_duration_s is not None:
+            self.limits.check_media_seconds(audio_duration_s, input_path.name)
 
         segments: list[dict] | None = None
         srt_content: str | None = None
@@ -326,7 +352,6 @@ class Transcriber:
 
         has_local_overrides = any(
             [
-                self.language != "auto",
                 self.diarization is not False,
                 self.speaker_count is not None,
                 self.min_speakers is not None,
@@ -353,6 +378,7 @@ class Transcriber:
             audio_path=input_path,
             api_base=self.local_api_base,
             key=self.local_api_key,
+            allowed_endpoint_hosts=self.api_config.get("allowed_endpoint_hosts"),
             language=self.language,
             diarization=self.diarization,
             speaker_count=self.speaker_count,
@@ -389,6 +415,7 @@ class Transcriber:
             audio = AudioSegment.from_file(
                 input_path
             )  # works for audio, and many video containers via ffmpeg
+            self.limits.check_media_seconds(len(audio) / 1000, input_path.name)
             return split_and_transcribe_with_context(
                 str(input_path),
                 self.api_config,
@@ -398,6 +425,7 @@ class Transcriber:
                 base_prompt=prompt,
                 transcription_model=transcription_model,
                 usage=usage,
+                language=self.language,
             )
 
         print("Transcribing in a single request (original file)...")
@@ -431,17 +459,9 @@ class Transcriber:
         audio_client = _create_audio_client(self.api_config)
         try:
             with file_path.open("rb") as f:
-                if prompt is None:
-                    response = audio_client.audio.transcriptions.create(
-                        model=transcription_model,
-                        file=f,
-                    )
-                else:
-                    response = audio_client.audio.transcriptions.create(
-                        model=transcription_model,
-                        file=f,
-                        prompt=prompt,
-                    )
+                response = audio_client.audio.transcriptions.create(
+                    **_transcription_request(transcription_model, f, prompt, self.language)
+                )
             if usage is not None:
                 usage.add(_transcription_usage(response))
             return response.text
@@ -450,6 +470,29 @@ class Transcriber:
 
     def _build_azure_audio_client(self) -> AzureOpenAI:
         return _create_audio_client(self.api_config)
+
+
+def _sends_language(language: str | None) -> bool:
+    return language not in (None, "", "auto")
+
+
+def _check_cloud_language(language: str | None) -> None:
+    """Refuse, before any request, a language a cloud model cannot take."""
+    if _sends_language(language) and not re.fullmatch(r"[a-z]{2}", str(language)):
+        raise ValueError(
+            f"language={language!r} is not a two-letter ISO-639-1 code (such as 'fi' or "
+            "'en'). Cloud transcription models take such a code, or 'auto' to detect it."
+        )
+
+
+def _transcription_request(model: str, file, prompt: str | None, language: str | None) -> dict:
+    """The keyword arguments of one ``audio.transcriptions.create`` call."""
+    request: dict = {"model": model, "file": file}
+    if prompt is not None:
+        request["prompt"] = prompt
+    if _sends_language(language):
+        request["language"] = language
+    return request
 
 
 # How much of the previous chunk's transcript a chunk request carries.
@@ -477,10 +520,13 @@ def split_and_transcribe_with_context(
     base_prompt: str | None = None,
     transcription_model: str | None = None,
     usage: UsageCounter | None = None,
+    language: str | None = None,
 ):
     """Split audio into chunks and transcribe with rolling context.
 
     ``usage``, if given, gets the usage of every chunk request added to it.
+    ``language``, a two-letter ISO-639-1 code, goes with every chunk request;
+    ``None`` or ``"auto"`` sends none, so the provider detects the language.
     """
 
     _audio_provider(api_config)
@@ -531,17 +577,9 @@ def split_and_transcribe_with_context(
 
             try:
                 with open(chunk_path, "rb") as chunk_file:
-                    if prompt is None:
-                        transcript_response = audio_client.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                        )
-                    else:
-                        transcript_response = audio_client.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                            prompt=prompt,
-                        )
+                    transcript_response = audio_client.audio.transcriptions.create(
+                        **_transcription_request(transcription_model, chunk_file, prompt, language)
+                    )
 
                     chunk_transcript = transcript_response.text
                     transcripts.append(chunk_header + chunk_transcript)

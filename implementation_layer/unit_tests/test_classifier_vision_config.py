@@ -20,7 +20,7 @@ def test_classifier_passes_complete_config_to_vision_parser(monkeypatch, tmp_pat
     monkeypatch.setattr(
         classifier,
         "VisionParser",
-        lambda openai_config: configs.append(openai_config)
+        lambda openai_config, **kwargs: configs.append(openai_config)
         or SimpleNamespace(convert_image=lambda *args, **kwargs: "Document content"),
     )
     path = tmp_path / "document.png"

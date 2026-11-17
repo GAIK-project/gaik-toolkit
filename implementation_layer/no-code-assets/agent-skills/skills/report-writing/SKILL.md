@@ -139,6 +139,7 @@ For each audio/video file, call:
 
 If transcription fails with "file not found":
 - Re-check the path style and ensure Windows drive-letter paths on Windows.
+- If it says the file is outside the approved folders or not audio or video, ask the user to move it into the folder chosen in setup; do not try other paths.
 
 #### Step 4 - Images (Handwritten Notes, Diagrams, Sketches, Figures)
 For each image file (.jpg, .jpeg, .png, .gif, .webp, .bmp, .tiff):
@@ -424,7 +425,7 @@ NEXT STEPS
 5. Fuses all content with separators
 6. Analyzes content for section signals
 7. Generates Word document with applicable sections only
-8. Saves to outputs and presents to user
+8. Saves to input_documents/ and presents it to the user
 
 ### Example 2: With Template
 
