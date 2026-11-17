@@ -577,6 +577,10 @@ export type Dict = {
   pocEnvTitle: string;
   pocEnvNote: string;
   pocEnvOptional: string;
+  /** A variable of the provider the package uses that it cannot run without. */
+  pocEnvNeeded: string;
+  /** The disclosure for every other provider's variables: {n}. */
+  pocEnvRest: string;
   pocEnvShow: string;
   pocEnvHide: string;
   pocEnvAdd: string;
@@ -1303,6 +1307,8 @@ const fi: Dict = {
   pocEnvNote:
     "Avaimet pysyvät omalla koneellasi: ne lisätään ladattavaan pakettiin selaimessasi, eikä niitä lähetetä palvelimelle.",
   pocEnvOptional: "valinnainen",
+  pocEnvNeeded: "tarvitaan",
+  pocEnvRest: "Muut palveluntarjoajat ja asetukset ({n})",
   pocEnvShow: "Näytä arvo",
   pocEnvHide: "Piilota arvo",
   pocEnvAdd: "Lisää muuttuja",
@@ -2105,6 +2111,8 @@ const en: Dict = {
   pocEnvNote:
     "The keys stay on your own machine: they are added to the downloaded package in your browser and are not sent to the server.",
   pocEnvOptional: "optional",
+  pocEnvNeeded: "needed",
+  pocEnvRest: "Other providers and settings ({n})",
   pocEnvShow: "Show value",
   pocEnvHide: "Hide value",
   pocEnvAdd: "Add a variable",

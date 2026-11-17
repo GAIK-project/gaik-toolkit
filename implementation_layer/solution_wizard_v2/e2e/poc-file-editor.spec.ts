@@ -45,6 +45,34 @@ const PACKAGE_ZIP = zipSync({
   "use_case.blueprint.json": strToU8("{}\n"),
 });
 
+/** The shape of the scaffolder's .env.example: a section per provider, everything commented out. */
+const GENERATED_ENV_EXAMPLE = [
+  "# Environment variables for Invoice extraction",
+  "# Copy to .env and enable only providers used by config.yaml stages.",
+  "",
+  "# --- Azure OpenAI (model is your deployment name) ---",
+  "# AZURE_API_KEY=",
+  "# AZURE_ENDPOINT=https://your-resource.openai.azure.com/",
+  "# AZURE_API_VERSION=2025-03-01-preview",
+  "",
+  "# --- OpenAI ---",
+  "# OPENAI_API_KEY=",
+  "# OPENAI_MODEL=gpt-6-luna",
+  "",
+  "# --- Native Google Gemini Developer API ---",
+  "# GOOGLE_API_KEY=",
+  "# GEMINI_API_KEY is also accepted.",
+  "# GOOGLE_MODEL=gemini-2.5-flash",
+  "",
+  "# --- External services (outside GAIK) ---",
+  "# Web search for the enrichment step.",
+  "TAVILY_API_KEY=",
+  "",
+  "# A config.yaml address not on this machine needs its host here.",
+  "# GAIK_ALLOWED_ENDPOINT_HOSTS=",
+  "",
+].join("\n");
+
 const sse = (events: object[]) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
 
 /** A checked package with no test material, so the steps stay open; `recorded` adds a passed test run. */
@@ -403,6 +431,58 @@ test.describe("The .env form beside the deployable package", () => {
     await page.getByRole("tab", { name: "PoC" }).click();
     await expect(page.locator('[data-testid="poc-env-value"][data-name="AZURE_API_KEY"]')).toHaveValue("");
     await expect(page.getByTestId("poc-env-extra-name")).toHaveCount(0);
+  });
+
+  test("a generated .env.example shows the provider the package uses, marks what is needed and folds the rest", async ({
+    page,
+  }) => {
+    await fakePackage(page, { recorded: true });
+    await loginAsDev(page);
+    // The scaffolder's .env.example in place of the mock store's short one.
+    const read = await (await page.request.get(`${FILE_URL}?path=.env.example`)).json();
+    const put = await page.request.put(`${FILE_URL}?path=.env.example`, {
+      data: { content: GENERATED_ENV_EXAMPLE, base_digest: read.digest },
+    });
+    expect(put.ok()).toBe(true);
+    await page.goto(`/sessions/${SESSION}`);
+    await expect(page.locator('[data-testid="poc-check"][data-phase="ok"]')).toBeVisible();
+
+    const form = page.getByTestId("poc-env-form");
+    // The mock package's config.yaml names azure: its section, then the external services.
+    const shown = form.locator(':scope > [data-testid="poc-env-section"]');
+    await expect(shown.locator("h4")).toHaveText([
+      "Azure OpenAI (model is your deployment name)",
+      "External services (outside GAIK)",
+    ]);
+    await expect(shown.first().locator("label")).toHaveText([
+      /^AZURE_API_KEY\s*tarvitaan$/,
+      /^AZURE_ENDPOINT\s*tarvitaan$/,
+      /^AZURE_API_VERSION$/,
+    ]);
+    await expect(shown.last().locator("label")).toHaveText([/^TAVILY_API_KEY\s*tarvitaan · Web search/]);
+    // No heading of the file is anyone's help, and nothing here is "optional".
+    await expect(form).not.toContainText("---");
+    await expect(form.getByText("valinnainen")).toHaveCount(0);
+
+    const rest = form.getByTestId("poc-env-rest");
+    await expect(rest).toHaveJSProperty("open", false);
+    await expect(rest.locator("summary")).toHaveText("Muut palveluntarjoajat ja asetukset (5)");
+    await expect(rest.locator("label").first()).toBeHidden();
+    await rest.locator("summary").click();
+    await expect(rest.locator("h4")).toHaveText(["OpenAI", "Native Google Gemini Developer API"]);
+    await expect(rest.locator("label")).toHaveCount(5);
+
+    // A value typed behind the disclosure is written like any other.
+    await form.locator('[data-testid="poc-env-value"][data-name="AZURE_API_KEY"]').fill(TYPED);
+    await rest.locator('[data-testid="poc-env-value"][data-name="GOOGLE_API_KEY"]').fill("second-typed");
+    const download = page.waitForEvent("download");
+    await page.getByTestId("poc-deployable").click();
+    const zip = unzipSync(new Uint8Array(await readFile(await (await download).path())));
+    const env = strFromU8(zip["poc/.env"]).split("\n");
+    expect(env).toContain(`AZURE_API_KEY=${TYPED}`);
+    expect(env).toContain("GOOGLE_API_KEY=second-typed");
+    expect(env).toContain("# AZURE_ENDPOINT=https://your-resource.openai.azure.com/");
+    expect(env).toContain("# --- OpenAI ---");
   });
 
   test("with every field empty the download is the server's package as it is", async ({ page }) => {

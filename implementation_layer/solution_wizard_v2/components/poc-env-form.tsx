@@ -3,12 +3,17 @@
 import { useId, useState, type ReactNode } from "react";
 import { Icon } from "@/components/icons";
 import type { Dict } from "@/lib/i18n";
-import { ENV_NAME_RE, type EnvVariable, type ExtraVariable } from "@/lib/env-file";
+import { ENV_NAME_RE, type EnvLayout, type EnvSection, type EnvVariable, type ExtraVariable } from "@/lib/env-file";
 
 /**
  * The values for the package's `.env`, asked where the deployable package is
  * taken. The variables come from the package's `.env.example`; the user may
  * add others (a search API's key the example does not list yet).
+ *
+ * A generated `.env.example` lists every provider the toolkit knows. Where the
+ * package's config says which one it uses (`layout.kind === "grouped"`), that
+ * provider's section and the external services' are shown, with what the
+ * package cannot run without marked, and the rest is behind one disclosure.
  *
  * Nothing typed here leaves the page: the parent keeps the values in React
  * state, writes them into the downloaded zip in the browser (lib/zip-env) and
@@ -16,7 +21,7 @@ import { ENV_NAME_RE, type EnvVariable, type ExtraVariable } from "@/lib/env-fil
  * or password manager picks them up, and autocomplete is off.
  */
 export function PocEnvForm({
-  variables,
+  layout,
   values,
   extra,
   onValue,
@@ -25,7 +30,7 @@ export function PocEnvForm({
   t,
   children,
 }: {
-  variables: readonly EnvVariable[];
+  layout: EnvLayout;
   values: Record<string, string>;
   extra: readonly ExtraVariable[];
   onValue: (name: string, value: string) => void;
@@ -73,21 +78,29 @@ export function PocEnvForm({
     </span>
   );
 
-  return (
-    <div className="flex flex-col gap-3" data-testid="poc-env-form">
-      <p className="flex items-start gap-1.5 text-xs text-text-secondary" data-testid="poc-env-note">
-        <Icon name="lock" size={13} className="mt-0.5 text-text-muted" />
-        <span>{t.pocEnvNote}</span>
-      </p>
-      {variables.length > 0 && (
-        <ul className="flex flex-col gap-2.5">
-          {variables.map((variable) => (
-            <li key={variable.name} className="grid gap-1 @md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] @md:gap-3">
+  const needed = new Set(layout.kind === "grouped" ? layout.needed : []);
+  const rows = (variables: readonly EnvVariable[], mark: (variable: EnvVariable) => string) =>
+    variables.length > 0 && (
+      <ul className="flex flex-col gap-2.5">
+        {variables.map((variable) => {
+          const marked = mark(variable);
+          return (
+            <li
+              key={variable.name}
+              className="grid gap-1 @md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] @md:gap-3"
+              data-needed={needed.has(variable.name) ? "true" : undefined}
+            >
               <label htmlFor={`${id}-${variable.name}`} className="min-w-0 pt-1.5">
                 <span className="block break-all font-mono text-xs font-medium text-text">{variable.name}</span>
-                {(variable.help || variable.optional) && (
+                {(variable.help || marked) && (
                   <span className="block text-xs text-text-muted">
-                    {[variable.optional ? t.pocEnvOptional : "", variable.help].filter(Boolean).join(" · ")}
+                    {marked && (
+                      <span className={needed.has(variable.name) ? "font-medium text-text-secondary" : undefined}>
+                        {marked}
+                      </span>
+                    )}
+                    {marked && variable.help ? " · " : ""}
+                    {variable.help}
                   </span>
                 )}
               </label>
@@ -95,8 +108,44 @@ export function PocEnvForm({
                 onValue(variable.name, v),
               )}
             </li>
-          ))}
-        </ul>
+          );
+        })}
+      </ul>
+    );
+  const sectionOf = (section: EnvSection, mark: (variable: EnvVariable) => string) => (
+    <section
+      key={`${section.title ?? ""}:${section.variables[0]?.line}`}
+      className="flex flex-col gap-2"
+      data-testid="poc-env-section"
+    >
+      {section.title && <h4 className="text-xs font-semibold text-text">{section.title}</h4>}
+      {rows(section.variables, mark)}
+    </section>
+  );
+
+  return (
+    <div className="flex flex-col gap-3" data-testid="poc-env-form">
+      <p className="flex items-start gap-1.5 text-xs text-text-secondary" data-testid="poc-env-note">
+        <Icon name="lock" size={13} className="mt-0.5 text-text-muted" />
+        <span>{t.pocEnvNote}</span>
+      </p>
+      {layout.kind === "flat"
+        ? rows(layout.variables, (variable) => (variable.optional ? t.pocEnvOptional : ""))
+        : layout.shown.map((section) =>
+            sectionOf(section, (variable) => (needed.has(variable.name) ? t.pocEnvNeeded : "")),
+          )}
+      {layout.kind === "grouped" && layout.restCount > 0 && (
+        <details className="group/rest" data-testid="poc-env-rest">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-xs font-medium text-text-secondary transition-colors hover:text-text [&::-webkit-details-marker]:hidden">
+            <Icon
+              name="chevronRight"
+              size={13}
+              className="transition-transform duration-150 ease-out group-open/rest:rotate-90"
+            />
+            {t.pocEnvRest.replace("{n}", String(layout.restCount))}
+          </summary>
+          <div className="mt-2 flex flex-col gap-3">{layout.rest.map((section) => sectionOf(section, () => ""))}</div>
+        </details>
       )}
       {extra.length > 0 && (
         <ul className="flex flex-col gap-2.5">

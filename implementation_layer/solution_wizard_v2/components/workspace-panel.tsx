@@ -86,7 +86,7 @@ import { FileIcon } from "@/components/file-icon";
 import { FileTree } from "@/components/file-tree";
 import { PocFileEditor } from "@/components/poc-file-editor";
 import { PocEnvForm } from "@/components/poc-env-form";
-import { composeEnv, hasEnvValues, parseEnvExample, type ExtraVariable } from "@/lib/env-file";
+import { composeEnv, envLayout, hasEnvValues, layoutVariables, type ExtraVariable } from "@/lib/env-file";
 import { ENV_EXAMPLE_NAME, pocFileFrom, pocPathOf, type PocFileSaved } from "@/lib/poc-file";
 import { BlueprintModeBar } from "@/components/blueprint-mode-bar";
 import { Icon, type IconName } from "@/components/icons";
@@ -1057,7 +1057,13 @@ export function WorkspacePanel({
   const hasEnvExample = pocFiles.includes(`poc/${ENV_EXAMPLE_NAME}`);
   // Of the package as it is listed now: a package without the file has no variables.
   const envText = hasEnvExample ? envExample : "";
-  const envVariables = useMemo(() => parseEnvExample(envText), [envText]);
+  // The package's config.yaml says which provider it uses: that provider's
+  // variables are shown first and the others folded away (lib/env-file). Null
+  // when it could not be read: every variable is then listed, as before.
+  const [envConfig, setEnvConfig] = useState<string | null>(null);
+  const hasConfig = pocFiles.includes("poc/config.yaml");
+  const envShape = useMemo(() => envLayout(envText, hasConfig ? envConfig : null), [envText, hasConfig, envConfig]);
+  const envVariables = useMemo(() => layoutVariables(envShape), [envShape]);
   useEffect(() => {
     if (!pocActive || !runRecorded || !hasEnvExample || wizardReplying) return;
     let cancelled = false;
@@ -1075,6 +1081,21 @@ export function WorkspacePanel({
       cancelled = true;
     };
   }, [pocActive, runRecorded, hasEnvExample, wizardReplying, sessionId, envRevision, pocVersion]);
+  useEffect(() => {
+    if (!pocActive || !runRecorded || !hasEnvExample || !hasConfig || wizardReplying) return;
+    let cancelled = false;
+    fetch(`/api/sessions/${sessionId}/poc/file?path=config.yaml`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: unknown) => {
+        if (!cancelled) setEnvConfig(pocFileFrom(d)?.content ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setEnvConfig(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pocActive, runRecorded, hasEnvExample, hasConfig, wizardReplying, sessionId, envRevision, pocVersion]);
   // Leaving the tab forgets what was typed (state adjusted as the tab changes,
   // not in an effect: the values are gone from the first render without it).
   const [envTabOpen, setEnvTabOpen] = useState(pocActive);
@@ -1098,7 +1119,7 @@ export function WorkspacePanel({
       if (!res.ok) throw new Error(`deployable ${res.status}`);
       const zip = new Uint8Array(await res.arrayBuffer());
       const { attachmentName, saveBytes, zipWithEnv } = await import("@/lib/zip-env");
-      const withEnv = await zipWithEnv(zip, composeEnv(envText, envValues, envExtra));
+      const withEnv = await zipWithEnv(zip, composeEnv(envText, envValues, envExtra, envVariables));
       saveBytes(
         withEnv,
         attachmentName(res.headers.get("content-disposition"), `poc-${sessionId}-deployable.zip`),
@@ -1121,7 +1142,7 @@ export function WorkspacePanel({
     // The package is another one now: read it again, so the check and the
     // test run follow its new digest as after a change by the wizard.
     setPocRefresh((n) => n + 1);
-    if (saved.path === ENV_EXAMPLE_NAME) setEnvRevision((n) => n + 1);
+    if (saved.path === ENV_EXAMPLE_NAME || saved.path === "config.yaml") setEnvRevision((n) => n + 1);
     // A reopened gate is the page's to show (the gate bar, the step).
     if (saved.gateReopened) router.refresh();
   }
@@ -2706,7 +2727,7 @@ export function WorkspacePanel({
       </summary>
       <div className="px-4 pb-3">
         <PocEnvForm
-          variables={envVariables}
+          layout={envShape}
           values={envValues}
           extra={envExtra}
           onValue={(name, value) => setEnvValues((now) => ({ ...now, [name]: value }))}
