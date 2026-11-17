@@ -208,6 +208,10 @@ All wizard outputs go to the directory the user specifies. Never written inside 
 ├── poc/
 │   ├── README.md                  # use-case-specific run instructions
 │   ├── run_poc.py                 # runnable pipeline
+│   ├── app.py                     # test page's server: python app.py, then http://127.0.0.1:8000
+│   ├── ui/
+│   │   ├── index.html             # the test page (one file, no build)
+│   │   └── solution.json          # name, inputs and output fields the page reads
 │   ├── requirements.txt           # gaik[extras]>=<validated>,<next minor> (gaik_validated_version.txt)
 │   ├── .env.example               # env vars for the stage providers
 │   ├── config.yaml                # provider/model per stage, language, paths
