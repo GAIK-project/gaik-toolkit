@@ -49,9 +49,17 @@ from gaik.software_components.RAG.vector_store import VectorStore
 store = VectorStore(
     persist: bool = False,
     persist_path: str = "chroma_store",
-    collection_name: str = "gaik_rag"
+    collection_name: str = "gaik_rag",
+    owner: str | None = None,  # a user or session id: see below
 )
 ```
+
+### Several users on one store
+
+Pass `owner` (a user or session id) and the store records it on every chunk it adds,
+under the metadata key `gaik_owner`, and its searches and counts see only that owner's
+chunks. A caller's filter is added to the owner condition; it cannot replace it. Without
+`owner`, everyone using the same collection reads every chunk in it.
 
 ### Methods
 

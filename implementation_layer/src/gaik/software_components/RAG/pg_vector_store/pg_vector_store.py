@@ -29,6 +29,8 @@ except ImportError as exc:
 if TYPE_CHECKING:
     from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
 
+from ..vector_store.vector_store import OWNER_KEY, check_owner
+
 logger = logging.getLogger(__name__)
 
 # How a natural-language query becomes a tsquery. See `gaik_tsquery` in SQL.
@@ -237,6 +239,7 @@ class PgVectorStore:
         hnsw_ef_search: int | None = None,
         vector_type: str = "vector",
         hnsw_iterative_scan: str | None = None,
+        owner: str | None = None,
     ) -> None:
         if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", table_name):
             raise ValueError(
@@ -294,6 +297,7 @@ class PgVectorStore:
                 f"Invalid hnsw_iterative_scan {hnsw_iterative_scan!r}: expected one of "
                 f"{', '.join(sorted(_ITERATIVE_SCAN_MODES))}"
             )
+        self.owner = check_owner(owner)
         self.connection_string = connection_string
         self.table_name = table_name
         self.embedding_dim = embedding_dim
@@ -827,7 +831,9 @@ class PgVectorStore:
         with conn.cursor() as cur:
             for doc, emb in zip(documents, embeddings):
                 title = doc.metadata.get("title", "") if doc.metadata else ""
-                metadata = doc.metadata or {}
+                metadata = dict(doc.metadata or {})
+                if self.owner is not None:
+                    metadata[OWNER_KEY] = self.owner
                 vec_str = _format_vector(emb)
 
                 if self.text_processor is not None:
@@ -867,10 +873,19 @@ class PgVectorStore:
 
     @_rolls_back_on_error
     def count(self) -> int:
-        """Return the total number of documents in the store."""
+        """Return the number of documents in the store (this owner's, with one)."""
         conn = self._get_conn()
-        row = conn.execute(f"SELECT COUNT(*) AS cnt FROM {self.table_name}").fetchone()
+        clause, params = _build_filter_clause(self._scoped(None))
+        row = conn.execute(
+            f"SELECT COUNT(*) AS cnt FROM {self.table_name} WHERE TRUE {clause}", params
+        ).fetchone()
         return row["cnt"] if row else 0
+
+    def _scoped(self, filters: dict | None) -> dict | None:
+        """``filters`` with this store's owner added; the owner wins over a caller's key."""
+        if self.owner is None:
+            return filters
+        return {**(filters or {}), OWNER_KEY: self.owner}
 
     @_rolls_back_on_error
     def delete(self, document_ids: list[int]) -> int:
@@ -883,9 +898,10 @@ class PgVectorStore:
             return 0
 
         conn = self._get_conn()
+        clause, params = _build_filter_clause(self._scoped(None))
         result = conn.execute(
-            f"DELETE FROM {self.table_name} WHERE id = ANY(%s)",
-            (document_ids,),
+            f"DELETE FROM {self.table_name} WHERE id = ANY(%s) {clause}",
+            (document_ids, *params),
         )
         conn.commit()
         return result.rowcount
@@ -931,6 +947,7 @@ class PgVectorStore:
         """
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
+        filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
 
         rows = conn.execute(
@@ -963,7 +980,7 @@ class PgVectorStore:
             List of ``(Document, ts_rank_score)`` tuples, highest first.
         """
         conn = self._get_conn()
-        filter_clause, filter_params = _build_filter_clause(filters)
+        filter_clause, filter_params = _build_filter_clause(self._scoped(filters))
         effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
@@ -1021,6 +1038,7 @@ class PgVectorStore:
         """
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
+        filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
         effective_query = self._lemmatize_query(query_text)
 
@@ -1091,6 +1109,7 @@ class PgVectorStore:
         """
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
+        filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
         effective_query = self._lemmatize_query(query_text)
 

@@ -270,6 +270,13 @@ to hold against a `RelevanceGate` floor.
 
 Standard PostgreSQL URI: `postgresql://user:password@host:port/database`
 
+### Owner
+
+`PgVectorStore(..., owner="user-42")` records the owner in each row's `metadata`
+(`gaik_owner`) and adds it to the metadata filter of every search, `count()` and
+`delete()`, so one table can hold several users' documents. A caller's `filters` are
+combined with it and cannot replace it. Without `owner` the store reads the whole table.
+
 ### FTS Language
 
 The `fts_language` parameter controls PostgreSQL text search stemming:
