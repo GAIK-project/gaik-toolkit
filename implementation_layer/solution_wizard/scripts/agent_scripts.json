@@ -32,6 +32,7 @@
   },
   "left_out": {
     "promote_template.py": "a promoted template is reused by every later session; the person runs it",
+    "refresh_schema_model.py": "it imports output_schema.py, which the agent writes, so it would run the agent's own code. Skip it: the audio and document PoCs write output_schema_model.json again themselves when output_schema.py is newer",
     "run_wizard.py --export-schema": "it rewrites the wizard's own schema file"
   }
 }

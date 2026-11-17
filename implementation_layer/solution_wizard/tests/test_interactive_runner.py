@@ -346,10 +346,19 @@ def _cli_process_env(options: ClaudeAgentOptions, monkeypatch) -> dict[str, str]
     return seen
 
 
+def _temp_is_an_ordinary_folder(monkeypatch, tmp_path) -> None:
+    """On Windows pytest's temporary folder is under %LOCALAPPDATA%, which the
+    runner refuses as an output folder; point the settings folders elsewhere."""
+    if sys.platform == "win32":
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "AppData" / "Local"))
+        monkeypatch.setenv("APPDATA", str(tmp_path / "AppData" / "Roaming"))
+
+
 def test_the_cli_gets_only_the_env_files_names_and_the_system_basics(
     tmp_path, monkeypatch, shell_env
 ) -> None:
     """``main`` itself narrows the environment before the SDK starts the CLI."""
+    _temp_is_an_ordinary_folder(monkeypatch, tmp_path)
     env_file = tmp_path / ".env"
     env_file.write_text(
         "CLAUDE_CODE_USE_FOUNDRY=1\nANTHROPIC_FOUNDRY_API_KEY=k\n"
@@ -404,7 +413,10 @@ def test_without_an_env_file_the_provider_names_come_from_the_shell(tmp_path, sh
     assert "MY_SHELL_VAR" not in env
 
 
-def test_a_relative_output_folder_is_taken_from_where_the_runner_starts(tmp_path) -> None:
+def test_a_relative_output_folder_is_taken_from_where_the_runner_starts(
+    tmp_path, monkeypatch
+) -> None:
+    _temp_is_an_ordinary_folder(monkeypatch, tmp_path)
     assert runner.resolve_output_dir("out/case", tmp_path) == (tmp_path / "out" / "case").resolve()
 
 

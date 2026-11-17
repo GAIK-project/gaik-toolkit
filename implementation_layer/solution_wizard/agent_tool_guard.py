@@ -84,6 +84,12 @@ def load_scripts(table: Path = SCRIPTS_TABLE) -> dict[str, dict[str, str]]:
     return json.loads(table.read_text(encoding="utf-8"))["scripts"]
 
 
+def load_left_out(table: Path = SCRIPTS_TABLE) -> dict[str, str]:
+    """Scripts the agent may not run at all, with the reason the refusal gives."""
+    left_out = json.loads(table.read_text(encoding="utf-8"))["left_out"]
+    return {name: reason for name, reason in left_out.items() if " " not in name}
+
+
 def endpoint_ok(value: str) -> bool:
     """A known provider's own https endpoint."""
     try:
@@ -287,6 +293,7 @@ class ToolGuard:
         *,
         blueprint_check: BlueprintCheck | None = None,
         scripts: dict[str, dict[str, str]] | None = None,
+        left_out: dict[str, str] | None = None,
         extra_tools: frozenset[str] = frozenset(),
         protected: list[Path] | None = None,
     ) -> None:
@@ -302,6 +309,7 @@ class ToolGuard:
         )
         self.blueprint_check = blueprint_check
         self.scripts = scripts if scripts is not None else load_scripts()
+        self.left_out = left_out if left_out is not None else load_left_out()
         #: The caller's own tools (v2's in-process gate tools), which check
         #: their own input.
         self.extra_tools = extra_tools
@@ -395,6 +403,9 @@ class ToolGuard:
         if len(argv) < 2 or argv[0] not in _PYTHON:
             return allowed
         script = argv[1]
+        name = Path(script).name
+        if name in self.left_out and name not in self.scripts:
+            return f"{name} is not run by the agent here: {self.left_out[name]}."
         options = self.scripts.get(Path(script).name)
         if options is None or not _inside(script, [self.cwd / "scripts"], self.cwd):
             return allowed

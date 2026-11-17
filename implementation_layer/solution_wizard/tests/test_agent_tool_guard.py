@@ -433,7 +433,8 @@ def _skill_commands() -> list[str]:
     text = re.sub(r"\\\n\s*", " ", text)  # line continuations
     found = re.findall(r"^\s*(python3? scripts/\S+(?: [^\n`]*)?)$", text, re.M)
     found += re.findall(r"`(python3? (?:scripts/|-c )[^`]+)`", text)
-    return sorted({c.strip() for c in found})
+    # `python scripts/<name>.py` names the form of every command, not a command.
+    return sorted({c.strip() for c in found if "scripts/<" not in c})
 
 
 def test_every_command_skill_md_gives_the_agent_passes_the_guard(guard):
@@ -450,6 +451,10 @@ def test_every_command_skill_md_gives_the_agent_passes_the_guard(guard):
         command = re.sub(r"<[^<>]+>", "Value", command)  # the other placeholders
         if "promote_template.py" in command:
             assert guard.check("Bash", {"command": command}), "promote_template.py is left out"
+            continue
+        if "refresh_schema_model.py" in command:
+            reason = guard.check("Bash", {"command": command})
+            assert reason and "Skip it" in reason, "refresh_schema_model.py runs the agent's code"
             continue
         if reason := guard.check("Bash", {"command": command}):
             refused[command] = reason
@@ -505,6 +510,13 @@ def test_plain_paths_are_not_odd_forms():
         assert not agent_tool_guard.odd_path_form(value), value
 
 
+def _link_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:  # Windows without the symlink privilege
+        pytest.skip("this system cannot create the link")
+
+
 def test_a_script_does_not_write_into_an_output_folder_that_holds_a_link(guard, tmp_path):
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
@@ -512,7 +524,7 @@ def test_a_script_does_not_write_into_an_output_folder_that_holds_a_link(guard, 
     _blueprint(bp)
     command = f"python scripts/validate_blueprint.py --blueprint {bp.as_posix()}"
     assert guard.check("Bash", {"command": command}) is None
-    (guard.session / "poc" / "out").symlink_to(elsewhere, target_is_directory=True)
+    _link_or_skip(guard.session / "poc" / "out", elsewhere)
     assert "link" in guard.check("Bash", {"command": command})
 
 
@@ -520,7 +532,7 @@ def test_a_folder_search_through_a_link_is_refused(guard, tmp_path):
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
     (elsewhere / ".env").write_text("KEY=x")
-    (guard.session / "poc" / "shared").symlink_to(elsewhere, target_is_directory=True)
+    _link_or_skip(guard.session / "poc" / "shared", elsewhere)
     assert guard.check("Grep", {"pattern": "KEY", "path": str(guard.session)})
 
 
