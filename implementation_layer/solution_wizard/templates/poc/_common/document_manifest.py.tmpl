@@ -1,0 +1,195 @@
+"""Match the documents a PoC reads to the entries of a document manifest.
+
+A manifest (access control, classification, a catalogue) names each document by a
+path, often relative to the manifest (``documents/<name>.pdf``), while the code that
+walks the input folder holds a full path or a bare file name. Written fresh in every
+package, that lookup missed in four UC03 packages in a row (5 Oct 2026): the manifest
+was keyed by ``documents/<name>.pdf`` and searched with ``<name>.pdf``, so every
+document was dropped, refused or raised ``KeyError``. Use this module instead of
+writing the lookup again:
+
+    manifest = DocumentManifest.load(manifest_path)
+    for pdf in manifest.documents():        # the files the manifest names, found on disk
+        entry = manifest.require(pdf)      # the manifest's own record (a dict)
+        roles = entry.get("allowed_roles", [])
+
+Do not resolve the manifest's paths yourself either: they are relative to the manifest,
+not to ``sample_input/`` or the bundle, and a package that joined them to the wrong folder
+found no file at all (UC03, 6 Oct 2026). ``documents()`` does that resolution.
+
+A manifest path is used only when it resolves inside the PoC's ``sample_input/`` folder
+(the nearest one above the manifest), the manifest's folder or one of the search roots,
+links included, so an entry cannot reach files elsewhere on the machine.
+
+Standard library only, so it runs wherever the package runs.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+#: Where a manifest keeps its list of records, in the order they are tried.
+RECORD_KEYS = ("documents", "manifest", "files", "items", "entries")
+#: The field of a record that names its document, in the order they are tried.
+FILE_KEYS = ("file", "file_name", "filename", "path", "document", "name")
+
+
+class ManifestEntryNotFound(KeyError):
+    """A document has no entry in the manifest."""
+
+    def __str__(self) -> str:  # KeyError would show the message in quotes
+        return str(self.args[0]) if self.args else ""
+
+
+def _records(data) -> list[dict]:
+    if isinstance(data, list):
+        return [r for r in data if isinstance(r, dict)]
+    if isinstance(data, dict):
+        for key in RECORD_KEYS:
+            value = data.get(key)
+            if isinstance(value, list):
+                return [r for r in value if isinstance(r, dict)]
+            if isinstance(value, dict):
+                # {"<file>": {...metadata...}}
+                return [
+                    {"file": name, **meta}
+                    for name, meta in value.items()
+                    if isinstance(meta, dict)
+                ]
+    raise ValueError(f"the manifest has no list of documents under any of {RECORD_KEYS}")
+
+
+def _file_of(record: dict) -> str | None:
+    for key in FILE_KEYS:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip().replace("\\", "/")
+    return None
+
+
+class DocumentManifest:
+    """The manifest's records, findable by a document's path however it is held."""
+
+    def __init__(self, records: list[dict], base_dir: Path, search_roots: list[Path]):
+        self.records = records
+        self.base_dir = base_dir
+        self._by_path: dict[Path, dict] = {}
+        self._by_name: dict[str, list[dict]] = {}
+        self._by_key: dict[str, dict] = {}
+        self._path_of: dict[str, Path] = {}
+        roots = [base_dir, *search_roots]
+        allowed = [r.resolve() for r in roots]
+        # A manifest in sample_input/meta/ may name ../documents/a.pdf.
+        allowed += [a for a in base_dir.resolve().parents if a.name == "sample_input"][:1]
+
+        def inside(candidate: Path) -> bool:
+            return any(candidate.is_relative_to(a) for a in allowed)
+
+        for record in records:
+            key = _file_of(record)
+            if key is None:
+                continue
+            self._by_key[key] = record
+            self._by_name.setdefault(Path(key).name, []).append(record)
+            found = None
+            for root in roots:
+                candidate = (root / key).resolve()
+                if candidate.is_file() and inside(candidate):
+                    found = candidate
+                    break
+            if found is None:
+                # Laid out differently than the manifest says (e.g. flat): the bare
+                # name, if exactly one file under the roots has it.
+                hits = {
+                    p.resolve()
+                    for root in roots
+                    if root.is_dir()
+                    for p in root.rglob(Path(key).name)
+                    if p.is_file() and inside(p.resolve())
+                }
+                if len(hits) == 1:
+                    found = hits.pop()
+            if found is not None:
+                self._path_of[key] = found
+                self._by_path.setdefault(found, record)
+
+    @classmethod
+    def load(cls, manifest_path, *, search_roots=()) -> "DocumentManifest":
+        """Read a manifest; its relative paths resolve against its own folder first.
+
+        ``search_roots`` are further folders to resolve them against, for example the
+        bundle's folder when the bundle says paths are relative to it.
+        """
+        path = Path(manifest_path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return cls(_records(data), path.parent.resolve(), [Path(r).resolve() for r in search_roots])
+
+    @property
+    def keys(self) -> list[str]:
+        """The document names as the manifest writes them."""
+        return list(self._by_key)
+
+    def entry_for(self, document) -> dict | None:
+        """The manifest's record for ``document`` (a path or a name), or None.
+
+        Tried in order: the same file on disk; the manifest's own key; the path's
+        ending (``documents/<name>.pdf`` matches ``.../documents/<name>.pdf``); the
+        bare file name when exactly one record has it.
+        """
+        doc = Path(str(document).replace("\\", "/"))
+        try:
+            resolved = doc.resolve()
+        except OSError:
+            resolved = None
+        if resolved is not None and resolved in self._by_path:
+            return self._by_path[resolved]
+        text = doc.as_posix()
+        if text in self._by_key:
+            return self._by_key[text]
+        endings = [r for k, r in self._by_key.items() if text.endswith("/" + k)]
+        if len(endings) == 1:
+            return endings[0]
+        same_name = self._by_name.get(doc.name, [])
+        if len(same_name) == 1:
+            return same_name[0]
+        return None
+
+    def require(self, document) -> dict:
+        """Like ``entry_for``, but a document with no entry is an error that says why."""
+        entry = self.entry_for(document)
+        if entry is not None:
+            return entry
+        name = Path(str(document)).name
+        if len(self._by_name.get(name, [])) > 1:
+            reason = f"{len(self._by_name[name])} manifest entries are named {name!r}"
+        else:
+            reason = "no manifest entry matches it"
+        raise ManifestEntryNotFound(
+            f"{document} is not in the manifest ({reason}); manifest entries: {self.keys}"
+        )
+
+    def documents(self, *, strict: bool = True) -> list[Path]:
+        """The files the manifest names, found on disk, in the manifest's order.
+
+        Use this as the list of documents to read; do not join the manifest's paths
+        to a folder yourself. With ``strict`` (the default) an entry whose file is
+        not found is an error naming it and where it was looked for; with
+        ``strict=False`` it is left out (see ``missing_documents``).
+        """
+        missing = self.missing_documents()
+        if missing and strict:
+            raise FileNotFoundError(
+                f"manifest entries with no file on disk: {missing}; looked under "
+                f"{self.base_dir} and its subfolders, and the search roots"
+            )
+        return [self._path_of[k] for k in self._by_key if k in self._path_of]
+
+    def path_for(self, key_or_entry) -> Path | None:
+        """The file on disk for a manifest key or record, or None if not found."""
+        key = key_or_entry if isinstance(key_or_entry, str) else _file_of(key_or_entry)
+        return self._path_of.get(key) if key else None
+
+    def missing_documents(self) -> list[str]:
+        """Manifest entries whose file was not found on disk."""
+        return [k for k in self._by_key if k not in self._path_of]
