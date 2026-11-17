@@ -159,7 +159,40 @@ def test_a_provider_or_sandbox_variable_is_not_a_services_own(name) -> None:
     would send it to a third party."""
     message = _refused(env_vars=[name])
 
-    assert "belongs to gaik, the model providers, the sandbox or Python" in message
+    assert "belongs to gaik, the model providers, the sandbox, Python, the network" in message
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "REQUESTS_CA_BUNDLE",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "CURL_CA_BUNDLE",
+        "PIP_INDEX_URL",
+        "PIP_EXTRA_INDEX_URL",
+        "UV_INDEX_URL",
+        "CONDA_PREFIX",
+        "LD_PRELOAD",
+        "DYLD_INSERT_LIBRARIES",
+    ],
+)
+def test_a_network_tls_or_installer_setting_is_not_a_services_own(name) -> None:
+    """Set from the service's .env section, these would send every model call, with the
+    provider's key, through a proxy or a certificate the service chose."""
+    message = _refused(env_vars=[name])
+
+    assert "the network or the installers" in message
+
+
+@pytest.mark.parametrize("name", ["http_proxy", "https_proxy", "Https_Proxy", "no_proxy"])
+def test_a_proxy_variable_in_any_case_is_refused(name) -> None:
+    assert bp_module.env_name_problem(name)
+    assert _refused(env_vars=[name])
 
 
 def test_every_variable_the_env_template_names_is_reserved() -> None:
@@ -292,6 +325,48 @@ def test_local_processing_refuses_a_service_that_receives_data() -> None:
     assert "Tavily web search" in errors[0] and "local_processing_required" in errors[0]
 
 
+@pytest.mark.parametrize(
+    "said",
+    [
+        "none",
+        "None",
+        "none: it runs locally",
+        "Nothing leaves the machine",
+        "No data is sent",
+        "NO DATA, the library runs in the PoC",
+    ],
+)
+def test_a_natural_wording_of_nothing_sent_counts_as_nothing(said) -> None:
+    bp = _blueprint({**SEARCH, "name": "Local graph library", "data_sent": said})
+    bp.governance.data_handling.local_processing_required = True
+
+    errors, _ = _rule_15(validate(bp))
+
+    assert bp_module.sends_nothing(said)
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Nothing but the supplier's name",
+        "None except the business ID",
+        "nothing other than the query",
+        "Nonessential metadata of the invoice",
+        "The supplier's company name",
+        "Some data, none of it personal",
+    ],
+)
+def test_a_wording_that_names_data_counts_as_sent(said) -> None:
+    bp = _blueprint({**SEARCH, "data_sent": said})
+    bp.governance.data_handling.local_processing_required = True
+
+    errors, _ = _rule_15(validate(bp))
+
+    assert not bp_module.sends_nothing(said)
+    assert len(errors) == 1
+
+
 def test_no_external_model_api_asks_for_the_data_owners_word() -> None:
     bp = _blueprint(SEARCH)
     bp.governance.data_handling.external_model_api_allowed = False
@@ -322,25 +397,47 @@ def _requirements(poc: Path) -> list[str]:
     return (poc / "requirements.txt").read_text(encoding="utf-8").splitlines()
 
 
-def test_packages_follow_the_gaik_lines_once_each(tmp_path) -> None:
+def _added_requirements(tmp_path: Path, *services: dict) -> list[str]:
+    """The lines the services add after what the package has without them."""
+    lines = _requirements(scaffold_poc(_blueprint(*services), tmp_path)["poc_dir"])
+    plain = _requirements(scaffold_poc(_blueprint(), tmp_path / "plain")["poc_dir"])
+    # The gaik lines and the rest come first, as without services.
+    assert lines[: len(plain)] == plain
+    return lines[len(plain) :]
+
+
+def test_packages_follow_the_gaik_lines_and_an_exact_duplicate_is_left_out(tmp_path) -> None:
     services = (
         SEARCH,
-        {**SEARCH, "name": "Tavily again", "python_package": "Tavily_Python>=0.6"},
-        {**SEARCH, "name": "YAML", "python_package": "PyYAML>=6"},
+        {**SEARCH, "name": "Tavily again", "python_package": "Tavily_Python>=0.5"},
+        {**SEARCH, "name": "YAML", "python_package": "PyYAML"},
         {**SEARCH, "name": "Register lookup", "python_package": "requests[socks]>=2.31"},
         {**SEARCH, "name": "No package", "python_package": None},
     )
-    poc = scaffold_poc(_blueprint(*services), tmp_path)["poc_dir"]
-    lines = _requirements(poc)
-    plain = scaffold_poc(_blueprint(), tmp_path / "plain")["poc_dir"]
 
-    # The gaik lines and the rest come first, as without services.
-    assert lines[: len(_requirements(plain))] == _requirements(plain)
-    added = lines[len(_requirements(plain)) :]
-    assert added == [
+    assert _added_requirements(tmp_path, *services) == [
         "# Packages of the external services (README, External services)",
         "tavily-python>=0.5",
         "requests[socks]>=2.31",
+    ]
+
+
+def test_a_package_with_extras_or_a_stricter_version_is_kept(tmp_path) -> None:
+    """pip combines every line of one project, so the extra and the version count."""
+    services = (
+        SEARCH,
+        {**SEARCH, "name": "Stricter", "python_package": "tavily-python>=0.6"},
+        {**SEARCH, "name": "E-mail check", "python_package": "pydantic[email]>=2.6"},
+        {**SEARCH, "name": "YAML", "python_package": "PyYAML>=6"},
+        {**SEARCH, "name": "Same again", "python_package": "pydantic[email]>=2.6"},
+    )
+
+    assert _added_requirements(tmp_path, *services) == [
+        "# Packages of the external services (README, External services)",
+        "tavily-python>=0.5",
+        "tavily-python>=0.6",
+        "pydantic[email]>=2.6",
+        "PyYAML>=6",
     ]
 
 
@@ -411,6 +508,28 @@ def test_without_services_the_readme_has_no_section_and_the_guide_says_none(tmp_
     assert "${" not in docs["technical_specification"] + docs["user_guide"]
 
 
+def test_the_web_diagram_path_does_not_carry_services() -> None:
+    """generate_bpmn_from_v2.py validates what v2_to_v1_dict builds. Its technical_spec
+    has fixed keys, so a service entry the scaffolder would refuse cannot stop the
+    Workflow tab's diagram."""
+    from solution_wizard.bpmn_generator import generate_bpmn
+    from solution_wizard.v2_adapter import v2_to_v1_dict
+
+    v2 = {
+        "name": "Invoice check",
+        "steps": [
+            {"id": "upload", "name": "Upload invoice", "type": "io"},
+            {"id": "extract", "name": "Extract fields", "type": "ai", "component": "Extractor"},
+        ],
+        "technical_spec": {"external_services": [{**SEARCH, "python_package": "-e ."}]},
+        "external_services": [{**SEARCH, "env_vars": ["HTTPS_PROXY"]}],
+    }
+    v1 = v2_to_v1_dict(v2, session_id="s1")
+
+    assert "external_services" not in v1["technical_spec"]
+    assert "<bpmn" in generate_bpmn(Blueprint.model_validate(v1))
+
+
 @pytest.mark.parametrize(
     "example", ["document_extraction_blueprint.json", "rag_workflow_blueprint.json"]
 )
@@ -478,6 +597,41 @@ def test_with_the_package_and_the_key_the_package_is_returned(monkeypatch) -> No
 
     assert package is json
     assert said == ""
+
+
+@pytest.mark.parametrize("module", ["no_such_package_xyz.client", "json.no_such_submodule"])
+def test_a_missing_module_inside_a_package_is_not_installed(monkeypatch, module) -> None:
+    monkeypatch.setenv("TAVILY_API_KEY", "test-value-not-a-key")
+
+    package, said = _call("Tavily web search", module, ("TAVILY_API_KEY",))
+
+    assert package is None
+    assert f"package {module!r} is not installed" in said
+
+
+def _broken_package(tmp_path: Path, monkeypatch, name: str, body: str) -> None:
+    (tmp_path / name).mkdir()
+    (tmp_path / name / "__init__.py").write_text(body, encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setenv("TAVILY_API_KEY", "test-value-not-a-key")
+
+
+def test_an_installed_package_without_its_own_dependency_is_an_error(tmp_path, monkeypatch):
+    """Not "not installed": the package is there and its install is broken."""
+    _broken_package(tmp_path, monkeypatch, "broken_sdk_xyz", "import missing_dependency_xyz\n")
+
+    with pytest.raises(ModuleNotFoundError, match="missing_dependency_xyz"):
+        _call("Tavily web search", "broken_sdk_xyz", ("TAVILY_API_KEY",))
+
+
+def test_an_import_error_of_the_package_itself_is_raised(tmp_path, monkeypatch) -> None:
+    _broken_package(
+        tmp_path, monkeypatch, "failing_sdk_xyz", "raise ImportError('needs a newer OpenSSL')\n"
+    )
+
+    with pytest.raises(ImportError, match="needs a newer OpenSSL"):
+        _call("Tavily web search", "failing_sdk_xyz", ("TAVILY_API_KEY",))
 
 
 def test_the_helper_is_no_import_statement_the_package_check_would_refuse() -> None:

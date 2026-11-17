@@ -1348,21 +1348,56 @@ def _external_services_readme(blueprint: Blueprint) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _requirement_name(line: str) -> str:
-    """The normalised project name of a requirement line (PEP 503)."""
-    match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", line)
-    return re.sub(r"[-_.]+", "-", match.group(0)).lower() if match else line
+def _normalised(name: str) -> str:
+    """A project or extra name as pip compares it (PEP 503, PEP 685)."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+_REQUIREMENT_RE = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[([^\]]*)\])?\s*(.*)")
+
+
+def _requirement_parts(line: str) -> tuple[str, set[str], set[str]]:
+    """A requirement line's project name, extras and version specifiers, normalised."""
+    match = _REQUIREMENT_RE.fullmatch(line.strip())
+    if not match:
+        return line, set(), set()
+    name, extras, specifiers = match.groups()
+    return (
+        _normalised(name),
+        {_normalised(e) for e in (extras or "").split(",") if e.strip()},
+        {s.replace(" ", "") for s in specifiers.split(",") if s.strip()},
+    )
 
 
 def _external_requirements(blueprint: Blueprint, lines: list[str]) -> list[str]:
-    """The external services' packages that ``lines`` does not already name."""
-    seen = {_requirement_name(line) for line in lines}
-    added: list[str] = []
-    for service in external_services(blueprint):
-        package = service.python_package
-        if package and _requirement_name(package) not in seen:
-            seen.add(_requirement_name(package))
-            added.append(package)
+    """The external services' packages, each as written, unless it adds nothing.
+
+    pip combines every line of one project: ``pydantic[email]>=2.6`` beside
+    ``pydantic>=2`` adds an extra and a stricter version, so it is kept. A line is
+    left out only when the lines already there ask for all its extras and
+    specifiers, as an exact duplicate or a bare name does.
+    """
+    required: dict[str, tuple[set[str], set[str]]] = {}
+
+    def note(line: str) -> bool:
+        """Record ``line``; True when it asks for something not asked for yet."""
+        name, extras, specifiers = _requirement_parts(line)
+        if name not in required:
+            required[name] = (extras, specifiers)
+            return True
+        have_extras, have_specifiers = required[name]
+        adds = not (extras <= have_extras and specifiers <= have_specifiers)
+        have_extras |= extras
+        have_specifiers |= specifiers
+        return adds
+
+    for line in lines:
+        note(line)
+    added = [
+        service.python_package
+        for service in external_services(blueprint)
+        if service.python_package and note(service.python_package)
+    ]
     if not added:
         return []
     return ["# Packages of the external services (README, External services)", *added]

@@ -223,9 +223,11 @@ _HTTPS_URL_PATTERN = r"^https://[^\s]+$"
 #: One line of text: no line break or other control character.
 _ONE_LINE_PATTERN = r"^[^\x00-\x1f\x7f\x85\u2028\u2029]+$"
 
-#: Variables of gaik, the model providers, the wizard's sandbox and the Python process.
-#: A service that named one would have the PoC send that key or setting to a
-#: third party: the sandbox holds the provider's key under these names.
+#: Variables of gaik, the model providers, the wizard's sandbox, the Python process,
+#: the network and TLS settings every HTTP client reads, and the installers. A
+#: service that named one would have the PoC send that key to a third party (the
+#: sandbox holds the provider's key under these names), or route the model calls,
+#: provider key included, through a proxy or a certificate the service chose.
 RESERVED_ENV_PREFIXES = (
     "GAIK_",
     "AZURE_",
@@ -240,21 +242,52 @@ RESERVED_ENV_PREFIXES = (
     "DOCLING_",
     "WIZARD_",
     "PYTHON",
+    "PIP_",
+    "UV_",
+    "CONDA_",
+    "LD_",
+    "DYLD_",
 )
-RESERVED_ENV_NAMES = frozenset({"EMBEDDING_MODEL", "HOME", "PATH"})
+RESERVED_ENV_NAMES = frozenset(
+    {
+        "EMBEDDING_MODEL",
+        "HOME",
+        "PATH",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "REQUESTS_CA_BUNDLE",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "CURL_CA_BUNDLE",
+    }
+)
 
-#: ``data_sent`` of a service that receives nothing: a library that runs locally.
+#: ``data_sent`` of a service that receives nothing, a library that runs locally:
+#: "none", or a wording that starts with "none", "nothing" or "no data" and names
+#: no exception ("none: it runs locally", "Nothing leaves the machine").
 NOTHING_SENT = "none"
+_NOTHING_SENT_RE = re.compile(r"(?:none|nothing|no data)\b", re.IGNORECASE)
+_EXCEPT_RE = re.compile(r"\b(?:but|except|other than|apart from|besides)\b", re.IGNORECASE)
+
+
+def sends_nothing(data_sent: str) -> bool:
+    """True when ``data_sent`` says that nothing leaves for the third party."""
+    text = data_sent.strip()
+    return bool(_NOTHING_SENT_RE.match(text)) and not _EXCEPT_RE.search(text)
 
 
 def env_name_problem(name: Any) -> str | None:
     """Why ``name`` cannot be an external service's variable, or None when it can."""
     if not isinstance(name, str) or len(name) > 64 or not re.fullmatch(ENV_VAR_PATTERN, name):
         return f"{name!r} must be an UPPER_CASE name (letters, digits, _), at most 64 characters"
-    if name in RESERVED_ENV_NAMES or name.startswith(RESERVED_ENV_PREFIXES):
+    upper = name.upper()
+    if upper in RESERVED_ENV_NAMES or upper.startswith(RESERVED_ENV_PREFIXES):
         return (
-            f"{name!r} belongs to gaik, the model providers, the sandbox or Python; give the "
-            "service a name of its own, for example SEARCH_API_KEY"
+            f"{name!r} belongs to gaik, the model providers, the sandbox, Python, the "
+            "network or the installers; give the service a name of its own, for example "
+            "SEARCH_API_KEY"
         )
     return None
 
@@ -296,7 +329,10 @@ class ExternalService(BaseModel):
     )
     data_sent: str = Field(
         max_length=300,
-        description=f"What leaves for the third party, or '{NOTHING_SENT}' for a local library.",
+        description=(
+            "What leaves for the third party. For a library that runs locally write "
+            f"'{NOTHING_SENT}' (or a wording that starts with it, e.g. 'none: runs locally')."
+        ),
     )
     user_can_provide: bool = Field(
         description="The user's answer: they can get the account, key and terms for it."

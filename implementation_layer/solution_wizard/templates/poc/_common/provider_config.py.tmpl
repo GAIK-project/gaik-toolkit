@@ -286,13 +286,19 @@ def external_service(name: str, module: str, env_vars: tuple = ()):
     this prints one SKIPPED line and returns None. The step then uses its fallback and
     the run goes on with the GAIK steps. Read only the service's own variables, never a
     model provider's key.
+
+    Only the module itself (or a package it is in) missing counts as "not installed".
+    An installed package that fails to import, for want of one of its own dependencies
+    or with an error of its own, is a broken install: that error is raised.
     """
     import importlib
 
     problems = []
     try:
         package = importlib.import_module(module)
-    except ImportError:
+    except ModuleNotFoundError as exc:
+        if not exc.name or not (exc.name == module or module.startswith(exc.name + ".")):
+            raise
         package = None
         problems.append(f"package {module!r} is not installed (pip install -r requirements.txt)")
     missing = [var for var in env_vars if not os.environ.get(var, "").strip()]

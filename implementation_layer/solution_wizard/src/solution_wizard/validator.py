@@ -10,11 +10,11 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from .blueprint import (
-    NOTHING_SENT,
     ArtifactSource,
     AssumptionStatus,
     Blueprint,
     external_services,
+    sends_nothing,
 )
 from .registry import Registry, get_registry
 
@@ -508,7 +508,7 @@ def _check_external_services(blueprint: Blueprint, errors: list, warnings: list)
     handling = blueprint.governance.data_handling
     for index, service in enumerate(services):
         where = f"technical_spec.external_services[{index}] ({service.name})"
-        sends = service.data_sent.strip().lower() != NOTHING_SENT
+        sends = not sends_nothing(service.data_sent)
         if sends and handling.local_processing_required:
             errors.append(
                 Issue(
