@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { GATE_BAR_ATTRIBUTE, GATE_POINT_EVENT } from "@/lib/chat-events";
+import { Icon } from "./icons";
 
 const noChange = () => () => {};
 const barOnPage = () => document.querySelector(`[${GATE_BAR_ATTRIBUTE}]`) !== null;
@@ -23,8 +24,9 @@ export function ShowGateButton({ label, name }: { label: string; name: string })
       type="button"
       aria-label={name}
       onClick={() => window.dispatchEvent(new Event(GATE_POINT_EVENT))}
-      className="rounded px-1.5 py-1 text-xs font-medium text-text-muted transition-colors duration-150 hover:text-text max-xl:hidden"
+      className="btn-inline max-xl:hidden"
     >
+      <Icon name="arrowLeft" size={13} />
       {label}
     </button>
   );
