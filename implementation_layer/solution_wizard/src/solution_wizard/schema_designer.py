@@ -269,15 +269,22 @@ def nested_row_fields(target_output_spec: dict[str, Any]) -> dict[str, list[str]
     }
 
 
+#: Words that end like a plural but are not one, or whose singular is themselves.
+_NOT_PLURAL_ENDINGS = ("ss", "us", "is")
+_SAME_SINGULAR = {"series", "species", "news", "data"}
+
+
 def _child_model_name(container: str) -> str:
     """``line_items`` -> ``LineItem``. Singular, because the class is one row."""
     words = [w for w in container.split("_") if w]
     if words:
         last = words[-1]
-        if len(last) > 3 and last.endswith("ies"):
+        if last.lower() in _SAME_SINGULAR or last.lower().endswith(_NOT_PLURAL_ENDINGS):
+            pass  # status, analysis, address and series stay as they are
+        elif len(last) > 3 and last.endswith("ies"):
             words[-1] = last[:-3] + "y"  # entries -> entry
-        elif len(last) > 2 and last.endswith("s") and not last.endswith("ss"):
-            words[-1] = last[:-1]  # items -> item, but address stays
+        elif len(last) > 2 and last.endswith("s"):
+            words[-1] = last[:-1]  # items -> item
     return "".join(w.title() for w in words) or "Item"
 
 
@@ -333,8 +340,11 @@ def _model_plan(target_output_spec: dict[str, Any], name: str) -> list[dict[str,
         _source_name(model_name, "class name")
         for field in fields:
             _source_name(field, "field name")
-        enums = _enum_names(fields, spec.get("allowed_values", {}), prefix, taken)
         nested = _nested_specs(spec)
+        # A container is a list of rows: allowed values on it name no Enum.
+        enums = _enum_names(
+            [f for f in fields if f not in nested], spec.get("allowed_values", {}), prefix, taken
+        )
         if nested and row:
             raise ValueError(
                 f"the rows of {model_name} have rows of their own ({', '.join(nested)}); "

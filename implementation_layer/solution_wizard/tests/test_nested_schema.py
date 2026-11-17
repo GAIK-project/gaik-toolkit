@@ -74,8 +74,18 @@ def test_the_child_class_is_named_after_one_row():
     assert _child_model_name("participants") == "Participant"
 
 
-def test_a_container_that_is_already_singular_keeps_its_name():
-    assert _child_model_name("address") == "Address"
+@pytest.mark.parametrize(
+    ("container", "name"),
+    [
+        ("address", "Address"),
+        ("status", "Status"),
+        ("analysis", "Analysis"),
+        ("time_series", "TimeSeries"),
+        ("bus", "Bus"),
+    ],
+)
+def test_a_container_that_is_already_singular_keeps_its_name(container, name):
+    assert _child_model_name(container) == name
 
 
 def test_an_ies_plural_becomes_a_y_singular():
@@ -335,3 +345,14 @@ def test_the_row_blocks_own_description_reaches_every_file(tmp_path):
     assert schema["properties"]["line_items"]["description"] == "Rows"
     assert requirements["children"][0]["container_description"] == "Rows"
     assert _model_from_spec(spec, "PurchaseOrder").model_json_schema() == schema
+
+
+def test_allowed_values_on_a_container_make_no_enum():
+    spec = dict(PO_SPEC, allowed_values={"line_items": ["a"], "po_number": ["PO-1"]})
+
+    source = build_pydantic_model(spec)
+
+    assert "LineItemsEnum" not in source and "class PoNumberEnum" in source
+    assert _model_from_spec(spec, "PurchaseOrder").model_json_schema() == (
+        _model(spec)["PurchaseOrder"].model_json_schema()
+    )
