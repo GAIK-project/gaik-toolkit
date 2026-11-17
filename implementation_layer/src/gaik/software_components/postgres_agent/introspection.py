@@ -115,9 +115,12 @@ def introspect_schema(
         """,
         (schema_name,),
     ).fetchall()
+    # A reference to a table the agent may not read is left out, so the prompt
+    # names only tables a query can use.
     foreign_keys = {
         (r["table_name"], r["column_name"]): f"{r['foreign_table']}.{r['foreign_column']}"
         for r in fk_rows
+        if allowed is None or r["foreign_table"] in allowed
     }
 
     columns_by_table: dict[str, list[ColumnInfo]] = {}

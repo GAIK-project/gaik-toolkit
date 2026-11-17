@@ -1251,7 +1251,7 @@
   },
   "PostgresAgent": {
     "import": "from gaik.software_components.postgres_agent import PostgresAgent",
-    "construct": "agent = PostgresAgent(connection_string=connection_string, config=get_stage_config(config, 'answer'), temperature=None)",
+    "construct": "agent = PostgresAgent(connection_string=connection_string, table_allowlist=table_allowlist, config=get_stage_config(config, 'answer'), temperature=None)",
     "call": "with agent:\n        ar = agent.ask(user_query)\n    answer = ar.answer",
     "returns": "AnswerResult(.answer, .generated_sql, .query_result)",
     "install_extra": "postgres-agent",
@@ -1260,9 +1260,9 @@
         "name": "table_allowlist",
         "type": "list[str]",
         "default": null,
-        "effect": "Restrict which tables the agent may query (security).",
+        "effect": "Required: the tables and views the agent may read, as PostgreSQL stores their names (case-sensitive). Only these reach the LLM's schema, and a query that touches any other table, view or system catalog (information_schema, pg_catalog), also through a CTE, subquery, join or UNION, is refused before it runs. Since the release after gaik 0.11.0, constructing the agent without it raises TypeError and an empty list raises ValueError; earlier releases read every table in schema_name.",
         "selection_relevant": true,
-        "infer_from": "security_constraints / access controls"
+        "infer_from": "the tables the use case's questions need (data sources / security_constraints); ask the user to name them -- never leave it out or list every table"
       },
       {
         "name": "answer_language",

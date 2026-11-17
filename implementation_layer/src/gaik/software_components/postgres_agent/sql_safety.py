@@ -201,7 +201,10 @@ def validate_read_only(
         schema_name: The only schema the query may reference. It is read as an
             unquoted identifier, so it folds to lower case, as it does in the
             agent's ``search_path``.
-        allowlist: When given, the query may only touch these tables. Entries
+        allowlist: The tables the query may touch; an empty list allows
+            none. ``None`` checks the schema only, which is for callers that
+            enforce their own table list; ``PostgresAgent`` always passes its
+            required ``table_allowlist``. Entries
             are table names as PostgreSQL stores them, so they are
             case-sensitive: ``Users`` names the table created as ``"Users"``,
             and ``users`` the one created as ``users`` or ``Users``.

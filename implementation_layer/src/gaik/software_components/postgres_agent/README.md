@@ -15,6 +15,13 @@ connector:
 
 - **Read-only.** Only `SELECT` / `WITH ... SELECT` queries. No
   `INSERT`/`UPDATE`/`DELETE`, no DDL, no data import, no `FOR UPDATE`.
+- **Only the tables you name.** `table_allowlist` is required: the agent sees
+  and reads only those tables and views. A query that touches any other
+  table, view or system catalog (`information_schema`, `pg_catalog`), also
+  inside a CTE, subquery, join or `UNION`, is refused before it runs.
+  Constructing the agent without the list raises `TypeError`, and an empty
+  list raises `ValueError`; up to gaik 0.11.0 the agent read every table in
+  `schema_name` when the list was left out.
 - **One schema.** The agent operates on a single schema (`schema_name`).
   Cross-schema and cross-database references are rejected, and unqualified
   table names are read from that schema only.
@@ -23,7 +30,7 @@ connector:
   extensions, are rejected (see [Security model](#security-model)).
 - **Relational tables only.** Not a CSV importer or an ETL tool.
 - **Best for small / medium schemas.** The whole schema is placed in the LLM
-  prompt. For very large databases, narrow it with `table_allowlist`.
+  prompt for the tables on `table_allowlist`.
 
 ## Installation
 
@@ -39,7 +46,10 @@ also install `gaik[llm-anthropic]` or `gaik[llm-google]`.
 ```python
 from gaik.software_components.postgres_agent import PostgresAgent
 
-with PostgresAgent("postgresql://user:pass@localhost:5432/db") as agent:
+with PostgresAgent(
+    "postgresql://user:pass@localhost:5432/db",
+    table_allowlist=["customers", "orders"],
+) as agent:
     result = agent.ask("Which customer placed the most orders?")
     print(result.answer)          # natural-language answer
     print(result.query_result.sql)  # the SQL that produced it
@@ -61,7 +71,7 @@ The agent executes LLM-generated SQL. Three layers limit what it can do:
      that run SQL text, change settings, read files or sequences, or sleep are
      not on it, and neither are your own functions or extension functions.
      Schema-qualified function calls are rejected;
-   - tables are in `schema_name` and, when `table_allowlist` is given, on it.
+   - tables are in `schema_name` and on `table_allowlist`.
      Unqualified table names are rewritten to `schema.table`, so a name cannot
      resolve to a system catalog or another schema on the search path. The
      SQL that runs is this rewritten form; `QueryResult.sql` keeps the query
@@ -102,7 +112,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO gaik_readonly;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO gaik_readonly;
 ```
 
-Then narrow the agent to exactly the tables it should see with `table_allowlist`:
+Then name exactly the tables the agent may read with `table_allowlist`:
 
 ```python
 with PostgresAgent(
@@ -131,7 +141,7 @@ PostgresAgent(
     max_retries: int = 3,                # agentic retry attempts
     max_rows: int = 100,                 # hard cap on returned rows
     statement_timeout_ms: int = 10_000,
-    table_allowlist: list[str] | None = None,
+    table_allowlist: list[str],          # required: the tables it may read
     schema_name: str = "public",
     extra_instructions: str | None = None,   # appended to the SQL prompt
     answer_language: str = "en",             # ISO 639-1 for the answer
@@ -161,7 +171,7 @@ SQL: SELECT customer_id, name, discount_percent
      FROM customers WHERE discount_percent > 0;
 """
 
-with PostgresAgent(dsn, extra_instructions=extra) as agent:
+with PostgresAgent(dsn, table_allowlist=["customers"], extra_instructions=extra) as agent:
     print(agent.ask("Which customers have a discount?").answer)
 ```
 
