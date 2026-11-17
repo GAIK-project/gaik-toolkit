@@ -44,6 +44,7 @@ import { sourceTraceIn, sourcesForField } from "@/lib/poc-source-trace";
 import {
   CHAT_REFERENCE_EVENT,
   CHAT_REPLYING_EVENT,
+  DEPLOYABLE_DOWNLOAD_EVENT,
   WORKSPACE_SHOW_EVENT,
   type WorkspacePlace,
 } from "@/lib/chat-events";
@@ -1137,6 +1138,25 @@ export function WorkspacePanel({
     e.preventDefault();
     void downloadWithEnv();
   }
+
+  // The finished solution's banner has the download and cannot see what is
+  // typed here: it asks first, and with a value typed this tab does the
+  // download, so there is one download and it always carries the values.
+  const bannerDownload = useRef<() => boolean>(() => false);
+  useEffect(() => {
+    bannerDownload.current = () => {
+      if (!envTyped) return false;
+      void downloadWithEnv();
+      return true;
+    };
+  });
+  useEffect(() => {
+    const onDownload = (e: Event) => {
+      if (bannerDownload.current()) e.preventDefault();
+    };
+    window.addEventListener(DEPLOYABLE_DOWNLOAD_EVENT, onDownload);
+    return () => window.removeEventListener(DEPLOYABLE_DOWNLOAD_EVENT, onDownload);
+  }, []);
 
   function onFileSaved(saved: PocFileSaved) {
     // The package is another one now: read it again, so the check and the
@@ -2734,23 +2754,7 @@ export function WorkspacePanel({
           onExtra={setEnvExtra}
           problem={envProblem ? t.pocEnvDownloadFailed : null}
           t={t}
-        >
-          {/* The finished solution's banner has the download and cannot see
-              what is typed here. Once something is typed, the form offers the
-              download that carries it; before that the banner's is the one. */}
-          {handoverInBanner && envTyped && (
-            <button
-              type="button"
-              onClick={() => void downloadWithEnv()}
-              disabled={envBusy}
-              className="btn-secondary"
-              data-testid="poc-deployable-env"
-            >
-              <Icon name={envBusy ? "loaderCircle" : "download"} size={16} className={envBusy ? "animate-spin" : ""} />
-              {t.pocEnvDownload}
-            </button>
-          )}
-        </PocEnvForm>
+        />
       </div>
     </details>
   );

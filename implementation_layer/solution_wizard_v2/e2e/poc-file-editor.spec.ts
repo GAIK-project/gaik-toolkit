@@ -524,7 +524,7 @@ test.describe("The .env form beside the deployable package", () => {
     await expect(form.locator("label").last()).toHaveText("SERPER_API_KEY");
   });
 
-  test("under the finished solution's banner the form has a download of its own only once something is typed", async ({
+  test("the finished solution's banner download carries what is typed in the form, and is the only download", async ({
     page,
     request,
     baseURL,
@@ -541,20 +541,28 @@ test.describe("The .env form beside the deployable package", () => {
     await expect(page.getByTestId("solution-done")).toBeVisible({ timeout: 20_000 });
     await page.goto(`/sessions/${SESSION}?tab=poc`);
 
-    // The banner has the download; the tab does not offer it a second time.
+    // One download on the page, the banner's: the tab does not offer a second.
     const form = page.getByTestId("poc-env-form");
     await expect(form).toBeVisible();
-    await expect(page.getByTestId("poc-deployable-env")).toHaveCount(0);
+    const banner = page.getByTestId("solution-done-download");
     await expect(page.locator(`a[href="/api/sessions/${SESSION}/poc/deployable"]`)).toHaveCount(1);
+    await expect(form.getByRole("button", { name: /Lataa/ })).toHaveCount(0);
 
-    // The banner's link cannot see what is typed here: the form's own can.
+    // With a value typed, that one download is made in the page and has the .env.
     await form.locator('[data-testid="poc-env-value"][data-name="AZURE_API_KEY"]').fill(TYPED);
-    const own = page.getByTestId("poc-deployable-env");
-    await expect(own).toHaveText("Lataa paketti .env-tiedoston kanssa");
     const download = page.waitForEvent("download");
-    await own.click();
-    const zip = unzipSync(new Uint8Array(await readFile(await (await download).path())));
+    await banner.click();
+    const saved = await download;
+    expect(saved.url()).toMatch(/^blob:/);
+    const zip = unzipSync(new Uint8Array(await readFile(await saved.path())));
     expect(strFromU8(zip["poc/.env"])).toContain(`AZURE_API_KEY=${TYPED}`);
+    expect(strFromU8(zip["poc/run_poc.py"])).toBe("print('ok')\n");
+
+    // With the field emptied again, the banner's link is followed as it always was.
+    await form.locator('[data-testid="poc-env-value"][data-name="AZURE_API_KEY"]').fill("");
+    const plain = page.waitForEvent("download");
+    await banner.click();
+    expect(new URL((await plain).url()).pathname).toBe(`/api/sessions/${SESSION}/poc/deployable`);
   });
 
   test("a package changed after the run that passed is not offered for download: a new test run is asked for", async ({

@@ -89,10 +89,11 @@ export function pocPathOf(packagePath: string): string | null {
   return packagePath.startsWith("poc/") && packagePath.length > 4 ? packagePath.slice(4) : null;
 }
 
-/** `.env` and every `.env*` name but `.env.example`: a file that would hold keys. */
+/** `.env`, every `.env*` name but `.env.example`, and every `*.env`: a file that would hold keys. */
 export function isSecretEnvName(path: string): boolean {
   const name = (path.split(/[\\/]/).pop() ?? "").toLowerCase();
-  return name.startsWith(".env") && name !== ENV_EXAMPLE_NAME;
+  if (name === ENV_EXAMPLE_NAME) return false;
+  return name.startsWith(".env") || name.endsWith(".env");
 }
 
 /** Why the editor may not save `path` (relative to `poc/`), as wizard_api's code; null when it may. */

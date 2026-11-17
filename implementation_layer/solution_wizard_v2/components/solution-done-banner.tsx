@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore, type ReactNode } from "react";
 import { Icon } from "@/components/icons";
+import { DEPLOYABLE_DOWNLOAD_EVENT } from "@/lib/chat-events";
 import { runWarningsFor, subscribeResultStale } from "@/lib/poc-result-state";
 
 /**
@@ -46,6 +47,12 @@ export function SolutionDoneBanner({
     <a
       href={`/api/sessions/${sessionId}/poc/deployable`}
       download
+      // The PoC tab under the banner may hold values for the package's .env:
+      // it then takes the download over and adds them (DEPLOYABLE_DOWNLOAD_EVENT).
+      onClick={(e) => {
+        const followed = window.dispatchEvent(new CustomEvent(DEPLOYABLE_DOWNLOAD_EVENT, { cancelable: true }));
+        if (!followed) e.preventDefault();
+      }}
       className={warnings ? "btn-secondary" : "btn-brand"}
       data-testid="solution-done-download"
     >

@@ -589,8 +589,6 @@ export type Dict = {
   pocEnvRemove: string;
   pocEnvNameInvalid: string;
   pocEnvDownloadFailed: string;
-  /** The form's own download, where the finished solution's banner has the plain one. */
-  pocEnvDownload: string;
   pocOpenCases: string;
   pocOpenCasesHint: string;
   pocCheckRunning: string;
@@ -1317,7 +1315,6 @@ const fi: Dict = {
   pocEnvRemove: "Poista muuttuja",
   pocEnvNameInvalid: "Nimessä voi olla kirjaimia, numeroita ja alaviivoja.",
   pocEnvDownloadFailed: "Paketin lataus ei onnistunut. Yritä uudelleen.",
-  pocEnvDownload: "Lataa paketti .env-tiedoston kanssa",
   pocCheckRunning: "Tarkistetaan pakettia…",
   pocCheckFailed: "Tarkistus löysi virheitä, jotka kaatavat ajon:",
   pocCheckUnfinished: "Tarkistus ei valmistunut",
@@ -2121,7 +2118,6 @@ const en: Dict = {
   pocEnvRemove: "Remove variable",
   pocEnvNameInvalid: "A name can have letters, numbers and underscores.",
   pocEnvDownloadFailed: "The package could not be downloaded. Try again.",
-  pocEnvDownload: "Download package with .env",
   pocCheckRunning: "Checking the package…",
   pocCheckFailed: "The check found problems that would fail the run:",
   pocCheckUnfinished: "The check did not finish",

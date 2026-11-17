@@ -183,7 +183,7 @@ describe("PoC file relay", () => {
       // A refused save is audited here as it is with wizard_api.
       expect(audit).toHaveBeenLastCalledWith("poc.file.save", expect.objectContaining({ outcome: "error" }));
 
-      for (const path of [".env", "config/.env.local"]) {
+      for (const path of [".env", "config/.env.local", "prod.env"]) {
         const refused = await get(path);
         expect(refused.status).toBe(422);
         expect((await refused.json()).detail.error).toBe("secrets_not_stored");

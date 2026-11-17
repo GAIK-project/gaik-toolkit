@@ -20,11 +20,21 @@ describe("pocPathOf", () => {
 });
 
 describe("isSecretEnvName", () => {
-  it("is every .env name but .env.example, in any folder and case", () => {
-    for (const name of [".env", ".env.local", ".ENV", "config/.env", ".env.production", ".envrc"]) {
+  it("is every .env and *.env name but .env.example, in any folder and case", () => {
+    for (const name of [
+      ".env",
+      ".env.local",
+      ".ENV",
+      "config/.env",
+      ".env.production",
+      ".envrc",
+      "prod.env",
+      "config/local.env",
+      "Keys.ENV",
+    ]) {
       expect(isSecretEnvName(name), name).toBe(true);
     }
-    for (const name of [".env.example", "config/.env.example", "env.py", "environment.yaml"]) {
+    for (const name of [".env.example", "config/.env.example", "env.py", "environment.yaml", "prod.env.md"]) {
       expect(isSecretEnvName(name), name).toBe(false);
     }
   });
