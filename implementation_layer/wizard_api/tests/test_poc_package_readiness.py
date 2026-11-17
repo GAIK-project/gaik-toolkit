@@ -313,3 +313,43 @@ def test_a_composite_requirements_file_is_left_to_gaik_at_run_time(tmp_path):
     _requirements_file(poc, [], requirements_type="parent_with_nested_list")
 
     assert package_problems(poc) == []
+
+
+# ---------------------------------------------------------------------------
+# The package's test page (app.py, ui/)
+# ---------------------------------------------------------------------------
+
+
+def test_the_test_page_travels_with_the_package():
+    from wizard_api.services.poc_service import is_deployable_path
+
+    assert is_deployable_path("app.py")
+    assert is_deployable_path("ui/index.html")
+    assert is_deployable_path("ui/solution.json")
+
+
+def test_the_scaffolded_test_page_is_shipped_and_is_no_problem_of_the_package(tmp_path):
+    """The page's server is a second Python file at the package's root: the checks
+    read every .py there, and it must not look like a component the package wires."""
+    import shutil
+
+    import pytest
+
+    pytest.importorskip("solution_wizard.scaffolder")
+    from solution_wizard.blueprint import Blueprint
+    from solution_wizard.scaffolder import TEMPLATES_DIR, scaffold_poc
+    from wizard_api.services import poc_service
+
+    example = TEMPLATES_DIR.parent.parent / "examples" / "document_extraction_blueprint.json"
+    poc = scaffold_poc(Blueprint.from_file(example), tmp_path)["poc_dir"]
+
+    shipped = set(poc_service.deployable_files(str(poc)))
+    assert {"app.py", "ui/index.html", "ui/solution.json"} <= {
+        name.replace("\\", "/") for name in shipped
+    }
+    with_page = package_problems(str(poc))
+    assert not poc_service._package_transcribes(str(poc))
+
+    (poc / "app.py").unlink()
+    shutil.rmtree(poc / "ui")
+    assert package_problems(str(poc)) == with_page
