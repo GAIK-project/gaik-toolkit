@@ -536,6 +536,55 @@ export type Dict = {
   pocInputFailed: string;
   pocDeployable: string;
   pocDeployableHint: string;
+  // ==== the PoC tab's file editor ====
+  /** A file in the package's tree, as a button: {name}. */
+  pocFileOpen: string;
+  pocFileLoading: string;
+  /** What a screen reader calls the editor's text field: {name}. */
+  pocFileEditorLabel: string;
+  pocFileClose: string;
+  pocFileSave: string;
+  pocFileSaving: string;
+  pocFileSaved: string;
+  /** Puts the saved text back in the editor. */
+  pocFileDiscard: string;
+  /** Closing with unsaved text: the question and its two answers. */
+  pocFileUnsaved: string;
+  pocFileKeepEditing: string;
+  pocFileDiscardClose: string;
+  /** Why a file is shown but not edited. */
+  pocFileReadOnly: string;
+  pocFileTypeReadOnly: string;
+  /** Why a file cannot be opened. */
+  pocFileNotText: string;
+  pocFileTooLargeToOpen: string;
+  pocFileNotFound: string;
+  pocFileLoadFailed: string;
+  /** A `.env` with keys is never read or kept by the server. */
+  pocFileSecrets: string;
+  /** Why a save was refused. */
+  pocFileTooLargeToSave: string;
+  pocFileConflict: string;
+  pocFileConflictReload: string;
+  pocFileWizardBusy: string;
+  pocFileSaveFailed: string;
+  /** What saving a file the test run is tied to sets off: before Gate 3, and after it. */
+  pocFileRetest: string;
+  pocFileReopens: string;
+  // ==== the .env form beside the deployable package ====
+  pocEnvTitle: string;
+  pocEnvNote: string;
+  pocEnvOptional: string;
+  pocEnvShow: string;
+  pocEnvHide: string;
+  pocEnvAdd: string;
+  pocEnvName: string;
+  pocEnvValue: string;
+  pocEnvRemove: string;
+  pocEnvNameInvalid: string;
+  pocEnvDownloadFailed: string;
+  /** The form's own download, where the finished solution's banner has the plain one. */
+  pocEnvDownload: string;
   pocOpenCases: string;
   pocOpenCasesHint: string;
   pocCheckRunning: string;
@@ -1218,6 +1267,47 @@ const fi: Dict = {
   pocOpenCases: "Kokeile ratkaisua omilla tapauksilla",
   pocOpenCasesHint: "Avaa ratkaisun käyttönäkymän: roolit BPMN:stä, tapaus ajetaan sandboxissa omalla syötteellä.",
   pocDeployableHint: "Käyttöönottopaketti avautuu, kun testiajo on onnistunut.",
+  pocFileOpen: "Avaa {name}",
+  pocFileLoading: "Avataan tiedostoa…",
+  pocFileEditorLabel: "Tiedoston {name} sisältö",
+  pocFileClose: "Sulje",
+  pocFileSave: "Tallenna",
+  pocFileSaving: "Tallennetaan…",
+  pocFileSaved: "Tallennettu",
+  pocFileDiscard: "Hylkää muutokset",
+  pocFileUnsaved: "Tallentamattomat muutokset häviävät, jos suljet tiedoston.",
+  pocFileKeepEditing: "Jatka muokkausta",
+  pocFileDiscardClose: "Sulje tallentamatta",
+  pocFileReadOnly: "Vain luku: tätä tiedostoa ei muokata käsin.",
+  pocFileTypeReadOnly: "Vain luku: tämän tyyppistä tiedostoa ei voi muokata täällä.",
+  pocFileNotText: "Tiedostoa ei voi näyttää, koska se ei ole tekstiä.",
+  pocFileTooLargeToOpen: "Tiedosto on liian suuri avattavaksi täällä (yli 256 kt). Se on mukana ladattavassa paketissa.",
+  pocFileNotFound: "Tiedostoa ei enää ole paketissa.",
+  pocFileLoadFailed: "Tiedoston avaaminen ei onnistunut. Yritä uudelleen.",
+  pocFileSecrets:
+    "Avaimia sisältäviä .env-tiedostoja ei tallenneta palvelimelle. Anna avaimet, kun lataat käyttöönottopaketin.",
+  pocFileTooLargeToSave: "Tiedosto on liian suuri tallennettavaksi täällä (yli 256 kt).",
+  pocFileConflict:
+    "Tiedosto on muuttunut sen jälkeen, kun avasit sen: wizard on voinut kirjoittaa sen uudelleen. Muutoksiasi ei tallennettu.",
+  pocFileConflictReload: "Avaa uusi versio",
+  pocFileWizardBusy: "Wizard vastaa vielä ja voi muuttaa pakettia. Tallenna uudelleen, kun vastaus on valmis.",
+  pocFileSaveFailed: "Tallennus ei onnistunut. Yritä uudelleen.",
+  pocFileRetest: "Tallennuksen jälkeen paketti tarkistetaan ja testataan uudelleen.",
+  pocFileReopens:
+    "Tallennus avaa portin 3 uudelleen: paketti testataan ja hyväksytään uudestaan ennen käyttöönottoa.",
+  pocEnvTitle: "Ympäristömuuttujat (.env)",
+  pocEnvNote:
+    "Avaimet pysyvät omalla koneellasi: ne lisätään ladattavaan pakettiin selaimessasi, eikä niitä lähetetä palvelimelle.",
+  pocEnvOptional: "valinnainen",
+  pocEnvShow: "Näytä arvo",
+  pocEnvHide: "Piilota arvo",
+  pocEnvAdd: "Lisää muuttuja",
+  pocEnvName: "Muuttujan nimi",
+  pocEnvValue: "Arvo",
+  pocEnvRemove: "Poista muuttuja",
+  pocEnvNameInvalid: "Nimessä voi olla kirjaimia, numeroita ja alaviivoja.",
+  pocEnvDownloadFailed: "Paketin lataus ei onnistunut. Yritä uudelleen.",
+  pocEnvDownload: "Lataa paketti .env-tiedoston kanssa",
   pocCheckRunning: "Tarkistetaan pakettia…",
   pocCheckFailed: "Tarkistus löysi virheitä, jotka kaatavat ajon:",
   pocCheckUnfinished: "Tarkistus ei valmistunut",
@@ -1978,6 +2068,46 @@ const en: Dict = {
   pocOpenCases: "Try the solution on your own cases",
   pocOpenCasesHint: "Opens the solution in use: roles from the BPMN, each case run in the sandbox on its own input.",
   pocDeployableHint: "The deployment package opens once a test run has succeeded.",
+  pocFileOpen: "Open {name}",
+  pocFileLoading: "Opening the file…",
+  pocFileEditorLabel: "Content of {name}",
+  pocFileClose: "Close",
+  pocFileSave: "Save",
+  pocFileSaving: "Saving…",
+  pocFileSaved: "Saved",
+  pocFileDiscard: "Discard changes",
+  pocFileUnsaved: "Unsaved changes are lost if you close the file.",
+  pocFileKeepEditing: "Keep editing",
+  pocFileDiscardClose: "Close without saving",
+  pocFileReadOnly: "Read-only: this file is not changed by hand.",
+  pocFileTypeReadOnly: "Read-only: files of this type cannot be edited here.",
+  pocFileNotText: "The file cannot be shown because it is not text.",
+  pocFileTooLargeToOpen: "The file is too large to open here (over 256 KB). It is in the package you download.",
+  pocFileNotFound: "The file is no longer in the package.",
+  pocFileLoadFailed: "The file could not be opened. Try again.",
+  pocFileSecrets:
+    "Environment files with keys are not kept on the server. Give the keys when you download the deployment package.",
+  pocFileTooLargeToSave: "The file is too large to save here (over 256 KB).",
+  pocFileConflict:
+    "The file has changed since you opened it: the wizard may have rewritten it. Your changes were not saved.",
+  pocFileConflictReload: "Open the new version",
+  pocFileWizardBusy: "The wizard is still replying and may change the package. Save again when the reply is done.",
+  pocFileSaveFailed: "The file could not be saved. Try again.",
+  pocFileRetest: "After a save the package is checked and tested again.",
+  pocFileReopens: "Saving reopens Gate 3: the package is tested and approved again before it is taken into use.",
+  pocEnvTitle: "Environment variables (.env)",
+  pocEnvNote:
+    "The keys stay on your own machine: they are added to the downloaded package in your browser and are not sent to the server.",
+  pocEnvOptional: "optional",
+  pocEnvShow: "Show value",
+  pocEnvHide: "Hide value",
+  pocEnvAdd: "Add a variable",
+  pocEnvName: "Variable name",
+  pocEnvValue: "Value",
+  pocEnvRemove: "Remove variable",
+  pocEnvNameInvalid: "A name can have letters, numbers and underscores.",
+  pocEnvDownloadFailed: "The package could not be downloaded. Try again.",
+  pocEnvDownload: "Download package with .env",
   pocCheckRunning: "Checking the package…",
   pocCheckFailed: "The check found problems that would fail the run:",
   pocCheckUnfinished: "The check did not finish",

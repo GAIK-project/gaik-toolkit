@@ -31,6 +31,15 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   "blueprint_not_scaffoldable",
   "package_folder",
   "invalid_blueprint",
+  // one package file in the editor
+  "invalid_path",
+  "secrets_not_stored",
+  "file_read_only",
+  "file_type_not_editable",
+  "file_not_text",
+  "file_too_large",
+  "file_changed",
+  "wizard_responding",
   // the sandbox
   "sandbox_busy",
   // input files
