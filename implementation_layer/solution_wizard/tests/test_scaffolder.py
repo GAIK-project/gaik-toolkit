@@ -280,3 +280,17 @@ def test_pip_requirements_audio_components():
     combined = " ".join(lines)
     assert "transcriber" in combined
     assert "enhance-transcript" in combined
+
+
+@pytest.mark.parametrize(
+    "template",
+    sorted((Path(__file__).parent.parent / "templates" / "poc").glob("*/run_poc.py.tmpl")),
+    ids=lambda path: path.parent.name,
+)
+def test_run_poc_templates_read_only_their_own_env_file(template):
+    """The PoC loads the .env beside run_poc.py, never one found in a parent folder,
+    and puts no folder outside the package on the import path."""
+    source = template.read_text(encoding="utf-8")
+    assert "load_dotenv()" not in source
+    assert 'load_dotenv(Path(__file__).parent / ".env")' in source
+    assert ".parent.parent" not in source
