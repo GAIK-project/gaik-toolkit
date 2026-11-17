@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components.endpoints import check_openai_endpoint
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
@@ -91,6 +93,8 @@ class OpenAIConfig:
     timeout: float | None = None
     max_retries: int | None = None
     http_client: Any = None
+    # Hosts the application allows besides the provider's own (see the endpoints module).
+    allowed_endpoint_hosts: str | Sequence[str] | None = None
 
     def azure_base_endpoint(self) -> str | None:
         """Return the sanitized Azure endpoint without deployment path."""
@@ -147,7 +151,13 @@ def get_openai_config(use_azure: bool = True) -> OpenAIConfig:
 
 
 class VisionParser:
-    """Convert PDFs to Markdown using OpenAI vision models."""
+    """Convert PDFs to Markdown using OpenAI vision models.
+
+    Every PDF page becomes one model call, so a file over ``limits`` (size,
+    pages, pixels of a rendered page or image) is refused with
+    :class:`~gaik.software_components.input_limits.InputLimitError` before any
+    page is rendered or sent.
+    """
 
     def __init__(
         self,
@@ -158,7 +168,9 @@ class VisionParser:
         max_tokens: int = 16_000,
         temperature: float | None = 0.0,
         reasoning_effort: str | None = None,
+        limits: InputLimits | None = None,
     ) -> None:
+        self.limits = limits or InputLimits()
         self._request_config = dict(openai_config) if isinstance(openai_config, Mapping) else {}
         provider = (
             resolve_provider(config=self._request_config)
@@ -172,6 +184,7 @@ class VisionParser:
             Provider.AITTA.value,
         }
         self.config = self._coerce_config(openai_config)
+        self._provider = provider
         self.custom_prompt = custom_prompt or self._default_prompt()
         self.use_context = use_context
         self.max_tokens = max_tokens
@@ -184,7 +197,14 @@ class VisionParser:
     # ---------------------------------------------------------------------
     # Public API
     # ---------------------------------------------------------------------
-    def convert_pdf(self, pdf_path: str, *, dpi: int = 200, clean_output: bool = True) -> list[str]:
+    def convert_pdf(
+        self,
+        pdf_path: str,
+        *,
+        dpi: int = 200,
+        clean_output: bool = True,
+        first_pages: int | None = None,
+    ) -> list[str]:
         """Convert a PDF into Markdown pages.
 
         Parameters
@@ -196,9 +216,22 @@ class VisionParser:
         clean_output:
             When ``True`` merge and clean multi-page output via a post-processing
             LLM call.
+        first_pages:
+            Convert only this many pages from the start, e.g. ``1`` to read the
+            first page. The ``max_pages`` limit then applies to these pages, not
+            to the whole document. ``None`` (default) converts every page.
+
+        Raises
+        ------
+        InputLimitError
+            If the PDF is over ``max_file_bytes`` or ``max_pages``, or a page
+            rendered at ``dpi`` is over ``max_image_pixels``.
         """
 
-        images = self._pdf_to_images(pdf_path, dpi=dpi)
+        if first_pages is not None and first_pages < 1:
+            raise ValueError("first_pages must be at least 1")
+        self.limits.check_file_size(pdf_path)
+        images = self._pdf_to_images(pdf_path, dpi=dpi, first_pages=first_pages)
         markdown_pages: list[str] = []
 
         for index, image in enumerate(images, start=1):
@@ -226,6 +259,11 @@ class VisionParser:
         -------
         str
             Markdown extracted from the image.
+
+        Raises
+        ------
+        InputLimitError
+            If the file is over ``max_file_bytes`` or ``max_image_pixels``.
         """
 
         image_path = Path(image_path)
@@ -239,6 +277,7 @@ class VisionParser:
             mime_type = "image/png"
         if not mime_type.startswith("image/"):
             raise ValueError(f"Unsupported image type: {image_path.suffix}")
+        self.limits.check_image_file(image_path)
         image_bytes = image_path.read_bytes()
         return self._parse_image(image_bytes, page=1, previous_context=None, mime_type=mime_type)
 
@@ -292,6 +331,14 @@ class VisionParser:
 
             if not config.api_version:
                 raise ValueError("Azure API version is required when use_azure=True.")
+            check_openai_endpoint(
+                {
+                    "base_url": config.base_url,
+                    "azure_endpoint": endpoint,
+                    "allowed_endpoint_hosts": config.allowed_endpoint_hosts,
+                },
+                Provider.AZURE.value,
+            )
 
             logger.debug(
                 "Initializing Azure OpenAI client for endpoint %s", config.base_url or endpoint
@@ -307,6 +354,12 @@ class VisionParser:
             )
 
         logger.debug("Initializing standard OpenAI client")
+        check_openai_endpoint(
+            {"base_url": config.base_url, "allowed_endpoint_hosts": config.allowed_endpoint_hosts},
+            self._provider
+            if self._provider in {Provider.OPENAI_COMPATIBLE.value, Provider.AITTA.value}
+            else Provider.OPENAI.value,
+        )
         kwargs: dict[str, Any] = {"api_key": config.api_key, **client_options}
         if config.base_url:
             kwargs["base_url"] = config.base_url
@@ -349,29 +402,41 @@ class VisionParser:
             timeout=timeout,
             max_retries=config.get("max_retries"),
             http_client=config.get("http_client"),
+            allowed_endpoint_hosts=config.get("allowed_endpoint_hosts"),
         )
 
-    def _pdf_to_images(self, pdf_path: str, *, dpi: int) -> list[bytes]:
+    def _pdf_to_images(
+        self, pdf_path: str, *, dpi: int, first_pages: int | None = None
+    ) -> list[bytes]:
         """Convert PDF pages to PNG image bytes using PyMuPDF.
 
         Returns a list of PNG image data as bytes objects.
         """
         logger.info("Converting PDF %s to images at %s DPI", pdf_path, dpi)
         images: list[bytes] = []
-        doc = fitz.open(pdf_path)
+        name = Path(pdf_path).name
 
         # Calculate zoom factor from DPI (72 is the default DPI in PDFs)
         zoom = dpi / 72.0
         mat = fitz.Matrix(zoom, zoom)
 
-        for page_num in range(len(doc)):
-            # Render page to pixmap with specified DPI
-            pix = doc[page_num].get_pixmap(matrix=mat)
-            # Get PNG bytes directly
-            png_bytes = pix.tobytes("png")
-            images.append(png_bytes)
+        with fitz.open(pdf_path) as doc:
+            page_count = doc.page_count
+            if first_pages is not None:
+                page_count = min(page_count, first_pages)
+            self.limits.check_pages(page_count, name)
+            # Check every page's image size before rendering any of them.
+            for page_num in range(page_count):
+                self.limits.check_rendered_page(
+                    doc[page_num], zoom, f"{name}, page {page_num + 1} at {dpi} DPI"
+                )
+            for page_num in range(page_count):
+                # Render page to pixmap with specified DPI
+                pix = doc[page_num].get_pixmap(matrix=mat)
+                # Get PNG bytes directly
+                png_bytes = pix.tobytes("png")
+                images.append(png_bytes)
 
-        doc.close()
         logger.debug("Converted %s pages", len(images))
         return images
 

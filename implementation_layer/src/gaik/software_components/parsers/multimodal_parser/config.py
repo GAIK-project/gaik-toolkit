@@ -14,6 +14,14 @@ from dotenv import load_dotenv
 from google.oauth2 import service_account
 from openai import AzureOpenAI, OpenAI
 
+from gaik.software_components.endpoints import (
+    ANTHROPIC_URL,
+    check_openai_endpoint,
+    foundry_host,
+    host_of,
+    log_endpoint,
+)
+
 load_dotenv()
 
 
@@ -49,11 +57,13 @@ def get_openai_config(use_azure: bool = True) -> dict:
 def create_openai_client(config: dict):
     """Create an OpenAI or Azure OpenAI client based on configuration."""
     if config.get("use_azure", False):
+        check_openai_endpoint(config, "azure")
         return AzureOpenAI(
             api_key=config["api_key"],
             api_version=config["api_version"],
             azure_endpoint=config["azure_endpoint"],
         )
+    check_openai_endpoint({}, "openai")
     return OpenAI(api_key=config["api_key"])
 
 
@@ -79,10 +89,12 @@ def get_claude_config(use_azure: bool = True) -> dict:
 def create_claude_client(config: dict):
     """Create an Anthropic Foundry or direct Anthropic client based on configuration."""
     if config.get("use_azure", False):
+        log_endpoint("anthropic_foundry", foundry_host(config["resource"]))
         return anthropic.AnthropicFoundry(
             resource=config["resource"],
             api_key=config["api_key"],
         )
+    log_endpoint("anthropic", host_of(os.getenv("ANTHROPIC_BASE_URL") or ANTHROPIC_URL))
     return anthropic.Anthropic(api_key=config["api_key"])
 
 

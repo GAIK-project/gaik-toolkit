@@ -147,6 +147,7 @@ def test_generated_audio_uses_separate_openai_and_aitta_credentials(tmp_path, mo
             "provider": "aitta",
             "extraction_model": MODELS["aitta"],
             "base_url": "https://aitta.invalid/openai/v1",
+            "local_endpoints": ["aitta.invalid"],
             "transcription_config": {
                 "provider": "openai",
                 "transcription_model": "gpt-4o-transcribe",
@@ -166,6 +167,51 @@ def test_generated_audio_uses_separate_openai_and_aitta_credentials(tmp_path, mo
     assert extracted[0]["provider"] == "aitta"
     assert extracted[0]["api_key"] == "fake-aitta"
     assert extracted[0]["base_url"] == "https://aitta.invalid/openai/v1"
+
+
+def test_a_stage_address_neither_local_nor_listed_is_left_to_gaiks_check(tmp_path, monkeypatch):
+    from gaik.software_components.endpoints import EndpointNotAllowedError
+    from gaik.software_components.llm import create_llm_client
+
+    for name in ("GAIK_ALLOWED_ENDPOINT_HOSTS", "OPENAI_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    bp = _blueprint(
+        "document_extraction_blueprint.json",
+        {
+            "provider": "openai_compatible",
+            "model": "served-model",
+            "base_url": "https://inference.invalid/v1",
+            "local_endpoints": ["other.invalid"],
+        },
+    )
+    poc = scaffold_poc(bp, tmp_path)["poc_dir"]
+    runner = _load_runner(poc, monkeypatch)
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-compatible")
+    stage = runner.get_stage_config(runner.load_config(), "extraction")
+    assert "inference.invalid" not in stage.get("allowed_endpoint_hosts", [])
+    with pytest.raises(EndpointNotAllowedError):
+        create_llm_client({**stage, "api_key": "fake-compatible"})
+
+
+def test_a_stage_address_on_this_machine_is_allowed(tmp_path, monkeypatch):
+    bp = _blueprint(
+        "document_extraction_blueprint.json",
+        {"provider": "azure", "model": "m", "base_url": "http://localhost:8000/openai/v1"},
+    )
+    poc = scaffold_poc(bp, tmp_path)["poc_dir"]
+    runner = _load_runner(poc, monkeypatch)
+    monkeypatch.setenv("AZURE_API_KEY", "fake-azure")
+    stage = runner.get_stage_config(runner.load_config(), "extraction")
+    assert stage["allowed_endpoint_hosts"] == ["localhost"]
+
+
+def test_local_endpoints_entries_must_be_host_names(tmp_path):
+    bp = _blueprint(
+        "document_extraction_blueprint.json",
+        {"provider": "openai", "local_endpoints": ["https://x.invalid/path"]},
+    )
+    with pytest.raises(ValueError, match="local_endpoints"):
+        scaffold_poc(bp, tmp_path)
 
 
 def test_audio_provider_guard_applies_at_generation_and_after_config_edit(tmp_path, monkeypatch):

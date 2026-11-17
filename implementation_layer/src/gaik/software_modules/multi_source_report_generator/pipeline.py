@@ -29,6 +29,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.source_material import (
     SourceMaterial,
     clean_label,
@@ -464,12 +465,34 @@ class MultiSourceReportGenerator:
     >>> print(result.markdown_path)
     """
 
-    def __init__(self, *, api_config: dict | None = None, use_azure: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        api_config: dict | None = None,
+        use_azure: bool = True,
+        limits: InputLimits | None = None,
+    ) -> None:
+        """
+        Args:
+            api_config: Shared LLM config; read from the environment when omitted.
+            use_azure: With no ``api_config``, read the Azure OpenAI config.
+            limits: Input limits for every parser, transcriber and image extractor
+                this module builds; a ``ctor`` option that sets its own ``limits``
+                wins. ``None`` keeps each component's defaults. A file over one
+                raises ``InputLimitError``.
+        """
         if api_config is None:
             from gaik.software_components.config import get_openai_config
 
             api_config = get_openai_config(use_azure=use_azure)
         self.api_config = api_config
+        self.limits = limits
+
+    def _limited(self, ctor: dict) -> dict:
+        """A copy of ``ctor`` with this generator's ``limits``, unless it sets its own."""
+        if self.limits is None:
+            return dict(ctor)
+        return {"limits": self.limits, **ctor}
 
     # -- public API -------------------------------------------------------
 
@@ -858,7 +881,7 @@ class MultiSourceReportGenerator:
         if choice == "pymupdf":
             from gaik.software_components.parsers import PyMuPDFParser
 
-            return PyMuPDFParser().parse_pdf(str(path), use_markdown=True)
+            return PyMuPDFParser(limits=self.limits).parse_pdf(str(path), use_markdown=True)
         if choice in ("vision", "vision_parser"):
             from gaik.software_components.parsers import VisionParser
 
@@ -867,18 +890,20 @@ class MultiSourceReportGenerator:
                 or parser_options.get("openai_config")
                 or self.api_config
             )
-            pages = VisionParser(cfg, **parser_options.get("ctor", {})).convert_pdf(str(path))
+            ctor = self._limited(parser_options.get("ctor", {}))
+            pages = VisionParser(cfg, **ctor).convert_pdf(str(path))
             return "\n\n".join(pages)
         if choice == "multimodal":
             from gaik.software_components.parsers import MultimodalParser
 
-            ctor = self._shared_ctor(parser_options)
+            ctor = self._limited(self._shared_ctor(parser_options))
             result = MultimodalParser(**ctor).parse(str(path))
             return result.clean_markdown or result.raw_markdown
         if choice == "docling":
             from gaik.software_components.parsers import DoclingParser
 
-            result = DoclingParser(**parser_options.get("ctor", {})).parse_document(str(path))
+            ctor = self._limited(parser_options.get("ctor", {}))
+            result = DoclingParser(**ctor).parse_document(str(path))
             return _coerce_markdown(result)
         raise ValueError(
             f"Unknown parser_choice '{parser_choice}'. "
@@ -888,12 +913,12 @@ class MultiSourceReportGenerator:
     def _parse_docx(self, path: Path) -> str:
         from gaik.software_components.parsers import DocxParser
 
-        return DocxParser().parse_docx(str(path), use_markdown=True)
+        return DocxParser(limits=self.limits).parse_docx(str(path), use_markdown=True)
 
     def _transcribe(self, path: Path, *, transcriber_options: dict) -> str:
         from gaik.software_components.transcriber import Transcriber
 
-        ctor = dict(transcriber_options.get("ctor", {}))
+        ctor = self._limited(transcriber_options.get("ctor", {}))
         ctor.setdefault("api_config", self.api_config)
         transcriber = Transcriber(**ctor)
         result = transcriber.transcribe(str(path), **transcriber_options.get("call", {}))
@@ -922,7 +947,7 @@ class MultiSourceReportGenerator:
         if mode == "structured":
             from gaik.software_components.vision_extractor import VisionExtractor
 
-            extractor = VisionExtractor(**self._shared_ctor(image_options))
+            extractor = VisionExtractor(**self._limited(self._shared_ctor(image_options)))
             user_requirements = image_options.get(
                 "user_requirements",
                 "Extract all visible text, tables, figures, and structured content from the image.",
@@ -936,7 +961,8 @@ class MultiSourceReportGenerator:
         cfg = (
             image_options.get("api_config") or image_options.get("openai_config") or self.api_config
         )
-        return VisionParser(cfg, **image_options.get("ctor", {})).convert_image(str(path))
+        ctor = self._limited(image_options.get("ctor", {}))
+        return VisionParser(cfg, **ctor).convert_image(str(path))
 
     def _evidence_sources(
         self, evidence_items: list[EvidenceItem], *, max_evidence_chars: int | None

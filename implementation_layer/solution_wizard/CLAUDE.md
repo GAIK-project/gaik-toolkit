@@ -1,5 +1,14 @@
 # Solution Wizard — Claude Code Notes
 
+## Schema corrections reach the PoC through the model file
+
+The PoC's `load_schema()` reads `schemas/output_schema_model.json` and never imports
+`output_schema.py`. After editing `output_schema.py` (SKILL.md Step 4.5), run
+`python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas`: it says at
+once whether the edit can be saved. The audio and document PoCs also write the model file
+again themselves when `output_schema.py` is newer, and stop when it does not import or
+cannot be saved.
+
 ## Schema generation constraints
 
 Two constraints must be checked every time a GAIK extraction schema is generated or manually edited. Both caused runtime failures during a hospital admissions PoC (2026-06-06) and are now enforced in SKILL.md Phase 4.

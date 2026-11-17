@@ -14,6 +14,8 @@ from typing import Literal
 from markdown_it import MarkdownIt
 
 from gaik.software_components import _http
+from gaik.software_components.endpoints import check_endpoint
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.source_material import with_source_material_instruction
 
 from .config import (
@@ -171,6 +173,7 @@ class MultimodalParser:
         additional_instructions: str | None = None,
         create_html: bool = False,
         api_config: dict | None = None,
+        limits: InputLimits | None = None,
     ):
         """
         Args:
@@ -187,7 +190,12 @@ class MultimodalParser:
             create_html: If True, also produce an HTML version of the cleaned markdown.
             api_config: Shared provider config. Uses chat with rendered PDF page
                 images, so the selected model must support image input.
+            limits: Input limits checked before the PDF is sent: size, pages and,
+                with ``api_config``, the pixels of each rendered page. A PDF over
+                one raises ``InputLimitError``. Defaults to
+                :class:`~gaik.software_components.input_limits.InputLimits`.
         """
+        self.limits = limits or InputLimits()
         if api_config is None:
             if model_provider not in ("openai", "claude", "google"):
                 raise ValueError(f"Unsupported model_provider: {model_provider}")
@@ -230,6 +238,7 @@ class MultimodalParser:
         pdf_path = Path(pdf_path)
         if not pdf_path.exists():
             raise FileNotFoundError(f"PDF not found: {pdf_path}")
+        self.limits.check_pdf(pdf_path, require_count=True)
 
         system_prompt = self._get_system_prompt()
         user_prompt = self._get_user_prompt()
@@ -321,7 +330,9 @@ class MultimodalParser:
                     {"role": "system", "content": system_prompt},
                     {
                         "role": "user",
-                        "content": build_chat_document_content([pdf_path], user_prompt),
+                        "content": build_chat_document_content(
+                            [pdf_path], user_prompt, limits=self.limits
+                        ),
                     },
                 ],
                 **options,
@@ -385,13 +396,19 @@ class MultimodalParser:
         body = _build_google_body(pdf_path, system_prompt, user_prompt, self.reasoning_effort)
 
         if self.config.get("vertex_ai", True):
-            token = get_google_access_token(self.config)
             url = self.config["generate_content_url"]
             # Substitute ``{model}`` placeholder with the active model so one
             # env-configured URL can drive runtime model swaps. URLs without
             # the placeholder are used as-is (backwards compatible).
             if "{model}" in url:
                 url = url.replace("{model}", self.config["model"])
+            check_endpoint(
+                url,
+                provider="vertex",
+                allowed_hosts=self.config.get("allowed_endpoint_hosts"),
+                what="generate_content_url",
+            )
+            token = get_google_access_token(self.config)
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",

@@ -476,7 +476,15 @@ def append_messages(
     session: WizardSession,
     user_content: str,
     assistant_content: str,
+    *,
+    stopped: dict | None = None,
 ) -> WizardSession:
+    """Store one exchange. ``stopped`` marks a reply the user stopped.
+
+    Its ``note`` is the short line the stored text ends with ("(Pysäytetty)"),
+    so a reader that does not know the flag still sees that the reply is not
+    whole, and ``tool`` the kind of tool call that was running, if one was.
+    """
     lock_fresh(db, session)
     metadata = dict(session.session_metadata)
     messages = list(metadata.get("messages") or [])
@@ -489,14 +497,18 @@ def append_messages(
             "createdAt": ts,
         }
     )
-    messages.append(
-        {
-            "id": f"msg_{uuid.uuid4().hex[:8]}",
-            "role": "assistant",
-            "content": assistant_content,
-            "createdAt": ts,
-        }
-    )
+    reply = {
+        "id": f"msg_{uuid.uuid4().hex[:8]}",
+        "role": "assistant",
+        "content": assistant_content,
+        "createdAt": ts,
+    }
+    if stopped is not None:
+        reply["stopped"] = True
+        reply["stoppedNote"] = stopped.get("note") or ""
+        if stopped.get("tool"):
+            reply["stoppedDuring"] = stopped["tool"]
+    messages.append(reply)
     metadata["messages"] = messages
     session.session_metadata = metadata
     session.updated_at = datetime.now(UTC)

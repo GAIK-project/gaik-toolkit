@@ -4,7 +4,6 @@ Single-pass vision extraction: PDF/image → structured data in one LLM call.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import time
 from dataclasses import dataclass
@@ -16,10 +15,15 @@ from pydantic_core import PydanticUndefined
 
 from gaik.observability import UsageRecord, build_usage_record
 from gaik.software_components import _http
+from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.extractor import (
     CompositeExtractionRequirements,
     ExtractionRequirements,
     SchemaGenerator,
+)
+from gaik.software_components.extractor.saved_schema import (
+    load_saved_model,
+    save_model_file,
 )
 from gaik.software_components.extractor.schema import (
     DECIMAL_PERSISTED_HELPER_SOURCE,
@@ -28,7 +32,9 @@ from gaik.software_components.extractor.schema import (
     apply_field_policies,
     decimal_field_repr,
     normalize_extracted_data,
+    sanitize_model_name,
 )
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.parsers.multimodal_parser.config import (
     create_claude_client,
     create_openai_client,
@@ -156,17 +162,32 @@ def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
                 value_field = Field(default=finfo.default, description=finfo.description)
 
             verifiable = create_model(
-                f"{fname}_Verifiable",
+                sanitize_model_name(fname, "_Verifiable") + "_Verifiable",
                 __base__=VerifiableField,
                 value=(annotation, value_field),
             )
             wrapped_fields[fname] = (verifiable, outer_field)
 
     return create_model(
-        f"{model.__name__}_Verifiable",
+        # OpenAI and Azure take the class name as the schema name, at most 64 characters.
+        sanitize_model_name(model.__name__, "_Verifiable") + "_Verifiable",
         __config__=model.model_config,
         **wrapped_fields,
     )
+
+
+def _within_schema_name_limit(model: type[BaseModel]) -> type[BaseModel]:
+    """The model under a name OpenAI and Azure accept as a schema name.
+
+    The SDK sends the class name as ``response_format.json_schema.name``, which must be
+    letters, digits, underscores or hyphens, at most 64 characters; anything else is
+    refused with a 400. A Python class name may hold letters such as "ä". The subclass
+    keeps every field and setting of ``model``.
+    """
+    name = sanitize_model_name(model.__name__)
+    if name == model.__name__:
+        return model
+    return create_model(name, __base__=model)
 
 
 def _unwrap_verification(result_dict: dict) -> tuple[dict, dict]:
@@ -463,7 +484,9 @@ def _inline_schema_refs(schema: dict) -> dict:
 
 
 def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
-    """Generate and save a Pydantic model as a standalone Python module.
+    """Write a Pydantic model as Python source for people to read.
+
+    Loading never imports this file; it reads SCHEMA_MODEL_FILE instead.
 
     Generates Python source directly from model_fields using repr() for every
     string value, so quotes, umlauts, and other special characters in field
@@ -583,11 +606,9 @@ def _save_requirements(requirements: RequirementsSpec, model_name: str, path: Pa
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def _load_saved_schema(path: Path, model_name: str) -> type[BaseModel]:
-    spec = importlib.util.spec_from_file_location("_vision_saved_schema", path)
-    module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-    spec.loader.exec_module(module)  # type: ignore[union-attr]
-    return getattr(module, model_name)
+# The saved model is read from SCHEMA_MODEL_FILE as data; schema.py is written
+# for people to read and is never imported.
+SCHEMA_MODEL_FILE = "schema_model.json"
 
 
 def _load_saved_requirements(path: Path) -> tuple[str, RequirementsSpec]:
@@ -707,6 +728,13 @@ class VisionExtractor:
     All files are sent in one API call so the model sees the full context
     across related documents (e.g. a Purchase Order + multiple BOMs).
 
+    Before that call, every file is checked against ``limits``: its size, the
+    pixels of an image file (and, with a shared ``api_config``, of every PDF page
+    rendered as an image), and the pages of all files together, an image file
+    counting as one page. A file over a limit raises
+    :class:`~gaik.software_components.input_limits.InputLimitError` and no model
+    is called.
+
     Usage::
 
         extractor = VisionExtractor(model_provider="openai", use_azure=True)
@@ -729,7 +757,9 @@ class VisionExtractor:
         vertex_ai: bool = True,
         additional_instructions: str | None = None,
         include_verification: bool = False,
+        limits: InputLimits | None = None,
     ) -> None:
+        self.limits = limits or InputLimits()
         self.model_provider = model_provider
         self.reasoning_effort = reasoning_effort
         self.merge_table = merge_table
@@ -782,14 +812,22 @@ class VisionExtractor:
             extraction_model: Pre-built Pydantic model (skips schema generation).
             requirements: Pre-built ExtractionRequirements (skips schema generation).
             schema_dir: Directory for schema persistence.
-                        Loads schema.py + requirements.json if present; saves them
-                        after generation if not.
+                        Loads schema_model.json + requirements.json if present
+                        (schema.py is written for reading only and never
+                        imported); saves them after generation if not.
 
         Schema resolution order:
             1. Both extraction_model and requirements passed → use directly.
             2. schema_dir set and files exist → load from disk.
             3. Otherwise → generate via SchemaGenerator (text LLM call).
+
+        Raises:
+            InputLimitError: A file is over ``limits``; checked first, before a
+                schema is generated or any other model call.
         """
+        file_path_list = [Path(p) for p in file_paths]
+        # Before the schema step too: generating a schema is a paid call.
+        self._check_input_limits(file_path_list)
         if extraction_model is None or requirements is None:
             extraction_model, requirements = self._resolve_schema(user_requirements, schema_dir)
 
@@ -799,7 +837,6 @@ class VisionExtractor:
             else extraction_model
         )
 
-        file_path_list = [Path(p) for p in file_paths]
         t0 = time.perf_counter()
         result_dict, usage = self._extract(file_path_list, llm_model, user_requirements)
         duration_s = round(time.perf_counter() - t0, 3)
@@ -893,6 +930,7 @@ class VisionExtractor:
             prompt += f"\n\nAdditional user guidance to follow: {instructions.strip()}"
 
         file_path_list = [Path(p) for p in file_paths]
+        self._check_input_limits(file_path_list)
         t0 = time.perf_counter()
         result_dict, usage = self._extract(file_path_list, _RequirementsSuggestion, prompt)
         duration_s = round(time.perf_counter() - t0, 3)
@@ -952,6 +990,7 @@ class VisionExtractor:
         extraction_model: type[BaseModel],
         user_requirements: str,
     ) -> tuple[dict, UsageRecord | None]:
+        # The public methods have checked file_paths against the input limits.
         system_prompt = self._get_system_prompt()
         user_prompt = self._get_user_prompt(user_requirements)
 
@@ -964,6 +1003,17 @@ class VisionExtractor:
         elif self.model_provider == "google":
             return self._call_google(file_paths, system_prompt, user_prompt, extraction_model)
         raise ValueError(f"Unknown model_provider '{self.model_provider}'")
+
+    def _check_input_limits(self, file_paths: list[Path]) -> None:
+        """Refuse the call before any model request when a file is over ``limits``."""
+        pages = 0
+        for path in file_paths:
+            if _is_pdf(path):
+                pages += self.limits.check_pdf(path, require_count=True) or 1
+            elif path.suffix.lower() in SUPPORTED_MIME_TYPES:
+                self.limits.check_image_file(path)
+                pages += 1
+        self.limits.check_pages(pages, f"The {len(file_paths)} file(s) of this call")
 
     # -- internal: provider calls ---------------------------------------------
 
@@ -992,11 +1042,14 @@ class VisionExtractor:
                     {
                         "role": "user",
                         "content": build_chat_document_content(
-                            file_paths, user_prompt, include_text_layer=True
+                            file_paths,
+                            user_prompt,
+                            include_text_layer=True,
+                            limits=self.limits,
                         ),
                     },
                 ],
-                response_format=extraction_model,
+                response_format=_within_schema_name_limit(extraction_model),
                 **options,
             )
             # ProviderClient's parsed-output contract returns only the validated
@@ -1039,7 +1092,7 @@ class VisionExtractor:
             request["reasoning"] = {"effort": self.reasoning_effort}
         response_format = {
             "type": "json_schema",
-            "name": extraction_model.__name__[:64],
+            "name": sanitize_model_name(extraction_model.__name__),
             "schema": _make_schema_strict(extraction_model.model_json_schema()),
             "strict": True,
         }
@@ -1179,10 +1232,16 @@ class VisionExtractor:
         }
 
         if is_vertex:
-            token = get_google_access_token(self.config)
             url = self.config["generate_content_url"]
             if "{model}" in url:
                 url = url.replace("{model}", self.model)
+            check_endpoint(
+                url,
+                provider="vertex",
+                allowed_hosts=self.config.get("allowed_endpoint_hosts"),
+                what="generate_content_url",
+            )
+            token = get_google_access_token(self.config)
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",
@@ -1281,12 +1340,14 @@ class VisionExtractor:
     ) -> tuple[type[BaseModel], RequirementsSpec]:
         if schema_dir is not None:
             schema_dir = Path(schema_dir)
-            schema_path = schema_dir / "schema.py"
+            model_path = schema_dir / SCHEMA_MODEL_FILE
             req_path = schema_dir / "requirements.json"
-            if schema_path.exists() and req_path.exists():
+            # A folder from an older gaik has schema.py but no model file; it is
+            # rebuilt from requirements.json where that determines the model.
+            if req_path.exists() and (model_path.exists() or (schema_dir / "schema.py").exists()):
                 print(f"Loading saved schema from {schema_dir}")
                 model_name, requirements = _load_saved_requirements(req_path)
-                extraction_model = _load_saved_schema(schema_path, model_name)
+                extraction_model = load_saved_model(model_path, model_name, requirements)
                 return extraction_model, requirements
 
         schema_config = (
@@ -1302,6 +1363,7 @@ class VisionExtractor:
             schema_dir = Path(schema_dir)
             schema_dir.mkdir(parents=True, exist_ok=True)
             _save_schema_to_python(extraction_model, schema_dir / "schema.py")
+            save_model_file(extraction_model, schema_dir / SCHEMA_MODEL_FILE)
             _save_requirements(
                 requirements, extraction_model.__name__, schema_dir / "requirements.json"
             )

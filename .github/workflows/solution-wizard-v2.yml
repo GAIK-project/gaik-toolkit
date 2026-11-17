@@ -106,8 +106,10 @@ jobs:
       # Tests of the fork's own that need gaik use pytest.importorskip and skip.
       # Upstream's test_source_tracing.py checks the scaffolder without gaik, so it
       # runs here; only its three tests that compare the registry entry and the
-      # card with the installed gaik are deselected, and so are the four tests of
-      # upstream's test_cards_describe_current_gaik.py that import gaik. --deselect takes a node id,
+      # card with the installed gaik are deselected, and so are the five tests of
+      # upstream's test_cards_describe_current_gaik.py that import gaik, and the four
+      # of upstream's test_governance_and_poc_output.py that load the generated
+      # provider_config.py or run_poc.py, which import gaik. --deselect takes a node id,
       # which starts at the repository root (pytest's rootdir), not at this folder.
       - name: Pytest solution_wizard
         working-directory: implementation_layer/solution_wizard
@@ -125,6 +127,11 @@ jobs:
           --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_spreadsheet_parser_entry_says_numbers_keep_their_format
           --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_report_loaders_and_source_path_error_are_described
           --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_card_imports_resolve
+          --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_every_component_that_takes_input_limits_says_so_on_its_card_and_entry
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_a_stage_without_a_provider_stops_unless_the_blueprint_allows_the_fallback
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_run_time_refuses_an_external_provider_before_reading_credentials
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_transcript_enhancement_is_off_when_no_external_model_is_allowed
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_the_local_audio_poc_gives_the_transcriber_its_local_endpoint
       - name: Test report (solution_wizard)
         if: always()
         run: python .github/scripts/junit_summary.py "solution_wizard unit tests" "$RUNNER_TEMP/junit/solution-wizard.xml"

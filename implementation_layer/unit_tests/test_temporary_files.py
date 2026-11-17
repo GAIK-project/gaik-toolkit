@@ -96,7 +96,9 @@ def test_extracted_audio_is_not_written_beside_the_video(
         return _Response({"text": "hello", "segments": []})
 
     monkeypatch.setattr(whisper_local.requests, "post", post)
-    result = whisper_local.transcribe(video, api_base="http://local.test", key="k")
+    result = whisper_local.transcribe(
+        video, api_base="http://local.test", key="k", allowed_endpoint_hosts="http://local.test"
+    )
 
     assert result["text"] == "hello"
     assert seen["name"] == "meeting_extracted.wav"
@@ -116,7 +118,9 @@ def test_extracted_audio_is_removed_when_the_request_fails(
 
     monkeypatch.setattr(whisper_local.requests, "post", post)
     with pytest.raises(ConnectionError):
-        whisper_local.transcribe(video, api_base="http://local.test", key="k")
+        whisper_local.transcribe(
+            video, api_base="http://local.test", key="k", allowed_endpoint_hosts="http://local.test"
+        )
 
     assert sorted(p.name for p in tmp_path.iterdir()) == ["meeting.mp4", "tmp"]
     assert list(temp_root.iterdir()) == []
@@ -132,7 +136,9 @@ def test_audio_input_is_sent_as_it_is(whisper_local, temp_root, tmp_path, monkey
         return _Response({"text": "hi", "segments": []})
 
     monkeypatch.setattr(whisper_local.requests, "post", post)
-    whisper_local.transcribe(audio, api_base="http://local.test", key="k")
+    whisper_local.transcribe(
+        audio, api_base="http://local.test", key="k", allowed_endpoint_hosts="http://local.test"
+    )
 
     assert seen["path"] == audio
     assert audio.exists()
@@ -144,7 +150,7 @@ def test_extraction_keeps_writing_beside_the_video_by_default(tmp_path, monkeypa
 
     commands = []
 
-    def run(cmd, capture_output=None, text=None):
+    def run(cmd, capture_output=None, text=None, timeout=None):
         commands.append(cmd)
         return type("Done", (), {"returncode": 0, "stderr": ""})()
 

@@ -474,7 +474,8 @@ def test_rag_workflow_alone_has_no_redundancy_warning():
 
 
 # ---------------------------------------------------------------------------
-# Rule 13: declared hallucination check must receive grounding evidence
+# Rule 14: declared hallucination check must receive grounding evidence
+# (rule 13 is the governance rule, tested in test_governance_and_poc_output.py)
 # ---------------------------------------------------------------------------
 
 
@@ -540,97 +541,175 @@ def _judge_blueprint(judge_inputs, hallucination_check=True) -> Blueprint:
     )
 
 
-def test_rule13_judge_without_grounding_input_is_an_error():
+def test_rule14_judge_without_grounding_input_is_an_error():
     """Dropping the source artifact must not pass silently."""
     result = validate(_judge_blueprint(["extracted"]))
     assert not result.ok
-    assert any(e.rule == 13 and e.step_id == "step_c" for e in result.errors)
+    assert any(e.rule == 14 and e.step_id == "step_c" for e in result.errors)
 
 
-def test_rule13_judge_with_grounding_input_passes():
+def test_rule14_judge_with_grounding_input_passes():
     result = validate(_judge_blueprint(["transcript", "extracted"]))
-    assert not [e for e in result.errors if e.rule == 13]
+    assert not [e for e in result.errors if e.rule == 14]
 
 
-def test_rule13_not_applied_when_hallucination_check_is_off():
+def test_rule14_not_applied_when_hallucination_check_is_off():
     result = validate(_judge_blueprint(["extracted"], hallucination_check=False))
-    assert not [e for e in result.errors if e.rule == 13]
+    assert not [e for e in result.errors if e.rule == 14]
 
 
-def test_rule13_warns_when_check_declared_but_no_validator_step():
+def test_rule14_warns_when_check_declared_but_no_validator_step():
     result = validate(_base_blueprint(validation={"hallucination_check": True}))
-    assert any(w.rule == 13 for w in result.warnings)
+    assert any(w.rule == 14 and "hallucination_check" in w.message for w in result.warnings)
 
 
-# ---------------------------------------------------------------------------
-# Rule 14: model providers agree with the governance flags
-# ---------------------------------------------------------------------------
+def test_rule14_says_nothing_about_a_draft_without_steps():
+    """The draft blueprint of the specification phase has no workflow yet."""
+    result = validate(
+        _base_blueprint(workflow=Workflow(steps=[]), validation={"hallucination_check": True})
+    )
+    assert not [i for i in result.errors + result.warnings if i.rule == 14]
 
 
-def _governed(models: dict, *, external: bool = False, local: bool = False) -> Blueprint:
-    bp = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
-    bp.governance.data_handling.external_model_api_allowed = external
-    bp.governance.data_handling.local_processing_required = local
-    bp.models = models
-    return bp
-
-
-def _rule14(result):
-    return [e for e in result.errors if e.rule == 14], [w for w in result.warnings if w.rule == 14]
-
-
-def test_rule14_default_flags_allow_any_provider():
-    bp = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
-    bp.models = {"provider": "azure"}
-    assert _rule14(validate(bp)) == ([], [])
-
-
-def test_rule14_hosted_provider_contradicts_no_external_api():
-    errors, _ = _rule14(validate(_governed({"provider": "openai"})))
-    assert len(errors) == 1 and "models.provider is 'openai'" in errors[0].message
-
-
-def test_rule14_unset_provider_is_not_left_to_the_hosted_default():
-    errors, _ = _rule14(validate(_governed({}, external=True, local=True)))
-    assert len(errors) == 1 and "not set" in errors[0].message
-
-
-def test_rule14_stage_override_is_checked_too():
-    models = {
-        "provider": "openai_compatible",
-        "base_url": "http://localhost:8000/v1",
-        "judge_config": {"provider": "anthropic"},
-    }
-    errors, warnings = _rule14(validate(_governed(models)))
-    assert len(errors) == 1
-    assert "models.judge_config.provider is 'anthropic'" in errors[0].message
-    assert any("base_url" in w.message for w in warnings)
-
-
-def test_rule14_local_whisper_still_needs_a_self_hosted_provider_for_enhancement():
-    """Transcript enhancement sends the transcript to the stage's chat API."""
-    hosted = {
-        "provider": "openai_compatible",
-        "transcription_config": {"provider": "azure", "transcription_model": "whisper_local"},
-    }
-    errors, _ = _rule14(validate(_governed(hosted)))
-    assert len(errors) == 1
-    assert "models.transcription_config.provider is 'azure'" in errors[0].message
-
-    local = {
-        "provider": "openai_compatible",
-        "transcription_config": {
-            "provider": "openai_compatible",
-            "transcription_model": "whisper_local",
+@pytest.mark.parametrize(
+    ("module", "upload_type", "source_type"),
+    [
+        ("AudioToStructuredData", "audio", "transcript"),
+        ("AudioToStructuredData", "audio", "enhanced_transcript"),
+        ("DocumentsToStructuredData", "pdf", "parsed_text"),
+    ],
+)
+def test_rule14_a_module_hands_the_judge_the_text_it_read(module, upload_type, source_type):
+    """A module returns the transcript or parsed text with the extracted record
+    (PipelineResult.transcription, .parsed_documents), so a module step may produce
+    it (rule 4) and the judge step can take it as its grounding evidence."""
+    bp = _base_blueprint(
+        artifacts={
+            "upload": Artifact(type=upload_type, source=ArtifactSource.USER_UPLOAD, optional=False),
+            "source": Artifact(
+                type=source_type,
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="extract",
+            ),
+            "record": Artifact(
+                type="structured_json",
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="extract",
+                final_output=True,
+            ),
+            "report": Artifact(
+                type="validation_report",
+                source=ArtifactSource.GENERATED,
+                optional=False,
+                produced_by="judge",
+            ),
         },
+        components=Components(selected_building_blocks=[module, "LLMJudge"]),
+        workflow=Workflow(
+            steps=[
+                WorkflowStep(
+                    id="extract",
+                    name="Extract",
+                    type="automated_task",
+                    component=module,
+                    inputs=["upload"],
+                    outputs=["record", "source"],
+                ),
+                WorkflowStep(
+                    id="judge",
+                    name="Validate",
+                    type="automated_task",
+                    component="LLMJudge",
+                    inputs=["source", "record"],
+                    outputs=["report"],
+                    depends_on=["extract"],
+                ),
+            ]
+        ),
+        validation={"hallucination_check": True},
+    )
+
+    result = validate(bp)
+
+    assert not [e for e in result.errors if e.rule in (4, 14)], result.errors
+
+
+def _source_and_judge(source_type: str, judge: str, upload: str = "pdf") -> Blueprint:
+    """upload -> VisionExtractor -> judge, the judge reading ``source_type`` beside the record."""
+    artifacts = {
+        "upload": Artifact(type=upload, source=ArtifactSource.USER_UPLOAD, optional=False),
+        "record": Artifact(
+            type="structured_json",
+            source=ArtifactSource.GENERATED,
+            optional=False,
+            produced_by="extract",
+            final_output=True,
+        ),
+        "report": Artifact(
+            type="validation_report",
+            source=ArtifactSource.GENERATED,
+            optional=False,
+            produced_by="judge",
+        ),
     }
-    errors, warnings = _rule14(validate(_governed(local)))
-    assert errors == [] and warnings
+    judge_inputs = ["record"] + (["upload"] if source_type == upload else [])
+    return _base_blueprint(
+        artifacts=artifacts,
+        components=Components(selected_building_blocks=["VisionExtractor", judge]),
+        workflow=Workflow(
+            steps=[
+                WorkflowStep(
+                    id="extract",
+                    name="Extract",
+                    type="automated_task",
+                    component="VisionExtractor",
+                    inputs=["upload"],
+                    outputs=["record"],
+                ),
+                WorkflowStep(
+                    id="judge",
+                    name="Validate",
+                    type="automated_task",
+                    component=judge,
+                    inputs=judge_inputs,
+                    outputs=["report"],
+                    depends_on=["extract"],
+                ),
+            ]
+        ),
+        validation={"hallucination_check": True},
+    )
 
 
-def test_rule14_blank_provider_counts_as_unset():
-    errors, _ = _rule14(validate(_governed({"provider": "  "})))
-    assert len(errors) == 1 and "not set" in errors[0].message
+@pytest.mark.parametrize("judge", ["LLMJudge", "LLMJudgePanel"])
+@pytest.mark.parametrize("upload", ["pdf", "image"])
+def test_rule14_a_judge_may_check_against_the_pages_themselves(judge, upload):
+    """VisionExtractor returns no text; the judges' validate(source_pages=...) reads the
+    PDF's or image's pages, so the upload itself is the grounding evidence."""
+    result = validate(_source_and_judge(upload, judge, upload=upload))
+
+    assert not [e for e in result.errors if e.rule in (4, 14)], result.errors
+
+
+@pytest.mark.parametrize("judge", ["LLMJudge", "llm_judge", "LLMJudgePanel", "llm_judge_panel"])
+def test_rule14_a_judge_named_by_its_registry_id_is_checked_too(judge):
+    result = validate(_source_and_judge("none", judge))
+
+    assert any(e.rule == 14 and e.step_id == "judge" for e in result.errors)
+
+
+def test_rule14_a_panel_cannot_check_against_text():
+    """LLMJudgePanel.validate reads page images only; a text source is refused (rule 4)
+    and does not satisfy the declared check (rule 14)."""
+    bp = _judge_blueprint(["transcript", "extracted"])
+    bp.workflow.steps[2].component = "LLMJudgePanel"
+
+    result = validate(bp)
+
+    assert any(e.rule == 4 and e.step_id == "step_c" for e in result.errors)
+    assert any(e.rule == 14 and e.step_id == "step_c" for e in result.errors)
 
 
 # ---------------------------------------------------------------------------

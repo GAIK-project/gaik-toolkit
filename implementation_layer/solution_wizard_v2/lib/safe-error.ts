@@ -22,6 +22,7 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   "gate_not_ready",
   "agent_busy",
   "agent_capacity",
+  "no_reply_running",
   "blueprint_change_required",
   "server_owned_metadata",
   // the package

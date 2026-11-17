@@ -149,7 +149,11 @@ def test_a_failed_docling_call_raises_only_the_status(monkeypatch, tmp_path, cap
         requests, "get", lambda *a, **k: SimpleNamespace(raise_for_status=lambda: None, json=dict)
     )
     monkeypatch.setattr(requests, "post", lambda *a, **k: _http_error_response(401, "Unauthorized"))
-    parser = DoclingApiClientParser(api_base="https://parse.example", password="pw-secret")
+    parser = DoclingApiClientParser(
+        api_base="https://parse.example",
+        password="pw-secret",
+        allowed_endpoint_hosts=["parse.example"],
+    )
 
     with pytest.raises(requests.HTTPError) as caught:
         parser.parse_document(document)

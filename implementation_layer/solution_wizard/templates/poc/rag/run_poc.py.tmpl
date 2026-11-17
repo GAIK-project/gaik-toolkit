@@ -29,7 +29,8 @@ load_dotenv(Path(__file__).parent / ".env")
 from gaik.software_modules.RAG_workflow import RAGWorkflow  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
 from input_bundle import uploaded_names  # noqa: E402
-from provider_config import get_stage_config  # noqa: E402
+from provider_config import external_model_forbidden, get_stage_config  # noqa: E402
+import poc_output  # noqa: E402
 
 #: Text files in sample_input/ hold the questions of a run that has no terminal.
 QUESTION_SUFFIXES = (".txt", ".md")
@@ -51,7 +52,13 @@ def find_documents(config: dict) -> list:
     sample_dir = Path(__file__).parent / config.get("paths", {}).get("sample_input", "sample_input")
     # RAGWorkflow uses VisionRagParser which expects PDF files.
     # Subfolders too: a case's documents often sit in documents/ under the bundle (#255).
-    docs = [f for f in sample_dir.rglob("*") if f.is_file() and f.suffix.lower() == ".pdf"]
+    # Only files that stay inside sample_input/ once links are resolved.
+    root = sample_dir.resolve()
+    docs = [
+        f
+        for f in sample_dir.rglob("*")
+        if f.is_file() and f.suffix.lower() == ".pdf" and f.resolve().is_relative_to(root)
+    ]
     return sorted(docs)
 
 
@@ -142,7 +149,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="${use_case_name} PoC")
     parser.add_argument("--synthetic", action="store_true", help="Generate synthetic sample documents")
     parser.add_argument("--query", help="Run a single question and exit")
+    poc_output.add_output_flags(parser)
     args = parser.parse_args()
+    poc_output.configure(args)
 
     config = load_config()
     sample_dir = Path(__file__).parent / config.get("paths", {}).get("sample_input", "sample_input")
@@ -201,8 +210,11 @@ def main() -> None:
     if args.query:
         result = workflow.ask(args.query, stream=False)
         answer = getattr(result, "answer", str(result))
-        print(f"\nQ: {args.query}")
-        print(f"A: {answer}")
+        if poc_output.VERBOSE:
+            print(f"\nQ: {args.query}")
+            print(f"A: {answer}")
+        else:
+            print(f"\nAnswer: {len(str(answer))} characters (run with --verbose to print it)")
         output_path = output_dir / "query_result.json"
         output_path.write_text(
             json.dumps({"query": args.query, "answer": answer}, indent=2, ensure_ascii=False),
@@ -211,21 +223,27 @@ def main() -> None:
         print(f"\nResult saved to: {output_path}")
         _pdf_source = {"query": args.query, "answer": answer}
     else:
+        # Interactive mode, or the questions of a run without a terminal.
         session_results = []
 
-        def ask(query: str) -> None:
+        def ask(query: str, show: bool) -> None:
             result = workflow.ask(query, stream=False)
             answer = getattr(result, "answer", str(result))
-            print(f"\nAnswer: {answer}")
+            if show:
+                print(f"\nAnswer: {answer}")
+            else:
+                print(f"\nAnswer: {len(str(answer))} characters (run with --verbose to print it)")
             session_results.append({"query": query, "answer": answer})
 
         if questions is not None:
+            # Nobody types these questions here: as with --query, the answers go to
+            # output/ and the log prints them only with --verbose.
             print(f"\nNo terminal: answering {len(questions)} question(s) {asked_from}.")
             for query in questions:
                 print(f"\nQuestion: {query}")
-                ask(query)
+                ask(query, show=poc_output.VERBOSE)
         else:
-            # Interactive mode
+            # Interactive mode: the user asks each question here, so each answer is shown.
             print("\nReady. Type your question (or 'exit' to quit).")
             while True:
                 try:
@@ -236,7 +254,7 @@ def main() -> None:
                     break
                 if not query:
                     continue
-                ask(query)
+                ask(query, show=True)
 
         if session_results:
             output_path = output_dir / "session_results.json"
@@ -250,4 +268,4 @@ def main() -> None:
 ${pdf_report_section}
 
 if __name__ == "__main__":
-    main()
+    poc_output.run(main)

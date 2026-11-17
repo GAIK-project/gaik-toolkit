@@ -149,7 +149,10 @@ class SpacyBackend(LemmatizationBackend):
         doc = self._nlp(normalize_unicode(text))
         out: list[str] = []
         for tok in doc:
-            if tok.is_space or tok.is_punct or tok.like_num is False and not tok.is_alpha:
+            # Keep any token with a letter or digit: spaCy's Finnish tokenizer
+            # keeps "Y-tunnus", "5G-verkossa" and "COVID-19" whole, and those are
+            # neither alphabetic nor number-like.
+            if tok.is_space or tok.is_punct or not any(ch.isalnum() for ch in tok.text):
                 continue
             lemma = (tok.lemma_ or tok.text).lower()
             if lemma and lemma not in self._stopwords:
@@ -157,16 +160,24 @@ class SpacyBackend(LemmatizationBackend):
         return out
 
 
-def _split_on_structure(baseform: str, structure: str | None) -> list[str]:
-    """Slice *baseform* into compound parts on the ``=`` boundaries in *structure*.
+def _split_on_structure(
+    baseform: str, structure: str | None, written: str | None = None
+) -> list[str]:
+    """Split a compound into parts on the ``=`` boundaries in *structure*.
 
-    Voikko's ``STRUCTURE`` is a per-character map of the analysed word where ``=``
-    opens each compound part, so ``=ppppp=pppp=pppppppppp`` over ``arvonlisäverotus``
-    gives ``arvon`` / ``lisä`` / ``verotus``. Returns ``[]`` when the word is not a
-    compound, so the caller can fall back to the baseform.
+    Voikko's ``STRUCTURE`` maps the characters of the word as written, where
+    ``=`` opens each compound part: ``=pppppp=pppppppp`` over ``kerrostaloissa``
+    marks ``kerros`` / ``taloissa``. When *written* is given, the written word is
+    sliced and the last part is taken from *baseform* past the same prefix, so
+    ``kerrostaloissa`` (baseform ``kerrostalo``) gives ``kerros`` / ``talo``, the
+    same parts as the query ``kerrostalo``. Without *written*, *baseform* itself
+    is sliced. Returns ``[]`` when the word is not a compound or the structure
+    does not line up, so the caller can fall back to the baseform.
     """
     if not structure or structure.count("=") < 2:
         return []
+    if written is not None:
+        return _split_written(baseform, structure, written)
     parts: list[str] = []
     position = 0
     for segment in structure.split("=")[1:]:
@@ -178,6 +189,25 @@ def _split_on_structure(baseform: str, structure: str | None) -> list[str]:
     # A structure that does not line up with the baseform (derived forms shift the
     # character count) would silently produce truncated nonsense.
     return parts if position == len(baseform) else []
+
+
+def _split_written(baseform: str, structure: str, written: str) -> list[str]:
+    segments = [len(segment) for segment in structure.split("=")[1:]]
+    if sum(segments) != len(written):
+        return []
+    pieces: list[str] = []
+    position = 0
+    for length in segments:
+        pieces.append(written[position : position + length])
+        position += length
+    head = [piece.strip("-") for piece in pieces[:-1] if piece.strip("-")]
+    prefix = "".join(pieces[:-1])
+    if not baseform.startswith(prefix):
+        return []
+    last = baseform[len(prefix) :].strip("-")
+    if not head or not last:
+        return []
+    return [*head, last]
 
 
 class VoikkoBackend(LemmatizationBackend):
@@ -229,7 +259,11 @@ class VoikkoBackend(LemmatizationBackend):
                 continue
             analysis = analyses[0]
             base = analysis.get("BASEFORM", token).lower()
-            parts = _split_on_structure(base, analysis.get("STRUCTURE")) if self._decompound else []
+            parts = (
+                _split_on_structure(base, analysis.get("STRUCTURE"), token.lower())
+                if self._decompound
+                else []
+            )
             for word in parts or [base]:
                 if word and word not in self._stopwords:
                     out.append(word)

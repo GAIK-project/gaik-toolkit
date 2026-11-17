@@ -125,7 +125,9 @@ def dirs(tmp_path):
 
 def test_the_options_register_the_guard_for_every_tool_call(dirs) -> None:
     wizard, session, _ = dirs
-    options = agent_service._build_options(wizard, session)
+    options = agent_service._build_options(
+        wizard, session, guard=agent_tool_guard.ToolGuard(wizard, session)
+    )
 
     assert isinstance(options, ClaudeAgentOptions)
     # bypassPermissions is why the hook has to apply: nothing else asks.
@@ -261,7 +263,9 @@ def _assert_denied(answer: dict[str, Any]) -> str:
 
 def test_the_sdk_runs_the_guard_on_each_tool_call(dirs) -> None:
     wizard, session, other = dirs
-    options = agent_service._build_options(wizard, session)
+    options = agent_service._build_options(
+        wizard, session, guard=agent_tool_guard.ToolGuard(wizard, session)
+    )
     cli = _FakeCLI()
 
     async def go() -> dict[str, Any]:

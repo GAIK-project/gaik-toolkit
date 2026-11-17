@@ -91,6 +91,10 @@ export type ChatMessage = {
   role: ChatRole;
   content: string;
   createdAt: string;
+  /** The user stopped this reply while it was being written (lib/chat-stopped). */
+  stopped?: boolean;
+  /** The note the stored text of a stopped reply ends with ("(Pysäytetty)"). */
+  stoppedNote?: string;
 };
 
 export type WizardSession = {
@@ -667,7 +671,17 @@ function buildSeedSessions(): WizardSession[] {
   ];
 }
 
-type MockGlobal = typeof globalThis & { __wizardMockSessions?: WizardSession[] };
+type MockReplies = {
+  /** Session id -> the scripted reply being streamed, and whether it was stopped. */
+  running: Map<string, { stopped: boolean }>;
+  /** Milliseconds between the words of a scripted reply. */
+  pace: number;
+};
+
+type MockGlobal = typeof globalThis & {
+  __wizardMockSessions?: WizardSession[];
+  __wizardMockReplies?: MockReplies;
+};
 
 const mockGlobal = globalThis as MockGlobal;
 if (!mockGlobal.__wizardMockSessions) {
@@ -675,11 +689,61 @@ if (!mockGlobal.__wizardMockSessions) {
 }
 const sessions = mockGlobal.__wizardMockSessions;
 
+/** How fast a scripted reply is written unless a spec asks for another pace. */
+export const MOCK_REPLY_PACE_MS = 45;
+
+// On globalThis like the sessions: the chat route and the stop route are
+// separate modules of the dev server, and both must see the same reply.
+if (!mockGlobal.__wizardMockReplies) {
+  mockGlobal.__wizardMockReplies = { running: new Map(), pace: MOCK_REPLY_PACE_MS };
+}
+const replies = mockGlobal.__wizardMockReplies;
+
 /** Dev/test: restore seeded sessions (e.g. between E2E runs). */
 export function resetMockSessions(): void {
   const fresh = buildSeedSessions();
   sessions.length = 0;
   sessions.push(...fresh);
+  // A reply still being streamed for the old store is told to end.
+  for (const reply of replies.running.values()) reply.stopped = true;
+  replies.running.clear();
+  replies.pace = MOCK_REPLY_PACE_MS;
+}
+
+// --- The scripted reply in progress ------------------------------------------
+//
+// wizard_api keeps the turn it is answering, so the user can stop it. The
+// scripted reply lives inside the response that streams it; these let the stop
+// route reach it.
+
+/** A scripted reply starts streaming for the session; ask the handle whether it was stopped. */
+export function beginMockReply(id: string): { stopped: boolean } {
+  const reply = { stopped: false };
+  replies.running.set(id, reply);
+  return reply;
+}
+
+/** The reply has ended (whole, stopped or abandoned). */
+export function endMockReply(id: string, reply: { stopped: boolean }): void {
+  if (replies.running.get(id) === reply) replies.running.delete(id);
+}
+
+/** Stops the session's scripted reply. False when none is being streamed. */
+export function stopMockReply(id: string): boolean {
+  const reply = replies.running.get(id);
+  if (!reply) return false;
+  reply.stopped = true;
+  return true;
+}
+
+/** Milliseconds between the words of a scripted reply. */
+export function mockReplyPace(): number {
+  return replies.pace;
+}
+
+/** Dev/test: slow the scripted replies down, so a spec has time to stop one. */
+export function setMockReplyPace(ms: number): void {
+  replies.pace = Math.min(Math.max(Math.round(ms), 0), 5000);
 }
 
 // --- Read operations --------------------------------------------------------
@@ -753,10 +817,13 @@ export function renameSession(id: string, title: string): WizardSession | undefi
 
 // Append the user message + (mock) assistant reply to the chat history.
 // The reply text is passed in so it can be localized via i18n.
+// A reply the user stopped is stored as wizard_api stores one: its text ends
+// with `stoppedNote`, and the message says so (lib/chat-stopped).
 export function postMessage(
   id: string,
   userContent: string,
   assistantContent: string,
+  stoppedNote?: string,
 ): WizardSession | undefined {
   const s = getSession(id);
   if (!s) return undefined;
@@ -772,6 +839,7 @@ export function postMessage(
     role: "assistant",
     content: assistantContent,
     createdAt: now(),
+    ...(stoppedNote ? { stopped: true, stoppedNote } : {}),
   });
   s.updatedAt = now();
   return s;

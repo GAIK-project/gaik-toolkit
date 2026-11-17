@@ -1,0 +1,76 @@
+# Rahti's LimitRange: every container requests at least 50m CPU, and its CPU limit is at most five times
+# its request. The base's requests are a tenth of the limits, so they are raised here to a fifth (and to
+# at least 50m). Limits stay as in the base, so the stack's share of the project quota does not change.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: alertmanager}
+spec:
+  template:
+    spec:
+      containers:
+        - {name: alertmanager, resources: {requests: {cpu: 50m}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: grafana}
+spec:
+  template:
+    spec:
+      containers:
+        - {name: grafana, resources: {requests: {cpu: 100m}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: grafana-setup}
+spec:
+  template:
+    spec:
+      containers:
+        - {name: grafana-setup, resources: {requests: {cpu: 50m}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: mlflow}
+spec:
+  template:
+    spec:
+      containers:
+        - {name: mlflow, resources: {requests: {cpu: 200m}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: otel-collector}
+spec:
+  template:
+    spec:
+      initContainers:
+        - {name: mlflow-setup, resources: {requests: {cpu: 100m}}}
+      containers:
+        - {name: otel-collector, resources: {requests: {cpu: 200m}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: prometheus}
+spec:
+  template:
+    spec:
+      containers:
+        - {name: prometheus, resources: {requests: {cpu: 200m}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: sink}
+spec:
+  template:
+    spec:
+      containers:
+        - {name: sink, resources: {requests: {cpu: 100m}}}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: postgres}
+spec:
+  template:
+    spec:
+      containers:
+        - {name: postgres, resources: {requests: {cpu: 200m}}}

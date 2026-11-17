@@ -708,6 +708,12 @@ export type Dict = {
       /** In the message field while a gate's chip is attached: {n}. */
       gatePlaceholder: string;
       referenceRemove: string;
+      /** In place of the send button while a reply is being written. */
+      stop: string;
+      /** The same button once it is pressed, until the reply has ended. */
+      stopping: string;
+      /** Under a reply the user stopped. */
+      stopped: string;
       background: string;
       nonTechnical: string;
       nonTechnicalText: string;
@@ -1430,6 +1436,9 @@ const fi: Dict = {
     panel: {
       gatePlaceholder: "Mitä Gate {n}:ssä pitää muuttaa?",
       referenceRemove: "Poista viittaus",
+      stop: "Pysäytä",
+      stopping: "Pysäytetään…",
+      stopped: "Pysäytetty",
       background: "Taustasi",
       nonTechnical: "En ole tekninen",
       nonTechnicalText: BACKGROUND_SENTENCES.fi.nonTechnical,
@@ -2197,6 +2206,9 @@ const en: Dict = {
     panel: {
       gatePlaceholder: "What should change at Gate {n}?",
       referenceRemove: "Remove reference",
+      stop: "Stop",
+      stopping: "Stopping…",
+      stopped: "Stopped",
       background: "Your background",
       nonTechnical: "Not technical",
       nonTechnicalText: BACKGROUND_SENTENCES.en.nonTechnical,

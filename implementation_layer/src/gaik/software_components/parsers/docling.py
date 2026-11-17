@@ -85,6 +85,8 @@ import os
 import re
 from collections import OrderedDict
 
+from gaik.software_components.input_limits import InputLimits, docling_limits
+
 # Try to import additional format options
 try:
     from docling.document_converter import DocxFormatOption, TxtFormatOption
@@ -131,6 +133,8 @@ class DoclingParser:
     - TXT files (plain text)
     - Automatic CUDA/CPU device detection
     - Markdown or structured text output
+    - Refuses a file over its input limits (size, PDF pages, unpacked size) with
+      ``InputLimitError`` before Docling reads it
     """
 
     def __init__(
@@ -140,6 +144,8 @@ class DoclingParser:
         enable_formula_enrichment: bool = True,
         num_threads: int = 4,
         ocr_engine: str = "rapidocr",
+        *,
+        limits: InputLimits | None = None,
     ):
         """
         Initialize the DoclingParser with configuration options.
@@ -151,7 +157,11 @@ class DoclingParser:
             num_threads: Number of threads for processing (default: 4)
             ocr_engine: OCR engine to use when enable_ocr is True (default: "tesseract_cli")
                        Options: "tesseract_cli", "tesseract", "easyocr", "rapidocr"
+            limits: Size and page limits checked before parsing; defaults to
+                :meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`,
+                which limits the size and not the page count.
         """
+        self.limits = limits or InputLimits.local_parsing()
         self.summaries = summaries.copy()
         self.docling_available = DOCLING_IMPORT_SUCCESS
 
@@ -328,6 +338,8 @@ class DoclingParser:
 
         Raises:
             ValueError: If Docling is not available or file format is not supported
+            InputLimitError: If the file is over ``max_file_bytes``, a PDF over
+                ``max_pages``, or a DOCX/XLSX/PPTX unpacks to over ten times the size limit
         """
         import psutil
 
@@ -376,8 +388,9 @@ class DoclingParser:
             except (FileNotFoundError, PermissionError):
                 pass
 
-        # Convert document using docling
-        result = self.converter.convert(file_path)
+        # Convert document using docling, within the input limits
+        self.limits.check_document(file_path)
+        result = self.converter.convert(file_path, **docling_limits(self.limits))
         doc = result.document
 
         if use_markdown:

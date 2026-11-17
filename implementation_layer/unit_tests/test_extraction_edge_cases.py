@@ -1,5 +1,6 @@
 """Extraction edge cases: an empty item list, class names, and Gemini's schema."""
 
+import pytest
 from gaik.software_components.extractor.extractor import DataExtractor
 from gaik.software_components.extractor.schema import (
     ExtractionRequirements,
@@ -8,8 +9,6 @@ from gaik.software_components.extractor.schema import (
     sanitize_model_name,
 )
 from pydantic import BaseModel
-
-import pytest
 
 
 def _requirements(use_case_name: str = "order lines") -> ExtractionRequirements:
@@ -87,16 +86,13 @@ def test_a_model_name_is_a_python_class_name(use_case_name):
 @pytest.mark.parametrize("use_case_name", ["near-miss report", "2024 budget"])
 def test_a_saved_schema_loads_again_whatever_the_use_case_is_called(tmp_path, use_case_name):
     pytest.importorskip("fitz")
-    from gaik.software_components.vision_extractor.vision_extractor import (
-        _load_saved_schema,
-        _save_schema_to_python,
-    )
+    from gaik.software_components.extractor.saved_schema import load_saved_model, save_model_file
 
     model = create_extraction_model(_requirements(use_case_name))
-    path = tmp_path / "schema.py"
+    path = tmp_path / "schema_model.json"
 
-    _save_schema_to_python(model, path)
-    loaded = _load_saved_schema(path, model.__name__)
+    save_model_file(model, path)
+    loaded = load_saved_model(path, model.__name__, None)
 
     assert loaded.model_json_schema()["properties"].keys() == {"name", "qty"}
 
