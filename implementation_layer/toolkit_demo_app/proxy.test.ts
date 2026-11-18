@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 import { NextRequest, type NextResponse } from "next/server";
-import { SHARED_DATA_DENIAL } from "./lib/api-access";
+import {
+  EMAIL_UNCONFIRMED,
+  PENDING_DENIAL,
+  SHARED_DATA_DENIAL,
+} from "./lib/api-access";
 
 // A demo run from a page left open past the access token's lifetime: the API
 // gate refreshes the session, and the browser must get the new cookies, or its
@@ -15,10 +19,15 @@ const KEYS = [
   "BYPASS_AUTH",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "UPSTASH_REDIS_REST_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
 ] as const;
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 const realFetch = globalThis.fetch;
 process.env.BYPASS_AUTH = "";
+// No trial store: a pending user's run that needs a trial run is refused.
+delete process.env.UPSTASH_REDIS_REST_URL;
+delete process.env.UPSTASH_REDIS_REST_TOKEN;
 const { default: proxy } = await import("./proxy");
 
 function jwt(sub: string, exp: number): string {
@@ -213,10 +222,17 @@ test("a page request keeps its cookies for the app", async () => {
 
 const fresh = () => Math.floor(Date.now() / 1000) + 3600;
 
+// A well-formed own-key header, which the proxy re-encodes and forwards.
+const OWN_KEY = JSON.stringify({
+  provider: "openai",
+  model: "test-model",
+  apiKey: "test-key",
+});
+
 function post(url: string, init: { cookie?: string; ownKey?: boolean } = {}) {
   const headers = new Headers();
   if (init.cookie) headers.set("cookie", init.cookie);
-  if (init.ownKey) headers.set("x-gaik-model-settings", "e30");
+  if (init.ownKey) headers.set("x-gaik-model-settings", OWN_KEY);
   return proxy(new NextRequest(url, { method: "POST", headers }));
 }
 
@@ -338,6 +354,78 @@ test("a visitor with their own model key is asked to sign in", async () => {
     });
   }
   expect(backendCalls).toBe(0);
+});
+
+const OWN_KEY_RUN = "https://demo.test/api/extract";
+
+test("a visitor whose refresh token is spent and who sends their own model key is asked to sign in", async () => {
+  // The first request spends the refresh token; the second cannot refresh the
+  // session, so it is anonymous.
+  await run(sessionCookie("r1", expired()));
+  backendCalls = 0;
+  const response = await post(OWN_KEY_RUN, {
+    cookie: sessionCookie("r1", expired()),
+    ownKey: true,
+  });
+  expect(response.status).toBe(401);
+  expect(backendCalls).toBe(0);
+});
+
+test("an approved user runs on their own model key, and the key reaches the API", async () => {
+  const response = await post(OWN_KEY_RUN, {
+    cookie: sessionCookie("r1", fresh()),
+    ownKey: true,
+  });
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(
+    JSON.parse(backendHeaders?.get("x-gaik-model-settings") ?? "null"),
+  ).toEqual(JSON.parse(OWN_KEY));
+});
+
+test("a pending user with a confirmed e-mail address runs on their own model key without a trial run", async () => {
+  // No trial store is configured in these tests, so a run that needed a trial
+  // run would be refused: the own-key run passes without one.
+  accessRow = { status: "pending", wizard_access: false };
+  user.email_confirmed_at = "2026-01-01T00:00:00Z";
+  try {
+    const cookie = sessionCookie("r1", fresh());
+    const trial = await post(OWN_KEY_RUN, { cookie });
+    expect(trial.status).toBe(403);
+    expect(backendCalls).toBe(0);
+    const ownKey = await post(OWN_KEY_RUN, { cookie, ownKey: true });
+    expect(ownKey.status).toBe(200);
+    expect(backendCalls).toBe(1);
+  } finally {
+    delete user.email_confirmed_at;
+  }
+});
+
+test("a pending user without a confirmed e-mail address is refused with their own model key", async () => {
+  accessRow = { status: "pending", wizard_access: false };
+  const response = await post(OWN_KEY_RUN, {
+    cookie: sessionCookie("r1", fresh()),
+    ownKey: true,
+  });
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: EMAIL_UNCONFIRMED.error });
+  expect(backendCalls).toBe(0);
+});
+
+test("a rejected user is refused with their own model key", async () => {
+  accessRow = { status: "rejected", wizard_access: false };
+  user.email_confirmed_at = "2026-01-01T00:00:00Z";
+  try {
+    const response = await post(OWN_KEY_RUN, {
+      cookie: sessionCookie("r1", fresh()),
+      ownKey: true,
+    });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: PENDING_DENIAL.error });
+    expect(backendCalls).toBe(0);
+  } finally {
+    delete user.email_confirmed_at;
+  }
 });
 
 test("the API learns the model tier from the session, never from the browser", async () => {
