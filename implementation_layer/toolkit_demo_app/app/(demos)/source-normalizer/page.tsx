@@ -5,6 +5,7 @@ import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
+import { useConfirm } from "@/components/demo/use-confirm";
 import { FeedbackButton } from "@/components/feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -196,6 +197,7 @@ export default function SourceNormalizerPage() {
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -269,10 +271,14 @@ export default function SourceNormalizerPage() {
     setTab("rendered");
   }
 
-  function clearAll() {
+  async function clearAll() {
     if (
       hasResult &&
-      !window.confirm("Clearing removes the current result. Continue?")
+      !(await confirm({
+        title: "Clear the sources?",
+        description: "This also removes the current result.",
+        action: "Clear",
+      }))
     )
       return;
     setRows([]);
@@ -285,9 +291,11 @@ export default function SourceNormalizerPage() {
     if (busy) return;
     if (
       hasResult &&
-      !window.confirm(
-        "Loading an example replaces the current result. Continue?",
-      )
+      !(await confirm({
+        title: "Load the example?",
+        description: "It replaces the current result.",
+        action: "Load example",
+      }))
     )
       return;
     setLoadingExample(true);
@@ -443,6 +451,7 @@ export default function SourceNormalizerPage() {
 
   return (
     <PageTransition>
+      {confirmDialog}
       <DemoPageHeader
         icon={FileStack}
         title="Source Normalizer"

@@ -4,6 +4,7 @@ import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
+import { useConfirm } from "@/components/demo/use-confirm";
 import { FeedbackButton } from "@/components/feedback";
 import {
   Accordion,
@@ -185,6 +186,7 @@ export default function KnowledgeCuratorPage() {
   const [draft, setDraft] = useState<string | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -239,15 +241,21 @@ export default function KnowledgeCuratorPage() {
     setError(null);
   }
 
-  function confirmReplace(what: string): boolean {
+  /** Asks before the curated knowledge is cleared; with none there is nothing to ask. */
+  async function confirmReplace(title: string, action: string) {
     return (
       knowledgePaths.length === 0 ||
-      window.confirm(`${what} clears the current knowledge. Continue?`)
+      (await confirm({
+        title,
+        description: "It clears the current knowledge.",
+        action,
+      }))
     );
   }
 
   async function pickExample(example: CuratorExample) {
-    if (busy || !confirmReplace("Loading an example")) return;
+    if (busy || !(await confirmReplace("Load the example?", "Load example")))
+      return;
     setLoadingExample(true);
     try {
       const response = await fetch(example.url);
@@ -267,8 +275,8 @@ export default function KnowledgeCuratorPage() {
     }
   }
 
-  function clearAll() {
-    if (!confirmReplace("Clearing")) return;
+  async function clearAll() {
+    if (!(await confirmReplace("Clear the page?", "Clear"))) return;
     setNormalized(null);
     setOrigin("");
     setExampleId(null);
@@ -279,7 +287,7 @@ export default function KnowledgeCuratorPage() {
   }
 
   async function loadZip(file: File) {
-    if (!confirmReplace("Loading a zip")) return;
+    if (!(await confirmReplace("Load the zip?", "Load zip"))) return;
     try {
       const loaded = readWorkspaceZip(new Uint8Array(await file.arrayBuffer()));
       resetResult();
@@ -309,9 +317,11 @@ export default function KnowledgeCuratorPage() {
     }
     if (
       knowledgePaths.length > 0 &&
-      !window.confirm(
-        "Curating again replaces the knowledge, including your edits. Continue?",
-      )
+      !(await confirm({
+        title: "Curate again?",
+        description: "It replaces the knowledge, including your edits.",
+        action: "Curate again",
+      }))
     )
       return;
     abortRef.current?.abort();
@@ -438,6 +448,7 @@ export default function KnowledgeCuratorPage() {
 
   return (
     <PageTransition>
+      {confirmDialog}
       <DemoPageHeader
         icon={LibraryBig}
         title="Knowledge Curator"

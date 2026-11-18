@@ -30,6 +30,7 @@ function ReportWriterPage() {
   return (
     <ReportWriterContext.Provider value={rw}>
       <PageTransition>
+        {rw.confirmDialog}
         <div className="space-y-6">
           <DemoPageHeader
             icon={FilePen}
