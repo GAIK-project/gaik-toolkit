@@ -1,0 +1,8 @@
+invoice_number,description,quantity,unit_price,line_total
+INV-2026-0042,Pumpun huolto,2,150.00,300.00
+INV-2026-0042,Tiivistesarja,5,18.90,94.50
+INV-2026-0042,Matkakulut,1,45.00,45.00
+INV-2026-0107,Safety gloves (box),10,25.00,250.00
+INV-2026-0107,Hard hat,8,125.00,1000.00
+INV-2026-0113,Suodatinpatruuna,4,32.50,130.00
+INV-2026-0113,Asennustyö,3,62.00,186.00

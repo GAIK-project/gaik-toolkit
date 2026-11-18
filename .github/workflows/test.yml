@@ -334,7 +334,8 @@ jobs:
         uv run python scripts/release_check.py --live --require-provider azure --version "${RELEASE_VERSION#v}"
 
     # The tag must also pass the component check (.claude/skills/component-check): the
-    # schema generator, extractor and vision extractor on synthetic invoices, on Azure.
+    # schema generator, extractor, vision extractor, RAG, tabular agent and vision parser
+    # on synthetic invoices, on Azure.
     # --public keeps provider error text out of the published summary.
     - name: Component check on Azure
       timeout-minutes: 20

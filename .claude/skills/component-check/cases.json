@@ -42,6 +42,65 @@
       "rubric": "A parent record with invoice_number and supplier, and a list called line_items whose items have description (text), quantity (integer), unit_price and line_total (numbers). The line items are not flattened into the parent."
     },
     {
+      "id": "schema-inventory-list",
+      "component": "schema_generator",
+      "title": "A document that is only a list of records (nested_list) with a choice field",
+      "requirements": "Extract every inventory item mentioned in the document and return them as a list called inventory_items. Use exactly these field names. For each item, return product_name (the product name, text), quantity (the quantity in stock, an integer), unit_price (the price of one unit, a decimal number) and category (one of: tools, spare_parts, consumables). Create a separate list entry for every distinct product.",
+      "expect": {
+        "structure_type": "nested_list",
+        "container": "inventory_items",
+        "fields": {
+          "product_name": ["str"],
+          "quantity": ["int"],
+          "unit_price": ["float", "decimal"],
+          "category": ["str"]
+        },
+        "exact_fields": true,
+        "enums": {"category": ["tools", "spare_parts", "consumables"]}
+      },
+      "rubric": "A list called inventory_items and nothing else at the top level: no header fields. Each item has exactly product_name (text), quantity (integer), unit_price (a number) and category limited to tools, spare_parts and consumables."
+    },
+    {
+      "id": "schema-meeting-two-lists",
+      "component": "schema_generator",
+      "title": "Meeting minutes: header fields and two separate child lists",
+      "requirements": "Extract structured information from meeting minutes. Use exactly these field names. Return meeting_title (the title of the meeting, text) and meeting_date (the date of the meeting, a date). Return a list called participants with one entry for each participant: name (the participant's name, text) and role (their role in the meeting, text). Also return a separate list called action_items with one entry for each action item: task (what is to be done, text), owner (the person responsible, text) and due_date (the deadline, a date).",
+      "expect": {
+        "structure_type": "parent_with_nested_list",
+        "fields": {
+          "meeting_title": ["str"],
+          "meeting_date": ["date"]
+        },
+        "exact_fields": true,
+        "children": {
+          "participants": {"name": ["str"], "role": ["str"]},
+          "action_items": {"task": ["str"], "owner": ["str"], "due_date": ["date"]}
+        }
+      },
+      "rubric": "A parent with exactly meeting_title (text) and meeting_date (date), and two separate lists: participants with name and role, and action_items with task, owner and due_date (a date). Neither list is merged into the other or flattened into the parent."
+    },
+    {
+      "id": "schema-field-rules",
+      "component": "schema_generator",
+      "title": "Flat schema with a boolean, a whole number, a DD.MM.YYYY date, a list of texts and a stated default",
+      "requirements": "Extract the following from a machine inspection report. Use exactly these field names:\n- machine_id (the machine's identifier, text)\n- has_defects (boolean: true if any defects were found, otherwise false)\n- defect_count (the number of defects found, a whole number)\n- inspection_date (the date of the inspection, in the format DD.MM.YYYY)\n- checked_parts (the parts that were checked, a list of texts)\n- inspector_comment (the inspector's comment, text; if no comment is given, return \"not given\")",
+      "expect": {
+        "structure_type": "flat",
+        "fields": {
+          "machine_id": ["str"],
+          "has_defects": ["bool"],
+          "defect_count": ["int"],
+          "inspection_date": ["date"],
+          "checked_parts": ["list[str]"],
+          "inspector_comment": ["str"]
+        },
+        "exact_fields": true,
+        "formats": {"inspection_date": "%d.%m.%Y"},
+        "defaults": {"inspector_comment": "not given"}
+      },
+      "rubric": "Six fields with exactly the requested names: has_defects a boolean, defect_count an integer, inspection_date a date written as DD.MM.YYYY, checked_parts a list of texts (not a nested list of records), and inspector_comment text whose stated default is \"not given\"."
+    },
+    {
       "id": "extract-invoice-text",
       "component": "extractor",
       "title": "Text extraction from a Finnish invoice (Finnish date and decimal comma)",
@@ -160,6 +219,38 @@
         ]
       },
       "rubric": "Three line items read from the page, same as the text case."
+    },
+    {
+      "id": "rag-invoice-total",
+      "component": "rag",
+      "title": "RAG over both invoices answers from the right one and cites it",
+      "documents": ["fixtures/invoice-fi.txt", "fixtures/invoice-en.txt"],
+      "question": "What is the total including VAT of invoice INV-2026-0042?",
+      "expect": {
+        "answer_contains": [["551,57", "551.57"]],
+        "cited_document": "fixtures/invoice-fi.txt"
+      },
+      "rubric": "The answer gives 551,57 EUR, the Finnish invoice's total including VAT, not its net 439,50, its VAT 112,07 or the English invoice's 1,250.00. It cites invoice-fi.txt in the form [document_name, page X] and cites no document it did not use."
+    },
+    {
+      "id": "tabular-invoice-lines",
+      "component": "tabular_agent",
+      "title": "The tabular agent sums one invoice's lines in a CSV",
+      "files": ["fixtures/invoice-lines.csv"],
+      "question": "What is the sum of line_total for invoice INV-2026-0042?",
+      "expect": {"number": 439.5},
+      "rubric": "The SQL keeps the three lines of INV-2026-0042 and sums their line_total (300.00 + 94.50 + 45.00 = 439.50); the other invoices' lines are not counted. The answer states 439.50."
+    },
+    {
+      "id": "parse-invoice-pdf",
+      "component": "vision_parser",
+      "title": "The vision parser turns the PDF invoice into markdown",
+      "files": ["fixtures/invoice-fi.pdf"],
+      "source_text": "fixtures/invoice-fi.txt",
+      "expect": {
+        "contains": ["INV-2026-0042", "Esimerkki Oy", "Tiivistesarja", ["551,57", "551.57"]]
+      },
+      "rubric": "Markdown that keeps the page's text: the invoice number INV-2026-0042 (the fixed check reads a typographic dash as a hyphen; report one as a defect), the supplier Esimerkki Oy, the three line items with their quantities and prices (a table is fine), and the totals 439,50, 112,07 and 551,57. Nothing is invented or left out."
     }
   ]
 }

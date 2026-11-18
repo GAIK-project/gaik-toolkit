@@ -1,5 +1,7 @@
-"""Run gaik's schema generator, extractor and vision extractor on synthetic cases, per provider.
+"""Run gaik's components on synthetic cases, per provider.
 
+Covered: the schema generator, the extractor, the vision extractor, RAG (embedder, in-memory
+vector store, retriever and answer generator), the tabular agent and the vision parser.
 The components call each provider's API with the keys in the environment (or --env-file).
 The optional judge (--judge claude|codex|agy) is a local CLI on its own subscription login:
 every API key is removed from the judge's environment, so a judge call is never billed to
@@ -34,8 +36,20 @@ ROOT = SKILL_DIR.parents[2]
 DEFAULT_CASES = SKILL_DIR / "cases.json"
 
 PROVIDERS = ("azure", "openai", "google", "vertex", "aitta", "anthropic", "anthropic_foundry")
-COMPONENTS = ("schema_generator", "extractor", "vision_extractor")
+COMPONENTS = (
+    "schema_generator",
+    "extractor",
+    "vision_extractor",
+    "rag",
+    "tabular_agent",
+    "vision_parser",
+)
+# The components whose cases extract with the schema a schema_generator case made.
+SCHEMA_CONSUMERS = ("extractor", "vision_extractor")
 STATUSES = ("pass", "fail", "error", "skip")
+
+# Providers whose API has no embeddings, so a RAG case cannot run on them.
+NO_EMBEDDINGS = ("anthropic", "anthropic_foundry")
 
 # Values whose names look like credentials are redacted from every error the run records.
 SECRET_NAME = re.compile(r"(API_KEY|_TOKEN|TOKEN$|SECRET|PASSWORD|CREDENTIALS|SERVICE_ACCOUNT)")
@@ -145,6 +159,27 @@ def model_for(provider: str, overrides: dict[str, str], environ: dict[str, str])
 
 def vision_model_for(provider: str, model: str | None, environ: dict[str, str]) -> str | None:
     return environ.get(f"CHECK_{provider.upper()}_VISION_MODEL", "").strip() or model
+
+
+def embedding_model_for(provider: str, environ: dict[str, str]) -> str | None:
+    """CHECK_<P>_EMBEDDING_MODEL, then RELEASE_<P>_EMBEDDING_MODEL; None lets gaik choose."""
+    upper = provider.upper()
+    for name in (f"CHECK_{upper}_EMBEDDING_MODEL", f"RELEASE_{upper}_EMBEDDING_MODEL"):
+        if environ.get(name, "").strip():
+            return environ[name].strip()
+    return None
+
+
+def rag_skip_reason(provider: str, config: dict, embedding_model: str | None) -> str | None:
+    """Why a RAG case cannot run on this provider, or None when it can."""
+    if provider in NO_EMBEDDINGS:
+        return f"{provider} has no embeddings API, so gaik's Embedder cannot run on it"
+    if not (embedding_model or config.get("embedding_model")):
+        return (
+            f"gaik has no default embedding model for {provider}: "
+            f"set CHECK_{provider.upper()}_EMBEDDING_MODEL"
+        )
+    return None
 
 
 def parse_model_overrides(values: list[str]) -> dict[str, str]:
@@ -303,13 +338,160 @@ def check_extraction(expect: dict, data: Any) -> list[str]:
     return problems
 
 
+# A number as a sentence writes it: 439.50, 439,50, 1,250.00 or 1 250,00. A comma or a
+# point must be followed by a digit, so "2, 5 and 1" gives three numbers. Digits in a
+# word or a code (INV-2026-0042, line_2) are not a number.
+_NUMBER_TOKEN = re.compile(
+    r"(?<![\w-])(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)(?![\w-])"
+)
+
+
+def number_tokens(text: str) -> list[str]:
+    """The numbers written in a text, as they are written."""
+    return _NUMBER_TOKEN.findall(text or "")
+
+
+# The typographic dashes (U+2010 to U+2015) and the minus sign (U+2212), read as a hyphen.
+_DASHES = str.maketrans(dict.fromkeys([*range(0x2010, 0x2016), 0x2212], "-"))
+
+
+def _plain_text(value: str) -> str:
+    return _text(value).translate(_DASHES)
+
+
+def check_contains(wanted: list, text: str, where: str) -> list[str]:
+    """Each wanted string, or one of a list of alternatives, is in ``text``.
+
+    Both sides are compared after normalising case and spaces, as compare_value does, and
+    with a typographic dash read as a hyphen: a model writing markdown has set the hyphens
+    of INV-2026-0042 as en dashes, every letter and digit right. A wrong or missing letter
+    or digit still fails.
+    """
+    have = _plain_text(text or "")
+    problems = []
+    for item in wanted:
+        options = [item] if isinstance(item, str) else list(item)
+        if not any(_plain_text(option) in have for option in options):
+            problems.append(f"{where} has no {' or '.join(repr(o) for o in options)}")
+    return problems
+
+
+# ---------------------------------------------------------------------------
+# RAG, the tabular agent and the vision parser
+# ---------------------------------------------------------------------------
+
+_BRACKET = re.compile(r"\[([^\[\]]+)\]")
+_PAGE = re.compile(r"\bpage\b\s*:?\s*([0-9]+|unknown)", re.IGNORECASE)
+
+
+def parse_citations(answer: str) -> list[dict]:
+    """The citations in an answer, in the form gaik's AnswerGenerator asks for.
+
+    That form is ``[document_name, page X]`` (also read: ``[Document: name, Page: X]``
+    and several citations in one bracket separated by ``;``). A bracket without a page
+    is not a citation in that form.
+    """
+    found = []
+    for group in _BRACKET.findall(answer or ""):
+        for part in group.split(";"):
+            page = _PAGE.search(part)
+            if not page:
+                continue
+            name = re.sub(r"^\s*document\s*:\s*", "", part.split(",")[0], flags=re.IGNORECASE)
+            found.append(
+                {
+                    "text": part.strip(),
+                    "document_name": name.strip().strip("'\"`*"),
+                    "page": page.group(1).lower(),
+                }
+            )
+    return found
+
+
+def resolve_citations(citations: list[dict], retrieved: list[dict]) -> list[dict]:
+    """Each citation with the source of the retrieved chunk it names (None if none).
+
+    A citation names a chunk when its document name is the chunk's ``document_name``
+    and its page is the chunk's page (a page of ``unknown`` matches any page).
+    """
+    resolved = []
+    for citation in citations:
+        source = None
+        for chunk in retrieved:
+            same_name = _text(citation["document_name"]) == _text(chunk.get("document_name", ""))
+            page = citation["page"]
+            if same_name and (page == "unknown" or page == str(chunk.get("page_number"))):
+                source = chunk.get("source")
+                break
+        resolved.append({**citation, "source": source})
+    return resolved
+
+
+def check_rag(expect: dict, output: dict) -> list[str]:
+    """Problems with a RAG answer: its content, the retrieval and its citations.
+
+    The citations are read from the answer in gaik's citation form and resolved against
+    the chunks the retriever returned (with their metadata), not matched as free text.
+    """
+    answer = output.get("answer") or ""
+    problems = check_contains(expect.get("answer_contains", []), answer, "the answer")
+    wanted = expect.get("cited_document")
+    if not wanted:
+        return problems
+    retrieved = output.get("retrieved", [])
+    if not any(chunk.get("source") == wanted for chunk in retrieved):
+        got = [chunk.get("source") for chunk in retrieved]
+        problems.append(f"the retriever did not return {wanted} (got {got})")
+    citations = resolve_citations(parse_citations(answer), retrieved)
+    if not citations:
+        problems.append("the answer has no citation in the form [document_name, page X]")
+    elif not any(c["source"] == wanted for c in citations):
+        problems.append(
+            f"no citation resolves to {wanted} (cited: {[c['text'] for c in citations]})"
+        )
+    unresolved = [c["text"] for c in citations if c["source"] is None]
+    if unresolved:
+        problems.append(f"citation(s) naming no retrieved chunk: {unresolved}")
+    return problems
+
+
+def check_tabular(expect: dict, output: dict) -> list[str]:
+    """Problems with a tabular agent's answer: its query result and the number it states."""
+    problems = []
+    if not output.get("succeeded"):
+        problems.append(
+            f"the query failed after {output.get('attempts')} attempt(s): {output.get('error')}"
+        )
+    wanted = expect["number"]
+    rows = output.get("rows") or []
+    values = [value for row in rows for value in row.values()]
+    if not any(compare_value(wanted, value)[0] for value in values):
+        problems.append(f"the query result holds no {wanted!r} (rows: {rows[:5]})")
+    answer = output.get("answer") or ""
+    if not any(compare_value(wanted, token)[0] for token in number_tokens(answer)):
+        problems.append(f"the answer states no {wanted!r}: {answer[:300]!r}")
+    return problems
+
+
+def check_markdown(expect: dict, output: dict) -> list[str]:
+    """Problems with a parser's markdown: the strings it must hold."""
+    return check_contains(expect.get("contains", []), output.get("markdown") or "", "the markdown")
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
 
 
-def describe_requirements(requirements: Any, structure_type: str) -> dict:
-    """Field names, types and enums of generated requirements, flat or nested."""
+def describe_requirements(
+    requirements: Any, structure_type: str, container: str | None = None
+) -> dict:
+    """Field names, types, enums, formats and defaults of generated requirements.
+
+    ``container`` is the name of the list a ``nested_list`` schema puts its records in
+    (gaik's ``StructureAnalysis.parent_container_name``); the requirements of such a
+    schema are the fields of one record.
+    """
 
     def fields_of(spec) -> dict:
         return {
@@ -317,6 +499,9 @@ def describe_requirements(requirements: Any, structure_type: str) -> dict:
                 "type": f.field_type,
                 "enum": f.enum,
                 "format": f.format,
+                "default": f.default,
+                "has_explicit_default": f.has_explicit_default,
+                "nullable": f.nullable,
                 "description": f.description,
             }
             for f in spec.fields
@@ -331,7 +516,19 @@ def describe_requirements(requirements: Any, structure_type: str) -> dict:
                 for child in requirements.children
             },
         }
-    return {"structure_type": structure_type, "fields": fields_of(requirements), "children": {}}
+    observed = {"structure_type": structure_type, "fields": fields_of(requirements), "children": {}}
+    if structure_type == "nested_list":
+        observed["container"] = container
+    return observed
+
+
+def expected_children(expect: dict) -> dict[str, dict]:
+    """The child lists a schema case expects: ``children``, or one ``child_container``."""
+    if "children" in expect:
+        return expect["children"]
+    if "child_container" in expect:
+        return {expect["child_container"]: expect.get("child_fields", {})}
+    return {}
 
 
 def _check_fields(wanted: dict, observed: dict, where: str, exact: bool) -> list[str]:
@@ -361,15 +558,32 @@ def check_schema(expect: dict, observed: dict) -> list[str]:
         got = (observed["fields"].get(name) or {}).get("enum") or []
         if sorted(v.upper() for v in got) != sorted(v.upper() for v in values):
             problems.append(f"fields.{name}: enum {got}, expected {values}")
-    if "child_container" in expect:
-        container = expect["child_container"]
-        children = observed["children"]
+    for name, wanted in expect.get("formats", {}).items():
+        got = (observed["fields"].get(name) or {}).get("format")
+        if got != wanted:
+            problems.append(f"fields.{name}: format {got!r}, expected {wanted!r}")
+    for name, wanted in expect.get("defaults", {}).items():
+        spec = observed["fields"].get(name) or {}
+        if not spec.get("has_explicit_default"):
+            problems.append(f"fields.{name}: no explicit default, expected {wanted!r}")
+        elif not compare_value(wanted, spec.get("default"))[0]:
+            problems.append(f"fields.{name}: default {spec.get('default')!r}, expected {wanted!r}")
+    if "container" in expect and observed.get("container") != expect["container"]:
+        problems.append(
+            f"records listed under {observed.get('container')!r}, not {expect['container']!r}"
+        )
+    children = observed["children"]
+    # A case that lists its children with ``children`` gets them exactly when exact_fields.
+    exact_children = "children" in expect and expect.get("exact_fields", False)
+    for container, fields in expected_children(expect).items():
         if container not in children:
             problems.append(f"no child list {container!r} (got {', '.join(children) or 'none'})")
         else:
-            problems += _check_fields(
-                expect.get("child_fields", {}), children[container], container, False
-            )
+            problems += _check_fields(fields, children[container], container, exact_children)
+    if exact_children:
+        extra = sorted(set(children) - set(expect["children"]))
+        if extra:
+            problems.append(f"unexpected child list(s) {extra}")
     return problems
 
 
@@ -405,29 +619,51 @@ def _enum_values(root: dict, node: dict) -> list[str]:
     return found
 
 
+def _list_item_properties(root: dict, properties: dict, container: str) -> dict | None:
+    """The properties of one item of the list ``container``, or None if it is no list."""
+    node = _resolve(root, properties.get(container, {}))
+    if node.get("type") != "array":
+        return None
+    return _resolve(root, node.get("items", {})).get("properties", {})
+
+
 def check_model(expect: dict, json_schema: dict) -> list[str]:
-    """Problems with the generated model itself: its field names, enums and nested list."""
+    """Problems with the generated model itself: its field names, enums, defaults and lists.
+
+    For a ``nested_list`` case (``container`` in expect) the fields are those of one item
+    of that list, which is the model's only property.
+    """
     problems = []
     properties = _resolve(json_schema, json_schema).get("properties", {})
+    where = "model"
+    if "container" in expect:
+        container = expect["container"]
+        item = _list_item_properties(json_schema, properties, container)
+        if item is None:
+            return [f"model: {container!r} is not a list (got {', '.join(properties)})"]
+        properties, where = item, f"model.{container}"
     for name in expect.get("fields", {}):
         if name not in properties:
-            problems.append(f"model: no property {name!r} (got {', '.join(properties)})")
+            problems.append(f"{where}: no property {name!r} (got {', '.join(properties)})")
     for name, values in expect.get("enums", {}).items():
         if name in properties:
             # gaik adds an empty value to an enum the model may leave unanswered.
             got = [v for v in _enum_values(json_schema, properties[name]) if v != ""]
             if sorted(v.upper() for v in got) != sorted(v.upper() for v in values):
-                problems.append(f"model.{name}: allows {got}, expected {values}")
-    container = expect.get("child_container")
-    if container:
-        node = _resolve(json_schema, properties.get(container, {}))
-        if node.get("type") != "array":
+                problems.append(f"{where}.{name}: allows {got}, expected {values}")
+    for name, wanted in expect.get("defaults", {}).items():
+        if name in properties:
+            got = properties[name].get("default")
+            if not compare_value(wanted, got)[0]:
+                problems.append(f"{where}.{name}: default {got!r}, expected {wanted!r}")
+    for container, fields in expected_children(expect).items():
+        item = _list_item_properties(json_schema, properties, container)
+        if item is None:
             problems.append(f"model: {container!r} is not a list")
-        else:
-            item = _resolve(json_schema, node.get("items", {}))
-            for name in expect.get("child_fields", {}):
-                if name not in item.get("properties", {}):
-                    problems.append(f"model.{container}: no property {name!r}")
+            continue
+        for name in fields:
+            if name not in item:
+                problems.append(f"model.{container}: no property {name!r}")
     return problems
 
 
@@ -441,6 +677,89 @@ def _usage(usage: Any) -> dict | None:
         return None
     names = ("input_tokens", "output_tokens", "thinking_tokens", "total_tokens", "cost_usd")
     return {n: getattr(usage, n) for n in names if getattr(usage, n, None) is not None}
+
+
+_USAGE_NAMES = {"prompt_tokens": "input_tokens", "completion_tokens": "output_tokens"}
+_USAGE_KEPT = ("input_tokens", "output_tokens", "thinking_tokens", "total_tokens")
+
+
+def usage_counts(usage: Any) -> dict[str, int]:
+    """Token counts, by the names ``_usage`` gives, from an OpenAI response's ``usage``
+    or a gaik usage dict (``prompt_tokens``/``completion_tokens``)."""
+    if usage is None:
+        return {}
+    if hasattr(usage, "model_dump"):
+        usage = usage.model_dump()
+    if not isinstance(usage, dict):
+        return {}
+    counts: dict[str, int] = {}
+    for key, value in usage.items():
+        name = _USAGE_NAMES.get(key, key)
+        if name in _USAGE_KEPT and isinstance(value, int) and not isinstance(value, bool):
+            counts[name] = counts.get(name, 0) + value
+    reasoning = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+    if isinstance(reasoning, int) and reasoning:
+        counts["thinking_tokens"] = counts.get("thinking_tokens", 0) + reasoning
+    return counts
+
+
+class UsageTap:
+    """The token counts of the calls a component makes through its own client.
+
+    gaik's Embedder, AnswerGenerator and TabularAgent return no usage. A gaik
+    ProviderClient counts its calls itself (``usage``); for a raw OpenAI or Azure client
+    the tap wraps that one instance's chat, parse and embeddings calls and adds up each
+    response's ``usage``. Nothing else is changed, and a client in another thread (another
+    provider) is never touched.
+    """
+
+    _CALLS = (
+        ("chat", "completions", "create"),
+        ("chat", "completions", "parse"),
+        ("beta", "chat", "completions", "parse"),
+        ("embeddings", "create"),
+    )
+
+    def __init__(self) -> None:
+        self._totals: dict[str, int] = {}
+        self._counters: list[tuple[Any, dict]] = []
+        self._lock = threading.Lock()
+
+    def watch(self, client: Any) -> None:
+        counter = getattr(client, "usage", None)
+        if hasattr(counter, "snapshot"):
+            self._counters.append((counter, counter.snapshot()))
+            return
+        for path in self._CALLS:
+            owner = client
+            try:
+                for name in path[:-1]:
+                    owner = getattr(owner, name)
+                call = getattr(owner, path[-1])
+            except AttributeError:
+                continue
+            setattr(owner, path[-1], self._counted(call))
+
+    def _counted(self, call):
+        def counted(*args, **kwargs):
+            response = call(*args, **kwargs)
+            self._add(usage_counts(getattr(response, "usage", None)))
+            return response
+
+        return counted
+
+    def _add(self, counts: dict[str, int]) -> None:
+        with self._lock:
+            for name, value in counts.items():
+                self._totals[name] = self._totals.get(name, 0) + value
+
+    def result(self) -> dict | None:
+        for counter, before in self._counters:
+            after = counter.snapshot()
+            self._add(usage_counts({k: v - before.get(k, 0) for k, v in after.items()}))
+        self._counters = []
+        with self._lock:
+            return dict(self._totals) or None
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -492,10 +811,12 @@ def run_provider(
             },
         }
 
+    embedding_model = embedding_model_for(provider, environ)
     info = {
         "provider": provider,
         "model": config.get("model"),
         "vision_model": vision_config.get("model"),
+        "embedding_model": embedding_model or config.get("embedding_model") or None,
     }
     results: dict[str, dict] = {}
     if progress is not None:
@@ -520,6 +841,26 @@ def run_provider(
                 _write_json(case_dir / "json_schema.json", output["json_schema"])
                 _write_json(case_dir / "structure.json", output["structure"])
                 entry["usage"] = output.get("usage")
+            elif case["component"] not in SCHEMA_CONSUMERS:
+                if case["component"] == "rag":
+                    reason = rag_skip_reason(provider, config, embedding_model)
+                    if reason:
+                        entry.update(status="skip", reason=reason)
+                        _write_json(case_dir / "checks.json", entry)
+                        results[case["id"]] = entry
+                        say(f"[{provider}] {case['id']}: skip ({reason})")
+                        continue
+                    data, usage = _run_rag(case, config, embedding_model)
+                    entry["problems"] = check_rag(case.get("expect", {}), data)
+                elif case["component"] == "tabular_agent":
+                    data, usage = _run_tabular(case, config)
+                    entry["problems"] = check_tabular(case.get("expect", {}), data)
+                else:
+                    data, usage = _run_vision_parser(case, vision_config)
+                    entry["problems"] = check_markdown(case.get("expect", {}), data)
+                _write_json(case_dir / "result.json", data)
+                entry["output"] = data
+                entry["usage"] = usage
             else:
                 parent = schemas.get(case.get("schema_from", ""))
                 if parent is None:
@@ -594,21 +935,29 @@ def _run_schema(case: dict, config: dict, reuse: Path | None) -> dict:
             requirements = ExtractionRequirements.model_validate(raw)
             schema = create_extraction_model(requirements)
         structure = raw.get("structure_type") or saved_structure.get("structure_type", "flat")
+        container = None
         usage = None
     else:
         generator = SchemaGenerator(config)
         result = generator.generate_schema_with_usage(case["requirements"])
         schema, requirements = result.schema, result.requirements
         structure = result.structure_analysis.structure_type
+        # A nested_list schema is one list of records; this is the list's field name.
+        container = (
+            result.structure_analysis.parent_container_name if structure == "nested_list" else None
+        )
         usage = _usage(result.usage)
+    saved = {"structure_type": structure}
+    if container is not None:
+        saved["parent_container_name"] = container
     return {
         "schema": schema,
         "requirements": requirements,
         "user_requirements": case["requirements"],
         "requirements_json": requirements.model_dump(mode="json"),
         "json_schema": schema.model_json_schema(),
-        "observed": describe_requirements(requirements, structure),
-        "structure": {"structure_type": structure},
+        "observed": describe_requirements(requirements, structure, container),
+        "structure": saved,
         "usage": usage,
     }
 
@@ -639,6 +988,94 @@ def _run_vision(case: dict, config: dict, parent: dict) -> tuple[Any, dict | Non
         requirements=parent["requirements"],
     )
     return result.data, _usage(result.usage)
+
+
+def _run_rag(case: dict, config: dict, embedding_model: str | None) -> tuple[dict, dict | None]:
+    """Index the case's documents in memory and answer its question with citations.
+
+    No parser: each document is one chunk (a fixture is one page), with the metadata
+    gaik's answer generator builds its citations from.
+    """
+    from gaik.software_components.RAG.answer_generator import AnswerGenerator
+    from gaik.software_components.RAG.embedder import Embedder
+    from gaik.software_components.RAG.retriever import Retriever
+    from gaik.software_components.RAG.vector_store import VectorStore
+    from langchain_core.documents import Document
+
+    chunks = [
+        Document(
+            page_content=_read(path),
+            metadata={
+                "document_name": Path(path).name,
+                "page_number": 1,
+                "chunk_id": 0,
+                "source": path,
+            },
+        )
+        for path in case["documents"]
+    ]
+    tap = UsageTap()
+    embedder = Embedder(config, model=embedding_model)
+    tap.watch(embedder.client)
+    store = VectorStore()
+    vectors, documents = embedder.embed(chunks)
+    store.add(documents, vectors)
+    retriever = Retriever(embedder=embedder, vector_store=store, top_k=case.get("top_k", 5))
+    found = retriever.search(case["question"], include_scores=True)
+    generator = AnswerGenerator(config=config, citations=True, stream=False)
+    tap.watch(generator.client)
+    answer = generator.generate(case["question"], found)
+    retrieved = [
+        {
+            "document_name": doc.metadata.get("document_name"),
+            "page_number": doc.metadata.get("page_number"),
+            "source": doc.metadata.get("source"),
+            "score": round(float(doc.metadata.get("relevance_score", 0.0)), 4),
+        }
+        for doc in found
+    ]
+    output = {
+        "question": case["question"],
+        "embedding_model": embedder.model,
+        "answer": answer,
+        "retrieved": retrieved,
+        "citations": resolve_citations(parse_citations(answer), retrieved),
+    }
+    return output, tap.result()
+
+
+def _run_tabular(case: dict, config: dict) -> tuple[dict, dict | None]:
+    from gaik.software_components.tabular_agent import TabularAgent
+
+    tap = UsageTap()
+    with TabularAgent([SKILL_DIR / p for p in case["files"]], config=config) as agent:
+        # The agent builds its client on first use; this is the one its calls go through.
+        tap.watch(agent._get_llm_client())
+        result = agent.ask(case["question"])
+        tables = agent.table_names
+    query = result.query_result
+    output = {
+        "question": case["question"],
+        "tables": tables,
+        "answer": result.answer,
+        "sql": query.sql,
+        "rows": query.rows,
+        "succeeded": query.succeeded,
+        "attempts": query.attempts,
+        "error": query.error,
+    }
+    return output, tap.result()
+
+
+def _run_vision_parser(case: dict, config: dict) -> tuple[dict, dict | None]:
+    from gaik.software_components.parsers.vision import VisionParser
+
+    parser = VisionParser(config)
+    pages: list[str] = []
+    for path in case["files"]:
+        pages += parser.convert_pdf(str(SKILL_DIR / path))
+    output = {"pages": len(pages), "markdown": "\n\n".join(pages)}
+    return output, usage_counts(parser.usage.snapshot()) or None
 
 
 # ---------------------------------------------------------------------------
@@ -704,22 +1141,55 @@ def check_judge_login(kind: str) -> None:
         raise SystemExit(f"--judge {kind}: {problem}; no judge call would be a subscription call")
 
 
+_EXTRACTION_DEFECTS = "wrong or invented value, missing or extra field, wrong type or order"
+
+# Per component: what the judge is told it checks, and the defects to look for.
+JUDGE_SUBJECTS = {
+    "schema_generator": ("a document-extraction component", _EXTRACTION_DEFECTS),
+    "extractor": ("a document-extraction component", _EXTRACTION_DEFECTS),
+    "vision_extractor": ("a document-extraction component", _EXTRACTION_DEFECTS),
+    "rag": (
+        "a retrieval-augmented question-answering pipeline (embedder, vector store, "
+        "retriever and answer generator)",
+        "wrong or invented value, an answer the documents do not support, a citation to "
+        "the wrong document or to none",
+    ),
+    "tabular_agent": (
+        "a text-to-SQL agent that answers a question about a CSV file",
+        "wrong number, SQL that does not answer the question, an answer the query rows "
+        "do not support",
+    ),
+    "vision_parser": (
+        "a parser that turns a PDF page image into markdown",
+        "misread, missing or invented text, a lost or merged table row or column",
+    ),
+}
+
+
+def _texts(paths: list[str]) -> str:
+    return "\n\n".join(f"--- {p} ---\n{_read(p)}" for p in paths if p)
+
+
 def judge_prompt(case: dict, entry: dict) -> str:
-    if case["component"] == "schema_generator":
+    component = case["component"]
+    output = entry.get("output")
+    if component == "schema_generator":
         given = f"Task given to the schema generator:\n{case['requirements']}"
         output = entry.get("observed")
+    elif component == "rag":
+        given = f"Documents indexed:\n{_texts(case['documents'])}\n\nQuestion: {case['question']}"
+    elif component == "tabular_agent":
+        given = f"Files loaded:\n{_texts(case['files'])}\n\nQuestion: {case['question']}"
     else:
         paths = case.get("documents") or [case.get("source_text")]
-        texts = "\n\n".join(f"--- {p} ---\n{_read(p)}" for p in paths if p)
         label = "Documents" if case.get("documents") else "Text the page image was rendered from"
-        given = f"{label}:\n{texts}"
-        output = entry.get("output")
+        given = f"{label}:\n{_texts(paths)}"
+    subject, defects = JUDGE_SUBJECTS[component]
     return (
-        "You check one output of a document-extraction component against its input. "
+        f"You check one output of {subject} against its input. "
         "All data here is synthetic. Do not use tools; answer only with JSON matching the "
-        "schema: verdict pass or fail, problems as a list of concrete defects (wrong or "
-        "invented value, missing or extra field, wrong type or order), notes as one sentence. "
-        "Write in English.\n\n"
+        f"schema: verdict pass or fail, problems as a list of concrete defects ({defects}), "
+        "notes as one sentence. Write in English.\n\n"
         f"Case: {case.get('title', case['id'])}\n\n{given}\n\n"
         f"What a correct output does: {case.get('rubric', '')}\n\n"
         f"Component output:\n{json.dumps(output, ensure_ascii=False, indent=2, default=str)}\n\n"
@@ -872,17 +1342,27 @@ def diff_baseline(current: dict, baseline: dict) -> list[str]:
 
 
 def _contract(observed: dict) -> Any:
-    """A generated schema's names, types, enums, formats and structure, without descriptions."""
+    """A generated schema's names, types, enums, formats, defaults and structure.
+
+    Descriptions are left out (their wording varies), and so is an unset value (None or
+    False), so a run that records more about a field than an older one does not differ
+    from it on that account.
+    """
 
     def strip(fields: dict) -> dict:
         return {
-            name: {k: v for k, v in spec.items() if k != "description"}
+            name: {
+                k: v
+                for k, v in spec.items()
+                if k != "description" and v is not None and v is not False
+            }
             for name, spec in fields.items()
         }
 
     return _plain(
         {
             "structure_type": observed.get("structure_type"),
+            "container": observed.get("container"),
             "fields": strip(observed.get("fields", {})),
             "children": {k: strip(v) for k, v in observed.get("children", {}).items()},
         }
@@ -898,8 +1378,8 @@ def render_summary(summary: dict) -> str:
         f"{summary['git_commit']}{' (uncommitted changes)' if summary['git_dirty'] else ''}.",
         f"Judge: {summary['judge'] or 'none'}.",
         "",
-        "| Provider | Model | Vision model | Note |",
-        "| --- | --- | --- | --- |",
+        "| Provider | Model | Vision model | Embedding model | Note |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for name, result in summary["providers"].items():
         note = ""
@@ -908,7 +1388,8 @@ def render_summary(summary: dict) -> str:
         elif result.get("timed_out"):
             note = "stopped waiting (--provider-timeout); unfinished cases are errors"
         model, vision = result.get("model") or "-", result.get("vision_model") or "-"
-        lines.append(f"| {name} | {model} | {vision} | {note} |")
+        embedding = result.get("embedding_model") or "-"
+        lines.append(f"| {name} | {model} | {vision} | {embedding} | {note} |")
     lines += ["", "| Case | " + " | ".join(providers) + " |", "| --- |" + " --- |" * len(providers)]
     for case_id in summary["case_ids"]:
         cells = []
@@ -934,6 +1415,15 @@ def render_summary(summary: dict) -> str:
                     details.append(f"- judge error: {judge.get('error', '')[:300]}")
     if details:
         lines += ["", "## Failures"] + details
+    # The provider table already says which providers were not configured.
+    skipped = [
+        f"- {provider} / {case_id}: {entry.get('reason', '')}"
+        for provider in providers
+        for case_id, entry in summary["providers"][provider]["cases"].items()
+        if entry["status"] == "skip" and entry.get("reason") != "provider not configured"
+    ]
+    if skipped:
+        lines += ["", "## Skipped", ""] + skipped
     if summary.get("baseline_notes") is not None:
         lines += ["", f"## Against the baseline `{summary['baseline']}`", ""]
         lines += [f"- {n}" for n in summary["baseline_notes"]] or [
@@ -1042,7 +1532,7 @@ def check_cases(cases: list[dict]) -> list[dict]:
             raise SystemExit(f"case id {case['id']!r} appears twice")
         by_id[case["id"]] = case
     for case in cases:
-        if case["component"] == "schema_generator":
+        if case["component"] not in SCHEMA_CONSUMERS:
             continue
         parent = by_id.get(case.get("schema_from", ""))
         if parent is None or parent["component"] != "schema_generator":
