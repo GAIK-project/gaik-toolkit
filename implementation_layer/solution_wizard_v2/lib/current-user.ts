@@ -4,15 +4,24 @@
 // repeat the DEV_AUTH branching on every page.
 
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { DEV_AUTH, DEV_COOKIE, isAllowedUser } from "@/lib/auth";
 import { verifyDevSession } from "@/lib/dev-session";
+import { ACCESS_TOKEN_HEADER, proxyAuthEnabled, verifyAccessToken } from "@/lib/proxy-auth";
 
 export type CurrentUser = { email: string };
 
 // One lookup per request: the shell's layout and the page under it both ask.
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  // Proxy sign-in (lib/proxy-auth) comes first: an image built with the dev
+  // login on runs with it off when WIZARD_AUTH_MODE=proxy, and a dev cookie
+  // then signs nobody in.
+  if (proxyAuthEnabled()) {
+    const user = await verifyAccessToken((await headers()).get(ACCESS_TOKEN_HEADER));
+    return user ? { email: user.email } : null;
+  }
+
   if (DEV_AUTH) {
     const cookieStore = await cookies();
     const email = await verifyDevSession(cookieStore.get(DEV_COOKIE)?.value);

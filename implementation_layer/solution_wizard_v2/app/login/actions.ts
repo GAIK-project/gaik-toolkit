@@ -9,6 +9,12 @@ import { audit } from "@/lib/audit";
 import { DEV_SESSION_MAX_AGE_S, signDevSession, verifyDevSession } from "@/lib/dev-session";
 import { getIncomingTraceId } from "@/lib/request-context";
 import { accountKey, addressKey, clientAddress, devLoginCounter } from "@/lib/login-throttle";
+import {
+  ACCESS_TOKEN_HEADER,
+  proxyAuthEnabled,
+  proxySignOutUrl,
+  verifyAccessToken,
+} from "@/lib/proxy-auth";
 
 /** X-Forwarded-For of the sign-in request, or null outside a request scope. */
 async function forwardedFor(): Promise<string | null> {
@@ -76,6 +82,9 @@ async function devSignIn(formData: FormData) {
 }
 
 export async function login(formData: FormData) {
+  // Behind the sign-in proxy there is no password form: the proxy signed the
+  // user in before this page was reached.
+  if (proxyAuthEnabled()) redirect("/");
   if (DEV_AUTH) return devSignIn(formData);
 
   const email = formData.get("email") as string;
@@ -107,6 +116,12 @@ export async function login(formData: FormData) {
 
 export async function signOut() {
   const traceId = await getIncomingTraceId();
+  if (proxyAuthEnabled()) {
+    const user = await verifyAccessToken((await headers()).get(ACCESS_TOKEN_HEADER));
+    if (user) audit("auth.logout", { actor: user.email, outcome: "success", traceId, mode: "proxy" });
+    // The proxy clears its own cookie and then ends the Keycloak session.
+    redirect(proxySignOutUrl());
+  }
   if (DEV_AUTH) {
     const cookieStore = await cookies();
     const email = await verifyDevSession(cookieStore.get(DEV_COOKIE)?.value);
