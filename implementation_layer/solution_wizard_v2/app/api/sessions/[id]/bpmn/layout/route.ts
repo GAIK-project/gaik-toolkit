@@ -32,7 +32,7 @@ export const PUT = withLogging(
 
     return relayUpstream(
       () => apiPutBpmnLayout(id, read.body, { dataObjects }),
-      async () => new Response(null, { status: 204 }),
+      () => new Response(null, { status: 204 }),
       { event: "bpmn.layout.save", sessionId: id },
     );
   },

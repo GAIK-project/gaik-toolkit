@@ -82,6 +82,13 @@ describe("POST /sessions/[id]/blueprint/undo", () => {
     expect(body).toEqual({ id: "s1", step: 6, gate_statuses: {}, active_version: 5, blueprint: { name: "b", steps: [] } });
   });
 
+  it("answers 502 when a 2xx from wizard_api is not JSON", async () => {
+    vi.mocked(apiUndoBlueprint).mockResolvedValue(new Response("not json", { status: 200 }));
+    const res = await post({ base_version: 4 });
+    expect(res.status).toBe(502);
+    expect((await res.json()).detail.error).toBe("upstream_unreachable");
+  });
+
   it.each(["nothing_to_undo", "cannot_undo", "changed_elsewhere", "agent_busy"])(
     "passes a 409 %s through unchanged",
     async (code) => {

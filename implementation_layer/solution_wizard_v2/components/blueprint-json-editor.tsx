@@ -148,9 +148,9 @@ export function BlueprintJsonEditor({
   // The version the draft's next save by itself is made on: the page's, or the
   // one this form's last save wrote.
   const versionRef = useRef(baseVersion);
-  useEffect(() => {
-    versionRef.current = baseVersion;
-  }, [baseVersion]);
+  // A save refused because the server holds a newer version, waiting for the
+  // page to bring it (see `changed` below).
+  const refusedAsChanged = useRef(false);
   const [saved, setSaved] = useState(() => savedState(blueprint));
   const savedRef = useRef(saved);
   savedRef.current = saved;
@@ -177,6 +177,7 @@ export function BlueprintJsonEditor({
     newer.current = null;
     savedOverNewer.current = false;
     failedKey.current = null;
+    refusedAsChanged.current = false;
     setDraft(structuredClone(next));
     setJsonText(JSON.stringify(next, null, 2));
     if (!unsaved) setSaved(savedState(next));
@@ -293,6 +294,7 @@ export function BlueprintJsonEditor({
           // and the form asks which one stays, as when it arrives by itself.
           // This draft is not sent again by itself meanwhile.
           failedKey.current = key;
+          refusedAsChanged.current = true;
           setSaveState("idle");
           router.refresh();
           return;
@@ -301,6 +303,7 @@ export function BlueprintJsonEditor({
       if (!res.ok) throw new Error("save failed");
       const data = (await res.json()) as { blueprint: Blueprint; version?: number };
       failedKey.current = null;
+      refusedAsChanged.current = false;
       setSaveError(null);
       if (typeof data.version === "number") versionRef.current = data.version;
       // Only the user's choice ("keep mine") settles a newer version. One
@@ -380,6 +383,19 @@ export function BlueprintJsonEditor({
   // version the user has not chosen between yet.
   const flushNow = useRef(false);
   const [flushTick, setFlushTick] = useState(0);
+
+  // A new version from the page. After a save refused as made on an older
+  // version, the page brings the newer one: one with other content is a
+  // choice (`changedElsewhere`, set from the blueprint above, holds the save);
+  // one with the same content (a step forward writes one) leaves nothing to
+  // choose, so the draft goes out again on it instead of waiting for an edit.
+  useEffect(() => {
+    versionRef.current = baseVersion;
+    if (!refusedAsChanged.current) return;
+    refusedAsChanged.current = false;
+    failedKey.current = null;
+    setFlushTick((n) => n + 1);
+  }, [baseVersion]);
   useEffect(() => {
     const flush = flushNow.current;
     flushNow.current = false;

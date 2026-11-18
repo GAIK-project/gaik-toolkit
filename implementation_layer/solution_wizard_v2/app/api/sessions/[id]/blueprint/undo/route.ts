@@ -29,7 +29,7 @@ export const POST = withLogging(
 
     return relayUpstream(
       () => apiUndoBlueprint(id, read.body),
-      async (upstream) => Response.json(publicSession(await upstream.json()), { headers: NO_STORE }),
+      (body) => Response.json(publicSession(body), { headers: NO_STORE }),
       {
         event: "blueprint.undo",
         sessionId: id,

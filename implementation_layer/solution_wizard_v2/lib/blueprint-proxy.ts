@@ -64,13 +64,15 @@ export function publicSession(session: unknown): Record<string, unknown> | null 
 }
 
 /**
- * Calls wizard_api and answers with `onOk(upstream)` for a 2xx, the refusal
- * through lib/safe-error otherwise, and 502 when it does not answer.
- * `onDone` hears whether the call succeeded, was refused (4xx) or failed.
+ * Calls wizard_api and answers with `onOk(body)` for a 2xx (its JSON body;
+ * null for a 204), the refusal through lib/safe-error otherwise, and 502 when
+ * it does not answer or answers a 2xx that is not JSON (nothing of that body
+ * is passed on). `onDone` hears whether the call succeeded, was refused (4xx)
+ * or failed.
  */
 export async function relayUpstream(
   call: () => Promise<Response>,
-  onOk: (upstream: Response) => Promise<Response>,
+  onOk: (body: unknown) => Response,
   { event, sessionId, onDone }: {
     event: string;
     sessionId: string;
@@ -89,13 +91,23 @@ export async function relayUpstream(
     onDone?.(upstream.status < 500 ? "denied" : "error");
     return relayError(upstream);
   }
+  let body: unknown = null;
+  if (upstream.status !== 204) {
+    try {
+      body = JSON.parse(await upstream.text());
+    } catch (err) {
+      logger.error({ traceId: getTraceId(), err, sessionId, status: upstream.status }, `${event} answer is not JSON`);
+      onDone?.("error");
+      return unreachableResponse();
+    }
+  }
   onDone?.("success");
-  return onOk(upstream);
+  return onOk(body);
 }
 
 /** A 2xx edit answer `{session, warnings, needs_attention, bpmn_changed}` with the session trimmed. */
-export async function editResult(upstream: Response): Promise<Response> {
-  const data = (await upstream.json()) as Record<string, unknown>;
+export function editResult(body: unknown): Response {
+  const data = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   return Response.json(
     {
       session: publicSession(data.session),
@@ -108,8 +120,6 @@ export async function editResult(upstream: Response): Promise<Response> {
 }
 
 /** A 2xx JSON answer passed on as it came, uncached. */
-export async function passJson(upstream: Response): Promise<Response> {
-  return new Response(await upstream.text(), {
-    headers: { "Content-Type": "application/json", ...NO_STORE },
-  });
+export function passJson(body: unknown): Response {
+  return Response.json(body, { headers: NO_STORE });
 }

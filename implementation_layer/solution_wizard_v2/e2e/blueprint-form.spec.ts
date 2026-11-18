@@ -399,6 +399,36 @@ test.describe("Blueprint form", () => {
     await expect(page.getByTestId("solution-plan-view")).toContainText("Shorter handling time");
   });
 
+  test("saves again by itself after a refusal over a newer version with the same content", async ({ page }) => {
+    // A version written since the form read the blueprint, with the same
+    // content (a step forward writes one): the save made on the older version
+    // is refused, the page reads the new one, and as nothing in the blueprint
+    // changed there is nothing to choose between: the draft goes out again on
+    // the version now shown, without a further edit.
+    await openForm(page, "ses_ui_basics");
+    await page.getByTestId("blueprint-json-toggle").click();
+    const current = JSON.parse(await page.getByTestId("blueprint-json-editor").inputValue()) as unknown;
+    await page.getByTestId("blueprint-json-toggle").click();
+    const same = await page.request.patch("/api/sessions/ses_ui_basics/blueprint", {
+      data: { content: current, note: "e2e: the same content, a new version" },
+    });
+    expect(same.status()).toBe(200);
+
+    const statuses: number[] = [];
+    page.on("response", (r) => {
+      if (/\/api\/sessions\/[^/]+\/blueprint$/.test(r.url()) && r.request().method() === "PATCH") {
+        statuses.push(r.status());
+      }
+    });
+    await page.getByTestId("blueprint-field-goal").fill("Shorter handling time");
+    await page.getByTestId("blueprint-field-name").focus();
+    await expect.poll(() => statuses, { timeout: 15_000 }).toEqual([409, 200]);
+    await expect(status(page)).toHaveText("Tallennettu");
+    await expect(page.getByTestId("blueprint-changed-elsewhere")).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId("solution-plan-view")).toContainText("Shorter handling time");
+  });
+
   test("a save made on an older version that reaches the server after a newer one is refused, and Ota uudempi keeps the newer one", async ({ page }) => {
     const { release, patches, warning } = await conflictDuringSave(page);
     // The held save started by itself on the version before the agent's: it

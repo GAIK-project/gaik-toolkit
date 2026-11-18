@@ -182,6 +182,19 @@ describe("POST /sessions/[id]/blueprint/operations", () => {
     expect(JSON.parse(text).detail).toMatchObject({ error: "internal_error", trace_id: TRACE });
   });
 
+  it("answers 502, audited as an error, when a 2xx from wizard_api is not JSON", async () => {
+    vi.mocked(apiPostOperations).mockResolvedValue(new Response("<html>proxy page</html>", { status: 200 }));
+
+    const res = await post(OPS);
+    const text = await res.text();
+
+    expect(res.status).toBe(502);
+    expect(text).not.toContain("proxy page");
+    expect(JSON.parse(text).detail.error).toBe("upstream_unreachable");
+    expect(audit).toHaveBeenCalledWith("blueprint.ops", expect.objectContaining({ outcome: "error" }));
+    expect(audit).not.toHaveBeenCalledWith("blueprint.ops", expect.objectContaining({ outcome: "success" }));
+  });
+
   it("answers 502 when wizard_api cannot be reached", async () => {
     vi.mocked(apiPostOperations).mockRejectedValue(new Error("connect ECONNREFUSED"));
 
