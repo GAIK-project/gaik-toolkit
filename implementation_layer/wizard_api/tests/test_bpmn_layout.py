@@ -589,3 +589,37 @@ def test_two_saves_at_once_keep_each_others_entries(
     first.join(5)
 
     assert set(_stored(db_session, sid)["full"]["shapes"]) == {"A", "B"}
+
+
+@requires_postgres
+def test_session_responses_leave_the_stored_layout_out(
+    client, db_session, busy, monkeypatch
+) -> None:
+    """The layout can grow to megabytes; the web app reads it only through GET /bpmn."""
+    created = _create(client)
+    sid = created["id"]
+    full = client.get(f"/sessions/{sid}/bpmn").text
+    task = _tasks(full)[0]
+    place = _in_own_lane(full, task, dx=70, dy=3)
+    assert _put(client, sid, {"shapes": {task: place}}).status_code == 204
+    monkeypatch.setattr(agent_service, "is_busy", lambda session_id: False)
+
+    detail = client.get(f"/sessions/{sid}").json()
+    listed = client.get("/sessions", params={"user_id": "ops-user"}).json()["sessions"]
+    patched = client.patch(f"/sessions/{sid}", json={"metadata": {"title": "Renamed"}})
+
+    assert "bpmn_layout" not in detail["metadata"]
+    assert detail["metadata"]["title"] == "Ops"
+    mine = [s for s in listed if s["id"] == sid]
+    assert mine and "bpmn_layout" not in mine[0]["metadata"]
+    assert patched.status_code == 200, patched.text
+    assert "bpmn_layout" not in patched.json()["metadata"]
+    # Still stored, and still applied to the drawing.
+    assert task in _stored(db_session, sid)["full"]["shapes"]
+    assert _bounds(client.get(f"/sessions/{sid}/bpmn").text)[task][:2] == (place["x"], place["y"])
+
+
+def test_the_responses_leave_out_the_key_the_layout_is_stored_under() -> None:
+    assert session_service.public_metadata({bpmn_layout.LAYOUT_KEY: {}, "title": "x"}) == {
+        "title": "x"
+    }

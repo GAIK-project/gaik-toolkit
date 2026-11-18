@@ -139,13 +139,24 @@ def _session_title(metadata: dict) -> str:
     return "Nimetön sessio"
 
 
+#: Metadata the server keeps for itself and leaves out of session responses:
+#: the diagram layout can grow to megabytes, and the web app reads it only
+#: through ``GET /bpmn``, which lays it over the drawing.
+_SERVER_ONLY_METADATA = frozenset({"bpmn_layout"})
+
+
+def public_metadata(metadata: dict | None) -> dict:
+    """``metadata`` without the keys only the server reads (``_SERVER_ONLY_METADATA``)."""
+    return {k: v for k, v in (metadata or {}).items() if k not in _SERVER_ONLY_METADATA}
+
+
 def _to_response(session: WizardSession) -> dict:
     return {
         "id": session.id,
         "user_id": session.user_id,
         "step": session.step,
         "gate_statuses": session.gate_statuses,
-        "metadata": session.session_metadata,
+        "metadata": public_metadata(session.session_metadata),
         "output_dir": session.output_dir,
         "active_version": session.active_version,
         "created_at": session.created_at,
@@ -292,7 +303,7 @@ def session_detail(
         step=session.step,
         status=_session_status(session.step, metadata),
         gate_statuses=session.gate_statuses,
-        metadata=metadata,
+        metadata=public_metadata(metadata),
         output_dir=session.output_dir,
         active_version=session.active_version,
         versions=[
