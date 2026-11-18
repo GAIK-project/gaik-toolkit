@@ -300,9 +300,20 @@ class _Lane:
 # ---------------------------------------------------------------------------
 
 
+#: The lane priority of the first extra lane (``generate_bpmn``'s
+#: ``extra_lane_ids``): after every other lane, in the participants' order.
+_EXTRA_LANE_PRIORITY = 10
+
+
 class _BpmnBuilder:
-    def __init__(self, blueprint: Blueprint, include_data_objects: bool = True):
+    def __init__(
+        self,
+        blueprint: Blueprint,
+        include_data_objects: bool = True,
+        extra_lane_ids: frozenset[str] = frozenset(),
+    ):
         self.bp = blueprint
+        self.extra_lane_ids = frozenset(extra_lane_ids)
         # Without data objects the per-row data band is not reserved, so every
         # row (and the minimum lane height) loses ROW_DATA_H.
         self.include_data_objects = include_data_objects
@@ -368,8 +379,16 @@ class _BpmnBuilder:
                 lid = f"Lane_{_safe(p.id)}"
                 if lid not in self.mapping:
                     self._map(lid, "lane", f"business_process.participants[{i}]")
-                return lid, p.name, self._participant_priority(p)
+                return lid, p.name, self._priority(p)
         return None
+
+    def _priority(self, p) -> int:
+        """A participant's lane order: an extra lane (``extra_lane_ids``) after
+        every other lane, in the participants' order; else by its role."""
+        if getattr(p, "id", None) in self.extra_lane_ids:
+            ids = [q.id for q in self.bp.business_process.participants]
+            return _EXTRA_LANE_PRIORITY + ids.index(p.id)
+        return self._participant_priority(p)
 
     @staticmethod
     def _participant_priority(p) -> int:
@@ -419,7 +438,7 @@ class _BpmnBuilder:
                 lid = f"Lane_{_safe(p.id)}"
                 if lid not in self.mapping:
                     self._map(lid, "lane", f"business_process.participants[{i}]")
-                return self._ensure_lane(lid, p.name, self._participant_priority(p))
+                return self._ensure_lane(lid, p.name, self._priority(p))
         if not self.bp.business_process.participants:
             # Derived lanes: a derived participant id names its lane.
             for category, (derived_id, _, _, _) in _DERIVED_LANES.items():
@@ -482,13 +501,16 @@ class _BpmnBuilder:
             self._map(nid, "manual_step", f"business_process.manual_steps[{i}]")
 
     def _build_participant_lanes(self) -> None:
-        """Every participant is a lane, also one no step is in yet: a lane the
-        user adds is drawn, so a step can be moved into it."""
+        """The extra lanes (``extra_lane_ids``) are drawn also while no step is
+        in them, so a step can be moved into a lane the user added. Other
+        participants are lanes only when a node reaches them."""
         for i, p in enumerate(self.bp.business_process.participants):
+            if p.id not in self.extra_lane_ids:
+                continue
             lid = f"Lane_{_safe(p.id)}"
             if lid not in self.mapping:
                 self._map(lid, "lane", f"business_process.participants[{i}]")
-            self._ensure_lane(lid, p.name, self._participant_priority(p))
+            self._ensure_lane(lid, p.name, self._priority(p))
 
     # -- base sequence-flow graph -----------------------------------------
 
@@ -1536,12 +1558,22 @@ def route_edge(
     return [(xs, int(sy + sh)), (xs, low), (xt, low), (xt, int(ty + th))]
 
 
-def generate_bpmn(blueprint: Blueprint, *, include_data_objects: bool = True) -> str:
+def generate_bpmn(
+    blueprint: Blueprint,
+    *,
+    include_data_objects: bool = True,
+    extra_lane_ids: frozenset[str] = frozenset(),
+) -> str:
     """Generate BPMN 2.0 XML from a blueprint.
 
     With ``include_data_objects=False`` the artifacts are left out (no data
     objects, no data associations to them) and the rows lose their data band,
     so the diagram is more compact. Data stores stay.
+
+    ``extra_lane_ids`` names participants drawn as lanes even when no node is
+    in them (lanes a user added in an editor). They come after every other
+    lane, in their order in ``participants``, so adding one moves no other
+    lane. Without it, a participant no node reaches is not drawn.
 
     Side effect: writes the element->blueprint id map to
     ``blueprint.visualizations["bpmn_mapping"]`` so the linkage is recorded in
@@ -1550,7 +1582,9 @@ def generate_bpmn(blueprint: Blueprint, *, include_data_objects: bool = True) ->
     if not blueprint.workflow.steps:
         # minimal valid empty diagram
         return _empty_bpmn()
-    builder = _BpmnBuilder(blueprint, include_data_objects=include_data_objects)
+    builder = _BpmnBuilder(
+        blueprint, include_data_objects=include_data_objects, extra_lane_ids=extra_lane_ids
+    )
     xml = builder.build()
     if not isinstance(blueprint.visualizations, dict):
         blueprint.visualizations = {}

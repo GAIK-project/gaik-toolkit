@@ -271,6 +271,7 @@ def _session_bpmn_view(
         "session_id": str(session_id),
         "agent_draft": artifact_sync.read_draft_blueprint(session.output_dir),
         "include_data_objects": bool(data_objects),
+        "extra_lane_ids": artifact_sync.user_lanes(session.session_metadata),
     }
     try:
         if with_mapping:
@@ -445,6 +446,7 @@ def _sync_bpmn_into_draft(
                 session_id=str(session.id),
                 agent_draft=draft,
                 include_data_objects=include_data_objects,
+                extra_lane_ids=artifact_sync.user_lanes(session.session_metadata),
             )
             before = bpmn_service.sync_blueprint_from_bpmn(view, drawn)
             after = bpmn_service.sync_blueprint_from_bpmn(view, xml)
@@ -1532,7 +1534,11 @@ async def chat(
         if session.step >= artifact_sync.STEP_BPMN or user_changed:
             blueprint = session_service.session_detail(db, session).blueprint.model_dump()
             view_written = await asyncio.to_thread(
-                _write_ui_view, blueprint, str(session_id), session.output_dir
+                _write_ui_view,
+                blueprint,
+                str(session_id),
+                session.output_dir,
+                artifact_sync.user_lanes(session.session_metadata),
             )
             if view_written and session.step >= artifact_sync.STEP_BPMN:
                 view_note = _UI_VIEW_NOTE
@@ -1888,7 +1894,12 @@ _UI_VIEW_NOTE = (
 )
 
 
-def _write_ui_view(blueprint: dict[str, Any], session_id: str, output_dir: str) -> bool:
+def _write_ui_view(
+    blueprint: dict[str, Any],
+    session_id: str,
+    output_dir: str,
+    extra_lane_ids: frozenset[str] = frozenset(),
+) -> bool:
     """Write the diagram the user sees, and the blueprint behind it, for the agent.
 
     The Workflow tab renders BPMN generated from the session blueprint, and the
@@ -1903,6 +1914,7 @@ def _write_ui_view(blueprint: dict[str, Any], session_id: str, output_dir: str) 
             blueprint,
             session_id=session_id,
             agent_draft=artifact_sync.read_draft_blueprint(output_dir),
+            extra_lane_ids=extra_lane_ids,
         )
     except Exception:  # noqa: BLE001 - see the docstring
         logger.warning("UI diagram for the agent could not be generated", exc_info=True)
@@ -2909,6 +2921,7 @@ def _package_bpmn(db: Session, session: Any) -> tuple[str | None, dict[str, Any]
             session_service.session_detail(db, session).blueprint.model_dump(),
             session_id=str(session.id),
             agent_draft=artifact_sync.read_draft_blueprint(session.output_dir),
+            extra_lane_ids=artifact_sync.user_lanes(session.session_metadata),
         )
         return xml, {"made_from": "blueprint", "blueprint_version": session.active_version}
     except Exception:  # noqa: BLE001 - the package goes out with the diagram the session kept

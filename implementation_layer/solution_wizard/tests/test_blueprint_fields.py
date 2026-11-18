@@ -70,24 +70,94 @@ def test_a_step_with_performed_by_is_drawn_in_that_lane(include_data_objects):
     assert ly <= y and y + h <= ly + lh
 
 
+def _v1_participants() -> list:
+    """A participant list as an agent writes it, with roles no step of the examples uses."""
+    return [
+        Participant(id="clerk", name="Clerk", default_lane_for=["user_task"]),
+        Participant(id="genai", name="GenAI", kind="system", default_lane_for=["automated_task"]),
+        Participant(id="erp", name="ERP", kind="system"),
+        Participant(id="manager", name="Manager", default_lane_for=["human_review"]),
+    ]
+
+
+def _shapes(root) -> dict:
+    return {
+        shape.get("bpmnElement"): tuple(
+            float(shape.find("omgdc:Bounds", NS).get(k)) for k in ("x", "y", "width", "height")
+        )
+        for shape in root.findall(".//bpmndi:BPMNShape", NS)
+    }
+
+
+@pytest.mark.parametrize("name", EXAMPLES)
 @pytest.mark.parametrize("include_data_objects", [True, False])
-def test_a_participant_no_step_is_in_is_drawn_as_an_empty_lane(include_data_objects):
+def test_a_participant_no_node_reaches_is_not_drawn(name, include_data_objects):
+    # The diagram is what it was before participants could be drawn empty: the
+    # same bytes as with only the participants a node reaches.
+    bp = _example(name)
+    bp.business_process.participants = _v1_participants()
+    xml = generate_bpmn(bp, include_data_objects=include_data_objects)
+    drawn = [p for p in _v1_participants() if f'bpmnElement="Lane_{p.id}"' in xml]
+    assert "ERP" not in _lane_names(xml)
+    trimmed = _example(name)
+    trimmed.business_process.participants = drawn
+    assert generate_bpmn(trimmed, include_data_objects=include_data_objects) == xml
+
+
+@pytest.mark.parametrize("name", EXAMPLES)
+@pytest.mark.parametrize("include_data_objects", [True, False])
+def test_an_extra_lane_is_drawn_last_and_moves_no_other_lane(name, include_data_objects):
+    bp = _example(name)
+    bp.business_process.participants = _v1_participants()
+    before = ET.fromstring(generate_bpmn(bp, include_data_objects=include_data_objects))
+
+    bp.business_process.participants.insert(0, Participant(id="legal", name="Legal"))
+    bp.business_process.participants.append(Participant(id="audit", name="Audit"))
+    extra = frozenset({"legal", "audit"})
+    after = ET.fromstring(
+        generate_bpmn(bp, include_data_objects=include_data_objects, extra_lane_ids=extra)
+    )
+
+    names = [
+        lane.get("name")
+        for lane in sorted(
+            after.findall(".//bpmn:lane", NS), key=lambda la: _bounds(after, la.get("id"))[1]
+        )
+    ]
+    # After every other lane, in the participants' order, and empty.
+    assert names[-2:] == ["Legal", "Audit"]
+    assert names[:-2] == [
+        lane.get("name")
+        for lane in sorted(
+            before.findall(".//bpmn:lane", NS), key=lambda la: _bounds(before, la.get("id"))[1]
+        )
+    ]
+    assert after.find(".//bpmn:lane[@id='Lane_legal']", NS).findall("bpmn:flowNodeRef", NS) == []
+    assert bp.visualizations["bpmn_mapping"]["Lane_legal"] == {
+        "kind": "lane",
+        "blueprint_path": "business_process.participants[0]",
+    }
+    # Every shape in the lanes keeps its place; the pool grows, and what is drawn
+    # below it (data stores, outside the lanes) moves down with its edge.
+    old, new = _shapes(before), _shapes(after)
+    for element, box in old.items():
+        if element.startswith(("Participant_", "DataStore_")):
+            continue
+        assert new[element] == box, element
+
+
+def test_a_step_in_an_extra_lane_is_drawn_there_and_the_lane_stays_last():
     bp = _example()
     bp.business_process.participants = [
-        Participant(id="clerk", name="Clerk", default_lane_for=["user_task"]),
         Participant(id="legal", name="Legal"),
+        *_v1_participants(),
     ]
-    root = ET.fromstring(generate_bpmn(bp, include_data_objects=include_data_objects))
-
-    lane = root.find(".//bpmn:lane[@name='Legal']", NS)
-    assert lane is not None
-    assert lane.findall("bpmn:flowNodeRef", NS) == []
-    assert _bounds(root, "Lane_legal")[3] > 0
-    mapping = bp.visualizations["bpmn_mapping"]
-    assert mapping["Lane_legal"] == {
-        "kind": "lane",
-        "blueprint_path": "business_process.participants[1]",
-    }
+    _step(bp, "extract_po_fields").performed_by = "legal"
+    root = ET.fromstring(generate_bpmn(bp, extra_lane_ids=frozenset({"legal"})))
+    lanes = sorted(root.findall(".//bpmn:lane", NS), key=lambda la: _bounds(root, la.get("id"))[1])
+    assert lanes[-1].get("name") == "Legal"
+    refs = [r.text for r in lanes[-1].findall("bpmn:flowNodeRef", NS)]
+    assert "Activity_extract_po_fields" in refs
 
 
 def test_an_unknown_performer_falls_back_to_the_category_lane():

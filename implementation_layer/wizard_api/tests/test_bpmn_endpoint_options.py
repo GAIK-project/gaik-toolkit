@@ -26,11 +26,15 @@ DRAFT = {"business_spec": {"intended_users": ["Accountant"]}}
 @pytest.mark.parametrize("agent_draft", [None, DRAFT], ids=["blueprint", "agent-draft"])
 def test_the_view_passes_the_data_objects_option(monkeypatch, agent_draft) -> None:
     seen: list[bool] = []
+    lanes: list[frozenset] = []
     real = bpmn_service.generate_bpmn
 
-    def spy(blueprint, *, include_data_objects=True):
+    def spy(blueprint, *, include_data_objects=True, extra_lane_ids=frozenset()):
         seen.append(include_data_objects)
-        return real(blueprint, include_data_objects=include_data_objects)
+        lanes.append(extra_lane_ids)
+        return real(
+            blueprint, include_data_objects=include_data_objects, extra_lane_ids=extra_lane_ids
+        )
 
     monkeypatch.setattr(bpmn_service, "generate_bpmn", spy)
     if agent_draft is not None:
@@ -48,9 +52,13 @@ def test_the_view_passes_the_data_objects_option(monkeypatch, agent_draft) -> No
     assert "dataObjectReference" not in xml
     assert all(info["kind"] != "data_object" for info in mapping.values())
 
-    xml = bpmn_service.generate_bpmn_xml(BLUEPRINT, session_id="s1", agent_draft=agent_draft)
+    xml = bpmn_service.generate_bpmn_xml(
+        BLUEPRINT, session_id="s1", agent_draft=agent_draft, extra_lane_ids=frozenset({"legal"})
+    )
     assert seen == [False, True]
     assert "dataObjectReference" in xml
+    # The user's lanes reach the generator too.
+    assert lanes == [frozenset(), frozenset({"legal"})]
 
 
 def _seeded_session(client) -> str:

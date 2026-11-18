@@ -87,6 +87,9 @@ class OpsResult:
     warnings: list[str]
     needs_attention: list[str]
     bpmn_changed: bool
+    #: Lane ids ``add_lane`` added and ``remove_lane`` removed, in order.
+    lanes_added: list[str] = field(default_factory=list)
+    lanes_removed: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -97,6 +100,8 @@ class _Context:
     #: Steps an operation made automated or added as automated; checked for a
     #: component once all operations have run.
     component_checks: list[str] = field(default_factory=list)
+    lanes_added: list[str] = field(default_factory=list)
+    lanes_removed: list[str] = field(default_factory=list)
 
     @property
     def steps(self) -> list[dict]:
@@ -409,6 +414,8 @@ def apply_operations(draft: dict, ops: list[Any]) -> OpsResult:
         warnings=ctx.warnings,
         needs_attention=list(dict.fromkeys(needs_attention)),
         bpmn_changed=bpmn_relevant_digest(draft) != bpmn_relevant_digest(ctx.blueprint),
+        lanes_added=ctx.lanes_added,
+        lanes_removed=ctx.lanes_removed,
     )
 
 
@@ -767,6 +774,7 @@ def _add_lane(ctx: _Context, op: AddLane) -> None:
         taken |= {item.get("id") for item in ctx.process.get(key) or []}
     lane_id = new_step_id(name if re.search(r"[a-z0-9]", name.lower()) else "lane", taken)
     participants.append({"id": lane_id, "name": name, "kind": op.kind, "default_lane_for": []})
+    ctx.lanes_added.append(lane_id)
     ctx.summaries.append(f'Added lane "{name}"')
 
 
@@ -788,6 +796,7 @@ def _remove_lane(ctx: _Context, op: RemoveLane) -> None:
             "lane_id",
         )
     ctx.process["participants"] = [p for p in ctx.process["participants"] if p is not lane]
+    ctx.lanes_removed.append(op.lane_id)
     ctx.summaries.append(f'Removed lane "{_lane_name(lane)}"')
 
 

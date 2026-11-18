@@ -34,12 +34,14 @@ def generate_bpmn_xml(
     session_id: str,
     agent_draft: dict[str, Any] | None = None,
     include_data_objects: bool = True,
+    extra_lane_ids: frozenset[str] = frozenset(),
 ) -> str:
     return generate_bpmn_view(
         v2_blueprint,
         session_id=session_id,
         agent_draft=agent_draft,
         include_data_objects=include_data_objects,
+        extra_lane_ids=extra_lane_ids,
     )[0]
 
 
@@ -49,6 +51,7 @@ def generate_bpmn_view(
     session_id: str,
     agent_draft: dict[str, Any] | None = None,
     include_data_objects: bool = True,
+    extra_lane_ids: frozenset[str] = frozenset(),
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
     """The BPMN the UI shows, the element → blueprint mapping the generator
     records for it, and the V1 blueprint the mapping's paths point into.
@@ -59,21 +62,26 @@ def generate_bpmn_view(
     drawn, with the roles and process of a draft that fits it, see
     :func:`with_agent_process`; a draft that does not fit is dropped rather than
     failing the diagram. Without data objects (``include_data_objects=False``)
-    the diagram is drawn compact.
+    the diagram is drawn compact. ``extra_lane_ids``: the lanes the user
+    added (``artifact_sync.user_lanes``), drawn also while empty, last.
     """
     if not _SOLUTION_WIZARD_AVAILABLE:
         raise BpmnGenerationError("solution_wizard package is not installed")
     if agent_draft:
-        drawn = _render_draft(agent_draft, include_data_objects)
+        drawn = _render_draft(agent_draft, include_data_objects, extra_lane_ids)
         if drawn is not None:
             return drawn
     v1 = v2_to_v1_dict(v2_blueprint, session_id=session_id)
     if agent_draft:
         try:
-            return _render(with_agent_process(v1, v2_blueprint, agent_draft), include_data_objects)
+            return _render(
+                with_agent_process(v1, v2_blueprint, agent_draft),
+                include_data_objects,
+                extra_lane_ids,
+            )
         except Exception:  # noqa: BLE001 - a draft that does not fit falls back
             pass
-    return _render(v1, include_data_objects)
+    return _render(v1, include_data_objects, extra_lane_ids)
 
 
 #: The mapping path of each lane the generator derives, and the participant id
@@ -118,18 +126,26 @@ def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[s
 
 
 def _render(
-    v1: dict[str, Any], include_data_objects: bool = True
+    v1: dict[str, Any],
+    include_data_objects: bool = True,
+    extra_lane_ids: frozenset[str] = frozenset(),
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
     blueprint = Blueprint.model_validate(v1)
     # Marked here, so the file the session keeps and the diagram the API serves
     # are the same bytes, and both say a model made the diagram.
-    xml = ai_marking.mark_xml(generate_bpmn(blueprint, include_data_objects=include_data_objects))
+    xml = ai_marking.mark_xml(
+        generate_bpmn(
+            blueprint, include_data_objects=include_data_objects, extra_lane_ids=extra_lane_ids
+        )
+    )
     mapping = dict(blueprint.visualizations.get("bpmn_mapping") or {})
     return xml, mapping, v1
 
 
 def _render_draft(
-    draft: dict[str, Any], include_data_objects: bool
+    draft: dict[str, Any],
+    include_data_objects: bool,
+    extra_lane_ids: frozenset[str] = frozenset(),
 ) -> tuple[str, dict[str, Any], dict[str, Any]] | None:
     """The diagram of the draft itself, or None when it is no blueprint with steps."""
     workflow = draft.get("workflow")
@@ -143,7 +159,11 @@ def _render_draft(
     visualizations = dict(blueprint.visualizations or {})
     visualizations.pop("bpmn_mapping", None)
     blueprint.visualizations = visualizations
-    xml = ai_marking.mark_xml(generate_bpmn(blueprint, include_data_objects=include_data_objects))
+    xml = ai_marking.mark_xml(
+        generate_bpmn(
+            blueprint, include_data_objects=include_data_objects, extra_lane_ids=extra_lane_ids
+        )
+    )
     mapping = dict(blueprint.visualizations.get("bpmn_mapping") or {})
     return xml, mapping, draft
 

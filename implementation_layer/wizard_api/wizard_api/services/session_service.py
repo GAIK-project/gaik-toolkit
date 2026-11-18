@@ -51,6 +51,7 @@ SERVER_OWNED_METADATA_KEYS = frozenset(
         "protected",
         artifact_sync.ADOPTED_DRAFT_KEY,
         artifact_sync.AI_STEPS_KEY,
+        artifact_sync.USER_LANES_KEY,
         "gate_reopened",
         "gate_replay",
         "voided_runs",

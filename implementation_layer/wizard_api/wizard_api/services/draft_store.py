@@ -21,6 +21,7 @@ import logging
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from typing import Any
 
 from wizard_api.services.artifact_sync import (
@@ -32,11 +33,11 @@ from wizard_api.services.artifact_sync import (
 
 try:
     from solution_wizard.blueprint import Blueprint
-    from solution_wizard.bpmn_generator import write_bpmn
+    from solution_wizard.bpmn_generator import generate_bpmn, write_bpmn
     from solution_wizard.visualizer import write_mermaid
 except ImportError:  # pragma: no cover - optional in minimal installs
     Blueprint = None  # type: ignore[assignment,misc]
-    write_bpmn = write_mermaid = None  # type: ignore[assignment]
+    generate_bpmn = write_bpmn = write_mermaid = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +132,13 @@ def restore(output_dir: str, taken: dict[str, bytes | None]) -> None:
             logger.error("Could not put %s back after a failed edit", filename, exc_info=True)
 
 
-def refresh_derived_files(output_dir: str, blueprint: dict[str, Any]) -> None:
+def refresh_derived_files(
+    output_dir: str, blueprint: dict[str, Any], *, extra_lane_ids: frozenset[str] = frozenset()
+) -> None:
     """Rewrite ``workflow.bpmn`` and ``workflow.mmd`` from ``blueprint``.
+
+    ``extra_lane_ids``: the lanes the user added (``artifact_sync.user_lanes``),
+    drawn in ``workflow.bpmn`` also while empty, as the editor shows them.
 
     Best-effort: a failure is logged and the call returns. A symlink in the
     place of either file is left alone. Each file is generated in a temp
@@ -145,7 +151,15 @@ def refresh_derived_files(output_dir: str, blueprint: dict[str, Any]) -> None:
     except Exception:
         logger.warning("Derived files not refreshed: the blueprint is not valid", exc_info=True)
         return
-    for filename, writer in ((WORKFLOW_BPMN_FILE, write_bpmn), (WORKFLOW_MMD_FILE, write_mermaid)):
+
+    def bpmn_writer(model: Any, folder: str) -> Path:
+        if not extra_lane_ids:
+            return write_bpmn(model, folder)
+        path = Path(folder) / WORKFLOW_BPMN_FILE
+        path.write_text(generate_bpmn(model, extra_lane_ids=extra_lane_ids), encoding="utf-8")
+        return path
+
+    for filename, writer in ((WORKFLOW_BPMN_FILE, bpmn_writer), (WORKFLOW_MMD_FILE, write_mermaid)):
         target = artifact_path(output_dir, filename)
         if os.path.islink(target):
             logger.warning("%s is a symlink; not refreshing it", filename)

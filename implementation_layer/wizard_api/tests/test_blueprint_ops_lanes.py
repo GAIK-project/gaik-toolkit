@@ -7,7 +7,9 @@ diagram keeps the lanes it had.
 """
 
 import copy
+import os
 import re
+import uuid
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -47,8 +49,10 @@ def _derived_draft() -> dict:
     return draft
 
 
-def _draw(blueprint: dict) -> ET.Element:
-    return ET.fromstring(generate_bpmn(Blueprint.model_validate(blueprint)))
+def _draw(blueprint: dict, user_lanes=()) -> ET.Element:
+    """The diagram, with ``user_lanes`` drawn as the editor draws the lanes the user added."""
+    model = Blueprint.model_validate(blueprint)
+    return ET.fromstring(generate_bpmn(model, extra_lane_ids=frozenset(user_lanes)))
 
 
 def _box(root: ET.Element, element_id: str) -> tuple[float, float, float, float]:
@@ -153,10 +157,11 @@ def test_a_lane_added_first_comes_after_the_derived_lanes_it_keeps():
         "kind": "human_role",
         "default_lane_for": [],
     }
-    names = [name for _, name in _lanes(_draw(result.blueprint))]
-    # The new lane is drawn, empty, and the derived ones keep their order.
-    assert "Legal team" in names
-    assert [n for n in names if n != "Legal team"] == ["Clerk", "GenAI", "Controller"]
+    names = [name for _, name in _lanes(_draw(result.blueprint, result.lanes_added))]
+    # The new lane is drawn, empty and last, and the derived ones keep their order.
+    assert names == ["Clerk", "GenAI", "Controller", "Legal team"]
+    # Not one of the user's lanes, a participant no node reaches is not drawn.
+    assert "Legal team" not in [name for _, name in _lanes(_draw(result.blueprint))]
     assert result.summaries == ['Added lane "Legal team"']
     assert result.bpmn_changed
 
@@ -165,8 +170,8 @@ def test_a_lane_without_steps_is_drawn():
     draft = _draft()
     result = apply_operations(draft, ops({"op": "add_lane", "name": "Robots", "kind": "system"}))
 
-    root = _draw(result.blueprint)
-    assert "Robots" in [name for _, name in _lanes(root)]
+    root = _draw(result.blueprint, result.lanes_added)
+    assert [name for _, name in _lanes(root)][-1] == "Robots"
     assert _members(root, "Robots") == set()
 
 
@@ -201,11 +206,12 @@ def test_set_step_lane_puts_the_step_in_that_lane():
 
     review = next(s for s in result.blueprint["workflow"]["steps"] if s["id"] == "review")
     assert review["performed_by"] == "legal"
-    root = _draw(result.blueprint)
+    root = _draw(result.blueprint, ["legal"])
     # The review's approval gateway goes with it.
     assert "Activity_review" in _members(root, "Legal")
     assert _inside(_box(root, "Activity_review"), _box(root, "Lane_legal"))
-    assert "Activity_review" not in _members(root, "Controller")
+    # Nothing is left in the reviewers' lane, an agent's lane: it is not drawn.
+    assert "Controller" not in [name for _, name in _lanes(root)]
     assert result.summaries[-1] == 'Moved step "Review" to lane "Legal"'
 
     # None: back to the lane of its type.
@@ -214,7 +220,7 @@ def test_set_step_lane_puts_the_step_in_that_lane():
     )
     review = next(s for s in back.blueprint["workflow"]["steps"] if s["id"] == "review")
     assert "performed_by" not in review
-    assert "Activity_review" in _members(_draw(back.blueprint), "Controller")
+    assert "Activity_review" in _members(_draw(back.blueprint, ["legal"]), "Controller")
     assert back.summaries == ['Moved step "Review" back to the lane of its type']
 
 
@@ -371,3 +377,112 @@ def test_the_mapping_names_derived_lanes_by_their_participant_id(client, db_sess
 
     lanes = {k: v["participant_id"] for k, v in mapping.items() if v["kind"] == "lane"}
     assert lanes == {"Lane_users": "users", "Lane_gaik_ai": "system", "Lane_reviewers": "reviewers"}
+
+
+# ---------------------------------------------------------------- the user's lanes (R25)
+
+
+def test_the_operations_say_which_lanes_they_added_and_removed():
+    result = apply_operations(
+        _draft(),
+        ops(
+            {"op": "add_lane", "name": "Legal"},
+            {"op": "add_lane", "name": "Audit"},
+            {"op": "remove_lane", "lane_id": "legal"},
+        ),
+    )
+    assert result.lanes_added == ["legal", "audit"]
+    assert result.lanes_removed == ["legal"]
+
+
+def _lane_tops(xml: str) -> dict[str, float]:
+    root = ET.fromstring(xml)
+    return {
+        lane.get("name"): _box(root, lane.get("id"))[1]
+        for lane in root.findall(".//bpmn:lane", _NS)
+    }
+
+
+def _shape_boxes(xml: str) -> dict[str, tuple]:
+    root = ET.fromstring(xml)
+    out = {}
+    for shape in root.findall(".//bpmndi:BPMNShape", _NS):
+        b = shape.find("dc:Bounds", _NS)
+        out[shape.get("bpmnElement")] = tuple(
+            float(b.get(k)) for k in ("x", "y", "width", "height")
+        )
+    return out
+
+
+@requires_postgres
+def test_a_lane_the_user_adds_is_drawn_last_and_moves_no_other_lane(
+    client, db_session, monkeypatch
+) -> None:
+    from test_patch_blueprint_writes_draft import _create
+    from wizard_api.services import agent_service, artifact_sync, session_service
+
+    monkeypatch.setattr(agent_service, "is_busy", lambda session_id: False)
+    created = _create(client, db_session, draft=_derived_draft())
+    sid = created["id"]
+    before = client.get(f"/sessions/{sid}/bpmn").text
+
+    def run(*operations):
+        version = client.get(f"/sessions/{sid}").json()["active_version"]
+        res = client.post(
+            f"/sessions/{sid}/blueprint/operations",
+            json={"base_version": version, "operations": list(operations)},
+        )
+        assert res.status_code == 200, res.text
+
+    def metadata():
+        db_session.expire_all()
+        return session_service.get_session(db_session, uuid.UUID(sid)).session_metadata
+
+    # "New lane" sorts before "Users" by id: it is drawn last all the same.
+    run({"op": "add_lane", "name": "New lane"})
+    assert metadata()[artifact_sync.USER_LANES_KEY] == ["new_lane"]
+    after = client.get(f"/sessions/{sid}/bpmn").text
+    tops = _lane_tops(after)
+    assert max(tops, key=tops.get) == "New lane"
+    assert {k: v for k, v in tops.items() if k != "New lane"} == _lane_tops(before)
+    old, new = _shape_boxes(before), _shape_boxes(after)
+    for element, box in old.items():
+        # Lanes are compared by name above (materialised, the system lane's id changes).
+        if not element.startswith(("Participant_", "DataStore_", "Lane_")):
+            assert new[element] == box, element
+    # workflow.bpmn, which the agent reads, draws it too.
+    with open(os.path.join(created["output_dir"], "workflow.bpmn"), encoding="utf-8") as fh:
+        assert 'name="New lane"' in fh.read()
+
+    # Removed, it is no user lane any more; an undo brings it back as one.
+    run({"op": "remove_lane", "lane_id": "new_lane"})
+    assert artifact_sync.USER_LANES_KEY not in metadata()
+    assert 'name="New lane"' not in client.get(f"/sessions/{sid}/bpmn").text
+    version = client.get(f"/sessions/{sid}").json()["active_version"]
+    undone = client.post(f"/sessions/{sid}/blueprint/undo", json={"base_version": version})
+    assert undone.status_code == 200, undone.text
+    assert metadata()[artifact_sync.USER_LANES_KEY] == ["new_lane"]
+    assert 'name="New lane"' in client.get(f"/sessions/{sid}/bpmn").text
+
+
+@requires_postgres
+def test_a_participant_the_agent_declared_and_no_step_uses_is_not_drawn(client, db_session) -> None:
+    from test_patch_blueprint_writes_draft import _create
+
+    draft = _draft()
+    draft["business_process"]["participants"].append({"id": "erp", "name": "ERP", "kind": "system"})
+    created = _create(client, db_session, draft=draft)
+
+    assert 'name="ERP"' not in client.get(f"/sessions/{created['id']}/bpmn").text
+
+
+@requires_postgres
+def test_the_user_lanes_are_server_owned(client) -> None:
+    from wizard_api.services import artifact_sync
+
+    sid = client.post("/sessions", json={"user_id": "forge", "title": "Forge"}).json()["id"]
+    res = client.patch(
+        f"/sessions/{sid}", json={"metadata": {artifact_sync.USER_LANES_KEY: ["clerk"]}}
+    )
+    assert res.status_code == 422
+    assert res.json()["detail"]["error"] == "server_owned_metadata"

@@ -57,6 +57,19 @@ ADOPTED_DRAFT_KEY = "agent_draft_digest"
 #: these are shown as ``ai`` until the agent gives them one or the user changes
 #: the type.
 AI_STEPS_KEY = "ai_steps_without_component"
+#: The lanes the user added in the diagram editor (``add_lane``), by
+#: participant id. The generator draws them also while no step is in them,
+#: after every other lane (``generate_bpmn``'s ``extra_lane_ids``); a
+#: participant the agent declared is drawn only when a node reaches it.
+USER_LANES_KEY = "user_lanes"
+
+
+def user_lanes(metadata: dict[str, Any] | None) -> frozenset[str]:
+    """The lanes ``USER_LANES_KEY`` names."""
+    stored = (metadata or {}).get(USER_LANES_KEY)
+    if not isinstance(stored, list):
+        return frozenset()
+    return frozenset(v for v in stored if isinstance(v, str) and v)
 
 
 def ai_steps(metadata: dict[str, Any] | None) -> frozenset[str]:
