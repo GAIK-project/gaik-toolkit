@@ -68,6 +68,9 @@ body#keycloak-bg::after {
   position: relative;
   z-index: 1;
   background: transparent;
+  /* Room around the card on every screen; on a phone the card would touch the edges. */
+  padding: 2rem 1rem;
+  box-sizing: border-box;
 }
 /* One column at every width. PatternFly's wide layout puts the header beside
    the card and pads the container on both sides; with the card's own width
