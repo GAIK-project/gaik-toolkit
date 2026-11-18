@@ -85,12 +85,12 @@ export function panelOps(before: PanelValues, after: PanelValues): BlueprintOper
   return ops;
 }
 
-/** What the user typed into a step's panel and an edit carried: kept over a refusal, sent again later. */
-export type KeptPanelEdit = { stepId: string; name?: string; description?: string };
+/** What the user gave a step in its panel or the type menu: kept over a refusal, sent again later. */
+export type KeptPanelEdit = { stepId: string; name?: string; description?: string; type?: StepType };
 
 /**
- * The typed part of a refused edit: the name and the description it set for
- * one step. Null for anything else (a type alone is one click to make again).
+ * What a refused edit set for one step: its name, description and type.
+ * Null for anything else, and for edits of more than one step.
  */
 export function keptPanelEdit(ops: BlueprintOperation[]): KeptPanelEdit | null {
   let kept: KeptPanelEdit | null = null;
@@ -100,6 +100,7 @@ export function keptPanelEdit(ops: BlueprintOperation[]): KeptPanelEdit | null {
     kept ??= { stepId: op.step_id };
     if (op.op === "rename_step") kept.name = op.name;
     if (op.op === "set_step_description") kept.description = op.description;
+    if (op.op === "set_step_type") kept.type = op.type;
   }
-  return kept && (kept.name !== undefined || kept.description !== undefined) ? kept : null;
+  return kept;
 }

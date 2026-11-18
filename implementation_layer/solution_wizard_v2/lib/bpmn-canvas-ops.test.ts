@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isDecisionStep,
   isOperationElement,
   mappingFitsSteps,
   opForAddStep,
@@ -200,5 +201,25 @@ describe("mappingFitsSteps", () => {
       Gateway_route: { blueprint_path: "workflow.steps[1]" },
     };
     expect(mappingFitsSteps(mapping, [{ id: "read-mail" }, { id: "route" }])).toBe(true);
+  });
+});
+
+describe("isDecisionStep", () => {
+  // A decision is a workflow step too, drawn as a gateway (bpmn_generator `_map(nid, step.type, ...)`).
+  const withDecision: BpmnMapping = {
+    ...MAPPING,
+    Gateway_approve: { kind: "decision", blueprint_path: "workflow.steps[3]" },
+  };
+  const steps = [...STEPS, { id: "approve", name: "Approved?" }];
+
+  it("is true for a decision step's gateway, which stepIdOf still resolves", () => {
+    expect(stepIdOf("Gateway_approve", withDecision, steps)).toBe("approve");
+    expect(isDecisionStep("Gateway_approve", withDecision)).toBe(true);
+  });
+
+  it("is false for tasks, derived gateways and unknown elements", () => {
+    expect(isDecisionStep("Activity_extract", withDecision)).toBe(false);
+    expect(isDecisionStep("Gateway_approval_review", withDecision)).toBe(false);
+    expect(isDecisionStep("nope", withDecision)).toBe(false);
   });
 });

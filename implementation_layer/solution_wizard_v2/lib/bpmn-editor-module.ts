@@ -29,6 +29,7 @@ import RuleProvider from "diagram-js/lib/features/rules/RuleProvider";
 import type { BlueprintOperation, StepType } from "@/lib/blueprint-ops";
 import { STEP_OP_TYPES } from "@/lib/step-panel-model";
 import {
+  isDecisionStep,
   isOperationElement,
   opForAddStep,
   opForAppend,
@@ -257,13 +258,16 @@ class GaikContextPad {
           title: labels.rename,
           action: { click: () => this.directEditing.activate(element) },
         },
-        [STEP_TYPE_MENU]: {
+      };
+      // A decision has no step type to change: it stays a gateway.
+      if (!isDecisionStep(element.id, mapping)) {
+        out[STEP_TYPE_MENU] = {
           group: "edit",
           className: "bpmn-icon-screw-wrench",
           title: labels.changeType,
           action: { click: (event: MouseEvent) => this.openTypeMenu(element, event) },
-        },
-      };
+        };
+      }
       const append = opForAppend(element.id, labels.newStepName, mapping, steps);
       if (append) {
         out.append = {
@@ -303,8 +307,8 @@ class GaikContextPad {
 /**
  * The `gaik-step-type` menu: the three types a step can have, each sent as
  * `set_step_type`; the step's own type is shown and does nothing. Only on a
- * step (`workflow.steps`): what the blueprint draws from elsewhere and the
- * manual steps get no menu. bpmn-js's replace menu is never opened.
+ * step's task (`workflow.steps`): decisions, what the blueprint draws from
+ * elsewhere and the manual steps get no menu. bpmn-js's replace menu is never opened.
  */
 class GaikStepTypeMenu {
   static $inject = ["eventBus", "popupMenu", "config.gaikEditor"];
@@ -322,7 +326,8 @@ class GaikStepTypeMenu {
     const { labels, ops } = this.config;
     const ctx = ops?.context();
     const stepId = ops && ctx && element === owner(element) ? stepIdOf(element.id, ctx.mapping, ctx.steps) : null;
-    if (!ops || !stepId) return {};
+    // A decision step is drawn as a gateway; turning it into a task is no type change the menu offers.
+    if (!ops || !ctx || !stepId || isDecisionStep(element.id, ctx.mapping)) return {};
     const current = ops.stepType(stepId);
     const entries: Entries = {};
     for (const type of STEP_OP_TYPES) {

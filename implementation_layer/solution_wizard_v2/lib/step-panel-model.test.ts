@@ -108,23 +108,27 @@ describe("panelFields", () => {
 });
 
 describe("keptPanelEdit", () => {
-  it("keeps what the user typed for one step: its name and its description", () => {
+  it("keeps what the user gave one step: its name, its description and its type", () => {
     expect(
       keptPanelEdit([
         { op: "rename_step", step_id: "extract", name: "Read" },
         { op: "set_step_description", step_id: "extract", description: "Reads" },
         { op: "set_step_type", step_id: "extract", type: "human_review" },
       ]),
-    ).toEqual({ stepId: "extract", name: "Read", description: "Reads" });
+    ).toEqual({ stepId: "extract", name: "Read", description: "Reads", type: "human_review" });
+    // A type picked alone is kept too: it is made on the newer version.
+    expect(keptPanelEdit([{ op: "set_step_type", step_id: "extract", type: "user_task" }])).toEqual({
+      stepId: "extract",
+      type: "user_task",
+    });
     expect(keptPanelEdit([{ op: "rename_step", step_id: "extract", name: "Read" }])).toEqual({
       stepId: "extract",
       name: "Read",
     });
   });
 
-  it("keeps nothing for other edits, a type alone or edits of two steps", () => {
+  it("keeps nothing for other edits or edits of two steps", () => {
     expect(keptPanelEdit([{ op: "remove_step", step_id: "extract" }])).toBeNull();
-    expect(keptPanelEdit([{ op: "set_step_type", step_id: "extract", type: "user_task" }])).toBeNull();
     expect(
       keptPanelEdit([
         { op: "rename_step", step_id: "extract", name: "Read" },

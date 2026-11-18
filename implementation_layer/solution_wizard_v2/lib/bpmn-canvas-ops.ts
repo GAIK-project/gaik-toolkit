@@ -37,6 +37,17 @@ export function stepIdOf(elementId: string, mapping: BpmnMapping, steps: StepRef
 }
 
 /**
+ * Whether `elementId` is a decision step: a `workflow.steps` entry the
+ * generator draws as a gateway (its mapping kind is the step's type,
+ * `decision`). It is a step for the edits that keep it a decision (rename,
+ * move, connect, delete), but it has no step type to change.
+ */
+export function isDecisionStep(elementId: string, mapping: BpmnMapping): boolean {
+  const entry = Object.prototype.hasOwnProperty.call(mapping, elementId) ? mapping[elementId] : undefined;
+  return Boolean(entry && entry.kind === "decision" && STEP_PATH.test(entry.blueprint_path));
+}
+
+/**
  * Whether `steps` are the steps the diagram of `mapping` was drawn from: each
  * `workflow.steps[i]` is drawn as `Activity_<id>` (`Gateway_<id>` for a
  * decision), with the id of the step at that index, and there are as many.

@@ -192,8 +192,8 @@ export function BpmnDiagramPanel({
   const [propsClosed, setPropsClosed] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const pendingFocus = useRef<string | null>(null);
-  // A name or description typed for a step and refused as changed elsewhere (or
-  // typed while the canvas could not take it), not sent yet.
+  // A name, description or type given a step and refused as changed elsewhere
+  // (or given while the canvas could not take it), not sent yet.
   const pendingEdit = useRef<KeptPanelEdit | null>(null);
   // What the last edit left for the wizard to complete (wizard_api's needs_attention):
   // in state for the step panel, in a ref for the type menu, which reads it when it opens.
@@ -413,8 +413,8 @@ export function BpmnDiagramPanel({
         setStatus({ kind: "idle" });
         setOps("no_draft");
       } else if (err instanceof OperationRefused && err.code === "changed_elsewhere") {
-        // What was typed (a name, a description) is not given up: it is made
-        // again on the newer version once the page has it.
+        // What the user gave the step (a name, a description, a type) is not
+        // given up: it is made again on the newer version once the page has it.
         const kept = keptPanelEdit(operations);
         if (kept && !pendingEdit.current) pendingEdit.current = kept;
         waitingForVersion.current = true;
@@ -586,6 +586,7 @@ export function BpmnDiagramPanel({
       ...before,
       name: pending.name ?? before.name,
       description: pending.description ?? before.description,
+      type: pending.type ?? before.type,
     });
     if (ops.length) stableOps.onOperation(ops);
   }

@@ -192,7 +192,7 @@ test.describe("BPMN step panel", () => {
     expect(sent).toHaveLength(1);
   });
 
-  test("the panel saves a step's name, description and type on Enter or leaving a field, as one edit; Escape takes a change back", async ({
+  test("the panel saves a step's name, description and type on Enter or leaving a field, each save one edit; Escape takes a change back", async ({
     page,
   }) => {
     test.setTimeout(150_000);
@@ -260,5 +260,55 @@ test.describe("BPMN step panel", () => {
     expect(sent[3].operations).toEqual([
       { op: "set_step_description", step_id: "classify", description: "x".repeat(2000) },
     ]);
+  });
+  test("a type picked while the edit is refused as changed elsewhere is made again on the newer version", async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await openFlow(page);
+    const blueprint = await readBlueprint(page);
+    const sent: Body[] = [];
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await standInForWizardApi(page, async (route, body) => {
+      sent.push(body);
+      if (sent.length === 1) {
+        // Held while a version is written elsewhere, then refused as changed elsewhere.
+        await held;
+        const refused = { detail: { error: "changed_elsewhere", message: "reload" } };
+        await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify(refused) });
+        return;
+      }
+      await route.fulfill(made(blueprint, body));
+    });
+    await page.reload();
+    await setChatOpen(page, false);
+    await selectWorkspaceTab(page, "Työnkulku");
+    await openBpmnView(page);
+    await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-ops", "on", { timeout: 30_000 });
+
+    await rows(page).nth(0).getByRole("button").first().click();
+    const type = page.getByTestId("bpmn-step-type");
+    await expect(type).toHaveValue("user_task");
+    await type.selectOption("human_review");
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual({
+      base_version: 7,
+      operations: [{ op: "set_step_type", step_id: "ingest", type: "human_review" }],
+    });
+    // Meanwhile version 8 is written elsewhere; the type change is refused.
+    const res = await page.request.patch("/api/sessions/ses_laskut/blueprint", {
+      data: { content: { ...blueprint, goal: `${blueprint.goal} Reviewed weekly.` }, note: "e2e: written elsewhere" },
+    });
+    expect(res.status()).toBe(200);
+    release();
+    await expect(page.getByTestId("bpmn-changed-elsewhere")).toBeVisible();
+    // Once the page has version 8, the type change is made again on it.
+    await expect.poll(() => sent.length, { timeout: 20_000 }).toBe(2);
+    expect(sent[1]).toEqual({
+      base_version: 8,
+      operations: [{ op: "set_step_type", step_id: "ingest", type: "human_review" }],
+    });
+    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu");
   });
 });
