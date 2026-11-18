@@ -206,7 +206,7 @@ def test_path_ids_use_the_slug_rule_and_miss_the_drawn_end_events() -> None:
             _add(name="Success", outcome="end", attached_to="extract"),
             # EndEvent_rejected_<review step> is the approval's own rejection.
             _add(name="Rejected review", outcome="end", attached_to="upload"),
-            _add(name="Äö?", attached_to="deliver", outcome="end"),
+            _add(name="?!", attached_to="deliver", outcome="end"),
         ),
     )
     assert [p["id"] for p in _paths(result.blueprint)] == [
@@ -416,3 +416,11 @@ def test_paths_through_the_api_and_the_mapping_names_them(client, db_session, mo
     assert removed.status_code == 200, removed.text
     mapping = client.get(f"/sessions/{sid}/bpmn/mapping").json()["mapping"]
     assert not any("exception" in entry for entry in mapping.values())
+
+
+def test_a_finnish_path_name_gives_a_readable_id() -> None:
+    result = apply_operations(
+        _plain_draft(), ops(_add(name="Kenttä väärin", attached_to="deliver", outcome="end"))
+    )
+
+    assert [p["id"] for p in _paths(result.blueprint)][-1] == "kentta_vaarin"

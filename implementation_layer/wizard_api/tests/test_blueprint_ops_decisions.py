@@ -173,7 +173,7 @@ def test_decision_ids_use_the_slug_rule() -> None:
             _add(name="Same name"),
             _add(name="Same name", after="upload"),
             _add(name="Ok", after="review", branches=_to("decision_ok", "end")),
-            _add(name="Äö?", after="decision_ok", branches=_to("archive", "end")),
+            _add(name="?!", after="decision_ok", branches=_to("archive", "end")),
         ),
     )
     assert [d["id"] for d in _decisions(result.blueprint)] == [
@@ -504,3 +504,9 @@ def test_the_mapping_names_an_empty_target_the_end() -> None:
     }
     entry = named_mapping(mapping, drawn)["Gateway_decision_ok"]
     assert entry["decision"]["branches"][1] == {"condition": "no", "target": "end"}
+
+
+def test_a_finnish_decision_name_gives_a_readable_id() -> None:
+    result = apply_operations(_plain_draft(), ops(_add(name="Hyväksytäänkö?", after="upload")))
+
+    assert [d["id"] for d in _decisions(result.blueprint)] == ["hyvaksytaanko"]

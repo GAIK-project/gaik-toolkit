@@ -173,6 +173,15 @@ def test_new_step_id_is_a_lower_case_slug_numbered_when_taken():
     assert new_step_id("???", {"step"}) == "step_2"
 
 
+def test_new_step_id_drops_the_marks_of_finnish_letters():
+    assert new_step_id("Käsittele lasku", set()) == "kasittele_lasku"
+    assert new_step_id("Tarkista ostotilaus ja hyväksyntä", set()) == (
+        "tarkista_ostotilaus_ja_hyvaksynta"
+    )
+    assert new_step_id("Åland-öljy", set()) == "aland_oljy"
+    assert new_step_id("Öö", {"oo"}) == "oo_2"
+
+
 # ---------------------------------------------------------------- schemas
 
 

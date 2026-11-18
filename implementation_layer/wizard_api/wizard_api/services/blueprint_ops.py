@@ -19,6 +19,7 @@ import copy
 import hashlib
 import json
 import re
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -140,9 +141,23 @@ class _Context:
 # ---------------------------------------------------------------- public helpers
 
 
+def _slug(name: str) -> str:
+    """``name`` as lower-case ASCII letters, digits and ``_``; empty when nothing is left.
+
+    Accented letters lose their marks first (NFKD), so "Käsittele lasku"
+    gives ``kasittele_lasku``, not ``k_sittele_lasku``.
+    """
+    decomposed = unicodedata.normalize("NFKD", name)
+    plain = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]+", "_", plain.lower()).strip("_")
+
+
 def new_step_id(name: str, existing: set[str]) -> str:
-    """A lower-case slug of ``name``, numbered ``_2``, ``_3``... when it is taken."""
-    base = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "step"
+    """A lower-case slug of ``name``, numbered ``_2``, ``_3``... when it is taken.
+
+    The rule of steps, lanes, decisions and rework paths alike (``_slug``).
+    """
+    base = _slug(name) or "step"
     candidate, number = base, 1
     while candidate in existing:
         number += 1
@@ -908,7 +923,7 @@ def _add_lane(ctx: _Context, op: AddLane) -> None:
     taken |= {s.get("id") for s in ctx.steps}
     for key in ("manual_steps", "external_parties"):
         taken |= {item.get("id") for item in ctx.process.get(key) or []}
-    lane_id = new_step_id(name if re.search(r"[a-z0-9]", name.lower()) else "lane", taken)
+    lane_id = new_step_id(name if _slug(name) else "lane", taken)
     participants.append({"id": lane_id, "name": name, "kind": op.kind, "default_lane_for": []})
     ctx.lanes_added.append(lane_id)
     ctx.summaries.append(f'Added lane "{name}"')
@@ -1022,7 +1037,7 @@ def _add_decision(ctx: _Context, op: AddDecision) -> None:
         for s in ctx.steps
         if str(s.get("id") or "").startswith(_DECISION_STEP_PREFIX)
     }
-    slug_of = name if re.search(r"[a-z0-9]", name.lower()) else "decision"
+    slug_of = name if _slug(name) else "decision"
     decision_id = new_step_id(slug_of, taken)
     decisions.append({"id": decision_id, "name": name, "after": op.after, "branches": branches})
     ctx.summaries.append(f'Added decision "{name}" after step "{_label(after)}"')
@@ -1119,7 +1134,7 @@ def _add_rework_path(ctx: _Context, op: AddReworkPath) -> None:
     # EndEvent_success and each review's EndEvent_rejected_<step id>.
     taken = {e.get("id") for e in exceptions} | {"success"}
     taken |= {f"rejected_{sid}" for sid in order}
-    slug_of = name if re.search(r"[a-z0-9]", name.lower()) else "path"
+    slug_of = name if _slug(name) else "path"
     exception = {
         "id": new_step_id(slug_of, taken),
         "name": name,

@@ -599,3 +599,11 @@ def _read(created: dict) -> dict:
     from test_patch_blueprint_writes_draft import _read_draft
 
     return _read_draft(created["output_dir"])
+
+
+def test_a_finnish_lane_name_gives_a_readable_id():
+    result = apply_operations(
+        _draft(), ops({"op": "add_lane", "name": "Käyttäjä"}, {"op": "add_lane", "name": "Öö"})
+    )
+
+    assert [p["id"] for p in _participants(result.blueprint)][-2:] == ["kayttaja", "oo"]
