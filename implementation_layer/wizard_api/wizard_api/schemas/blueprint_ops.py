@@ -23,6 +23,10 @@ MAX_OPERATIONS = 50
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_NAME_CHARS = 200
 MAX_DESCRIPTION_CHARS = 2000
+MAX_CONDITION_CHARS = 200
+#: A decision has 2 to 5 branches.
+MIN_BRANCHES = 2
+MAX_BRANCHES = 5
 
 
 class _Operation(BaseModel):
@@ -107,6 +111,40 @@ class SetStepLane(_Operation):
     lane_id: str | None
 
 
+class Branch(BaseModel):
+    """One way out of a decision: its condition and the step it leads to, or ``"end"``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    condition: str = Field(min_length=1, max_length=MAX_CONDITION_CHARS)
+    target: str
+
+
+class AddDecision(_Operation):
+    """A business decision (``business_process.decision_points``) after the step ``after``."""
+
+    op: Literal["add_decision"]
+    after: str
+    name: str = Field(max_length=MAX_NAME_CHARS)
+    branches: list[Branch] = Field(min_length=MIN_BRANCHES, max_length=MAX_BRANCHES)
+
+
+class UpdateDecision(_Operation):
+    """A decision's new name, or its branches replaced; ``None`` keeps what it has."""
+
+    op: Literal["update_decision"]
+    decision_id: str
+    name: str | None = Field(default=None, max_length=MAX_NAME_CHARS)
+    branches: list[Branch] | None = Field(
+        default=None, min_length=MIN_BRANCHES, max_length=MAX_BRANCHES
+    )
+
+
+class RemoveDecision(_Operation):
+    op: Literal["remove_decision"]
+    decision_id: str
+
+
 Operation = Annotated[
     (
         RenameStep
@@ -121,6 +159,9 @@ Operation = Annotated[
         | RenameLane
         | RemoveLane
         | SetStepLane
+        | AddDecision
+        | UpdateDecision
+        | RemoveDecision
     ),
     Field(discriminator="op"),
 ]

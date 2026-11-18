@@ -26,11 +26,14 @@ from typing import Any
 from pydantic import ValidationError
 
 from wizard_api.schemas.blueprint_ops import (
+    AddDecision,
     AddLane,
     AddStep,
+    Branch,
     Connect,
     Disconnect,
     MoveStep,
+    RemoveDecision,
     RemoveLane,
     RemoveStep,
     RenameLane,
@@ -38,6 +41,7 @@ from wizard_api.schemas.blueprint_ops import (
     SetStepDescription,
     SetStepLane,
     SetStepType,
+    UpdateDecision,
 )
 
 try:
@@ -67,7 +71,8 @@ def solution_wizard_available() -> bool:
 
 class OperationError(Exception):
     """An operation the draft cannot take. ``code`` is machine-readable:
-    ``not_found``, ``last_step``, ``cycle``, ``lane_in_use`` or ``invalid``."""
+    ``not_found``, ``last_step``, ``cycle``, ``lane_in_use``, ``unknown_step`` or
+    ``invalid``."""
 
     def __init__(
         self, code: str, message: str, field: str | None = None, index: int | None = None
@@ -812,6 +817,144 @@ def _set_step_lane(ctx: _Context, op: SetStepLane) -> None:
     ctx.summaries.append(f'Moved step "{_label(step)}" to lane "{_lane_name(lane)}"')
 
 
+# ---------------------------------------------------------------- decisions
+#
+# A business decision is a ``business_process.decision_points`` entry: the step
+# it comes ``after`` and its branches, each a condition and the step it leads
+# to, or ``"end"``. The generator draws it as ``Gateway_decision_<id>`` after
+# that step. A decision *step* (a ``workflow.steps`` entry of type
+# ``decision``) is another thing: a step, edited with the step operations.
+
+_END = "end"
+#: The prefix of the element id a decision step is drawn with: ``Gateway_<step id>``
+#: and ``Gateway_decision_<decision id>`` must not meet.
+_DECISION_STEP_PREFIX = "decision_"
+
+
+def _decision(ctx: _Context, decision_id: str) -> dict:
+    for decision in ctx.process.get("decision_points") or []:
+        if decision.get("id") == decision_id:
+            return decision
+    raise OperationError("not_found", f'There is no decision "{decision_id}"', "decision_id")
+
+
+def _decision_name(value: str) -> str:
+    name = value.strip()
+    if not name:
+        raise OperationError("invalid", "A decision needs a name", "name")
+    return name
+
+
+def _drawn_step_ids(ctx: _Context) -> set[str]:
+    """The steps a branch can lead to: the workflow's and the manual ones."""
+    ids = {s.get("id") for s in ctx.steps}
+    return ids | {m.get("id") for m in ctx.process.get("manual_steps") or []}
+
+
+def _flow_successors(ctx: _Context, leaving: dict | None) -> dict[str, set[str]]:
+    """Each step's next steps as the diagram draws them: by ``depends_on`` and
+    by every decision's branches but ``leaving``'s."""
+    successors: dict[str, set[str]] = {}
+    for item in [*ctx.steps, *(ctx.process.get("manual_steps") or [])]:
+        for dep in item.get("depends_on") or []:
+            successors.setdefault(dep, set()).add(item.get("id"))
+    for decision in ctx.process.get("decision_points") or []:
+        if decision is leaving:
+            continue
+        for branch in decision.get("branches") or []:
+            if branch.get("target") not in (_END, ""):
+                successors.setdefault(decision.get("after"), set()).add(branch.get("target"))
+    return successors
+
+
+def _reaches(successors: dict[str, set[str]], start: str, goal: str) -> bool:
+    seen, todo = set(), [start]
+    while todo:
+        node = todo.pop()
+        if node == goal:
+            return True
+        if node in seen:
+            continue
+        seen.add(node)
+        todo.extend(successors.get(node, ()))
+    return False
+
+
+def _branches(
+    ctx: _Context, after: str, branches: list[Branch], decision: dict | None
+) -> list[dict]:
+    """The branches as stored, or refused: an unknown target (``unknown_step``),
+    a blank condition, all leading to one place (a decision that decides
+    nothing), or one back to ``after`` or a step before it, a loop the
+    validator does not see (rule 8 reads ``depends_on`` only) and the layout
+    cannot draw."""
+    known = _drawn_step_ids(ctx)
+    out = []
+    for branch in branches:
+        condition = branch.condition.strip()
+        if not condition:
+            raise OperationError("invalid", "A branch needs a condition", "condition")
+        if branch.target != _END and branch.target not in known:
+            raise OperationError("unknown_step", f'There is no step "{branch.target}"', "target")
+        out.append({"condition": condition, "target": branch.target})
+    if len({b["target"] for b in out}) == 1:
+        raise OperationError(
+            "invalid", "The branches of a decision must not all lead to one place", "branches"
+        )
+    successors = _flow_successors(ctx, decision)
+    for b in out:
+        if b["target"] != _END and _reaches(successors, b["target"], after):
+            raise OperationError(
+                "cycle", f'A branch to "{b["target"]}" would lead back to "{after}"', "target"
+            )
+    return out
+
+
+def _add_decision(ctx: _Context, op: AddDecision) -> None:
+    if op.after not in {s.get("id") for s in ctx.steps}:
+        raise OperationError("unknown_step", f'There is no step "{op.after}"', "after")
+    after = ctx.step(op.after, "after")
+    name = _decision_name(op.name)
+    decisions = ctx.process.get("decision_points")
+    if not isinstance(decisions, list):
+        decisions = ctx.process["decision_points"] = []
+    if any(d.get("after") == op.after for d in decisions):
+        raise OperationError(
+            "invalid", f'Step "{_label(after)}" is already followed by a decision', "after"
+        )
+    branches = _branches(ctx, op.after, op.branches, None)
+    taken = {d.get("id") for d in decisions}
+    taken |= {
+        str(s.get("id"))[len(_DECISION_STEP_PREFIX) :]
+        for s in ctx.steps
+        if str(s.get("id") or "").startswith(_DECISION_STEP_PREFIX)
+    }
+    slug_of = name if re.search(r"[a-z0-9]", name.lower()) else "decision"
+    decision_id = new_step_id(slug_of, taken)
+    decisions.append({"id": decision_id, "name": name, "after": op.after, "branches": branches})
+    ctx.summaries.append(f'Added decision "{name}" after step "{_label(after)}"')
+
+
+def _update_decision(ctx: _Context, op: UpdateDecision) -> None:
+    decision = _decision(ctx, op.decision_id)
+    old_name = decision.get("name") or decision.get("id", "")
+    if op.branches is not None:
+        decision["branches"] = _branches(ctx, decision.get("after", ""), op.branches, decision)
+    if op.name is not None:
+        decision["name"] = _decision_name(op.name)
+    name = decision.get("name") or decision.get("id", "")
+    renamed = f' (was "{old_name}")' if name != old_name else ""
+    ctx.summaries.append(f'Changed decision "{name}"{renamed}')
+
+
+def _remove_decision(ctx: _Context, op: RemoveDecision) -> None:
+    decision = _decision(ctx, op.decision_id)
+    ctx.process["decision_points"] = [
+        d for d in ctx.process["decision_points"] if d is not decision
+    ]
+    ctx.summaries.append(f'Removed decision "{decision.get("name") or decision.get("id", "")}"')
+
+
 def _set_field(ctx: _Context, op: SetField) -> None:
     _FIELD_HANDLERS[op.field](ctx, op)
 
@@ -930,5 +1073,8 @@ _HANDLERS: dict[type, Callable[[_Context, Any], None]] = {
     RenameLane: _rename_lane,
     RemoveLane: _remove_lane,
     SetStepLane: _set_step_lane,
+    AddDecision: _add_decision,
+    UpdateDecision: _update_decision,
+    RemoveDecision: _remove_decision,
     SetField: _set_field,
 }

@@ -103,9 +103,12 @@ def _index(path: str, prefix: str) -> int | None:
 def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[str, Any]:
     """``mapping`` with what the editor needs beside the paths: each lane's
     ``participant_id`` (the id lane operations take, derived lanes included),
-    and each step's ``performed_by`` ("" when its type decides its lane)."""
+    each step's ``performed_by`` ("" when its type decides its lane), and each
+    business decision's ``decision`` (its id, name, step and branches, which
+    the decision dialog edits)."""
     process = drawn_from.get("business_process") or {}
     participants = process.get("participants") or []
+    decisions = process.get("decision_points") or []
     steps = (drawn_from.get("workflow") or {}).get("steps") or []
     named: dict[str, Any] = {}
     for element_id, entry in mapping.items():
@@ -117,12 +120,30 @@ def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[s
                 entry["participant_id"] = str(participants[i].get("id") or "")
             elif path in _DERIVED_LANE_IDS:
                 entry["participant_id"] = _DERIVED_LANE_IDS[path]
+        elif isinstance(entry, dict) and entry.get("kind") == "decision_point":
+            i = _index(path, "business_process.decision_points")
+            if i is not None and i < len(decisions) and isinstance(decisions[i], dict):
+                entry["decision"] = _decision_entry(decisions[i])
         elif isinstance(entry, dict):
             i = _index(path, "workflow.steps")
             if i is not None and i < len(steps) and isinstance(steps[i], dict):
                 entry["performed_by"] = str(steps[i].get("performed_by") or "")
         named[element_id] = entry
     return named
+
+
+def _decision_entry(decision: dict[str, Any]) -> dict[str, Any]:
+    branches = decision.get("branches") or []
+    return {
+        "id": str(decision.get("id") or ""),
+        "name": str(decision.get("name") or ""),
+        "after": str(decision.get("after") or ""),
+        "branches": [
+            {"condition": str(b.get("condition") or ""), "target": str(b.get("target") or "")}
+            for b in branches
+            if isinstance(b, dict)
+        ],
+    }
 
 
 def _render(
