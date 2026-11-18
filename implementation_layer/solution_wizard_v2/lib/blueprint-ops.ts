@@ -48,6 +48,12 @@ export const DECISION_END = "end";
 export const REWORK_END = "end";
 export const REWORK_LOOP_TO = "loop_to:";
 
+/** A data object's name (`Artifact.label`): `MAX_LABEL_CHARS` there. */
+export const MAX_LABEL_CHARS = 200;
+
+/** How a step has a data object: it uses it (`inputs`) or makes it (`outputs`). */
+export type DataRole = "input" | "output";
+
 /** One way out of a business decision: its condition and the step it leads to, or `"end"`. */
 export type DecisionBranch = { condition: string; target: string };
 
@@ -78,7 +84,13 @@ export type BlueprintOperation =
       condition?: string | null;
       outcome?: string | null;
     }
-  | { op: "remove_rework_path"; exception_id: string };
+  | { op: "remove_rework_path"; exception_id: string }
+  /** A data object's name in the diagram; "" clears it (the generated name is used again). */
+  | { op: "rename_data_object"; artifact_id: string; label: string }
+  /** The step uses the data object (input) or makes it (output); a second step that makes it is refused. */
+  | { op: "link_data"; artifact_id: string; step_id: string; role: DataRole }
+  /** The only step that makes a data object another step uses is refused (`still_used`). */
+  | { op: "unlink_data"; artifact_id: string; step_id: string; role: DataRole };
 
 export type OperationsResult = {
   blueprint: Blueprint;

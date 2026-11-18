@@ -395,6 +395,9 @@ export function BpmnDiagramPanel({
       case "readonly_section": {
         if (err.reason === "lane_in_use") return t.bpmnLaneInUse;
         if (err.reason === "cycle") return t.bpmnLoopRefused;
+        if (err.reason === "second_producer") return t.bpmnDataSecondProducer;
+        if (err.reason === "still_used") return t.bpmnDataStillUsed;
+        if (err.reason === "already_linked") return t.bpmnDataAlreadyLinked;
         const field = fieldInPlainWords(err.field, t);
         return field ? fillTemplate(t.bpmnOpRefusedField, { field }) : t.bpmnOpRefused;
       }
@@ -924,6 +927,8 @@ export function BpmnDiagramPanel({
             addRework: t.bpmnPadAddRework,
             editRework: t.bpmnPadEditRework,
             removeRework: t.bpmnPadRemoveRework,
+            renameDataObject: t.bpmnPadRenameDataObject,
+            connectData: t.bpmnPadConnectData,
           }}
           ops={stableOps}
           onSelectionChange={setSelection}

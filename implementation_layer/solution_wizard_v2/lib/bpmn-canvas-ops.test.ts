@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  dataObjectOf,
+  opForDataObjectRename,
   exceptionOf,
   opForRework,
   reworkProblem,
@@ -466,5 +468,104 @@ describe("rework and rejection paths", () => {
       condition: "",
       outcome: "end",
     });
+  });
+});
+
+describe("data objects", () => {
+  // The mapping names a drawn data object's artifact and its label ("" when the generator names it).
+  const DATA: BpmnMapping = {
+    ...MAPPING,
+    DataObjectRef_invoice: {
+      kind: "data_object",
+      blueprint_path: "artifacts.invoice",
+      data_object: { id: "invoice", label: "" },
+    },
+    DataObjectRef_fields: {
+      kind: "data_object",
+      blueprint_path: "artifacts.fields",
+      data_object: { id: "fields", label: "Invoice fields" },
+    },
+    DataStoreRef_erp: { kind: "data_store", blueprint_path: "technical_spec.integration_targets[0]" },
+  };
+
+  it("dataObjectOf names the artifact behind a data object, and nothing else", () => {
+    expect(dataObjectOf("DataObjectRef_fields", DATA)).toEqual({ id: "fields", label: "Invoice fields" });
+    expect(dataObjectOf("DataStoreRef_erp", DATA)).toBeNull();
+    expect(dataObjectOf("Activity_extract", DATA)).toBeNull();
+    // A mapping without the artifact (an older wizard_api): no data tools.
+    expect(dataObjectOf("DataObjectRef_invoice", MAPPING)).toBeNull();
+  });
+
+  it("a typed name is rename_data_object; an emptied one clears the label", () => {
+    expect(opForDataObjectRename("DataObjectRef_fields", " Fields read ", "Invoice fields", DATA)).toEqual({
+      op: "rename_data_object",
+      artifact_id: "fields",
+      label: "Fields read",
+    });
+    expect(opForDataObjectRename("DataObjectRef_fields", "  ", "Invoice fields", DATA)).toEqual({
+      op: "rename_data_object",
+      artifact_id: "fields",
+      label: "",
+    });
+    expect(opForDataObjectRename("DataObjectRef_invoice", "Scanned invoice", "Invoice", DATA)).toEqual({
+      op: "rename_data_object",
+      artifact_id: "invoice",
+      label: "Scanned invoice",
+    });
+  });
+
+  it("is null for an unchanged name, an emptied generated name and what is no data object", () => {
+    expect(opForDataObjectRename("DataObjectRef_fields", "Invoice fields", "Invoice fields", DATA)).toBeNull();
+    // No label of its own: the generated name kept, or emptied, changes nothing.
+    expect(opForDataObjectRename("DataObjectRef_invoice", "Invoice", "Invoice", DATA)).toBeNull();
+    expect(opForDataObjectRename("DataObjectRef_invoice", "", "Invoice", DATA)).toBeNull();
+    expect(opForDataObjectRename("DataStoreRef_erp", "ERP", "Store", DATA)).toBeNull();
+    expect(opForDataObjectRename("Activity_extract", "X", "Extract", DATA)).toBeNull();
+  });
+
+  it("a line from a data object to a step is an input, from a step to a data object an output", () => {
+    expect(opForConnection("DataObjectRef_invoice", "Activity_review", DATA, STEPS)).toEqual({
+      op: "link_data",
+      artifact_id: "invoice",
+      step_id: "review",
+      role: "input",
+    });
+    expect(opForConnection("Activity_extract", "DataObjectRef_fields", DATA, STEPS)).toEqual({
+      op: "link_data",
+      artifact_id: "fields",
+      step_id: "extract",
+      role: "output",
+    });
+    expect(opForConnection("DataObjectRef_invoice", "DataObjectRef_fields", DATA, STEPS)).toBeNull();
+    expect(opForConnection("DataStoreRef_erp", "Activity_review", DATA, STEPS)).toBeNull();
+    expect(opForConnection("DataObjectRef_invoice", "Activity_archive", DATA, STEPS)).toBeNull();
+  });
+
+  it("deleting a data association is unlink_data, with the role from its kind", () => {
+    const input = { id: "DataAssoc_1", type: "bpmn:DataInputAssociation", source: "DataObjectRef_invoice", target: "Activity_extract" };
+    const output = { id: "DataAssoc_2", type: "bpmn:DataOutputAssociation", source: "Activity_extract", target: "DataObjectRef_fields" };
+    expect(opForDelete(input, DATA, STEPS)).toEqual({
+      op: "unlink_data",
+      artifact_id: "invoice",
+      step_id: "extract",
+      role: "input",
+    });
+    expect(opForDelete(output, DATA, STEPS)).toEqual({
+      op: "unlink_data",
+      artifact_id: "fields",
+      step_id: "extract",
+      role: "output",
+    });
+    expect(isOperationElement(input, DATA, STEPS)).toBe(true);
+    // A data store's association stays as it is.
+    const store = { id: "DataAssoc_3", type: "bpmn:DataOutputAssociation", source: "Activity_extract", target: "DataStoreRef_erp" };
+    expect(opForDelete(store, DATA, STEPS)).toBeNull();
+    expect(isOperationElement(store, DATA, STEPS)).toBe(false);
+  });
+
+  it("a data object has tools but no Delete of its own", () => {
+    expect(isOperationElement({ id: "DataObjectRef_fields", type: "bpmn:DataObjectReference" }, DATA, STEPS)).toBe(true);
+    expect(opForDelete({ id: "DataObjectRef_fields", type: "bpmn:DataObjectReference" }, DATA, STEPS)).toBeNull();
+    expect(isOperationElement({ id: "DataStoreRef_erp", type: "bpmn:DataStoreReference" }, DATA, STEPS)).toBe(false);
   });
 });

@@ -37,6 +37,13 @@
  *   Delete key) is `remove_rework_path`. A path's elements are its gateway,
  *   its end event, and the approval gateway of a review whose "No" is the
  *   path's loop back.
+ * - Data objects (drawn only with "Show data" on): a data object's pad renames
+ *   it in place (`rename_data_object`, an emptied name clears its own) and
+ *   starts a line to a step. The connect tool between a data object and a
+ *   step is `link_data`: from the data object the step uses it (input), from
+ *   the step it makes it (output). Deleting such an association is
+ *   `unlink_data`. A data object itself has no Delete; data stores (drawn
+ *   from the integration targets) have no tools.
  *
  * Labels and the operations come in through the modeler's `gaikEditor`
  * config, read each time they are needed.
@@ -46,6 +53,7 @@ import RuleProvider from "diagram-js/lib/features/rules/RuleProvider";
 import type { BlueprintOperation, StepType } from "@/lib/blueprint-ops";
 import { STEP_OP_TYPES } from "@/lib/step-panel-model";
 import {
+  dataObjectOf,
   decisionOf,
   exceptionOf,
   isDecisionStep,
@@ -54,6 +62,7 @@ import {
   opForAddStep,
   opForAppend,
   opForConnection,
+  opForDataObjectRename,
   opForDelete,
   opForLabelUpdate,
   opForLaneRename,
@@ -98,6 +107,9 @@ export type BpmnEditorLabels = {
   addRework: string;
   editRework: string;
   removeRework: string;
+  /** A data object's pad: rename it in place, and draw a line from it to a step. */
+  renameDataObject: string;
+  connectData: string;
 };
 
 /** What the branch dialog opens for: a new decision after a step, or a decision to edit. */
@@ -152,7 +164,7 @@ type Shape = {
   labelTarget?: Shape;
   parent?: Element;
   /** The BPMN element; a lane's lists the flow nodes in it (`flowNodeRef`). */
-  businessObject?: { id?: string; flowNodeRef?: unknown[] };
+  businessObject?: { id?: string; name?: string; flowNodeRef?: unknown[] };
   incoming?: Connection[];
   outgoing?: Connection[];
   waypoints?: undefined;
@@ -394,6 +406,18 @@ class GaikContextPad {
           },
         };
       }
+      if (dataObjectOf(element.id, mapping)) {
+        const out: Entries = {
+          "gaik-data-rename": {
+            group: "edit",
+            imageUrl: PENCIL,
+            title: labels.renameDataObject,
+            action: { click: () => this.directEditing.activate(element) },
+          },
+        };
+        if (entries.connect) out.connect = { ...entries.connect, group: "connect", title: labels.connectData };
+        return out;
+      }
       const path = exceptionOf(element.id, mapping);
       if (path) {
         return {
@@ -631,18 +655,28 @@ class GaikRules extends RuleProvider {
       const c = ctx();
       return Boolean(el && c && stepIdOf(owner(el).id, c.mapping, c.steps));
     };
+    const isData = (el?: Element) => {
+      const c = ctx();
+      return Boolean(el && c && dataObjectOf(owner(el).id, c.mapping));
+    };
     this.addRule("elements.delete", 2000, (context: { elements: Element[] }) => {
       const c = ctx();
       if (!c || context.elements.length !== 1) return false;
       const [el] = context.elements;
-      return el === owner(el) && isOperationElement(canvasElement(el), c.mapping, c.steps) ? [el] : false;
+      // A data object has tools but no Delete: only what an operation removes goes.
+      return el === owner(el) && opForDelete(canvasElement(el), c.mapping, c.steps) ? [el] : false;
     });
     this.addRule("shape.resize", 2000, () => false);
     this.addRule(["shape.create", "elements.create", "elements.paste", "element.copy", "shape.attach"], 2000, () => false);
-    this.addRule("connection.start", 2000, (context: { source?: Element }) => (isStep(context.source) ? undefined : false));
-    this.addRule("connection.create", 2000, (context: { source?: Element; target?: Element }) =>
-      isStep(context.source) && isStep(context.target) && context.source !== context.target ? undefined : false,
+    this.addRule("connection.start", 2000, (context: { source?: Element }) =>
+      isStep(context.source) || isData(context.source) ? undefined : false,
     );
+    // Between two steps (a flow), or a data object and a step (bpmn-js makes it a data association).
+    this.addRule("connection.create", 2000, (context: { source?: Element; target?: Element }) => {
+      const { source, target } = context;
+      if (isStep(source) && isStep(target)) return source !== target ? undefined : false;
+      return (isData(source) && isStep(target)) || (isStep(source) && isData(target)) ? undefined : false;
+    });
     this.addRule("connection.reconnect", 2000, () => false);
     this.addRule(
       "elements.move",
@@ -737,11 +771,13 @@ class GaikOperations {
     // While a name is typed in place the context pad goes: its tools would start an edit over it.
     eventBus.on("directEditing.activate", () => contextPad.close());
 
-    // Double-click and the E key rename in place: a step or a lane.
+    // Double-click and the E key rename in place: a step, a lane or a data object.
     eventBus.on("directEditing.activate.allowed", 2000, (e: { element: Element }) => {
       const c = this.config.ops?.context();
       const id = owner(e.element).id;
-      return c && (stepIdOf(id, c.mapping, c.steps) || laneIdOf(id, c.mapping)) ? undefined : false;
+      return c && (stepIdOf(id, c.mapping, c.steps) || laneIdOf(id, c.mapping) || dataObjectOf(id, c.mapping))
+        ? undefined
+        : false;
     });
 
     // Why an element has no tools, while the pointer is on it.
@@ -790,6 +826,10 @@ class GaikOperations {
         if (owner(element).type === "bpmn:Lane") {
           const oldLabel = top.context.oldLabel as string | undefined;
           return send(opForLaneRename(owner(element).id, top.context.newLabel as string, oldLabel, ctx.mapping));
+        }
+        if (dataObjectOf(owner(element).id, ctx.mapping)) {
+          const oldLabel = top.context.oldLabel as string | undefined;
+          return send(opForDataObjectRename(owner(element).id, top.context.newLabel as string, oldLabel, ctx.mapping));
         }
         return send(opForLabelUpdate(owner(element).id, top.context.newLabel as string, ctx.mapping, ctx.steps));
       }

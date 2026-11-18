@@ -260,6 +260,13 @@ export type Dict = {
   bpmnReworkBackTo: string;
   bpmnReworkEnd: string;
   bpmnReworkSave: string;
+  /** Data objects: a data object's pad (rename it in place, draw a line to a step). */
+  bpmnPadRenameDataObject: string;
+  bpmnPadConnectData: string;
+  /** Refused data object edits: another step makes it; the only step that makes a used one; a link the step has. */
+  bpmnDataSecondProducer: string;
+  bpmnDataStillUsed: string;
+  bpmnDataAlreadyLinked: string;
   /** The step panel's lane select, and its entry for the lane of the step's type. */
   bpmnStepLane: string;
   bpmnStepLaneDefault: string;
@@ -1115,6 +1122,13 @@ const fi: Dict = {
   bpmnReworkBackTo: "Takaisin vaiheeseen: {step}",
   bpmnReworkEnd: "Prosessi päättyy",
   bpmnReworkSave: "Tallenna polku",
+  bpmnPadRenameDataObject: "Nimeä dataobjekti uudelleen",
+  bpmnPadConnectData: "Yhdistä vaiheeseen: vaihe käyttää dataobjektia",
+  bpmnDataSecondProducer:
+    "Muutosta ei tehty: toinen vaihe tuottaa jo tämän dataobjektin. Dataobjektin tuottaa yksi vaihe.",
+  bpmnDataStillUsed:
+    "Yhteyttä ei poistettu: vaihe on ainoa, joka tuottaa tämän dataobjektin, ja toinen vaihe käyttää sitä. Poista ensin se käyttö.",
+  bpmnDataAlreadyLinked: "Muutosta ei tehty: vaihe on jo yhdistetty tähän dataobjektiin.",
   bpmnStepLane: "Kaista (kuka tekee)",
   bpmnStepLaneDefault: "Tyypin oletuskaista",
   bpmnUndo: "Kumoa",
@@ -1140,6 +1154,9 @@ const fi: Dict = {
     attached_to: "vaihe, jolla polku on",
     outcome: "polun jatko",
     exception_id: "polku",
+    artifact_id: "dataobjekti",
+    label: "dataobjektin nimi",
+    role: "dataobjektin käyttö",
   },
   bpmnSaved: "Tallennettu. Wizard näkee muutoksen seuraavasta chat-viestistäsi.",
   bpmnStepTitle: "Vaihe {n}",
@@ -2013,6 +2030,13 @@ const en: Dict = {
   bpmnReworkBackTo: "Back to step: {step}",
   bpmnReworkEnd: "The process ends",
   bpmnReworkSave: "Save the path",
+  bpmnPadRenameDataObject: "Rename the data object",
+  bpmnPadConnectData: "Connect to a step: the step uses the data object",
+  bpmnDataSecondProducer:
+    "The change was not made: another step already makes this data object. One step makes a data object.",
+  bpmnDataStillUsed:
+    "The link was not removed: this step is the only one that makes the data object, and another step uses it. Remove that use first.",
+  bpmnDataAlreadyLinked: "The change was not made: the step is already linked to this data object.",
   bpmnStepLane: "Lane (who does it)",
   bpmnStepLaneDefault: "Default for its type",
   bpmnUndo: "Undo",
@@ -2038,6 +2062,9 @@ const en: Dict = {
     attached_to: "step the path is on",
     outcome: "where the path leads",
     exception_id: "path",
+    artifact_id: "data object",
+    label: "data object's name",
+    role: "how the step uses the data object",
   },
   bpmnSaved: "Saved. The wizard sees the change from your next chat message.",
   bpmnStepTitle: "Step {n}",

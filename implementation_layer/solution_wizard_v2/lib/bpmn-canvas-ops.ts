@@ -18,9 +18,19 @@
  * and a step can get a decision after it. Rework and rejection paths: the
  * mapping names the path (`exception`) behind the elements that draw it (its
  * gateway, its end event, or the approval gateway whose "No" loops back), so
- * it can be edited and removed, and a step can get a new one.
+ * it can be edited and removed, and a step can get a new one. Data objects:
+ * the mapping names a drawn data object's artifact (`data_object`), so it can
+ * be renamed, linked to a step with the connect tool (from the data object an
+ * input, to it an output) and unlinked by deleting its association. Data
+ * stores are drawn from the integration targets and stay as they are.
  */
-import { MAX_BRANCHES, MIN_BRANCHES, type BlueprintOperation, type DecisionBranch } from "@/lib/blueprint-ops";
+import {
+  MAX_BRANCHES,
+  MIN_BRANCHES,
+  type BlueprintOperation,
+  type DataRole,
+  type DecisionBranch,
+} from "@/lib/blueprint-ops";
 
 /** A business decision (`business_process.decision_points[i]`), as the mapping names it. */
 export type DecisionRef = { id: string; name: string; after: string; branches: DecisionBranch[] };
@@ -30,6 +40,9 @@ export type DecisionRef = { id: string; name: string; after: string; branches: D
  * mapping names it: `outcome` is `"end"` or `"loop_to:<step id>"`.
  */
 export type ExceptionRef = { id: string; name: string; attached_to: string; condition: string; outcome: string };
+
+/** A data object (`artifacts.<id>`), as the mapping names it: `label` is "" when the generator names it. */
+export type DataObjectRef = { id: string; label: string };
 
 export type BpmnMapping = Record<
   string,
@@ -44,6 +57,8 @@ export type BpmnMapping = Record<
     decision?: DecisionRef;
     /** An element that draws a rework or rejection path: the path. */
     exception?: ExceptionRef;
+    /** A data object's: its artifact. */
+    data_object?: DataObjectRef;
   }
 >;
 
@@ -112,7 +127,11 @@ export function opForLabelUpdate(
   return { op: "rename_step", step_id: stepId, name };
 }
 
-/** A line drawn with the connect tool: connect, when both ends are steps. */
+/**
+ * A line drawn with the connect tool: connect, when both ends are steps;
+ * link_data between a data object and a step, an input when the line starts
+ * at the data object and an output when it ends there.
+ */
 export function opForConnection(
   sourceId: string,
   targetId: string,
@@ -121,20 +140,44 @@ export function opForConnection(
 ): BlueprintOperation | null {
   const source = stepIdOf(sourceId, mapping, steps);
   const target = stepIdOf(targetId, mapping, steps);
+  const fromData = dataObjectOf(sourceId, mapping);
+  const toData = dataObjectOf(targetId, mapping);
+  if (fromData && target) return { op: "link_data", artifact_id: fromData.id, step_id: target, role: "input" };
+  if (source && toData) return { op: "link_data", artifact_id: toData.id, step_id: source, role: "output" };
   if (!source || !target || source === target) return null;
   return { op: "connect", source, target };
+}
+
+/** The association kinds bpmn-js draws a step's link to a data object with, and the role each is. */
+const DATA_ASSOCIATIONS: Record<string, DataRole> = {
+  "bpmn:DataInputAssociation": "input",
+  "bpmn:DataOutputAssociation": "output",
+};
+
+function associationRole(type: string): DataRole | null {
+  return Object.prototype.hasOwnProperty.call(DATA_ASSOCIATIONS, type) ? DATA_ASSOCIATIONS[type] : null;
 }
 
 /**
  * Delete: remove_step for a step's task, remove_decision for a business
  * decision, remove_rework_path for an element that draws a path, disconnect
- * for a flow between two steps.
+ * for a flow between two steps, unlink_data for the association between a
+ * data object and a step (an input runs from the data object to the step, an
+ * output from the step to it). A data object itself has no Delete.
  */
 export function opForDelete(
   element: CanvasElement,
   mapping: BpmnMapping,
   steps: StepRef[],
 ): BlueprintOperation | null {
+  const role = associationRole(element.type);
+  if (role) {
+    if (!element.source || !element.target) return null;
+    const [dataEnd, stepEnd] = role === "input" ? [element.source, element.target] : [element.target, element.source];
+    const data = dataObjectOf(dataEnd, mapping);
+    const stepId = stepIdOf(stepEnd, mapping, steps);
+    return data && stepId ? { op: "unlink_data", artifact_id: data.id, step_id: stepId, role } : null;
+  }
   if (element.type === "bpmn:SequenceFlow") {
     if (!element.source || !element.target) return null;
     const source = stepIdOf(element.source, mapping, steps);
@@ -149,13 +192,20 @@ export function opForDelete(
   return stepId ? { op: "remove_step", step_id: stepId } : null;
 }
 
-/** Whether the canvas offers edits on `element`: a step's task, a business decision, a path, or a flow between two steps. */
+/**
+ * Whether the canvas offers edits on `element`: a step's task, a business
+ * decision, a path, a data object, a flow between two steps, or a data
+ * object's association with a step.
+ */
 export function isOperationElement(element: CanvasElement, mapping: BpmnMapping, steps: StepRef[]): boolean {
-  if (element.type === "bpmn:SequenceFlow") return opForDelete(element, mapping, steps) !== null;
+  if (element.type === "bpmn:SequenceFlow" || associationRole(element.type)) {
+    return opForDelete(element, mapping, steps) !== null;
+  }
   return (
     stepIdOf(element.id, mapping, steps) !== null ||
     decisionOf(element.id, mapping) !== null ||
-    exceptionOf(element.id, mapping) !== null
+    exceptionOf(element.id, mapping) !== null ||
+    dataObjectOf(element.id, mapping) !== null
   );
 }
 
@@ -368,4 +418,33 @@ export function opForRework(
     ...(outcome !== was.outcome ? { outcome } : {}),
   };
   return Object.keys(changed).length ? { op: "update_rework_path", exception_id: was.id, ...changed } : null;
+}
+
+/**
+ * The data object behind `elementId`: an element the mapping names as a
+ * `data_object` with its artifact. Null for anything else, a data store too.
+ */
+export function dataObjectOf(elementId: string, mapping: BpmnMapping): DataObjectRef | null {
+  const entry = entryOf(elementId, mapping);
+  const data = entry?.kind === "data_object" ? entry.data_object : undefined;
+  return data && typeof data.id === "string" && data.id ? { id: data.id, label: data.label ?? "" } : null;
+}
+
+/**
+ * A data object's name typed in place: rename_data_object with the trimmed
+ * name, "" to clear its own name. Null when nothing changes: the name it has,
+ * or, for one the generator names (no label), the drawn name kept or emptied.
+ */
+export function opForDataObjectRename(
+  elementId: string,
+  newLabel: string | null | undefined,
+  drawnLabel: string | null | undefined,
+  mapping: BpmnMapping,
+): BlueprintOperation | null {
+  const data = dataObjectOf(elementId, mapping);
+  if (!data) return null;
+  const label = (newLabel ?? "").trim();
+  if (label === data.label) return null;
+  if (!data.label && (!label || label === (drawnLabel ?? "").trim())) return null;
+  return { op: "rename_data_object", artifact_id: data.id, label };
 }

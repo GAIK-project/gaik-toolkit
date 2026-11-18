@@ -27,6 +27,14 @@ describe("blueprint field names", () => {
     }
   });
 
+  it("says the fields of a data object's edits in plain words, in both languages", () => {
+    expect(fieldInPlainWords("operations[0].artifact_id", dictionary("en"))).toBe("data object");
+    for (const key of ["artifact_id", "label", "role"]) {
+      expect(dictionary("fi").blueprintFieldNames[key], key).toBeTruthy();
+      expect(dictionary("en").blueprintFieldNames[key], key).toBeTruthy();
+    }
+  });
+
   it("is null for a field it has no words for", () => {
     expect(fieldInPlainWords("operations[0].mystery", dictionary("en"))).toBeNull();
   });
