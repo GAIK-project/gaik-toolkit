@@ -100,6 +100,10 @@ def _index(path: str, prefix: str) -> int | None:
     return int(number) if number.isdigit() else None
 
 
+#: A data object's mapping path: ``artifacts.<artifact id>``.
+_ARTIFACTS_PREFIX = "artifacts."
+
+
 def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[str, Any]:
     """``mapping`` with what the editor needs beside the paths: each lane's
     ``participant_id`` (the id lane operations take, derived lanes included),
@@ -108,12 +112,15 @@ def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[s
     the decision dialog edits), and the ``exception`` of each element that
     draws a rework or rejection path (its id, name, step, condition and
     outcome, which the path dialog edits): the path's gateway and end event,
-    and the approval gateway of a review step whose "No" is the path's loop."""
+    and the approval gateway of a review step whose "No" is the path's loop.
+    Each data object's ``data_object`` is its artifact's id and ``label`` ("" when
+    the generator names it), which a rename and the link operations take."""
     process = drawn_from.get("business_process") or {}
     participants = process.get("participants") or []
     decisions = process.get("decision_points") or []
     steps = (drawn_from.get("workflow") or {}).get("steps") or []
     paths = _paths_of(drawn_from)
+    artifacts = drawn_from.get("artifacts") or {}
     named: dict[str, Any] = {}
     for element_id, entry in mapping.items():
         entry = dict(entry) if isinstance(entry, dict) else entry
@@ -131,6 +138,14 @@ def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[s
             i = _index(path, "business_process.decision_points")
             if i is not None and i < len(decisions) and isinstance(decisions[i], dict):
                 entry["decision"] = _decision_entry(decisions[i])
+        elif isinstance(entry, dict) and entry.get("kind") == "data_object":
+            artifact_id = path[len(_ARTIFACTS_PREFIX) :]
+            artifact = artifacts.get(artifact_id) if path.startswith(_ARTIFACTS_PREFIX) else None
+            if isinstance(artifact, dict):
+                entry["data_object"] = {
+                    "id": artifact_id,
+                    "label": str(artifact.get("label") or ""),
+                }
         elif isinstance(entry, dict):
             i = _index(path, "workflow.steps")
             if i is not None and i < len(steps) and isinstance(steps[i], dict):

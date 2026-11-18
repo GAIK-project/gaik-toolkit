@@ -33,16 +33,19 @@ from wizard_api.schemas.blueprint_ops import (
     Branch,
     Connect,
     Disconnect,
+    LinkData,
     MoveStep,
     RemoveDecision,
     RemoveLane,
     RemoveReworkPath,
     RemoveStep,
+    RenameDataObject,
     RenameLane,
     RenameStep,
     SetStepDescription,
     SetStepLane,
     SetStepType,
+    UnlinkData,
     UpdateDecision,
     UpdateReworkPath,
 )
@@ -74,8 +77,8 @@ def solution_wizard_available() -> bool:
 
 class OperationError(Exception):
     """An operation the draft cannot take. ``code`` is machine-readable:
-    ``not_found``, ``last_step``, ``cycle``, ``lane_in_use``, ``unknown_step`` or
-    ``invalid``."""
+    ``not_found``, ``last_step``, ``cycle``, ``lane_in_use``, ``unknown_step``,
+    ``already_linked``, ``second_producer``, ``still_used`` or ``invalid``."""
 
     def __init__(
         self, code: str, message: str, field: str | None = None, index: int | None = None
@@ -1137,6 +1140,131 @@ def _remove_rework_path(ctx: _Context, op: RemoveReworkPath) -> None:
     ctx.summaries.append(f'Removed {_path_words(exception)} "{name}"')
 
 
+# ---------------------------------------------------------------- data objects
+#
+# A data object is an ``artifacts`` entry, drawn as ``DataObjectRef_<id>`` and
+# named by its ``label``. A step uses it (``inputs``) or makes it
+# (``outputs``); a generated one names the step that makes it in
+# ``produced_by``. One step makes a data object: rule 6 of the validator lets
+# two make it only when it is flagged ``overwrite``, which the diagram cannot
+# show, so a second one is refused.
+
+_ROLE_LISTS = {"input": "inputs", "output": "outputs"}
+_GENERATED = "generated"
+
+
+def _artifact(ctx: _Context, artifact_id: str) -> dict:
+    artifact = (ctx.blueprint.get("artifacts") or {}).get(artifact_id)
+    if not isinstance(artifact, dict):
+        raise OperationError("not_found", f'There is no data object "{artifact_id}"', "artifact_id")
+    return artifact
+
+
+def _data_name(artifact_id: str, artifact: dict) -> str:
+    return artifact.get("label") or artifact_id
+
+
+def _label_data_object(ctx: _Context, artifact_id: str, value: str, field_name: str) -> None:
+    """Sets the artifact's label, or clears it when ``value`` is empty."""
+    artifact = (ctx.blueprint.get("artifacts") or {}).get(artifact_id)
+    if not isinstance(artifact, dict):
+        raise OperationError("not_found", f'There is no artifact "{artifact_id}"', field_name)
+    old = artifact.get("label") or ""
+    if old == value:
+        return
+    if value:
+        artifact["label"] = value
+        ctx.summaries.append(f'Renamed data object "{artifact_id}" to "{value}"')
+    else:
+        # No label: the diagram names the data object itself again.
+        artifact.pop("label", None)
+        ctx.summaries.append(f'Cleared the name of data object "{artifact_id}"')
+
+
+def _rename_data_object(ctx: _Context, op: RenameDataObject) -> None:
+    _label_data_object(ctx, op.artifact_id, op.label.strip(), "artifact_id")
+
+
+def _producers(ctx: _Context, artifact_id: str) -> list[dict]:
+    return [s for s in ctx.steps if artifact_id in (s.get("outputs") or [])]
+
+
+def _users(ctx: _Context, artifact_id: str) -> list[str]:
+    """The steps and manual steps that use the data object, by name."""
+    users = [_label(s) for s in ctx.steps if artifact_id in (s.get("inputs") or [])]
+    manual = ctx.process.get("manual_steps") or []
+    return users + [_label(m) for m in manual if artifact_id in (m.get("consumes") or [])]
+
+
+def _link_data(ctx: _Context, op: LinkData) -> None:
+    artifact = _artifact(ctx, op.artifact_id)
+    step = ctx.step(op.step_id, "step_id")
+    links = step.setdefault(_ROLE_LISTS[op.role], [])
+    name = _data_name(op.artifact_id, artifact)
+    verb = "uses" if op.role == "input" else "makes"
+    if op.artifact_id in links:
+        raise OperationError(
+            "already_linked", f'Step "{_label(step)}" already {verb} "{name}"', "artifact_id"
+        )
+    if op.role == "output":
+        other = next((s for s in _producers(ctx, op.artifact_id) if s is not step), None)
+        if other is not None:
+            raise OperationError(
+                "second_producer",
+                f'Data object "{name}" is made by step "{_label(other)}"; a data object '
+                "is made by one step",
+                "artifact_id",
+            )
+        if artifact.get("source") == _GENERATED:
+            artifact["produced_by"] = step["id"]
+    links.append(op.artifact_id)
+    ctx.summaries.append(f'Step "{_label(step)}" now {verb} data object "{name}"')
+
+
+def _unlink_data(ctx: _Context, op: UnlinkData) -> None:
+    artifact = _artifact(ctx, op.artifact_id)
+    step = ctx.step(op.step_id, "step_id")
+    key = _ROLE_LISTS[op.role]
+    name = _data_name(op.artifact_id, artifact)
+    verb = "uses" if op.role == "input" else "makes"
+    if op.artifact_id not in (step.get(key) or []):
+        raise OperationError(
+            "not_found", f'Step "{_label(step)}" does not {verb[:-1]} "{name}"', "artifact_id"
+        )
+    if op.role == "output":
+        others = [s for s in _producers(ctx, op.artifact_id) if s is not step]
+        users = _users(ctx, op.artifact_id)
+        if not others and users:
+            raise OperationError(
+                "still_used",
+                f'Step "{_label(step)}" is the only one that makes "{name}", which '
+                f"{', '.join(users[:5])} use",
+                "artifact_id",
+            )
+    step[key] = [a for a in step[key] if a != op.artifact_id]
+    ctx.summaries.append(f'Step "{_label(step)}" no longer {verb} data object "{name}"')
+    if op.role != "output" or artifact.get("source") != _GENERATED:
+        return
+    if others:
+        if artifact.get("produced_by") == step["id"]:
+            artifact["produced_by"] = others[0]["id"]
+        return
+    # A generated data object that no step makes and none uses: it goes.
+    _drop_artifact(ctx, op.artifact_id)
+    ctx.warnings.append(
+        f'Removed data object "{name}": a generated data object needs the step that makes it'
+    )
+
+
+def _drop_artifact(ctx: _Context, artifact_id: str) -> None:
+    """Removes the artifact and what names it besides the steps' links."""
+    del ctx.blueprint["artifacts"][artifact_id]
+    for party in ctx.process.get("external_parties") or []:
+        party["sends"] = [a for a in party.get("sends", []) if a != artifact_id]
+    for manual in ctx.process.get("manual_steps") or []:
+        manual["produces"] = [a for a in manual.get("produces", []) if a != artifact_id]
+
+
 def _set_field(ctx: _Context, op: SetField) -> None:
     _FIELD_HANDLERS[op.field](ctx, op)
 
@@ -1216,19 +1344,7 @@ def _set_step_settings(ctx: _Context, op: SetField) -> None:
 
 
 def _set_artifact_label(ctx: _Context, op: SetField) -> None:
-    artifacts = ctx.blueprint.get("artifacts") or {}
-    artifact = artifacts.get(op.target)
-    if not isinstance(artifact, dict):
-        raise OperationError("not_found", f'There is no artifact "{op.target}"', "data_objects")
-    if (artifact.get("label") or "") == op.value:
-        return
-    if op.value:
-        artifact["label"] = op.value
-        ctx.summaries.append(f'Renamed data object "{op.target}" to "{op.value}"')
-    else:
-        # No label: the diagram names the data object itself again.
-        artifact.pop("label", None)
-        ctx.summaries.append(f'Cleared the name of data object "{op.target}"')
+    _label_data_object(ctx, str(op.target), op.value, "data_objects")
 
 
 _FIELD_HANDLERS: dict[str, Callable[[_Context, SetField], None]] = {
@@ -1261,5 +1377,8 @@ _HANDLERS: dict[type, Callable[[_Context, Any], None]] = {
     AddReworkPath: _add_rework_path,
     UpdateReworkPath: _update_rework_path,
     RemoveReworkPath: _remove_rework_path,
+    RenameDataObject: _rename_data_object,
+    LinkData: _link_data,
+    UnlinkData: _unlink_data,
     SetField: _set_field,
 }

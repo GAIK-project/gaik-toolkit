@@ -29,6 +29,10 @@ MIN_BRANCHES = 2
 MAX_BRANCHES = 5
 #: ``"loop_to:"`` and a step id.
 MAX_OUTCOME_CHARS = 300
+#: ``Artifact.label`` in solution_wizard's blueprint.
+MAX_LABEL_CHARS = 200
+#: How a step has a data object: it uses it (``inputs``) or makes it (``outputs``).
+DataRole = Literal["input", "output"]
 
 
 class _Operation(BaseModel):
@@ -174,6 +178,34 @@ class RemoveReworkPath(_Operation):
     exception_id: str
 
 
+class RenameDataObject(_Operation):
+    """A data object's name in the diagram (``Artifact.label``); empty clears it,
+    and the generator names the data object itself again."""
+
+    op: Literal["rename_data_object"]
+    artifact_id: str
+    label: str = Field(max_length=MAX_LABEL_CHARS)
+
+
+class LinkData(_Operation):
+    """The step uses the data object (``input``) or makes it (``output``)."""
+
+    op: Literal["link_data"]
+    artifact_id: str
+    step_id: str
+    role: DataRole
+
+
+class UnlinkData(_Operation):
+    """The step no longer uses or makes the data object. The only step that
+    makes a data object another step uses is refused (``still_used``)."""
+
+    op: Literal["unlink_data"]
+    artifact_id: str
+    step_id: str
+    role: DataRole
+
+
 Operation = Annotated[
     (
         RenameStep
@@ -194,6 +226,9 @@ Operation = Annotated[
         | AddReworkPath
         | UpdateReworkPath
         | RemoveReworkPath
+        | RenameDataObject
+        | LinkData
+        | UnlinkData
     ),
     Field(discriminator="op"),
 ]
