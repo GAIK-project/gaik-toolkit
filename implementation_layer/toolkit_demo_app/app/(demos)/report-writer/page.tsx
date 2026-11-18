@@ -895,7 +895,7 @@ export default function ReportWriterPage() {
               title="Generated Report"
               description={`${result.sections.length} section(s) · ${
                 result.usage?.total_tokens != null
-                  ? `${result.usage.total_tokens.toLocaleString()} tokens`
+                  ? `${result.usage.total_tokens.toLocaleString("en-US")} tokens`
                   : ""
               }`}
               feedbackSlot={<FeedbackButton demoType="report-writer" />}
