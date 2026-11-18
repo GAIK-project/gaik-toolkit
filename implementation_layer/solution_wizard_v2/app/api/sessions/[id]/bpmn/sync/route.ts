@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { BPMN_VISUAL_STEP, hasBpmnSpike } from "@/lib/bpmn-spike";
 import { BLUEPRINT_CHANGED_ELSEWHERE, baseIsStale } from "@/lib/blueprint-draft";
 import { syncSessionBpmn } from "@/lib/bpmn-generate";
+import { parseDataObjectsParam } from "@/lib/bpmn-show-data";
 import { BPMN_XML_MAX_BYTES, BpmnLintBusyError, lintBpmnXml } from "@/lib/bpmn-lint";
 import { requireOwnedSession } from "@/lib/session-access";
 import { declaredLengthProblem } from "@/lib/upload-limits";
@@ -28,6 +29,11 @@ export const POST = withLogging(
     setContextUserId(owned.user.email);
     if (!hasBpmnSpike(id) || owned.session.step < BPMN_VISUAL_STEP) {
       return new Response("BPMN not available for this session", { status: 404 });
+    }
+    // The diagram returned after the save is drawn as the canvas showed it.
+    const dataObjects = parseDataObjectsParam(req.nextUrl.searchParams.get("data_objects"));
+    if (dataObjects === null) {
+      return new Response("data_objects must be 0 or 1", { status: 400 });
     }
 
     // Size is checked before the body is parsed and again after: the linter
@@ -115,7 +121,7 @@ export const POST = withLogging(
     }
 
     try {
-      const result = await syncSessionBpmn(id, owned.session.blueprint, body.xml);
+      const result = await syncSessionBpmn(id, owned.session.blueprint, body.xml, { dataObjects });
       // wizard_api's /bpmn/sync stores the version itself; saving again here
       // wrote a second, identical one on every diagram save. Only the mock
       // sync leaves the save to us.

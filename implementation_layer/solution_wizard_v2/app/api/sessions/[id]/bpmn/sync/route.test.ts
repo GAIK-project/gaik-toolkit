@@ -39,10 +39,10 @@ import { lintBpmnXml } from "@/lib/bpmn-lint";
 import { syncSessionBpmn } from "@/lib/bpmn-generate";
 import { saveBlueprintAfterBpmnSync } from "@/lib/sessions";
 
-function post(xml: string, headers: Record<string, string> = {}) {
+function post(xml: string, headers: Record<string, string> = {}, query = "") {
   const body = JSON.stringify({ xml });
   // A browser's fetch always says the length of a string body.
-  const req = new NextRequest("http://localhost/api/sessions/s1/bpmn/sync", {
+  const req = new NextRequest(`http://localhost/api/sessions/s1/bpmn/sync${query}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -111,6 +111,20 @@ describe("POST /sessions/[id]/bpmn/sync — size cap (T3)", () => {
     expect(syncSessionBpmn).toHaveBeenCalledTimes(1);
     const body = (await res.json()) as { lint: { ok: boolean } };
     expect(body.lint.ok).toBe(true);
+  });
+
+  it("returns the diagram drawn as it was shown, with or without data objects", async () => {
+    await post("<bpmn:definitions/>");
+    expect(vi.mocked(syncSessionBpmn).mock.calls[0][3]).toEqual({ dataObjects: true });
+    await post("<bpmn:definitions/>", {}, "?data_objects=0");
+    expect(vi.mocked(syncSessionBpmn).mock.calls[1][3]).toEqual({ dataObjects: false });
+  });
+
+  it("refuses a data_objects value other than 0 or 1 before linting", async () => {
+    const res = await post("<bpmn:definitions/>", {}, "?data_objects=2");
+    expect(res.status).toBe(400);
+    expect(lintBpmnXml).not.toHaveBeenCalled();
+    expect(syncSessionBpmn).not.toHaveBeenCalled();
   });
 
   it("asks to retry, and saves nothing, when the linter is busy", async () => {

@@ -142,7 +142,13 @@ def patch_blueprint(
 
 
 @router.get("/{session_id}/bpmn")
-def get_session_bpmn(session_id: uuid.UUID, db: Session = Depends(get_db)) -> Response:
+def get_session_bpmn(
+    session_id: uuid.UUID,
+    data_objects: int = Query(
+        1, ge=0, le=1, description="1 draws the data objects, 0 a compact diagram without them."
+    ),
+    db: Session = Depends(get_db),
+) -> Response:
     from wizard_api.services import ai_marking, bpmn_service
 
     session = session_service.get_session(db, session_id)
@@ -154,6 +160,7 @@ def get_session_bpmn(session_id: uuid.UUID, db: Session = Depends(get_db)) -> Re
             detail.blueprint.model_dump(),
             session_id=str(session_id),
             agent_draft=artifact_sync.read_draft_blueprint(session.output_dir),
+            include_data_objects=bool(data_objects),
         )
     except bpmn_service.BpmnGenerationError as exc:
         raise internal_error(

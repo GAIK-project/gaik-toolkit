@@ -150,6 +150,15 @@ describe("wizardFetch-backed API helpers", () => {
     expect(fetchMock).toHaveBeenCalledWith("http://api.test/sessions/s1/bpmn", expect.anything());
   });
 
+  it("apiGetSessionBpmn asks wizard_api to leave the data objects out", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("<bpmn/>", { status: 200 }));
+    await apiGetSessionBpmn("s1", { dataObjects: false });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://api.test/sessions/s1/bpmn?data_objects=0",
+      expect.anything(),
+    );
+  });
+
   it("apiGetSessionBpmn throws with status + body text on failure", async () => {
     fetchMock.mockResolvedValueOnce(new Response("boom", { status: 500 }));
     await expect(apiGetSessionBpmn("s1")).rejects.toThrow(/500/);

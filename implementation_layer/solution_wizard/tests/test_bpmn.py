@@ -492,6 +492,51 @@ def test_integration_target_makes_send_task_and_data_store():
     assert any(s.startswith("Activity_submit_") for s in end_in)
 
 
+def _pool_height(root) -> float:
+    plane = root.find(".//bpmndi:BPMNPlane", NS)
+    for shape in plane.findall("bpmndi:BPMNShape", NS):
+        if shape.get("bpmnElement") == "Participant_main":
+            return float(shape.find("omgdc:Bounds", NS).get("height"))
+    raise AssertionError("no shape for the main pool")
+
+
+@pytest.mark.parametrize("make", [_simple_blueprint, _hospital_blueprint])
+def test_without_data_objects_the_diagram_has_none_and_is_lower(make):
+    full = ET.fromstring(generate_bpmn(make()))
+    bp = make()
+    compact = ET.fromstring(generate_bpmn(bp, include_data_objects=False))
+    proc = compact.find("bpmn:process", NS)
+    tags = {_local(e) for e in proc.iter()}
+    assert "dataObjectReference" not in tags
+    assert "dataObject" not in tags
+    assert "dataInputAssociation" not in tags
+    # the only data output left is the send task's link to its data store
+    stores = {e.get("id") for e in proc if _local(e) == "dataStoreReference"}
+    for out in proc.iter(f"{{{NS['bpmn']}}}dataOutputAssociation"):
+        assert out.find("bpmn:targetRef", NS).text in stores
+    if make is _simple_blueprint:
+        assert "dataOutputAssociation" not in tags
+    assert _pool_height(compact) < _pool_height(full)
+    # the mapping names no data object that was not drawn
+    kinds = {info["kind"] for info in bp.visualizations["bpmn_mapping"].values()}
+    assert "data_object" not in kinds
+    # every drawn element still has a shape or an edge
+    plane = compact.find(".//bpmndi:BPMNPlane", NS)
+    drawn = {s.get("bpmnElement") for s in plane}
+    for e in proc:
+        if _local(e) in FLOW_NODE_TAGS or _local(e) == "dataStoreReference":
+            assert e.get("id") in drawn
+
+
+def test_data_objects_are_drawn_by_default():
+    bp = _hospital_blueprint()
+    root = ET.fromstring(generate_bpmn(bp))
+    proc = root.find("bpmn:process", NS)
+    assert any(_local(e) == "dataObjectReference" for e in proc)
+    kinds = {info["kind"] for info in bp.visualizations["bpmn_mapping"].values()}
+    assert "data_object" in kinds
+
+
 def test_no_approval_gateway_without_human_review():
     xml, root = _parse(_simple_blueprint())
     proc = root.find("bpmn:process", NS)

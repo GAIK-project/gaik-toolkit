@@ -79,6 +79,7 @@ import {
   type ValueWords,
 } from "@/lib/poc-run-output";
 import { shouldShowBpmnSpike } from "@/lib/bpmn-spike";
+import { bpmnDataObjectsQuery, readBpmnShowData, saveBpmnShowData } from "@/lib/bpmn-show-data";
 import { BlueprintJsonEditor } from "@/components/blueprint-json-editor";
 import { isSeedBlueprint } from "@/lib/blueprint-goal";
 import { SolutionPlanView } from "@/components/solution-plan-view";
@@ -358,6 +359,8 @@ function WorkflowFlowTab({
   const [loading, setLoading] = useState(showBpmn);
   const [fetchError, setFetchError] = useState(false);
   const [retry, setRetry] = useState(0);
+  // "Show data" on the BPMN diagram, kept in this browser: off draws it without data objects.
+  const [showData, setShowData] = useState(() => readBpmnShowData());
   const [rootRef, wide] = useWideEnough(FLOW_TWO_COLUMNS_MIN_WIDTH);
   const [view, setView] = useState<"diagram" | "list">("diagram");
   // Which diagram: the simple flow, or the BPMN editor.
@@ -486,7 +489,7 @@ function WorkflowFlowTab({
     setLoading(true);
     setFetchError(false);
 
-    fetch(`/api/sessions/${sessionId}/bpmn`)
+    fetch(`/api/sessions/${sessionId}/bpmn${bpmnDataObjectsQuery(showData)}`)
       .then((res) => {
         if (!res.ok) throw new Error("bpmn unavailable");
         return res.text();
@@ -506,7 +509,7 @@ function WorkflowFlowTab({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, showBpmn, bpmnRefreshKey, retry]);
+  }, [sessionId, showBpmn, bpmnRefreshKey, retry, showData]);
 
   const count = blueprint.steps.length;
 
@@ -659,6 +662,11 @@ function WorkflowFlowTab({
               focusRequest={focusRequest}
               onSelectedStepChange={setSelectedStepId}
               fullView={fullView}
+              showData={showData}
+              onShowDataChange={(show) => {
+                saveBpmnShowData(show);
+                setShowData(show);
+              }}
               // Other tabs get a change once it is saved, never while it is being typed.
               onSynced={({ blueprint: synced }) => {
                 onBlueprintChange(synced);

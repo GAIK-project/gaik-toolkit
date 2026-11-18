@@ -241,8 +241,14 @@ class _Lane:
 
 
 class _BpmnBuilder:
-    def __init__(self, blueprint: Blueprint):
+    def __init__(self, blueprint: Blueprint, include_data_objects: bool = True):
         self.bp = blueprint
+        # Without data objects the per-row data band is not reserved, so every
+        # row (and the minimum lane height) loses ROW_DATA_H.
+        self.include_data_objects = include_data_objects
+        self.row_data_h = ROW_DATA_H if include_data_objects else 0
+        self.row_h = self.row_data_h + TASK_LABEL_H + ROW_TASK_H
+        self.base_lane_h = BASE_LANE_H if include_data_objects else BASE_LANE_H - ROW_DATA_H
         self.nodes: Dict[str, _Node] = {}
         self.lanes: Dict[str, _Lane] = {}
         self.flows: List[_Flow] = []
@@ -1016,7 +1022,7 @@ class _BpmnBuilder:
         top = float(POOL_Y)
         for lane in ordered_lanes:
             rows = max_stack_per_lane.get(lane.id, 1)
-            lane.height = max(BASE_LANE_H, LANE_PAD_TOP + rows * ROW_H + LANE_PAD_BOTTOM)
+            lane.height = max(self.base_lane_h, LANE_PAD_TOP + rows * self.row_h + LANE_PAD_BOTTOM)
             lane.top = top
             top += lane.height
         pool_height = top - POOL_Y
@@ -1032,8 +1038,8 @@ class _BpmnBuilder:
             self.node_row[node.id] = idx
             lane = self.lanes[node.lane]
             col_cx = CONTENT_X0 + node.rank * X_SPACING + COL_W / 2
-            row_top = lane.top + LANE_PAD_TOP + idx * ROW_H
-            task_cy = row_top + ROW_DATA_H + TASK_LABEL_H + ROW_TASK_H / 2
+            row_top = lane.top + LANE_PAD_TOP + idx * self.row_h
+            task_cy = row_top + self.row_data_h + TASK_LABEL_H + ROW_TASK_H / 2
             node.x = col_cx - node.w / 2
             node.y = task_cy - node.h / 2
             self.bounds[node.id] = (node.x, node.y, node.w, node.h)
@@ -1060,7 +1066,7 @@ class _BpmnBuilder:
                 ax, ay, aw, ah = self.bounds[anchor]
                 lane = self.lanes[self.nodes[anchor].lane]
                 idx = self.node_row[anchor]
-                row_top = lane.top + LANE_PAD_TOP + idx * ROW_H
+                row_top = lane.top + LANE_PAD_TOP + idx * self.row_h
                 # sit near the top of the data zone so there is a clear gap down
                 # to the task below it
                 oy = row_top + DATA_OBJ_TOP_PAD
@@ -1126,7 +1132,8 @@ class _BpmnBuilder:
         # review approves the output before the PDF is rendered.
         self._enrich_pdf_generation()
         self._enrich_integration()
-        self._build_data_objects()
+        if self.include_data_objects:
+            self._build_data_objects()
         self._build_external_parties()
         self._build_annotations()
         self._assign_lane_membership()
@@ -1452,8 +1459,12 @@ def route_edge(
     return [(xs, int(sy + sh)), (xs, low), (xt, low), (xt, int(ty + th))]
 
 
-def generate_bpmn(blueprint: Blueprint) -> str:
+def generate_bpmn(blueprint: Blueprint, *, include_data_objects: bool = True) -> str:
     """Generate BPMN 2.0 XML from a blueprint.
+
+    With ``include_data_objects=False`` the artifacts are left out (no data
+    objects, no data associations to them) and the rows lose their data band,
+    so the diagram is more compact. Data stores stay.
 
     Side effect: writes the element->blueprint id map to
     ``blueprint.visualizations["bpmn_mapping"]`` so the linkage is recorded in
@@ -1462,7 +1473,7 @@ def generate_bpmn(blueprint: Blueprint) -> str:
     if not blueprint.workflow.steps:
         # minimal valid empty diagram
         return _empty_bpmn()
-    builder = _BpmnBuilder(blueprint)
+    builder = _BpmnBuilder(blueprint, include_data_objects=include_data_objects)
     xml = builder.build()
     if not isinstance(blueprint.visualizations, dict):
         blueprint.visualizations = {}

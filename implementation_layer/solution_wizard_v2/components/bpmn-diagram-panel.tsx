@@ -21,6 +21,7 @@ import {
   type ModdleElement,
 } from "@/lib/bpmn-edit-state";
 import type { BlueprintUpdate } from "@/lib/blueprint-update";
+import { bpmnDataObjectsQuery } from "@/lib/bpmn-show-data";
 import { fillTemplate } from "@/lib/chat-template";
 import type { Dict } from "@/lib/i18n";
 import type { Blueprint, BlueprintStep } from "@/lib/mock-sessions";
@@ -58,9 +59,18 @@ export function BpmnDiagramPanel({
   onSelectedStepChange,
   onSynced,
   fullView,
+  showData = true,
+  onShowDataChange,
   t,
 }: {
   sessionId: string;
+  /**
+   * The diagram is drawn with its data objects; off, a compact one without
+   * them. The page fetches `xml` accordingly and keeps the choice.
+   */
+  showData?: boolean;
+  /** "Show data" was switched: the page fetches the diagram again. */
+  onShowDataChange?: (show: boolean) => void;
   /** The diagram at the size of the window, and the control that takes it there and back. */
   fullView?: { on: boolean; toggle: () => void };
   /** The diagram as the server generated it from the blueprint. */
@@ -334,7 +344,8 @@ export function BpmnDiagramPanel({
     const sent = m.semantics();
     try {
       const body = await m.saveXml();
-      const res = await fetch(`/api/sessions/${sessionId}/bpmn/sync`, {
+      // The diagram the server answers with is drawn as this one is, with or without data.
+      const res = await fetch(`/api/sessions/${sessionId}/bpmn/sync${bpmnDataObjectsQuery(showData)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // By itself only over the version the canvas was drawn from; over a
@@ -554,21 +565,36 @@ export function BpmnDiagramPanel({
           onToggleFullscreen={fullView?.toggle}
         />
 
-        <BpmnZoomControls
-          className="absolute right-3 top-3 z-10"
-          zoom={zoom}
-          onZoomIn={() => modelerRef.current?.zoomIn()}
-          onZoomOut={() => modelerRef.current?.zoomOut()}
-          onFit={() => modelerRef.current?.fit()}
-          zoomInLabel={t.wsBpmnZoomIn}
-          zoomOutLabel={t.wsBpmnZoomOut}
-          fitLabel={t.bpmnFitView}
-          groupLabel={t.wsBpmnToolbar}
-          expanded={fullView?.on ?? false}
-          onToggleExpanded={fullView?.toggle}
-          expandLabel={t.flowFullView}
-          collapseLabel={t.flowFullViewExit}
-        />
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
+          {onShowDataChange && (
+            // Switching redraws the diagram from the server, so not over edits not saved yet.
+            <button
+              type="button"
+              className="flex h-[34px] items-center gap-1.5 rounded-lg border border-border bg-surface/95 px-2.5 text-xs font-medium text-text-secondary shadow-sm backdrop-blur-sm hover:text-text-strong disabled:cursor-not-allowed disabled:opacity-60"
+              aria-pressed={showData}
+              onClick={() => onShowDataChange(!showData)}
+              disabled={edit.kind !== "none" || saveState === "saving" || reloading || changedElsewhere}
+              data-testid="bpmn-show-data"
+            >
+              <Icon name={showData ? "eye" : "eyeOff"} size={14} />
+              {t.bpmnShowData}
+            </button>
+          )}
+          <BpmnZoomControls
+            zoom={zoom}
+            onZoomIn={() => modelerRef.current?.zoomIn()}
+            onZoomOut={() => modelerRef.current?.zoomOut()}
+            onFit={() => modelerRef.current?.fit()}
+            zoomInLabel={t.wsBpmnZoomIn}
+            zoomOutLabel={t.wsBpmnZoomOut}
+            fitLabel={t.bpmnFitView}
+            groupLabel={t.wsBpmnToolbar}
+            expanded={fullView?.on ?? false}
+            onToggleExpanded={fullView?.toggle}
+            expandLabel={t.flowFullView}
+            collapseLabel={t.flowFullViewExit}
+          />
+        </div>
 
         {showProps && selection && (
           <aside

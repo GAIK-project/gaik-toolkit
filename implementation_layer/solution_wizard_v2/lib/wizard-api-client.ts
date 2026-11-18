@@ -403,9 +403,13 @@ export async function apiPatchBlueprint(
   });
 }
 
-export async function apiGetSessionBpmn(id: string): Promise<string> {
+export async function apiGetSessionBpmn(
+  id: string,
+  { dataObjects = true }: { dataObjects?: boolean } = {},
+): Promise<string> {
   const base = getWizardApiUrl() ?? DEFAULT_API_URL;
-  const res = await fetch(`${base}/sessions/${encodeURIComponent(id)}/bpmn`, {
+  const query = dataObjects ? "" : "?data_objects=0";
+  const res = await fetch(`${base}/sessions/${encodeURIComponent(id)}/bpmn${query}`, {
     headers: await outgoingHeaders(),
     cache: "no-store",
   });

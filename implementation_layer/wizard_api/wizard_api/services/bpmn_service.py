@@ -30,8 +30,14 @@ def generate_bpmn_xml(
     *,
     session_id: str,
     agent_draft: dict[str, Any] | None = None,
+    include_data_objects: bool = True,
 ) -> str:
-    return generate_bpmn_view(v2_blueprint, session_id=session_id, agent_draft=agent_draft)[0]
+    return generate_bpmn_view(
+        v2_blueprint,
+        session_id=session_id,
+        agent_draft=agent_draft,
+        include_data_objects=include_data_objects,
+    )[0]
 
 
 def generate_bpmn_view(
@@ -39,30 +45,34 @@ def generate_bpmn_view(
     *,
     session_id: str,
     agent_draft: dict[str, Any] | None = None,
+    include_data_objects: bool = True,
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
     """The BPMN the UI shows, the element → blueprint mapping the generator
     records for it, and the V1 blueprint the mapping's paths point into.
 
     With the agent's draft (``use_case.blueprint.json``), the roles and process
     come from it, see :func:`with_agent_process`; a draft that does not fit is
-    dropped rather than failing the diagram.
+    dropped rather than failing the diagram. Without data objects
+    (``include_data_objects=False``) the diagram is drawn compact.
     """
     if not _SOLUTION_WIZARD_AVAILABLE:
         raise BpmnGenerationError("solution_wizard package is not installed")
     v1 = v2_to_v1_dict(v2_blueprint, session_id=session_id)
     if agent_draft:
         try:
-            return _render(with_agent_process(v1, v2_blueprint, agent_draft))
+            return _render(with_agent_process(v1, v2_blueprint, agent_draft), include_data_objects)
         except Exception:  # noqa: BLE001 - a draft that does not fit falls back
             pass
-    return _render(v1)
+    return _render(v1, include_data_objects)
 
 
-def _render(v1: dict[str, Any]) -> tuple[str, dict[str, Any], dict[str, Any]]:
+def _render(
+    v1: dict[str, Any], include_data_objects: bool = True
+) -> tuple[str, dict[str, Any], dict[str, Any]]:
     blueprint = Blueprint.model_validate(v1)
     # Marked here, so the file the session keeps and the diagram the API serves
     # are the same bytes, and both say a model made the diagram.
-    xml = ai_marking.mark_xml(generate_bpmn(blueprint))
+    xml = ai_marking.mark_xml(generate_bpmn(blueprint, include_data_objects=include_data_objects))
     mapping = dict(blueprint.visualizations.get("bpmn_mapping") or {})
     return xml, mapping, v1
 
