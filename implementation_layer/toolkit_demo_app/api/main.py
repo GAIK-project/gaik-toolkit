@@ -35,12 +35,14 @@ try:
     from utils.errors import public_error
     from utils.model_settings import ModelSettingsMiddleware
     from utils.ops import OpsMiddleware
+    from utils.upload_limits import UploadLimitMiddleware
 except ImportError:
     from api.routers import model_settings
     from api.utils.ai_marking import AIMarkMiddleware
     from api.utils.errors import public_error
     from api.utils.model_settings import ModelSettingsMiddleware
     from api.utils.ops import OpsMiddleware
+    from api.utils.upload_limits import UploadLimitMiddleware
 
 try:
     # Docker: routers/ is in same directory as main.py
@@ -150,6 +152,9 @@ app = FastAPI(
     openapi_url="/openapi.json" if API_DOCS else None,
 )
 
+# Each route's body limit and file count, held while the body arrives
+# (utils/upload_limits.py). Innermost, so the request trace still sees a refusal.
+app.add_middleware(UploadLimitMiddleware)
 # CORS for Next.js frontend (allowing all origins for cluster-internal usage)
 app.add_middleware(
     CORSMiddleware,

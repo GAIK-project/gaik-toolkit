@@ -59,6 +59,7 @@ import {
   EXAMPLES,
   fileNameOf,
   MAX_FILE_MB,
+  MAX_FILES,
   type VisionExample,
 } from "./vision-data";
 
@@ -291,6 +292,10 @@ export default function VisionExtractorPage() {
         continue;
       }
       if (files.some((f) => f.name === file.name && f.size === file.size)) {
+        continue;
+      }
+      if (files.length + accepted.length >= MAX_FILES) {
+        errors.push(`${file.name}: at most ${MAX_FILES} files per extraction`);
         continue;
       }
       accepted.push(file);
@@ -529,8 +534,8 @@ export default function VisionExtractorPage() {
                       : "Drag & drop or click to add files"}
                   </p>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    PDF, PNG, JPG, GIF, WEBP, TIFF, BMP — up to {MAX_FILE_MB}MB
-                    each
+                    Up to {MAX_FILES} files: PDF, PNG, JPG, GIF, WEBP, TIFF,
+                    BMP — up to {MAX_FILE_MB}MB each
                   </p>
                 </div>
                 <input

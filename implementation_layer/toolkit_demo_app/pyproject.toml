@@ -19,3 +19,9 @@ dependencies = [
 
 [tool.uv.sources]
 gaik = { path = "../..", editable = true }
+
+[tool.uv]
+# CI resolves the demo afresh on Linux x86_64 (no lock file): take only versions that have
+# a wheel or sdist for it. A release whose Windows wheels reach PyPI before its Linux ones
+# is then skipped instead of failing the install (opencv-python-headless 5.1.0.95, 17 Nov 2026).
+required-environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]

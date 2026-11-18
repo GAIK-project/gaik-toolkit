@@ -13,6 +13,12 @@ A run that reached the API without the header (a call from inside the pod, such 
 one either. Through the proxy every run is signed in, so this never opens a user's
 result to a visitor.
 
+The API trusts the header on the premise that only the proxy reaches it. That rule is
+written in ``openshift/networkpolicy-api.yaml``, but the file narrows nothing while the
+project's shared policy admits every pod in the namespace (see its header and
+``openshift/README.md``, "Network policy and pod hardening"). Until that changes, the
+header is only as trustworthy as the namespace.
+
 Entries go after ``TTL_SECONDS``, longer than any route keeps its result; a result
 that lives as long as it is used (a RAG collection) restarts its entry's expiry on each
 use with :func:`touch_owner`.
