@@ -17,7 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from solution_wizard.blueprint import Blueprint
-from solution_wizard.bpmn_generator import generate_bpmn, write_bpmn
+from solution_wizard.bpmn_generator import generate_bpmn, route_edge, write_bpmn
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
@@ -536,6 +536,44 @@ def test_example_blueprints_generate_valid_bpmn(name):
     shapes = {s.get("bpmnElement") for s in plane.findall("bpmndi:BPMNShape", NS)}
     for nid in flow_nodes:
         assert nid in shapes
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "incident_reporting_blueprint.json",
+        "rag_workflow_blueprint.json",
+        "document_extraction_blueprint.json",
+    ],
+)
+def test_every_flow_is_drawn_with_right_angles(name):
+    bp = Blueprint.from_file(EXAMPLES_DIR / name)
+    root = ET.fromstring(generate_bpmn(bp))
+    plane = root.find(".//bpmndi:BPMNPlane", NS)
+    edges = plane.findall("bpmndi:BPMNEdge", NS)
+    assert edges
+    for edge in edges:
+        points = [(int(p.get("x")), int(p.get("y"))) for p in edge.findall("omgdi:waypoint", NS)]
+        assert len(points) >= 2, edge.get("id")
+        for a, b in zip(points, points[1:]):
+            assert a[0] == b[0] or a[1] == b[1], f"{edge.get('id')}: {a} -> {b}"
+
+
+def _on_border(point, rect) -> bool:
+    px, py = point
+    x, y, w, h = rect
+    inside = x <= px <= x + w and y <= py <= y + h
+    return inside and (px in (x, x + w) or py in (y, y + h))
+
+
+def test_route_edge_starts_and_ends_on_the_shapes():
+    src, tgt = (0, 0, 100, 80), (300, 200, 100, 80)
+    points = route_edge(src, tgt)
+    assert len(points) >= 2
+    assert _on_border(points[0], src)
+    assert _on_border(points[-1], tgt)
+    for a, b in zip(points, points[1:]):
+        assert a[0] == b[0] or a[1] == b[1]
 
 
 def _pdf_blueprint(has_pdf: bool) -> Blueprint:

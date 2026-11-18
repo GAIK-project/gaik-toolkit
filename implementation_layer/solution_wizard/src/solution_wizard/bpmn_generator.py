@@ -1362,20 +1362,17 @@ class _BpmnBuilder:
         # last-resort (should not happen now that every element is in bounds)
         return CONTENT_X0, POOL_Y
 
-    def _border_point(self, element_id: str, toward: Tuple[float, float]) -> Tuple[float, float]:
-        """Point on element_id's rectangle border on the ray toward `toward`."""
+    def _element_rect(self, element_id: str) -> tuple[float, float, float, float]:
         b = self.bounds.get(element_id)
-        if b is None:
-            return self._element_center(element_id)
-        x, y, w, h = b
-        cx, cy = x + w / 2, y + h / 2
-        dx, dy = toward[0] - cx, toward[1] - cy
-        if abs(dx) < 1e-6 and abs(dy) < 1e-6:
-            return cx, cy
-        sx = (w / 2) / abs(dx) if abs(dx) > 1e-6 else float("inf")
-        sy = (h / 2) / abs(dy) if abs(dy) > 1e-6 else float("inf")
-        s = min(sx, sy)
-        return cx + dx * s, cy + dy * s
+        if b is not None:
+            return b
+        cx, cy = self._element_center(element_id)
+        return cx, cy, 0.0, 0.0
+
+    @staticmethod
+    def _emit_waypoints(lines: list[str], points: list[tuple[int, int]]) -> None:
+        for x, y in points:
+            lines.append(f'        <omgdi:waypoint x="{x}" y="{y}" />')
 
     def _emit_edge(self, L: List[str], f: _Flow) -> None:
         src = self.nodes.get(f.src)
@@ -1396,42 +1393,63 @@ class _BpmnBuilder:
             L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(low)}" />')
             L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
         else:
-            sx, sy = src.x + src.w, src.cy
-            tx, ty = tgt.x, tgt.cy
-            if abs(sy - ty) < 1:
-                L.append(f'        <omgdi:waypoint x="{int(sx)}" y="{int(sy)}" />')
-                L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
-            else:
-                midx = (sx + tx) / 2
-                L.append(f'        <omgdi:waypoint x="{int(sx)}" y="{int(sy)}" />')
-                L.append(f'        <omgdi:waypoint x="{int(midx)}" y="{int(sy)}" />')
-                L.append(f'        <omgdi:waypoint x="{int(midx)}" y="{int(ty)}" />')
-                L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
+            points = route_edge((src.x, src.y, src.w, src.h), (tgt.x, tgt.y, tgt.w, tgt.h))
+            self._emit_waypoints(L, points)
         L.append("      </bpmndi:BPMNEdge>")
 
     def _emit_data_edge(self, L: List[str], edge_id: str, a_id: str, b_id: str) -> None:
         """A dashed data-association edge from a_id to b_id, attached to each
-        shape's border (never the centre) so it does not run through shapes."""
-        ax, ay = self._border_point(a_id, self._element_center(b_id))
-        bx, by = self._border_point(b_id, self._element_center(a_id))
+        shape's border (never the centre) and drawn with right angles."""
+        points = route_edge(self._element_rect(a_id), self._element_rect(b_id))
         L.append(f'      <bpmndi:BPMNEdge id="{edge_id}_di" bpmnElement="{edge_id}">')
-        L.append(f'        <omgdi:waypoint x="{int(ax)}" y="{int(ay)}" />')
-        L.append(f'        <omgdi:waypoint x="{int(bx)}" y="{int(by)}" />')
+        self._emit_waypoints(L, points)
         L.append("      </bpmndi:BPMNEdge>")
 
     def _emit_msg_edge(self, L: List[str], mid: str, src: str, tgt: str) -> None:
         # attach at borders so the dashed message flow meets the pool / task cleanly
-        sx, sy = self._border_point(src, self._element_center(tgt))
-        tx, ty = self._border_point(tgt, self._element_center(src))
+        points = route_edge(self._element_rect(src), self._element_rect(tgt))
         L.append(f'      <bpmndi:BPMNEdge id="{mid}_di" bpmnElement="{mid}">')
-        L.append(f'        <omgdi:waypoint x="{int(sx)}" y="{int(sy)}" />')
-        L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
+        self._emit_waypoints(L, points)
         L.append("      </bpmndi:BPMNEdge>")
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+
+def route_edge(
+    src: tuple[int, int, int, int], tgt: tuple[int, int, int, int]
+) -> list[tuple[int, int]]:
+    """Right-angle waypoints for a connection from shape `src` to shape `tgt`.
+
+    Both shapes are ``(x, y, width, height)``. Consecutive waypoints share x or
+    y; the first lies on the source's border and the last on the target's.
+
+    - target to the right: exit right, enter left, with a middle vertical
+      segment when the centres' ys differ;
+    - shapes stacked (their x ranges overlap): one vertical segment;
+    - target to the left: loop back below both shapes, as the rework loop does.
+    """
+    sx, sy, sw, sh = src
+    tx, ty, tw, th = tgt
+    s_cy, t_cy = sy + sh / 2, ty + th / 2
+    if tx >= sx + sw:
+        x0, x1 = int(sx + sw), int(tx)
+        y0, y1 = int(s_cy), int(t_cy)
+        if abs(s_cy - t_cy) < 1:
+            return [(x0, y0), (x1, y0)]
+        midx = int((sx + sw + tx) / 2)
+        return [(x0, y0), (midx, y0), (midx, y1), (x1, y1)]
+    left, right = max(sx, tx), min(sx + sw, tx + tw)
+    if left <= right:
+        x = int((left + right) / 2)
+        if t_cy >= s_cy:
+            return [(x, int(sy + sh)), (x, int(ty))]
+        return [(x, int(sy)), (x, int(ty + th))]
+    low = int(max(sy + sh, ty + th) + 50)
+    xs, xt = int(sx + sw / 2), int(tx + tw / 2)
+    return [(xs, int(sy + sh)), (xs, low), (xt, low), (xt, int(ty + th))]
 
 
 def generate_bpmn(blueprint: Blueprint) -> str:
