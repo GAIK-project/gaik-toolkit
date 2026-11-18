@@ -414,7 +414,8 @@ def check_model(expect: dict, json_schema: dict) -> list[str]:
             problems.append(f"model: no property {name!r} (got {', '.join(properties)})")
     for name, values in expect.get("enums", {}).items():
         if name in properties:
-            got = _enum_values(json_schema, properties[name])
+            # gaik adds an empty value to an enum the model may leave unanswered.
+            got = [v for v in _enum_values(json_schema, properties[name]) if v != ""]
             if sorted(v.upper() for v in got) != sorted(v.upper() for v in values):
                 problems.append(f"model.{name}: allows {got}, expected {values}")
     container = expect.get("child_container")
