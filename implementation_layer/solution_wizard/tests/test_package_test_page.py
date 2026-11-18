@@ -1892,19 +1892,41 @@ def test_an_ipv6_loopback_address_is_listened_on(tmp_path):
         served.close()
 
 
+def _dual_stack_here() -> bool:
+    """Whether an IPv6 socket on every address takes IPv4 connections on this system."""
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            listener.bind(("::", 0))
+            listener.listen(1)
+            with socket.create_connection(("127.0.0.1", listener.getsockname()[1]), timeout=5):
+                return True
+    except (AttributeError, OSError):
+        return False
+
+
 @pytest.mark.skipif(
     os.name == "nt",
     reason="listening on every address makes the Windows firewall ask for leave on screen",
 )
-def test_every_ipv6_address_takes_ipv4_as_well_and_turns_the_source_download_off(tmp_path):
+@pytest.mark.parametrize("ipv6_only", [False, True])
+def test_every_ipv6_address_answers_at_the_address_printed_and_has_no_source_download(
+    tmp_path, monkeypatch, ipv6_only
+):
+    """Where the system has no dual stack, --host :: printed 127.0.0.1, which did not
+    answer (second reader on #229, round 2). ``ipv6_only`` makes the dual stack fail."""
     if not _can_listen_on("::"):
         pytest.skip(":: cannot be listened on here")
+    dual_stack = _dual_stack_here() and not ipv6_only
+    if ipv6_only:
+        # No such option: setting it fails, as on a system without a dual stack.
+        monkeypatch.setattr(socket, "IPV6_V6ONLY", -1)
     served = Page(_scaffold(tmp_path), host="::")
-    served.address = "127.0.0.1" if served.server.dual_stack else "::1"
     try:
-        if served.server.dual_stack:
-            # Reached on 127.0.0.1: the IPv4 addresses are in as well.
-            assert served.request("GET", "/")[0] == 200
+        assert served.server.dual_stack is dual_stack
+        served.address = served.app._shown_host("::", served.server).strip("[]")
+        assert served.address == ("127.0.0.1" if dual_stack else "::1")
+        assert served.request("GET", "/")[0] == 200
         assert served.server.source_download is False
         assert served.request("GET", "/api/source")[0] == 403
     finally:
