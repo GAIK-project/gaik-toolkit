@@ -43,26 +43,34 @@ ffmpeg -version
 
 ### Tesseract CLI (for OCR)
 
-If you enable OCR (`enable_ocr=True`) with `ocr_engine="tesseract_cli"`, install Tesseract:
+If you enable OCR (`enable_ocr=True`) with `ocr_engine="tesseract_cli"` (the default), install
+Tesseract. The parser passes Docling the languages of Docling's default Tesseract options (English,
+Spanish, French and German) that your Tesseract has traineddata for, so English alone works; add the
+others your documents use. With none of the four installed, Docling raises
+`OcrLanguageNotSupportedError`. `ocr_engine="rapidocr"` needs no system packages.
 
 **Windows:**
 ```powershell
 winget install UB-Mannheim.TesseractOCR
 ```
 
+The installer adds English only: pick more languages when you run it interactively, or copy their
+`.traineddata` files (`spa`, `fra`, `deu`) into its `tessdata` folder.
+
 **macOS:**
 ```bash
-brew install tesseract
+brew install tesseract  # tesseract-lang adds the other languages
 ```
 
 **Linux:**
 ```bash
-sudo apt-get install tesseract-ocr  # Ubuntu/Debian
+sudo apt-get install tesseract-ocr  # Ubuntu/Debian; tesseract-ocr-spa, -fra and -deu add those languages
 ```
 
 **Verify:**
 ```bash
 tesseract --version
+tesseract --list-langs
 ```
 
 If needed, set:

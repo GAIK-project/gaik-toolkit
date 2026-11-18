@@ -489,9 +489,9 @@ chunks = parser.convert_pdf_to_chunks_with_metadata("document.pdf")
 | `enable_formula_enrichment` | bool | True | Formula enrichment |
 | `num_threads` | int | 4 | Accelerator threads |
 
-With `tesseract_cli` or `tesseract`, Tesseract needs the eng, spa, fra and deu traineddata
-(`tesseract --list-langs`): Docling 2.132 and later raises `OcrLanguageNotSupportedError` while one
-is missing. `rapidocr` needs no system packages.
+With `tesseract_cli` or `tesseract`, the parser passes Docling the default OCR languages (eng, spa,
+fra, deu) that Tesseract has traineddata for (`tesseract --list-langs`); with none of them
+installed, Docling raises `OcrLanguageNotSupportedError`. `rapidocr` needs no system packages.
 
 **Chunk metadata:** `source`, `document_name`, `page_number`, `heading`, `chunk_id`
 
