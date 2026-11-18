@@ -242,6 +242,8 @@ export type Dict = {
   bpmnDecisionSameTarget: string;
   bpmnDecisionSave: string;
   bpmnDecisionCancel: string;
+  /** An edit refused because it would make the process loop back to an earlier step. */
+  bpmnLoopRefused: string;
   /** The step panel's lane select, and its entry for the lane of the step's type. */
   bpmnStepLane: string;
   bpmnStepLaneDefault: string;
@@ -1082,6 +1084,8 @@ const fi: Dict = {
   bpmnDecisionSameTarget: "Kaikki haarat johtavat samaan paikkaan: valitse ainakin yhdelle toinen vaihe.",
   bpmnDecisionSave: "Tallenna päätös",
   bpmnDecisionCancel: "Peruuta",
+  bpmnLoopRefused:
+    "Muutosta ei tehty: prosessi palaisi sen jälkeen aiempaan vaiheeseen. Haara ei voi johtaa taaksepäin; pyydä paluupolkua wizardilta.",
   bpmnStepLane: "Kaista (kuka tekee)",
   bpmnStepLaneDefault: "Tyypin oletuskaista",
   bpmnUndo: "Kumoa",
@@ -1962,6 +1966,8 @@ const en: Dict = {
   bpmnDecisionSameTarget: "Every branch leads to the same place: pick another step for at least one.",
   bpmnDecisionSave: "Save the decision",
   bpmnDecisionCancel: "Cancel",
+  bpmnLoopRefused:
+    "The change was not made: the process would then loop back to an earlier step. A branch cannot lead back; ask the wizard for a rework path.",
   bpmnStepLane: "Lane (who does it)",
   bpmnStepLaneDefault: "Default for its type",
   bpmnUndo: "Undo",

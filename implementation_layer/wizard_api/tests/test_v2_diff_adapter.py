@@ -42,6 +42,10 @@ def _steps(view: dict) -> list[tuple[str, str, str]]:
 
 def test_the_diff_finds_rename_add_remove_move_and_type() -> None:
     draft = _draft()
+    # Without the fixture's decisions: "confident" (after extract, to review,
+    # which goes to deliver) would lead back once deliver moves before extract,
+    # a loop the operations refuse (test_a_reorder_that_turns_a_branch_back_is_refused).
+    draft["business_process"]["decision_points"] = []
     old = _view(draft)
     by_id = {s["id"]: dict(s) for s in old["steps"]}
     # upload -> extract -> review -> deliver becomes upload -> deliver (now a user
@@ -309,3 +313,16 @@ def test_an_ai_step_kept_with_its_component_is_not_remembered() -> None:
     new = {**old, "steps": [{**old["steps"][0], "name": "Upload it"}, *old["steps"][1:]]}
 
     assert blueprint_edit_service.v2_edit(draft, old, new).ai_steps == set()
+
+
+def test_a_reorder_that_turns_a_branch_back_is_refused() -> None:
+    # The fixture's decision after extract leads to review; once review is gone
+    # it leads to deliver, and deliver moved before extract makes the drawn
+    # flow loop: extract -> decision -> deliver -> extract.
+    draft = _draft()
+    old = _view(draft)
+    by_id = {s["id"]: dict(s) for s in old["steps"]}
+    new = {**old, "steps": [by_id["upload"], by_id["deliver"], by_id["extract"]]}
+    with pytest.raises(OperationError) as refused:
+        apply_operations(draft, operations_from_v2_diff(old, new))
+    assert refused.value.code == "cycle"

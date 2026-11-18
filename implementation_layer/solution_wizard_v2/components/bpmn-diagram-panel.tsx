@@ -26,6 +26,7 @@ import type {
 } from "@/lib/bpmn-editor-module";
 import {
   decisionOf,
+  decisionProblem,
   laneIdOf,
   opForDecision,
   mappingFitsSteps,
@@ -384,6 +385,7 @@ export function BpmnDiagramPanel({
       case "unsupported_edit":
       case "readonly_section": {
         if (err.reason === "lane_in_use") return t.bpmnLaneInUse;
+        if (err.reason === "cycle") return t.bpmnLoopRefused;
         const field = fieldInPlainWords(err.field, t);
         return field ? fillTemplate(t.bpmnOpRefusedField, { field }) : t.bpmnOpRefused;
       }
@@ -580,8 +582,10 @@ export function BpmnDiagramPanel({
   /** The branch dialog's Save: one edit through `run`. A refusal keeps the dialog open and says why. */
   async function saveDecision(values: DecisionValues): Promise<boolean> {
     const request = decisionDialog;
-    const op = request ? opForDecision(values, request) : null;
-    if (!op) return false;
+    if (!request || decisionProblem(values)) return false;
+    const op = opForDecision(values, request);
+    // An edit that changes nothing: the dialog closes, nothing is sent.
+    if (!op) return true;
     setDecisionError(null);
     const made = await run("ops", [op]);
     if (!made) setDecisionError(lastRefusal.current ?? t.bpmnOpRefused);

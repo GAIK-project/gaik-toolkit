@@ -350,15 +350,36 @@ describe("business decisions", () => {
         { condition: "No", target: "end" },
       ],
     });
-    expect(opForDecision(values, { decision })).toEqual({
+    expect(opForDecision({ ...values, name: "" }, { after: "extract" })).toBeNull();
+  });
+
+  it("sends only what an edit changed: an agent's branches (a branch back among them) stay untouched by a rename", () => {
+    const agents = {
+      ...decision,
+      branches: [
+        { condition: "ok", target: "review" },
+        { condition: "again", target: "upload" },
+      ],
+    };
+    const same = { name: agents.name, branches: agents.branches };
+    // Nothing changed (the same text around blanks): nothing to send.
+    expect(opForDecision({ ...same, name: " Big? " }, { decision: agents })).toBeNull();
+    expect(opForDecision({ ...same, name: "Bigger?" }, { decision: agents })).toEqual({
       op: "update_decision",
       decision_id: "big",
-      name: "Big?",
-      branches: [
-        { condition: "Yes", target: "review" },
-        { condition: "No", target: "end" },
-      ],
+      name: "Bigger?",
     });
-    expect(opForDecision({ ...values, name: "" }, { after: "extract" })).toBeNull();
+    const branches = [agents.branches[0], { condition: "redo", target: "upload" }];
+    expect(opForDecision({ ...same, branches }, { decision: agents })).toEqual({
+      op: "update_decision",
+      decision_id: "big",
+      branches,
+    });
+    expect(opForDecision({ name: "B", branches }, { decision: agents })).toEqual({
+      op: "update_decision",
+      decision_id: "big",
+      name: "B",
+      branches,
+    });
   });
 });

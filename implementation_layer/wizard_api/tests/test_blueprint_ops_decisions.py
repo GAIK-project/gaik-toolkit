@@ -201,7 +201,8 @@ def test_a_branch_back_to_an_earlier_step_is_refused_as_a_cycle() -> None:
         back = [{"condition": "again", "target": target}, {"condition": "ok", "target": "review"}]
         with pytest.raises(OperationError) as refused:
             apply_operations(_plain_draft(), ops(_add(branches=back)))
-        assert (refused.value.code, refused.value.field) == ("cycle", "target")
+        assert refused.value.code == "cycle"
+        assert '"extract"' in refused.value.message
 
 
 def test_a_loop_through_another_decision_is_refused() -> None:
@@ -214,7 +215,70 @@ def test_a_loop_through_another_decision_is_refused() -> None:
     back = [{"condition": "x", "target": "review"}, {"condition": "y", "target": "end"}]
     with pytest.raises(OperationError) as refused:
         apply_operations(first.blueprint, ops(_add(name="Loop", after="deliver", branches=back)))
-    assert (refused.value.code, refused.value.field) == ("cycle", "target")
+    assert refused.value.code == "cycle"
+    assert '"review", "deliver"' in refused.value.message
+
+
+def _agent_loop_draft() -> dict:
+    """An agent's decision after review with a branch back to upload: the
+    validator accepts it, and the diagram draws the loop."""
+    draft = _plain_draft()
+    draft["business_process"]["decision_points"] = [
+        {
+            "id": "redo",
+            "name": "Redo?",
+            "after": "review",
+            "branches": [
+                {"condition": "ok", "target": "deliver"},
+                {"condition": "again", "target": "upload"},
+            ],
+        }
+    ]
+    assert validator.validate(Blueprint.model_validate(draft)).ok
+    return draft
+
+
+def test_an_agents_decision_with_a_branch_back_can_be_renamed_and_its_branches_changed() -> None:
+    draft = _agent_loop_draft()
+    renamed = apply_operations(
+        draft, ops({"op": "update_decision", "decision_id": "redo", "name": "Again?"})
+    ).blueprint
+    assert _decisions(renamed)[0]["name"] == "Again?"
+    assert _decisions(renamed)[0]["branches"] == _decisions(draft)[0]["branches"]
+    # The back branch kept, a condition changed: no new loop.
+    kept = [
+        {"condition": "fine", "target": "deliver"},
+        {"condition": "again", "target": "upload"},
+    ]
+    op = {"op": "update_decision", "decision_id": "redo", "branches": kept}
+    assert _decisions(apply_operations(draft, ops(op)).blueprint)[0]["branches"] == kept
+    # A new branch back from outside the agent's loop makes a new one: refused, named by its steps.
+    back = [{"condition": "a", "target": "upload"}, {"condition": "b", "target": "end"}]
+    with pytest.raises(OperationError) as refused:
+        apply_operations(draft, ops(_add(name="Back", after="deliver", branches=back)))
+    assert refused.value.code == "cycle"
+    assert '"upload", "extract", "review", "deliver"' in refused.value.message
+
+
+def test_a_forward_decision_on_a_step_inside_an_existing_loop_is_made() -> None:
+    result = apply_operations(_agent_loop_draft(), ops(_add(after="extract")))
+    assert [d["id"] for d in _decisions(result.blueprint)] == ["redo", "confident_enough"]
+
+
+def test_a_move_that_makes_a_loop_through_a_decision_is_refused() -> None:
+    draft = _plain_draft()
+    made = apply_operations(
+        draft,
+        ops(
+            {"op": "add_step", "name": "Alpha", "type": "user_task", "after": "deliver"},
+            {"op": "add_step", "name": "Beta", "type": "user_task", "after": "alpha"},
+            _add(name="Go", after="alpha", branches=_to("beta", "end")),
+        ),
+    ).blueprint
+    with pytest.raises(OperationError) as refused:
+        apply_operations(made, ops({"op": "move_step", "step_id": "beta", "after": "deliver"}))
+    assert refused.value.code == "cycle"
+    assert '"alpha", "beta"' in refused.value.message or '"beta", "alpha"' in refused.value.message
 
 
 def test_a_second_decision_after_one_step_is_refused() -> None:
@@ -373,3 +437,28 @@ def test_decisions_through_the_api_and_the_mapping_names_them(
     assert removed.status_code == 200, removed.text
     mapping = client.get(f"/sessions/{sid}/bpmn/mapping").json()["mapping"]
     assert not any(k.startswith("Gateway_decision") for k in mapping)
+
+
+def test_the_mapping_names_an_empty_target_the_end() -> None:
+    from wizard_api.services.bpmn_service import named_mapping
+
+    drawn = _plain_draft()
+    drawn["business_process"]["decision_points"] = [
+        {
+            "id": "ok",
+            "name": "OK?",
+            "after": "extract",
+            "branches": [
+                {"condition": "yes", "target": "review"},
+                {"condition": "no", "target": ""},
+            ],
+        }
+    ]
+    mapping = {
+        "Gateway_decision_ok": {
+            "kind": "decision_point",
+            "blueprint_path": "business_process.decision_points[0]",
+        }
+    }
+    entry = named_mapping(mapping, drawn)["Gateway_decision_ok"]
+    assert entry["decision"]["branches"][1] == {"condition": "no", "target": "end"}

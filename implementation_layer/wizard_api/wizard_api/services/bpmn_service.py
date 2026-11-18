@@ -139,7 +139,8 @@ def _decision_entry(decision: dict[str, Any]) -> dict[str, Any]:
         "name": str(decision.get("name") or ""),
         "after": str(decision.get("after") or ""),
         "branches": [
-            {"condition": str(b.get("condition") or ""), "target": str(b.get("target") or "")}
+            # The generator draws an empty target as the end, as the operations name it.
+            {"condition": str(b.get("condition") or ""), "target": str(b.get("target") or "end")}
             for b in branches
             if isinstance(b, dict)
         ],

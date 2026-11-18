@@ -408,6 +408,7 @@ def apply_operations(draft: dict, ops: list[Any]) -> OpsResult:
         except OperationError as exc:
             exc.index = index
             raise
+    _check_loops(draft, ctx.blueprint)
     needs_attention = _check(draft, ctx.blueprint)
     for step_id in dict.fromkeys(ctx.component_checks):
         step = next((s for s in ctx.steps if s.get("id") == step_id), None)
@@ -437,6 +438,71 @@ def _issue_key(issue: Any) -> tuple:
 def _errors(blueprint: dict) -> dict[tuple, Any]:
     result = validator.validate(Blueprint.model_validate(blueprint))
     return {_issue_key(issue): issue for issue in result.errors}
+
+
+def _drawn_loops(blueprint: dict) -> list[frozenset[str]]:
+    """The loops of the flow the diagram draws, each as the set of its steps.
+
+    The flow is each step's (and manual step's) ``depends_on`` and each business
+    decision's branches. A branch back to an earlier step is drawn as a normal
+    flow, which the generator's layout cannot rank (rule 8 of the validator
+    reads ``depends_on`` only); rework loops are exceptions (``loop_to:``),
+    drawn apart, and are not counted.
+    """
+    workflow = blueprint.get("workflow") or {}
+    process = blueprint.get("business_process") or {}
+    items = [*(workflow.get("steps") or []), *(process.get("manual_steps") or [])]
+    nodes = [str(i.get("id")) for i in items if isinstance(i, dict)]
+    known = set(nodes)
+    successors: dict[str, set[str]] = {n: set() for n in nodes}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        for dep in item.get("depends_on") or []:
+            if dep in known:
+                successors[dep].add(str(item.get("id")))
+    for decision in process.get("decision_points") or []:
+        if not isinstance(decision, dict) or decision.get("after") not in known:
+            continue
+        for branch in decision.get("branches") or []:
+            if isinstance(branch, dict) and branch.get("target") in known:
+                successors[decision["after"]].add(branch["target"])
+
+    def reach(start: str) -> set[str]:
+        seen: set[str] = set()
+        todo = list(successors[start])
+        while todo:
+            node = todo.pop()
+            if node not in seen:
+                seen.add(node)
+                todo.extend(successors[node])
+        return seen
+
+    reached = {n: reach(n) for n in nodes}
+    loops: list[frozenset[str]] = []
+    for n in nodes:
+        if n not in reached[n] or any(n in loop for loop in loops):
+            continue
+        loops.append(frozenset({n} | {m for m in reached[n] if n in reached[m]}))
+    return loops
+
+
+def _check_loops(draft: dict, blueprint: dict) -> None:
+    """Refuse a loop the operations make; loops already in the draft (an agent
+    may write a branch back) stay, and edits beside them are made."""
+    before = _drawn_loops(draft)
+    for loop in _drawn_loops(blueprint):
+        if any(loop <= old for old in before):
+            continue
+        steps = (blueprint.get("workflow") or {}).get("steps") or []
+        order = [str(s.get("id")) for s in steps if isinstance(s, dict)]
+        names = sorted(loop, key=lambda sid: order.index(sid) if sid in order else len(order))
+        raise OperationError(
+            "cycle",
+            "The edit would make a loop through steps "
+            + ", ".join(f'"{sid}"' for sid in names)
+            + ": a branch cannot lead back to an earlier step",
+        )
 
 
 def _check(draft: dict, blueprint: dict) -> list[str]:
@@ -851,43 +917,11 @@ def _drawn_step_ids(ctx: _Context) -> set[str]:
     return ids | {m.get("id") for m in ctx.process.get("manual_steps") or []}
 
 
-def _flow_successors(ctx: _Context, leaving: dict | None) -> dict[str, set[str]]:
-    """Each step's next steps as the diagram draws them: by ``depends_on`` and
-    by every decision's branches but ``leaving``'s."""
-    successors: dict[str, set[str]] = {}
-    for item in [*ctx.steps, *(ctx.process.get("manual_steps") or [])]:
-        for dep in item.get("depends_on") or []:
-            successors.setdefault(dep, set()).add(item.get("id"))
-    for decision in ctx.process.get("decision_points") or []:
-        if decision is leaving:
-            continue
-        for branch in decision.get("branches") or []:
-            if branch.get("target") not in (_END, ""):
-                successors.setdefault(decision.get("after"), set()).add(branch.get("target"))
-    return successors
-
-
-def _reaches(successors: dict[str, set[str]], start: str, goal: str) -> bool:
-    seen, todo = set(), [start]
-    while todo:
-        node = todo.pop()
-        if node == goal:
-            return True
-        if node in seen:
-            continue
-        seen.add(node)
-        todo.extend(successors.get(node, ()))
-    return False
-
-
-def _branches(
-    ctx: _Context, after: str, branches: list[Branch], decision: dict | None
-) -> list[dict]:
+def _branches(ctx: _Context, branches: list[Branch]) -> list[dict]:
     """The branches as stored, or refused: an unknown target (``unknown_step``),
-    a blank condition, all leading to one place (a decision that decides
-    nothing), or one back to ``after`` or a step before it, a loop the
-    validator does not see (rule 8 reads ``depends_on`` only) and the layout
-    cannot draw."""
+    a blank condition, or all leading to one place (a decision that decides
+    nothing). A branch back to an earlier step is checked once all operations
+    have run (``_check_loops``)."""
     known = _drawn_step_ids(ctx)
     out = []
     for branch in branches:
@@ -901,12 +935,6 @@ def _branches(
         raise OperationError(
             "invalid", "The branches of a decision must not all lead to one place", "branches"
         )
-    successors = _flow_successors(ctx, decision)
-    for b in out:
-        if b["target"] != _END and _reaches(successors, b["target"], after):
-            raise OperationError(
-                "cycle", f'A branch to "{b["target"]}" would lead back to "{after}"', "target"
-            )
     return out
 
 
@@ -922,7 +950,7 @@ def _add_decision(ctx: _Context, op: AddDecision) -> None:
         raise OperationError(
             "invalid", f'Step "{_label(after)}" is already followed by a decision', "after"
         )
-    branches = _branches(ctx, op.after, op.branches, None)
+    branches = _branches(ctx, op.branches)
     taken = {d.get("id") for d in decisions}
     taken |= {
         str(s.get("id"))[len(_DECISION_STEP_PREFIX) :]
@@ -939,7 +967,7 @@ def _update_decision(ctx: _Context, op: UpdateDecision) -> None:
     decision = _decision(ctx, op.decision_id)
     old_name = decision.get("name") or decision.get("id", "")
     if op.branches is not None:
-        decision["branches"] = _branches(ctx, decision.get("after", ""), op.branches, decision)
+        decision["branches"] = _branches(ctx, op.branches)
     if op.name is not None:
         decision["name"] = _decision_name(op.name)
     name = decision.get("name") or decision.get("id", "")

@@ -63,14 +63,13 @@ async function openEditable(
   return { sent, gateway: gateways[0] };
 }
 
-const refused = (route: Route) =>
+const refusedAs = (code: string, field?: string) => (route: Route) =>
   route.fulfill({
     status: 422,
     contentType: "application/json",
-    body: JSON.stringify({
-      detail: { error: "invalid_operation", message: "no", field: "target", code: "unknown_step" },
-    }),
+    body: JSON.stringify({ detail: { error: "invalid_operation", message: "no", field, code } }),
   });
+const refused = refusedAs("unknown_step", "target");
 
 const pad = (page: Page) => page.locator(".djs-context-pad .entry");
 
@@ -209,7 +208,7 @@ test.describe("BPMN decisions", () => {
     const { sent, gateway } = await openEditable(
       page,
       () => ({ kind: "decision_point", blueprint_path: "business_process.decision_points[0]", decision }),
-      refused,
+      refusedAs("cycle"),
     );
     const shape = await pickGateway(page, gateway);
     await expect(shape).not.toHaveAttribute("data-gaik-derived", "true");
@@ -223,19 +222,27 @@ test.describe("BPMN decisions", () => {
     await expect(dialog.getByTestId("bpmn-branch-name")).toHaveValue("Iso summa?");
     await expect(dialog.getByTestId("bpmn-branch-condition").nth(1)).toHaveValue("Ei");
     await expect(dialog.getByTestId("bpmn-branch-target").nth(0)).toHaveValue("approve");
+    // Saved unchanged: the dialog closes and nothing is sent.
+    await dialog.getByTestId("bpmn-branch-save").click();
+    await expect(dialog).toHaveCount(0);
+    expect(sent).toHaveLength(0);
+    await page.locator('.djs-context-pad .entry[data-action="gaik-decision-edit"]').click();
+    await expect(dialog.getByTestId("bpmn-branch-name")).toHaveValue("Iso summa?");
     await dialog.getByTestId("bpmn-branch-add").click();
     await dialog.getByTestId("bpmn-branch-condition").nth(2).fill("Ehkä");
     await dialog.getByTestId("bpmn-branch-target").nth(2).selectOption("classify");
     await dialog.getByTestId("bpmn-branch-save").click();
     await expect.poll(() => sent.length).toBe(1);
+    // Only what changed: the name stays out.
     expect(sent[0]).toEqual([
       {
         op: "update_decision",
         decision_id: "big",
-        name: "Iso summa?",
         branches: [...decision.branches, { condition: "Ehkä", target: "classify" }],
       },
     ]);
+    // A loop is said as one, not as a field to check.
+    await expect(dialog.getByRole("alert")).toContainText("Haara ei voi johtaa taaksepäin");
     await dialog.getByRole("button", { name: "Peruuta" }).click();
     await expect(dialog).toHaveCount(0);
 

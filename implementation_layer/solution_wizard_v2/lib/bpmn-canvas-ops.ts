@@ -269,8 +269,9 @@ export function decisionProblem(values: DecisionValues): DecisionProblem | null 
 
 /**
  * The dialog's values as an operation: add_decision after a step, or
- * update_decision (name and branches) for a decision; null while they are no
- * decision (`decisionProblem`).
+ * update_decision for a decision with only what changed (a rename leaves the
+ * branches as they are, an agent's branch back among them). Null while they
+ * are no decision (`decisionProblem`), and for an update that changes nothing.
  */
 export function opForDecision(
   values: DecisionValues,
@@ -279,7 +280,16 @@ export function opForDecision(
   if (decisionProblem(values)) return null;
   const name = values.name.trim();
   const branches = values.branches.map((b) => ({ condition: b.condition.trim(), target: b.target }));
-  return "after" in of
-    ? { op: "add_decision", after: of.after, name, branches }
-    : { op: "update_decision", decision_id: of.decision.id, name, branches };
+  if ("after" in of) return { op: "add_decision", after: of.after, name, branches };
+  const was = of.decision;
+  const sameBranches =
+    branches.length === was.branches.length &&
+    branches.every((b, i) => b.condition === was.branches[i].condition && b.target === was.branches[i].target);
+  if (name === was.name && sameBranches) return null;
+  return {
+    op: "update_decision",
+    decision_id: was.id,
+    ...(name !== was.name ? { name } : {}),
+    ...(sameBranches ? {} : { branches }),
+  };
 }
