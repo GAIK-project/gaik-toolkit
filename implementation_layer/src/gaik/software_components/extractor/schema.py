@@ -1568,6 +1568,11 @@ DECIMAL_JSON_SCHEMA = {"type": "string"}
 DECIMAL_JSON_SCHEMA_OR_NULL = {"anyOf": [{"type": "string"}, {"type": "null"}]}
 
 _CURRENCY_NOISE_RE = re.compile(r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]")
+# A currency marker between digits ("2€ 550,00") separates two amounts;
+# stripping it would join them into one ("2 550,00").
+_CURRENCY_BETWEEN_DIGITS_RE = re.compile(
+    r"(?i)\d\s*(?:\b(?:EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹])\s*\d"
+)
 # Exactly one signed amount in one of two notations. Dot decimal: comma only
 # as a thousands separator in groups of exactly 3 digits ("1,234.56").
 # Comma decimal: one comma before a required fraction, thousands optionally
@@ -1590,7 +1595,8 @@ def _clean_decimal_string(v):
     number parsing:
 
     - Known currency codes/symbols (EUR, USD, "$", "€", etc.) and surrounding
-      whitespace are stripped.
+      whitespace are stripped. A currency marker between digits ("2€ 550,00")
+      separates two amounts, so that input is rejected instead.
     - What remains must be exactly one well-formed amount, in one of two
       notations. Dot decimal: an optional sign, digits optionally grouped in
       thousands of exactly 3 via ``,``, and an optional ``.``-delimited
@@ -1613,6 +1619,8 @@ def _clean_decimal_string(v):
         return v
     s = v.strip()
     if not s:
+        return None
+    if _CURRENCY_BETWEEN_DIGITS_RE.search(s):
         return None
     s = _CURRENCY_NOISE_RE.sub("", s).strip()
     if not s:
@@ -1681,6 +1689,9 @@ from pydantic import BeforeValidator, WithJsonSchema
 _CURRENCY_NOISE_RE = _re.compile(
     r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]"
 )
+_CURRENCY_BETWEEN_DIGITS_RE = _re.compile(
+    r"(?i)\d\s*(?:\b(?:EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹])\s*\d"
+)
 _SINGLE_AMOUNT_RE = _re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
 _COMMA_DECIMAL_RE = _re.compile(
     r"^(?P<sign>[-+]?)(?P<int>\d{1,3}(?P<sep>[ \u00a0\u202f.])\d{3}(?:(?P=sep)\d{3})*|\d+)"
@@ -1699,6 +1710,8 @@ def _clean_decimal_string(v):
         return v
     s = v.strip()
     if not s:
+        return None
+    if _CURRENCY_BETWEEN_DIGITS_RE.search(s):
         return None
     s = _CURRENCY_NOISE_RE.sub("", s).strip()
     if not s:

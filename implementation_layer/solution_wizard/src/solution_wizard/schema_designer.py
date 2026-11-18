@@ -78,6 +78,9 @@ from pydantic import BeforeValidator, WithJsonSchema
 _CURRENCY_NOISE_RE = _re.compile(
     r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]"
 )
+_CURRENCY_BETWEEN_DIGITS_RE = _re.compile(
+    r"(?i)\d\s*(?:\b(?:EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹])\s*\d"
+)
 _SINGLE_AMOUNT_RE = _re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
 _COMMA_DECIMAL_RE = _re.compile(
     r"^(?P<sign>[-+]?)(?P<int>\d{1,3}(?P<sep>[ \u00a0\u202f.])\d{3}(?:(?P=sep)\d{3})*|\d+)"
@@ -96,6 +99,8 @@ def _clean_decimal_string(v):
         return v
     s = v.strip()
     if not s:
+        return None
+    if _CURRENCY_BETWEEN_DIGITS_RE.search(s):
         return None
     s = _CURRENCY_NOISE_RE.sub("", s).strip()
     if not s:

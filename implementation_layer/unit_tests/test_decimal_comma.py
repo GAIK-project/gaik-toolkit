@@ -46,6 +46,9 @@ REJECTED = [
     ",5",
     "1 234,56 7",
 ]
+# A currency marker between digits separates two amounts. Stripping it first would
+# join them: "2€ 550,00" into "2 550,00", read as 2550.00.
+CURRENCY_BETWEEN_DIGITS = ["2€ 550,00", "2 EUR 550,00", "2€550", "12,40 € 3,50", "5 $ 1.20"]
 
 
 @pytest.mark.parametrize(("raw", "expected"), COMMA_DECIMALS)
@@ -63,13 +66,18 @@ def test_malformed_or_ambiguous_is_still_rejected(raw):
     assert _clean_decimal_string(raw) is None
 
 
+@pytest.mark.parametrize("raw", CURRENCY_BETWEEN_DIGITS)
+def test_currency_marker_between_digits_is_rejected(raw):
+    assert _clean_decimal_string(raw) is None
+
+
 def test_saved_schema_helper_reads_the_same_values():
     # A saved schema.py carries its own copy of the cleaner; it must agree.
     namespace: dict = {}
     exec(compile(DECIMAL_PERSISTED_HELPER_SOURCE, "<schema.py>", "exec"), namespace)  # noqa: S102
     saved = namespace["_clean_decimal_string"]
 
-    for raw in [r for r, _ in COMMA_DECIMALS + UNCHANGED] + REJECTED:
+    for raw in [r for r, _ in COMMA_DECIMALS + UNCHANGED] + REJECTED + CURRENCY_BETWEEN_DIGITS:
         assert saved(raw) == _clean_decimal_string(raw), raw
 
 

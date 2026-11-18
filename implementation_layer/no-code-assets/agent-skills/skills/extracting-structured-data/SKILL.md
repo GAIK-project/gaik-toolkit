@@ -238,8 +238,10 @@ comparing two runs.
 - A `decimal` field reads an amount written with a decimal point (`1,234.56`) or a
   decimal comma (`150,00`, `1 234,56`, `1.234,56`); gaik 0.11.0 and earlier turned
   every decimal comma into `null`. A value it cannot read for certain, such as
-  `1 23,45` or two numbers in one field, still becomes `null` with no error, so a null
-  amount that the page shows is a format to look at, not a missing value. One comma
+  `1 23,45` or two amounts in one field (`2€ 550,00`), is dropped: an optional field
+  becomes `null` with no error, so a null amount that the page shows is a format to
+  look at, not a missing value; a field that cannot be `null` (one with an explicit
+  default) fails validation instead. One comma
   before exactly three digits reads as a thousands separator: `1,234` is 1234, where a
   Finnish document means 1.234. Check such amounts against their quote.
 - Stability alone rewards silence: a branch that leaves deep fields empty is perfectly

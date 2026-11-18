@@ -221,6 +221,9 @@ class TestRunPocTemplate:
             {"order_id": "PO-1", "items": [{"price": "12.40 EUR"}]}
         )
         assert loaded.items[0].price == Decimal("12.40")
+        # output_schema.py carries the cleaner of the gaik that wrote it.
+        comma = loaded_model.model_validate({"order_id": "PO-1", "items": [{"price": "150,00"}]})
+        assert comma.items[0].price == Decimal("150.00")
 
     def test_promoted_data_extractor_template_loads_composite_requirements(self, tmp_path):
         generic_path = WIZARD_ROOT / "templates" / "poc" / "_generic" / "run_poc.py.tmpl"
@@ -302,6 +305,25 @@ class TestSchemaDesigner:
         assert obj.fee == Decimal("150.00")
         assert obj.price == Decimal("1234.56")
         assert model_cls(name="x", fee="1", price="1 23,45").price is None
+        # Two amounts around a currency marker are not joined into one.
+        assert model_cls(name="x", fee="1", price="2€ 550,00").price is None
+
+    def test_model_file_reload_reads_a_decimal_comma(self, tmp_path):
+        # The PoC's load_schema() rebuilds the model from output_schema_model.json with
+        # the installed gaik's Decimal validators and never imports output_schema.py.
+        # A PoC reads "150,00" only with a gaik release that has this fix; with gaik
+        # 0.11.0 or earlier the optional price below comes back None.
+        pytest.importorskip("gaik.software_components.extractor.saved_schema")
+        from gaik.software_components.extractor.saved_schema import read_model_file
+        from solution_wizard.schema_designer import write_schema_files
+
+        write_schema_files({**self._spec(), "schema_name": "Test"}, "Test", tmp_path, "test_uc")
+        model = read_model_file(tmp_path / "schemas" / "output_schema_model.json")
+
+        obj = model(name="x", fee="150,00", price="1 234,56 EUR")
+        assert obj.fee == Decimal("150.00")
+        assert obj.price == Decimal("1234.56")
+        assert model(name="x", fee="1", price="2€ 550,00").price is None
 
     def test_required_decimal_field_has_no_default(self):
         from solution_wizard.schema_designer import build_pydantic_model
