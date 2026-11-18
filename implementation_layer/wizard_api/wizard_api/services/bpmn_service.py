@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from wizard_api.services import ai_marking, artifact_sync
@@ -15,6 +16,8 @@ try:
     _SOLUTION_WIZARD_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional in minimal installs
     _SOLUTION_WIZARD_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 class BpmnGenerationError(RuntimeError):
@@ -102,6 +105,28 @@ def _render_draft(
     xml = ai_marking.mark_xml(generate_bpmn(blueprint, include_data_objects=include_data_objects))
     mapping = dict(blueprint.visualizations.get("bpmn_mapping") or {})
     return xml, mapping, draft
+
+
+def with_session_layout(
+    xml: str, session_metadata: dict[str, Any] | None, *, include_data_objects: bool = True
+) -> str:
+    """``xml`` with the layout the user gave this drawing mode laid over it.
+
+    The layout is kept per mode in ``session_metadata["bpmn_layout"]``
+    (``bpmn_layout``). Without one, or should it not apply, the drawing is
+    returned as it is; laid over, the drawing is marked as a model's work again,
+    as re-writing the XML drops the mark's comment.
+    """
+    from wizard_api.services import bpmn_layout
+
+    layout = bpmn_layout.stored_layout(session_metadata, include_data_objects)
+    if not layout:
+        return xml
+    try:
+        return ai_marking.mark_xml(bpmn_layout.apply_layout(xml, layout))
+    except Exception:  # noqa: BLE001 - the drawing without the layout beats none
+        logger.warning("the stored diagram layout could not be applied", exc_info=True)
+        return xml
 
 
 def data_object_labels(draft: dict[str, Any]) -> dict[str, str]:

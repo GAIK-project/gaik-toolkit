@@ -279,6 +279,11 @@ def _session_bpmn_view(
             )
         else:
             xml = bpmn_service.generate_bpmn_xml(detail.blueprint.model_dump(), **drawing)
+            # Where the user placed the shapes of this drawing mode; the mapping
+            # has element ids only, which the layout does not change.
+            xml = bpmn_service.with_session_layout(
+                xml, session.session_metadata, include_data_objects=bool(data_objects)
+            )
             mapping = {}
     except bpmn_service.BpmnGenerationError as exc:
         raise internal_error(

@@ -5,16 +5,20 @@ The diagram's edits reach it as a list of operations (``schemas/blueprint_ops``)
 that ``services/blueprint_ops`` applies with every reference repaired.
 ``services/blueprint_edit_service`` writes the result as the agent's file, keeps
 it with a new version and records what changed for the agent's next turn, for
-the old saves (PATCH /blueprint, /bpmn/sync) too.
+the old saves (PATCH /blueprint, /bpmn/sync) too. Where the user placed the
+diagram's shapes is no part of the blueprint: ``PUT /bpmn/layout`` keeps it
+apart (``services/bpmn_layout``).
 
 Every route here sits behind the ownership check, like the sessions router.
 """
 
 from __future__ import annotations
 
+import json
 import uuid
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -27,7 +31,7 @@ from wizard_api.schemas.blueprint_ops import (
     OperationsRequest,
     OperationsResponse,
 )
-from wizard_api.services import blueprint_edit_service, session_service
+from wizard_api.services import blueprint_edit_service, bpmn_layout, session_service
 
 router = APIRouter(
     prefix="/sessions",
@@ -36,32 +40,36 @@ router = APIRouter(
 )
 
 
-async def _operations_body(request: Request) -> OperationsRequest:
-    """The request body as ``OperationsRequest``, read only up to ``MAX_REQUEST_BYTES``.
+async def _limited_body(request: Request, what: str) -> bytes:
+    """The request body, read only up to ``MAX_REQUEST_BYTES``.
 
     Read here rather than as a body parameter so a larger body is refused (413)
     at its first byte over the limit, also when it comes without a length.
     """
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_REQUEST_BYTES:
-        raise _too_large()
+        raise _too_large(what)
     body = bytearray()
     async for chunk in request.stream():
         body += chunk
         if len(body) > MAX_REQUEST_BYTES:
-            raise _too_large()
+            raise _too_large(what)
+    return bytes(body)
+
+
+async def _operations_body(request: Request) -> OperationsRequest:
+    """The request body as ``OperationsRequest``, at most ``MAX_REQUEST_BYTES``."""
+    body = await _limited_body(request, "An edit is at most {kb} KB of operations.")
     try:
-        return OperationsRequest.model_validate_json(bytes(body))
+        return OperationsRequest.model_validate_json(body)
     except ValidationError as exc:
         raise RequestValidationError(
             [{**e, "loc": ("body", *e["loc"])} for e in exc.errors(include_url=False)]
         ) from None
 
 
-def _too_large() -> HTTPException:
-    return api_error(
-        413, "too_large", f"An edit is at most {MAX_REQUEST_BYTES // 1024} KB of operations."
-    )
+def _too_large(what: str) -> HTTPException:
+    return api_error(413, "too_large", what.format(kb=MAX_REQUEST_BYTES // 1024))
 
 
 @router.post("/{session_id}/blueprint/operations", response_model=OperationsResponse)
@@ -96,3 +104,47 @@ def apply_blueprint_operations(
         needs_attention=result.needs_attention,
         bpmn_changed=result.bpmn_changed,
     )
+
+
+async def _layout_body(request: Request) -> Any:
+    """The request body as JSON, at most ``MAX_REQUEST_BYTES``; checked by the route."""
+    body = await _limited_body(request, "A layout is at most {kb} KB.")
+    try:
+        return json.loads(body)
+    except ValueError as exc:
+        raise api_error(422, "invalid_layout", "The layout is not JSON.") from exc
+
+
+@router.put("/{session_id}/bpmn/layout", status_code=204)
+def put_bpmn_layout(
+    session_id: uuid.UUID,
+    data_objects: int = Query(
+        1, ge=0, le=1, description="1 the layout of the full drawing, 0 of the compact one."
+    ),
+    payload: Any = Depends(_layout_body),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Keep where the user placed shapes and edges in the diagram; ``GET /bpmn`` applies it.
+
+    The body is a layout, ``{"shapes": {element_id: {"x": number, "y": number}},
+    "edges": {element_id: [[x, y], ...]}}``, both keys optional, keyed by the
+    element ids of the drawing (``GET /bpmn/mapping``). It is merged into the
+    session's layout of the drawing mode ``data_objects`` selects (1, the
+    default: with data objects; 0: compact): an entry replaces the stored one
+    of the same id, and ``null`` for an id removes it, which resets that shape
+    or edge to where the diagram draws it. Answers 204.
+
+    Refused with 422 ``invalid_layout`` when the body or the merged layout is
+    no valid layout (see ``bpmn_layout.clean_layout``: ids, finite numbers within
+    100000, 2 to 100 waypoints, at most 1000 shapes and edges together), and
+    with 413 ``too_large`` over 64 KB. The blueprint is not touched: no version
+    is added, and a layout is taken while the agent replies.
+    """
+    session = session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    try:
+        bpmn_layout.save_layout(db, session, bool(data_objects), payload)
+    except ValueError as exc:
+        raise api_error(422, "invalid_layout", str(exc)) from exc
+    return Response(status_code=204)

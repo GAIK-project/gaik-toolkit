@@ -621,6 +621,38 @@ def test_route_edge_starts_and_ends_on_the_shapes():
         assert a[0] == b[0] or a[1] == b[1]
 
 
+@pytest.mark.parametrize(
+    ("src", "tgt"),
+    [
+        ((0, 300, 100, 80), (0, 0, 100, 80)),  # above, same column
+        ((0, 300, 100, 80), (300, 0, 100, 80)),  # above and to the right
+        ((0, 0, 100, 80), (0, 200, 100, 80)),  # below, same column
+        ((0, 0, 100, 80), (40, 200, 36, 36)),  # below, narrower, overlapping column
+        ((400, 0, 100, 80), (0, 0, 100, 80)),  # to the left, same row
+        ((400, 0, 100, 80), (0, 200, 100, 80)),  # to the left and below
+        ((50, 50, 0, 0), (300, 200, 100, 80)),  # zero-size source, target right
+        ((50, 50, 0, 0), (0, 200, 100, 80)),  # zero-size source, target below
+    ],
+    ids=[
+        "above",
+        "above-right",
+        "below-same-column",
+        "below-overlapping",
+        "left",
+        "left-below",
+        "zero-size-source-right",
+        "zero-size-source-below",
+    ],
+)
+def test_route_edge_keeps_its_contract(src, tgt):
+    points = route_edge(src, tgt)
+    assert len(points) >= 2
+    assert _on_border(points[0], src), points
+    assert _on_border(points[-1], tgt), points
+    for a, b in zip(points, points[1:]):
+        assert a[0] == b[0] or a[1] == b[1], points
+
+
 def _pdf_blueprint(has_pdf: bool) -> Blueprint:
     """Hospital blueprint with/without pdf in output_types."""
     data = {
