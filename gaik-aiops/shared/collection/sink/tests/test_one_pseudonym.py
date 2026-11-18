@@ -24,21 +24,15 @@ COMPOSE = Path(__file__).resolve().parents[4] / "deploy" / "compose"
 
 def _privacy_statements(path: Path, key_source: str) -> list[str]:
     text = path.read_text()
-    block = text[text.index("  transform/privacy:") :]
+    block = text[text.index("  transform/privacy:"):]
     block = block[: re.search(r"\n  [a-z][\w/]*:\n", block[1:]).start() + 1]
-    lines = [
-        line.strip()
-        for line in block.splitlines()
-        if line.strip().startswith(("- set", "- delete", "- replace"))
-    ]
+    lines = [line.strip() for line in block.splitlines() if line.strip().startswith(("- set", "- delete", "- replace"))]
     return [line.replace(key_source, "<key>") for line in lines]
 
 
 def test_the_openbao_overlay_differs_from_the_base_only_in_the_key_source():
     base = _privacy_statements(COMPOSE / "otel-collector.yaml", "${env:PSEUDONYM_KEY}")
-    vault = _privacy_statements(
-        COMPOSE / "openbao" / "otel-collector.openbao.yaml", "${file:/run/bao/pseudonym_key}"
-    )
+    vault = _privacy_statements(COMPOSE / "openbao" / "otel-collector.openbao.yaml", "${file:/run/bao/pseudonym_key}")
     assert base and base == vault
 
 
@@ -53,17 +47,12 @@ def test_the_session_id_is_pseudonymised_before_it_names_the_mlflow_session():
     # The copy to session.id runs after the privacy processor, so it copies the pseudonym.
     assert "processors: [memory_limiter, transform/privacy, transform/session, batch]" in base
     # The overlay overrides transform/privacy only; the session rule lives in the base config.
-    assert (
-        "transform/session" not in (COMPOSE / "openbao" / "otel-collector.openbao.yaml").read_text()
-    )
+    assert "transform/session" not in (COMPOSE / "openbao" / "otel-collector.openbao.yaml").read_text()
 
 
 def _post(path: str, body: dict) -> None:
-    req = urllib.request.Request(
-        f"{OTLP}{path}",
-        data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"},
-    )
+    req = urllib.request.Request(f"{OTLP}{path}", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=5) as resp:
         assert resp.status == 200
 
@@ -87,79 +76,29 @@ def test_an_audit_row_and_a_trace_share_the_pseudonym():
     identity = f"user-{secrets.token_hex(6)}@example.com"
     trace_id = secrets.token_hex(16)
     resource = {"attributes": [_s("service.name", "pseudonym-test")]}
-    _post(
-        "/v1/logs",
-        {
-            "resourceLogs": [
-                {
-                    "resource": resource,
-                    "scopeLogs": [
-                        {
-                            "logRecords": [
-                                {
-                                    "traceId": trace_id,
-                                    "attributes": [
-                                        _s("gaik.event.class", "audit"),
-                                        _s("event.name", "auth.login"),
-                                        _s("gaik.audit.outcome", "success"),
-                                        _s("enduser.id", identity),
-                                    ],
-                                }
-                            ]
-                        }
-                    ],
-                }
-            ]
-        },
-    )
+    _post("/v1/logs", {"resourceLogs": [{"resource": resource, "scopeLogs": [{"logRecords": [{
+        "traceId": trace_id,
+        "attributes": [_s("gaik.event.class", "audit"), _s("event.name", "auth.login"),
+                       _s("gaik.audit.outcome", "success"), _s("enduser.id", identity)],
+    }]}]}]})
     now = time.time_ns()
-    _post(
-        "/v1/traces",
-        {
-            "resourceSpans": [
-                {
-                    "resource": resource,
-                    "scopeSpans": [
-                        {
-                            "spans": [
-                                {
-                                    "traceId": trace_id,
-                                    "spanId": secrets.token_hex(8),
-                                    "name": "chat",
-                                    "kind": 3,
-                                    "startTimeUnixNano": str(now - 1_000_000),
-                                    "endTimeUnixNano": str(now),
-                                    "attributes": [
-                                        _s("gaik.event.class", "llm_call"),
-                                        _s("enduser.id", identity),
-                                    ],
-                                }
-                            ]
-                        }
-                    ],
-                }
-            ]
-        },
-    )
+    _post("/v1/traces", {"resourceSpans": [{"resource": resource, "scopeSpans": [{"spans": [{
+        "traceId": trace_id, "spanId": secrets.token_hex(8), "name": "chat", "kind": 3,
+        "startTimeUnixNano": str(now - 1_000_000), "endTimeUnixNano": str(now),
+        "attributes": [_s("gaik.event.class", "llm_call"), _s("enduser.id", identity)],
+    }]}]}]})
 
     deadline = time.monotonic() + 30
     audit = span = None
     while time.monotonic() < deadline and not (audit and span):
         with psycopg.connect(READER) as conn:
-            row = conn.execute(
-                "SELECT actor_pseudo_id FROM collection.audit_events WHERE trace_id = %s",
-                (trace_id,),
-            ).fetchone()
+            row = conn.execute("SELECT actor_pseudo_id FROM collection.audit_events WHERE trace_id = %s",
+                               (trace_id,)).fetchone()
         audit = row[0] if row else None
         try:
-            trace = json.load(
-                urllib.request.urlopen(
-                    f"{MLFLOW}/api/3.0/mlflow/traces/get?trace_id=tr-{trace_id}", timeout=5
-                )
-            )["trace"]
-            attrs = {
-                a["key"]: next(iter(a["value"].values())) for a in trace["spans"][0]["attributes"]
-            }
+            trace = json.load(urllib.request.urlopen(f"{MLFLOW}/api/3.0/mlflow/traces/get?trace_id=tr-{trace_id}",
+                                                     timeout=5))["trace"]
+            attrs = {a["key"]: next(iter(a["value"].values())) for a in trace["spans"][0]["attributes"]}
             span = attrs.get("enduser.pseudo.id")
         except urllib.error.HTTPError as exc:
             if exc.code != 404:
@@ -178,9 +117,7 @@ def _routes_module():
     import types
 
     sys.modules.setdefault("mlflow", types.SimpleNamespace(MlflowClient=object))
-    spec = importlib.util.spec_from_file_location(
-        "setup_experiments", COMPOSE / "mlflow" / "setup_experiments.py"
-    )
+    spec = importlib.util.spec_from_file_location("setup_experiments", COMPOSE / "mlflow" / "setup_experiments.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
