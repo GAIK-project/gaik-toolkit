@@ -251,17 +251,17 @@
         "name": "temperature",
         "type": "float | None",
         "default": 0.0,
-        "effect": "None omits temperature from the API request. For recognized GPT-6 and GPT-5.6 families, the shared compatibility layer removes sampling controls unless reasoning_effort='none'. GPT-6 Astra does not accept 'none'; Sol/Luna do. Set model_family in a config for custom Azure deployment aliases. Other model families retain their own API rules; do not infer support from version-number ordering.",
+        "effect": "None omits temperature from the API request. With a temperature set and no reasoning_effort, the requirements parses send GPT-6 Sol/Luna and GPT-5.6 Sol/Luna/Terra reasoning_effort='none', so the temperature applies and they do not reason; with reasoning and free sampling these models sometimes kept only the first field of a task. Structure detection keeps the model's default. Other GPT-6 models (Astra, gpt-6-rosalind, gpt-6.x) reject 'none': they reason and the compatibility layer drops the temperature. Set model_family in a config for custom Azure deployment aliases. Other model families retain their own API rules; do not infer support from version-number ordering.",
         "selection_relevant": true,
-        "infer_from": "Use temperature=None with the default GPT-6 family unless explicitly disabling supported reasoning; tune other families only after checking their API."
+        "infer_from": "Keep the default 0.0 for GPT-6 Sol/Luna and GPT-5.6 so schema generation stays deterministic; set None only together with an active reasoning_effort, and tune other families only after checking their API."
       },
       {
         "name": "reasoning_effort",
         "type": "str | None",
         "default": null,
-        "effect": "Model-specific reasoning setting, not a universal provider option. GPT-6 supports low/medium/high/xhigh/max, plus none on Sol/Luna (not Astra). Omission uses the model default, not a promise of no reasoning. For OpenAI-compatible GPT-6/GPT-5.6 calls, sampling options are removed while reasoning is enabled. Native Google/Anthropic settings must follow their adapter's documented options.",
+        "effect": "Model-specific reasoning setting, not a universal provider option. GPT-6 supports low/medium/high/xhigh/max, plus none on Sol/Luna (not Astra or gpt-6.x). Left unset with a temperature, the requirements parses send 'none' to GPT-6 Sol/Luna and GPT-5.6 Sol/Luna/Terra themselves; an effort in the constructor or in config['reasoning_effort'] is sent as given to every call. Other models get no effort, which uses the model default, not a promise of no reasoning. For OpenAI-compatible GPT-6/GPT-5.6 calls, sampling options are removed while reasoning is enabled. Native Google/Anthropic settings must follow their adapter's documented options.",
         "selection_relevant": true,
-        "infer_from": "Choose a supported effort for the exact model and quality/cost requirement; otherwise leave omitted."
+        "infer_from": "Leave omitted unless the use case needs a reasoning model to reason while designing the schema; then choose a supported effort for the exact model with temperature=None."
       },
       {
         "name": "model",

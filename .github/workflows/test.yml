@@ -10,6 +10,7 @@ on:
       - 'implementation_layer/**'
       - '.claude-plugin/**'
       - '.claude/skills/gaik-sync/**'
+      - '.claude/skills/component-check/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
       - '.github/workflows/test.yml'
@@ -25,6 +26,7 @@ on:
       - 'implementation_layer/**'
       - '.claude-plugin/**'
       - '.claude/skills/gaik-sync/**'
+      - '.claude/skills/component-check/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
       - '.github/workflows/test.yml'
@@ -331,11 +333,36 @@ jobs:
         case "$RELEASE_REF" in refs/tags/v*) ;; *) echo 'Release certification requires a version tag'; exit 1;; esac
         uv run python scripts/release_check.py --live --require-provider azure --version "${RELEASE_VERSION#v}"
 
+    # The tag must also pass the component check (.claude/skills/component-check): the
+    # schema generator, extractor, vision extractor, RAG, tabular agent and vision parser
+    # on synthetic invoices, on Azure.
+    # --public keeps provider error text out of the published summary.
+    - name: Component check on Azure
+      timeout-minutes: 20
+      env:
+        RUN_DIR: ${{ runner.temp }}/component-check
+        RELEASE_AZURE_MODEL: ${{ vars.RELEASE_AZURE_MODEL || 'gpt-6-luna' }}
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+        AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
+      run: |
+        set -uo pipefail
+        status=0
+        uv run python .claude/skills/component-check/run_checks.py \
+          --providers azure --require-all --public --provider-timeout 600 --attempts 2 \
+          --out "$RUN_DIR" || status=1
+        if [ -f "$RUN_DIR/summary.md" ]; then
+          cat "$RUN_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        fi
+        exit "$status"
+
     - name: Upload sanitized certification report
       if: always()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-certification-${{ github.sha }}
-        path: results/release-check.json
+        path: |
+          results/release-check.json
+          ${{ runner.temp }}/component-check/
         if-no-files-found: error
         retention-days: 90
