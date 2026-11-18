@@ -26,10 +26,11 @@ Usage:
     # -> {"a": "Etunimi", "b": "Etunimet"}
 """
 
-from .understander import FormUnderstander, InputField, LabelEntry, LabelMapping
+from .understander import CleanedLabel, FormUnderstander, InputField, LabelEntry, LabelMapping
 
 __all__ = [
     "FormUnderstander",
+    "CleanedLabel",
     "InputField",
     "LabelEntry",
     "LabelMapping",

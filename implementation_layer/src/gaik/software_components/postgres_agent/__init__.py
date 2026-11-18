@@ -5,7 +5,8 @@ language. The agent introspects the schema, generates a validated read-only SQL
 query, runs it, and (optionally) synthesizes a natural-language answer. A
 lightweight agentic loop feeds SQL errors back to the LLM and retries.
 
-Scope (v1): READ-ONLY relational queries against a single schema. No writes, no
+Scope (v1): READ-ONLY relational queries over the tables named in
+``table_allowlist``, in a single schema. No writes, no
 DDL, no data import. SQL is parsed and validated before execution, but the real
 guarantee is a read-only database role -- see ``README.md``.
 
@@ -14,12 +15,18 @@ Main class:
 
 Example:
     >>> from gaik.software_components.postgres_agent import PostgresAgent
-    >>> with PostgresAgent("postgresql://user:pass@localhost:5432/db") as agent:
+    >>> with PostgresAgent(
+    ...     "postgresql://user:pass@localhost:5432/db",
+    ...     table_allowlist=["customers", "orders"],
+    ... ) as agent:
     ...     result = agent.ask("How many orders did each customer place?")
     ...     print(result.answer)
 
 Tool-style use (no LLM needed for these):
-    >>> with PostgresAgent("postgresql://user:pass@localhost:5432/db") as agent:
+    >>> with PostgresAgent(
+    ...     "postgresql://user:pass@localhost:5432/db",
+    ...     table_allowlist=["customers", "orders"],
+    ... ) as agent:
     ...     schema = agent.get_schema()          # introspect tables/columns
     ...     rows = agent.run_sql("SELECT * FROM customers LIMIT 10")
 """

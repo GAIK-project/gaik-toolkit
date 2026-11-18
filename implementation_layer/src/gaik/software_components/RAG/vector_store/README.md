@@ -49,9 +49,23 @@ from gaik.software_components.RAG.vector_store import VectorStore
 store = VectorStore(
     persist: bool = False,
     persist_path: str = "chroma_store",
-    collection_name: str = "gaik_rag"
+    collection_name: str = "gaik_rag",
+    owner: str | None = None,  # a user or session id: see below
 )
 ```
+
+### Several users on one store
+
+Pass `owner` (a user or session id) and the store records it on every chunk it adds,
+under the metadata key `gaik_owner`, and its searches and counts see only that owner's
+chunks. A caller's filter is added to the owner condition; it cannot replace it. Without
+`owner`, everyone using the same collection reads every chunk in it, and `add()` refuses
+metadata that already names an owner.
+
+This is a filter in gaik, not access control. Every process that can open the folder (a
+store without an owner, an older gaik, chromadb itself) reads and writes every owner's
+chunks, including chunks that name an owner. Treat all of them as trusted, or give users
+who must not reach each other's data separate collections or folders.
 
 ### Methods
 

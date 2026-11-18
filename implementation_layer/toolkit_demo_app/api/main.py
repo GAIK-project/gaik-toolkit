@@ -18,6 +18,9 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+# gaik's tabular loader names the uploaded file (and the table made from it) in its INFO
+# lines; the demo keeps the file under the user's name, so those lines stay out.
+logging.getLogger("gaik.software_components.tabular_agent").setLevel(logging.WARNING)
 
 # Load .env.local from toolkit_demo_app folder - must be before other imports
 env_path = Path(__file__).parent.parent / ".env.local"
@@ -36,6 +39,7 @@ try:
     from utils.errors import public_error
     from utils.model_settings import ModelSettingsMiddleware
     from utils.ops import OpsMiddleware
+    from utils.upload_limits import UploadLimitMiddleware
 except ImportError:
     from api.routers import model_settings
     from api.utils.ai_marking import AIMarkMiddleware
@@ -43,6 +47,7 @@ except ImportError:
     from api.utils.errors import public_error
     from api.utils.model_settings import ModelSettingsMiddleware
     from api.utils.ops import OpsMiddleware
+    from api.utils.upload_limits import UploadLimitMiddleware
 
 try:
     # Docker: routers/ is in same directory as main.py
@@ -152,6 +157,9 @@ app = FastAPI(
     openapi_url="/openapi.json" if API_DOCS else None,
 )
 
+# Each route's body limit and file count, held while the body arrives
+# (utils/upload_limits.py). Innermost, so the request trace still sees a refusal.
+app.add_middleware(UploadLimitMiddleware)
 # CORS for Next.js frontend (allowing all origins for cluster-internal usage)
 app.add_middleware(
     CORSMiddleware,
