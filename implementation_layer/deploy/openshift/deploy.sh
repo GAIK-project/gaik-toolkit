@@ -78,7 +78,7 @@ MANIFESTS=(rbac.yaml networkpolicy-sandbox.yaml postgres.yaml pvc-sessions.yaml 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
 print_usage() {
-    echo "Usage: PROJECT=<project> [INSTANCE=<name>] ./deploy.sh [secrets|manifests|api|web|poc-runner|scanner|all|verify|render <file>]"
+    echo "Usage: PROJECT=<project> [INSTANCE=<name>] ./deploy.sh [secrets|manifests|api|web|poc-runner|scanner|all|signin|signin-off|verify|render <file>]"
     echo ""
     echo "  secrets    Apply secrets.yaml (untracked) for this instance"
     echo "  manifests  Apply db + PVCs + services + route + deployments"
@@ -87,6 +87,8 @@ print_usage() {
     echo "  poc-runner Build and push $POC_RUNNER_IMAGE (sandbox runs)"
     echo "  scanner    Build and push $SCANNER_DEPLOYMENT, apply and roll it out (upload malware check)"
     echo "  all        manifests, then api, web and poc-runner"
+    echo "  signin     Put the Keycloak sign-in proxy in front of $WEB_DEPLOYMENT (signin-proxy.yaml)"
+    echo "  signin-off Point the Route straight at $WEB_DEPLOYMENT again, back to its own sign-in"
     echo "  verify     Show route, api env and recent api logs"
     echo "  render <f> Print manifest <f> with project and instance substituted"
     echo ""
@@ -211,10 +213,16 @@ deploy_secrets() {
 
 deploy_manifests() {
     echo -e "${YELLOW}Applying manifests for $NAME to project $PROJECT...${NC}"
-    local m
+    local m signin=0
+    # A stack whose sign-in goes through Keycloak keeps it: its Route stays on the
+    # proxy, and the web app's sign-in settings, which deployment-web.yaml lacks,
+    # are set again after it is applied.
+    signin_enabled && signin=1
     for m in "${MANIFESTS[@]}"; do
+        if [ "$m" = route.yaml ] && [ "$signin" = 1 ]; then m=route-signin.yaml; fi
         apply_manifest "$m"
     done
+    if [ "$signin" = 1 ]; then set_signin_env; fi
     echo -e "${GREEN}Manifests applied. (Ensure ./deploy.sh secrets has run for this instance.)${NC}"
 }
 
@@ -298,6 +306,63 @@ deploy_web() {
     echo -e "${GREEN}$WEB_DEPLOYMENT deployed${NC}"
 }
 
+# --- Sign-in through Keycloak (deploy/keycloak, signin-proxy.yaml) ----------
+SIGNIN_DEPLOYMENT="$NAME-signin"
+KEYCLOAK_HOST="gaik-keycloak-${PROJECT}.2.rahtiapp.fi"
+WEB_HOST="${WEB_DEPLOYMENT}-${PROJECT}.2.rahtiapp.fi"
+
+signin_enabled() {
+    oc get deployment "$SIGNIN_DEPLOYMENT" -n "$PROJECT" >/dev/null 2>&1
+}
+
+set_signin_env() {
+    # The web app checks the forwarded token itself (lib/proxy-auth.ts). The
+    # keys come from Keycloak's Service; the issuer is its public address.
+    # Sign-out goes to the proxy's /oauth2/sign_out, which also ends the
+    # Keycloak session (--backend-logout-url in signin-proxy.yaml).
+    local issuer="https://$KEYCLOAK_HOST/realms/gaik"
+    oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" \
+        WIZARD_AUTH_MODE=proxy \
+        WIZARD_OIDC_ISSUER="$issuer" \
+        WIZARD_OIDC_JWKS_URL="http://gaik-keycloak:8080/realms/gaik/protocol/openid-connect/certs" \
+        WIZARD_OIDC_CLIENT_ID="$NAME" \
+        WIZARD_OIDC_GROUP=wizard-user >/dev/null
+}
+
+deploy_signin() {
+    if ! oc get secret "$SIGNIN_DEPLOYMENT" -n "$PROJECT" >/dev/null 2>&1; then
+        echo -e "${RED}Error: Secret $SIGNIN_DEPLOYMENT is missing. Register the stack in Keycloak first:${NC}"
+        echo "  PROJECT=$PROJECT ../keycloak/deploy.sh add-client $NAME https://$WEB_HOST"
+        exit 1
+    fi
+    # The proxy's pages (signin-templates/). A user the proxy turned away has no
+    # proxy session to end, so the waiting page signs out at Keycloak itself.
+    local sign_out="https://$KEYCLOAK_HOST/realms/gaik/protocol/openid-connect/logout?client_id=$NAME\&amp;post_logout_redirect_uri=https%3A%2F%2F$WEB_HOST%2F"
+    sed -e "s#SIGN_OUT_URL_PLACEHOLDER#$sign_out#g" "$SCRIPT_DIR/signin-templates/error.html" \
+        | oc create configmap "$SIGNIN_DEPLOYMENT-templates" -n "$PROJECT" --from-file=error.html=/dev/stdin \
+            --dry-run=client -o yaml | oc apply -n "$PROJECT" -f -
+    # Proxy first, then the Route, then the web app: at no point does the Route
+    # lead to a web app that expects a proxy that is not there.
+    apply_manifest signin-proxy.yaml
+    oc rollout status "deployment/$SIGNIN_DEPLOYMENT" -n "$PROJECT" --timeout=300s
+    apply_manifest route-signin.yaml
+    set_signin_env
+    oc rollout status "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" --timeout=300s
+    echo -e "${GREEN}Sign-in for $NAME now goes through Keycloak: https://$WEB_HOST${NC}"
+}
+
+remove_signin() {
+    apply_manifest route.yaml
+    oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" WIZARD_AUTH_MODE- WIZARD_OIDC_ISSUER- \
+        WIZARD_OIDC_JWKS_URL- WIZARD_OIDC_CLIENT_ID- WIZARD_OIDC_GROUP- WIZARD_OIDC_LOGOUT_URL- >/dev/null
+    oc rollout status "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" --timeout=300s
+    # Removed, not scaled down: `manifests` keys on the proxy's Deployment.
+    # The Secret and the Keycloak client stay, so `signin` can turn it on again.
+    oc delete deployment,service "$SIGNIN_DEPLOYMENT" -n "$PROJECT" --ignore-not-found >/dev/null
+    oc delete configmap "$SIGNIN_DEPLOYMENT-templates" -n "$PROJECT" --ignore-not-found >/dev/null
+    echo -e "${GREEN}$NAME uses its own sign-in again; $SIGNIN_DEPLOYMENT removed.${NC}"
+}
+
 verify() {
     echo -e "${YELLOW}Route:${NC}";    oc get route "$WEB_DEPLOYMENT" -n "$PROJECT"
     echo -e "${YELLOW}API env:${NC}";  oc set env deployment/$API_DEPLOYMENT --list -n "$PROJECT"
@@ -330,6 +395,8 @@ case "$1" in
     poc-runner) check_docker; require_pushed_commit; deploy_poc_runner ;;
     scanner)    check_docker; require_pushed_commit; deploy_scanner ;;
     all)        check_docker; require_pushed_commit; deploy_scanner; deploy_manifests; deploy_api; deploy_web; deploy_poc_runner ;;
+    signin)     deploy_signin ;;
+    signin-off) remove_signin ;;
     verify)     verify ;;
     *)          print_usage; exit 1 ;;
 esac

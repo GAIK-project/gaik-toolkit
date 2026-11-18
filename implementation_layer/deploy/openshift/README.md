@@ -205,6 +205,16 @@ live deployments carry settings the manifests lack, so a release reaches staging
 target by target: build the api and web images from the tag, then restart each
 deployment. Do not run `deploy.sh all` against a live stack.
 
+## Sign-in through Keycloak (signin-proxy.yaml)
+
+Instead of the dev accounts, a stack can sign its users in at the GAIK Keycloak
+(`../keycloak`, its README says how to bring it up, add accounts and add
+Google). `PROJECT=<project> INSTANCE=<name> ./deploy.sh signin` runs an
+oauth2-proxy in front of the web app, points the stack's Route at it and sets
+the web app's `WIZARD_AUTH_MODE=proxy` and `WIZARD_OIDC_*`; `signin-off` undoes
+it. The web app does not take the proxy's word for who the user is: it checks the
+forwarded access token itself (`lib/proxy-auth.ts`).
+
 ## Environment variables
 
 **wizard-v2-api** (runtime):

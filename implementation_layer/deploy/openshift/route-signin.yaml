@@ -1,0 +1,37 @@
+# The stack's public Route when sign-in goes through Keycloak (signin-proxy.yaml):
+# the same Route as route.yaml, name and host unchanged, but it leads to the
+# sign-in proxy instead of straight to the web app. `deploy.sh signin` applies
+# it; applying route.yaml again points the Route back at the web app.
+#
+# Public HTTPS route to the frontend. `spec.host` is intentionally omitted so
+# OpenShift auto-assigns NAME_PLACEHOLDER-web-<project>.2.rahtiapp.fi — which is
+# also what gives a second instance its own URL. Set an explicit host here only
+# if a custom hostname is provisioned.
+#
+# The annotations matter for the streaming chat: response-buffering must be OFF
+# or SSE tokens arrive in one lump at the end, and the timeout must be long
+# enough for a full agent turn.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: NAME_PLACEHOLDER-web
+  labels:
+    app: NAME_PLACEHOLDER-web
+  annotations:
+    haproxy.router.openshift.io/timeout: 15m
+    haproxy.router.openshift.io/response-buffering: "off"
+    haproxy.router.openshift.io/disable-cookies: "true"
+    haproxy.router.openshift.io/proxy-body-size: 50m
+    # HSTS at the edge router (covers router error pages too). No preload on the
+    # shared *.2.rahtiapp.fi domain. App-level HSTS is handled here instead.
+    haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
+spec:
+  to:
+    kind: Service
+    name: NAME_PLACEHOLDER-signin
+    weight: 100
+  port:
+    targetPort: 4180
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

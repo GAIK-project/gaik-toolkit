@@ -15,6 +15,7 @@ resources:
   - ../../base
   - buildconfigs.yaml
   - mlflow-auth.yaml
+  - mlflow-signin.yaml
   - routes.yaml
   - networkpolicy-router.yaml
 
@@ -49,13 +50,14 @@ configMapGenerator:
     files: [nginx.conf=mlflow-auth-nginx.conf]
 
 patches:
-  # The base's workloads; mlflow-auth.yaml sets no seccomp profile to begin with.
+  # The base's workloads; mlflow-auth.yaml and mlflow-signin.yaml set no seccomp profile to begin with.
   - path: patch-rahti-seccomp.yaml
-    target: {kind: Deployment, labelSelector: "app.kubernetes.io/name!=mlflow-auth"}
+    target: {kind: Deployment, labelSelector: "app.kubernetes.io/name notin (mlflow-auth,mlflow-signin)"}
   - path: patch-rahti-seccomp.yaml
     target: {kind: StatefulSet}
   - path: patch-rahti-cpu-requests.yaml
   - path: patch-grafana-public-url.yaml
+  - path: patch-grafana-oidc.yaml
   - path: patch-mlflow-public-host.yaml
     target: {kind: Deployment, name: mlflow}
   - path: patch-image-triggers.yaml
