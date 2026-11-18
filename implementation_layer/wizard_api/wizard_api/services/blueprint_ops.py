@@ -1,0 +1,454 @@
+"""Apply typed operations to the full blueprint draft, repairing references.
+
+Pure: works on a deep copy of a dict and touches no database, file or request.
+All operations of a list apply, or none: the first refused one raises
+``OperationError`` and the caller's draft is left as it was.
+
+The result is checked with the shared validator. An edit is refused when the
+result is not a valid ``Blueprint``, or when it adds an error of a refusing rule
+(``REFUSING_RULES``); errors already in the draft do not count. New errors of any
+other rule are returned in ``needs_attention`` for the agent to complete.
+
+A new operation is a model in ``schemas/blueprint_ops.py`` and a handler here,
+registered in ``_HANDLERS``.
+"""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import re
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any
+
+from pydantic import ValidationError
+
+from wizard_api.schemas.blueprint_ops import (
+    AddStep,
+    Connect,
+    Disconnect,
+    MoveStep,
+    RemoveStep,
+    RenameStep,
+    SetStepDescription,
+    SetStepType,
+)
+
+try:
+    from solution_wizard import validator
+    from solution_wizard.blueprint import Blueprint
+
+    _SOLUTION_WIZARD_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional in minimal installs
+    _SOLUTION_WIZARD_AVAILABLE = False
+
+#: Validator rules whose new errors refuse an edit: unique step ids, undeclared
+#: artifact, produced_by consistency, cycle, unknown performed_by.
+REFUSING_RULES = frozenset({1, 2, 7, 8, 16})
+_CYCLE_RULE = 8
+_HUMAN_TYPES = frozenset({"user_task", "human_review"})
+_TYPE_WORDS = {
+    "user_task": "user task",
+    "automated_task": "automated task",
+    "human_review": "human review",
+}
+
+
+def solution_wizard_available() -> bool:
+    return _SOLUTION_WIZARD_AVAILABLE
+
+
+class OperationError(Exception):
+    """An operation the draft cannot take. ``code`` is machine-readable:
+    ``not_found``, ``last_step``, ``cycle`` or ``invalid``."""
+
+    def __init__(
+        self, code: str, message: str, field: str | None = None, index: int | None = None
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.field = field
+        #: The position of the refused operation in the list, when one is to blame.
+        self.index = index
+
+
+@dataclass
+class OpsResult:
+    blueprint: dict
+    summaries: list[str]
+    warnings: list[str]
+    needs_attention: list[str]
+    bpmn_changed: bool
+
+
+@dataclass
+class _Context:
+    blueprint: dict
+    summaries: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    #: Steps an operation made automated or added as automated; checked for a
+    #: component once all operations have run.
+    component_checks: list[str] = field(default_factory=list)
+
+    @property
+    def steps(self) -> list[dict]:
+        workflow = self.blueprint.setdefault("workflow", {})
+        return workflow.setdefault("steps", [])
+
+    @property
+    def process(self) -> dict:
+        return self.blueprint.setdefault("business_process", {})
+
+    def step(self, step_id: str | None, field_name: str) -> dict:
+        for step in self.steps:
+            if step.get("id") == step_id:
+                return step
+        raise OperationError("not_found", f'There is no step "{step_id}"', field_name)
+
+    def index(self, step_id: str) -> int:
+        return next(i for i, s in enumerate(self.steps) if s.get("id") == step_id)
+
+    def successors(self, step_id: str) -> list[dict]:
+        return [s for s in self.steps if step_id in s.get("depends_on", [])]
+
+
+# ---------------------------------------------------------------- public helpers
+
+
+def new_step_id(name: str, existing: set[str]) -> str:
+    """A lower-case slug of ``name``, numbered ``_2``, ``_3``... when it is taken."""
+    base = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "step"
+    candidate, number = base, 1
+    while candidate in existing:
+        number += 1
+        candidate = f"{base}_{number}"
+    return candidate
+
+
+_STEP_DIGEST_FIELDS = {
+    "id": None,
+    "name": "",
+    "type": "",
+    "component": None,
+    "inputs": [],
+    "outputs": [],
+    "depends_on": [],
+    "description": "",
+    "performed_by": "",
+}
+
+
+def bpmn_relevant_digest(blueprint: dict) -> str:
+    """SHA-256 of the canonical JSON of the parts of the blueprint the BPMN shows."""
+    steps = (blueprint.get("workflow") or {}).get("steps") or []
+    technical = blueprint.get("technical_spec") or {}
+    business = blueprint.get("business_spec") or {}
+    relevant = {
+        "steps": [
+            {key: step.get(key, default) for key, default in _STEP_DIGEST_FIELDS.items()}
+            for step in steps
+        ],
+        "artifacts": blueprint.get("artifacts") or {},
+        "business_process": blueprint.get("business_process") or {},
+        "integration_targets": technical.get("integration_targets"),
+        "input_types": technical.get("input_types"),
+        "output_types": technical.get("output_types"),
+        "intended_users": business.get("intended_users"),
+        "reviewers": business.get("reviewers"),
+        "governance": blueprint.get("governance") or {},
+    }
+    canonical = json.dumps(
+        relevant, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def apply_operations(draft: dict, ops: list[Any]) -> OpsResult:
+    """Apply every operation to a deep copy of ``draft``, or raise ``OperationError``."""
+    ctx = _Context(copy.deepcopy(draft))
+    for index, op in enumerate(ops):
+        try:
+            _HANDLERS[type(op)](ctx, op)
+        except OperationError as exc:
+            exc.index = index
+            raise
+    needs_attention = _check(draft, ctx.blueprint)
+    for step_id in dict.fromkeys(ctx.component_checks):
+        step = next((s for s in ctx.steps if s.get("id") == step_id), None)
+        if step and step.get("type") == "automated_task" and not step.get("component"):
+            needs_attention.insert(0, f"{step_id}: needs a component")
+    return OpsResult(
+        blueprint=ctx.blueprint,
+        summaries=ctx.summaries,
+        warnings=ctx.warnings,
+        needs_attention=list(dict.fromkeys(needs_attention)),
+        bpmn_changed=bpmn_relevant_digest(draft) != bpmn_relevant_digest(ctx.blueprint),
+    )
+
+
+# ---------------------------------------------------------------- validation
+
+
+def _issue_key(issue: Any) -> tuple:
+    # Rule 7 names list positions, which shift when a step is added or removed
+    # elsewhere; an error already in the draft must still match.
+    message = re.sub(r"position \d+", "position", issue.message)
+    return issue.rule, issue.step_id, issue.artifact_id, message
+
+
+def _errors(blueprint: dict) -> dict[tuple, Any]:
+    result = validator.validate(Blueprint.model_validate(blueprint))
+    return {_issue_key(issue): issue for issue in result.errors}
+
+
+def _check(draft: dict, blueprint: dict) -> list[str]:
+    """Refuse new errors of a refusing rule; return the other new errors."""
+    try:
+        after = _errors(blueprint)
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        where = ".".join(str(p) for p in first["loc"]) or "blueprint"
+        raise OperationError(
+            "invalid", f"The result is not a valid blueprint: {where}: {first['msg']}"
+        ) from None
+    if not after:
+        return []
+    try:
+        before = _errors(draft)
+    except ValidationError:
+        before = {}
+    new = [issue for key, issue in after.items() if key not in before]
+    refused = [issue for issue in new if issue.rule in REFUSING_RULES]
+    if refused:
+        code = "cycle" if any(i.rule == _CYCLE_RULE for i in refused) else "invalid"
+        raise OperationError(
+            code, "The operations would break the blueprint: " + "; ".join(map(str, refused))
+        )
+    return [str(issue) for issue in new]
+
+
+# ---------------------------------------------------------------- handlers
+
+
+def _name(value: str) -> str:
+    name = value.strip()
+    if not name:
+        raise OperationError("invalid", "A step needs a name", "name")
+    return name
+
+
+def _label(step: dict) -> str:
+    return step.get("name") or step.get("id", "")
+
+
+def _rename_step(ctx: _Context, op: RenameStep) -> None:
+    step = ctx.step(op.step_id, "step_id")
+    name = _name(op.name)
+    ctx.summaries.append(f'Renamed step "{_label(step)}" to "{name}"')
+    step["name"] = name
+
+
+def _set_step_description(ctx: _Context, op: SetStepDescription) -> None:
+    step = ctx.step(op.step_id, "step_id")
+    step["description"] = op.description
+    ctx.summaries.append(f'Changed the description of step "{_label(step)}"')
+
+
+def _insert(ctx: _Context, step: dict, after: str | None, before: str | None) -> None:
+    """Put ``step`` (already in no step's depends_on) after ``after`` and before ``before``.
+
+    With ``before``, ``before`` depends on the step instead of ``after`` (or in
+    addition, when it did not depend on ``after``). Without it, a single successor
+    of ``after`` moves behind the step; with none the step is the new end, with
+    several it starts a new branch. With neither, the step is a new start.
+    """
+    step["depends_on"] = [after] if after else []
+    if before is not None:
+        target = ctx.step(before, "before")
+        deps = target.setdefault("depends_on", [])
+        if after in deps:
+            deps[deps.index(after)] = step["id"]
+        else:
+            deps.append(step["id"])
+    elif after is not None:
+        successors = ctx.successors(after)
+        if len(successors) == 1:
+            deps = successors[0]["depends_on"]
+            deps[deps.index(after)] = step["id"]
+    if after is not None:
+        position = ctx.index(after) + 1
+    elif before is not None:
+        position = ctx.index(before)
+    else:
+        position = 0  # depends on nothing: a start
+    ctx.steps.insert(position, step)
+
+
+def _add_step(ctx: _Context, op: AddStep) -> None:
+    name = _name(op.name)
+    after = ctx.step(op.after, "after") if op.after is not None else None
+    before = ctx.step(op.before, "before") if op.before is not None else None
+    existing = {s.get("id") for s in ctx.steps}
+    existing |= {m.get("id") for m in ctx.process.get("manual_steps", [])}
+    step = {"id": new_step_id(name, existing), "name": name, "type": op.type}
+    step.update(inputs=[], outputs=[], depends_on=[])
+    _insert(ctx, step, op.after, op.before)
+    if op.type == "automated_task":
+        ctx.component_checks.append(step["id"])
+    where = "".join(
+        [
+            f' after "{_label(after)}"' if after else "",
+            f' before "{_label(before)}"' if before else "",
+        ]
+    )
+    ctx.summaries.append(f'Added {_TYPE_WORDS[op.type]} "{name}"{where}')
+
+
+def _bridge(ctx: _Context, step: dict) -> list[dict]:
+    """Detach ``step``: its successors depend on its dependencies instead.
+    Returns the successors, in step order."""
+    step_id = step["id"]
+    preds = list(step.get("depends_on", []))
+    successors = ctx.successors(step_id)
+    for succ in successors:
+        deps: list[str] = []
+        for dep in succ["depends_on"]:
+            for new in preds if dep == step_id else [dep]:
+                if new not in deps:
+                    deps.append(new)
+        succ["depends_on"] = deps
+    step["depends_on"] = []
+    return successors
+
+
+def _remove_artifacts(ctx: _Context, step_id: str) -> None:
+    artifacts = ctx.blueprint.get("artifacts") or {}
+    for art_id in [a for a, art in artifacts.items() if art.get("produced_by") == step_id]:
+        del artifacts[art_id]
+        consumers = []
+        for other in ctx.steps:
+            if art_id in other.get("inputs", []):
+                other["inputs"] = [a for a in other["inputs"] if a != art_id]
+                consumers.append(_label(other))
+            if art_id in other.get("outputs", []):
+                other["outputs"] = [a for a in other["outputs"] if a != art_id]
+        for party in ctx.process.get("external_parties", []):
+            party["sends"] = [a for a in party.get("sends", []) if a != art_id]
+        for manual in ctx.process.get("manual_steps", []):
+            manual["consumes"] = [a for a in manual.get("consumes", []) if a != art_id]
+            manual["produces"] = [a for a in manual.get("produces", []) if a != art_id]
+        used = f"; it was an input of {', '.join(consumers)}" if consumers else ""
+        ctx.warnings.append(f'Removed artifact "{art_id}", which step "{step_id}" produced{used}')
+
+
+def _remove_step(ctx: _Context, op: RemoveStep) -> None:
+    step = ctx.step(op.step_id, "step_id")
+    if len(ctx.steps) == 1:
+        raise OperationError("last_step", "The workflow needs at least one step", "step_id")
+    step_id = step["id"]
+    successors = _bridge(ctx, step)
+    ctx.steps.pop(ctx.index(step_id))
+    _remove_artifacts(ctx, step_id)
+    next_id = successors[0]["id"] if successors else "end"
+
+    process = ctx.process
+    decisions = [d for d in process.get("decision_points", []) if d.get("after") != step_id]
+    for decision in decisions:
+        for branch in decision.get("branches", []):
+            if branch.get("target") == step_id:
+                branch["target"] = next_id
+    if "decision_points" in process:
+        process["decision_points"] = decisions
+
+    exceptions = [e for e in process.get("exceptions", []) if e.get("attached_to") != step_id]
+    for exception in exceptions:
+        if exception.get("outcome") == f"loop_to:{step_id}":
+            exception["outcome"] = "end"
+    if "exceptions" in process:
+        process["exceptions"] = exceptions
+
+    gone = {step_id}
+    parties = []
+    for party in process.get("external_parties", []):
+        if party.get("to_step") == step_id:
+            if not successors:
+                gone.add(party.get("id"))
+                continue
+            party["to_step"] = next_id
+        parties.append(party)
+    if "external_parties" in process:
+        process["external_parties"] = parties
+
+    for manual in process.get("manual_steps", []):
+        manual["depends_on"] = [d for d in manual.get("depends_on", []) if d != step_id]
+    if "message_flows" in process:
+        process["message_flows"] = [
+            f
+            for f in process["message_flows"]
+            if f.get("from", f.get("from_")) not in gone and f.get("to") not in gone
+        ]
+    ctx.summaries.append(f'Removed step "{_label(step)}"')
+
+
+def _move_step(ctx: _Context, op: MoveStep) -> None:
+    step = ctx.step(op.step_id, "step_id")
+    after = ctx.step(op.after, "after") if op.after is not None else None
+    if op.after == op.step_id:
+        raise OperationError("invalid", "A step cannot be moved after itself", "after")
+    _bridge(ctx, step)
+    ctx.steps.pop(ctx.index(step["id"]))
+    _insert(ctx, step, op.after, None)
+    where = f'after "{_label(after)}"' if after else "to the start"
+    ctx.summaries.append(f'Moved step "{_label(step)}" {where}')
+
+
+def _connect(ctx: _Context, op: Connect) -> None:
+    source = ctx.step(op.source, "source")
+    target = ctx.step(op.target, "target")
+    deps = target.setdefault("depends_on", [])
+    if source["id"] not in deps:
+        deps.append(source["id"])
+    ctx.summaries.append(f'Connected "{_label(source)}" to "{_label(target)}"')
+
+
+def _disconnect(ctx: _Context, op: Disconnect) -> None:
+    source = ctx.step(op.source, "source")
+    target = ctx.step(op.target, "target")
+    deps = target.get("depends_on", [])
+    if source["id"] not in deps:
+        raise OperationError(
+            "not_found",
+            f'Step "{target["id"]}" does not follow step "{source["id"]}"',
+            "source",
+        )
+    target["depends_on"] = [d for d in deps if d != source["id"]]
+    ctx.summaries.append(f'Disconnected "{_label(source)}" from "{_label(target)}"')
+
+
+def _set_step_type(ctx: _Context, op: SetStepType) -> None:
+    step = ctx.step(op.step_id, "step_id")
+    old = step.get("type", "")
+    step["type"] = op.type
+    if op.type in _HUMAN_TYPES:
+        step.pop("component", None)
+    else:
+        ctx.component_checks.append(step["id"])
+    ctx.summaries.append(
+        f'Changed the type of step "{_label(step)}" from '
+        f"{_TYPE_WORDS.get(old, old or 'none')} to {_TYPE_WORDS[op.type]}"
+    )
+
+
+_HANDLERS: dict[type, Callable[[_Context, Any], None]] = {
+    RenameStep: _rename_step,
+    SetStepDescription: _set_step_description,
+    AddStep: _add_step,
+    RemoveStep: _remove_step,
+    MoveStep: _move_step,
+    Connect: _connect,
+    Disconnect: _disconnect,
+    SetStepType: _set_step_type,
+}
