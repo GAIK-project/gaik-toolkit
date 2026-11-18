@@ -14,6 +14,9 @@ while reasoning effort is ``"none"``. With an active effort the temperature has
 to be omitted, and on the older non-reasoning models the effort has to be
 omitted instead — they reject the parameter.
 
+The schema generator's own calls also send ``reasoning_effort="none"`` on a model
+that accepts it when no effort is set, so their ``temperature=0`` applies (#94).
+
 No network: a fake client records the kwargs ``_parse_with`` would have sent.
 """
 
@@ -214,6 +217,239 @@ class TestComponentsForwardTheirSettings:
 
         assert captured["temperature"] is None
         assert captured["reasoning_effort"] == "low"
+
+
+class _RecordingProvider:
+    """A ``ProviderClient`` that records the options ``chat_parsed`` receives."""
+
+    raw = None
+
+    def __init__(self, provider: str, model: str, config: dict | None = None) -> None:
+        self.provider = provider
+        self.model = model
+        self._config = {"provider": provider, "model": model, **(config or {})}
+        self.calls: list[dict] = []
+
+    def chat_parsed(self, messages, response_format, **kwargs):
+        from gaik.software_components.llm.parameters import normalize_chat_kwargs
+
+        model = kwargs.pop("model", self.model)
+        # What OpenAIProvider.chat_parsed would pass to the SDK.
+        self.calls.append(normalize_chat_kwargs(model, kwargs, config=self._config))
+        return _parsed_for(response_format)
+
+    def chat(self, messages, **kwargs):
+        raise AssertionError("Expected a structured call")
+
+    def chat_stream(self, messages, **kwargs):
+        raise AssertionError("Expected a structured call")
+
+    def embed(self, texts, **kwargs):
+        raise AssertionError("Expected a structured call")
+
+
+def _parsed_for(response_format):
+    from gaik.software_components.extractor.schema import ExtractionRequirements
+
+    if response_format is ExtractionRequirements:
+        return _flat_requirements()
+    return _Answer(answer="ok")
+
+
+class _RecordingSchemaClient(_RecordingClient):
+    """Raw-client fake whose parse answers in the requested response format."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        outer = self
+
+        class _Completions:
+            def parse(self, **kwargs):
+                outer.calls.append(kwargs)
+                message = type("M", (), {"parsed": _parsed_for(kwargs["response_format"])})()
+                choice = type("C", (), {"message": message})()
+                return type("R", (), {"choices": [choice], "usage": None})()
+
+        self.beta = type(
+            "Beta", (), {"chat": type("Chat", (), {"completions": _Completions()})()}
+        )()
+
+
+def _sent_by_parse_user_requirements(model: str, config: dict | None = None, **sampling) -> dict:
+    """The kwargs the requirements parse sends to the SDK through a raw client."""
+    from gaik.software_components.extractor.schema import parse_user_requirements
+
+    client = _RecordingSchemaClient()
+    parse_user_requirements(
+        "Extract `po_number` and `order_date`.",
+        client=client,
+        model=model,
+        config=config,
+        **sampling,
+    )
+    return client.last
+
+
+class TestSchemaGenerationIsDeterministicWhereTheModelAllows:
+    """Issue #94: with reasoning and free sampling, gpt-6-luna kept only the first field.
+
+    The schema generator asks for ``temperature=0`` by default, but on GPT-6 and GPT-5.6
+    the compatibility layer drops the temperature unless ``reasoning_effort="none"``, so
+    the default sent neither and the deployment reasoned.
+    """
+
+    @pytest.mark.parametrize(
+        "model", ["gpt-6-luna", "gpt-6-sol", "gpt-5.6-sol", "azure/gpt-6-luna"]
+    )
+    def test_default_sends_effort_none_and_temperature_zero(self, model):
+        sent = _sent_by_parse_user_requirements(model)
+        assert sent["reasoning_effort"] == "none"
+        assert sent["temperature"] == 0.0
+        assert sent["top_p"] == 1.0
+
+    def test_deployment_alias_with_model_family(self):
+        sent = _sent_by_parse_user_requirements(
+            "production", config={"provider": "azure", "model_family": "gpt-6-luna"}
+        )
+        assert sent["model"] == "production"
+        assert (sent["reasoning_effort"], sent["temperature"]) == ("none", 0.0)
+
+    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6.1-sol", "gpt-6.2-sol"])
+    def test_model_that_rejects_none_gets_no_effort(self, model):
+        # Sending "none" would fail before the request; these always reason, so the
+        # temperature is dropped as before.
+        sent = _sent_by_parse_user_requirements(model)
+        assert "reasoning_effort" not in sent
+        assert "temperature" not in sent
+        assert "top_p" not in sent
+
+    @pytest.mark.parametrize("model", ["gpt-4o", "gpt-5.4", "my-deployment", "o3"])
+    def test_other_models_unchanged(self, model):
+        # A deployment alias without model_family is not recognised either.
+        sent = _sent_by_parse_user_requirements(model)
+        assert "reasoning_effort" not in sent
+        assert sent["temperature"] == 0.0
+
+    @pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max"])
+    def test_caller_effort_wins(self, effort):
+        sent = _sent_by_parse_user_requirements(
+            "gpt-6-luna", temperature=None, reasoning_effort=effort
+        )
+        assert sent["reasoning_effort"] == effort
+        assert "temperature" not in sent
+
+    def test_caller_effort_wins_even_with_a_temperature(self):
+        # The compatibility layer still drops the temperature an active effort cannot take.
+        sent = _sent_by_parse_user_requirements("gpt-6-luna", reasoning_effort="low")
+        assert sent["reasoning_effort"] == "low"
+        assert "temperature" not in sent
+
+    def test_config_effort_wins(self):
+        sent = _sent_by_parse_user_requirements(
+            "gpt-6-luna", config={"provider": "azure", "reasoning_effort": "medium"}
+        )
+        assert sent["reasoning_effort"] == "medium"
+        assert "temperature" not in sent
+
+    def test_caller_temperature_wins(self):
+        sent = _sent_by_parse_user_requirements("gpt-6-luna", temperature=0.3)
+        assert (sent["reasoning_effort"], sent["temperature"]) == ("none", 0.3)
+
+    def test_temperature_none_leaves_the_model_default(self):
+        sent = _sent_by_parse_user_requirements("gpt-6-luna", temperature=None)
+        assert "reasoning_effort" not in sent
+        assert "temperature" not in sent
+
+    def test_explicit_none_effort_is_kept(self):
+        sent = _sent_by_parse_user_requirements("gpt-6-luna", reasoning_effort="none")
+        assert (sent["reasoning_effort"], sent["temperature"]) == ("none", 0.0)
+
+    def test_every_schema_generator_call_gets_it(self, monkeypatch):
+        """Structure detection, the parent parse and each child parse, from the class."""
+        from gaik.software_components.extractor import schema as schema_module
+
+        client = _RecordingSchemaClient()
+        monkeypatch.setattr(schema_module, "build_compat_client", lambda config: client)
+        analysis = schema_module.StructureAnalysis(
+            structure_type="parent_with_nested_list",
+            parent_container_name="purchase_order",
+            parent_description="One purchase order",
+            item_description="One order line",
+            reasoning="A header with repeated lines.",
+            child_containers=[
+                schema_module.ChildContainerSpec(
+                    container_name="line_items", container_description="Order lines"
+                )
+            ],
+        )
+        real_parse = client.beta.chat.completions.parse
+
+        def parse(**kwargs):
+            if kwargs["response_format"] is schema_module.StructureAnalysis:
+                client.calls.append(kwargs)
+                message = type("M", (), {"parsed": analysis})()
+                choice = type("C", (), {"message": message})()
+                return type("R", (), {"choices": [choice], "usage": None})()
+            return real_parse(**kwargs)
+
+        client.beta.chat.completions.parse = parse
+        generator = schema_module.SchemaGenerator(
+            {"provider": "azure", "api_key": "test", "model": "gpt-6-luna"}
+        )
+        generator.generate_schema_with_usage("Extract `po_number`; for each line `sku`.")
+
+        formats = [call["response_format"].__name__ for call in client.calls]
+        assert formats == ["StructureAnalysis", "ExtractionRequirements", "ExtractionRequirements"]
+        for call in client.calls:
+            assert (call["reasoning_effort"], call["temperature"]) == ("none", 0.0)
+
+    @pytest.mark.parametrize("provider", ["openai_compatible", "aitta", "litellm"])
+    def test_provider_adapter_gets_it_for_a_gpt6_model(self, provider):
+        from gaik.software_components.extractor.schema import parse_user_requirements
+
+        client = _RecordingProvider(provider, "gpt-6-luna")
+        parse_user_requirements("Extract `po_number`.", client=client, model="gpt-6-luna")
+        assert client.calls[0] == {"temperature": 0.0, "reasoning_effort": "none"}
+
+    def test_provider_adapter_config_effort_wins(self):
+        from gaik.software_components.extractor.schema import parse_user_requirements
+
+        client = _RecordingProvider("aitta", "gpt-6-luna", {"reasoning_effort": "high"})
+        parse_user_requirements("Extract `po_number`.", client=client, model="gpt-6-luna")
+        assert client.calls[0] == {"reasoning_effort": "high"}
+
+    @pytest.mark.parametrize(
+        ("provider", "model"),
+        [
+            ("aitta", "google/gemma-4-31b-it"),
+            ("anthropic", "claude-sonnet-5-5"),
+            ("google", "gemini-2.5-flash"),
+        ],
+    )
+    def test_other_providers_unchanged(self, provider, model):
+        from gaik.software_components.extractor.schema import parse_user_requirements
+
+        client = _RecordingProvider(provider, model)
+        parse_user_requirements("Extract `po_number`.", client=client, model=model)
+        assert client.calls[0] == {"temperature": 0.0}
+
+    def test_data_extractor_is_unchanged(self, monkeypatch):
+        """The change is the schema generator's: DataExtractor still sends no effort."""
+        from gaik.software_components.extractor import extractor as extractor_module
+
+        client = _RecordingSchemaClient()
+        monkeypatch.setattr(extractor_module, "build_compat_client", lambda config: client)
+        extractor = extractor_module.DataExtractor(
+            {"provider": "azure", "api_key": "test", "model": "gpt-6-luna"}
+        )
+        extractor._extract_one(
+            doc="doc",
+            extraction_model=_Answer,
+            requirements=_flat_requirements(),
+            user_requirements="extract the answer",
+        )
+        assert "reasoning_effort" not in client.last
+        assert "temperature" not in client.last
 
 
 @pytest.mark.parametrize(

@@ -6,6 +6,26 @@ from typing import Any
 
 # OpenAI reasoning families that accept only max_completion_tokens.
 _REASONING_PREFIXES = ("o1", "o3", "o4", "gpt-5")
+# Families that reason by default and take sampling controls only at effort "none".
+_SAMPLING_AT_NONE_PREFIXES = ("gpt-6-", "gpt-6.", "gpt-5.6-")
+# Of those, the ones that always reason: Astra and the gpt-6.x generation reject "none".
+_ALWAYS_REASONING_PREFIXES = ("gpt-6-astra", "gpt-6.")
+
+
+def _family(model: str, config: dict) -> str:
+    return str(config.get("model_family") or model).rsplit("/", 1)[-1].lower()
+
+
+def _accepts_effort_none(model: str, config: dict | None = None) -> bool:
+    """True for a family that reasons by default and can be told not to with "none".
+
+    GPT-6 Sol/Luna and GPT-5.6 qualify; GPT-6 Astra, the gpt-6.x generation, other
+    families and a custom deployment name without ``model_family`` do not.
+    """
+    family = _family(model, config or {})
+    return family.startswith(_SAMPLING_AT_NONE_PREFIXES) and not family.startswith(
+        _ALWAYS_REASONING_PREFIXES
+    )
 
 
 def normalize_chat_kwargs(
@@ -27,9 +47,9 @@ def normalize_chat_kwargs(
     config = config or {}
     if "reasoning_effort" not in result and config.get("reasoning_effort") is not None:
         result["reasoning_effort"] = config["reasoning_effort"]
-    family = str(config.get("model_family") or model).rsplit("/", 1)[-1].lower()
+    family = _family(model, config)
     is_gpt6 = family.startswith(("gpt-6-", "gpt-6."))
-    is_reasoning_family = is_gpt6 or family.startswith("gpt-5.6-")
+    is_reasoning_family = family.startswith(_SAMPLING_AT_NONE_PREFIXES)
     is_openai_reasoning = _is_openai_api(config) and family.startswith(_REASONING_PREFIXES)
     if "max_tokens" in result and (is_reasoning_family or is_openai_reasoning):
         if "max_completion_tokens" in result:
@@ -39,8 +59,7 @@ def normalize_chat_kwargs(
         return result
     effort = result.get("reasoning_effort")
     allowed = {"low", "medium", "high", "xhigh", "max"}
-    # Astra and the gpt-6.x generation always reason: they reject "none".
-    if not family.startswith(("gpt-6-astra", "gpt-6.")):
+    if _accepts_effort_none(model, config):
         allowed.add("none")
     if is_gpt6 and effort is not None and effort not in allowed:
         raise ValueError(f"{family} reasoning_effort must be one of {sorted(allowed)}")

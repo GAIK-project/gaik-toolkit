@@ -114,3 +114,36 @@ def test_shared_openai_client_sends_max_completion_tokens():
         client.raw.close()
     assert calls[0]["max_completion_tokens"] == 64
     assert "max_tokens" not in calls[0]
+
+
+@pytest.mark.parametrize(
+    ("model", "config", "expected"),
+    [
+        ("gpt-6-luna", None, True),
+        ("gpt-6-sol", None, True),
+        ("azure/gpt-6-luna", None, True),
+        ("gpt-5.6-terra", None, True),
+        ("production", {"model_family": "gpt-6-luna"}, True),
+        ("gpt-6-astra", None, False),
+        ("gpt-6.1-sol", None, False),
+        ("production", {"model_family": "gpt-6-astra"}, False),
+        ("production", None, False),
+        ("gpt-5.4", None, False),
+        ("gpt-4o", None, False),
+        ("claude-sonnet-5-5", None, False),
+    ],
+)
+def test_accepts_effort_none_follows_the_family_table(model, config, expected):
+    from gaik.software_components.llm.parameters import _accepts_effort_none
+
+    assert _accepts_effort_none(model, config) is expected
+
+
+@pytest.mark.parametrize(
+    ("model", "config"),
+    [("gpt-6-luna", None), ("production", {"model_family": "gpt-6-sol"})],
+)
+def test_normalize_accepts_none_where_the_table_does(model, config):
+    assert normalize_chat_kwargs(model, {"reasoning_effort": "none"}, config=config) == {
+        "reasoning_effort": "none"
+    }

@@ -52,7 +52,7 @@ from gaik.observability import (
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
-from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.llm.parameters import _accepts_effort_none, normalize_chat_kwargs
 
 # -----------------------------------------------------------------------------
 # Setup
@@ -206,6 +206,37 @@ def _parse_with(
             **sampling,
         )
     )
+
+
+def _schema_effort(
+    *,
+    client,
+    model: str,
+    config: dict | None,
+    temperature: float | None,
+    reasoning_effort: str | None,
+) -> str | None:
+    """The reasoning effort a schema-generation call sends.
+
+    GPT-6 Sol/Luna and GPT-5.6 reason unless told not to, and while they reason
+    the compatibility layer drops ``temperature``. Reasoning with free sampling made
+    the requirements parse keep only the first field of a task in some calls, with
+    no error (issue #94). So when the caller asks for a temperature and sets no
+    effort, in the call or in the config, a model that accepts ``"none"`` gets
+    ``"none"`` and the temperature (``0`` by default) applies. An effort the caller
+    sets is sent as given, and ``temperature=None`` leaves the model's own default.
+    Models that reject ``"none"`` (GPT-6 Astra, gpt-6.x) and other families get no
+    effort, as before.
+    """
+    if reasoning_effort is not None or temperature is None:
+        return reasoning_effort
+    # A provider adapter keeps its own config, which may set the effort or the
+    # family of a deployment alias; the config passed in wins over it.
+    client_config = getattr(client, "_config", None) if isinstance(client, ProviderClient) else None
+    settings = {**(client_config if isinstance(client_config, dict) else {}), **(config or {})}
+    if settings.get("reasoning_effort") is not None:
+        return None
+    return "none" if _accepts_effort_none(model, settings) else None
 
 
 # -----------------------------------------------------------------------------
@@ -476,9 +507,10 @@ def detect_structure_type(
     """
     Analyze if the extraction requires a nested list structure or flat structure.
 
-    ``temperature`` / ``reasoning_effort`` are passed straight to
-    :func:`_parse_with`; see it for how the two interact on reasoning
-    deployments.
+    ``temperature`` / ``reasoning_effort`` are passed to :func:`_parse_with`; see
+    it for how the two interact on reasoning deployments. Without an effort, a
+    model that accepts ``"none"`` gets it, so the temperature applies
+    (:func:`_schema_effort`).
 
     When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
     LLM call is appended to it. This is an internal hook used by
@@ -504,7 +536,13 @@ def detect_structure_type(
         ],
         response_format=StructureAnalysis,
         temperature=temperature,
-        reasoning_effort=reasoning_effort,
+        reasoning_effort=_schema_effort(
+            client=client,
+            model=model,
+            config=config,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+        ),
         config=config,
     )
     analysis = resp.choices[0].message.parsed
@@ -1064,9 +1102,10 @@ def parse_user_requirements(
     Parse extraction requirements from natural language using LLM with type detection rules.
     Works with any input format - numbered lists, bullets, prose, tables, etc.
 
-    ``temperature`` / ``reasoning_effort`` are passed straight to
-    :func:`_parse_with`; see it for how the two interact on reasoning
-    deployments.
+    ``temperature`` / ``reasoning_effort`` are passed to :func:`_parse_with`; see
+    it for how the two interact on reasoning deployments. Without an effort, a
+    model that accepts ``"none"`` gets it, so the temperature applies
+    (:func:`_schema_effort`).
 
     When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
     LLM call is appended to it. Internal hook for :class:`SchemaGenerator`;
@@ -1091,7 +1130,13 @@ def parse_user_requirements(
         ],
         response_format=ExtractionRequirements,
         temperature=temperature,
-        reasoning_effort=reasoning_effort,
+        reasoning_effort=_schema_effort(
+            client=client,
+            model=model,
+            config=config,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+        ),
         config=config,
     )
     req = resp.choices[0].message.parsed
@@ -2360,13 +2405,16 @@ class SchemaGenerator:
             temperature: Sampling temperature for every schema-generation call.
                 Defaults to ``0.0`` so the same requirements yield the same
                 schema. ``None`` omits the parameter from the request.
-            reasoning_effort: Reasoning effort for a gpt-5.x reasoning
-                deployment; not sent by default, since the non-reasoning models
-                reject it. The two settings are coupled — a reasoning
-                deployment accepts an explicit temperature only at effort
-                ``"none"``, so run it either as ``reasoning_effort="none"``
-                (determinism kept) or as an active effort with
-                ``temperature=None``. See :func:`_parse_with`.
+            reasoning_effort: Reasoning effort for a reasoning deployment. The
+                two settings are coupled: GPT-6 and GPT-5.6 accept a
+                temperature only at effort ``"none"``. When this is ``None``
+                (the default), ``config`` sets no effort and a temperature is
+                set, GPT-6 Sol/Luna and GPT-5.6 (by name or ``model_family``)
+                are sent ``"none"`` so the temperature applies; reasoning with
+                free sampling sometimes dropped all but the first field. Other
+                models get no effort, since the non-reasoning ones reject it.
+                Pass an active effort, with ``temperature=None``, to make a
+                reasoning model reason. See :func:`_schema_effort`.
         """
         self.config = config
         self.model = model if model else self.config["model"]

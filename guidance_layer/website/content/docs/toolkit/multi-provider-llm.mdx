@@ -10,7 +10,7 @@ The `gaik.software_components.llm` package lets text components use OpenAI, Azur
 `create_llm_client()` exposes a common `ProviderClient` interface for direct calls. OpenAI, Azure, Aitta, and compatible servers share the OpenAI SDK adapter; Anthropic, Google and Vertex use native SDKs. LiteLLM is an optional backend for additional provider integrations. Existing `get_openai_config()` configurations still use the legacy OpenAI/Azure component paths.
 
 <Callout type="info" title="Upgrading from 0.7">
-`get_openai_config(use_azure=...)`, `create_openai_client(config)` and dicts with `use_azure` work unchanged. The OpenAI/Azure default model is now `gpt-6-luna` (previously `gpt-5.4`), a reasoning family: components omit their default temperature unless `reasoning_effort="none"`. To keep your previous model, set `AZURE_DEPLOYMENT` or `OPENAI_MODEL`, or pass `model=...` to `get_llm_config()` or the component. If an Azure deployment name does not show its model family, set `model_family` (for example `"gpt-6-luna"`) in the config.
+`get_openai_config(use_azure=...)`, `create_openai_client(config)` and dicts with `use_azure` work unchanged. The OpenAI/Azure default model is now `gpt-6-luna` (previously `gpt-5.4`), a reasoning family: components omit their default temperature unless `reasoning_effort="none"`. With no effort set, the schema generator sends GPT-6 Sol/Luna and GPT-5.6 `"none"` itself, so its calls keep `temperature=0`. To keep your previous model, set `AZURE_DEPLOYMENT` or `OPENAI_MODEL`, or pass `model=...` to `get_llm_config()` or the component. If an Azure deployment name does not show its model family, set `model_family` (for example `"gpt-6-luna"`) in the config.
 </Callout>
 
 <Callout type="info">
