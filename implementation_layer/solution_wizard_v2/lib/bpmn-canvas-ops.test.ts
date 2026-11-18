@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   dataObjectOf,
+  holdsData,
   opForDataObjectRename,
   exceptionOf,
   opForRework,
@@ -567,5 +568,14 @@ describe("data objects", () => {
     expect(isOperationElement({ id: "DataObjectRef_fields", type: "bpmn:DataObjectReference" }, DATA, STEPS)).toBe(true);
     expect(opForDelete({ id: "DataObjectRef_fields", type: "bpmn:DataObjectReference" }, DATA, STEPS)).toBeNull();
     expect(isOperationElement({ id: "DataStoreRef_erp", type: "bpmn:DataStoreReference" }, DATA, STEPS)).toBe(false);
+  });
+});
+
+describe("holdsData", () => {
+  it("is true for the tasks a step is drawn as, false for a gateway and anything else", () => {
+    for (const type of ["bpmn:Task", "bpmn:UserTask", "bpmn:ServiceTask"]) expect(holdsData(type), type).toBe(true);
+    for (const type of ["bpmn:ExclusiveGateway", "bpmn:StartEvent", "bpmn:DataObjectReference", "bpmn:Lane"]) {
+      expect(holdsData(type), type).toBe(false);
+    }
   });
 });

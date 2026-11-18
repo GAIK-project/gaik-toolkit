@@ -27,20 +27,27 @@ async function readDraft(request: APIRequestContext, id: string): Promise<Draft>
 const inputsOf = async (request: APIRequestContext, id: string, step: string) =>
   (await readDraft(request, id)).workflow.steps.find((s) => s.id === step)?.inputs ?? [];
 
-/** The id of the data input association from `data` to `task` the server draws, or null. */
-async function inputAssociation(page: Page, id: string, data: string, task: string): Promise<string | null> {
+/** The id of the data association between `data` and `task` the server draws, or null. */
+async function association(
+  page: Page,
+  id: string,
+  data: string,
+  task: string,
+  role: "input" | "output" = "input",
+): Promise<string | null> {
   const xml = await (await page.request.get(`/api/sessions/${id}/bpmn?data_objects=1`)).text();
   return page.evaluate(
-    ({ text, data, task }) => {
+    ({ text, data, task, role }) => {
       const doc = new DOMParser().parseFromString(text, "application/xml");
+      const kind = role === "input" ? "dataInputAssociation" : "dataOutputAssociation";
       for (const e of doc.getElementsByTagName("*")) {
-        if (e.localName !== "dataInputAssociation" || e.parentElement?.getAttribute("id") !== task) continue;
-        const ref = [...e.children].find((c) => c.localName === "sourceRef");
+        if (e.localName !== kind || e.parentElement?.getAttribute("id") !== task) continue;
+        const ref = [...e.children].find((c) => c.localName === (role === "input" ? "sourceRef" : "targetRef"));
         if (ref?.textContent?.trim() === data) return e.getAttribute("id");
       }
       return null;
     },
-    { text: xml, data, task },
+    { text: xml, data, task, role },
   );
 }
 
@@ -101,11 +108,11 @@ test.describe("BPMN data objects (stack)", () => {
     await expect(element(page, `${FIELDS}_label`)).toContainText("Laskun kentät");
     expect((await readDraft(request, id)).artifacts.fields.label).toBe("Laskun kentät");
     expect(await inputsOf(request, id, "deliver")).toContain("fields");
-    const association = await inputAssociation(page, id, FIELDS, "Activity_deliver");
-    expect(association).not.toBeNull();
+    const input = await association(page, id, FIELDS, "Activity_deliver");
+    expect(input).not.toBeNull();
 
     // Delete the association: deliver no longer uses the fields.
-    await pick(page, association!);
+    await pick(page, input!);
     const unlinked = operationAnswer(page);
     await page.locator('.djs-context-pad .entry[data-action="delete"]').click();
     expect((await unlinked).status()).toBe(200);
@@ -113,7 +120,18 @@ test.describe("BPMN data objects (stack)", () => {
     await page.reload();
     await openEditor(page);
     expect(await inputsOf(request, id, "deliver")).not.toContain("fields");
-    expect(await inputAssociation(page, id, FIELDS, "Activity_deliver")).toBeNull();
+    expect(await association(page, id, FIELDS, "Activity_deliver")).toBeNull();
     await expect(element(page, `${FIELDS}_label`)).toContainText("Laskun kentät");
+
+    // The report's only producer: the line from deliver stays, and so does the report.
+    const output = await association(page, id, "DataObjectRef_report", "Activity_deliver", "output");
+    expect(output).not.toBeNull();
+    await pick(page, output!);
+    const refused = operationAnswer(page);
+    await page.locator('.djs-context-pad .entry[data-action="delete"]').click();
+    expect((await refused).status()).toBe(422);
+    await expect(page.getByTestId("bpmn-status")).toContainText("joten yhteys pysyy", { timeout: 20_000 });
+    expect((await readDraft(request, id)).artifacts.report).toBeTruthy();
+    expect(await association(page, id, "DataObjectRef_report", "Activity_deliver", "output")).not.toBeNull();
   });
 });

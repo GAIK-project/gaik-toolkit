@@ -42,7 +42,9 @@
  *   starts a line to a step. The connect tool between a data object and a
  *   step is `link_data`: from the data object the step uses it (input), from
  *   the step it makes it (output). Deleting such an association is
- *   `unlink_data`. A data object itself has no Delete; data stores (drawn
+ *   `unlink_data` (refused for the only step that makes a generated data
+ *   object: a link's removal never deletes it). Only a task takes a data
+ *   link, not a decision step's gateway. A data object itself has no Delete; data stores (drawn
  *   from the integration targets) have no tools.
  *
  * Labels and the operations come in through the modeler's `gaikEditor`
@@ -55,6 +57,7 @@ import { STEP_OP_TYPES } from "@/lib/step-panel-model";
 import {
   dataObjectOf,
   decisionOf,
+  holdsData,
   exceptionOf,
   isDecisionStep,
   stepHasDecision,
@@ -675,7 +678,9 @@ class GaikRules extends RuleProvider {
     this.addRule("connection.create", 2000, (context: { source?: Element; target?: Element }) => {
       const { source, target } = context;
       if (isStep(source) && isStep(target)) return source !== target ? undefined : false;
-      return (isData(source) && isStep(target)) || (isStep(source) && isData(target)) ? undefined : false;
+      // Only a task holds a data association: a decision step is drawn as a gateway.
+      const isTask = (el?: Element) => isStep(el) && holdsData(owner(el as Element).type);
+      return (isData(source) && isTask(target)) || (isTask(source) && isData(target)) ? undefined : false;
     });
     this.addRule("connection.reconnect", 2000, () => false);
     this.addRule(

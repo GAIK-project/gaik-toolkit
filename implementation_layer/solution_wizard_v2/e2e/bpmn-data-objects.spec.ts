@@ -176,11 +176,12 @@ test.describe("BPMN data objects", () => {
     await expect(page.getByTestId("bpmn-status")).toContainText("vaihe on jo yhdistetty tähän dataobjektiin");
   });
 
-  test("deleting a data association is unlink_data; the only producer of a used data object says why", async ({
+  test("deleting a data association is unlink_data; the only producer of a data object says why", async ({
     page,
   }) => {
     test.setTimeout(90_000);
-    const { sent, drawn } = await openEditable(page, refusedAs("still_used", "artifact_id"));
+    const answers = [refusedAs("still_used", "artifact_id"), refusedAs("only_producer", "artifact_id")];
+    const { sent, drawn } = await openEditable(page, (route) => answers[Math.min(sent.length - 1, 1)](route));
     const link = drawn.links.find((l) => l.role === "output" && STEPS.includes(l.task.replace(/^Activity_/, "")))!;
     await pick(page, link.id);
     await page.locator('.djs-context-pad .entry[data-action="delete"]').click();
@@ -189,5 +190,12 @@ test.describe("BPMN data objects", () => {
       { op: "unlink_data", artifact_id: artifactOf(link.data), step_id: link.task.replace(/^Activity_/, ""), role: "output" },
     ]);
     await expect(page.getByTestId("bpmn-status")).toContainText("ainoa, joka tuottaa tämän dataobjektin");
+    await expect(page.getByTestId("bpmn-status")).toContainText("Poista ensin se käyttö");
+    // Used by no step, it still needs the step that makes it: the link stays.
+    await expect(shape(page, link.id)).toBeVisible();
+    await pick(page, link.id);
+    await page.locator('.djs-context-pad .entry[data-action="delete"]').click();
+    await expect.poll(() => sent.length).toBe(2);
+    await expect(page.getByTestId("bpmn-status")).toContainText("joten yhteys pysyy");
   });
 });

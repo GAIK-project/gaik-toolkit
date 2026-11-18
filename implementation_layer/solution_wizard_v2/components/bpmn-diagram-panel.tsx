@@ -71,7 +71,8 @@ type OpsState = "unknown" | "on" | "off" | "no_draft";
 type Status =
   | { kind: "idle" }
   | { kind: "saving" }
-  | { kind: "saved" }
+  /** `warnings`: what the server said the edit also did (a step's artifacts removed with it), as it said it. */
+  | { kind: "saved"; warnings?: string[] }
   | { kind: "undone" }
   | { kind: "error"; message: string; retry?: () => void };
 
@@ -397,6 +398,7 @@ export function BpmnDiagramPanel({
         if (err.reason === "cycle") return t.bpmnLoopRefused;
         if (err.reason === "second_producer") return t.bpmnDataSecondProducer;
         if (err.reason === "still_used") return t.bpmnDataStillUsed;
+        if (err.reason === "only_producer") return t.bpmnDataOnlyProducer;
         if (err.reason === "already_linked") return t.bpmnDataAlreadyLinked;
         const field = fieldInPlainWords(err.field, t);
         return field ? fillTemplate(t.bpmnOpRefusedField, { field }) : t.bpmnOpRefused;
@@ -451,9 +453,12 @@ export function BpmnDiagramPanel({
       if (next) showDiagram(next);
       onSynced({ blueprint: result.blueprint, xml: next?.xml ?? propXml.current, version: result.version, via: result.via });
       // Made, but its diagram did not come: the way to read it again.
+      const warnings = "warnings" in result ? result.warnings : [];
       setStatus(
         next
-          ? { kind: kind === "undo" ? "undone" : "saved" }
+          ? kind === "undo"
+            ? { kind: "undone" }
+            : { kind: "saved", ...(warnings.length ? { warnings } : {}) }
           : { kind: "error", message: t.wsBpmnError, retry: () => void latest.current?.revert() },
       );
       return true;
@@ -859,6 +864,11 @@ export function BpmnDiagramPanel({
         <Icon name="check" size={14} className="text-success-text" />
         {/* When the wizard hears of it: wizard_api tells the agent with the next chat message. */}
         {status.kind === "undone" ? t.bpmnUndone : t.bpmnSaved}
+        {status.kind === "saved" && status.warnings?.length ? (
+          <span data-testid="bpmn-warnings" className="text-warning-text">
+            {status.warnings.join(" ")}
+          </span>
+        ) : null}
       </span>
     );
   } else if (update && !reloading && !changedElsewhere) {

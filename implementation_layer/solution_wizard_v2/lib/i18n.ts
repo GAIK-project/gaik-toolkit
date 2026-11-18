@@ -267,6 +267,8 @@ export type Dict = {
   bpmnDataSecondProducer: string;
   bpmnDataStillUsed: string;
   bpmnDataAlreadyLinked: string;
+  /** Refused: the link's removal would leave a generated data object no step that makes it. */
+  bpmnDataOnlyProducer: string;
   /** The step panel's lane select, and its entry for the lane of the step's type. */
   bpmnStepLane: string;
   bpmnStepLaneDefault: string;
@@ -1129,6 +1131,8 @@ const fi: Dict = {
   bpmnDataStillUsed:
     "Yhteyttä ei poistettu: vaihe on ainoa, joka tuottaa tämän dataobjektin, ja toinen vaihe käyttää sitä. Poista ensin se käyttö.",
   bpmnDataAlreadyLinked: "Muutosta ei tehty: vaihe on jo yhdistetty tähän dataobjektiin.",
+  bpmnDataOnlyProducer:
+    "Yhteyttä ei poistettu: vaihe on ainoa, joka tuottaa tämän dataobjektin, joten yhteys pysyy.",
   bpmnStepLane: "Kaista (kuka tekee)",
   bpmnStepLaneDefault: "Tyypin oletuskaista",
   bpmnUndo: "Kumoa",
@@ -2037,6 +2041,8 @@ const en: Dict = {
   bpmnDataStillUsed:
     "The link was not removed: this step is the only one that makes the data object, and another step uses it. Remove that use first.",
   bpmnDataAlreadyLinked: "The change was not made: the step is already linked to this data object.",
+  bpmnDataOnlyProducer:
+    "The link was not removed: this step is the only one that makes this data object, so the link stays.",
   bpmnStepLane: "Lane (who does it)",
   bpmnStepLaneDefault: "Default for its type",
   bpmnUndo: "Undo",

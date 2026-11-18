@@ -119,6 +119,8 @@ test.describe("BPMN canvas edits as operations (stack)", () => {
     // Delete the deliver step.
     const count = (await steps()).length;
     await padAction(page, count - 1, "delete");
+    // The server's warnings are said with "Tallennettu": the report the step made went with it.
+    await expect(page.getByTestId("bpmn-warnings")).toContainText('Removed artifact "report"');
     await reopen(page);
     await expect(task(page, "deliver")).toHaveCount(0);
     expect((await steps()).some((s) => s.id === "deliver")).toBe(false);

@@ -78,7 +78,8 @@ def solution_wizard_available() -> bool:
 class OperationError(Exception):
     """An operation the draft cannot take. ``code`` is machine-readable:
     ``not_found``, ``last_step``, ``cycle``, ``lane_in_use``, ``unknown_step``,
-    ``already_linked``, ``second_producer``, ``still_used`` or ``invalid``."""
+    ``already_linked``, ``second_producer``, ``still_used``, ``only_producer`` or
+    ``invalid``."""
 
     def __init__(
         self, code: str, message: str, field: str | None = None, index: int | None = None
@@ -1150,6 +1151,7 @@ def _remove_rework_path(ctx: _Context, op: RemoveReworkPath) -> None:
 # show, so a second one is refused.
 
 _ROLE_LISTS = {"input": "inputs", "output": "outputs"}
+_DECISION_TYPE = "decision"
 _GENERATED = "generated"
 
 
@@ -1199,6 +1201,11 @@ def _users(ctx: _Context, artifact_id: str) -> list[str]:
 def _link_data(ctx: _Context, op: LinkData) -> None:
     artifact = _artifact(ctx, op.artifact_id)
     step = ctx.step(op.step_id, "step_id")
+    if step.get("type") == _DECISION_TYPE:
+        # Drawn as a gateway, which holds no data association.
+        raise OperationError(
+            "invalid", f'Decision step "{_label(step)}" uses or makes no data', "step_id"
+        )
     links = step.setdefault(_ROLE_LISTS[op.role], [])
     name = _data_name(op.artifact_id, artifact)
     verb = "uses" if op.role == "input" else "makes"
@@ -1241,28 +1248,18 @@ def _unlink_data(ctx: _Context, op: UnlinkData) -> None:
                 f"{', '.join(users[:5])} use",
                 "artifact_id",
             )
+        if not others and artifact.get("source") == _GENERATED:
+            # A generated data object needs the step that makes it (produced_by),
+            # and removing a link never deletes the data object.
+            raise OperationError(
+                "only_producer",
+                f'Step "{_label(step)}" is the only one that makes "{name}"',
+                "artifact_id",
+            )
+        if others and artifact.get("produced_by") == step["id"]:
+            artifact["produced_by"] = others[0]["id"]
     step[key] = [a for a in step[key] if a != op.artifact_id]
     ctx.summaries.append(f'Step "{_label(step)}" no longer {verb} data object "{name}"')
-    if op.role != "output" or artifact.get("source") != _GENERATED:
-        return
-    if others:
-        if artifact.get("produced_by") == step["id"]:
-            artifact["produced_by"] = others[0]["id"]
-        return
-    # A generated data object that no step makes and none uses: it goes.
-    _drop_artifact(ctx, op.artifact_id)
-    ctx.warnings.append(
-        f'Removed data object "{name}": a generated data object needs the step that makes it'
-    )
-
-
-def _drop_artifact(ctx: _Context, artifact_id: str) -> None:
-    """Removes the artifact and what names it besides the steps' links."""
-    del ctx.blueprint["artifacts"][artifact_id]
-    for party in ctx.process.get("external_parties") or []:
-        party["sends"] = [a for a in party.get("sends", []) if a != artifact_id]
-    for manual in ctx.process.get("manual_steps") or []:
-        manual["produces"] = [a for a in manual.get("produces", []) if a != artifact_id]
 
 
 def _set_field(ctx: _Context, op: SetField) -> None:

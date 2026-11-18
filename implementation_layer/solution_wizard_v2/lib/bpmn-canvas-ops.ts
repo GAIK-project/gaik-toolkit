@@ -448,3 +448,12 @@ export function opForDataObjectRename(
   if (!data.label && (!label || label === (drawnLabel ?? "").trim())) return null;
   return { op: "rename_data_object", artifact_id: data.id, label };
 }
+
+/**
+ * Whether a shape of `type` can use or make a data object: a task. A decision
+ * step is drawn as a gateway, which holds no data association (wizard_api
+ * refuses a link to it too).
+ */
+export function holdsData(type: string): boolean {
+  return /^bpmn:[A-Za-z]*Task$/.test(type);
+}

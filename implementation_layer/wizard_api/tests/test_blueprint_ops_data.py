@@ -177,6 +177,25 @@ def test_an_unknown_data_object_step_or_role_is_refused() -> None:
         ops(_link("invoice", "extract", "both"))
 
 
+def test_a_decision_step_has_no_data() -> None:
+    # The generator draws a decision step as a gateway, which holds no data association.
+    draft = _draft()
+    draft["workflow"]["steps"].insert(
+        2,
+        {
+            "id": "check",
+            "name": "Check",
+            "type": "decision",
+            "inputs": [],
+            "outputs": [],
+            "depends_on": ["extract"],
+        },
+    )
+    _steps(draft)["review"]["depends_on"] = ["check"]
+    err = _refused(draft, _link("invoice", "check", "input"))
+    assert (err.code, err.field) == ("invalid", "step_id")
+
+
 # ---------------------------------------------------------------- unlink
 
 
@@ -188,24 +207,18 @@ def test_the_only_producer_of_a_used_artifact_cannot_be_unlinked() -> None:
     draft["business_process"]["manual_steps"][0]["consumes"] = ["report"]
     err = _refused(draft, _unlink("report", "deliver", "output"))
     assert err.code == "still_used"
-    # Once nothing uses it, the producer can go (see the next test).
-    draft = _draft()
-    result = apply_operations(
-        draft, ops(_unlink("fields", "review", "input"), _unlink("fields", "extract", "output"))
+    # Once nothing uses it, it still needs the step that makes it (see the next test).
+    err = _refused(
+        _draft(), _unlink("fields", "review", "input"), _unlink("fields", "extract", "output")
     )
-    assert "fields" not in result.blueprint["artifacts"]
+    assert (err.code, err.index) == ("only_producer", 1)
 
 
-def test_unlinking_the_only_producer_of_an_unused_generated_artifact_removes_it() -> None:
-    draft = _draft()
-    draft["artifacts"]["report"]["label"] = "Report"
-    result = apply_operations(draft, ops(_unlink("report", "deliver", "output")))
-    assert "report" not in result.blueprint["artifacts"]
-    assert _steps(result.blueprint)["deliver"]["outputs"] == []
-    assert result.warnings == [
-        'Removed data object "Report": a generated data object needs the step that makes it'
-    ]
-    _no_new_refusing_errors(draft, result.blueprint)
+def test_the_only_producer_of_a_generated_artifact_cannot_be_unlinked() -> None:
+    # The deliverable: generated, final, used by no step. Removing the line
+    # would leave it no step that makes it, and a data object is never deleted.
+    err = _refused(_draft(), _unlink("report", "deliver", "output"))
+    assert (err.code, err.field) == ("only_producer", "artifact_id")
 
     # A user's upload stays declared: nothing has to make it.
     draft = _draft()
