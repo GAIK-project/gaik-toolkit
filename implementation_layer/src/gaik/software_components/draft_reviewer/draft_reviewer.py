@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from difflib import SequenceMatcher
 
 from pydantic import BaseModel, ConfigDict
 
@@ -45,17 +46,56 @@ def _apply(text: str, edits: list[Edit]) -> tuple[str, list[Edit], list[tuple[Ed
 LEFT_OUT = "left out of the last answer, propose it again"
 
 
-def _answers(edit: Edit, earlier: Edit) -> bool:
-    """Whether a retry edit stands for an earlier failed edit.
+def _closeness(a: str, b: str) -> float:
+    """How alike two texts are, from 0 to 1; 1 when one contains the other."""
+    a, b = a.strip(), b.strip()
+    if a and b and (a in b or b in a):
+        return 1.0
+    return SequenceMatcher(None, a, b).ratio()
 
-    It does when it gives the same reason or makes the same replacement (the earlier
-    replacement text occurs in its own; a deletion is answered by another deletion).
+
+def _answer_score(edit: Edit, earlier: Edit) -> float | None:
+    """How well a retry edit stands for an earlier failed edit, or None when it does not.
+
+    It does when it gives the same reason, or makes the same correction: a replacement
+    whose text contains the earlier replacement or is contained in it, or a deletion of
+    text like the text the earlier deletion meant to delete. Closer search texts score
+    higher, so each earlier edit is paired with the retry edit nearest to it.
     """
-    if edit.reason.strip() == earlier.reason.strip():
-        return True
-    if earlier.replace.strip():
-        return earlier.replace.strip() in edit.replace
-    return not edit.replace.strip()
+    closeness = _closeness(edit.search, earlier.search)
+    if edit.reason.strip() and edit.reason.strip() == earlier.reason.strip():
+        return 2.0 + closeness
+    old, new = earlier.replace.strip(), edit.replace.strip()
+    if not old:
+        return 1.0 + closeness if not new and closeness >= 0.5 else None
+    if new and (old in new or new in old):
+        return 1.0 + closeness
+    return None
+
+
+def _unanswered(previous: list[Edit], edits: list[Edit]) -> list[Edit]:
+    """The earlier failed edits that no retry edit stands for.
+
+    Each retry edit answers at most one earlier edit, so one retried deletion or
+    correction cannot account for several earlier ones; the best-scoring pairs are
+    taken first.
+    """
+    pairs = sorted(
+        (
+            (score, i, j)
+            for i, earlier in enumerate(previous)
+            for j, edit in enumerate(edits)
+            if (score := _answer_score(edit, earlier)) is not None
+        ),
+        key=lambda pair: (-pair[0], pair[1], pair[2]),
+    )
+    answered: set[int] = set()
+    used: set[int] = set()
+    for _, i, j in pairs:
+        if i not in answered and j not in used:
+            answered.add(i)
+            used.add(j)
+    return [earlier for i, earlier in enumerate(previous) if i not in answered]
 
 
 class DraftReviewer:
@@ -133,11 +173,7 @@ class DraftReviewer:
             applied.extend(done)
             # A failed edit that the retry answer does not stand for stays failed, so it
             # is asked for again and ends in ``unresolved`` rather than disappearing.
-            failed += [
-                (edit, LEFT_OUT)
-                for edit, _ in previous
-                if not any(_answers(new, edit) for new in edits)
-            ]
+            failed += [(edit, LEFT_OUT) for edit in _unanswered([e for e, _ in previous], edits)]
             if not failed:
                 break
         return ReviewResult(text=text, applied=applied, unresolved=[edit for edit, _ in failed])

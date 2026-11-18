@@ -62,7 +62,9 @@ def test_report_writer_two_sections_cite_their_sources(tmp_path: Path):
             "primary": [tmp_path / "roof_inspection.txt"],
             "secondary": [tmp_path / "plumbing_notes.txt"],
         },
-        settings=RunSettings(review_attempts=1, docx=False),
+        # The checks below are about sections and citations; with one review attempt a
+        # strict review would fail the run on a single misquoted edit.
+        settings=RunSettings(review_attempts=1, strict_review=False, docx=False),
     )
     workspace = tmp_path / "workspace"
 

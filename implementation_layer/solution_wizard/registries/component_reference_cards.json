@@ -2524,7 +2524,7 @@
         "name": "max_attempts",
         "type": "int",
         "default": 5,
-        "effect": "Most LLM requests per review, the first one included. Retries re-request only edits whose search text did not match exactly once; edits still failing end up in unresolved.",
+        "effect": "Most LLM requests per review, the first one included. Retries re-request only edits whose search text did not match exactly once; a failed edit that a retry answer leaves out is asked for again; edits still failing or still missing end up in unresolved.",
         "selection_relevant": false,
         "infer_from": "leave at 5; lower it only when reviewer cost dominates"
       },

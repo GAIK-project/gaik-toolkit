@@ -138,6 +138,33 @@ def test_edit_left_out_of_retry_answer_stays_unresolved(make):
     assert "'opened in 1990'" not in third
 
 
+def test_shorter_retry_with_another_reason_answers_the_failed_edit(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    year = Edit(search="1999", replace="1998", reason="The reference gives 1998.")
+    reviewer, client = make(_edits(typo), _edits(year), _edits())
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.text == DRAFT.replace("1999", "1998")
+    assert result.applied == [year]
+    assert result.unresolved == []
+    assert len(client.calls) == 2
+
+
+def test_one_retried_deletion_answers_only_the_deletion_it_matches(make):
+    draft = DRAFT + " It has a toll booth."
+    paint = Edit(search=" It was painted bleu.", replace="", reason="Not in the reference.")
+    toll = Edit(search=" It has a tol booth.", replace="", reason="Not in the reference.")
+    fixed_toll = Edit(search=" It has a toll booth.", replace="", reason="Not in the reference.")
+    reviewer, client = make(_edits(paint, toll), _edits(fixed_toll), _edits())
+    result = reviewer.review(draft, reference=REFERENCE)
+    assert result.text == DRAFT
+    assert result.applied == [fixed_toll]
+    assert result.unresolved == [paint]
+    assert len(client.calls) == 3
+    third = client.calls[2][2]["content"]
+    assert "painted bleu" in third
+    assert "tol booth" not in third
+
+
 def test_empty_replace_deletes_passage(make):
     delete = Edit(search=" It was painted blue.", replace="", reason="Not in the reference.")
     reviewer, _ = make(_edits(delete))

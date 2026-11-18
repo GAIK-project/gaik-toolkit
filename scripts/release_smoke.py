@@ -518,7 +518,8 @@ def run_smoke(args) -> dict:
                 mock.patch.object(writer_module, "create_llm_client", budgeted_client),
                 mock.patch.object(reviewer_module, "create_llm_client", budgeted_client),
             ):
-                report = ReportSynthesizer(config).synthesize(
+                # Strict review, the default users get, is what the release checks.
+                report = ReportSynthesizer(config, strict_review=True).synthesize(
                     knowledge, sections, title="Synthetic heating check"
                 )
             text = report.sections[0].text

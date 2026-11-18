@@ -53,6 +53,10 @@ removed; style and order are left alone.
   edits, their errors and the current text go back to the LLM for new edits, which are
   applied the same way. A retry answer with no edits ends the review and leaves the
   failed edits unresolved.
+- Each retry edit stands for at most one earlier failed edit: one with the same reason,
+  the same correction or, for a deletion, a deletion of like text. A failed edit that
+  the retry answer leaves out is asked for again in the next request, and is returned in
+  `unresolved` if it is still missing when the review ends.
 - This repeats until nothing fails or `max_attempts` requests (the first one included)
   have been made. Edits that still fail are returned in `unresolved`, not raised: the
   caller decides whether they are fatal.
