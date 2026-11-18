@@ -220,6 +220,28 @@ export type Dict = {
   bpmnPadRemoveLane: string;
   /** A lane that steps are in is not removed. */
   bpmnLaneInUse: string;
+  /** Business decisions: a step's pad ("a decision after it"), a decision gateway's pad (edit, remove). */
+  bpmnPadAddDecision: string;
+  bpmnPadEditDecision: string;
+  bpmnPadRemoveDecision: string;
+  /** The branch dialog (components/bpmn-branch-dialog): its titles, fields and buttons. */
+  bpmnDecisionAddTitle: string;
+  bpmnDecisionEditTitle: string;
+  /** Under the title: what a decision is, and how many branches it has ("{min}" to "{max}"). */
+  bpmnDecisionHelp: string;
+  bpmnDecisionName: string;
+  /** "Branch {n}": a branch's group of fields. */
+  bpmnDecisionBranch: string;
+  bpmnDecisionCondition: string;
+  bpmnDecisionTarget: string;
+  /** The target that ends the process. */
+  bpmnDecisionEnd: string;
+  bpmnDecisionAddBranch: string;
+  bpmnDecisionRemoveBranch: string;
+  /** Every branch leads to one place: the decision decides nothing. */
+  bpmnDecisionSameTarget: string;
+  bpmnDecisionSave: string;
+  bpmnDecisionCancel: string;
   /** The step panel's lane select, and its entry for the lane of the step's type. */
   bpmnStepLane: string;
   bpmnStepLaneDefault: string;
@@ -1043,6 +1065,23 @@ const fi: Dict = {
   bpmnPadRenameLane: "Nimeä kaista uudelleen",
   bpmnPadRemoveLane: "Poista kaista",
   bpmnLaneInUse: "Kaistaa ei poistettu: siinä on vaiheita. Siirrä ne ensin toiseen kaistaan.",
+  bpmnPadAddDecision: "Lisää päätös tämän jälkeen",
+  bpmnPadEditDecision: "Muokkaa päätöstä",
+  bpmnPadRemoveDecision: "Poista päätös",
+  bpmnDecisionAddTitle: "Lisää päätös",
+  bpmnDecisionEditTitle: "Muokkaa päätöstä",
+  bpmnDecisionHelp:
+    "Päätös jakaa prosessin haaroihin. Anna kullekin haaralle ehto ja vaihe, johon se johtaa. Haaroja on {min}–{max}.",
+  bpmnDecisionName: "Päätöksen nimi",
+  bpmnDecisionBranch: "Haara {n}",
+  bpmnDecisionCondition: "Ehto",
+  bpmnDecisionTarget: "Johtaa vaiheeseen",
+  bpmnDecisionEnd: "Loppu",
+  bpmnDecisionAddBranch: "Lisää haara",
+  bpmnDecisionRemoveBranch: "Poista haara {n}",
+  bpmnDecisionSameTarget: "Kaikki haarat johtavat samaan paikkaan: valitse ainakin yhdelle toinen vaihe.",
+  bpmnDecisionSave: "Tallenna päätös",
+  bpmnDecisionCancel: "Peruuta",
   bpmnStepLane: "Kaista (kuka tekee)",
   bpmnStepLaneDefault: "Tyypin oletuskaista",
   bpmnUndo: "Kumoa",
@@ -1062,6 +1101,9 @@ const fi: Dict = {
     type: "vaiheen tyyppi",
     description: "vaiheen kuvaus",
     lane_id: "kaista",
+    decision_id: "päätös",
+    branches: "päätöksen haarat",
+    condition: "haaran ehto",
   },
   bpmnSaved: "Tallennettu. Wizard näkee muutoksen seuraavasta chat-viestistäsi.",
   bpmnStepTitle: "Vaihe {n}",
@@ -1903,6 +1945,23 @@ const en: Dict = {
   bpmnPadRenameLane: "Rename the lane",
   bpmnPadRemoveLane: "Remove the lane",
   bpmnLaneInUse: "The lane was not removed: it has steps in it. Move them to another lane first.",
+  bpmnPadAddDecision: "Add a decision after this",
+  bpmnPadEditDecision: "Edit the decision",
+  bpmnPadRemoveDecision: "Remove the decision",
+  bpmnDecisionAddTitle: "Add a decision",
+  bpmnDecisionEditTitle: "Edit the decision",
+  bpmnDecisionHelp:
+    "A decision splits the process into branches. Give each branch a condition and the step it leads to. A decision has {min} to {max} branches.",
+  bpmnDecisionName: "Name of the decision",
+  bpmnDecisionBranch: "Branch {n}",
+  bpmnDecisionCondition: "Condition",
+  bpmnDecisionTarget: "Leads to",
+  bpmnDecisionEnd: "End",
+  bpmnDecisionAddBranch: "Add a branch",
+  bpmnDecisionRemoveBranch: "Remove branch {n}",
+  bpmnDecisionSameTarget: "Every branch leads to the same place: pick another step for at least one.",
+  bpmnDecisionSave: "Save the decision",
+  bpmnDecisionCancel: "Cancel",
   bpmnStepLane: "Lane (who does it)",
   bpmnStepLaneDefault: "Default for its type",
   bpmnUndo: "Undo",
@@ -1922,6 +1981,9 @@ const en: Dict = {
     type: "step type",
     description: "step description",
     lane_id: "lane",
+    decision_id: "decision",
+    branches: "decision's branches",
+    condition: "branch condition",
   },
   bpmnSaved: "Saved. The wizard sees the change from your next chat message.",
   bpmnStepTitle: "Step {n}",

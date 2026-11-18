@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  decisionOf,
+  decisionProblem,
   isDecisionStep,
+  opForDecision,
+  stepHasDecision,
   isOperationElement,
   laneIdOf,
   mappingFitsSteps,
@@ -273,5 +277,88 @@ describe("lanes", () => {
     expect(opForLaneRename("Lane_legal", "Legal", "Legal", withLanes)).toBeNull();
     expect(opForLaneRename("Lane_legal", "  ", "Legal", withLanes)).toBeNull();
     expect(opForLaneRename("Activity_upload", "X", "Upload", withLanes)).toBeNull();
+  });
+});
+
+describe("business decisions", () => {
+  const decision = {
+    id: "big",
+    name: "Big?",
+    after: "extract",
+    branches: [
+      { condition: "Yes", target: "review" },
+      { condition: "No", target: "end" },
+    ],
+  };
+  const withDecision: BpmnMapping = {
+    ...MAPPING,
+    Gateway_decision_big: { kind: "decision_point", blueprint_path: "business_process.decision_points[0]", decision },
+  };
+
+  it("names the decision behind a decision_point gateway, and nothing else", () => {
+    expect(decisionOf("Gateway_decision_big", withDecision)).toEqual(decision);
+    expect(decisionOf("Gateway_approval_review", withDecision)).toBeNull();
+    expect(decisionOf("Activity_extract", withDecision)).toBeNull();
+    // A decision_point entry without its decision (an older wizard_api) gives no tools.
+    const bare: BpmnMapping = { X: { kind: "decision_point", blueprint_path: "business_process.decision_points[0]" } };
+    expect(decisionOf("X", bare)).toBeNull();
+  });
+
+  it("says which step a decision already follows", () => {
+    expect(stepHasDecision("extract", withDecision)).toBe(true);
+    expect(stepHasDecision("upload", withDecision)).toBe(false);
+  });
+
+  it("deletes a decision with remove_decision, and it is an operation element; a derived gateway is not", () => {
+    expect(opForDelete({ id: "Gateway_decision_big", type: "bpmn:ExclusiveGateway" }, withDecision, STEPS)).toEqual({
+      op: "remove_decision",
+      decision_id: "big",
+    });
+    expect(isOperationElement({ id: "Gateway_decision_big", type: "bpmn:ExclusiveGateway" }, withDecision, STEPS)).toBe(true);
+    expect(isOperationElement({ id: "Gateway_approval_review", type: "bpmn:ExclusiveGateway" }, withDecision, STEPS)).toBe(
+      false,
+    );
+  });
+
+  it("checks the dialog's values: a name, 2 to 5 branches with conditions, not all to one place", () => {
+    const ok = { name: " Big? ", branches: decision.branches };
+    expect(decisionProblem(ok)).toBeNull();
+    expect(decisionProblem({ ...ok, name: "  " })).toBe("name");
+    expect(decisionProblem({ ...ok, branches: [decision.branches[0]] })).toBe("count");
+    expect(decisionProblem({ ...ok, branches: Array(6).fill(decision.branches[0]) })).toBe("count");
+    expect(decisionProblem({ ...ok, branches: [{ condition: " ", target: "end" }, decision.branches[0]] })).toBe("condition");
+    expect(decisionProblem({ ...ok, branches: [{ condition: "x", target: "" }, decision.branches[0]] })).toBe("target");
+    expect(
+      decisionProblem({
+        ...ok,
+        branches: [
+          { condition: "a", target: "end" },
+          { condition: "b", target: "end" },
+        ],
+      }),
+    ).toBe("same_target");
+  });
+
+  it("makes add_decision after a step, and update_decision for a decision, trimmed", () => {
+    const values = { name: " Big? ", branches: [{ condition: " Yes ", target: "review" }, decision.branches[1]] };
+    expect(opForDecision(values, { after: "extract" })).toEqual({
+      op: "add_decision",
+      after: "extract",
+      name: "Big?",
+      branches: [
+        { condition: "Yes", target: "review" },
+        { condition: "No", target: "end" },
+      ],
+    });
+    expect(opForDecision(values, { decision })).toEqual({
+      op: "update_decision",
+      decision_id: "big",
+      name: "Big?",
+      branches: [
+        { condition: "Yes", target: "review" },
+        { condition: "No", target: "end" },
+      ],
+    });
+    expect(opForDecision({ ...values, name: "" }, { after: "extract" })).toBeNull();
   });
 });

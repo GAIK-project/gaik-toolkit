@@ -290,16 +290,17 @@ test.describe("Workflow tab", () => {
     await expect(entries.nth(1)).toHaveAttribute("title", "Lisää kaista");
     await expect(entries.nth(2)).toHaveAttribute("title", /^Yhdistä/);
 
-    // The first step: rename, change type, append, move (not earlier), connect, delete.
+    // The first step: rename, change type, append, a decision after it, move (not earlier), connect, delete.
     const rows = page.getByTestId("flow-step-list").locator("li");
     await rows.nth(0).getByRole("button").first().click();
     const pad = page.locator(".djs-context-pad .entry");
-    await expect(pad).toHaveCount(7);
+    await expect(pad).toHaveCount(8);
     const titles = await pad.evaluateAll((els) => els.map((el) => el.getAttribute("title")));
     expect(titles).toEqual([
       "Nimeä uudelleen",
       "Vaihda vaiheen tyyppi",
       "Lisää vaihe tämän jälkeen",
+      "Lisää päätös tämän jälkeen",
       "Siirrä aiemmaksi",
       "Siirrä myöhemmäksi",
       "Poista",

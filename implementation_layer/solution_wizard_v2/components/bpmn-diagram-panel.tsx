@@ -15,15 +15,24 @@ import { BpmnZoomControls } from "@/components/bpmn-viewer-toolbar";
 import { FlowEditingNote, FlowLockedNote, FlowUpdatedLine } from "@/components/flow-status";
 import { AskStepButton, StepNumber, stepTypeLabels } from "@/components/step-type";
 import { BpmnStepPanel } from "@/components/bpmn-step-panel";
+import { BpmnBranchDialog } from "@/components/bpmn-branch-dialog";
 import { Icon } from "@/components/icons";
 import { stepIdToBpmnId, stepIndexForBpmnId } from "@/lib/bpmn-edit-state";
-import type { BpmnEditorOps, BpmnLayoutChange, BpmnStepLaneChange } from "@/lib/bpmn-editor-module";
+import type {
+  BpmnDecisionRequest,
+  BpmnEditorOps,
+  BpmnLayoutChange,
+  BpmnStepLaneChange,
+} from "@/lib/bpmn-editor-module";
 import {
+  decisionOf,
   laneIdOf,
+  opForDecision,
   mappingFitsSteps,
   performedByOf,
   stepIdOf,
   type BpmnMapping,
+  type DecisionValues,
 } from "@/lib/bpmn-canvas-ops";
 import { keptPanelEdit, panelFields, panelOps, type KeptPanelEdit, type PanelValues } from "@/lib/step-panel-model";
 import type { BlueprintUpdate } from "@/lib/blueprint-update";
@@ -181,6 +190,11 @@ export function BpmnDiagramPanel({
 
   const busy = useRef(false);
   const [working, setWorking] = useState(false);
+  // The branch dialog: open for a new decision after a step, or for a decision to edit.
+  const [decisionDialog, setDecisionDialog] = useState<BpmnDecisionRequest | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  // What the last refused edit said, for the branch dialog, which stays open over it.
+  const lastRefusal = useRef<string | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   // A version written elsewhere refused the last edit: the canvas shows the newer diagram.
   const [changedElsewhere, setChangedElsewhere] = useState(false);
@@ -393,6 +407,7 @@ export function BpmnDiagramPanel({
     // The one gate every edit passes (palette, context pad, keys, the name
     // field, Kumoa): none starts while a name is typed in place, or the
     // diagram drawn after it would be imported over the typed name.
+    lastRefusal.current = null;
     if (busy.current || typing.current) return false;
     const base = canvasVersion.current;
     busy.current = true;
@@ -434,18 +449,21 @@ export function BpmnDiagramPanel({
         // The agent has not written its blueprint yet: the editor waits for it, as the note says.
         setStatus({ kind: "idle" });
         setOps("no_draft");
+        lastRefusal.current = t.bpmnNeedsDraft;
       } else if (err instanceof OperationRefused && err.code === "changed_elsewhere") {
         // What the user gave the step (a name, a description, a type) is not
         // given up: it is made again on the newer version once the page has it.
         const kept = keptPanelEdit(operations);
         if (kept && !pendingEdit.current) pendingEdit.current = kept;
         waitingForVersion.current = true;
+        lastRefusal.current = t.wsJsonChangedElsewhere;
         setChangedElsewhere(true);
         setStatus({ kind: "idle" });
         // The page reads the newer version and its number; the canvas draws its diagram now.
         router.refresh();
       } else {
-        setStatus({ kind: "error", message: refusalMessage(err) });
+        lastRefusal.current = refusalMessage(err);
+        setStatus({ kind: "error", message: lastRefusal.current });
       }
       await revert();
       return false;
@@ -552,6 +570,24 @@ export function BpmnDiagramPanel({
     return run("ops", [change.op], () => resetLayout(change.shapes, change.edges));
   }
 
+  /** A step's "Add decision after" or a decision's Edit: the branch dialog opens, while the canvas can take an edit. */
+  function openDecision(request: BpmnDecisionRequest) {
+    if (!opsContext()) return;
+    setDecisionError(null);
+    setDecisionDialog(request);
+  }
+
+  /** The branch dialog's Save: one edit through `run`. A refusal keeps the dialog open and says why. */
+  async function saveDecision(values: DecisionValues): Promise<boolean> {
+    const request = decisionDialog;
+    const op = request ? opForDecision(values, request) : null;
+    if (!op) return false;
+    setDecisionError(null);
+    const made = await run("ops", [op]);
+    if (!made) setDecisionError(lastRefusal.current ?? t.bpmnOpRefused);
+    return made;
+  }
+
   // Dragged shapes are kept before the page goes: another page, or a reload
   // of this one (keepalive lets the request outlive it).
   useEffect(() => {
@@ -576,6 +612,7 @@ export function BpmnDiagramPanel({
     flushPending: () => void;
     stepTypeOf: (stepId: string) => StepType | null;
     moveStepToLane: typeof moveStepToLane;
+    openDecision: typeof openDecision;
   } | null>(null);
   const stableOps = useMemo<BpmnEditorOps>(
     () => ({
@@ -584,6 +621,7 @@ export function BpmnDiagramPanel({
       onRevert: () => void latest.current?.revert(),
       onLayout: (change) => latest.current?.sendLayout(change),
       onStepLane: (change) => void latest.current?.moveStepToLane(change),
+      onDecision: (request) => latest.current?.openDecision(request),
       stepType: (stepId) => latest.current?.stepTypeOf(stepId) ?? null,
     }),
     [],
@@ -721,7 +759,17 @@ export function BpmnDiagramPanel({
   }
 
   useEffect(() => {
-    latest.current = { opsContext, run, revert, sendLayout, flushLayout, flushPending, stepTypeOf, moveStepToLane };
+    latest.current = {
+      opsContext,
+      run,
+      revert,
+      sendLayout,
+      flushLayout,
+      flushPending,
+      stepTypeOf,
+      moveStepToLane,
+      openDecision,
+    };
   });
 
   /** "Lopeta muokkaus": the canvas is read-only again, as it opened. */
@@ -793,6 +841,9 @@ export function BpmnDiagramPanel({
 
   const opsOn = ops === "on" && !locked;
 
+  // The canvas turned read-only (locked, no wizard_api, no draft): the branch dialog goes with its tools.
+  if (decisionDialog && !opsOn) setDecisionDialog(null);
+
   return (
     <section
       className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg border border-border bg-surface"
@@ -830,6 +881,9 @@ export function BpmnDiagramPanel({
             newLaneName: t.bpmnNewLaneName,
             renameLane: t.bpmnPadRenameLane,
             removeLane: t.bpmnPadRemoveLane,
+            addDecision: t.bpmnPadAddDecision,
+            editDecision: t.bpmnPadEditDecision,
+            removeDecision: t.bpmnPadRemoveDecision,
           }}
           ops={stableOps}
           onSelectionChange={setSelection}
@@ -931,7 +985,7 @@ export function BpmnDiagramPanel({
                 </span>
               </p>
             )}
-            {opsOn && !step && fitting && (
+            {opsOn && !step && fitting && !decisionOf(selection.id, fitting) && (
               <p className="mt-2 text-xs text-text-muted" data-testid="bpmn-derived-note">
                 {t.bpmnDerivedElement}
               </p>
@@ -965,6 +1019,22 @@ export function BpmnDiagramPanel({
           </div>
         )}
       </div>
+      {decisionDialog && (
+        <BpmnBranchDialog
+          mode={"after" in decisionDialog ? "add" : "edit"}
+          initial={
+            "after" in decisionDialog
+              ? { name: "", branches: [] }
+              : { name: decisionDialog.decision.name, branches: decisionDialog.decision.branches }
+          }
+          steps={steps.map((s) => ({ id: s.id, name: s.name }))}
+          busy={working}
+          error={decisionError}
+          onSave={saveDecision}
+          onClose={() => setDecisionDialog(null)}
+          t={t}
+        />
+      )}
       {locked && onUnlock ? (
         <FlowLockedNote onUnlock={onUnlock} testId="bpmn" t={t} />
       ) : ops === "off" || ops === "no_draft" ? (

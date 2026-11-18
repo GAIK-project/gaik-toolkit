@@ -13,9 +13,14 @@
  * Tier 1: rename, add, move, connect, disconnect and remove a step. Tier 2
  * adds lanes: the mapping names a lane's participant (`participant_id`) and a
  * step's `performed_by`, so a lane can be renamed or removed and a step put
- * in another lane.
+ * in another lane. Business decisions: the mapping names the decision behind
+ * a `decision_point` gateway (`decision`), so it can be edited and removed,
+ * and a step can get a decision after it.
  */
-import type { BlueprintOperation } from "@/lib/blueprint-ops";
+import { MAX_BRANCHES, MIN_BRANCHES, type BlueprintOperation, type DecisionBranch } from "@/lib/blueprint-ops";
+
+/** A business decision (`business_process.decision_points[i]`), as the mapping names it. */
+export type DecisionRef = { id: string; name: string; after: string; branches: DecisionBranch[] };
 
 export type BpmnMapping = Record<
   string,
@@ -26,6 +31,8 @@ export type BpmnMapping = Record<
     participant_id?: string;
     /** A step's: the lane it is put in, "" when its type decides. */
     performed_by?: string;
+    /** A business decision's gateway (`decision_point`): the decision it stands for. */
+    decision?: DecisionRef;
   }
 >;
 
@@ -107,7 +114,7 @@ export function opForConnection(
   return { op: "connect", source, target };
 }
 
-/** Delete: remove_step for a step's task, disconnect for a flow between two steps. */
+/** Delete: remove_step for a step's task, remove_decision for a business decision, disconnect for a flow between two steps. */
 export function opForDelete(
   element: CanvasElement,
   mapping: BpmnMapping,
@@ -119,14 +126,16 @@ export function opForDelete(
     const target = stepIdOf(element.target, mapping, steps);
     return source && target ? { op: "disconnect", source, target } : null;
   }
+  const decision = decisionOf(element.id, mapping);
+  if (decision) return { op: "remove_decision", decision_id: decision.id };
   const stepId = stepIdOf(element.id, mapping, steps);
   return stepId ? { op: "remove_step", step_id: stepId } : null;
 }
 
-/** Whether the canvas offers edits on `element`: a step's task, or a flow between two steps. */
+/** Whether the canvas offers edits on `element`: a step's task, a business decision, or a flow between two steps. */
 export function isOperationElement(element: CanvasElement, mapping: BpmnMapping, steps: StepRef[]): boolean {
   if (element.type === "bpmn:SequenceFlow") return opForDelete(element, mapping, steps) !== null;
-  return stepIdOf(element.id, mapping, steps) !== null;
+  return stepIdOf(element.id, mapping, steps) !== null || decisionOf(element.id, mapping) !== null;
 }
 
 /** The palette's "Add step": a new step after the last one. */
@@ -222,4 +231,55 @@ export function opForLaneRename(
   const name = (newName ?? "").trim();
   if (!laneId || !name || name === (oldName ?? "").trim()) return null;
   return { op: "rename_lane", lane_id: laneId, name };
+}
+
+/**
+ * The business decision behind `elementId`: a gateway the mapping names as a
+ * `decision_point` with its decision. Null for anything else, the approval
+ * gateway and the other gateways the generator draws by itself included, and
+ * for a decision step (a `workflow.steps` entry drawn as a gateway).
+ */
+export function decisionOf(elementId: string, mapping: BpmnMapping): DecisionRef | null {
+  const entry = entryOf(elementId, mapping);
+  const decision = entry?.kind === "decision_point" ? entry.decision : undefined;
+  return decision && typeof decision.id === "string" && decision.id ? decision : null;
+}
+
+/** Whether a business decision already follows the step: a step has one at most. */
+export function stepHasDecision(stepId: string, mapping: BpmnMapping): boolean {
+  return Object.values(mapping).some((entry) => entry?.kind === "decision_point" && entry.decision?.after === stepId);
+}
+
+/** What the branch dialog holds. */
+export type DecisionValues = { name: string; branches: DecisionBranch[] };
+
+/** What keeps the dialog's values from being a decision, or null when they are one. */
+export type DecisionProblem = "name" | "count" | "condition" | "target" | "same_target";
+
+export function decisionProblem(values: DecisionValues): DecisionProblem | null {
+  if (!values.name.trim()) return "name";
+  const { branches } = values;
+  if (branches.length < MIN_BRANCHES || branches.length > MAX_BRANCHES) return "count";
+  if (branches.some((b) => !b.condition.trim())) return "condition";
+  if (branches.some((b) => !b.target)) return "target";
+  // Every branch to one place decides nothing (wizard_api refuses it too).
+  if (new Set(branches.map((b) => b.target)).size === 1) return "same_target";
+  return null;
+}
+
+/**
+ * The dialog's values as an operation: add_decision after a step, or
+ * update_decision (name and branches) for a decision; null while they are no
+ * decision (`decisionProblem`).
+ */
+export function opForDecision(
+  values: DecisionValues,
+  of: { after: string } | { decision: DecisionRef },
+): BlueprintOperation | null {
+  if (decisionProblem(values)) return null;
+  const name = values.name.trim();
+  const branches = values.branches.map((b) => ({ condition: b.condition.trim(), target: b.target }));
+  return "after" in of
+    ? { op: "add_decision", after: of.after, name, branches }
+    : { op: "update_decision", decision_id: of.decision.id, name, branches };
 }

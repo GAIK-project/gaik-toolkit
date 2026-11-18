@@ -32,6 +32,18 @@ export type StepType = "user_task" | "automated_task" | "human_review";
 /** `LaneKind` there: a lane for people in a role, or for a system. */
 export type LaneKind = "human_role" | "system";
 
+/** A decision's branches: `MIN_BRANCHES`..`MAX_BRANCHES` there, each condition 1..`MAX_CONDITION_CHARS`. */
+export const MIN_BRANCHES = 2;
+export const MAX_BRANCHES = 5;
+export const MAX_CONDITION_CHARS = 200;
+/** A step's or a decision's name: `MAX_NAME_CHARS` there. */
+export const MAX_NAME_CHARS = 200;
+/** The target of a branch that ends the process. */
+export const DECISION_END = "end";
+
+/** One way out of a business decision: its condition and the step it leads to, or `"end"`. */
+export type DecisionBranch = { condition: string; target: string };
+
 export type BlueprintOperation =
   | { op: "rename_step"; step_id: string; name: string }
   | { op: "set_step_description"; step_id: string; description: string }
@@ -45,7 +57,11 @@ export type BlueprintOperation =
   | { op: "rename_lane"; lane_id: string; name: string }
   | { op: "remove_lane"; lane_id: string }
   /** Who does the step: a lane's participant id, or null for the lane of its type. */
-  | { op: "set_step_lane"; step_id: string; lane_id: string | null };
+  | { op: "set_step_lane"; step_id: string; lane_id: string | null }
+  /** A business decision (`business_process.decision_points`) after the step `after`. */
+  | { op: "add_decision"; after: string; name: string; branches: DecisionBranch[] }
+  | { op: "update_decision"; decision_id: string; name?: string | null; branches?: DecisionBranch[] | null }
+  | { op: "remove_decision"; decision_id: string };
 
 export type OperationsResult = {
   blueprint: Blueprint;

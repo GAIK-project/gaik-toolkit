@@ -130,7 +130,7 @@ test.describe("BPMN step type and step panel (stack)", () => {
     const actions = await page
       .locator(".djs-context-pad .entry")
       .evaluateAll((els) => els.map((el) => el.getAttribute("data-action")));
-    expect(actions).toEqual(["rename", "append", "move-earlier", "move-later", "delete", "connect"]);
+    expect(actions).toEqual(["rename", "append", "gaik-add-decision", "move-earlier", "move-later", "delete", "connect"]);
     // The R key opens no menu either, and the step panel is not offered for it.
     await page.locator('.bpmn-editable svg[tabindex="0"]').focus();
     await page.keyboard.press("r");

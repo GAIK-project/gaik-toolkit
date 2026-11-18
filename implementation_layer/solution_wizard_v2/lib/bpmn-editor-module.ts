@@ -26,6 +26,12 @@
  *   another lane is refused.
  * - Lanes: the palette's "Add lane" (`add_lane`), and a lane's context pad:
  *   rename it in place (`rename_lane`) and remove it (`remove_lane`).
+ * - Business decisions: a step's "Add decision after" and a decision
+ *   gateway's Edit open the branch dialog (`onDecision`, in the panel); a
+ *   decision gateway's Remove (and the Delete key) is `remove_decision`. A
+ *   gateway the generator draws by itself (the approval after a review) has
+ *   no tools; a decision step (a `workflow.steps` entry drawn as a gateway)
+ *   keeps the step tools.
  *
  * Labels and the operations come in through the modeler's `gaikEditor`
  * config, read each time they are needed.
@@ -35,7 +41,9 @@ import RuleProvider from "diagram-js/lib/features/rules/RuleProvider";
 import type { BlueprintOperation, StepType } from "@/lib/blueprint-ops";
 import { STEP_OP_TYPES } from "@/lib/step-panel-model";
 import {
+  decisionOf,
   isDecisionStep,
+  stepHasDecision,
   isOperationElement,
   opForAddStep,
   opForAppend,
@@ -49,6 +57,7 @@ import {
   stepIdOf,
   type BpmnMapping,
   type CanvasElement,
+  type DecisionRef,
   type StepRef,
 } from "@/lib/bpmn-canvas-ops";
 
@@ -74,7 +83,14 @@ export type BpmnEditorLabels = {
   newLaneName: string;
   renameLane: string;
   removeLane: string;
+  /** A step's pad: a business decision after it; a decision gateway's pad: edit and remove it. */
+  addDecision: string;
+  editDecision: string;
+  removeDecision: string;
 };
+
+/** What the branch dialog opens for: a new decision after a step, or a decision to edit. */
+export type BpmnDecisionRequest = { after: string } | { decision: DecisionRef };
 
 /**
  * A step put in another lane: the operation, and the drawn places that no
@@ -102,6 +118,8 @@ export type BpmnEditorOps = {
   onLayout: (layout: BpmnLayoutChange) => void;
   /** A step dragged into another lane. */
   onStepLane: (change: BpmnStepLaneChange) => void;
+  /** Opens the branch dialog: it sends the decision through `onOperation`'s gate. */
+  onDecision: (request: BpmnDecisionRequest) => void;
   /** The type a step has now, as the step panel shows it; null when unknown. */
   stepType: (stepId: string) => StepType | null;
 };
@@ -193,6 +211,10 @@ const PENCIL = icon(
 const PLUS = icon('<path d="M5 12h14"/><path d="M12 5v14"/>');
 const ARROW_LEFT = icon('<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>');
 const ARROW_RIGHT = icon('<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>');
+// Lucide "split": a decision's branches.
+const SPLIT = icon(
+  '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/>',
+);
 const TYPE_ICONS: Record<StepType, string> = {
   // arrowRightLeft, brain and userCheck: the step list's icons for the three types.
   user_task: icon('<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'),
@@ -337,7 +359,25 @@ class GaikContextPad {
           },
         };
       }
-      if (!stepIdOf(element.id, mapping, steps)) return {};
+      const decision = decisionOf(element.id, mapping);
+      if (decision) {
+        return {
+          "gaik-decision-edit": {
+            group: "edit",
+            imageUrl: PENCIL,
+            title: labels.editDecision,
+            action: { click: () => ops.onDecision({ decision }) },
+          },
+          "gaik-decision-remove": {
+            group: "edit",
+            className: "bpmn-icon-trash",
+            title: labels.removeDecision,
+            action: { click: () => ops.onOperation([{ op: "remove_decision", decision_id: decision.id }]) },
+          },
+        };
+      }
+      const stepId = stepIdOf(element.id, mapping, steps);
+      if (!stepId) return {};
       const out: Entries = {
         rename: {
           group: "edit",
@@ -362,6 +402,15 @@ class GaikContextPad {
           imageUrl: PLUS,
           title: labels.append,
           action: { click: () => ops.onOperation([append]) },
+        };
+      }
+      // A step is followed by one decision at most (wizard_api refuses a second).
+      if (!stepHasDecision(stepId, mapping)) {
+        out["gaik-add-decision"] = {
+          group: "edit",
+          imageUrl: SPLIT,
+          title: labels.addDecision,
+          action: { click: () => ops.onDecision({ after: stepId }) },
         };
       }
       const earlier = opsForMove(element.id, "earlier", mapping, steps);
