@@ -1,6 +1,5 @@
 import asyncio
 import collections
-import hashlib
 import io
 import logging
 import os
@@ -247,17 +246,12 @@ def _chat_rate_limited(exc: agent_service.ChatRateLimitError) -> HTTPException:
     )
 
 
-def _poc_dir(output_dir: str) -> str | None:
-    """Resolve the session's generated PoC folder (``<output_dir>/poc``), guarding
-    against path escapes. Returns None if output_dir is unset or the resolved poc
-    path would fall outside it."""
-    if not output_dir:
-        return None
-    base = os.path.realpath(output_dir)
-    poc = os.path.realpath(os.path.join(base, "poc"))
-    if poc != base and not poc.startswith(base + os.sep):
-        return None
-    return poc
+# Moved to session_service, where the blueprint operations router uses them too.
+_PACKAGE_DIGEST_SCHEME = session_service.PACKAGE_DIGEST_SCHEME
+_poc_dir = session_service.poc_dir
+_approved_content = session_service.approved_content
+_approved_package_digest = session_service.approved_package_digest
+_reopen_if_approved_content_changed = session_service.reopen_if_approved_content_changed
 
 
 def _deployable_entries(poc: str) -> list[str]:
@@ -916,37 +910,6 @@ def _gate_span(session, payload: SessionUpdate) -> Iterator[None]:
         ops_metrics.record_gate_changes(session, changes)
 
 
-#: What the package digest covers. 3: every file of the package but its
-#: README files (``poc_service._in_version``); 2: every Python file and every
-#: file in ``schemas/``, and the prompts; 1: a fixed list and the prompts. A
-#: package approved under another scheme is not comparable with today's digest.
-_PACKAGE_DIGEST_SCHEME = 3
-
-
-def _approved_content(session) -> dict[str, str | int] | None:
-    """Digests of the solution and of the package as they are now, or None without a draft."""
-
-    solution = artifact_sync.solution_digest(artifact_sync.read_draft_blueprint(session.output_dir))
-    if solution is None:
-        return None
-    poc = _poc_dir(session.output_dir)
-    package = _approved_package_digest(poc) if poc and os.path.isdir(poc) else ""
-    return {"solution": solution, "package": package, "package_scheme": _PACKAGE_DIGEST_SCHEME}
-
-
-def _approved_package_digest(poc: str) -> str:
-    """The package as approved and tested: every file of it but its README files.
-
-    ``package_version`` covers the code, the settings, the schema, the
-    extraction instructions under ``prompts/`` and the data files the run
-    reads, so a change to any of them after a test run or Gate 3 is a change
-    to what was tested and accepted.
-    """
-    from wizard_api.services import poc_service
-
-    return hashlib.sha256(poc_service.package_version(poc).encode()).hexdigest()[:16]
-
-
 def _gate_reopened_by_turn(db: Session, session) -> str | None:
     """The number of the gate this turn's change reopened, or None. Best-effort."""
     try:
@@ -960,56 +923,6 @@ def _gate_reopened_by_turn(db: Session, session) -> str | None:
         logger.warning("approved content could not be compared", exc_info=True)
         db.rollback()
         return None
-
-
-def _reopen_if_approved_content_changed(db: Session, session) -> bool:
-    """After a chat turn: reopen the gate whose approved content the turn changed.
-
-    Once Gate 3 is approved the solution and its package are what the user
-    accepted. Asked in the chat for another field after that, the agent
-    changed its files and said "ok", and every gate stayed approved: the
-    approvals then covered a solution nobody had reviewed, and the deployable
-    package was offered on a test run of the old one. The agent has a tool to
-    reopen a gate and is told to use it, but an approval must not depend on
-    that, so the server compares what is on disk with what was approved.
-
-    A changed solution (fields, steps, components, participants) reopens Gate
-    2; a changed package alone reopens Gate 3. Before Gate 3 is approved
-    nothing is compared: refining the PoC is what that gate's loop is for
-    (#96). Best-effort, like the rest of the sync. True when a gate was reopened.
-    """
-    if session.gate_statuses.get("gate_3") != "approved":
-        return False
-    now = _approved_content(session)
-    if now is None:
-        return False
-    approved = session.session_metadata.get(session_service.APPROVED_CONTENT_KEY)
-    if not isinstance(approved, dict):
-        # A session approved before this was kept: start from what is there now.
-        session_service.update_session(
-            db, session, SessionUpdate(metadata={session_service.APPROVED_CONTENT_KEY: now})
-        )
-        return False
-    if approved.get("solution") != now["solution"]:
-        gate_key = "gate_2"
-    elif approved.get("package_scheme") != now["package_scheme"]:
-        # Approved under a digest that covered fewer files: it differs from
-        # today's for a package nobody changed. Start from the package as it is,
-        # as for a session approved before this was kept.
-        session_service.update_session(
-            db, session, SessionUpdate(metadata={session_service.APPROVED_CONTENT_KEY: now})
-        )
-        return False
-    elif approved.get("package") != now["package"]:
-        gate_key = "gate_3"
-    else:
-        return False
-    try:
-        session_service.reopen_gate(db, session, gate_key, by="change")
-    except session_service.GateNotReopenableError:
-        return False
-    logger.info("session %s: %s reopened, its approved content changed", session.id, gate_key)
-    return True
 
 
 @router.post("/{session_id}/gates/{gate}/reopen", response_model=SessionDetailResponse)

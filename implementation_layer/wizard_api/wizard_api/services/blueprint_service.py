@@ -189,3 +189,18 @@ def get_previous_draft_version(db: Session, session: WizardSession) -> Blueprint
         .limit(1)
     )
     return db.scalars(stmt).first()
+
+
+def backfill_active_draft(db: Session, session: WizardSession, draft: dict) -> bool:
+    """Store ``draft`` on the active version when it carries none; True when stored.
+
+    Versions saved before migration 003 have no draft. The first edit of such a
+    session writes over the agent's file, and without this the version before
+    the edit would hold no copy of it to go back to. Called only on an edit,
+    inside its transaction: sessions nobody edits are left as they are.
+    """
+    active = get_active_version(db, session)
+    if active is None or active.draft is not None:
+        return False
+    active.draft = draft
+    return True

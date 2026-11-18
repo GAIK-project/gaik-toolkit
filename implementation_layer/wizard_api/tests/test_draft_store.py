@@ -104,3 +104,18 @@ def test_a_symlinked_derived_file_is_not_followed(tmp_path) -> None:
     assert outside.read_text(encoding="utf-8") == "keep me"
     assert os.path.islink(session / WORKFLOW_MMD_FILE)
     assert (session / WORKFLOW_BPMN_FILE).is_file()  # the other file is still refreshed
+
+
+def test_restore_puts_back_what_the_snapshot_took(tmp_path) -> None:
+    draft = tmp_path / DRAFT_BLUEPRINT_FILE
+    draft.write_bytes(b'{"agent": "wrote this"}')
+    taken = draft_store.snapshot(str(tmp_path))
+
+    draft_store.write_draft(str(tmp_path), _blueprint())
+    draft_store.refresh_derived_files(str(tmp_path), _blueprint())
+    draft_store.restore(str(tmp_path), taken)
+
+    assert draft.read_bytes() == b'{"agent": "wrote this"}'
+    # Not there before the edit, so not there after it was undone.
+    assert not (tmp_path / WORKFLOW_BPMN_FILE).exists()
+    assert not (tmp_path / WORKFLOW_MMD_FILE).exists()

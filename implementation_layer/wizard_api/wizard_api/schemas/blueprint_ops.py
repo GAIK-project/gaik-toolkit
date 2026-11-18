@@ -12,9 +12,13 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from wizard_api.schemas.blueprint import SessionDetailResponse
+
 StepType = Literal["user_task", "automated_task", "human_review"]
 
 MAX_OPERATIONS = 50
+#: The largest request body the operations route reads: 50 operations fit with room.
+MAX_REQUEST_BYTES = 64 * 1024
 MAX_NAME_CHARS = 200
 MAX_DESCRIPTION_CHARS = 2000
 
@@ -92,3 +96,12 @@ class OperationsRequest(BaseModel):
 
     base_version: int
     operations: list[Operation] = Field(min_length=1, max_length=MAX_OPERATIONS)
+
+
+class OperationsResponse(BaseModel):
+    """The session after the edit, and what the edit left for the agent to complete."""
+
+    session: SessionDetailResponse
+    warnings: list[str]
+    needs_attention: list[str]
+    bpmn_changed: bool
