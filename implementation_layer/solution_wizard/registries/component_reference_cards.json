@@ -937,7 +937,15 @@
         "default": null,
         "effect": "Per-connection hnsw.iterative_scan ('relaxed_order', 'strict_order' or 'off'; pgvector 0.8+). Without it, a search with a selective filters argument can return fewer rows than asked, or none: the HNSW index picks its nearest candidates first and the filter is applied afterwards. Measured: 0 of 20 rows on a 20,000-row table where 40 rows matched, 20 of 20 with 'relaxed_order'.",
         "selection_relevant": true,
-        "infer_from": "searches pass filters (per-tenant, per-document, per-category retrieval) -> 'relaxed_order'; unfiltered search -> leave None"
+        "infer_from": "searches pass filters (per-tenant, per-document, per-category retrieval) -> 'relaxed_order'; unfiltered search -> leave None; with owner set it defaults to relaxed_order"
+      },
+      {
+        "name": "owner",
+        "type": "str | None",
+        "default": null,
+        "effect": "A user or session id. Rows added are recorded for it (metadata gaik_owner), and every search_*(), count() and delete() sees only that owner's rows, whatever the filters say; several owners can share one table. Sets hnsw_iterative_scan='relaxed_order' unless given (pgvector 0.8+), since the owner filters every HNSW search. health() and relemmatize() stay table-wide. Without it every caller reads the whole table, add() refuses metadata naming an owner and delete() removes any owner's rows. A filter in gaik, not database access control: any other client of the table reads every row.",
+        "selection_relevant": true,
+        "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ]
   },
@@ -1781,6 +1789,14 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "owner",
+        "type": "str | None",
+        "default": null,
+        "effect": "A user or session id. Documents indexed are recorded for it (metadata gaik_owner), and ask() retrieves only that owner's documents, also from a collection or folder other owners share (Chroma or in memory). A filter in gaik, not access control. The conversation history is kept on the workflow object, so create one RAGWorkflow per user or session.",
+        "selection_relevant": true,
+        "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ],
     "note": "End-to-end module: embeds, stores in an internal Chroma VectorStore, retrieves, and answers. Do NOT also add Embedder / Retriever / AnswerGenerator as separate steps. PgVectorStore is a separate PostgreSQL component and is not subsumed by this module."
@@ -3085,6 +3101,14 @@
         "effect": "Chroma collection name when persist=True; use one name per knowledge base so indexes do not mix.",
         "selection_relevant": false,
         "infer_from": "several knowledge bases in one persist_path -> one collection_name each"
+      },
+      {
+        "name": "owner",
+        "type": "str | None",
+        "default": null,
+        "effect": "A user or session id. Chunks added are recorded for it (metadata gaik_owner), and search() and count() see only that owner's chunks, whatever the filters say; several owners can share one collection or folder. A filter in gaik, not access control: any other client of the folder reads every chunk. Without it every caller of the collection reads every chunk, and add() refuses metadata that already names an owner.",
+        "selection_relevant": true,
+        "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ],
     "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. Since gaik 0.11.0, a persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored."
