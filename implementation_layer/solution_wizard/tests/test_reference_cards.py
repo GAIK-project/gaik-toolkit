@@ -29,6 +29,15 @@ def test_data_extractor_example_provides_its_required_blueprint_parameters():
     assert set(entry["required_parameters"]) <= set(example.get("parameters", {}))
 
 
+def test_postgres_agent_example_provides_its_required_blueprint_parameters():
+    entry = get_registry().lookup_by_name("PostgresAgent")
+    example = entry["example_blueprint_steps"][0]
+
+    assert set(entry["required_parameters"]) <= set(example.get("parameters", {}))
+    # The connection string carries a password, so the example reads it from the environment.
+    assert example["parameters"]["connection_string"].startswith("env:")
+
+
 def test_card_required_keys_present():
     cards = get_reference_cards()
     for name in cards.names():

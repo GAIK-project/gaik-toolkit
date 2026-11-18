@@ -29,7 +29,24 @@ try:
     from utils.log_names import file_tag
 except ImportError:
     from api.utils.log_names import file_tag
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+try:
+    from utils.result_owner import (
+        current_user,
+        forget_owner,
+        owned_by,
+        remember_owner,
+        require_owner,
+    )
+except ImportError:
+    from api.utils.result_owner import (
+        current_user,
+        forget_owner,
+        owned_by,
+        remember_owner,
+        require_owner,
+    )
 from pydantic import BaseModel, Field
 
 try:
@@ -235,6 +252,7 @@ async def tabular_agent_status():
 async def upload_file(
     file: UploadFile = File(...),
     layout_inference: str = Form("auto"),
+    user: str = Depends(current_user),
 ):
     """Load a spreadsheet and return its profiled schema plus a session id."""
     if not file.filename:
@@ -290,6 +308,7 @@ async def upload_file(
         ) from e
 
     session_id = uuid.uuid4().hex
+    remember_owner(session_id, user)
     session = {
         "agent": agent,
         "dir": session_dir,
@@ -319,8 +338,8 @@ async def upload_file(
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask_question(req: AskRequest):
-    """Answer a natural-language question against an uploaded file."""
+async def ask_question(req: AskRequest, user: str = Depends(current_user)):
+    """Answer a natural-language question against an uploaded file, for its owner only."""
     question = (req.question or "").strip()
     if not question:
         raise HTTPException(status_code=400, detail="Question must not be empty.")
@@ -328,7 +347,7 @@ async def ask_question(req: AskRequest):
     llm_configured = bool(os.getenv("AZURE_API_KEY") or os.getenv("OPENAI_API_KEY"))
     async with _SESSIONS_LOCK:
         _evict_locked(time.time())
-        session = _SESSIONS.get(req.session_id)
+        session = _SESSIONS.get(req.session_id) if owned_by(req.session_id, user) else None
         if session is not None and llm_configured:
             # From here to the ``finally`` below the session cannot be evicted.
             session["busy"] += 1
@@ -354,10 +373,12 @@ async def ask_question(req: AskRequest):
 
 
 @router.delete("/session/{session_id}")
-async def end_session(session_id: str):
-    """Drop a session and delete its uploaded file."""
+async def end_session(session_id: str, user: str = Depends(current_user)):
+    """Drop a session and delete its uploaded file, for its owner only."""
+    require_owner(session_id, user, "Session not found.")
     async with _SESSIONS_LOCK:
         session = _SESSIONS.pop(session_id, None)
+    forget_owner(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found.")
     if session["busy"]:
