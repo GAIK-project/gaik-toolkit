@@ -846,28 +846,35 @@ class Handler(BaseHTTPRequestHandler):
         """The request's body, refused when it does not arrive in time.
 
         It holds the one run while it arrives (see ``_post``), so it is read a
-        piece at a time against :data:`BODY_TIMEOUT_SECONDS`, and the connection's
-        own timeout ends a wait for a piece that does not come.
+        piece at a time against :data:`BODY_TIMEOUT_SECONDS`: no wait for a piece
+        lasts past that deadline, and a body that ends after it is refused.
         """
         deadline = time.monotonic() + BODY_TIMEOUT_SECONDS
         pieces: list[bytes] = []
         remaining = length
         try:
             while remaining > 0:
-                if time.monotonic() > deadline:
+                left = deadline - time.monotonic()
+                if left <= 0:
                     raise TimeoutError
-                # read1: at most one read from the connection, so the deadline is
-                # looked at between them however slowly the bytes come.
+                # read1: at most one read from the connection, which waits no longer
+                # than the time left, however slowly the bytes come.
+                self.connection.settimeout(min(self.timeout, left))
                 piece = self.rfile.read1(min(remaining, 1024 * 1024))
                 if not piece:
                     break
                 pieces.append(piece)
                 remaining -= len(piece)
+            if time.monotonic() > deadline:
+                raise TimeoutError
         except TimeoutError:
             self.close_connection = True
             raise RefusalError(
                 408, "too_slow", "The files did not arrive in time. Send them again."
             ) from None
+        finally:
+            # The answer is written with the connection's own timeout again.
+            self.connection.settimeout(self.timeout)
         return b"".join(pieces)
 
     def _skip(self, length: int) -> None:
