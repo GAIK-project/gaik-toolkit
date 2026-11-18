@@ -107,7 +107,7 @@ _DEFAULT_MODELS = (
     ("gpt", "gpt-6.1-sol", True),
     ("gpt", "gpt-6-astra", True),
     ("claude", "claude-haiku-5-5", False),
-    ("claude", "claude-sonnet-5-5", True),
+    ("claude", "claude-sonnet-5-5", False),
     ("claude", "claude-opus-5-5", True),
     ("gemini", "gemini-3.8-flash", False),
     ("gemini", "gemini-4-argon", True),

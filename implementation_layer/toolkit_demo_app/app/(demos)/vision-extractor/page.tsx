@@ -825,7 +825,6 @@ export default function VisionExtractorPage() {
           {result && !isLoading && (
             <ResultView
               results={[result.data]}
-              defaultTab={result.sources ? "sources" : "readable"}
               documentCount={result.documents_processed}
               seconds={result.duration_s}
               detail={result.model}
