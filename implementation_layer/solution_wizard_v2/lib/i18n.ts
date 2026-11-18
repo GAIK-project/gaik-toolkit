@@ -22,6 +22,8 @@ export const LOGIN_MESSAGE_CODES = ["signed-up"] as const;
 export type LoginMessageCode = (typeof LOGIN_MESSAGE_CODES)[number];
 
 export type Dict = {
+  /** The dictionary's own language. */
+  locale: Locale;
   appName: string;
   signOut: string;
 
@@ -469,6 +471,38 @@ export type Dict = {
   wsJsonInvalidDraft: string;
   /** A full save refused for a section only the wizard writes (readonly_section): "{field}". */
   wsJsonReadonlySection: string;
+  // ==== full blueprint view (components/full-blueprint-view) ====
+  bpViewLabel: string;
+  /** The Blueprint tab's two views: the form and its read view of the steps, and the whole draft. */
+  bpViewSteps: string;
+  bpViewFull: string;
+  fullBpLoading: string;
+  /** Without wizard_api (mock mode) there is no full draft to show. */
+  fullBpNeedsApi: string;
+  fullBpNoDraft: string;
+  fullBpLoadError: string;
+  fullBpDownload: string;
+  fullBpAdvanced: string;
+  fullBpEditorLabel: string;
+  /** Beside a section only the wizard writes. */
+  fullBpReadonly: string;
+  fullBpEditHelp: string;
+  fullBpSave: string;
+  fullBpCancel: string;
+  /** "{line}", "{column}": where the JSON goes wrong. */
+  fullBpParseError: string;
+  fullBpNotObject: string;
+  /** "{field}" in plain words (fieldName), "{message}" the server's. */
+  fullBpRefused: string;
+  fullBpChangedElsewhere: string;
+  fullBpReload: string;
+  fullBpKeepEditing: string;
+  /** After "keep editing" over a newer draft: what the next save does. */
+  fullBpKeptEditing: string;
+  fullBpAgentBusy: string;
+  fullBpUnchanged: string;
+  /** Over the server's warnings and what the wizard completes after a save. */
+  fullBpAttention: string;
   wsFormName: string;
   wsFormDescription: string;
   wsFormSteps: string;
@@ -922,6 +956,7 @@ export type Dict = {
 };
 
 const fi: Dict = {
+  locale: "fi",
   appName: "GAIK Solution Wizard",
   signOut: "Kirjaudu ulos",
 
@@ -1336,6 +1371,30 @@ const fi: Dict = {
   wsJsonChangedElsewhere: "Blueprint muuttui muualla, kun muutoksesi olivat vielä tallentamatta.",
   wsJsonInvalidDraft: "Ei tallennettu: blueprint ei ole kelvollinen kohdassa {field}.",
   wsJsonReadonlySection: "Ei tallennettu: osiota {field} ylläpitää wizard, eikä sitä voi muokata täällä.",
+  bpViewLabel: "Blueprintin näkymä",
+  bpViewSteps: "Työnkulun vaiheet",
+  bpViewFull: "Koko blueprint",
+  fullBpLoading: "Ladataan blueprintia…",
+  fullBpNeedsApi: "Koko blueprint näkyy, kun wizardin palvelin on käytössä. Tässä tilassa sitä ei ole.",
+  fullBpNoDraft: "Blueprintia ei ole vielä. Se näkyy täällä, kun wizard on kirjoittanut sen.",
+  fullBpLoadError: "Blueprintia ei saatu ladattua.",
+  fullBpDownload: "Lataa JSON",
+  fullBpAdvanced: "Edistynyt: muokkaa JSONia",
+  fullBpEditorLabel: "Blueprint JSON-muodossa",
+  fullBpReadonly: "vain luku",
+  fullBpEditHelp: "Varjostettuja osioita ylläpitää wizard, eikä niitä voi muokata. Muutos tallentuu, kun painat Tallenna.",
+  fullBpSave: "Tallenna",
+  fullBpCancel: "Peruuta",
+  fullBpParseError: "Ei tallennettu: JSON ei ole kelvollinen rivillä {line}, sarakkeessa {column}.",
+  fullBpNotObject: "Ei tallennettu: blueprintin pitää olla JSON-olio ({ … }).",
+  fullBpRefused: "Ei tallennettu: {field}: {message}",
+  fullBpChangedElsewhere: "Blueprint muuttui muualla, eikä muutostasi tallennettu. Tekstisi on yhä editorissa.",
+  fullBpReload: "Lataa uudempi versio (hylkää muutokseni)",
+  fullBpKeepEditing: "Jatka muokkausta",
+  fullBpKeptEditing: "Seuraava tallennus korvaa uudemman version tekstilläsi. Wizardin ylläpitämät osiot otetaan uudemmasta versiosta.",
+  fullBpAgentBusy: "Wizard kirjoittaa vastausta. Tallenna uudelleen, kun se on valmis; tekstisi on tallessa.",
+  fullBpUnchanged: "Ei muutoksia tallennettavaksi.",
+  fullBpAttention: "Wizard täydentää nämä seuraavassa vastauksessaan:",
   wsFormName: "Nimi",
   wsFormDescription: "Kuvaus",
   wsFormSteps: "Prosessin vaiheet",
@@ -1834,6 +1893,7 @@ const fi: Dict = {
 };
 
 const en: Dict = {
+  locale: "en",
   appName: "GAIK Solution Wizard",
   signOut: "Sign out",
 
@@ -2248,6 +2308,30 @@ const en: Dict = {
   wsJsonChangedElsewhere: "The blueprint changed elsewhere while your changes were not saved yet.",
   wsJsonInvalidDraft: "Not saved: the blueprint is not valid at {field}.",
   wsJsonReadonlySection: "Not saved: the {field} section is kept by the wizard and cannot be edited here.",
+  bpViewLabel: "Blueprint view",
+  bpViewSteps: "Workflow steps",
+  bpViewFull: "Full blueprint",
+  fullBpLoading: "Loading the blueprint…",
+  fullBpNeedsApi: "The full blueprint is shown when the wizard's server is in use. It is not in this mode.",
+  fullBpNoDraft: "There is no blueprint yet. It is shown here once the wizard has written it.",
+  fullBpLoadError: "The blueprint could not be loaded.",
+  fullBpDownload: "Download JSON",
+  fullBpAdvanced: "Advanced: edit JSON",
+  fullBpEditorLabel: "The blueprint as JSON",
+  fullBpReadonly: "read-only",
+  fullBpEditHelp: "The shaded sections are kept by the wizard and cannot be edited. Your change is saved when you press Save.",
+  fullBpSave: "Save",
+  fullBpCancel: "Cancel",
+  fullBpParseError: "Not saved: the JSON is not valid at line {line}, column {column}.",
+  fullBpNotObject: "Not saved: the blueprint must be a JSON object ({ … }).",
+  fullBpRefused: "Not saved: {field}: {message}",
+  fullBpChangedElsewhere: "The blueprint changed elsewhere, so your change was not saved. Your text is still in the editor.",
+  fullBpReload: "Load the newer version (discard my changes)",
+  fullBpKeepEditing: "Keep editing",
+  fullBpKeptEditing: "Your next save replaces the newer version with your text. The sections the wizard keeps are taken from the newer version.",
+  fullBpAgentBusy: "The wizard is replying. Save again once it is done; your text is kept.",
+  fullBpUnchanged: "Nothing changed to save.",
+  fullBpAttention: "The wizard completes these in its next reply:",
   wsFormName: "Name",
   wsFormDescription: "Description",
   wsFormSteps: "Process steps",

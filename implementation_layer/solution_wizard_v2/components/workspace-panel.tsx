@@ -81,6 +81,7 @@ import {
 import { shouldShowBpmnSpike } from "@/lib/bpmn-spike";
 import { bpmnDataObjectsQuery, readBpmnShowData, saveBpmnShowData } from "@/lib/bpmn-show-data";
 import { BlueprintJsonEditor } from "@/components/blueprint-json-editor";
+import { FullBlueprintView } from "@/components/full-blueprint-view";
 import { isSeedBlueprint } from "@/lib/blueprint-goal";
 import { SolutionPlanView } from "@/components/solution-plan-view";
 import { AskStepButton, StepNumber, StepTypeTag, stepTypeLabels } from "@/components/step-type";
@@ -851,6 +852,9 @@ export function WorkspacePanel({
   // after "Done", so a draft not yet saved is still there on the next "Edit".
   const [blueprintEditing, setBlueprintEditing] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
+  // The tab's two views: "Workflow steps" (the plan and its form) and "Full
+  // blueprint" (the whole draft, components/full-blueprint-view).
+  const [blueprintView, setBlueprintView] = useState<"steps" | "full">("steps");
   // The form holds a draft it cannot save (an unnamed step, JSON that does not
   // parse, a failed save, a newer version to choose over). Behind the read
   // view that draft was out of sight and the read view showed the old
@@ -863,7 +867,11 @@ export function WorkspacePanel({
   useEffect(() => {
     // The note beside "Done" says why the form is open: it was brought back.
     setDoneRefused(formStuck && !blueprintEditingRef.current);
-    if (formStuck) setBlueprintEditing(true);
+    if (formStuck) {
+      setBlueprintEditing(true);
+      // The form is in the "Workflow steps" view: it is brought back there.
+      setBlueprintView("steps");
+    }
   }, [formStuck]);
   // "Generate again" in the package details asks first: it replaces the package.
   const [regenConfirm, setRegenConfirm] = useState(false);
@@ -3065,6 +3073,30 @@ export function WorkspacePanel({
     </BlueprintModeBar>
   );
   const pocLockedNoteId = `${baseId}-poc-locked`;
+  const blueprintViewButton = (key: "steps" | "full", icon: IconName, label: string) => (
+    <button
+      type="button"
+      aria-pressed={blueprintView === key}
+      onClick={() => setBlueprintView(key)}
+      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${
+        blueprintView === key ? "bg-surface text-text-strong shadow-xs" : "text-text-muted hover:text-text"
+      }`}
+      data-testid={`blueprint-view-${key}`}
+    >
+      <Icon name={icon} size={14} />
+      {label}
+    </button>
+  );
+  const blueprintViewSwitch = (
+    <div
+      role="group"
+      aria-label={t.bpViewLabel}
+      className="mb-3 inline-flex rounded-lg border border-border bg-surface-muted p-0.5"
+    >
+      {blueprintViewButton("steps", "listChecks", t.bpViewSteps)}
+      {blueprintViewButton("full", "fileBraces", t.bpViewFull)}
+    </div>
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -3175,11 +3207,26 @@ export function WorkspacePanel({
 
             {key === "json" && (
               <>
-                {!blueprintEditing && (
+                {blueprintViewSwitch}
+                {blueprintView === "full" && (
+                  <FullBlueprintView
+                    sessionId={sessionId}
+                    version={activeVersion}
+                    t={t}
+                    onSaved={({ blueprint: saved, version, bpmnChanged }) => {
+                      if (saved) takeOwnBlueprint(saved);
+                      takeOwnVersion(version);
+                      if (bpmnChanged) setBpmnRefreshKey((k) => k + 1);
+                      noteBlueprintSaved("save");
+                    }}
+                  />
+                )}
+                {blueprintView === "steps" && !blueprintEditing && (
                   <SolutionPlanView blueprint={blueprint} outputFields={outputFields} t={t} note={readBar} />
                 )}
                 {editorMounted && (
-                  <div className={blueprintEditing ? "" : "hidden"}>
+                  // Kept mounted under the other view: a draft the form has not saved stays.
+                  <div className={blueprintEditing && blueprintView === "steps" ? "" : "hidden"}>
                     <div>
                       <BlueprintJsonEditor
                         control={
