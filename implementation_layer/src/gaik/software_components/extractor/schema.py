@@ -232,19 +232,23 @@ def _schema_effort(
     """
     if reasoning_effort is not None or temperature is None:
         return reasoning_effort
-    # A provider adapter keeps its own config, which may set the effort or the
-    # family of a deployment alias; the config passed in wins over it.
-    adapter = isinstance(client, ProviderClient)
-    client_config = getattr(client, "_config", None) if adapter else None
-    settings = {**(client_config if isinstance(client_config, dict) else {}), **(config or {})}
+    if isinstance(client, ProviderClient):
+        # An adapter builds the request from its own config, which may set the
+        # effort or the family of a deployment alias; decide on that config.
+        adapter_config = getattr(client, "_config", None)
+        settings = adapter_config if isinstance(adapter_config, dict) else config or {}
+        provider = client.provider
+    else:
+        settings = config or {}
+        provider = settings.get("provider")
     if settings.get("reasoning_effort") is not None:
         return None
-    provider = client.provider if adapter else settings.get("provider")
+    accepted = _accepts_effort_none(model, settings)
     if provider == "litellm":
-        # LiteLLM checks "none" against the routed name, so an alias such as
-        # azure/gpt-6-luna-prod is refused before the request, model_family or not.
-        settings.pop("model_family", None)
-    return "none" if _accepts_effort_none(model, settings) else None
+        # LiteLLM also checks "none" against the routed name and refuses an alias
+        # such as azure/gpt-6-luna-prod before the request: both must accept it.
+        accepted = accepted and _accepts_effort_none(model)
+    return "none" if accepted else None
 
 
 # -----------------------------------------------------------------------------

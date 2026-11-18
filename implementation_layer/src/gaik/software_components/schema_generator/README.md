@@ -47,8 +47,8 @@ sometimes kept only the first field of a task. The structure detection call keep
 the model's default: without reasoning it often ignored a list name the task
 gave. An effort in the call or in the config is sent as given to every call.
 Other models get no effort, including GPT-6 Astra, gpt-6-rosalind and gpt-6.x,
-which reject `"none"`. Through LiteLLM the routed name decides, since LiteLLM
-refuses `"none"` for a name it does not know.
+which reject `"none"`. Through LiteLLM both the routed name and `model_family`
+must be on that list, since LiteLLM refuses `"none"` for a name it does not know.
 
 To have a reasoning model reason, omit the temperature from the provider request
 and set an appropriate reasoning effort:

@@ -446,16 +446,37 @@ class TestSchemaGenerationIsDeterministicWhereTheModelAllows:
         [
             ("azure/gpt-6-luna-prod", {"model_family": "gpt-6-luna"}),
             ("openai/gpt-6-rosalind", None),
+            ("azure/gpt-6-luna", {"model_family": "gpt-6-astra"}),
         ],
     )
-    def test_litellm_gets_no_none_for_a_name_it_would_refuse(self, model, config):
-        # LiteLLM checks "none" against the routed name and refuses these before any
-        # request, so the parse sends no effort, as before.
+    def test_litellm_gets_no_none_unless_route_and_family_accept_it(self, model, config):
+        # LiteLLM checks "none" against the routed name and gaik against model_family;
+        # either refusal stops the request, so the parse sends no effort, as before.
         from gaik.software_components.extractor.schema import parse_user_requirements
 
         client = _RecordingProvider("litellm", model, config)
         parse_user_requirements("Extract `po_number`.", client=client, model=model)
         assert "reasoning_effort" not in client.calls[0]
+
+    def test_litellm_gets_none_when_route_and_family_accept_it(self):
+        from gaik.software_components.extractor.schema import parse_user_requirements
+
+        client = _RecordingProvider("litellm", "azure/gpt-6-luna", {"model_family": "gpt-6-luna"})
+        parse_user_requirements("Extract `po_number`.", client=client, model="azure/gpt-6-luna")
+        assert client.calls[0] == {"temperature": 0.0, "reasoning_effort": "none"}
+
+    def test_adapter_effort_wins_over_a_passed_config_without_one(self):
+        # The adapter sends with its own config, so its effort is the one that counts.
+        from gaik.software_components.extractor.schema import parse_user_requirements
+
+        client = _RecordingProvider("aitta", "gpt-6-luna", {"reasoning_effort": "high"})
+        parse_user_requirements(
+            "Extract `po_number`.",
+            client=client,
+            model="gpt-6-luna",
+            config={"provider": "aitta", "reasoning_effort": None},
+        )
+        assert client.calls[0] == {"reasoning_effort": "high"}
 
     def test_provider_adapter_config_effort_wins(self):
         from gaik.software_components.extractor.schema import parse_user_requirements
