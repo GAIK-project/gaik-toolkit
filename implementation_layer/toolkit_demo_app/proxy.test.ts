@@ -586,3 +586,63 @@ test("a video's playback link is handed out to a signed-in user only", async () 
   expect(backendHeaders?.has("x-gaik-signed-in")).toBe(false);
   expect(backendCalls).toBe(2);
 });
+
+// Upload limits (lib/upload-limits.ts): /api/parse takes 22 MiB in all. A body
+// is refused by its declared length before any of it is read, and otherwise at
+// the first chunk past the limit; the backend sees neither.
+
+const MIB = 1024 * 1024;
+
+function upload(chunks: number, size: number, declared?: number) {
+  const seen = { pulled: 0 };
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        if (seen.pulled === chunks) return controller.close();
+        seen.pulled += 1;
+        controller.enqueue(new Uint8Array(size));
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const headers = new Headers({
+    cookie: sessionCookie("r1", fresh()),
+    "content-type": "multipart/form-data; boundary=x",
+  });
+  if (declared !== undefined) headers.set("content-length", String(declared));
+  const request = new NextRequest("https://demo.test/api/parse", {
+    method: "POST",
+    headers,
+    body,
+    duplex: "half",
+  } as ConstructorParameters<typeof NextRequest>[1]);
+  return { request, seen };
+}
+
+test("an upload that declares more than its route takes is refused before it is read", async () => {
+  const { request, seen } = upload(30, MIB, 30 * MIB);
+  const response = await proxy(request);
+  expect(response.status).toBe(413);
+  expect(await response.json()).toEqual({
+    error: "File too large. Maximum size is 20MB",
+    detail: "File too large. Maximum size is 20MB",
+  });
+  expect(seen.pulled).toBe(0);
+  expect(backendCalls).toBe(0);
+});
+
+test("an upload without a declared length is refused once it passes its route's limit", async () => {
+  const { request, seen } = upload(30, MIB);
+  const response = await proxy(request);
+  expect(response.status).toBe(413);
+  expect(seen.pulled).toBe(23);
+  expect(backendCalls).toBe(0);
+});
+
+test("an upload within its route's limit is forwarded whole", async () => {
+  const { request } = upload(3, MIB);
+  const response = await proxy(request);
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(backendHeaders?.get("content-length")).toBe(String(3 * MIB));
+});

@@ -1,5 +1,6 @@
 // What the Vision Extractor demo works with: the file types it accepts, and
 // ready-made documents with a matching extraction task.
+import { bodyLimitFor } from "@/lib/upload-limits";
 
 export const ACCEPTED_EXTENSIONS = [
   ".pdf",
@@ -12,6 +13,8 @@ export const ACCEPTED_EXTENSIONS = [
   ".bmp",
 ];
 export const MAX_FILE_MB = 20;
+/** Files one extraction request may carry (api/upload_limits.json). */
+export const MAX_FILES = bodyLimitFor("/extract-vision").maxFiles;
 
 export interface ExampleFile {
   url: string;
