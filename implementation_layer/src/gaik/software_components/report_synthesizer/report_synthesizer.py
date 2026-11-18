@@ -133,8 +133,10 @@ class ReportSynthesizer:
             sections: The report sections in report order.
             title: The report title.
             language: The language the sections are written in.
-            instructions: Report-level rules: source hierarchy, missing data, citation
-                style. They go to every writer and to the reviewer checks.
+            instructions: Report-level rules: wording per kind of source, missing data,
+                citation style. They go to every writer and to the reviewer checks.
+                Which side of a conflict a section follows comes from the knowledge
+                (the curator's ``source_precedence``), not from these rules.
             sample_report: A Markdown sample report, given to the writers as a format
                 reference for structure, length and tone only. The reviewer never sees it.
             progress_callback: Called with a status line as each section is written,

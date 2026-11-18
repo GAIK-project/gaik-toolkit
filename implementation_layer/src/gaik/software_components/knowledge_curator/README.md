@@ -132,11 +132,13 @@ The model records that sources disagree and describes each side; it does not dec
 side the report follows. The curator decides that in code from `source_precedence`:
 
 - A conflict is `resolved` when every unit's `source_class` is in `source_precedence` and
-  exactly one unit has the highest-ranked class among them. `preferred_unit_ids` names
+  exactly one unit has the highest-ranked class among them, and that unit is not of `low`
+  confidence. `preferred_unit_ids` names
   that unit and `resolved_by` its class; the writer follows it.
 - It is `unresolved` when two or more units share the top class (they may disagree with
-  each other), when the units share one class, when a class is not in
-  `source_precedence`, or when there is no `source_precedence`. The writer gives both
+  each other), when the top unit has `low` confidence (its source is itself unsure), when
+  the units share one class, when a class is not in `source_precedence`, or when there is
+  no `source_precedence`. The writer gives both
   sides, marked `Unresolved:`, for a person to settle.
 - A rule the classes cannot express, such as a newer document over an older one, is
   settled by a person: set `status`, `preferred_unit_ids` and `resolved_by` in the

@@ -311,7 +311,8 @@ def _decide(
     one unit has the highest-ranked class among them: that unit is the side the report
     follows. Two units of the top class may disagree with each other, so they leave the
     conflict unresolved, as do units of one class only, a class the precedence does not
-    name, or no precedence at all: a person decides.
+    name, or no precedence at all: a person decides. So does a top unit of ``low``
+    confidence, a source that is itself unsure: the class does not make it right.
     """
     if not source_precedence:
         return "unresolved", [], None
@@ -322,6 +323,8 @@ def _decide(
     top = min(classes, key=rank.__getitem__)
     preferred = [u.id for u in units if u.source_class == top]
     if len(preferred) != 1 or len(units) < 2:
+        return "unresolved", [], None
+    if next(u for u in units if u.source_class == top).confidence == "low":
         return "unresolved", [], None
     return "resolved", preferred, top
 

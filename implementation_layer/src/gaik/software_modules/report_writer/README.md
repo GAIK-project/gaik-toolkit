@@ -88,7 +88,8 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
       "depends_on": ["building_services"]
     }
   ],
-  "instructions": "Site recordings are primary sources and outrank the documents.",
+  "instructions": "Narrate site recordings as observations; attribute document content.",
+  "source_precedence": ["primary", "secondary"],
   "sources": {
     "primary": ["inputs/rec3_building_services.mp3"],
     "secondary": ["inputs/renovation_report_1998.pdf", "inputs/maintenance_log.xlsx"]
@@ -124,7 +125,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `required_items` | Items a section must cover; each one no source covers becomes `(missing: <item>)` |
 | `depends_on` | Makes a section *derived*: it has no knowledge file and is written from the reviewed texts of these sections |
 | `instructions` | Rules for every section: how each kind of source is worded, citation style, tone |
-| `source_precedence` | Optional source classes, highest first, e.g. `["primary", "secondary"]`. A conflict is resolved in code only when exactly one of its units has the highest-ranked class; without it every conflict is `Unresolved:` in the report (see the KnowledgeCurator README, Conflicts) |
+| `source_precedence` | Optional source classes, highest first, e.g. `["primary", "secondary"]`. A conflict is resolved in code only when exactly one of its units has the highest-ranked class and that unit is not of `low` confidence; without it every conflict is `Unresolved:` in the report (see the KnowledgeCurator README, Conflicts) |
 | `sources` | Files grouped by class, `primary` and/or `secondary`; file names must be unique |
 | `sample_report` | Optional report whose structure, length and tone the new report follows; never its facts |
 | `models` | Optional model or deployment name per step; `null` uses the model of the config |

@@ -75,7 +75,8 @@ class Conflict(BaseModel):
 
     The curator sets ``status`` in code, never from the model's answer: ``resolved`` only
     when ``source_precedence`` ranks one source class of the conflict's units above every
-    other class among them, and then ``preferred_unit_ids`` names the units of that class.
+    other class among them and that class's unit is not of ``low`` confidence, and then
+    ``preferred_unit_ids`` names the units of that class.
     A person can resolve a conflict by hand in the saved knowledge file the same way.
 
     A conflict marked ``resolved`` without ``preferred_unit_ids``, with an id that is not

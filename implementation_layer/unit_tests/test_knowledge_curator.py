@@ -923,6 +923,26 @@ def test_two_units_of_the_top_class_leave_the_conflict_unresolved(fake):
     assert (conflict.status, conflict.preferred_unit_ids) == ("unresolved", [])
 
 
+@pytest.mark.parametrize(("confidence", "status"), [("low", "unresolved"), ("medium", "resolved")])
+def test_an_unsure_top_source_leaves_the_conflict_unresolved(fake, confidence, status):
+    unsure_note = NOTE.model_copy(update={"confidence": confidence})
+    fake({"a": [_conflicting(DOC, unsure_note)]})
+
+    conflict = _one_conflict(None, source_precedence=["primary", "secondary"])
+
+    assert conflict.status == status
+    assert conflict.preferred_unit_ids == (["a-02"] if status == "resolved" else [])
+
+
+def test_an_unsure_lower_source_does_not_stop_the_top_one(fake):
+    unsure_doc = DOC.model_copy(update={"confidence": "low"})
+    fake({"a": [_conflicting(unsure_doc, NOTE)]})
+
+    conflict = _one_conflict(None, source_precedence=["primary", "secondary"])
+
+    assert (conflict.status, conflict.preferred_unit_ids) == ("resolved", ["a-02"])
+
+
 def test_a_number_in_the_time_qualifier_counts_only_if_the_source_has_it():
     unit = _summarised(
         "The system is 28 years old.",
