@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import time
+import unicodedata
 from typing import Literal
 
 from openai import APIError, APITimeoutError, RateLimitError
@@ -11,6 +13,7 @@ from pydantic import BaseModel, Field
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 LanguageHint = Literal["fi", "en"]
 
@@ -53,6 +56,58 @@ class LabelMapping(BaseModel):
     """LLM response schema."""
 
     entries: list[LabelEntry] = Field(default_factory=list)
+
+
+class CleanedLabel(BaseModel):
+    """The label a person sees, with the label the page itself gave the field.
+
+    The page's labels and HTML steer the names the model returns, so a field can be
+    shown as something it is not. Show ``original`` next to ``label`` when ``changed``
+    is true, so the person can tell what the page said.
+    """
+
+    id: str
+    label: str
+    """The cleaned label, at most 60 characters; the page's own label, cut to 60, when
+    the model returned none for the id."""
+    original: str
+    """The raw label as the page gave it, trimmed."""
+    changed: bool
+    """True when ``label`` has other words than ``original`` (case, spacing and
+    sentence punctuation aside). A page label only cut to 60 characters is not a
+    change; see ``truncated``."""
+    truncated: bool = False
+    """True when ``label`` is the page's own label cut to 60 characters: show
+    ``original`` too, since the cut may drop meaning."""
+
+
+MAX_LABEL_CHARS = 60
+_SENTENCE_PUNCTUATION = re.compile(r"[:;!?]|\.(?=\s|$)")
+
+
+def _visible(text: str) -> str:
+    """``text`` without invisible format characters (soft hyphens, bidi controls).
+
+    They are taken out of every label gaik returns, so the label a person sees is the
+    one that was compared: a bidi control could otherwise show words in another order.
+    """
+    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+
+
+def _words(text: str) -> str:
+    """``text`` without what a cleanup may change: case, spacing, sentence punctuation.
+
+    Only canonical Unicode differences are ignored (NFC), so a superscript or a ß stays
+    what it is, and only ``: ; ! ?`` and a sentence-ending ``.`` are dropped, so "1.000"
+    and "1,000", "-5" and "5", or a required-field ``*`` still differ.
+    """
+    text = _visible(unicodedata.normalize("NFC", text))
+    return " ".join(_SENTENCE_PUNCTUATION.sub(" ", text).split()).lower()
+
+
+def _same_words(a: str, b: str) -> bool:
+    """The same words, case, spacing and sentence punctuation aside ("Name:", "name")."""
+    return _words(a) == _words(b)
 
 
 def _with_retries(call, tries: int = 3):
@@ -99,8 +154,53 @@ class FormUnderstander:
 
         Unknown ids in the LLM response are dropped; empty labels are dropped;
         labels longer than 60 chars are truncated so the caller can rely on
-        a bounded payload size.
+        a bounded payload size. To show the page's own label beside the cleaned
+        one, use :meth:`describe_labels`.
         """
+        return self._clean(fields, language_hint)
+
+    def describe_labels(
+        self,
+        fields: list[dict] | list[InputField],
+        language_hint: LanguageHint | None = None,
+    ) -> list[CleanedLabel]:
+        """Each field's cleaned label next to the label the page gave it, in input order.
+
+        The page's labels and HTML steer the names the model returns, so a field can be
+        shown as something it is not. ``changed`` tells which labels the model rewrote;
+        show their ``original`` beside them. A field the model returned no label for
+        keeps its page label (``changed`` false).
+        """
+        safe_fields = [f if isinstance(f, InputField) else InputField(**f) for f in fields]
+        ids = [f.id for f in safe_fields]
+        repeated = sorted({i for i in ids if ids.count(i) > 1})
+        if repeated:
+            # The model answers per id, so two fields with one id would get one label.
+            raise ValueError(f"field ids must be unique; repeated: {repeated}")
+        cleaned = self._clean(safe_fields, language_hint)
+        described = []
+        for f in safe_fields:
+            original = _visible(f.raw).strip()
+            label = cleaned.get(f.id, original[:MAX_LABEL_CHARS])
+            truncated = len(original) > MAX_LABEL_CHARS and _same_words(
+                label, original[:MAX_LABEL_CHARS]
+            )
+            described.append(
+                CleanedLabel(
+                    id=f.id,
+                    label=label,
+                    original=original,
+                    changed=not (_same_words(label, original) or truncated),
+                    truncated=truncated,
+                )
+            )
+        return described
+
+    def _clean(
+        self,
+        fields: list[dict] | list[InputField],
+        language_hint: LanguageHint | None,
+    ) -> dict[str, str]:
         safe_fields: list[InputField] = []
         for f in fields:
             if isinstance(f, InputField):
@@ -109,30 +209,28 @@ class FormUnderstander:
                 safe_fields.append(InputField(**f))
         if not safe_fields:
             return {}
+        if language_hint not in (None, "fi", "en"):
+            raise ValueError(f"language_hint must be 'fi', 'en' or None, not {language_hint!r}")
 
-        # Compose the user message. System prompt ships as-is; the user
-        # message contains the language hint (if any) plus a compact listing
-        # of the fields.
+        # The labels and HTML come from the page, so the listing goes in a data block,
+        # apart from the rules; the language hint is the caller's and stays outside.
         lines: list[str] = []
-        if language_hint:
-            lines.append(f"Output language hint: {language_hint}.")
-        lines.append("Fields:")
         for f in safe_fields:
             chunks = [f"- id={f.id!r}", f"label={f.raw!r}"]
             if f.type:
-                chunks.append(f"type={f.type}")
+                chunks.append(f"type={f.type!r}")
             if f.htmlType:
-                chunks.append(f"htmlType={f.htmlType}")
+                chunks.append(f"htmlType={f.htmlType!r}")
             if f.parent:
                 # Cap parent snippet so the prompt stays small on huge forms.
                 snippet = f.parent if len(f.parent) <= 200 else f.parent[:200]
                 chunks.append(f"parent={snippet!r}")
             lines.append(" ".join(chunks))
-        user_prompt = "\n".join(lines)
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
+        material = SourceMaterial()
+        hint = f"Output language hint: {language_hint}.\n" if language_hint else ""
+        messages = source_material_messages(
+            SYSTEM_PROMPT, hint + "Fields:\n" + material.wrap("\n".join(lines), label="form fields")
+        )
 
         def _call():
             if isinstance(self.client, ProviderClient):
@@ -161,8 +259,8 @@ class FormUnderstander:
         for entry in parsed.entries:
             if entry.id not in known_ids:
                 continue
-            label = entry.label.strip()
+            label = _visible(entry.label).strip()
             if not label:
                 continue
-            result[entry.id] = label[:60]
+            result[entry.id] = label[:MAX_LABEL_CHARS]
         return result
