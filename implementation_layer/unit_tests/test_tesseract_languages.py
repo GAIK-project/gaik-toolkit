@@ -89,17 +89,69 @@ def test_docling_default_stays_when_nothing_or_everything_matches(installed, cap
     assert caplog.records == []
 
 
-def test_no_matching_language_still_gets_doclings_own_error(monkeypatch):
-    """With none of the defaults installed, Docling's error explains the install."""
+def _fake_tesseract_cli(monkeypatch, listing: str):
+    """Fake the Tesseract CLI for gaik's language list and for Docling's own engine.
+
+    Both call ``subprocess.run(["tesseract", "--list-langs"], ...)``: gaik with
+    ``text=True``, Docling for bytes. Docling reads the version through ``Popen``.
+    """
+    from docling.models.stages.ocr import tesseract_ocr_cli_model
+
+    def fake_run(cmd, **kwargs):
+        assert cmd[-1] == "--list-langs", cmd
+        out = listing if kwargs.get("text") else listing.encode()
+        return subprocess.CompletedProcess(cmd, 0, stdout=out, stderr=out[:0])
+
+    class FakePopen:
+        def __init__(self, cmd, **kwargs):
+            assert cmd[-1] == "--version", cmd
+
+        def communicate(self):
+            return b"tesseract 5.5.0\n", b""
+
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(tesseract_ocr_cli_model, "Popen", FakePopen)
+    return tesseract_ocr_cli_model.TesseractOcrCliModel
+
+
+def _start_docling_engine(engine_cls, options):
+    from docling.datamodel.accelerator_options import AcceleratorOptions
+
+    return engine_cls(
+        enabled=True,
+        artifacts_path=None,
+        options=options,
+        accelerator_options=AcceleratorOptions(),
+    )
+
+
+def test_docling_engine_starts_when_only_english_is_installed(monkeypatch):
     pytest.importorskip("docling")
-    from docling.datamodel.pipeline_options import TesseractCliOcrOptions
     from gaik.software_components.RAG.rag_parser_docling.parser import _build_ocr_options
 
-    _fake_list_langs(monkeypatch, "List of available languages (2):\nfin\nosd\n")
+    engine_cls = _fake_tesseract_cli(monkeypatch, DEBIAN_ENG_ONLY)
     options = _build_ocr_options("tesseract_cli")
 
-    assert isinstance(options, TesseractCliOcrOptions)
+    engine = _start_docling_engine(engine_cls, options)
+    assert engine.options.lang == ["eng"]
+
+
+def test_no_installed_default_language_leaves_doclings_default_and_error(monkeypatch):
+    """With none of the defaults installed, Docling's own error explains the install."""
+    pytest.importorskip("docling")
+    from docling.datamodel.pipeline_options import TesseractCliOcrOptions
+    from docling.exceptions import OcrLanguageNotSupportedError
+    from gaik.software_components.RAG.rag_parser_docling.parser import _build_ocr_options
+
+    engine_cls = _fake_tesseract_cli(monkeypatch, "List of available languages (2):\nfin\nosd\n")
+    options = _build_ocr_options("tesseract_cli")
+
     assert options.lang == TesseractCliOcrOptions.model_fields["lang"].default
+    with pytest.raises(OcrLanguageNotSupportedError, match="'eng'"):
+        _start_docling_engine(engine_cls, options)
 
 
 def test_rag_parser_tesseract_cli_options_skip_missing_languages(monkeypatch):

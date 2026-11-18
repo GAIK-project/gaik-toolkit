@@ -103,18 +103,19 @@ answer-generator = [
     "langchain-core>=0.2.0",
 ]
 
-# Document parsing (PDF, DOCX, images)
+# Document parsing (PDF, DOCX, images). docling's [rapidocr] extra adds onnxruntime,
+# which RapidOCR (DoclingParser's default OCR engine) needs; plain docling leaves it out.
 parser = [
     "PyMuPDF>=1.26.0",
     "python-docx>=1.2.0",
-    "docling==2.150.1",
+    "docling[rapidocr]==2.150.1",
     "psutil",
     "requests>=2.31.0",
 ]
 
 # RAG docling parser
 rag-parser-docling = [
-    "docling==2.150.1",
+    "docling[rapidocr]==2.150.1",
     "docling-core[chunking]>=2.106.0,<3.0.0",
     "docling-ibm-models>=4.0.2,<5",
     "docling-parse>=7.22.2,<8.0.0",
@@ -127,7 +128,7 @@ rag-parser-docling = [
 
 # RAG vision parser (Docling + Vision model for images)
 rag-parser-vision = [
-    "docling==2.150.1",
+    "docling[rapidocr]==2.150.1",
     "docling-core[chunking]>=2.106.0,<3.0.0",
     "docling-ibm-models>=4.0.2,<5",
     "docling-parse>=7.22.2,<8.0.0",
