@@ -87,10 +87,12 @@ async function chatTurn(page: Page) {
  * wizard_api's mapping for ses_laskut's diagram, stood in by the test: the
  * five tasks are `workflow.steps[0..4]`, the rest is drawn from elsewhere.
  * With it the editor opens with its tools; `operations` answers the edits.
+ * `hasDraft: false` is a session whose agent has not written its draft yet.
  */
 async function standInForWizardApi(
   page: Page,
   operations: (route: Route, body: { base_version: number; operations: unknown[] }) => Promise<void>,
+  { hasDraft = true }: { hasDraft?: boolean } = {},
 ) {
   const steps = ["ingest", "extract", "classify", "approve", "export"];
   const mapping: Record<string, { kind: string; blueprint_path: string }> = {
@@ -101,7 +103,11 @@ async function standInForWizardApi(
     mapping[`Activity_${id}`] = { kind: "user_task", blueprint_path: `workflow.steps[${i}]` };
   });
   await page.route("**/api/sessions/ses_laskut/bpmn/mapping*", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ mapping }) }),
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ mapping, has_draft: hasDraft }),
+    }),
   );
   await page.route("**/api/sessions/ses_laskut/blueprint/operations", (route) =>
     operations(route, route.request().postDataJSON() as { base_version: number; operations: unknown[] }),
@@ -323,7 +329,7 @@ test.describe("Workflow tab", () => {
     await expect(generated).toBeVisible();
   });
 
-  test("each tool sends its operation on the version shown, and a refusal says why and puts the diagram back", async ({
+  test("move later, rename in place, delete and the Delete key send their operations on the version shown; each refusal is said in the UI language and the diagram is put back", async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -332,6 +338,7 @@ test.describe("Workflow tab", () => {
       { status: 422, body: { detail: { error: "invalid_operation", message: "x", field: "operations[0].after" } } },
       { status: 409, body: { detail: { error: "agent_busy", message: "busy" } } },
       { status: 409, body: { detail: { error: "changed_elsewhere", message: "reload" } } },
+      { status: 422, body: { detail: { error: "unsupported_edit", message: "Ask the wizard to change x." } } },
     ];
     await standInForWizardApi(page, async (route, body) => {
       sent.push(body);
@@ -371,6 +378,104 @@ test.describe("Workflow tab", () => {
     expect(sent[2].operations).toEqual([{ op: "remove_step", step_id: "approve" }]);
     await expect(tasks).toHaveCount(count);
     await expect(rows).toHaveCount(5);
+
+    // The Delete key on a picked step: remove_step. The server's English words are not shown.
+    await rows.nth(0).getByRole("button").first().click();
+    await expect(page.locator('.bpmn-editable [data-element-id="Activity_ingest"]')).toHaveClass(/selected/);
+    // The keys go to the canvas once it has the focus.
+    await page.locator('.bpmn-editable svg[tabindex="0"]').focus();
+    await page.keyboard.press("Delete");
+    await expect(status).toContainText("Muutosta ei voitu tehdä.");
+    await expect(status).not.toContainText("Ask the wizard");
+    expect(sent[3].operations).toEqual([{ op: "remove_step", step_id: "ingest" }]);
+    await expect(tasks).toHaveCount(count);
+
+    // Ctrl+Z on the canvas undoes nothing locally: the blueprint's Kumoa is the way back.
+    await page.locator('.bpmn-editable svg[tabindex="0"]').focus();
+    await page.keyboard.press("Control+z");
+    await expect(tasks).toHaveCount(count);
+    expect(sent).toHaveLength(4);
+  });
+
+  test("no edit starts while a name is typed in place, and a name typed during a refused edit is sent after it", async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const sent: unknown[][] = [];
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await standInForWizardApi(page, async (route, body) => {
+      sent.push(body.operations);
+      if (sent.length === 2) await held;
+      const refused = { detail: { error: "changed_elsewhere", message: "reload" } };
+      await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify(refused) });
+    });
+    await openFlow(page);
+    await waitForDiagram(page);
+    const rows = page.getByTestId("flow-step-list").locator("li");
+
+    // A name is being typed in place: Add step in the palette does nothing meanwhile,
+    // and the name stays open for typing.
+    await rows.nth(2).getByRole("button").first().click();
+    await page.locator('.djs-context-pad .entry[data-action="rename"]').click();
+    const typed = page.locator(".bpmn-editable .djs-direct-editing-content");
+    await typed.fill("Cost centre proposal");
+    await expect(page.getByTestId("bpmn-show-data")).toBeDisabled();
+    await page.locator('.bpmn-editable .djs-palette .entry[data-action="gaik-add-step"]').click();
+    await expect(typed).toBeVisible();
+    expect(sent).toEqual([]);
+    // Finished, the name goes out, and only it.
+    await typed.press("Enter");
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0]).toEqual([{ op: "rename_step", step_id: "classify", name: "Cost centre proposal" }]);
+
+    // An edit held at the server; meanwhile a name is typed in the field.
+    await rows.nth(0).getByRole("button").first().click();
+    await page.locator('.djs-context-pad .entry[data-action="move-later"]').click();
+    await expect.poll(() => sent.length).toBe(2);
+    const name = page.getByTestId("bpmn-property-name");
+    await name.fill("Receive the invoice");
+    await name.press("Enter");
+    // The edit is refused (changed elsewhere): the typed name is kept and sent after it.
+    release();
+    await expect(page.getByTestId("bpmn-changed-elsewhere")).toBeVisible();
+    await expect.poll(() => sent.length).toBe(3);
+    expect(sent[2]).toEqual([{ op: "rename_step", step_id: "ingest", name: "Receive the invoice" }]);
+  });
+
+  test("before the agent has written its blueprint the canvas is read-only and says why", async ({ page }) => {
+    const sent: unknown[] = [];
+    await standInForWizardApi(page, async (route, body) => {
+      sent.push(body);
+      await route.fulfill({ status: 500, body: "not in this test" });
+    }, { hasDraft: false });
+    await openFlow(page);
+    await waitForDiagram(page);
+
+    const panel = page.getByTestId("bpmn-panel");
+    await expect(panel).toHaveAttribute("data-ops", "no_draft");
+    await expect(page.getByTestId("bpmn-readonly-editing")).toContainText(
+      "Vain luku: kaaviota voi muokata, kun wizard on kirjoittanut ensimmäisen blueprintin.",
+    );
+    await expect(page.locator(".bpmn-editable .djs-palette")).toHaveCount(0);
+    await page.getByTestId("flow-step-list").locator("li").nth(2).getByRole("button").first().click();
+    await expect(page.getByTestId("bpmn-property-name-text")).toHaveText("Classification");
+    expect(sent).toEqual([]);
+  });
+
+  test("an edit refused because there is no draft yet makes the canvas read-only with the same note", async ({
+    page,
+  }) => {
+    await standInForWizardApi(page, async (route) => {
+      const refused = { detail: { error: "no_draft", message: "The wizard has not written the blueprint yet" } };
+      await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify(refused) });
+    });
+    await openFlow(page);
+    await waitForDiagram(page);
+    await page.locator('.bpmn-editable .djs-palette .entry[data-action="gaik-add-step"]').click();
+    await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-ops", "no_draft");
+    await expect(page.getByTestId("bpmn-readonly-editing")).toContainText("kun wizard on kirjoittanut");
+    await expect(page.getByTestId("bpmn-status")).toHaveCount(0);
   });
 
   test("a blueprint changed in the chat reloads the read-only diagram", async ({ page }) => {

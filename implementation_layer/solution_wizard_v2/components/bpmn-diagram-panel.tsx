@@ -30,9 +30,11 @@ const PROPS_WIDE = 512;
 /**
  * Whether edits can be sent: `on` once the server's mapping for the diagram
  * has come, `off` where there is no wizard_api to send them to (the mock
- * store answers 503 needs_wizard_api), `unknown` until the first answer.
+ * store answers 503 needs_wizard_api), `no_draft` while the agent has not
+ * written its blueprint yet (wizard_api refuses every operation then),
+ * `unknown` until the first answer.
  */
-type OpsState = "unknown" | "on" | "off";
+type OpsState = "unknown" | "on" | "off" | "no_draft";
 
 type Status =
   | { kind: "idle" }
@@ -41,8 +43,11 @@ type Status =
   | { kind: "undone" }
   | { kind: "error"; message: string; retry?: () => void };
 
-/** The diagram as the server draws it now, and which element stands for what in it. */
-type ServerDiagram = { xml: string; mapping: BpmnMapping };
+/** Which element stands for what in the server's diagram, and whether the agent's draft is there. */
+type ServerMapping = { mapping: BpmnMapping; hasDraft: boolean };
+
+/** The diagram as the server draws it now, and its mapping. */
+type ServerDiagram = { xml: string } & ServerMapping;
 
 export function BpmnDiagramPanel({
   sessionId,
@@ -134,6 +139,8 @@ export function BpmnDiagramPanel({
   useEffect(() => {
     stepsRef.current = steps;
     modelerRef.current?.refreshOps();
+    // A rename kept over a version written elsewhere goes out once the page has its steps.
+    latest.current?.flushRename();
   }, [steps]);
 
   // The version the next edit is made on: the page's, or the one the last edit wrote.
@@ -151,7 +158,13 @@ export function BpmnDiagramPanel({
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   // A version written elsewhere refused the last edit: the canvas shows the newer diagram.
   const [changedElsewhere, setChangedElsewhere] = useState(false);
-  const [labelEditing, setLabelEditing] = useState(false);
+  const [labelEditing, setLabelEditingState] = useState(false);
+  // Read by the editor's tools: no other edit starts while a name is typed in place.
+  const typing = useRef(false);
+  function setLabelEditing(active: boolean) {
+    typing.current = active;
+    setLabelEditingState(active);
+  }
 
   const readOnly = locked || ops !== "on";
 
@@ -171,12 +184,12 @@ export function BpmnDiagramPanel({
   /** The mapping of the diagram on the canvas, when the page's steps are the ones it was drawn from. */
   function opsContext() {
     const current = mappingRef.current;
-    if (!current || busy.current || current.forXml !== propXml.current) return null;
+    if (!current || busy.current || typing.current || current.forXml !== propXml.current) return null;
     if (!mappingFitsSteps(current.mapping, stepsRef.current)) return null;
     return { mapping: current.mapping, steps: stepsRef.current };
   }
 
-  async function readMapping(dataObjects: boolean): Promise<BpmnMapping | "unavailable"> {
+  async function readMapping(dataObjects: boolean): Promise<ServerMapping | "unavailable"> {
     const res = await fetch(`/api/sessions/${sessionId}/bpmn/mapping${bpmnDataObjectsQuery(dataObjects)}`, {
       cache: "no-store",
     });
@@ -185,8 +198,18 @@ export function BpmnDiagramPanel({
       if (body?.error === "needs_wizard_api") return "unavailable";
     }
     if (!res.ok) throw new Error(`mapping ${res.status}`);
-    const body = (await res.json()) as { mapping?: BpmnMapping };
-    return body.mapping && typeof body.mapping === "object" ? body.mapping : {};
+    const body = (await res.json()) as { mapping?: BpmnMapping; has_draft?: boolean };
+    return {
+      mapping: body.mapping && typeof body.mapping === "object" ? body.mapping : {},
+      // Said by wizard_api since the operations need the draft; an answer without it has one.
+      hasDraft: body.has_draft !== false,
+    };
+  }
+
+  /** Edits on, or off until the agent has written its draft. */
+  function takeMapping(forXml: string, read: ServerMapping) {
+    setMapping({ forXml, mapping: read.mapping });
+    setOps(read.hasDraft ? "on" : "no_draft");
   }
 
   /** Reads the mapping of `forXml`, the diagram the page brought. */
@@ -194,15 +217,14 @@ export function BpmnDiagramPanel({
     const seq = ++mappingSeq.current;
     setMappingError(false);
     readMapping(showDataRef.current)
-      .then((mapping) => {
+      .then((read) => {
         if (seq !== mappingSeq.current) return;
-        if (mapping === "unavailable") {
+        if (read === "unavailable") {
           setMapping(null);
           setOps("off");
           return;
         }
-        setMapping({ forXml, mapping });
-        setOps("on");
+        takeMapping(forXml, read);
         modelerRef.current?.refreshOps();
       })
       .catch(() => {
@@ -213,15 +235,15 @@ export function BpmnDiagramPanel({
   /** The diagram and its mapping as the server has them now, for the "Show data" mode on screen. */
   async function readServerDiagram(): Promise<ServerDiagram> {
     const query = bpmnDataObjectsQuery(showDataRef.current);
-    const [diagram, mapping] = await Promise.all([
+    const [diagram, read] = await Promise.all([
       fetch(`/api/sessions/${sessionId}/bpmn${query}`, { cache: "no-store" }).then((res) => {
         if (!res.ok) throw new Error(`bpmn ${res.status}`);
         return res.text();
       }),
       readMapping(showDataRef.current),
     ]);
-    if (!diagram.trim() || mapping === "unavailable") throw new Error("no diagram");
-    return { xml: diagram, mapping };
+    if (!diagram.trim() || read === "unavailable") throw new Error("no diagram");
+    return { xml: diagram, ...read };
   }
 
   function showDiagram(next: ServerDiagram) {
@@ -229,7 +251,7 @@ export function BpmnDiagramPanel({
     waitingXml.current = null;
     propXml.current = next.xml;
     mappingSeq.current += 1;
-    setMapping({ forXml: next.xml, mapping: next.mapping });
+    takeMapping(next.xml, next);
     setShownXml(next.xml);
     // Also when the text is the same: what was drawn on the canvas meanwhile goes.
     setImportKey((k) => k + 1);
@@ -273,6 +295,8 @@ export function BpmnDiagramPanel({
 
   /** The server's diagram goes back on the canvas: after a refused edit, or a change no operation describes. */
   async function revert() {
+    // An edit on its way draws the server's diagram itself when it is answered.
+    if (busy.current) return;
     try {
       showDiagram(await readServerDiagram());
     } catch {
@@ -282,16 +306,29 @@ export function BpmnDiagramPanel({
     }
   }
 
-  /** What a refused edit says, in the UI language. */
+  /** What a refused edit says, in the UI language: never wizard_api's own (English) words. */
   function refusalMessage(err: unknown): string {
     if (!(err instanceof OperationRefused)) return t.wsBpmnSaveError;
-    if (err.code === "agent_busy") return t.bpmnAgentBusy;
-    if (err.code === "nothing_to_undo") return t.bpmnNothingToUndo;
-    if (err.code === "invalid_operation" || err.code === "unsupported_edit") {
-      const field = fieldInPlainWords(err.field, t);
-      if (field) return fillTemplate(t.bpmnOpRefusedField, { field });
+    switch (err.code) {
+      case "agent_busy":
+        return t.bpmnAgentBusy;
+      case "nothing_to_undo":
+        return t.bpmnNothingToUndo;
+      case "cannot_undo":
+        return t.bpmnCannotUndo;
+      case "no_draft":
+        return t.bpmnNeedsDraft;
+      case "too_large":
+        return t.bpmnTooLarge;
+      case "invalid_operation":
+      case "unsupported_edit":
+      case "readonly_section": {
+        const field = fieldInPlainWords(err.field, t);
+        return field ? fillTemplate(t.bpmnOpRefusedField, { field }) : t.bpmnOpRefused;
+      }
+      default:
+        return t.bpmnOpRefused;
     }
-    return err.message || t.bpmnOpRefused;
   }
 
   /**
@@ -333,7 +370,11 @@ export function BpmnDiagramPanel({
       );
     } catch (err) {
       busy.current = false;
-      if (err instanceof OperationRefused && err.code === "changed_elsewhere") {
+      if (err instanceof OperationRefused && err.code === "no_draft") {
+        // The agent has not written its blueprint yet: the editor waits for it, as the note says.
+        setStatus({ kind: "idle" });
+        setOps("no_draft");
+      } else if (err instanceof OperationRefused && err.code === "changed_elsewhere") {
         setChangedElsewhere(true);
         setStatus({ kind: "idle" });
         // The page reads the newer version and its number; the canvas draws its diagram now.
@@ -466,13 +507,19 @@ export function BpmnDiagramPanel({
     if (pendingFocus.current && m.focusElement(pendingFocus.current, propsCover())) pendingFocus.current = null;
   }
 
-  /** Sends the name typed in the field, once nothing else is on its way. */
+  /**
+   * Sends the name typed in the field, once nothing else is on its way. While
+   * the canvas cannot take it (an edit is answered, the page has not read the
+   * version a refusal named yet) it is kept, and sent when it can be: on the
+   * newer version, where its step is still there.
+   */
   function flushRename() {
     const pending = pendingRename.current;
     if (!pending || busy.current) return;
-    pendingRename.current = null;
     const ctx = opsContext();
-    const op = ctx ? opForLabelUpdate(pending.elementId, pending.name, ctx.mapping, ctx.steps) : null;
+    if (!ctx) return;
+    pendingRename.current = null;
+    const op = opForLabelUpdate(pending.elementId, pending.name, ctx.mapping, ctx.steps);
     if (op) void run("ops", [op]);
   }
 
@@ -726,10 +773,10 @@ export function BpmnDiagramPanel({
       </div>
       {locked && onUnlock ? (
         <FlowLockedNote onUnlock={onUnlock} testId="bpmn" t={t} />
-      ) : ops === "off" ? (
-        // No wizard_api to send edits to: the diagram is for reading.
+      ) : ops === "off" || ops === "no_draft" ? (
+        // No wizard_api to send edits to, or no blueprint of the agent's to edit yet: the diagram is for reading.
         <FlowEditingNote
-          help={t.bpmnNeedsWizardApi}
+          help={ops === "off" ? t.bpmnNeedsWizardApi : t.bpmnNeedsDraft}
           icon="lock"
           onLock={onLock ? lock : undefined}
           testId="bpmn-readonly"

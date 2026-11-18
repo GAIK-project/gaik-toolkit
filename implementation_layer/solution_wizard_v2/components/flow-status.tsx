@@ -37,12 +37,11 @@ export function FlowLockedNote({ onUnlock, testId, t }: { onUnlock: () => void; 
 }
 
 /**
- * Under the BPMN editor while it can be edited: what saves by itself, what
- * waits for "Tallenna muutokset", and when the wizard hears of a save. After
+ * Under a diagram open for edits: how edits are kept (`help`), with the
+ * diagram's own controls (`actions`, the BPMN editor's Kumoa). Also under a
+ * BPMN editor that cannot take edits yet, with a lock icon and why. After
  * Gate 2, where "Muokkaa kaaviota" opened it, "Lopeta muokkaus" closes it
- * again; unsaved edits are saved or discarded first, so the button waits.
- * Before this the lock note went away for good, with no word on how edits
- * are kept and no way back to the read-only view.
+ * again; it waits while an edit is on its way (`lockWaits`).
  */
 export function FlowEditingNote({
   help,

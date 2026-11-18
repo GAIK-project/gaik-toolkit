@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import { DEV_USERS, loginAsDev } from "./helpers/auth";
 import { getWizardApiUrl, setApiSessionStep, waitForApiHealthy } from "./helpers/api";
@@ -15,21 +13,13 @@ const STACK_E2E = process.env.PLAYWRIGHT_STACK_E2E === "true";
  * Undo takes the last one back. e2e/bpmn-editing.spec.ts covers the editor
  * on the mock store, where it is read-only.
  *
- * The test writes the agent's draft itself, into the session's output_dir,
- * so the folder must be reachable from where Playwright runs. When wizard_api
- * runs elsewhere (WSL, a container), PLAYWRIGHT_API_OUTPUT_MAP="from=to"
- * rewrites the start of its output_dir to the local path of the same folder
- * (e.g. "/mnt/d/=D:/").
+ * The test writes and reads the agent's draft through wizard_api's test hook
+ * (`/test/sessions/{id}/draft`, mounted only with WIZARD_TEST_HOOKS=1, as the
+ * stack E2E's wizard-api-e2e sets it): the Playwright container cannot reach
+ * the API's session folder.
  */
 
 type Step = { id: string; name: string; type: string; depends_on: string[] };
-
-function localDir(outputDir: string): string {
-  const map = process.env.PLAYWRIGHT_API_OUTPUT_MAP;
-  if (!map) return outputDir;
-  const [from, to] = map.split("=");
-  return outputDir.startsWith(from) ? to + outputDir.slice(from.length) : outputDir;
-}
 
 /** A small valid blueprint: upload → extract → review → deliver. */
 function draft() {
@@ -76,17 +66,13 @@ function draft() {
   };
 }
 
-/** A session at the BPMN step whose agent has written `draft()`, its version showing the same steps. */
-async function sessionWithDraft(page: Page, request: APIRequestContext): Promise<{ id: string; dir: string }> {
+/** A session at the BPMN step, its version showing the steps of `draft()`; the agent has written no draft yet. */
+async function sessionAtBpmn(page: Page, request: APIRequestContext): Promise<string> {
   await loginAsDev(page, DEV_USERS.primary);
   await createSession(page, `BPMN ops ${Date.now()}`);
   const id = new URL(page.url()).pathname.split("/").pop() as string;
   await setApiSessionStep(request, id, 8);
   const base = getWizardApiUrl();
-  const session = (await (await request.get(`${base}/sessions/${id}`)).json()) as { output_dir: string };
-  const dir = localDir(session.output_dir);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, "use_case.blueprint.json"), JSON.stringify(draft(), null, 2));
   const res = await request.post(`${base}/sessions/${id}/versions`, {
     data: {
       note: "e2e: the agent's draft",
@@ -105,14 +91,20 @@ async function sessionWithDraft(page: Page, request: APIRequestContext): Promise
     },
   });
   expect(res.ok(), `seed version: ${res.status()}`).toBe(true);
-  return { id, dir };
+  return id;
 }
 
-function draftSteps(dir: string): Step[] {
-  const raw = JSON.parse(fs.readFileSync(path.join(dir, "use_case.blueprint.json"), "utf8")) as {
-    workflow: { steps: Step[] };
-  };
-  return raw.workflow.steps;
+/** Writes `draft()` as the agent would, through the test hook. */
+async function writeDraft(request: APIRequestContext, id: string) {
+  const res = await request.post(`${getWizardApiUrl()}/test/sessions/${id}/draft`, { data: draft() });
+  expect(res.status(), `write draft: ${await res.text()}`).toBe(204);
+}
+
+/** The agent's draft as wizard_api has it now. */
+async function draftSteps(request: APIRequestContext, id: string): Promise<Step[]> {
+  const res = await request.get(`${getWizardApiUrl()}/test/sessions/${id}/draft`);
+  expect(res.ok(), `read draft: ${res.status()}`).toBe(true);
+  return ((await res.json()) as { workflow: { steps: Step[] } }).workflow.steps;
 }
 
 async function openEditor(page: Page) {
@@ -157,7 +149,21 @@ test.describe("BPMN canvas edits as operations (stack)", () => {
     request,
   }) => {
     test.setTimeout(240_000);
-    const { dir } = await sessionWithDraft(page, request);
+    const id = await sessionAtBpmn(page, request);
+
+    // Before the agent has written its draft the diagram is read-only, and says why.
+    await page.reload();
+    await setChatOpen(page, false);
+    await selectWorkspaceTab(page, "Työnkulku");
+    await openBpmnView(page);
+    await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-ops", "no_draft", { timeout: 45_000 });
+    await expect(page.getByTestId("bpmn-readonly-editing")).toContainText(
+      "kun wizard on kirjoittanut ensimmäisen blueprintin",
+    );
+    await expect(page.locator(".bpmn-editable .djs-palette")).toHaveCount(0);
+
+    await writeDraft(request, id);
+    const steps = () => draftSteps(request, id);
     await page.reload();
     await openEditor(page);
     await expect(rows(page)).toHaveCount(4);
@@ -170,15 +176,18 @@ test.describe("BPMN canvas edits as operations (stack)", () => {
     await name.fill("Read the fields");
     await name.press("Enter");
     expect((await renamed).status()).toBe(200);
+    // The step list and the canvas take it at once, without a reload.
+    await expect(rows(page).nth(1)).toContainText("Read the fields");
+    await expect(task(page, "extract")).toContainText("Read the fields");
     await reopen(page);
     await expect(task(page, "extract")).toContainText("Read the fields");
-    expect(draftSteps(dir).find((s) => s.id === "extract")?.name).toBe("Read the fields");
+    expect((await steps()).find((s) => s.id === "extract")?.name).toBe("Read the fields");
 
     // Append a step after the first one.
     await padAction(page, 0, "append");
     await reopen(page);
     await expect(rows(page)).toHaveCount(5);
-    const added = draftSteps(dir)[1];
+    const added = (await steps())[1];
     expect(added.depends_on).toEqual(["upload"]);
     await expect(task(page, added.id)).toBeVisible();
 
@@ -187,7 +196,7 @@ test.describe("BPMN canvas edits as operations (stack)", () => {
     // server refuses that, rule 7.)
     await padAction(page, 1, "move-earlier");
     await reopen(page);
-    const moved = draftSteps(dir);
+    const moved = (await steps());
     expect(moved.map((s) => s.id).slice(0, 2)).toEqual([added.id, "upload"]);
     expect(moved.find((s) => s.id === "upload")?.depends_on).toEqual([added.id]);
     await expect(rows(page).nth(0)).toContainText("Uusi vaihe");
@@ -201,14 +210,14 @@ test.describe("BPMN canvas edits as operations (stack)", () => {
     await task(page, "deliver").click();
     expect((await connected).status()).toBe(200);
     await reopen(page);
-    expect(draftSteps(dir).find((s) => s.id === "deliver")?.depends_on).toContain("upload");
+    expect((await steps()).find((s) => s.id === "deliver")?.depends_on).toContain("upload");
 
     // Delete the deliver step.
-    const count = draftSteps(dir).length;
+    const count = (await steps()).length;
     await padAction(page, count - 1, "delete");
     await reopen(page);
     await expect(task(page, "deliver")).toHaveCount(0);
-    expect(draftSteps(dir).some((s) => s.id === "deliver")).toBe(false);
+    expect((await steps()).some((s) => s.id === "deliver")).toBe(false);
 
     // Undo brings the deleted step back, also after a reload.
     const undone = page.waitForResponse((r) => r.url().includes("/blueprint/undo"));
@@ -217,7 +226,7 @@ test.describe("BPMN canvas edits as operations (stack)", () => {
     await expect(page.getByTestId("bpmn-status")).toContainText("Viimeisin muutos kumottu.");
     await reopen(page);
     await expect(task(page, "deliver")).toBeVisible();
-    expect(draftSteps(dir).some((s) => s.id === "deliver")).toBe(true);
-    expect(draftSteps(dir).find((s) => s.id === "extract")?.name).toBe("Read the fields");
+    expect((await steps()).some((s) => s.id === "deliver")).toBe(true);
+    expect((await steps()).find((s) => s.id === "extract")?.name).toBe("Read the fields");
   });
 });
