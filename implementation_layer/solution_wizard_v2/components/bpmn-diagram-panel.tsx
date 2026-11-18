@@ -17,8 +17,14 @@ import { AskStepButton, StepNumber, stepTypeLabels } from "@/components/step-typ
 import { BpmnStepPanel } from "@/components/bpmn-step-panel";
 import { Icon } from "@/components/icons";
 import { stepIdToBpmnId, stepIndexForBpmnId } from "@/lib/bpmn-edit-state";
-import type { BpmnEditorOps, BpmnLayoutChange } from "@/lib/bpmn-editor-module";
-import { mappingFitsSteps, stepIdOf, type BpmnMapping } from "@/lib/bpmn-canvas-ops";
+import type { BpmnEditorOps, BpmnLayoutChange, BpmnStepLaneChange } from "@/lib/bpmn-editor-module";
+import {
+  laneIdOf,
+  mappingFitsSteps,
+  performedByOf,
+  stepIdOf,
+  type BpmnMapping,
+} from "@/lib/bpmn-canvas-ops";
 import { keptPanelEdit, panelFields, panelOps, type KeptPanelEdit, type PanelValues } from "@/lib/step-panel-model";
 import type { BlueprintUpdate } from "@/lib/blueprint-update";
 import { bpmnDataObjectsQuery } from "@/lib/bpmn-show-data";
@@ -189,6 +195,8 @@ export function BpmnDiagramPanel({
   const readOnly = locked || ops !== "on";
 
   const [selection, setSelection] = useState<BpmnSelectionInfo>(null);
+  /** The lanes the canvas draws, top to bottom: the step panel's lane select lists them. */
+  const [canvasLanes, setCanvasLanes] = useState<{ id: string; name: string }[]>([]);
   const [propsClosed, setPropsClosed] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const pendingFocus = useRef<string | null>(null);
@@ -361,6 +369,7 @@ export function BpmnDiagramPanel({
       case "invalid_operation":
       case "unsupported_edit":
       case "readonly_section": {
+        if (err.reason === "lane_in_use") return t.bpmnLaneInUse;
         const field = fieldInPlainWords(err.field, t);
         return field ? fillTemplate(t.bpmnOpRefusedField, { field }) : t.bpmnOpRefused;
       }
@@ -491,6 +500,50 @@ export function BpmnDiagramPanel({
     return sending;
   }
 
+  /**
+   * Drops the kept places of `shapes` and the routes of `edges`, in both
+   * drawing modes (`null` resets an id): a step put in another lane is drawn
+   * where its new lane puts it. Sent after what is pending, before the next edit.
+   */
+  function resetLayout(shapes: string[], edges: string[]): Promise<void> {
+    if (!shapes.length && !edges.length) return layoutSending.current;
+    void flushLayout();
+    const body = JSON.stringify({
+      shapes: Object.fromEntries(shapes.map((id) => [id, null])),
+      edges: Object.fromEntries(edges.map((id) => [id, null])),
+    });
+    const sending = layoutSending.current.then(async () => {
+      try {
+        for (const mode of [0, 1]) {
+          const res = await fetch(`/api/sessions/${sessionId}/bpmn/layout?data_objects=${mode}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body,
+          });
+          if (!res.ok) throw new Error(`layout ${res.status}`);
+        }
+      } catch {
+        // The server ignores a kept place outside the step's own lane, so the step is drawn in its lane anyway.
+      }
+    });
+    layoutSending.current = sending;
+    return sending;
+  }
+
+  /**
+   * A step put in another lane, dragged on the canvas or picked in its panel:
+   * its kept place goes, then `set_step_lane` through `run`. While nothing
+   * can be sent the server's diagram goes back on the canvas.
+   */
+  async function moveStepToLane(change: BpmnStepLaneChange): Promise<boolean> {
+    if (busy.current || typing.current || !opsContext()) {
+      void revert();
+      return false;
+    }
+    void resetLayout(change.shapes, change.edges);
+    return run("ops", [change.op]);
+  }
+
   // Dragged shapes are kept before the page goes: another page, or a reload
   // of this one (keepalive lets the request outlive it).
   useEffect(() => {
@@ -514,6 +567,7 @@ export function BpmnDiagramPanel({
     flushLayout: typeof flushLayout;
     flushPending: () => void;
     stepTypeOf: (stepId: string) => StepType | null;
+    moveStepToLane: typeof moveStepToLane;
   } | null>(null);
   const stableOps = useMemo<BpmnEditorOps>(
     () => ({
@@ -521,6 +575,7 @@ export function BpmnDiagramPanel({
       onOperation: (list) => void latest.current?.run("ops", list),
       onRevert: () => void latest.current?.revert(),
       onLayout: (change) => latest.current?.sendLayout(change),
+      onStepLane: (change) => void latest.current?.moveStepToLane(change),
       stepType: (stepId) => latest.current?.stepTypeOf(stepId) ?? null,
     }),
     [],
@@ -566,6 +621,7 @@ export function BpmnDiagramPanel({
   function onImported() {
     const m = modelerRef.current;
     if (!m) return;
+    setCanvasLanes(m.lanes());
     if (pendingFocus.current && m.focusElement(pendingFocus.current, propsCover())) pendingFocus.current = null;
   }
 
@@ -623,6 +679,26 @@ export function BpmnDiagramPanel({
    * that cannot go now is kept and sent later (flushPending). True once the
    * edit is made, or when there was nothing to change.
    */
+  /** The step panel's lane select: the lanes the mapping names a participant for, top to bottom. */
+  const laneOptions = fitting
+    ? canvasLanes.flatMap((lane) => {
+        const id = laneIdOf(lane.id, fitting);
+        return id ? [{ id, name: lane.name || id }] : [];
+      })
+    : [];
+
+  /** The lane select picked `laneId` (null: the lane of the step's type). */
+  async function saveLane(laneId: string | null): Promise<boolean> {
+    if (!selectedId || !editableStep) return false;
+    const current = fitting ? performedByOf(selectedId, fitting) : "";
+    if ((laneId ?? "") === current) return true;
+    return moveStepToLane({
+      op: { op: "set_step_lane", step_id: editableStep, lane_id: laneId },
+      shapes: [selectedId],
+      edges: modelerRef.current?.edgesOf(selectedId) ?? [],
+    });
+  }
+
   async function savePanel(after: PanelValues): Promise<boolean> {
     const step = stepsRef.current.find((s) => s.id === after.stepId);
     if (!step || editableStep !== after.stepId) return false;
@@ -637,7 +713,7 @@ export function BpmnDiagramPanel({
   }
 
   useEffect(() => {
-    latest.current = { opsContext, run, revert, sendLayout, flushLayout, flushPending, stepTypeOf };
+    latest.current = { opsContext, run, revert, sendLayout, flushLayout, flushPending, stepTypeOf, moveStepToLane };
   });
 
   /** "Lopeta muokkaus": the canvas is read-only again, as it opened. */
@@ -742,6 +818,10 @@ export function BpmnDiagramPanel({
             connectFrom: t.bpmnPadConnect,
             derived: t.bpmnDerivedElement,
             newStepName: t.flowNewStepName,
+            addLane: t.bpmnPaletteAddLane,
+            newLaneName: t.bpmnNewLaneName,
+            renameLane: t.bpmnPadRenameLane,
+            removeLane: t.bpmnPadRemoveLane,
           }}
           ops={stableOps}
           onSelectionChange={setSelection}
@@ -827,6 +907,9 @@ export function BpmnDiagramPanel({
                 )}
                 disabled={!editableStep || working || labelEditing}
                 onSave={savePanel}
+                lanes={editableStep && fitting ? laneOptions : null}
+                lane={selectedId && fitting ? performedByOf(selectedId, fitting) : ""}
+                onLaneChange={saveLane}
                 t={t}
               />
             ) : (

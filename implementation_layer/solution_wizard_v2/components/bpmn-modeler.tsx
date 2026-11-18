@@ -42,6 +42,8 @@ type DiagramElement = {
   height?: number;
   labelTarget?: DiagramElement;
   businessObject?: { id?: string; name?: string; $type?: string; documentation?: { text?: string }[] };
+  incoming?: { id: string }[];
+  outgoing?: { id: string }[];
 };
 
 type Selection = {
@@ -59,7 +61,10 @@ type Canvas = {
   };
 };
 
-type ElementRegistry = { get: (id: string) => DiagramElement | undefined };
+type ElementRegistry = {
+  get: (id: string) => DiagramElement | undefined;
+  filter: (fn: (el: DiagramElement) => boolean) => DiagramElement[];
+};
 
 type DirectEditing = { isActive: () => boolean };
 type Dragging = { context: () => unknown };
@@ -103,6 +108,10 @@ export type BpmnModelerHandle = {
   toggleFullscreen: () => void;
   /** The `<bpmn:documentation>` of the element `id` on the canvas (a step's description); null when it is not there. */
   documentationOf: (id: string) => string | null;
+  /** The lanes on the canvas, top to bottom: their element ids and names. */
+  lanes: () => { id: string; name: string }[];
+  /** The ids of the flows that start or end at the element `id`. */
+  edgesOf: (id: string) => string[];
 };
 
 function selectionFromModeler(modeler: BpmnCanvas): BpmnSelectionInfo {
@@ -290,6 +299,28 @@ export const BpmnModeler = forwardRef<
           return el ? documentationOf(el) : null;
         } catch {
           return null;
+        }
+      },
+      lanes: () => {
+        const m = modelerRef.current;
+        if (!m) return [];
+        try {
+          return (m.get("elementRegistry") as ElementRegistry)
+            .filter((el) => el.type === "bpmn:Lane")
+            .sort((a, b) => (a.y ?? 0) - (b.y ?? 0))
+            .map((el) => ({ id: el.id, name: el.businessObject?.name ?? "" }));
+        } catch {
+          return [];
+        }
+      },
+      edgesOf: (id: string) => {
+        const m = modelerRef.current;
+        if (!m) return [];
+        try {
+          const el = (m.get("elementRegistry") as ElementRegistry).get(id);
+          return el ? [...(el.incoming ?? []), ...(el.outgoing ?? [])].map((c) => c.id) : [];
+        } catch {
+          return [];
         }
       },
       refreshOps: () => {

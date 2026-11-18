@@ -10,12 +10,24 @@
  * is drawn from other parts of the blueprint, and these helpers answer null
  * for it: the canvas offers no edit there.
  *
- * Tier 1: rename, add, move, connect, disconnect and remove a step. Later
- * tiers add their element kinds here in the same way.
+ * Tier 1: rename, add, move, connect, disconnect and remove a step. Tier 2
+ * adds lanes: the mapping names a lane's participant (`participant_id`) and a
+ * step's `performed_by`, so a lane can be renamed or removed and a step put
+ * in another lane.
  */
 import type { BlueprintOperation } from "@/lib/blueprint-ops";
 
-export type BpmnMapping = Record<string, { kind?: string; blueprint_path: string }>;
+export type BpmnMapping = Record<
+  string,
+  {
+    kind?: string;
+    blueprint_path: string;
+    /** A lane's: the id lane operations take (a derived lane's too). */
+    participant_id?: string;
+    /** A step's: the lane it is put in, "" when its type decides. */
+    performed_by?: string;
+  }
+>;
 
 /** A step of the blueprint the mapping's indexes point into. */
 export type StepRef = { id: string; name?: string };
@@ -164,4 +176,50 @@ export function opsForMove(
     ];
   }
   return [{ op: "move_step", step_id: stepId, after: steps[index - 2].id }];
+}
+
+function entryOf(elementId: string, mapping: BpmnMapping) {
+  return Object.prototype.hasOwnProperty.call(mapping, elementId) ? mapping[elementId] : undefined;
+}
+
+/** The participant id behind the lane `elementId`, or null when it is no lane the mapping names. */
+export function laneIdOf(elementId: string, mapping: BpmnMapping): string | null {
+  const entry = entryOf(elementId, mapping);
+  return entry?.kind === "lane" && entry.participant_id ? entry.participant_id : null;
+}
+
+/** The lane a step is put in (its `performed_by`); "" when the step's type decides its lane. */
+export function performedByOf(elementId: string, mapping: BpmnMapping): string {
+  return entryOf(elementId, mapping)?.performed_by ?? "";
+}
+
+/**
+ * A step dragged from the lane `fromLaneId` into the lane `toLaneId` (both
+ * element ids): set_step_lane with the target lane's participant. Null when it
+ * stays in its lane, or either is not a step or a lane the mapping names.
+ */
+export function opForStepLane(
+  stepElementId: string,
+  toLaneId: string,
+  fromLaneId: string | null,
+  mapping: BpmnMapping,
+  steps: StepRef[],
+): BlueprintOperation | null {
+  if (toLaneId === fromLaneId) return null;
+  const stepId = stepIdOf(stepElementId, mapping, steps);
+  const laneId = laneIdOf(toLaneId, mapping);
+  return stepId && laneId ? { op: "set_step_lane", step_id: stepId, lane_id: laneId } : null;
+}
+
+/** A lane's name typed in place: rename_lane, or null for an empty or unchanged name or no lane. */
+export function opForLaneRename(
+  laneElementId: string,
+  newName: string | null | undefined,
+  oldName: string | null | undefined,
+  mapping: BpmnMapping,
+): BlueprintOperation | null {
+  const laneId = laneIdOf(laneElementId, mapping);
+  const name = (newName ?? "").trim();
+  if (!laneId || !name || name === (oldName ?? "").trim()) return null;
+  return { op: "rename_lane", lane_id: laneId, name };
 }

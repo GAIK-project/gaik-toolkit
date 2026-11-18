@@ -29,6 +29,9 @@ export const MAX_OPERATIONS = 50;
 
 export type StepType = "user_task" | "automated_task" | "human_review";
 
+/** `LaneKind` there: a lane for people in a role, or for a system. */
+export type LaneKind = "human_role" | "system";
+
 export type BlueprintOperation =
   | { op: "rename_step"; step_id: string; name: string }
   | { op: "set_step_description"; step_id: string; description: string }
@@ -37,7 +40,12 @@ export type BlueprintOperation =
   | { op: "move_step"; step_id: string; after: string | null }
   | { op: "connect"; source: string; target: string }
   | { op: "disconnect"; source: string; target: string }
-  | { op: "set_step_type"; step_id: string; type: StepType };
+  | { op: "set_step_type"; step_id: string; type: StepType }
+  | { op: "add_lane"; name: string; kind?: LaneKind }
+  | { op: "rename_lane"; lane_id: string; name: string }
+  | { op: "remove_lane"; lane_id: string }
+  /** Who does the step: a lane's participant id, or null for the lane of its type. */
+  | { op: "set_step_lane"; step_id: string; lane_id: string | null };
 
 export type OperationsResult = {
   blueprint: Blueprint;

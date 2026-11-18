@@ -23,7 +23,9 @@ const FIELD = "input-field w-full text-sm disabled:cursor-not-allowed disabled:b
  * when the user leaves it or presses Enter (Shift+Enter is a new line in the
  * description), and Escape takes its change back; the type saves when it is
  * picked. Each save hands the panel's values to `onSave`, which sends what
- * changed as one edit (lib/step-panel-model `panelOps`).
+ * changed as one edit (lib/step-panel-model `panelOps`). The lane (who does
+ * the step) saves when it is picked, through `onLaneChange`; the select is
+ * there only where the editor knows the lanes.
  *
  * What the user typed stays in its field until the step has it: through an
  * edit on its way, and over a refusal, so nothing typed is lost; once the
@@ -34,12 +36,21 @@ export function BpmnStepPanel({
   fields,
   disabled,
   onSave,
+  lanes = null,
+  lane = "",
+  onLaneChange,
   t,
 }: {
   fields: PanelFields;
   disabled: boolean;
   /** Sends what changed; true once it is made (or there was nothing to change). */
   onSave: (after: PanelValues) => Promise<boolean>;
+  /** The lanes a step can be put in (participant id and name); null hides the select. */
+  lanes?: { id: string; name: string }[] | null;
+  /** The lane the step is put in; "" when its type decides. */
+  lane?: string;
+  /** A lane picked: its id, or null for the lane of the step's type. */
+  onLaneChange?: (laneId: string | null) => Promise<boolean>;
   t: Dict;
 }) {
   const descriptionId = useId();
@@ -142,6 +153,29 @@ export function BpmnStepPanel({
           </select>
         </label>
       </div>
+
+      {lanes && lanes.length > 0 && onLaneChange && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-text-muted">{t.bpmnStepLane}</span>
+          <select
+            className={FIELD}
+            value={lane}
+            disabled={disabled}
+            onChange={(e) => {
+              if (!disabled) void onLaneChange(e.target.value || null);
+            }}
+            data-testid="bpmn-step-lane"
+          >
+            <option value="">{t.bpmnStepLaneDefault}</option>
+            {lanes.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+            {lane && !lanes.some((option) => option.id === lane) && <option value={lane}>{lane}</option>}
+          </select>
+        </label>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline justify-between gap-2">

@@ -21,7 +21,11 @@
  *   panel puts the server's diagram back). Dragging shapes within their
  *   lane and bending flows changes no blueprint: their new places are handed
  *   over as a layout (`onLayout`), which the panel keeps with
- *   `PUT /bpmn/layout`. A drag into another lane is refused.
+ *   `PUT /bpmn/layout`. A step dragged into another lane is put in that lane
+ *   (`set_step_lane`, through `onStepLane`); anything else dragged into
+ *   another lane is refused.
+ * - Lanes: the palette's "Add lane" (`add_lane`), and a lane's context pad:
+ *   rename it in place (`rename_lane`) and remove it (`remove_lane`).
  *
  * Labels and the operations come in through the modeler's `gaikEditor`
  * config, read each time they are needed.
@@ -38,7 +42,10 @@ import {
   opForConnection,
   opForDelete,
   opForLabelUpdate,
+  opForLaneRename,
+  opForStepLane,
   opsForMove,
+  laneIdOf,
   stepIdOf,
   type BpmnMapping,
   type CanvasElement,
@@ -62,6 +69,22 @@ export type BpmnEditorLabels = {
   derived: string;
   /** The name a step added from the canvas starts with. */
   newStepName: string;
+  addLane: string;
+  /** The name a lane added from the palette starts with. */
+  newLaneName: string;
+  renameLane: string;
+  removeLane: string;
+};
+
+/**
+ * A step put in another lane: the operation, and the drawn places that no
+ * longer fit (the step's and its flows'), which the panel drops from the
+ * layout so the step is drawn in its new lane.
+ */
+export type BpmnStepLaneChange = {
+  op: BlueprintOperation;
+  shapes: string[];
+  edges: string[];
 };
 
 /** Where dragged shapes and edges now are, as `PUT /bpmn/layout` takes it. */
@@ -77,6 +100,8 @@ export type BpmnEditorOps = {
   /** The canvas changed in a way no operation describes: the server's diagram goes back on it. */
   onRevert: () => void;
   onLayout: (layout: BpmnLayoutChange) => void;
+  /** A step dragged into another lane. */
+  onStepLane: (change: BpmnStepLaneChange) => void;
   /** The type a step has now, as the step panel shows it; null when unknown. */
   stepType: (stepId: string) => StepType | null;
 };
@@ -112,7 +137,12 @@ type Entry = Record<string, unknown>;
 type Entries = Record<string, Entry>;
 
 type Palette = { registerProvider: (priority: number, provider: unknown) => void };
-type ContextPad = { registerProvider: (priority: number, provider: unknown) => void };
+type ContextPad = {
+  registerProvider: (priority: number, provider: unknown) => void;
+  /** diagram-js's own placement of the pad, in px within the canvas's container. */
+  _getPosition?: (target: unknown) => Record<string, number>;
+};
+type Canvas = { getContainer: () => HTMLElement };
 type PopupMenu = {
   registerProvider: (id: string, provider: unknown) => void;
   open: (target: Element, providerId: string, position: { x: number; y: number }, options?: unknown) => void;
@@ -172,6 +202,11 @@ const TYPE_ICONS: Record<StepType, string> = {
   human_review: icon('<path d="m16 11 2 2 4-4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'),
 };
 
+/** Room for a lane's two pad entries, inside the lane's right edge. */
+const LANE_PAD_WIDTH = 90;
+/** The canvas's "Show data" and zoom buttons cover its top right this far down. */
+const LANE_PAD_TOP = 56;
+
 /** The step type menu's id with diagram-js's popup menu. */
 export const STEP_TYPE_MENU = "gaik-step-type";
 
@@ -210,6 +245,16 @@ class GaikPalette {
           },
         },
       };
+      out["gaik-add-lane"] = {
+        group: "activity",
+        className: "bpmn-icon-lane-insert-below",
+        title: labels.addLane,
+        action: {
+          click: () => {
+            if (ops.context()) ops.onOperation([{ op: "add_lane", name: labels.newLaneName }]);
+          },
+        },
+      };
       if (entries["global-connect-tool"]) {
         out["global-connect-tool"] = { ...entries["global-connect-tool"], title: labels.connect };
       }
@@ -220,15 +265,33 @@ class GaikPalette {
 
 /** A step: rename, change type, append, move, connect, delete. A flow between steps: delete. Nothing else. */
 class GaikContextPad {
-  static $inject = ["contextPad", "directEditing", "popupMenu", "elementRegistry", "config.gaikEditor"];
+  static $inject = ["contextPad", "directEditing", "popupMenu", "elementRegistry", "config.gaikEditor", "canvas"];
   constructor(
     contextPad: ContextPad,
     private directEditing: DirectEditing,
     private popupMenu: PopupMenu,
     private registry: ElementRegistry,
     private config: Config,
+    canvas: Canvas,
   ) {
     contextPad.registerProvider(500, this);
+    // A lane spans the whole drawing, so the pad at its top right corner is
+    // often out of view: a lane's pad sits at the top right of the part of
+    // the lane that is on screen.
+    const place = contextPad._getPosition?.bind(contextPad);
+    if (place) {
+      contextPad._getPosition = (target: unknown) => {
+        const lane = target as Element;
+        const gfx = !Array.isArray(target) && lane?.type === "bpmn:Lane" ? registry.getGraphics(lane) : undefined;
+        if (!gfx) return place(target);
+        const box = canvas.getContainer().getBoundingClientRect();
+        const r = gfx.getBoundingClientRect();
+        const right = Math.min(r.right, box.right) - box.left;
+        // Below the canvas's own buttons at its top right, and within the lane.
+        const top = Math.min(Math.max(r.top - box.top, LANE_PAD_TOP), r.bottom - box.top - 40);
+        return { left: Math.max(0, right - LANE_PAD_WIDTH), top: top + 6 };
+      };
+    }
   }
 
   /** The type menu, just under the step. */
@@ -255,6 +318,24 @@ class GaikContextPad {
               },
             }
           : {};
+      }
+      if (element.type === "bpmn:Lane") {
+        const laneId = laneIdOf(element.id, mapping);
+        if (!laneId) return {};
+        return {
+          "gaik-lane-rename": {
+            group: "edit",
+            imageUrl: PENCIL,
+            title: labels.renameLane,
+            action: { click: () => this.directEditing.activate(element) },
+          },
+          "gaik-lane-remove": {
+            group: "edit",
+            className: "bpmn-icon-trash",
+            title: labels.removeLane,
+            action: { click: () => ops.onOperation([{ op: "remove_lane", lane_id: laneId }]) },
+          },
+        };
       }
       if (!stepIdOf(element.id, mapping, steps)) return {};
       const out: Entries = {
@@ -381,8 +462,8 @@ function ownLane(lanes: Shape[], shape: Shape): Shape | null {
  * Whether a drag only moves shapes where the layout keeps them: each lands,
  * by its middle, in its own lane, the one whose `flowNodeRef` lists it. A
  * lane is who does the step, which the blueprint says, so a drag into another
- * lane would be an edit the layout cannot keep (Task 17 makes that an
- * operation). A shape drawn outside its own lane may go back into it. A shape
+ * lane is no layout change (for a step on its own it is an operation,
+ * `stepLaneChange`). A shape drawn outside its own lane may go back into it. A shape
  * no lane lists (a data object) stays in the lane it is drawn in, or outside
  * the lanes. A label is placed with its shape and is not kept on its own, and
  * nothing is dropped onto another parent (out of the pool, onto a flow).
@@ -406,12 +487,44 @@ export function moveKeepsLanes(
 }
 
 /**
+ * A step dragged, on its own, into another lane than its own: the
+ * `set_step_lane` that puts it there, with what the layout drops for it (its
+ * place and its flows' routes). Null for anything else: several shapes, no
+ * step, a drop outside the lanes or onto another parent, a lane the mapping
+ * names no participant for, or a drop in its own lane.
+ */
+export function stepLaneChange(
+  shapes: Element[],
+  delta: Point | undefined,
+  target: Element | undefined,
+  lanes: Shape[],
+  mapping: BpmnMapping,
+  steps: StepRef[],
+): BpmnStepLaneChange | null {
+  const moved = shapes.filter((s): s is Shape => !s.labelTarget && !isConnection(s));
+  if (moved.length !== 1 || !delta) return null;
+  const [shape] = moved;
+  if (target && shape.parent && target !== shape.parent && target.type !== "bpmn:Lane") return null;
+  const middle = { x: shape.x + shape.width / 2, y: shape.y + shape.height / 2 };
+  const lands = laneAt(lanes, { x: middle.x + delta.x, y: middle.y + delta.y });
+  if (!lands) return null;
+  const own = ownLane(lanes, shape) ?? laneAt(lanes, middle);
+  const op = opForStepLane(shape.id, lands.id, own?.id ?? null, mapping, steps);
+  if (!op) return null;
+  const edges = [...(shape.incoming ?? []), ...(shape.outgoing ?? [])]
+    .map((c) => c.id)
+    .filter((id) => LAYOUT_ID.test(id));
+  return { op, shapes: LAYOUT_ID.test(shape.id) ? [shape.id] : [], edges };
+}
+
+/**
  * What the keyboard and the mouse may still do: Delete removes one step or
  * one flow between steps; lines start and end at steps; nothing is created,
  * resized, copied or reconnected (no operation keeps that); lanes and pools
  * stay where the drawing puts them. Shapes move within their lane, and a
- * flow's bends move, as a layout; neither while an edit is on its way or a
- * name is typed in place (the diagram drawn after it would drop the move).
+ * flow's bends move, as a layout; a step on its own may go into another lane,
+ * as an operation. None of this while an edit is on its way or a name is
+ * typed in place (the diagram drawn after it would drop the move).
  */
 class GaikRules extends RuleProvider {
   static $inject = ["eventBus", "config.gaikEditor", "elementRegistry"];
@@ -446,9 +559,12 @@ class GaikRules extends RuleProvider {
       2000,
       (context: { shapes?: Element[]; delta?: Point; target?: Element }) => {
         const shapes = context.shapes ?? [];
-        if (!ctx() || shapes.some((s) => FIXED.has(s.type))) return false;
+        const c = ctx();
+        if (!c || shapes.some((s) => FIXED.has(s.type))) return false;
         const lanes = this.registry.getAll().filter((el): el is Shape => el.type === "bpmn:Lane" && !isConnection(el));
-        return moveKeepsLanes(shapes, context.delta, context.target, lanes) ? undefined : false;
+        if (moveKeepsLanes(shapes, context.delta, context.target, lanes)) return undefined;
+        // A step into another lane: who does it changes (set_step_lane).
+        return stepLaneChange(shapes, context.delta, context.target, lanes, c.mapping, c.steps) ? undefined : false;
       },
     );
     this.addRule("connection.updateWaypoints", 2000, (context: { connection?: Element }) =>
@@ -485,6 +601,8 @@ class GaikOperations {
   private nested = new Set<string>();
   private shapes = new Set<Shape>();
   private edges = new Set<Connection>();
+  /** A step's drag into another lane, read before the move updates the lanes' lists. */
+  private laneChange: BpmnStepLaneChange | null = null;
 
   constructor(
     eventBus: DiagramEventBus,
@@ -495,8 +613,10 @@ class GaikOperations {
   ) {
     eventBus.on("commandStack.preExecute", (e: { command: string; context: Record<string, unknown> }) => {
       this.depth += 1;
-      if (this.depth === 1) this.top = { command: e.command, context: e.context };
-      else this.nested.add(e.command);
+      if (this.depth === 1) {
+        this.top = { command: e.command, context: e.context };
+        if (e.command === "elements.move") this.laneChange = this.readLaneChange(e.context);
+      } else this.nested.add(e.command);
       if (e.command === "shape.move") this.shapes.add(e.context.shape as Shape);
       if (["connection.layout", "connection.updateWaypoints", "connection.move"].includes(e.command)) {
         this.edges.add(e.context.connection as Connection);
@@ -510,10 +630,11 @@ class GaikOperations {
       const nested = this.nested;
       const shapes = this.shapes;
       const edges = this.edges;
+      const laneChange = this.laneChange;
       this.reset();
       if (e.trigger !== "execute" || !top) return;
       // Out of bpmn-js's command stack before anything else happens.
-      window.setTimeout(() => this.handle(top, nested, shapes, edges), 0);
+      window.setTimeout(() => this.handle(top, nested, shapes, edges, laneChange), 0);
     });
     eventBus.on("diagram.clear", () => this.reset());
 
@@ -526,10 +647,11 @@ class GaikOperations {
     // While a name is typed in place the context pad goes: its tools would start an edit over it.
     eventBus.on("directEditing.activate", () => contextPad.close());
 
-    // Double-click and the E key rename in place: a step only.
+    // Double-click and the E key rename in place: a step or a lane.
     eventBus.on("directEditing.activate.allowed", 2000, (e: { element: Element }) => {
       const c = this.config.ops?.context();
-      return c && stepIdOf(owner(e.element).id, c.mapping, c.steps) ? undefined : false;
+      const id = owner(e.element).id;
+      return c && (stepIdOf(id, c.mapping, c.steps) || laneIdOf(id, c.mapping)) ? undefined : false;
     });
 
     // Why an element has no tools, while the pointer is on it.
@@ -543,6 +665,21 @@ class GaikOperations {
     this.nested = new Set();
     this.shapes = new Set();
     this.edges = new Set();
+    this.laneChange = null;
+  }
+
+  private readLaneChange(context: Record<string, unknown>): BpmnStepLaneChange | null {
+    const c = this.config.ops?.context();
+    if (!c) return null;
+    const lanes = this.registry.getAll().filter((el): el is Shape => el.type === "bpmn:Lane" && !isConnection(el));
+    return stepLaneChange(
+      (context.shapes as Element[] | undefined) ?? [],
+      context.delta as Point | undefined,
+      undefined,
+      lanes,
+      c.mapping,
+      c.steps,
+    );
   }
 
   private handle(
@@ -550,6 +687,7 @@ class GaikOperations {
     nested: Set<string>,
     shapes: Set<Shape>,
     edges: Set<Connection>,
+    laneChange: BpmnStepLaneChange | null,
   ) {
     const ops = this.config.ops;
     if (!ops) return;
@@ -559,6 +697,10 @@ class GaikOperations {
       case "element.updateLabel": {
         const element = top.context.element as Element | undefined;
         if (!ctx || !element) return ops.onRevert();
+        if (owner(element).type === "bpmn:Lane") {
+          const oldLabel = top.context.oldLabel as string | undefined;
+          return send(opForLaneRename(owner(element).id, top.context.newLabel as string, oldLabel, ctx.mapping));
+        }
         return send(opForLabelUpdate(owner(element).id, top.context.newLabel as string, ctx.mapping, ctx.steps));
       }
       case "connection.create": {
@@ -574,6 +716,8 @@ class GaikOperations {
       }
     }
     if (MOVE_ROOTS.has(top.command) && [...nested].every((c) => MOVE_COMMANDS.has(c))) {
+      // A step into another lane is no layout: who does it changes.
+      if (laneChange) return ops.onStepLane(laneChange);
       const layout: BpmnLayoutChange = { shapes: {}, edges: {} };
       for (const shape of shapes) {
         if (shape.labelTarget || FIXED.has(shape.type) || !LAYOUT_ID.test(shape.id)) continue;

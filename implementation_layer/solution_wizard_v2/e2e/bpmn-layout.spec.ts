@@ -8,7 +8,8 @@ import { centre, drag, flowBetween, focusStep, inLaneBelow, laneAt, offset, onFl
  * Where the user puts shapes and bends flows on the BPMN canvas: a layout
  * (`PUT /bpmn/layout`), not an operation on the blueprint. A drag within a
  * lane and a bent flow are sent together after 800 ms, with no operation, no
- * version and no reload; a drag into another lane is refused; a drag not sent
+ * version and no reload; a drag into a lane no participant stands for is
+ * refused; a drag not sent
  * yet goes out before the next operation; no drag starts while an operation
  * is on its way. wizard_api's mapping and layout routes are stood in by the
  * test on the mock store. Without wizard_api the canvas is read-only and a
@@ -124,7 +125,11 @@ test.describe("BPMN layout", () => {
     expect(Object.keys((compact.body as { shapes: object }).shapes)).toEqual(["Activity_classify"]);
   });
 
-  test("a drag into another lane is refused: the shape goes back and nothing is sent", async ({ page }) => {
+  // The mapping here names no lane's participant: a step dragged into a lane the mapping
+  // names is put in it (set_step_lane, e2e/bpmn-lanes.spec.ts).
+  test("a drag into a lane the mapping names no participant for is refused: the shape goes back and nothing is sent", async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     const sent = await openEditable(page, (route) => route.fulfill({ status: 500, body: "not in this test" }));
     await focusStep(page, 2);

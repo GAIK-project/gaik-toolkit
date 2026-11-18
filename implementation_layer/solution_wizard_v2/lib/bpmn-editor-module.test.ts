@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { moveKeepsLanes } from "@/lib/bpmn-editor-module";
+import { moveKeepsLanes, stepLaneChange } from "@/lib/bpmn-editor-module";
+import type { BpmnMapping } from "@/lib/bpmn-canvas-ops";
 
 // Two lanes in one pool, one above the other, as the generator draws them. Each
 // lane's BPMN element lists the flow nodes in it (`flowNodeRef`).
@@ -88,5 +89,40 @@ describe("moveKeepsLanes", () => {
 
   it("lets a shape move freely in a drawing without lanes, within its parent", () => {
     expect(moveKeepsLanes([task], { x: 0, y: 300 }, pool, [])).toBe(true);
+  });
+});
+
+describe("stepLaneChange", () => {
+  const mapping: BpmnMapping = {
+    Activity_extract: { kind: "automated_task", blueprint_path: "workflow.steps[0]", performed_by: "" },
+    Lane_users: { kind: "lane", blueprint_path: "derived:business_spec.intended_users", participant_id: "users" },
+    Lane_gaik_ai: { kind: "lane", blueprint_path: "derived:system", participant_id: "system" },
+  };
+  const steps = [{ id: "extract", name: "Extract" }];
+  const withFlows = {
+    ...task,
+    incoming: [{ id: "Flow_1" }],
+    outgoing: [{ id: "Flow_2" }, { id: "bad id!" }],
+  } as unknown as typeof task;
+
+  it("a step dropped into another lane is set_step_lane, and its place and flows are dropped", () => {
+    expect(stepLaneChange([withFlows, label], { x: 0, y: 200 }, pool, lanes, mapping, steps)).toEqual({
+      op: { op: "set_step_lane", step_id: "extract", lane_id: "system" },
+      shapes: ["Activity_extract"],
+      edges: ["Flow_1", "Flow_2"],
+    });
+  });
+
+  it("is null within its lane, outside the lanes, for no step, for several shapes, or before a delta", () => {
+    expect(stepLaneChange([task], { x: 300, y: 40 }, pool, lanes, mapping, steps)).toBeNull();
+    expect(stepLaneChange([task], { x: 0, y: 900 }, pool, lanes, mapping, steps)).toBeNull();
+    expect(stepLaneChange([data], { x: 0, y: 200 }, pool, lanes, mapping, steps)).toBeNull();
+    expect(stepLaneChange([task, data], { x: 0, y: 200 }, pool, lanes, mapping, steps)).toBeNull();
+    expect(stepLaneChange([task], undefined, pool, lanes, mapping, steps)).toBeNull();
+  });
+
+  it("is null for a lane the mapping names no participant for", () => {
+    const noIds: BpmnMapping = { Activity_extract: mapping.Activity_extract };
+    expect(stepLaneChange([task], { x: 0, y: 200 }, pool, lanes, noIds, steps)).toBeNull();
   });
 });

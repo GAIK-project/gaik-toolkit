@@ -213,6 +213,16 @@ export type Dict = {
   bpmnStepSaveHint: string;
   /** The step panel: an AI step without a component. */
   bpmnStepNeedsComponent: string;
+  /** Lanes: the palette's "Add lane", the name a new lane starts with, a lane's context pad. */
+  bpmnPaletteAddLane: string;
+  bpmnNewLaneName: string;
+  bpmnPadRenameLane: string;
+  bpmnPadRemoveLane: string;
+  /** A lane that steps are in is not removed. */
+  bpmnLaneInUse: string;
+  /** The step panel's lane select, and its entry for the lane of the step's type. */
+  bpmnStepLane: string;
+  bpmnStepLaneDefault: string;
   /** Takes back the last change to the blueprint (wizard_api's undo). */
   bpmnUndo: string;
   bpmnUndone: string;
@@ -1028,6 +1038,13 @@ const fi: Dict = {
   bpmnStepDescriptionCount: "{n} / {max} merkkiä",
   bpmnStepSaveHint: "Enter tai kentästä poistuminen tallentaa, Esc peruu.",
   bpmnStepNeedsComponent: "Tekoälyvaihe tarvitsee komponentin: pyydä wizardia valitsemaan se.",
+  bpmnPaletteAddLane: "Lisää kaista",
+  bpmnNewLaneName: "Uusi kaista",
+  bpmnPadRenameLane: "Nimeä kaista uudelleen",
+  bpmnPadRemoveLane: "Poista kaista",
+  bpmnLaneInUse: "Kaistaa ei poistettu: siinä on vaiheita. Siirrä ne ensin toiseen kaistaan.",
+  bpmnStepLane: "Kaista (kuka tekee)",
+  bpmnStepLaneDefault: "Tyypin oletuskaista",
   bpmnUndo: "Kumoa",
   bpmnUndone: "Viimeisin muutos kumottu.",
   bpmnNothingToUndo: "Ei kumottavaa.",
@@ -1044,6 +1061,7 @@ const fi: Dict = {
     target: "vaihe, johon nuoli päättyy",
     type: "vaiheen tyyppi",
     description: "vaiheen kuvaus",
+    lane_id: "kaista",
   },
   bpmnSaved: "Tallennettu. Wizard näkee muutoksen seuraavasta chat-viestistäsi.",
   bpmnStepTitle: "Vaihe {n}",
@@ -1880,6 +1898,13 @@ const en: Dict = {
   bpmnStepDescriptionCount: "{n} / {max} characters",
   bpmnStepSaveHint: "Enter or leaving the field saves, Esc cancels.",
   bpmnStepNeedsComponent: "This AI step needs a component: ask the wizard to choose one.",
+  bpmnPaletteAddLane: "Add a lane",
+  bpmnNewLaneName: "New lane",
+  bpmnPadRenameLane: "Rename the lane",
+  bpmnPadRemoveLane: "Remove the lane",
+  bpmnLaneInUse: "The lane was not removed: it has steps in it. Move them to another lane first.",
+  bpmnStepLane: "Lane (who does it)",
+  bpmnStepLaneDefault: "Default for its type",
   bpmnUndo: "Undo",
   bpmnUndone: "The last change was undone.",
   bpmnNothingToUndo: "Nothing to undo.",
@@ -1896,6 +1921,7 @@ const en: Dict = {
     target: "step the arrow ends at",
     type: "step type",
     description: "step description",
+    lane_id: "lane",
   },
   bpmnSaved: "Saved. The wizard sees the change from your next chat message.",
   bpmnStepTitle: "Step {n}",

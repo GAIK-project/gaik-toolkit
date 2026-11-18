@@ -10,10 +10,14 @@ const STACK_E2E = process.env.PLAYWRIGHT_STACK_E2E === "true";
  * real stack (UI + wizard_api + Postgres): a layout kept by wizard_api
  * (`PUT /bpmn/layout`) and laid over the diagram it draws again from the
  * blueprint, so a dragged task and a bent flow are where they were left after
- * a page reload. A drag into another lane is refused and nothing is kept.
+ * a page reload. A data object dragged into another lane is refused and
+ * nothing is kept (a step dragged there changes lanes: e2e/bpmn-lanes-stack.spec.ts).
  * e2e/bpmn-layout.spec.ts covers the same on the mock store with wizard_api
  * stood in.
  */
+
+/** The invoice's data object, drawn above the upload step. */
+const DATA = "DataObjectRef_invoice";
 
 /** Where a shape is drawn, in diagram units (its graphics' translation). */
 async function placed(page: Page, id: string) {
@@ -118,7 +122,10 @@ test.describe("BPMN layout (stack)", () => {
     expect(await draftSteps(request, id)).toEqual(stepsBefore);
   });
 
-  test("a drag into another lane is refused: the task goes back and nothing is kept", async ({ page, request }) => {
+  test("a data object dragged into another lane is refused: it goes back and nothing is kept", async ({
+    page,
+    request,
+  }) => {
     test.setTimeout(240_000);
     const id = await sessionAtBpmn(page, request);
     await writeDraft(request, id);
@@ -128,21 +135,21 @@ test.describe("BPMN layout (stack)", () => {
     page.on("request", (r) => {
       if (r.url().includes("/bpmn/layout")) layouts.push(`${r.method()} ${r.url()}`);
     });
-    const before = await shapeBounds(page, id, "Activity_upload");
+    const before = await shapeBounds(page, id, DATA);
 
     await focusStep(page, 0);
-    const where = await placed(page, "Activity_upload");
-    const from = await centre(page, "Activity_upload");
+    const where = await placed(page, DATA);
+    const from = await centre(page, DATA);
     const to = await inLaneBelow(page, from);
     expect(await laneAt(page, to)).not.toBe(await laneAt(page, from));
     await drag(page, from, to);
-    expect(await placed(page, "Activity_upload")).toEqual(where);
+    expect(await placed(page, DATA)).toEqual(where);
     await page.waitForTimeout(1_500);
     expect(layouts).toEqual([]);
 
     await page.reload();
     await openEditor(page);
-    expect(await placed(page, "Activity_upload")).toEqual(where);
-    expect(await shapeBounds(page, id, "Activity_upload")).toEqual(before);
+    expect(await placed(page, DATA)).toEqual(where);
+    expect(await shapeBounds(page, id, DATA)).toEqual(before);
   });
 });

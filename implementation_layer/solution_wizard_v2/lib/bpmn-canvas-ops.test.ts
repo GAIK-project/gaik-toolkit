@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   isDecisionStep,
   isOperationElement,
+  laneIdOf,
   mappingFitsSteps,
+  opForLaneRename,
+  opForStepLane,
+  performedByOf,
   opForAddStep,
   opForAppend,
   opForConnection,
@@ -221,5 +225,53 @@ describe("isDecisionStep", () => {
     expect(isDecisionStep("Activity_extract", withDecision)).toBe(false);
     expect(isDecisionStep("Gateway_approval_review", withDecision)).toBe(false);
     expect(isDecisionStep("nope", withDecision)).toBe(false);
+  });
+});
+
+describe("lanes", () => {
+  // The mapping names each lane's participant and each step's performed_by.
+  const withLanes: BpmnMapping = {
+    ...MAPPING,
+    Activity_upload: { kind: "user_task", blueprint_path: "workflow.steps[0]", performed_by: "" },
+    Activity_review: { kind: "human_review", blueprint_path: "workflow.steps[2]", performed_by: "legal" },
+    Lane_clerk: { kind: "lane", blueprint_path: "business_process.participants[0]", participant_id: "clerk" },
+    Lane_gaik_ai: { kind: "lane", blueprint_path: "derived:system", participant_id: "system" },
+    Lane_legal: { kind: "lane", blueprint_path: "business_process.participants[1]", participant_id: "legal" },
+  };
+
+  it("laneIdOf is the lane's participant id, null for anything else", () => {
+    expect(laneIdOf("Lane_clerk", withLanes)).toBe("clerk");
+    expect(laneIdOf("Lane_gaik_ai", withLanes)).toBe("system");
+    expect(laneIdOf("Lane_clerk", MAPPING)).toBeNull();
+    expect(laneIdOf("Activity_upload", withLanes)).toBeNull();
+    expect(laneIdOf("nope", withLanes)).toBeNull();
+  });
+
+  it("performedByOf is the step's performed_by, empty for the lane of its type", () => {
+    expect(performedByOf("Activity_review", withLanes)).toBe("legal");
+    expect(performedByOf("Activity_upload", withLanes)).toBe("");
+    expect(performedByOf("Activity_extract", withLanes)).toBe("");
+  });
+
+  it("a step dropped in a lane is set_step_lane; nothing for a lane it is in or no step", () => {
+    expect(opForStepLane("Activity_upload", "Lane_legal", "Lane_clerk", withLanes, STEPS)).toEqual({
+      op: "set_step_lane",
+      step_id: "upload",
+      lane_id: "legal",
+    });
+    expect(opForStepLane("Activity_upload", "Lane_clerk", "Lane_clerk", withLanes, STEPS)).toBeNull();
+    expect(opForStepLane("Activity_archive", "Lane_legal", "Lane_clerk", withLanes, STEPS)).toBeNull();
+    expect(opForStepLane("Activity_upload", "Lane_unknown", "Lane_clerk", withLanes, STEPS)).toBeNull();
+  });
+
+  it("a lane renamed in place is rename_lane; nothing for an empty or unchanged name", () => {
+    expect(opForLaneRename("Lane_legal", " Legal team ", "Legal", withLanes)).toEqual({
+      op: "rename_lane",
+      lane_id: "legal",
+      name: "Legal team",
+    });
+    expect(opForLaneRename("Lane_legal", "Legal", "Legal", withLanes)).toBeNull();
+    expect(opForLaneRename("Lane_legal", "  ", "Legal", withLanes)).toBeNull();
+    expect(opForLaneRename("Activity_upload", "X", "Upload", withLanes)).toBeNull();
   });
 });

@@ -282,12 +282,13 @@ test.describe("Workflow tab", () => {
     await expect(page.getByTestId("bpmn-editing")).toContainText("Jokainen muutos tallentuu heti");
     await expect(page.getByTestId("bpmn-undo")).toHaveText("Kumoa");
 
-    // The palette: Add step and the connect tool.
+    // The palette: Add step, Add lane and the connect tool.
     const entries = page.locator(".bpmn-editable .djs-palette .entry");
-    await expect(entries).toHaveCount(2);
+    await expect(entries).toHaveCount(3);
     await expect(entries.nth(0)).toHaveAttribute("title", "Lisää vaihe prosessin loppuun");
     await expect(entries.nth(0)).toHaveAttribute("data-action", "gaik-add-step");
-    await expect(entries.nth(1)).toHaveAttribute("title", /^Yhdistä/);
+    await expect(entries.nth(1)).toHaveAttribute("title", "Lisää kaista");
+    await expect(entries.nth(2)).toHaveAttribute("title", /^Yhdistä/);
 
     // The first step: rename, change type, append, move (not earlier), connect, delete.
     const rows = page.getByTestId("flow-step-list").locator("li");
@@ -751,7 +752,8 @@ test.describe("Workflow tab", () => {
     await (await openAccountMenu(page)).locator('button[name="locale"][value="en"]').click();
     const entries = page.locator(".bpmn-editable .djs-palette .entry");
     await expect(entries.nth(0)).toHaveAttribute("title", "Add a step at the end of the process");
-    await expect(entries.nth(1)).toHaveAttribute("title", /^Connect steps/);
+    await expect(entries.nth(1)).toHaveAttribute("title", "Add a lane");
+    await expect(entries.nth(2)).toHaveAttribute("title", /^Connect steps/);
     await expect(page.getByTestId("bpmn-editing")).toContainText("Each change saves at once.");
     await expect(page.locator('.bpmn-editable [data-element-id="Activity_classify"]')).toBeVisible();
 
