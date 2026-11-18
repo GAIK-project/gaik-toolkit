@@ -86,7 +86,8 @@ sign-in. The passwords are written to `users-passwords-<time>.csv` next to the
 file, readable by you only; they never appear on the screen. Hand each one to
 its owner over a channel of its own (not in the same message as the address and
 the link), then delete the file. An address that already has an account is
-skipped.
+skipped. To add an account to one more group (for example `aiops-viewer`):
+`PROJECT=gaik ./deploy.sh join someone@example.org aiops-viewer`.
 
 ### Approvers (group admin)
 

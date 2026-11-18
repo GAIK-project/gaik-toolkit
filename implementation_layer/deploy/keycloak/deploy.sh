@@ -10,6 +10,7 @@
 #   PROJECT=<project> ./deploy.sh add-google             "Sign in with Google" (GOOGLE_CLIENT_ID/SECRET from env)
 #   PROJECT=<project> ./deploy.sh add-users <file>       accounts from a file, one "email[,group]" per line
 #   PROJECT=<project> ./deploy.sh approve <email>        pending -> wizard-user
+#   PROJECT=<project> ./deploy.sh join <email> <group>   add an account to one more group
 #   PROJECT=<project> ./deploy.sh users                  list accounts and their groups
 #   PROJECT=<project> ./deploy.sh prune-pending [days] [--dry-run]
 #                                                         delete unapproved accounts now (nightly: 7 days)
@@ -275,6 +276,15 @@ approve() {  # <email>: pending -> wizard-user
     echo -e "${GREEN}$email approved (wizard-user).${NC}"
 }
 
+join_group() {  # <email> <group>: add an account to one more group
+    local email uid gid
+    email="$(echo "${1:?email}" | tr '[:upper:]' '[:lower:]')"
+    uid=$(user_id "$email"); [ -n "$uid" ] || { echo -e "${RED}No account $email${NC}"; exit 1; }
+    gid=$(group_id "${2:?group}"); [ -n "$gid" ] || { echo -e "${RED}No group $2${NC}"; exit 1; }
+    kcadm update "users/$uid/groups/$gid" -r "$REALM" -s realm="$REALM" -s userId="$uid" -s groupId="$gid" -n >/dev/null
+    echo "$email joined $2."
+}
+
 users() {
     local row id email
     kcadm get users -r "$REALM" --fields id,email --format csv --noquotes | while IFS=, read -r id email; do
@@ -290,7 +300,8 @@ case "${1:-}" in
     add-google) add_google ;;
     add-users)  add_users "${2:-}" ;;
     approve)    approve "${2:-}" ;;
+    join)       join_group "${2:-}" "${3:-}" ;;
     users)      users ;;
     prune-pending) prune_pending "${2:-7}" "${3:-}" ;;
-    *) sed -n '2,19p' "$0"; exit 1 ;;
+    *) sed -n '2,20p' "$0"; exit 1 ;;
 esac
