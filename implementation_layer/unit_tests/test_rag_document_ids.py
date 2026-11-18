@@ -487,6 +487,15 @@ def test_pg_a_store_without_an_owner_refuses_chunks_that_name_one():
     assert not _inserts(recorder)
 
 
+@pytest.mark.parametrize("has_chunk_key", [True, False])
+def test_pg_setup_alters_the_table_only_when_chunk_key_is_missing(has_chunk_key):
+    store, recorder = _pg(has_chunk_key=has_chunk_key)
+    store.setup()
+
+    altered = [sql for sql, _ in recorder.calls if sql.startswith("ALTER TABLE")]
+    assert bool(altered) is not has_chunk_key
+
+
 def test_pg_a_table_without_chunk_key_is_inserted_into_as_before():
     store, recorder = _pg(has_chunk_key=False)
     store.add(_chunks("report", ["alpha"]), [A1])

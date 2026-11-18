@@ -479,8 +479,11 @@ class PgVectorStore:
             """)
 
         # A table made by an older gaik has no chunk_key; its rows keep NULL,
-        # which the unique index allows any number of.
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS chunk_key TEXT")
+        # which the unique index allows any number of. ALTER TABLE locks the table
+        # against readers even when the column exists, so it runs only when the
+        # column is missing.
+        if not self._has_chunk_key_column(conn):
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS chunk_key TEXT")
 
         # 3. Indexes
         conn.execute(f"""
@@ -942,18 +945,10 @@ class PgVectorStore:
         """Whether the table has the ``chunk_key`` column ``setup()`` adds."""
         # Only a found column is remembered: setup() may add it later.
         if not self._has_chunk_key:
-            row = conn.execute(
-                """
-                SELECT 1 FROM pg_attribute
-                WHERE attrelid = to_regclass(%s)
-                  AND attname = 'chunk_key'
-                  AND NOT attisdropped
-                """,
-                (self.table_name,),
-            ).fetchone()
+            found = self._has_chunk_key_column(conn)
             # Warn once: a None (not checked yet) becomes False only here.
-            warn = self._has_chunk_key is None and not row
-            self._has_chunk_key = bool(row)
+            warn = self._has_chunk_key is None and not found
+            self._has_chunk_key = found
             if warn:
                 logger.warning(
                     "Table '%s' has no chunk_key column: adding a document again "
@@ -961,6 +956,19 @@ class PgVectorStore:
                     self.table_name,
                 )
         return self._has_chunk_key
+
+    def _has_chunk_key_column(self, conn: psycopg.Connection) -> bool:
+        """Whether the table has a ``chunk_key`` column now (read from ``pg_attribute``)."""
+        row = conn.execute(
+            """
+            SELECT 1 FROM pg_attribute
+            WHERE attrelid = to_regclass(%s)
+              AND attname = 'chunk_key'
+              AND NOT attisdropped
+            """,
+            (self.table_name,),
+        ).fetchone()
+        return bool(row)
 
     @_rolls_back_on_error
     def count(self) -> int:
