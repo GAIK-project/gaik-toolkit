@@ -892,6 +892,7 @@ class PgVectorStore:
         row = conn.execute(
             f"SELECT COUNT(*) AS cnt FROM {self.table_name} WHERE TRUE {clause}", params
         ).fetchone()
+        conn.commit()
         return row["cnt"] if row else 0
 
     def _scoped(self, filters: dict | None) -> dict | None:
@@ -971,6 +972,7 @@ class PgVectorStore:
             """,
             (vec_str, threshold, top_k, filter_json),
         ).fetchall()
+        conn.commit()
 
         return self._rows_to_results(rows, score_key="similarity")
 
@@ -1012,6 +1014,7 @@ class PgVectorStore:
             """,
             (effective_query, effective_query, *filter_params, top_k),
         ).fetchall()
+        conn.commit()
 
         return self._rows_to_results(rows, score_key="score")
 
@@ -1082,6 +1085,7 @@ class PgVectorStore:
                 self.tsquery_mode,
             ),
         ).fetchall()
+        conn.commit()
 
         return self._rows_to_results(
             rows,
@@ -1146,6 +1150,7 @@ class PgVectorStore:
                 self.tsquery_mode,
             ),
         ).fetchall()
+        conn.commit()
 
         return self._rows_to_results(
             rows,
@@ -1211,6 +1216,7 @@ class PgVectorStore:
             (table,),
         ).fetchall()
         if not columns:
+            conn.commit()
             return HealthReport(
                 False, [f"table {table!r} does not exist: call setup() first"], details
             )
@@ -1392,6 +1398,7 @@ class PgVectorStore:
                 "pgvector 0.8 or newer, and a transaction pooler drops session settings"
             )
 
+        conn.commit()
         return HealthReport(not problems, problems, details)
 
     @_rolls_back_on_error
