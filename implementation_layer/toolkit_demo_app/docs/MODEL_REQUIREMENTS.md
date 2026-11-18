@@ -161,5 +161,5 @@ the 0.9.1 release smoke run on gpt-oss 120B generated the schema in 17 seconds.
 ## Models listed in the UI today
 
 Server models: see the README. Own key, OpenAI/Azure: `gpt-6-sol` (default), `gpt-6-luna`,
-`gpt-6.1-sol`, `gpt-6-astra`, `gpt-5.6-terra`. Own key, Aitta:
+`gpt-6.2-sol`, `gpt-6.1-sol`, `gpt-6-astra`, `gpt-5.6-terra`. Own key, Aitta:
 `google/gemma-4-31b-it`, `openai/gpt-oss-120b` (text only), `Qwen/Qwen3.8-27B`.

@@ -110,7 +110,7 @@ The **model menu** in the nav shows which model runs the current demo. Signed-in
 can switch among the server's own models without a key. `GET /api/model-settings/server`
 lists them, and the API checks the `x-gaik-server-model` header against that list.
 By default these are GPT-6 Sol (the server default, set with `DEMO_LLM_MODEL`), GPT-6 Luna,
-Claude Haiku 5.5, Claude Sonnet 5.5 and Gemini 3.8 Flash for everyone, and GPT-6.1 Sol,
+Claude Haiku 5.5, Claude Sonnet 5.5 and Gemini 3.8 Flash for everyone, and GPT-6.2 Sol, GPT-6.1 Sol,
 GPT-6 Astra, Claude Opus 5.5 and Gemini 4 Argon for the GAIK team only: the admin, the `DEMO_USER_NAME`
 account, `haaga-helia.fi` addresses and anyone in `MODEL_STAFF_EMAILS`. The proxy
 decides this from the session and tells the API in `x-gaik-model-tier`; a browser cannot
