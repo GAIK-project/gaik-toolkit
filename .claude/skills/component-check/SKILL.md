@@ -63,14 +63,14 @@ names:
 | `--judge` | CLI | Signed in with |
 | --- | --- | --- |
 | `claude` | `claude -p` (no tools, no MCP servers) | `claude` then `/login` with the Claude subscription |
-| `codex` | `codex exec --sandbox read-only` | `codex login` with ChatGPT |
+| `codex` | `codex exec --sandbox read-only`, model `gpt-6.2-sol` | `codex login` with ChatGPT |
 | `agy` | Antigravity `agy -p --mode plan --sandbox` | the Antigravity Google sign-in |
 
 The runner removes every API key, token and alternative endpoint from the judge's environment
 (`judge_env` in `run_checks.py`), so the CLI falls back to its own login and nothing is billed
 to an API key. A judge that is not signed in, or has hit its plan's usage limit, gives
-`judge error` with the CLI's message; the fixed checks still stand. `--judge-model` passes a
-model to the CLI. Give a judge only synthetic or otherwise shareable inputs: it sends them to
+`judge error` with the CLI's message; the fixed checks still stand. `--judge-model` (or
+`CHECK_JUDGE_MODEL`) picks the CLI's model; Codex gets `gpt-6.2-sol` unless you name another. Give a judge only synthetic or otherwise shareable inputs: it sends them to
 its own provider under the subscription's terms.
 
 The judge is advice. A `judge fail` on a case the fixed checks pass is a finding only after

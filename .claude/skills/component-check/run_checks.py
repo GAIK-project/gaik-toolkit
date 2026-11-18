@@ -72,6 +72,10 @@ JUDGE_DROP_PATTERN = re.compile(
 # `claude setup-token` gives a subscription token, not an API key: keep it.
 JUDGE_KEEP = {"CLAUDE_CODE_OAUTH_TOKEN"}
 
+# The model a judge CLI gets when --judge-model is not given; None keeps the CLI's own default.
+# GPT-6.2 Sol is the Codex model the maintainers chose for judging (2026-11).
+DEFAULT_JUDGE_MODELS = {"codex": "gpt-6.2-sol"}
+
 JUDGE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -668,9 +672,8 @@ def judge_case(case: dict, entry: dict, args) -> dict:
     with tempfile.TemporaryDirectory(prefix="component-judge-") as tmp:
         work = Path(tmp)
         try:
-            cmd, stdin = judge_command(
-                args.judge, args.judge_model, work, judge_prompt(case, entry)
-            )
+            model = args.judge_model or DEFAULT_JUDGE_MODELS.get(args.judge)
+            cmd, stdin = judge_command(args.judge, model, work, judge_prompt(case, entry))
             done = subprocess.run(
                 cmd,
                 input=stdin,
@@ -843,7 +846,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=["claude", "codex", "agy"],
         help="Judge every output with this CLI on its subscription login",
     )
-    parser.add_argument("--judge-model", help="Model for the judge CLI (its default otherwise)")
+    parser.add_argument(
+        "--judge-model",
+        default=os.getenv("CHECK_JUDGE_MODEL"),
+        help="Model for the judge CLI (codex: gpt-6.2-sol; claude and agy: their own default)",
+    )
     parser.add_argument("--judge-timeout", type=float, default=300)
     parser.add_argument("--baseline", type=Path, help="An earlier run folder to compare with")
     parser.add_argument(

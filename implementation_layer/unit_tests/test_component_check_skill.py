@@ -242,3 +242,9 @@ def test_the_baseline_reports_a_lost_pass_but_not_a_decimal_read_back_as_text():
         "azure / c: was pass, now fail",
         "azure / c: output differs from the baseline",
     ]
+
+
+def test_codex_judges_with_gpt_6_2_sol_unless_told_otherwise():
+    assert rc.DEFAULT_JUDGE_MODELS["codex"] == "gpt-6.2-sol"
+    assert rc.parse_args(["--judge", "codex"]).judge_model in (None, "")
+    assert "claude" not in rc.DEFAULT_JUDGE_MODELS and "agy" not in rc.DEFAULT_JUDGE_MODELS
