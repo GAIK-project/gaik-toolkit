@@ -481,6 +481,15 @@ class _BpmnBuilder:
             self.nodes[nid] = node
             self._map(nid, "manual_step", f"business_process.manual_steps[{i}]")
 
+    def _build_participant_lanes(self) -> None:
+        """Every participant is a lane, also one no step is in yet: a lane the
+        user adds is drawn, so a step can be moved into it."""
+        for i, p in enumerate(self.bp.business_process.participants):
+            lid = f"Lane_{_safe(p.id)}"
+            if lid not in self.mapping:
+                self._map(lid, "lane", f"business_process.participants[{i}]")
+            self._ensure_lane(lid, p.name, self._participant_priority(p))
+
     # -- base sequence-flow graph -----------------------------------------
 
     def _add_flow(self, src: str, tgt: str, name: str = "", is_loop: bool = False) -> _Flow:
@@ -1185,6 +1194,7 @@ class _BpmnBuilder:
     def build(self) -> str:
         self._build_step_nodes()
         self._build_manual_steps()
+        self._build_participant_lanes()
         self._build_base_edges()
         self._enrich_approval()
         self._enrich_decision_points()

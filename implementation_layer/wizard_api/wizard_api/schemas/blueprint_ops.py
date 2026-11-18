@@ -15,6 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from wizard_api.schemas.blueprint import SessionDetailResponse
 
 StepType = Literal["user_task", "automated_task", "human_review"]
+#: ``Participant.kind`` in solution_wizard's blueprint: a person's role or a system.
+LaneKind = Literal["human_role", "system"]
 
 MAX_OPERATIONS = 50
 #: The largest request body the operations route reads: 50 operations fit with room.
@@ -76,6 +78,35 @@ class SetStepType(_Operation):
     type: StepType
 
 
+class AddLane(_Operation):
+    """A new lane (``business_process.participants`` entry) that no step is in yet."""
+
+    op: Literal["add_lane"]
+    name: str = Field(max_length=MAX_NAME_CHARS)
+    kind: LaneKind = "human_role"
+
+
+class RenameLane(_Operation):
+    op: Literal["rename_lane"]
+    lane_id: str
+    name: str = Field(max_length=MAX_NAME_CHARS)
+
+
+class RemoveLane(_Operation):
+    """Refused (``lane_in_use``) while a step or a manual step is in the lane."""
+
+    op: Literal["remove_lane"]
+    lane_id: str
+
+
+class SetStepLane(_Operation):
+    """Who does the step: its ``performed_by``. ``None`` puts it back in the lane of its type."""
+
+    op: Literal["set_step_lane"]
+    step_id: str
+    lane_id: str | None
+
+
 Operation = Annotated[
     (
         RenameStep
@@ -86,6 +117,10 @@ Operation = Annotated[
         | Connect
         | Disconnect
         | SetStepType
+        | AddLane
+        | RenameLane
+        | RemoveLane
+        | SetStepLane
     ),
     Field(discriminator="op"),
 ]

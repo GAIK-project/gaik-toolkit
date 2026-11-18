@@ -274,9 +274,10 @@ def _session_bpmn_view(
     }
     try:
         if with_mapping:
-            xml, mapping, _ = bpmn_service.generate_bpmn_view(
+            xml, mapping, drawn_from = bpmn_service.generate_bpmn_view(
                 detail.blueprint.model_dump(), **drawing
             )
+            mapping = bpmn_service.named_mapping(mapping, drawn_from)
         else:
             xml = bpmn_service.generate_bpmn_xml(detail.blueprint.model_dump(), **drawing)
             # Where the user placed the shapes of this drawing mode; the mapping
@@ -315,7 +316,8 @@ def get_session_bpmn_mapping(
     db: Session = Depends(get_db),
 ) -> JSONResponse:
     """``{"mapping": {element_id: {"kind": ..., "blueprint_path": ...}}, "has_draft": bool}``
-    of the diagram ``GET /bpmn`` serves with the same ``data_objects``. Drawn
+    of the diagram ``GET /bpmn`` serves with the same ``data_objects``. A lane's
+    entry also has its ``participant_id`` and a step's its ``performed_by``. Drawn
     again here, so its element ids are the ones in that XML; a mapping stored in
     the draft can be from before an edit. ``has_draft`` says whether the agent
     has written its draft: without one the diagram's operations are refused

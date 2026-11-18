@@ -137,7 +137,9 @@ def test_the_mapping_names_the_elements_of_the_diagram(client, db_session, data_
     assert mapping["Activity_extract"] == {
         "kind": "automated_task",
         "blueprint_path": "workflow.steps[1]",
+        "performed_by": "",
     }
+    assert mapping["Lane_clerk"]["participant_id"] == "clerk"
     assert any(info["kind"] == "manual_step" for info in mapping.values())
     assert all("blueprint_path" in info for info in mapping.values())
     assert any(info["kind"] == "data_object" for info in mapping.values()) == bool(data_objects)

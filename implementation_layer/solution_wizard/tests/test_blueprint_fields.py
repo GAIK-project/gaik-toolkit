@@ -70,6 +70,26 @@ def test_a_step_with_performed_by_is_drawn_in_that_lane(include_data_objects):
     assert ly <= y and y + h <= ly + lh
 
 
+@pytest.mark.parametrize("include_data_objects", [True, False])
+def test_a_participant_no_step_is_in_is_drawn_as_an_empty_lane(include_data_objects):
+    bp = _example()
+    bp.business_process.participants = [
+        Participant(id="clerk", name="Clerk", default_lane_for=["user_task"]),
+        Participant(id="legal", name="Legal"),
+    ]
+    root = ET.fromstring(generate_bpmn(bp, include_data_objects=include_data_objects))
+
+    lane = root.find(".//bpmn:lane[@name='Legal']", NS)
+    assert lane is not None
+    assert lane.findall("bpmn:flowNodeRef", NS) == []
+    assert _bounds(root, "Lane_legal")[3] > 0
+    mapping = bp.visualizations["bpmn_mapping"]
+    assert mapping["Lane_legal"] == {
+        "kind": "lane",
+        "blueprint_path": "business_process.participants[1]",
+    }
+
+
 def test_an_unknown_performer_falls_back_to_the_category_lane():
     bp = _example()
     _step(bp, "extract_po_fields").performed_by = "nobody"

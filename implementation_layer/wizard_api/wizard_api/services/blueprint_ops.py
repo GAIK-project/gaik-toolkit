@@ -26,19 +26,24 @@ from typing import Any
 from pydantic import ValidationError
 
 from wizard_api.schemas.blueprint_ops import (
+    AddLane,
     AddStep,
     Connect,
     Disconnect,
     MoveStep,
+    RemoveLane,
     RemoveStep,
+    RenameLane,
     RenameStep,
     SetStepDescription,
+    SetStepLane,
     SetStepType,
 )
 
 try:
     from solution_wizard import validator
     from solution_wizard.blueprint import Blueprint
+    from solution_wizard.bpmn_generator import DERIVED_PARTICIPANT_IDS, derived_participants
 
     _SOLUTION_WIZARD_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional in minimal installs
@@ -62,7 +67,7 @@ def solution_wizard_available() -> bool:
 
 class OperationError(Exception):
     """An operation the draft cannot take. ``code`` is machine-readable:
-    ``not_found``, ``last_step``, ``cycle`` or ``invalid``."""
+    ``not_found``, ``last_step``, ``cycle``, ``lane_in_use`` or ``invalid``."""
 
     def __init__(
         self, code: str, message: str, field: str | None = None, index: int | None = None
@@ -665,6 +670,139 @@ def _set_step_type(ctx: _Context, op: SetStepType) -> None:
     )
 
 
+# ---------------------------------------------------------------- lanes
+#
+# A lane is a ``business_process.participants`` entry, and a step's lane its
+# ``performed_by``. Without participants the generator derives the lanes
+# (``derived_participants``); the first lane operation makes them participants,
+# so the diagram keeps the lanes, names and order it had. A derived lane drawn
+# beside participants (a category no participant covers) becomes one when an
+# operation names it.
+
+
+def _lane_participants(ctx: _Context) -> list[dict]:
+    """The participants; on a draft without any, the derived lanes made real ones."""
+    participants = ctx.process.get("participants")
+    if not isinstance(participants, list):
+        participants = ctx.process["participants"] = []
+    if not participants:
+        participants.extend(_derived(ctx))
+    return participants
+
+
+def _derived(ctx: _Context) -> list[dict]:
+    try:
+        blueprint = Blueprint.model_validate(ctx.blueprint)
+    except ValidationError as exc:
+        message = f"The blueprint is not valid: {exc.errors()[0]['msg']}"
+        raise OperationError("invalid", message) from None
+    return [p.model_dump() for p in derived_participants(blueprint)]
+
+
+def _lane(ctx: _Context, lane_id: str) -> dict:
+    participants = _lane_participants(ctx)
+    for participant in participants:
+        if participant.get("id") == lane_id:
+            return participant
+    if lane_id in DERIVED_PARTICIPANT_IDS:
+        # A derived lane drawn beside the participants: it becomes one of them.
+        derived = next((p for p in _derived(ctx) if p["id"] == lane_id), None)
+        if derived is not None:
+            participants.append(derived)
+            return derived
+    raise OperationError("not_found", f'There is no lane "{lane_id}"', "lane_id")
+
+
+def _lane_name(lane: dict) -> str:
+    return lane.get("name") or lane.get("id", "")
+
+
+def _lane_text(value: str) -> str:
+    name = value.strip()
+    if not name:
+        raise OperationError("invalid", "A lane needs a name", "name")
+    return name
+
+
+def _category_lane(participants: list[dict], step_type: str) -> str | None:
+    """The participant a step of ``step_type`` without ``performed_by`` is drawn in,
+    as the generator picks it (``_lane_for_category``); None for a derived lane."""
+    if step_type in ("automated_task", "decision"):
+        hit = next((p for p in participants if p.get("kind") == "system"), None)
+    else:
+        wanted = "human_review" if step_type == "human_review" else "user_task"
+        hit = next((p for p in participants if wanted in (p.get("default_lane_for") or [])), None)
+    return hit.get("id") if hit else None
+
+
+def _lane_users(ctx: _Context, lane_id: str) -> list[str]:
+    """What is in the lane or names it: steps and manual steps, by their
+    ``performed_by`` or, without one, by their type; and message flows."""
+    participants = ctx.process.get("participants") or []
+    known = {p.get("id") for p in participants}
+
+    def drawn_in(item: dict, step_type: str) -> bool:
+        by = item.get("performed_by") or ""
+        if by in known:
+            return by == lane_id
+        return _category_lane(participants, step_type) == lane_id
+
+    users = [f'step "{_label(s)}"' for s in ctx.steps if drawn_in(s, s.get("type", ""))]
+    manual_steps = ctx.process.get("manual_steps") or []
+    users += [f'step "{_label(m)}"' for m in manual_steps if drawn_in(m, "user_task")]
+    for flow in ctx.process.get("message_flows") or []:
+        if lane_id in (flow.get("from"), flow.get("to")):
+            users.append("a message flow")
+    return users
+
+
+def _add_lane(ctx: _Context, op: AddLane) -> None:
+    name = _lane_text(op.name)
+    participants = _lane_participants(ctx)
+    # Unique among the element ids a message flow can name, and never a
+    # derived lane's id, which a step's performed_by may already hold.
+    taken = {p.get("id") for p in participants} | set(DERIVED_PARTICIPANT_IDS)
+    taken |= {s.get("id") for s in ctx.steps}
+    for key in ("manual_steps", "external_parties"):
+        taken |= {item.get("id") for item in ctx.process.get(key) or []}
+    lane_id = new_step_id(name if re.search(r"[a-z0-9]", name.lower()) else "lane", taken)
+    participants.append({"id": lane_id, "name": name, "kind": op.kind, "default_lane_for": []})
+    ctx.summaries.append(f'Added lane "{name}"')
+
+
+def _rename_lane(ctx: _Context, op: RenameLane) -> None:
+    lane = _lane(ctx, op.lane_id)
+    name = _lane_text(op.name)
+    ctx.summaries.append(f'Renamed lane "{_lane_name(lane)}" to "{name}"')
+    lane["name"] = name
+
+
+def _remove_lane(ctx: _Context, op: RemoveLane) -> None:
+    lane = _lane(ctx, op.lane_id)
+    users = _lane_users(ctx, op.lane_id)
+    if users:
+        raise OperationError(
+            "lane_in_use",
+            f'Lane "{_lane_name(lane)}" is in use ({", ".join(users[:5])}): '
+            "move them to another lane first",
+            "lane_id",
+        )
+    ctx.process["participants"] = [p for p in ctx.process["participants"] if p is not lane]
+    ctx.summaries.append(f'Removed lane "{_lane_name(lane)}"')
+
+
+def _set_step_lane(ctx: _Context, op: SetStepLane) -> None:
+    step = ctx.step(op.step_id, "step_id")
+    _lane_participants(ctx)
+    if op.lane_id is None:
+        step.pop("performed_by", None)
+        ctx.summaries.append(f'Moved step "{_label(step)}" back to the lane of its type')
+        return
+    lane = _lane(ctx, op.lane_id)
+    step["performed_by"] = lane["id"]
+    ctx.summaries.append(f'Moved step "{_label(step)}" to lane "{_lane_name(lane)}"')
+
+
 def _set_field(ctx: _Context, op: SetField) -> None:
     _FIELD_HANDLERS[op.field](ctx, op)
 
@@ -779,5 +917,9 @@ _HANDLERS: dict[type, Callable[[_Context, Any], None]] = {
     Connect: _connect,
     Disconnect: _disconnect,
     SetStepType: _set_step_type,
+    AddLane: _add_lane,
+    RenameLane: _rename_lane,
+    RemoveLane: _remove_lane,
+    SetStepLane: _set_step_lane,
     SetField: _set_field,
 }

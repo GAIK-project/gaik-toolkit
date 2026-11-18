@@ -76,6 +76,47 @@ def generate_bpmn_view(
     return _render(v1, include_data_objects)
 
 
+#: The mapping path of each lane the generator derives, and the participant id
+#: that names it (``derived_participants``): a step's performed_by may hold it.
+_DERIVED_LANE_IDS = {
+    "derived:business_spec.intended_users": "users",
+    "derived:system": "system",
+    "derived:business_spec.reviewers": "reviewers",
+}
+
+
+def _index(path: str, prefix: str) -> int | None:
+    if not (path.startswith(prefix + "[") and path.endswith("]")):
+        return None
+    number = path[len(prefix) + 1 : -1]
+    return int(number) if number.isdigit() else None
+
+
+def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[str, Any]:
+    """``mapping`` with what the editor needs beside the paths: each lane's
+    ``participant_id`` (the id lane operations take, derived lanes included),
+    and each step's ``performed_by`` ("" when its type decides its lane)."""
+    process = drawn_from.get("business_process") or {}
+    participants = process.get("participants") or []
+    steps = (drawn_from.get("workflow") or {}).get("steps") or []
+    named: dict[str, Any] = {}
+    for element_id, entry in mapping.items():
+        entry = dict(entry) if isinstance(entry, dict) else entry
+        path = entry.get("blueprint_path", "") if isinstance(entry, dict) else ""
+        if isinstance(entry, dict) and entry.get("kind") == "lane":
+            i = _index(path, "business_process.participants")
+            if i is not None and i < len(participants):
+                entry["participant_id"] = str(participants[i].get("id") or "")
+            elif path in _DERIVED_LANE_IDS:
+                entry["participant_id"] = _DERIVED_LANE_IDS[path]
+        elif isinstance(entry, dict):
+            i = _index(path, "workflow.steps")
+            if i is not None and i < len(steps) and isinstance(steps[i], dict):
+                entry["performed_by"] = str(steps[i].get("performed_by") or "")
+        named[element_id] = entry
+    return named
+
+
 def _render(
     v1: dict[str, Any], include_data_objects: bool = True
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
