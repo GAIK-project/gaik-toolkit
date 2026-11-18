@@ -96,5 +96,7 @@ test("an alternative's condition reads once after If", () => {
   expect(conditionText("the system ranks job applicants")).toBe(
     "the system ranks job applicants",
   );
-  expect(conditionText("  if it profiles people .. ")).toBe("it profiles people");
+  expect(conditionText("  if it profiles people .. ")).toBe(
+    "it profiles people",
+  );
 });
