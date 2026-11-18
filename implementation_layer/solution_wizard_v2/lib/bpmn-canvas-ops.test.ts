@@ -22,6 +22,7 @@ import {
   opForAppend,
   opForConnection,
   opForDelete,
+  opForDeleteKey,
   opForLabelUpdate,
   opsForMove,
   stepIdOf,
@@ -104,6 +105,34 @@ describe("opForConnection", () => {
     expect(opForConnection("Activity_upload", "Gateway_approval_review", MAPPING, STEPS)).toBeNull();
     expect(opForConnection("DataObjectRef_invoice", "Activity_review", MAPPING, STEPS)).toBeNull();
     expect(opForConnection("Activity_upload", "Activity_upload", MAPPING, STEPS)).toBeNull();
+  });
+});
+
+describe("opForDeleteKey", () => {
+  const path = { id: "wrong_class", name: "Wrong", attached_to: "review", condition: "c", outcome: "loop_to:extract" };
+  const mapping: BpmnMapping = {
+    ...MAPPING,
+    Gateway_approval_review: { kind: "approval_gateway", blueprint_path: "derived:approval_after:review", exception: path },
+    Gateway_exc_wrong_class: { kind: "exception_gateway", blueprint_path: "business_process.exceptions[0]", exception: path },
+  };
+  const steps = [{ id: "upload" }, { id: "extract" }, { id: "review" }];
+
+  it("does nothing on the approval gateway, whose pad's Remove still removes its path", () => {
+    const gateway = { id: "Gateway_approval_review", type: "bpmn:ExclusiveGateway" };
+    expect(opForDeleteKey(gateway, mapping, steps)).toBeNull();
+    expect(opForDelete(gateway, mapping, steps)).toEqual({ op: "remove_rework_path", exception_id: "wrong_class" });
+  });
+
+  it("removes what the pad's Remove removes everywhere else", () => {
+    const pathGateway = { id: "Gateway_exc_wrong_class", type: "bpmn:ExclusiveGateway" };
+    expect(opForDeleteKey(pathGateway, mapping, steps)).toEqual({
+      op: "remove_rework_path",
+      exception_id: "wrong_class",
+    });
+    expect(opForDeleteKey({ id: "Activity_extract", type: "bpmn:ServiceTask" }, mapping, steps)).toEqual({
+      op: "remove_step",
+      step_id: "extract",
+    });
   });
 });
 

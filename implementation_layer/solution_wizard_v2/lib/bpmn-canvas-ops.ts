@@ -193,6 +193,23 @@ export function opForDelete(
 }
 
 /**
+ * What the Delete key does to `element`: what its pad's Remove does
+ * (`opForDelete`), except on the approval gateway after a review. That
+ * gateway stands for its review, and a key pressed while it is picked would
+ * remove the rework path its "No" draws without the user meaning to: its
+ * path is removed with the pad's Remove only.
+ */
+export function opForDeleteKey(
+  element: CanvasElement,
+  mapping: BpmnMapping,
+  steps: StepRef[],
+): BlueprintOperation | null {
+  const entry = Object.prototype.hasOwnProperty.call(mapping, element.id) ? mapping[element.id] : undefined;
+  if (entry?.kind === "approval_gateway") return null;
+  return opForDelete(element, mapping, steps);
+}
+
+/**
  * Whether the canvas offers edits on `element`: a step's task, a business
  * decision, a path, a data object, a flow between two steps, or a data
  * object's association with a step.

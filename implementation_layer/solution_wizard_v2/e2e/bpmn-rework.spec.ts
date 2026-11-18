@@ -206,7 +206,15 @@ test.describe("BPMN rework paths", () => {
 
     // Another element first: the gateway is picked anew, and its pad opens again.
     await page.getByTestId("flow-step-list").locator("li").nth(0).getByRole("button").first().click();
-    await pickGateway(page, gateway);
+    const picked = await pickGateway(page, gateway);
+    // The Delete key does nothing on the approval gateway: its path goes with Remove only.
+    // The keys go to the canvas once it has the focus.
+    await page.locator('.bpmn-editable svg[tabindex="0"]').focus();
+    await expect(picked).toHaveClass(/selected/);
+    await page.keyboard.press("Delete");
+    await page.waitForTimeout(500);
+    expect(sent).toHaveLength(1);
+    await expect(picked).toBeVisible();
     await page.locator('.djs-context-pad .entry[data-action="gaik-rework-remove"]').click();
     await expect.poll(() => sent.length).toBe(2);
     expect(sent[1]).toEqual([{ op: "remove_rework_path", exception_id: "wrong_class" }]);

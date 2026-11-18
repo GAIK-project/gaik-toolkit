@@ -30,13 +30,16 @@
  *   gateway's Edit open the branch dialog (`onDecision`, in the panel); a
  *   decision gateway's Remove (and the Delete key) is `remove_decision`. A
  *   gateway the generator draws by itself (the approval after a review) has
- *   no tools; a decision step (a `workflow.steps` entry drawn as a gateway)
- *   keeps the step tools.
+ *   no tools of its own: it has a path's Edit and Remove only when its "No"
+ *   draws a rework path (below). A decision step (a `workflow.steps` entry
+ *   drawn as a gateway) keeps the step tools.
  * - Rework and rejection paths: a step's "Add rework path" and a path's Edit
  *   open the path dialog (`onRework`, in the panel); a path's Remove (and the
  *   Delete key) is `remove_rework_path`. A path's elements are its gateway,
  *   its end event, and the approval gateway of a review whose "No" is the
- *   path's loop back.
+ *   path's loop back. On that approval gateway the Delete key does nothing
+ *   (`opForDeleteKey`): it stands for the review, and only its pad's Remove
+ *   removes the path.
  * - Data objects (drawn only with "Show data" on): a data object's pad renames
  *   it in place (`rename_data_object`, an emptied name clears its own) and
  *   starts a line to a step. The connect tool between a data object and a
@@ -67,6 +70,7 @@ import {
   opForConnection,
   opForDataObjectRename,
   opForDelete,
+  opForDeleteKey,
   opForLabelUpdate,
   opForLaneRename,
   opForStepLane,
@@ -667,7 +671,7 @@ class GaikRules extends RuleProvider {
       if (!c || context.elements.length !== 1) return false;
       const [el] = context.elements;
       // A data object has tools but no Delete: only what an operation removes goes.
-      return el === owner(el) && opForDelete(canvasElement(el), c.mapping, c.steps) ? [el] : false;
+      return el === owner(el) && opForDeleteKey(canvasElement(el), c.mapping, c.steps) ? [el] : false;
     });
     this.addRule("shape.resize", 2000, () => false);
     this.addRule(["shape.create", "elements.create", "elements.paste", "element.copy", "shape.attach"], 2000, () => false);
@@ -847,7 +851,7 @@ class GaikOperations {
       case "elements.delete": {
         const elements = (top.context.elements as Element[] | undefined) ?? [];
         if (!ctx || elements.length !== 1) return ops.onRevert();
-        return send(opForDelete(canvasElement(elements[0]), ctx.mapping, ctx.steps));
+        return send(opForDeleteKey(canvasElement(elements[0]), ctx.mapping, ctx.steps));
       }
     }
     if (MOVE_ROOTS.has(top.command) && [...nested].every((c) => MOVE_COMMANDS.has(c))) {
