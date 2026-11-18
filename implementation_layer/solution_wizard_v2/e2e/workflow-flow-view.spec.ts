@@ -507,11 +507,13 @@ test.describe("Workflow tab: the simple flow", () => {
       await expect(page.getByTestId("simple-flow-name")).toHaveValue("Classification");
       await expect(page.getByTestId("simple-flow-remove")).toBeVisible();
 
-      // One lock for the two diagrams: the BPMN editor is open for edits too.
+      // One lock for the two diagrams: the BPMN editor is open too. Without
+      // wizard_api (the mock store) it has no tools and says it is read-only.
       await openBpmnView(page, { edit: false });
       await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-locked", "false", { timeout: 45_000 });
       await expect(page.getByTestId("bpmn-locked")).toHaveCount(0);
-      await expect(page.locator(".bpmn-editable .djs-palette")).toBeVisible();
+      await expect(page.getByTestId("bpmn-readonly-editing")).toBeVisible();
+      await expect(page.locator(".bpmn-editable .djs-palette")).toHaveCount(0);
     });
 
     test("before Gate 2 nothing is locked, and a step's menu asks the wizard too", async ({

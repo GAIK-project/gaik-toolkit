@@ -7,8 +7,10 @@ import { openBpmnView } from "./helpers/workspace";
  * The Workflow tab's editor shows a palette over the diagram. At bpmn-js's own size
  * (46 px entries, 94 px wide) it covered a third of the canvas, and a compact rule written
  * inside a CSS layer never applied, because bpmn-js's stylesheet is unlayered. This measures
- * the rendered palette, not the CSS text. The palette holds the two tools whose result a
- * save keeps (add a task, connect); see e2e/bpmn-editing.spec.ts for what they are.
+ * the rendered palette, not the CSS text. The palette holds the two tools that are
+ * operations on the blueprint (add a step, connect); see e2e/bpmn-editing.spec.ts for
+ * what they are. The tools come with wizard_api's mapping of the diagram, which the
+ * mock store has not: the test stands in for it.
  */
 test.describe("BPMN editor palette", () => {
   test.beforeEach(async ({ request }) => {
@@ -16,6 +18,15 @@ test.describe("BPMN editor palette", () => {
   });
 
   test("is compact and holds its two tools", async ({ page }) => {
+    const mapping = Object.fromEntries(
+      ["ingest", "extract", "classify", "approve", "export"].map((id, i) => [
+        `Activity_${id}`,
+        { kind: "user_task", blueprint_path: `workflow.steps[${i}]` },
+      ]),
+    );
+    await page.route("**/api/sessions/ses_laskut/bpmn/mapping*", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ mapping }) }),
+    );
     await loginAsDev(page);
     await page.goto("/sessions/ses_laskut");
     await page.getByRole("tab", { name: "Työnkulku" }).click();

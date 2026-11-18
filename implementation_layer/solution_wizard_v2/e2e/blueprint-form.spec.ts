@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { loginAsDev } from "./helpers/auth";
 import { resetMockSessions } from "./helpers/mock";
-import { openBlueprintEditor, openBpmnView, selectWorkspaceTab, setChatOpen } from "./helpers/workspace";
+import { openBlueprintEditor, selectWorkspaceTab, setChatOpen } from "./helpers/workspace";
 
 /**
  * The Blueprint form: one page the tab scrolls, with the control that closes
@@ -452,7 +452,6 @@ test.describe("Blueprint form", () => {
   });
 
   test("asks which version stays when the blueprint changes under an unsaved draft", async ({ page }) => {
-    // The Workflow tab's save lints, syncs and regenerates the diagram in child processes.
     test.setTimeout(150_000);
     await openForm(page, "ses_laskut");
 
@@ -461,17 +460,22 @@ test.describe("Blueprint form", () => {
     await page.getByTestId("blueprint-step-0-name").fill("");
     await expect(status(page)).toHaveText("Ei tallennettu: anna vaiheelle nimi");
 
-    // Meanwhile the diagram saves a rename of another step. The session waits
-    // on a gate, so the chat is open: collapsed, the tab has room for the step list.
+    // Meanwhile the simple flow beside it saves a rename of another step (the
+    // BPMN canvas sends its edits to wizard_api, which the mock store has not).
+    // The session waits on a gate, so the chat is open: collapsed, the tab has room.
     await setChatOpen(page, false);
     await selectWorkspaceTab(page, "Työnkulku");
-    await openBpmnView(page);
-    await expect(page.locator(".bpmn-editable")).toHaveAttribute("aria-busy", "false", { timeout: 45_000 });
-    await page.getByTestId("flow-step-list").locator("li").nth(4).getByRole("button").first().click();
-    const sync = page.waitForResponse((r) => r.url().includes("/bpmn/sync") && r.request().method() === "POST");
-    await page.getByTestId("bpmn-property-name").fill("Send to finance");
-    expect((await sync).status()).toBe(200);
-    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu", { timeout: 15_000 });
+    await expect(page.getByTestId("simple-flow")).toBeVisible({ timeout: 45_000 });
+    const flowLocked = page.getByTestId("simple-flow-locked");
+    if (await flowLocked.count()) await flowLocked.getByRole("button", { name: "Muokkaa kaaviota" }).click();
+    await page.getByTestId("simple-flow-node-4").click();
+    const flowName = page.getByTestId("simple-flow-name");
+    await expect(flowName).toHaveValue("Export to finance system");
+    const saved = page.waitForResponse((r) => /\/blueprint$/.test(r.url()) && r.request().method() === "PATCH");
+    await flowName.fill("Send to finance");
+    await flowName.press("Enter");
+    expect((await saved).status()).toBe(200);
+    await expect(page.getByTestId("simple-flow-status")).toHaveText("Tallennettu", { timeout: 15_000 });
 
     await page.getByRole("tab", { name: "Blueprint" }).click();
     const warning = page.getByTestId("blueprint-changed-elsewhere");
