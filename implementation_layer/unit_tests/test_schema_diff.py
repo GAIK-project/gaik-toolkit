@@ -218,22 +218,106 @@ def test_a_wrong_approved_type_fails_before_any_model_call(monkeypatch):
     assert calls == []
 
 
-def test_a_named_container_on_one_side_only_is_no_structure_change():
+def _nested(container="items", description="d"):
     from gaik.software_components.extractor import StructureAnalysis
 
-    analysis = StructureAnalysis(
+    return StructureAnalysis(
         structure_type="nested_list",
-        parent_container_name="items",
-        parent_description="d",
+        parent_container_name=container,
+        parent_description=description,
         item_description="d",
         reasoning="r",
     )
 
+
+def test_a_container_named_on_one_side_only_leaves_a_note_and_is_not_empty():
     diff = compare_requirements(
-        APPROVED, APPROVED, approved_structure="nested_list", new_structure=analysis
+        APPROVED, APPROVED, approved_structure="nested_list", new_structure=_nested("line_items")
     )
 
-    assert diff.is_empty
+    assert diff.structure is None
+    assert not diff.is_empty
+    assert any("container" in note for note in diff.notes)
+    assert "No changes to the approved schema" not in str(diff)
+
+
+def test_a_renamed_nested_list_container_is_a_structure_change():
+    diff = compare_requirements(
+        APPROVED,
+        APPROVED,
+        approved_structure=_nested("records"),
+        new_structure=_nested("line_items"),
+    )
+
+    assert diff.structure == ("nested_list in records", "nested_list in line_items")
+    assert diff.changes_output
+
+
+def test_a_saved_structure_dict_is_read_like_the_analysis():
+    saved = _nested("records").model_dump()
+
+    renamed = compare_requirements(
+        APPROVED, APPROVED, approved_structure=saved, new_structure=_nested("line_items")
+    )
+    same = compare_requirements(
+        APPROVED, APPROVED, approved_structure=saved, new_structure=_nested("records")
+    )
+
+    assert renamed.structure == ("nested_list in records", "nested_list in line_items")
+    assert same.is_empty
+    assert saved["parent_container_name"] == "records"
+
+
+def test_a_reworded_nested_list_container_description_is_a_change():
+    diff = compare_requirements(
+        APPROVED,
+        APPROVED,
+        approved_structure=_nested("items", "Order lines"),
+        new_structure=_nested("items", "Shipping notes"),
+    )
+
+    assert [(c.field_name, c.changes) for c in diff.changed] == [
+        ("items[]", {"container_description": ("Order lines", "Shipping notes")})
+    ]
+
+
+def test_a_wrong_approved_structure_fails_before_any_model_call(monkeypatch):
+    import pytest
+
+    generator = SchemaGenerator.__new__(SchemaGenerator)
+    calls = []
+    monkeypatch.setattr(SchemaGenerator, "_generate_schema_inner", lambda self, t: calls.append(t))
+
+    for wrong in ("nested", {"structure_type": "nested_list"}, 3):
+        with pytest.raises(ValueError, match="approved_structure"):
+            generator.generate_schema_with_usage(
+                "x", approved_requirements=APPROVED, approved_structure=wrong
+            )
+    assert calls == []
+
+
+def test_generate_schema_with_usage_reads_a_saved_structure_dict(monkeypatch):
+    generator = SchemaGenerator.__new__(SchemaGenerator)
+    generator.model = "m"
+
+    def inner(self, text):
+        self.item_requirements = APPROVED
+        self.structure_analysis = _nested("line_items")
+        self.extraction_model = object
+        return object, None, 0.1
+
+    monkeypatch.setattr(SchemaGenerator, "_generate_schema_inner", inner)
+    monkeypatch.setattr(
+        "gaik.software_components.extractor.schema.print_pydantic_schema", lambda *a, **k: None
+    )
+
+    result = generator.generate_schema_with_usage(
+        "x",
+        approved_requirements=APPROVED.model_dump(),
+        approved_structure=_nested("records").model_dump(),
+    )
+
+    assert result.diff.structure == ("nested_list in records", "nested_list in line_items")
 
 
 def test_an_unknown_structure_string_is_refused():

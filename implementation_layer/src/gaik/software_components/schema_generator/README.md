@@ -75,7 +75,7 @@ result = generator.generate_schema_with_usage(
     user_requirements: str,
     *,
     approved_requirements=None,  # the requirements of the schema a person approved
-    approved_structure=None,     # its StructureAnalysis, or "flat" / "nested_list"
+    approved_structure=None,     # its StructureAnalysis (or dict), or "flat" / "nested_list"
 )
 ```
 
@@ -97,7 +97,7 @@ show them the difference:
 result = generator.generate_schema_with_usage(
     text,
     approved_requirements=approved,        # ExtractionRequirements, or the saved dict
-    approved_structure=approved_analysis,  # StructureAnalysis or "flat" / "nested_list"
+    approved_structure=approved_analysis,  # StructureAnalysis, its dict, "flat" or "nested_list"
 )
 if not result.diff.is_empty:
     print(result.diff)   # ! structure, + added, - removed, ~ changed (old -> new), notes
@@ -112,12 +112,16 @@ if not result.diff.is_empty:
   type, output policy, allowed values in any order, pattern, format and effective
   default).
 - A flat and a nested-list schema hold the same fields. Pass `approved_structure`
-  (`"flat"`, `"nested_list"` or the approved `StructureAnalysis`) to compare it; without
-  it `diff.notes` says so and `is_empty` is false.
+  (`"flat"`, `"nested_list"`, or the approved `StructureAnalysis` or its saved
+  `model_dump()` dict) to compare it; without it `diff.notes` says so and `is_empty` is
+  false. A nested-list schema's list container (the output's top-level key) and its
+  description are compared only from the `StructureAnalysis` or its dict; with
+  `"nested_list"` a note says a renamed container cannot be seen.
 - Names and values in `str(diff)` are quoted and cut to 200 characters, so a name or a
   value from a saved or edited dict cannot make up a diff line. Letters that only look
   alike (Latin and Cyrillic) are not told apart on screen.
-- A wrong `approved_requirements` type raises `TypeError` before any model call.
+- A wrong `approved_requirements` type raises `TypeError`, and a wrong
+  `approved_structure` raises `ValueError`, before any model call.
 - `compare_requirements(approved, new, approved_structure=..., new_structure=...)` gives
   the same `SchemaDiff` for any two requirements, e.g. a saved one and an edited one.
 

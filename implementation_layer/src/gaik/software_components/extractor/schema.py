@@ -2365,12 +2365,39 @@ def _coerce_requirements(value, what: str):
 _STRUCTURE_KINDS = ("flat", "nested_list", "parent_with_nested_list")
 
 
+def _coerce_structure(value, what: str = "structure") -> StructureAnalysis | str | None:
+    """``value`` as a structure: a :class:`StructureAnalysis`, its saved
+    ``model_dump()`` dict (read as one), or one of the structure kinds.
+
+    Raises ``ValueError`` for anything else, so a caller can check it before any
+    model call.
+    """
+    if value is None or isinstance(value, StructureAnalysis):
+        return value
+    if isinstance(value, dict):
+        try:
+            return StructureAnalysis.model_validate(copy.deepcopy(value))
+        except ValidationError as error:
+            raise ValueError(
+                f"{what} is not a saved StructureAnalysis: {error.error_count()} "
+                "field(s) missing or invalid"
+            ) from None
+    if isinstance(value, str) and value in _STRUCTURE_KINDS:
+        return value
+    shown = _shown(value) if isinstance(value, str) else type(value).__name__
+    raise ValueError(
+        f"{what} must be a StructureAnalysis, its model_dump() dict or one of "
+        f"{_STRUCTURE_KINDS}, not {shown}"
+    )
+
+
 def _structure_key(structure, requirements) -> tuple[str, str | None] | None:
     """``(kind, container)`` of the output's shape, or None when it cannot be told.
 
     The requirements decide where they can: parent-with-children requirements are that
     shape, and plain requirements are never it, whatever an analysis says (a failed
     parent-with-children parse falls back to flat ones). A string names only the kind.
+    ``structure`` has been through :func:`_coerce_structure`.
     """
     if isinstance(requirements, CompositeExtractionRequirements):
         return ("parent_with_nested_list", None)
@@ -2378,12 +2405,8 @@ def _structure_key(structure, requirements) -> tuple[str, str | None] | None:
         return None
     if isinstance(structure, StructureAnalysis):
         kind, container = structure.structure_type, structure.parent_container_name
-    elif isinstance(structure, str) and structure in _STRUCTURE_KINDS:
-        kind, container = structure, None
     else:
-        raise ValueError(
-            f"structure must be a StructureAnalysis or one of {_STRUCTURE_KINDS}, not {structure!r}"
-        )
+        kind, container = structure, None
     if kind == "parent_with_nested_list":
         kind = "flat"
     if kind != "nested_list":
@@ -2392,7 +2415,8 @@ def _structure_key(structure, requirements) -> tuple[str, str | None] | None:
 
 
 def _same_structure(a: tuple[str, str | None], b: tuple[str, str | None]) -> bool:
-    """Same kind, and the same container where both name one."""
+    """Same kind, and the same container where both name one (a container named on
+    one side only gets a note in the diff instead)."""
     return a[0] == b[0] and (a[1] is None or b[1] is None or a[1] == b[1])
 
 
@@ -2442,8 +2466,11 @@ def compare_requirements(
 
     A flat schema and a nested-list one hold the same fields; only the structure tells
     them apart. Pass ``approved_structure`` and ``new_structure`` (a
-    :class:`StructureAnalysis`, or ``"flat"`` / ``"nested_list"``) to compare it; a
-    parent-with-children schema is recognised from its requirements. ``approved`` and
+    :class:`StructureAnalysis` or its ``model_dump()`` dict, or ``"flat"`` /
+    ``"nested_list"``) to compare it; a parent-with-children schema is recognised from
+    its requirements. A nested-list schema's list container (its name and description)
+    is compared only when both structures are a :class:`StructureAnalysis` or its
+    dict; a bare ``"nested_list"`` on either side adds a note instead. ``approved`` and
     ``new`` may also be the ``model_dump()`` dicts of saved requirements.
     """
     approved = _coerce_requirements(approved, "approved")
@@ -2474,6 +2501,8 @@ def compare_requirements(
                     changes={"container_description": (old_boxes[box], new_boxes[box])},
                 )
             )
+    approved_structure = _coerce_structure(approved_structure, "approved_structure")
+    new_structure = _coerce_structure(new_structure, "new_structure")
     old_key = _structure_key(approved_structure, approved)
     new_key = _structure_key(new_structure, new)
     notes = []
@@ -2481,6 +2510,31 @@ def compare_requirements(
         notes.append(
             "the structure of one schema is not known, so a flat versus nested-list "
             "change cannot be seen; pass approved_structure and new_structure"
+        )
+    elif old_key[0] == new_key[0] == "nested_list" and (old_key[1] is None or new_key[1] is None):
+        notes.append(
+            "the list container of one nested-list schema is not known, so a renamed "
+            "container cannot be seen; pass its StructureAnalysis (or the model_dump() "
+            'dict) instead of "nested_list"'
+        )
+    elif (
+        old_key == new_key
+        and old_key[0] == "nested_list"
+        and isinstance(approved_structure, StructureAnalysis)
+        and isinstance(new_structure, StructureAnalysis)
+        and approved_structure.parent_description != new_structure.parent_description
+    ):
+        # The extraction model reads the list container's description too.
+        changed.append(
+            FieldChange(
+                field_name=f"{old_key[1]}[]",
+                changes={
+                    "container_description": (
+                        approved_structure.parent_description,
+                        new_structure.parent_description,
+                    )
+                },
+            )
         )
     structure = (
         (_label(old_key), _label(new_key))
@@ -2722,13 +2776,18 @@ class SchemaGenerator:
                 ``requirements`` dict is accepted; anything else raises
                 ``TypeError`` before any model call.
             approved_structure: The approved schema's structure (its
-                :class:`StructureAnalysis`, or ``"flat"`` / ``"nested_list"``), so a
-                change between a flat and a nested-list schema shows in ``diff``.
+                :class:`StructureAnalysis` or its saved ``model_dump()`` dict, or
+                ``"flat"`` / ``"nested_list"``), so a change between a flat and a
+                nested-list schema shows in ``diff``; with the analysis or its dict, a
+                renamed or reworded list container shows too. Anything else raises
+                ``ValueError`` before any model call.
         """
         if approved_requirements is not None:
             approved_requirements = _coerce_requirements(
                 approved_requirements, "approved_requirements"
             )
+        # Checked before any model call, so a wrong value loses no paid generation.
+        approved_structure = _coerce_structure(approved_structure, "approved_structure")
         print("Generating schema from requirements...")
         schema, usage, duration_s = self._generate_schema_inner(user_requirements)
 
