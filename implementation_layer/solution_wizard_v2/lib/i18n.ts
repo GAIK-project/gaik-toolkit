@@ -201,6 +201,8 @@ export type Dict = {
   /** Refused edits: the undo's version is no valid blueprint any more; the edit is too large. */
   bpmnCannotUndo: string;
   bpmnTooLarge: string;
+  /** A kept rename whose step was removed elsewhere meanwhile: "{name}" is the typed name. */
+  bpmnRenameStepGone: string;
   /** Takes back the last change to the blueprint (wizard_api's undo). */
   bpmnUndo: string;
   bpmnUndone: string;
@@ -1009,6 +1011,7 @@ const fi: Dict = {
     "Vain luku: kaaviota voi muokata, kun wizard on kirjoittanut ensimmäisen blueprintin. Sitä ennen muutokset tehdään yksinkertaisessa kaaviossa.",
   bpmnCannotUndo: "Viimeisintä muutosta ei voi kumota.",
   bpmnTooLarge: "Muutos on liian suuri tallennettavaksi.",
+  bpmnRenameStepGone: "Nimeä ”{name}” ei tallennettu: vaihe poistettiin muualla.",
   bpmnUndo: "Kumoa",
   bpmnUndone: "Viimeisin muutos kumottu.",
   bpmnNothingToUndo: "Ei kumottavaa.",
@@ -1854,6 +1857,7 @@ const en: Dict = {
     "Read only: the diagram can be edited once the wizard has written the first blueprint. Until then, make changes in the simple diagram.",
   bpmnCannotUndo: "The last change cannot be undone.",
   bpmnTooLarge: "The change is too large to save.",
+  bpmnRenameStepGone: "The name “{name}” was not saved: the step was removed elsewhere.",
   bpmnUndo: "Undo",
   bpmnUndone: "The last change was undone.",
   bpmnNothingToUndo: "Nothing to undo.",

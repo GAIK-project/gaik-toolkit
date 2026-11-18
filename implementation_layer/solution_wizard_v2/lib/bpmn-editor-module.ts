@@ -319,7 +319,7 @@ const MOVE_ROOTS = new Set(["elements.move", "shape.move", "connection.updateWay
  * way back, and a local undo would leave the canvas apart from the server.
  */
 class GaikOperations {
-  static $inject = ["eventBus", "config.gaikEditor", "elementRegistry", "keyboard"];
+  static $inject = ["eventBus", "config.gaikEditor", "elementRegistry", "keyboard", "contextPad"];
   private depth = 0;
   private top: { command: string; context: Record<string, unknown> } | null = null;
   private nested = new Set<string>();
@@ -331,6 +331,7 @@ class GaikOperations {
     private config: Config,
     private registry: ElementRegistry,
     keyboard: Keyboard,
+    contextPad: { close: () => void },
   ) {
     eventBus.on("commandStack.preExecute", (e: { command: string; context: Record<string, unknown> }) => {
       this.depth += 1;
@@ -361,6 +362,9 @@ class GaikOperations {
       if (keyboard.isCmd(event) && keyboard.isKey(["z", "Z", "y", "Y"], event)) return true;
       return undefined;
     });
+
+    // While a name is typed in place the context pad goes: its tools would start an edit over it.
+    eventBus.on("directEditing.activate", () => contextPad.close());
 
     // Double-click and the E key rename in place: a step only.
     eventBus.on("directEditing.activate.allowed", 2000, (e: { element: Element }) => {

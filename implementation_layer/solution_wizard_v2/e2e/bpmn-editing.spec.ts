@@ -87,26 +87,32 @@ async function chatTurn(page: Page) {
  * wizard_api's mapping for ses_laskut's diagram, stood in by the test: the
  * five tasks are `workflow.steps[0..4]`, the rest is drawn from elsewhere.
  * With it the editor opens with its tools; `operations` answers the edits.
- * `hasDraft: false` is a session whose agent has not written its draft yet.
+ * `hasDraft: false` is a session whose agent has not written its draft yet;
+ * `steps` the step ids the mapping is drawn for, read at each request.
  */
 async function standInForWizardApi(
   page: Page,
   operations: (route: Route, body: { base_version: number; operations: unknown[] }) => Promise<void>,
-  { hasDraft = true }: { hasDraft?: boolean } = {},
+  {
+    hasDraft = true,
+    steps = () => ["ingest", "extract", "classify", "approve", "export"],
+  }: { hasDraft?: boolean; steps?: () => string[] } = {},
 ) {
-  const steps = ["ingest", "extract", "classify", "approve", "export"];
-  const mapping: Record<string, { kind: string; blueprint_path: string }> = {
-    StartEvent_1: { kind: "start_event", blueprint_path: "derived:start" },
-    Activity_submit_finance_system: { kind: "send_task", blueprint_path: "derived:submit:finance_system" },
+  const mappingNow = () => {
+    const mapping: Record<string, { kind: string; blueprint_path: string }> = {
+      StartEvent_1: { kind: "start_event", blueprint_path: "derived:start" },
+      Activity_submit_finance_system: { kind: "send_task", blueprint_path: "derived:submit:finance_system" },
+    };
+    steps().forEach((id, i) => {
+      mapping[`Activity_${id}`] = { kind: "user_task", blueprint_path: `workflow.steps[${i}]` };
+    });
+    return mapping;
   };
-  steps.forEach((id, i) => {
-    mapping[`Activity_${id}`] = { kind: "user_task", blueprint_path: `workflow.steps[${i}]` };
-  });
   await page.route("**/api/sessions/ses_laskut/bpmn/mapping*", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ mapping, has_draft: hasDraft }),
+      body: JSON.stringify({ mapping: mappingNow(), has_draft: hasDraft }),
     }),
   );
   await page.route("**/api/sessions/ses_laskut/blueprint/operations", (route) =>
@@ -397,50 +403,131 @@ test.describe("Workflow tab", () => {
     expect(sent).toHaveLength(4);
   });
 
-  test("no edit starts while a name is typed in place, and a name typed during a refused edit is sent after it", async ({
+  test("no edit starts while a name is typed in place: the palette does nothing and the step's tools go", async ({
     page,
   }) => {
     test.setTimeout(90_000);
     const sent: unknown[][] = [];
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => (release = resolve));
     await standInForWizardApi(page, async (route, body) => {
       sent.push(body.operations);
-      if (sent.length === 2) await held;
-      const refused = { detail: { error: "changed_elsewhere", message: "reload" } };
+      const refused = { detail: { error: "agent_busy", message: "busy" } };
       await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify(refused) });
     });
     await openFlow(page);
     await waitForDiagram(page);
     const rows = page.getByTestId("flow-step-list").locator("li");
 
-    // A name is being typed in place: Add step in the palette does nothing meanwhile,
-    // and the name stays open for typing.
     await rows.nth(2).getByRole("button").first().click();
+    const pad = page.locator(".djs-context-pad .entry");
+    await expect(page.locator('.djs-context-pad .entry[data-action="move-later"]')).toBeVisible();
     await page.locator('.djs-context-pad .entry[data-action="rename"]').click();
     const typed = page.locator(".bpmn-editable .djs-direct-editing-content");
     await typed.fill("Cost centre proposal");
+    // The step's own tools (append, move, delete) are gone while its name is typed.
+    await expect(pad).toHaveCount(0);
     await expect(page.getByTestId("bpmn-show-data")).toBeDisabled();
+    await expect(page.getByTestId("bpmn-undo")).toBeDisabled();
+    // Add step in the palette does nothing meanwhile, and the name stays open for typing.
     await page.locator('.bpmn-editable .djs-palette .entry[data-action="gaik-add-step"]').click();
     await expect(typed).toBeVisible();
+    await expect(typed).toHaveText("Cost centre proposal");
     expect(sent).toEqual([]);
     // Finished, the name goes out, and only it.
     await typed.press("Enter");
     await expect.poll(() => sent.length).toBe(1);
     expect(sent[0]).toEqual([{ op: "rename_step", step_id: "classify", name: "Cost centre proposal" }]);
+  });
 
-    // An edit held at the server; meanwhile a name is typed in the field.
+  test("a rename refused as changed elsewhere is made again on the newer version, or said lost when its step is gone", async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await openFlow(page);
+    await waitForDiagram(page);
+    await openBlueprintEditor(page);
+    await page.getByTestId("blueprint-json-toggle").click();
+    const blueprint = JSON.parse(await page.getByTestId("blueprint-json-editor").inputValue()) as {
+      goal: string;
+      steps: { id: string; name: string; type: string }[];
+    };
+    await page.getByTestId("blueprint-done").click();
+
+    let steps = blueprint.steps.map((s) => s.id);
+    const sent: { base_version: number; operations: unknown[] }[] = [];
+    let release!: () => void;
+    let held = new Promise<void>((resolve) => (release = resolve));
+    await standInForWizardApi(
+      page,
+      async (route, body) => {
+        sent.push(body);
+        if (sent.length === 1 || sent.length === 3) {
+          // Held while a version is written elsewhere, then refused as changed elsewhere.
+          await held;
+          const refused = { detail: { error: "changed_elsewhere", message: "reload" } };
+          await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify(refused) });
+          return;
+        }
+        // The stand-in writes no version to the mock store, so the session stays on the one sent.
+        const session = { id: "ses_laskut", active_version: body.base_version, blueprint };
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ session, warnings: [], needs_attention: [], bpmn_changed: true }),
+        });
+      },
+      { steps: () => steps },
+    );
+    // The stand-in comes before the canvas reads its mapping again.
+    await page.reload();
+    await setChatOpen(page, false);
+    await selectWorkspaceTab(page, "Työnkulku");
+    await openBpmnView(page);
+    await waitForDiagram(page);
+    await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-ops", "on");
+    const rows = page.getByTestId("flow-step-list").locator("li");
+    const write = async (content: unknown) => {
+      const res = await page.request.patch("/api/sessions/ses_laskut/blueprint", {
+        data: { content, note: "e2e: written elsewhere" },
+      });
+      expect(res.status()).toBe(200);
+    };
+
+    // A rename in the name field, on version 7, held at the server.
     await rows.nth(0).getByRole("button").first().click();
-    await page.locator('.djs-context-pad .entry[data-action="move-later"]').click();
-    await expect.poll(() => sent.length).toBe(2);
     const name = page.getByTestId("bpmn-property-name");
+    await expect(name).toHaveValue("Invoice intake");
     await name.fill("Receive the invoice");
     await name.press("Enter");
-    // The edit is refused (changed elsewhere): the typed name is kept and sent after it.
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0].base_version).toBe(7);
+    // Meanwhile version 8 is written elsewhere; the rename is refused.
+    await write({ ...blueprint, goal: `${blueprint.goal} Reviewed weekly.` });
     release();
     await expect(page.getByTestId("bpmn-changed-elsewhere")).toBeVisible();
+    // Once the page has version 8 the rename is made again, on it.
+    await expect.poll(() => sent.length, { timeout: 20_000 }).toBe(2);
+    expect(sent[1]).toEqual({
+      base_version: 8,
+      operations: [{ op: "rename_step", step_id: "ingest", name: "Receive the invoice" }],
+    });
+    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu");
+
+    // Again, but this time the step is removed elsewhere meanwhile: the user is told.
+    held = new Promise<void>((resolve) => (release = resolve));
+    await rows.nth(1).getByRole("button").first().click();
+    await expect(name).toHaveValue("Data extraction");
+    await name.fill("Read the amounts");
+    await name.press("Enter");
     await expect.poll(() => sent.length).toBe(3);
-    expect(sent[2]).toEqual([{ op: "rename_step", step_id: "ingest", name: "Receive the invoice" }]);
+    const without = blueprint.steps.filter((s) => s.id !== "extract");
+    steps = without.map((s) => s.id);
+    await write({ ...blueprint, steps: without });
+    release();
+    await expect(page.getByTestId("bpmn-status")).toContainText(
+      "Nimeä ”Read the amounts” ei tallennettu: vaihe poistettiin muualla.",
+      { timeout: 20_000 },
+    );
+    expect(sent).toHaveLength(3);
   });
 
   test("before the agent has written its blueprint the canvas is read-only and says why", async ({ page }) => {

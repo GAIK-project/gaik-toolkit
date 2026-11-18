@@ -19,8 +19,14 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_the_draft_hook_is_absent_without_the_env_var(client, monkeypatch) -> None:
-    # The app under test is built without WIZARD_TEST_HOOKS: the router is not mounted.
-    monkeypatch.delenv("WIZARD_TEST_HOOKS", raising=False)
+    # The app under test is built without WIZARD_TEST_HOOKS: the router is not
+    # mounted at all (not only answering 404, which _require_hooks would also do).
+    from wizard_api.main import app
+
+    assert os.getenv("WIZARD_TEST_HOOKS") != "1"
+    paths = {getattr(route, "path", "") for route in app.routes}
+    assert "/test/sessions/{session_id}/draft" not in paths
+    assert "/test/shutdown" not in paths
     sid = "00000000-0000-0000-0000-000000000000"
     assert client.post(f"/test/sessions/{sid}/draft", json={}).status_code == 404
     assert client.get(f"/test/sessions/{sid}/draft").status_code == 404

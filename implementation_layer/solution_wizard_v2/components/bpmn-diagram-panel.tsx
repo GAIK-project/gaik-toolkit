@@ -11,7 +11,7 @@ import { AskStepButton, StepNumber, StepTypeTag, stepTypeLabels } from "@/compon
 import { Icon } from "@/components/icons";
 import { stepIdToBpmnId, stepIndexForBpmnId } from "@/lib/bpmn-edit-state";
 import type { BpmnEditorOps, BpmnLayoutChange } from "@/lib/bpmn-editor-module";
-import { mappingFitsSteps, opForLabelUpdate, stepIdOf, type BpmnMapping } from "@/lib/bpmn-canvas-ops";
+import { mappingFitsSteps, stepIdOf, type BpmnMapping } from "@/lib/bpmn-canvas-ops";
 import type { BlueprintUpdate } from "@/lib/blueprint-update";
 import { bpmnDataObjectsQuery } from "@/lib/bpmn-show-data";
 import { fillTemplate } from "@/lib/chat-template";
@@ -145,8 +145,18 @@ export function BpmnDiagramPanel({
 
   // The version the next edit is made on: the page's, or the one the last edit wrote.
   const canvasVersion = useRef(baseVersion);
+  // Set when an edit was refused as changed elsewhere: until the page has read
+  // the newer version, an edit would be made on the old one and refused again.
+  const waitingForVersion = useRef(false);
+  const reverting = useRef(false);
   useEffect(() => {
     canvasVersion.current = baseVersion;
+    waitingForVersion.current = false;
+    // A rename kept over that refusal goes out now, on the newer version: once
+    // the page has also handed over that version's steps, which it does in an
+    // effect of its own after this one.
+    const timer = window.setTimeout(() => latest.current?.flushRename(), 0);
+    return () => window.clearTimeout(timer);
   }, [baseVersion]);
   const showDataRef = useRef(showData);
   useEffect(() => {
@@ -175,8 +185,8 @@ export function BpmnDiagramPanel({
   const pendingFocus = useRef<string | null>(null);
   // Set when the canvas is put back to a server diagram; the next selection gives the name field its name.
   const nameFromCanvas = useRef(false);
-  // A rename typed in the name field and not sent yet.
-  const pendingRename = useRef<{ elementId: string; name: string } | null>(null);
+  // A rename typed in the name field, or refused as changed elsewhere, and not sent yet.
+  const pendingRename = useRef<{ stepId: string; name: string } | null>(null);
   // Places of dragged shapes not sent yet, per drawing mode.
   const pendingLayout = useRef<{ dataObjects: boolean; layout: BpmnLayoutChange } | null>(null);
   const layoutTimer = useRef<number | null>(null);
@@ -226,6 +236,8 @@ export function BpmnDiagramPanel({
         }
         takeMapping(forXml, read);
         modelerRef.current?.refreshOps();
+        // A kept rename waited for the mapping of the diagram now on the canvas.
+        latest.current?.flushRename();
       })
       .catch(() => {
         if (seq === mappingSeq.current) setMappingError(true);
@@ -291,19 +303,26 @@ export function BpmnDiagramPanel({
   function onEditingEnd() {
     const next = waitingXml.current;
     if (next && !busy.current && !modelerRef.current?.isEditing()) showPageDiagram(next);
+    // A name typed in the field meanwhile waited for the typing on the canvas to end.
+    else latest.current?.flushRename();
   }
 
   /** The server's diagram goes back on the canvas: after a refused edit, or a change no operation describes. */
   async function revert() {
     // An edit on its way draws the server's diagram itself when it is answered.
     if (busy.current) return;
+    // Until the server's diagram is back, a kept rename would be matched against the old one.
+    reverting.current = true;
     try {
       showDiagram(await readServerDiagram());
     } catch {
       // The diagram the canvas stood on, drawn again.
       nameFromCanvas.current = true;
       setImportKey((k) => k + 1);
+    } finally {
+      reverting.current = false;
     }
+    latest.current?.flushRename();
   }
 
   /** What a refused edit says, in the UI language: never wizard_api's own (English) words. */
@@ -337,7 +356,10 @@ export function BpmnDiagramPanel({
    * back; a version written elsewhere meanwhile is read by the page too.
    */
   async function run(kind: "ops" | "undo", operations: BlueprintOperation[] = []) {
-    if (busy.current) return;
+    // The one gate every edit passes (palette, context pad, keys, the name
+    // field, Kumoa): none starts while a name is typed in place, or the
+    // diagram drawn after it would be imported over the typed name.
+    if (busy.current || typing.current) return;
     const base = canvasVersion.current;
     busy.current = true;
     setWorking(true);
@@ -375,6 +397,12 @@ export function BpmnDiagramPanel({
         setStatus({ kind: "idle" });
         setOps("no_draft");
       } else if (err instanceof OperationRefused && err.code === "changed_elsewhere") {
+        // A rename is not given up: it is made again on the newer version once the page has it.
+        const [only] = operations;
+        if (operations.length === 1 && only.op === "rename_step" && !pendingRename.current) {
+          pendingRename.current = { stepId: only.step_id, name: only.name };
+        }
+        waitingForVersion.current = true;
         setChangedElsewhere(true);
         setStatus({ kind: "idle" });
         // The page reads the newer version and its number; the canvas draws its diagram now.
@@ -515,12 +543,19 @@ export function BpmnDiagramPanel({
    */
   function flushRename() {
     const pending = pendingRename.current;
-    if (!pending || busy.current) return;
+    if (!pending || busy.current || reverting.current || typing.current || waitingForVersion.current) return;
     const ctx = opsContext();
     if (!ctx) return;
     pendingRename.current = null;
-    const op = opForLabelUpdate(pending.elementId, pending.name, ctx.mapping, ctx.steps);
-    if (op) void run("ops", [op]);
+    const step = ctx.steps.find((s) => s.id === pending.stepId);
+    if (!step) {
+      // Removed meanwhile, elsewhere: the name has nowhere to go, and the user hears so.
+      setStatus({ kind: "error", message: fillTemplate(t.bpmnRenameStepGone, { name: pending.name.trim() }) });
+      return;
+    }
+    const name = pending.name.trim();
+    if (!name || name === step.name) return;
+    void run("ops", [{ op: "rename_step", step_id: step.id, name }]);
   }
 
   useEffect(() => {
@@ -536,7 +571,7 @@ export function BpmnDiagramPanel({
 
   function applyNameChange(next: string) {
     setEditName(next);
-    if (selectedId) pendingRename.current = { elementId: selectedId, name: next };
+    if (editableStep) pendingRename.current = { stepId: editableStep, name: next };
   }
 
   /** "Lopeta muokkaus": the canvas is read-only again, as it opened. */
