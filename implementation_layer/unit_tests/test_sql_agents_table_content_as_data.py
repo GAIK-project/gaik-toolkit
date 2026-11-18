@@ -148,7 +148,7 @@ def postgres():
     from gaik.software_components.postgres_agent.agent import PostgresAgent
     from gaik.software_components.postgres_agent.models import ColumnInfo, SchemaInfo, TableInfo
 
-    agent = PostgresAgent("postgresql://stub:stub@localhost:1/stub")
+    agent = PostgresAgent("postgresql://stub:stub@localhost:1/stub", table_allowlist=["orders"])
     agent._schema = SchemaInfo(
         schema_name=agent.schema_name,
         tables=[
