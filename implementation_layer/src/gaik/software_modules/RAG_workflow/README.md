@@ -67,6 +67,7 @@ workflow = RAGWorkflow(
     persist: bool = True,
     persist_path: str = "chroma_store",
     collection_name: str = "gaik_rag",
+    owner: str | None = None,
     embedding_model: str | None = None,
     retriever_top_k: int = 5,
     retriever_threshold: float | None = None,
@@ -95,6 +96,16 @@ result = workflow.ask(
     stream: bool | None = None,
 )
 ```
+
+### Several users
+
+- `owner` (a user or session id) records the indexed documents for that owner, and
+  `ask()` retrieves only that owner's documents, also from a collection and folder that
+  other owners share. Without it, every workflow on the same collection reads every
+  document in it.
+- The conversation history (`conversation_history`, `last_n`) is kept on the workflow
+  object. A service with several users creates one workflow per user or session; a shared
+  one would put one user's earlier questions in another user's prompt.
 
 ---
 
