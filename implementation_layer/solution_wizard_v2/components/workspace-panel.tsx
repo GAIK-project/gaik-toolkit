@@ -2838,6 +2838,13 @@ export function WorkspacePanel({
       </div>
     </details>
   );
+  // How to try the package on one's own computer: under "try it" before the
+  // run, and in the finished run's card after it, where the package is taken.
+  const testPageHint = pocReady && (
+    <p className="border-t border-border px-4 py-3 text-xs text-text-muted" data-testid="poc-test-page-hint">
+      {t.pocTestPageHint} <code className="font-mono text-text">python app.py</code>
+    </p>
+  );
   const useCard = (
     <StepCard
       n={4}
@@ -2899,6 +2906,7 @@ export function WorkspacePanel({
         </div>
       )}
       {envSection}
+      {testPageHint}
     </StepCard>
   );
 
@@ -3013,6 +3021,7 @@ export function WorkspacePanel({
       </ul>
       )}
       {envSection}
+      {testPageHint}
       <div className="border-t border-border px-2.5 py-1.5">
         <button
           type="button"

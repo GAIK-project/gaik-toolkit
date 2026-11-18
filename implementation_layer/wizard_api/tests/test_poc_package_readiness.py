@@ -313,3 +313,125 @@ def test_a_composite_requirements_file_is_left_to_gaik_at_run_time(tmp_path):
     _requirements_file(poc, [], requirements_type="parent_with_nested_list")
 
     assert package_problems(poc) == []
+
+
+# ---------------------------------------------------------------------------
+# The package's test page (app.py, ui/)
+# ---------------------------------------------------------------------------
+
+
+def test_the_test_page_travels_with_the_package():
+    from wizard_api.services.poc_service import is_deployable_path
+
+    assert is_deployable_path("app.py")
+    assert is_deployable_path("ui/index.html")
+    assert is_deployable_path("ui/solution.json")
+    assert is_deployable_path("ui/fonts/sora-latin-wght-normal.woff2")
+    assert is_deployable_path("ui/fonts/OFL.txt")
+    assert is_deployable_path("ui/gaik.svg")
+
+
+def test_the_scaffolded_test_page_is_shipped_and_is_no_problem_of_the_package(tmp_path):
+    """The page's server is a second Python file at the package's root: the checks
+    read every .py there, and it must not look like a component the package wires."""
+    import shutil
+
+    import pytest
+
+    pytest.importorskip("solution_wizard.scaffolder")
+    from solution_wizard.blueprint import Blueprint
+    from solution_wizard.scaffolder import TEMPLATES_DIR, scaffold_poc
+    from wizard_api.services import poc_service
+
+    example = TEMPLATES_DIR.parent.parent / "examples" / "document_extraction_blueprint.json"
+    poc = scaffold_poc(Blueprint.from_file(example), tmp_path)["poc_dir"]
+
+    shipped = set(poc_service.deployable_files(str(poc)))
+    assert {
+        "app.py",
+        "ui/index.html",
+        "ui/solution.json",
+        "ui/fonts/sora-latin-wght-normal.woff2",
+        "ui/fonts/sora-latin-ext-wght-normal.woff2",
+        "ui/fonts/OFL.txt",
+        "ui/gaik.svg",
+    } <= {name.replace("\\", "/") for name in shipped}
+    with_page = package_problems(str(poc))
+    assert not poc_service._package_transcribes(str(poc))
+
+    (poc / "app.py").unlink()
+    shutil.rmtree(poc / "ui")
+    assert package_problems(str(poc)) == with_page
+
+
+def _page_package(tmp_path):
+    """A complete package with the test page as the scaffolder writes it."""
+    import pytest
+
+    pytest.importorskip("solution_wizard.scaffolder")
+    from solution_wizard.scaffolder import TEMPLATES_DIR, TEST_PAGE_TEMPLATES
+
+    poc = Path(_package(tmp_path))
+    for relative, template in TEST_PAGE_TEMPLATES.items():
+        (poc / relative).parent.mkdir(parents=True, exist_ok=True)
+        (poc / relative).write_bytes((TEMPLATES_DIR / template).read_bytes())
+    return poc
+
+
+def test_a_changed_test_page_is_a_problem_of_the_package(tmp_path):
+    """Nothing checked that the shipped app.py and ui/index.html were still the template's."""
+    poc = _page_package(tmp_path)
+    assert package_problems(str(poc)) == []
+
+    app = poc / "app.py"
+    app.write_bytes(app.read_bytes() + b"\nprint('one more thing')\n")
+    page = poc / "ui" / "index.html"
+    page.write_bytes(page.read_bytes().replace(b"<body", b"<body data-changed", 1))
+
+    assert package_problems(str(poc)) == [
+        "app.py is not the wizard's current test page: the package was generated with an "
+        "earlier version of it, or the file was changed afterwards. Generate the package "
+        "again to update it",
+        "ui/index.html is not the wizard's current test page: the package was generated "
+        "with an earlier version of it, or the file was changed afterwards. Generate the "
+        "package again to update it",
+    ]
+
+
+def test_the_test_page_with_other_line_ends_is_the_same_page(tmp_path):
+    """The scaffolder writes text files, so on Windows the copy has CRLF line ends."""
+    poc = _page_package(tmp_path)
+    for relative in ("app.py", "ui/index.html"):
+        path = poc / relative
+        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+
+    assert package_problems(str(poc)) == []
+
+
+def test_a_manifest_hash_does_not_make_a_changed_test_page_pass(tmp_path):
+    """The scaffold manifest is in the session folder, which the agent can write: a hash
+    recorded there for a changed app.py does not make the change the wizard's."""
+    import hashlib
+    import json
+
+    from wizard_api.services.poc_service import MANIFEST_NAME
+
+    poc = _page_package(tmp_path)
+    changed = (poc / "app.py").read_bytes() + b"\nprint('one more thing')\n"
+    (poc / "app.py").write_bytes(changed)
+    (poc.parent / MANIFEST_NAME).write_text(
+        json.dumps(
+            {
+                "blueprint": "x",
+                "files": ["app.py"],
+                "hashes": {"app.py": hashlib.sha256(changed).hexdigest()},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert package_problems(str(poc)) == [
+        "app.py is not the wizard's current test page: the package was generated with an "
+        "earlier version of it, or the file was changed afterwards. Generate the package "
+        "again to update it",
+    ]

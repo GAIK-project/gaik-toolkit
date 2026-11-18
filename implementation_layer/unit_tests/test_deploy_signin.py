@@ -207,7 +207,7 @@ def test_the_waiting_page_signs_out_at_keycloak() -> None:
     # A user the proxy turned away has no proxy session; only Keycloak's own
     # logout lets them try another account. deploy.sh fills the address in.
     assert 'href="SIGN_OUT_URL_PLACEHOLDER"' in page
-    assert "{{ if eq .StatusCode 403 }}" in page
+    assert "{{ if and (eq .StatusCode 403)" in page
     script = OPENSHIFT_DEPLOY.read_text()
     assert "SIGN_OUT_URL_PLACEHOLDER" in script and "$SIGNIN_DEPLOYMENT-templates" in script
     # The page loads nothing from elsewhere.
@@ -441,3 +441,31 @@ def test_the_keycloak_script_signs_in_once_and_keeps_the_scripts_stdin() -> None
     assert "</dev/null" in signin
     # The Google client id is an argument, not spliced into the pod's script.
     assert "'\"$GOOGLE_CLIENT_ID\"'" not in script
+
+
+def test_a_changed_stylesheet_gets_a_new_address() -> None:
+    # Keycloak's theme file addresses do not change with their content, and a browser that fetched
+    # the old stylesheet kept it (the sign-in card stayed squeezed after the fix). deploy.sh theme puts a
+    # digest of the stylesheet in its address.
+    script = (KEYCLOAK_DIR / "deploy.sh").read_text()
+    theme_fn = script.split("theme() {", 1)[1].split("\n}\n", 1)[0]
+    assert 'shasum -a 256 "$t/resources/css/gaik.css"' in theme_fn
+    assert "s#css/gaik.css#css/gaik.css?v=$version#" in theme_fn
+    assert '--from-file=theme.properties="$props"' in theme_fn
+    props = (KEYCLOAK_DIR / "theme" / "gaik" / "login" / "theme.properties").read_text()
+    assert "css/gaik.css" in props
+
+
+def test_the_waiting_page_is_shown_only_for_an_account_outside_the_group() -> None:
+    page = (DEPLOY_DIR / "openshift" / "signin-templates" / "error.html").read_text()
+    # oauth2-proxy's 403 for an account outside --allowed-group carries its default message; a sign-in
+    # that lost its CSRF cookie is a 403 too, and must not read as "awaiting approval".
+    refused = (
+        '(eq .StatusCode 403) (eq .Message "You do not have permission to access this resource.")'
+    )
+    assert page.count(refused) == 2  # title and body
+    assert "{{ else if eq .StatusCode 403 }}" in page
+    assert (
+        "oc rollout restart"
+        in OPENSHIFT_DEPLOY.read_text().split("deploy_signin() {", 1)[1].split("\n}\n", 1)[0]
+    )

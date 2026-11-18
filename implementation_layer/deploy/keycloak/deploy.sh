@@ -76,14 +76,22 @@ up() {
 }
 
 theme() {  # the sign-in pages' GAIK look (theme/gaik); keycloak.yaml maps the files
-    local t="$SCRIPT_DIR/theme/gaik/login"
+    local t="$SCRIPT_DIR/theme/gaik/login" version props
+    # Keycloak serves theme files under an address that does not change with
+    # their content, and a browser keeps what it fetched. The stylesheet's
+    # address therefore carries a digest of its content (?v=...), so a changed
+    # stylesheet is a new address and every browser fetches it at once.
+    version=$(shasum -a 256 "$t/resources/css/gaik.css" | cut -c1-12)
+    props="$(mktemp)"
+    sed -e "s#css/gaik.css#css/gaik.css?v=$version#" "$t/theme.properties" > "$props"
     oc create configmap gaik-keycloak-theme -n "$PROJECT" \
-        --from-file=theme.properties="$t/theme.properties" \
+        --from-file=theme.properties="$props" \
         --from-file=gaik.css="$t/resources/css/gaik.css" \
         --from-file=gaik-wordmark.svg="$t/resources/img/gaik-wordmark.svg" \
         --from-file=messages_fi.properties="$t/messages/messages_fi.properties" \
         --from-file=messages_en.properties="$t/messages/messages_en.properties" \
         --dry-run=client -o yaml | oc apply -n "$PROJECT" -f -
+    rm -f "$props"
 }
 
 setup() {

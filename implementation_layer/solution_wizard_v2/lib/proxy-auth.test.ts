@@ -120,9 +120,15 @@ describe("verifyAccessToken", () => {
     }
   });
 
-  it("accepts the client named in aud when azp is another", async () => {
+  it("refuses a token issued to another client even when its aud names this app", async () => {
     const fetcher = await jwksFetcher(pair.publicKey);
-    const token = await sign(pair.privateKey, claims({ azp: "oauth2-proxy", aud: ["account", "wizard-v2"] }));
+    const token = await sign(pair.privateKey, claims({ azp: "gaik-demo", aud: ["account", "wizard-v2"] }));
+    expect(await verifyAccessToken(token, CONFIG, { fetcher, nowMs: NOW_MS })).toBeNull();
+  });
+
+  it("accepts a token issued to this app whatever its aud names", async () => {
+    const fetcher = await jwksFetcher(pair.publicKey);
+    const token = await sign(pair.privateKey, claims({ azp: "wizard-v2", aud: ["account", "gaik-demo"] }));
     expect(await verifyAccessToken(token, CONFIG, { fetcher, nowMs: NOW_MS })).not.toBeNull();
   });
 

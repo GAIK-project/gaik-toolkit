@@ -34,6 +34,13 @@ try:
 except ImportError:  # pragma: no cover - optional in minimal installs
     _SOLUTION_WIZARD_AVAILABLE = False
 
+try:
+    from solution_wizard.scaffolder import TEMPLATES_DIR as _TEMPLATES_DIR
+    from solution_wizard.scaffolder import TEST_PAGE_TEMPLATES as _TEST_PAGE_TEMPLATES
+except ImportError:  # pragma: no cover - without solution_wizard there is nothing to compare
+    _TEMPLATES_DIR = None
+    _TEST_PAGE_TEMPLATES = {}
+
 logger = logging.getLogger(__name__)
 
 
@@ -523,6 +530,50 @@ def package_problems(poc_dir: str) -> list[str]:
 
     problems.extend(_schema_problems(poc_dir))
     problems.extend(_transcription_problems(poc_dir))
+    problems.extend(_test_page_problems(poc_dir))
+    return problems
+
+
+def _same_text(data: bytes, other: bytes) -> bool:
+    """Whether two files have the same content, whichever line ends they were written with."""
+    return data.replace(b"\r\n", b"\n") == other.replace(b"\r\n", b"\n")
+
+
+def _test_page_problems(poc_dir: str) -> list[str]:
+    """A test page file (``app.py``, ``ui/index.html``) that is not the one the wizard writes.
+
+    The README tells the user to start ``app.py``, with the package's keys beside
+    it, and the page and its server are the same files in every package. A copy
+    that differs from the template as it is on this server is either from an
+    earlier template or was changed after generation, a change nobody reviewed;
+    the message names both, as the server cannot tell them apart. Only the template counts: the
+    scaffold manifest lives in the session folder, which the agent can write, so
+    a hash recorded there could be made to match any file. A package generated
+    from an earlier template is reported too; generating it again brings the
+    current page. A package without the page (one the agent built, or one from
+    before the page) has nothing to compare.
+    """
+    if _TEMPLATES_DIR is None or not _TEST_PAGE_TEMPLATES:
+        return []
+    problems: list[str] = []
+    for relative, template in _TEST_PAGE_TEMPLATES.items():
+        native = os.path.join(*relative.split("/"))
+        path = os.path.join(poc_dir, native)
+        if not regular_file(path, poc_dir):
+            continue
+        try:
+            with open(path, "rb") as fh:
+                data = fh.read()
+            expected = (_TEMPLATES_DIR / template).read_bytes()
+        except OSError:
+            continue
+        if _same_text(data, expected):
+            continue
+        problems.append(
+            f"{relative} is not the wizard's current test page: the package was generated "
+            "with an earlier version of it, or the file was changed afterwards. Generate the "
+            "package again to update it"
+        )
     return problems
 
 
@@ -1352,10 +1403,11 @@ def env_example_key_values(text: str) -> list[str]:
     shipped in both zips. A credential (``_is_credential_name``) may stand
     there empty or with a placeholder (``_is_placeholder``), also commented
     out; any other value is refused. Other variables (a model name, an API
-    version, an endpoint) keep their example values.
+    version, an endpoint) keep their example values. A byte order mark before
+    the first line (as Windows editors write one) is not part of its name.
     """
     found: list[str] = []
-    for line in text.splitlines():
+    for line in text.removeprefix("\ufeff").splitlines():
         match = _ENV_COMMENTED_ASSIGNMENT.match(line) or _ENV_ASSIGNMENT.match(line)
         if match is None:
             continue
