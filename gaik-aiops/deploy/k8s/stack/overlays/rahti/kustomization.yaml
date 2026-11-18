@@ -18,6 +18,7 @@ resources:
   - mlflow-signin.yaml
   - routes.yaml
   - networkpolicy-router.yaml
+  - otlp-ingress.yaml
 
 images:
   # Built on Rahti into the project's own image streams.
@@ -48,6 +49,8 @@ images:
 configMapGenerator:
   - name: mlflow-auth-nginx
     files: [nginx.conf=mlflow-auth-nginx.conf]
+  - name: otel-collector-ingress
+    files: [otlp-ingress-collector.yaml]
   # The GAIK waiting-for-approval page of implementation_layer/deploy/openshift/signin-templates,
   # with MLflow's Keycloak sign-out address filled in (a test keeps the two the same).
   - name: mlflow-signin-templates
@@ -65,6 +68,17 @@ patches:
   - path: patch-mlflow-public-host.yaml
     target: {kind: Deployment, name: mlflow}
   - path: patch-image-triggers.yaml
+  # The token-checked OTLP receiver for other projects (otlp-ingress.yaml), read after the base's two
+  # configuration files.
+  - path: patch-otlp-ingress.yaml
+  - target: {kind: Deployment, name: otel-collector}
+    patch: |-
+      - op: test
+        path: /spec/template/spec/containers/0/args/1
+        value: --config=/etc/otelcol/generated/mlflow-routes.yaml
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --config=/etc/otelcol/ingress/otlp-ingress-collector.yaml
   # grafana-setup needs only Python's standard library; the MLflow image has it, so no Docker Hub pull.
   - target: {kind: Deployment, name: grafana-setup}
     patch: |-

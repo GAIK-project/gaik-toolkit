@@ -9,6 +9,13 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
+  # First in every pipeline: refuse data while the collector nears its memory limit (the container's
+  # cgroup limit on Rahti), so a burst of OTLP, now also from other projects through the ingress
+  # Route, is pushed back to the sender instead of getting the collector killed.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
   batch: {}
   # Prometheus accepts cumulative series only; producers may send delta.
   deltatocumulative: {}
@@ -108,13 +115,13 @@ service:
   pipelines:
     logs:
       receivers: [otlp]
-      processors: [transform/privacy, batch]
+      processors: [memory_limiter, transform/privacy, batch]
       exporters: [otlphttp/sink, count]
     traces:
       receivers: [otlp]
-      processors: [transform/privacy, transform/session, batch]
+      processors: [memory_limiter, transform/privacy, transform/session, batch]
       exporters: [spanmetrics, otlphttp/mlflow]
     metrics:
       receivers: [otlp, spanmetrics, count]
-      processors: [deltatocumulative, batch]
+      processors: [memory_limiter, deltatocumulative, batch]
       exporters: [otlphttp/prometheus]

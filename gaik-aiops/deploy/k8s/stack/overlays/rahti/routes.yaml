@@ -2,7 +2,7 @@
 #   grafana -> https://grafana-gaik-aiops.2.rahtiapp.fi  (Grafana's own sign-in)
 #   mlflow  -> https://mlflow-gaik-aiops.2.rahtiapp.fi   (basic auth in mlflow-auth, then MLflow)
 # spec.host is the one place they are written: kustomization.yaml copies them into Grafana's root URL
-# and MLflow's allowed hosts. The collector's OTLP port gets no Route yet (M2, see README.md).
+# and MLflow's allowed hosts. The collector's token-checked OTLP way in has its Route in otlp-ingress.yaml.
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:

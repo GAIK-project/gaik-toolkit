@@ -40,6 +40,10 @@ printf '  key: "%s"\n' "$(openssl rand -hex 32)" | create aiops-pseudonym
 
 printf '  admin-password: "%s"\n' "$(rand)" | create aiops-grafana
 
+# The bearer token for the OTLP way in from other projects (otlp-ingress.yaml). The producer's own
+# project gets the same value in a Secret of its own (README.md, "The wizard's way in").
+printf '  token: "%s"\n' "$(openssl rand -hex 32)" | create aiops-otlp-ingress
+
 # Sign-in for people goes through the GAIK Keycloak: its deploy.sh add-client makes the Secrets
 # aiops-grafana-signin and aiops-mlflow-signin here (README.md, Signing in).
 for s in aiops-grafana-signin aiops-mlflow-signin; do
