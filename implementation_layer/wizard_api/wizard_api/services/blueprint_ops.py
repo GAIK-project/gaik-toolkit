@@ -188,6 +188,23 @@ def _v1_type(step: dict) -> str:
     return _V2_TO_V1_TYPE[v2_type]
 
 
+@dataclass(frozen=True)
+class SetField:
+    """A field of the reduced (V2) blueprint carried into the draft.
+
+    Internal, not an API operation (it is no member of ``Operation``): the old
+    saves (the Blueprint form's PATCH, the diagram's ``/bpmn/sync``) send the
+    reduced blueprint whole, and what they change outside the steps' order,
+    names, types and descriptions reaches the draft as these, applied and
+    checked with the operations. ``field`` is one of ``_FIELD_HANDLERS``;
+    ``target`` is the step or artifact id where the field is one of theirs.
+    """
+
+    field: str
+    value: Any
+    target: str | None = None
+
+
 def operations_from_v2_diff(
     old: dict, new: dict, *, reserved_ids: set[str] | frozenset[str] = frozenset()
 ) -> list[Any]:
@@ -196,8 +213,10 @@ def operations_from_v2_diff(
     ``old`` and ``new`` are reduced (V2) blueprints: the draft's reduced view and
     the one a save sends. Only the steps are compared: their ids, order, names,
     types and, where ``new``'s step has one, descriptions. The order is removes,
-    then adds (each after the step before it in ``new``, or at the start), then
-    moves for the order changes left, then renames, descriptions and types.
+    then adds (each after the step before it in ``new``; a step added at the
+    start comes before the old first step), then moves for the order changes
+    left (a step moved to the start is connected to the old first step, so it
+    stays in the flow), then renames, descriptions and types.
 
     A new step's id is the one ``apply_operations`` will give it (``new_step_id``
     of its name), so a later operation can name it; ``reserved_ids`` are ids the
@@ -205,6 +224,20 @@ def operations_from_v2_diff(
     which a new step does not get. Raises ``OperationError`` for a step the
     operations cannot express (an unknown type, a name over the limit).
     """
+    return _v2_diff(old, new, reserved_ids)[0]
+
+
+def v2_step_ids(
+    old: dict, new: dict, *, reserved_ids: set[str] | frozenset[str] = frozenset()
+) -> dict[str, str]:
+    """Each step id of ``new`` mapped to the id it has in the draft once
+    ``operations_from_v2_diff``'s operations are applied."""
+    return _v2_diff(old, new, reserved_ids)[1]
+
+
+def _v2_diff(
+    old: dict, new: dict, reserved_ids: set[str] | frozenset[str]
+) -> tuple[list[Any], dict[str, str]]:
     old_steps = [s for s in old.get("steps") or [] if isinstance(s, dict)]
     new_steps = [s for s in new.get("steps") or [] if isinstance(s, dict)]
     old_by_id = {str(s.get("id")): s for s in old_steps}
@@ -228,9 +261,11 @@ def operations_from_v2_diff(
         if sid in old_by_id:
             continue
         after = real[new_ids[position - 1]] if position else None
+        # At the start, before the first step: it depends on the new one.
+        before = order[0] if after is None and order else None
         name = str(step.get("name") or "")
         add = _operation(
-            AddStep, op="add_step", name=name, type=_v1_type(step), after=after, before=None
+            AddStep, op="add_step", name=name, type=_v1_type(step), after=after, before=before
         )
         new_id = new_step_id(add.name.strip() or "step", taken)
         taken.add(new_id)
@@ -243,7 +278,11 @@ def operations_from_v2_diff(
         if order[position] == sid:
             continue
         after = target[position - 1] if position else None
+        first = order[0]
         ops.append(_operation(MoveStep, op="move_step", step_id=sid, after=after))
+        if after is None:
+            # A move to the start leaves the step a start that nothing follows.
+            ops.append(_operation(Connect, op="connect", source=sid, target=first))
         order.remove(sid)
         order.insert(position, sid)
 
@@ -273,7 +312,76 @@ def operations_from_v2_diff(
                     description=description,
                 )
             )
-    return ops + renames + descriptions + types
+    return ops + renames + descriptions + types, real
+
+
+#: Top-level fields of the reduced blueprint and the draft field each comes from
+#: (the inverse of ``artifact_sync.blueprint_from_draft``).
+_TOP_FIELDS = {
+    "name": "use_case_name",
+    "description": "use_case_description",
+    "goal": "goal",
+    "integration_targets": "integration_targets",
+}
+
+
+def _text(value: Any, where: str) -> str:
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise OperationError("invalid", f"{where} must be text", where)
+    return value.strip()
+
+
+def _texts(value: Any, where: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise OperationError("invalid", f"{where} must be a list of texts", where)
+    return [v.strip() for v in value if v.strip()]
+
+
+def _settings(value: Any, where: str) -> dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict) or not all(isinstance(v, str) for v in value.values()):
+        raise OperationError("invalid", f"{where} must map names to texts", where)
+    return {str(k): v for k, v in value.items()}
+
+
+def field_edits_from_v2_diff(old: dict, new: dict, step_ids: dict[str, str]) -> list[SetField]:
+    """The fields outside the steps' order, names, types and descriptions that
+    ``new`` gives other values than ``old``, as ``SetField`` edits.
+
+    Those are the inverses of ``artifact_sync.blueprint_from_draft``: the use
+    case's name and description, the goal, the integration targets, and each
+    step's component and settings (``parameters``). ``step_ids`` maps ``new``'s
+    step ids to the draft's (``v2_step_ids``). A missing value and an empty one
+    are the same. Raises ``OperationError`` for a value of the wrong kind.
+    """
+    edits: list[SetField] = []
+    for key, field_name in _TOP_FIELDS.items():
+        if key == "integration_targets":
+            value: Any = _texts(new.get(key), key)
+            was: Any = _texts(old.get(key), key)
+        else:
+            value, was = _text(new.get(key), key), _text(old.get(key), key)
+        if value != was:
+            edits.append(SetField(field_name, value))
+    old_steps = {str(s.get("id")): s for s in old.get("steps") or [] if isinstance(s, dict)}
+    for step in new.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        before = old_steps.get(str(step.get("id"))) or {}
+        sid = step_ids.get(str(step.get("id")), str(step.get("id")))
+        where = f"steps[{step.get('id')}]"
+        component = _text(step.get("component"), f"{where}.component")
+        if component != _text(before.get("component"), f"{where}.component"):
+            edits.append(SetField("step_component", component, sid))
+        settings = _settings(step.get("settings"), f"{where}.settings")
+        if settings != _settings(before.get("settings"), f"{where}.settings"):
+            edits.append(SetField("step_settings", settings, sid))
+    return edits
 
 
 def apply_operations(draft: dict, ops: list[Any]) -> OpsResult:
@@ -546,10 +654,115 @@ def _set_step_type(ctx: _Context, op: SetStepType) -> None:
         step.pop("component", None)
     else:
         ctx.component_checks.append(step["id"])
+    if old == op.type:
+        # The reduced view shows an automated step without a component as
+        # ``io``: made ``ai`` again, it stays an automated task.
+        ctx.summaries.append(f'Set the type of step "{_label(step)}" to {_TYPE_WORDS[op.type]}')
+        return
     ctx.summaries.append(
         f'Changed the type of step "{_label(step)}" from '
         f"{_TYPE_WORDS.get(old, old or 'none')} to {_TYPE_WORDS[op.type]}"
     )
+
+
+def _set_field(ctx: _Context, op: SetField) -> None:
+    _FIELD_HANDLERS[op.field](ctx, op)
+
+
+def _section(ctx: _Context, key: str) -> dict:
+    section = ctx.blueprint.get(key)
+    if not isinstance(section, dict):
+        section = ctx.blueprint[key] = {}
+    return section
+
+
+def _set_use_case_name(ctx: _Context, op: SetField) -> None:
+    use_case = _section(ctx, "use_case")
+    if not op.value:
+        raise OperationError("invalid", "The use case needs a name", "name")
+    if use_case.get("name") != op.value:
+        use_case["name"] = op.value
+        ctx.summaries.append(f'Renamed the use case to "{op.value}"')
+
+
+def _set_use_case_description(ctx: _Context, op: SetField) -> None:
+    use_case = _section(ctx, "use_case")
+    if (use_case.get("description") or "") != op.value:
+        use_case["description"] = op.value
+        ctx.summaries.append("Changed the use case's description")
+
+
+def _set_goal(ctx: _Context, op: SetField) -> None:
+    business = _section(ctx, "business_spec")
+    if (business.get("poc_goal") or "") != op.value:
+        business["poc_goal"] = op.value
+        ctx.summaries.append("Changed the goal of the proof of concept")
+
+
+def _set_integration_targets(ctx: _Context, op: SetField) -> None:
+    technical = _section(ctx, "technical_spec")
+    if list(technical.get("integration_targets") or []) == list(op.value):
+        return
+    technical["integration_targets"] = list(op.value)
+    if op.value:
+        names = ", ".join(f'"{t}"' for t in op.value)
+        ctx.summaries.append(f"Changed the integration targets to {names}")
+    else:
+        ctx.summaries.append("Removed the integration targets")
+
+
+def _set_step_component(ctx: _Context, op: SetField) -> None:
+    step = ctx.step(op.target, "component")
+    if (step.get("component") or "") == op.value:
+        return
+    if op.value:
+        step["component"] = op.value
+        ctx.summaries.append(f'Set the component of step "{_label(step)}" to "{op.value}"')
+    else:
+        step.pop("component", None)
+        ctx.summaries.append(f'Removed the component of step "{_label(step)}"')
+        ctx.component_checks.append(step["id"])
+
+
+def _setting_text(value: Any) -> str:
+    # As artifact_sync shows a parameter: text as it is, anything else as JSON.
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+
+
+def _set_step_settings(ctx: _Context, op: SetField) -> None:
+    step = ctx.step(op.target, "settings")
+    old = step.get("parameters") if isinstance(step.get("parameters"), dict) else {}
+    # A setting shown as it is keeps its value (a number stays a number).
+    parameters = {
+        key: old[key] if key in old and _setting_text(old[key]) == text else text
+        for key, text in op.value.items()
+    }
+    if parameters == old:
+        return
+    step["parameters"] = parameters
+    ctx.summaries.append(f'Changed the settings of step "{_label(step)}"')
+
+
+def _set_artifact_label(ctx: _Context, op: SetField) -> None:
+    artifacts = ctx.blueprint.get("artifacts") or {}
+    artifact = artifacts.get(op.target)
+    if not isinstance(artifact, dict):
+        raise OperationError("not_found", f'There is no artifact "{op.target}"', "data_objects")
+    if (artifact.get("label") or "") == op.value:
+        return
+    artifact["label"] = op.value
+    ctx.summaries.append(f'Renamed data object "{op.target}" to "{op.value}"')
+
+
+_FIELD_HANDLERS: dict[str, Callable[[_Context, SetField], None]] = {
+    "use_case_name": _set_use_case_name,
+    "use_case_description": _set_use_case_description,
+    "goal": _set_goal,
+    "integration_targets": _set_integration_targets,
+    "step_component": _set_step_component,
+    "step_settings": _set_step_settings,
+    "artifact_label": _set_artifact_label,
+}
 
 
 _HANDLERS: dict[type, Callable[[_Context, Any], None]] = {
@@ -561,4 +774,5 @@ _HANDLERS: dict[type, Callable[[_Context, Any], None]] = {
     Connect: _connect,
     Disconnect: _disconnect,
     SetStepType: _set_step_type,
+    SetField: _set_field,
 }

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -37,9 +38,19 @@ logger = logging.getLogger(__name__)
 #: How much of the summaries goes into the version's note (the column holds 512).
 _NOTE_SUMMARY_CHARS = 480
 
-#: Makes the operations from the draft as read under the session's lock. It may
-#: refuse the edit with an ``HTTPException`` or a ``blueprint_ops.OperationError``.
-OperationsFor = Callable[[dict[str, Any]], list[Any]]
+
+@dataclass
+class Edit:
+    """Operations, and the steps the save made AI steps (``artifact_sync.AI_STEPS_KEY``)."""
+
+    operations: list[Any]
+    ai_steps: set[str] = field(default_factory=set)
+
+
+#: Makes the operations (or an ``Edit``) from the draft as read under the
+#: session's lock. It may refuse the edit with an ``HTTPException`` or a
+#: ``blueprint_ops.OperationError``.
+OperationsFor = Callable[[dict[str, Any]], "list[Any] | Edit"]
 
 
 def no_draft() -> HTTPException:
@@ -76,12 +87,14 @@ def unsupported_edit(fields: list[str]) -> HTTPException:
     )
 
 
-def reduced_view(draft: dict[str, Any] | None) -> dict[str, Any] | None:
+def reduced_view(
+    draft: dict[str, Any] | None, ai: frozenset[str] = frozenset()
+) -> dict[str, Any] | None:
     """The reduced (V2) blueprint of the draft, with its steps' descriptions;
-    None when the draft has no workflow yet."""
+    None when the draft has no workflow yet. ``ai``: see ``artifact_sync.AI_STEPS_KEY``."""
     if draft is None:
         return None
-    mapped = artifact_sync.blueprint_from_draft(draft)
+    mapped = artifact_sync.blueprint_from_draft(draft, ai)
     if mapped is None:
         return None
     view = mapped.model_dump()
@@ -102,6 +115,29 @@ def other_ids(draft: dict[str, Any], view: dict[str, Any]) -> set[str]:
     manual = (draft.get("business_process") or {}).get("manual_steps") or []
     ids = {str(s.get("id")) for s in [*steps, *manual] if isinstance(s, dict) and s.get("id")}
     return ids - {str(s.get("id")) for s in view.get("steps") or []}
+
+
+def v2_edit(draft: dict[str, Any], old: dict[str, Any], new: dict[str, Any]) -> Edit:
+    """What turns the reduced blueprint ``old`` (read from ``draft``) into ``new``.
+
+    The steps' order, names, types and descriptions as operations, then the
+    other fields the reduced blueprint shows (the use case's name and
+    description, the goal, the integration targets, each step's component and
+    settings) carried into the draft, see ``blueprint_ops.field_edits_from_v2_diff``.
+    A step ``new`` makes ``ai``, which was not, is remembered as one: without a
+    component the draft's automated task would show as ``io``.
+    """
+    reserved = other_ids(draft, old)
+    operations = blueprint_ops.operations_from_v2_diff(old, new, reserved_ids=reserved)
+    ids = blueprint_ops.v2_step_ids(old, new, reserved_ids=reserved)
+    fields = blueprint_ops.field_edits_from_v2_diff(old, new, ids)
+    old_types = {str(s.get("id")): s.get("type") for s in old.get("steps") or []}
+    made_ai = {
+        ids[str(s.get("id"))]
+        for s in new.get("steps") or []
+        if isinstance(s, dict) and s.get("type") == "ai" and old_types.get(str(s.get("id"))) != "ai"
+    }
+    return Edit([*operations, *fields], made_ai)
 
 
 def apply_edit(
@@ -182,13 +218,25 @@ def _apply(
         if draft is None:
             raise no_draft()
         try:
-            operations = operations_for(draft)
+            edit = operations_for(draft)
+            # A save of the whole reduced blueprint that changes nothing in the
+            # draft is no edit; typed operations are what the user asked for.
+            whole_save = isinstance(edit, Edit)
+            if not whole_save:
+                edit = Edit(list(edit))
+            operations = edit.operations
             if not operations:
                 db.rollback()
                 return None
             result = blueprint_ops.apply_operations(draft, operations)
         except blueprint_ops.OperationError as exc:
             raise _invalid(exc) from exc
+        metadata = dict(session.session_metadata or {})
+        marked = artifact_sync.ai_steps(metadata)
+        ai = _still_without_component(result.blueprint, marked | edit.ai_steps)
+        if whole_save and result.blueprint == draft and ai == marked:
+            db.rollback()
+            return None
         # A version saved before migration 003 has no copy of the draft: keep
         # the one this edit is about to replace, so it can be gone back to.
         blueprint_service.backfill_active_draft(db, session, draft)
@@ -196,7 +244,7 @@ def _apply(
         try:
             draft_store.write_draft(output_dir, result.blueprint)
             draft_store.refresh_derived_files(output_dir, result.blueprint)
-            mapped = artifact_sync.blueprint_from_draft(result.blueprint)
+            mapped = artifact_sync.blueprint_from_draft(result.blueprint, ai)
             content = mapped.model_dump() if mapped is not None else None
             blueprint_service.add_version(
                 db,
@@ -207,7 +255,10 @@ def _apply(
                 content=content,
                 draft=result.blueprint,
             )
-            metadata = dict(session.session_metadata or {})
+            if ai:
+                metadata[artifact_sync.AI_STEPS_KEY] = sorted(ai)
+            else:
+                metadata.pop(artifact_sync.AI_STEPS_KEY, None)
             if content is not None:
                 # The next turn's sync finds this draft adopted already.
                 metadata[artifact_sync.ADOPTED_DRAFT_KEY] = artifact_sync.content_digest(content)
@@ -226,3 +277,17 @@ def _apply(
         raise
     logger.info("session %s: %d blueprint operations applied", session.id, len(operations))
     return result
+
+
+def _still_without_component(
+    blueprint: dict[str, Any], steps: frozenset[str] | set[str]
+) -> frozenset[str]:
+    """Of ``steps``, the automated tasks that have no component."""
+    return frozenset(
+        str(s.get("id"))
+        for s in (blueprint.get("workflow") or {}).get("steps") or []
+        if isinstance(s, dict)
+        and str(s.get("id")) in steps
+        and s.get("type") == "automated_task"
+        and not s.get("component")
+    )

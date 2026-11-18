@@ -50,6 +50,7 @@ SERVER_OWNED_METADATA_KEYS = frozenset(
         "agent_sdk_session_id",
         "protected",
         artifact_sync.ADOPTED_DRAFT_KEY,
+        artifact_sync.AI_STEPS_KEY,
         "gate_reopened",
         "gate_replay",
         "voided_runs",

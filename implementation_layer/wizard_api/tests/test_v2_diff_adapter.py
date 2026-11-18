@@ -10,6 +10,7 @@ import pytest
 from test_blueprint_ops import _draft
 from wizard_api.schemas.blueprint_ops import (
     AddStep,
+    Connect,
     MoveStep,
     RemoveStep,
     RenameStep,
@@ -20,7 +21,9 @@ from wizard_api.services import artifact_sync, blueprint_ops
 from wizard_api.services.blueprint_ops import (
     OperationError,
     apply_operations,
+    field_edits_from_v2_diff,
     operations_from_v2_diff,
+    v2_step_ids,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -182,3 +185,93 @@ def test_two_steps_with_one_id_are_refused() -> None:
 
     with pytest.raises(OperationError):
         operations_from_v2_diff(old, new)
+
+
+def _deps(blueprint: dict) -> dict[str, list[str]]:
+    return {s["id"]: s["depends_on"] for s in blueprint["workflow"]["steps"]}
+
+
+def test_a_step_added_at_the_start_comes_before_the_old_first_step() -> None:
+    draft = _draft()
+    old = _view(draft)
+    new = {**old, "steps": [{"id": "tmp", "name": "Receive", "type": "io"}, *old["steps"]]}
+
+    ops = operations_from_v2_diff(old, new)
+
+    assert (ops[0].after, ops[0].before) == (None, "upload")
+    deps = _deps(apply_operations(draft, ops).blueprint)
+    assert deps["receive"] == []
+    assert deps["upload"] == ["receive"]
+
+
+def test_a_step_moved_to_the_start_stays_in_the_flow() -> None:
+    draft = _draft()
+    # Deliver reads nothing, so it may come first.
+    draft["workflow"]["steps"][3]["inputs"] = []
+    old = _view(draft)
+    by_id = {s["id"]: s for s in old["steps"]}
+    new = {**old, "steps": [by_id[i] for i in ("deliver", "upload", "extract", "review")]}
+
+    ops = operations_from_v2_diff(old, new)
+
+    assert [(type(op), getattr(op, "after", None)) for op in ops] == [
+        (MoveStep, None),
+        (Connect, None),
+    ]
+    assert (ops[1].source, ops[1].target) == ("deliver", "upload")
+    result = apply_operations(draft, ops).blueprint
+    assert [s["id"] for s in result["workflow"]["steps"]] == [
+        "deliver",
+        "upload",
+        "extract",
+        "review",
+    ]
+    deps = _deps(result)
+    assert deps["deliver"] == []
+    assert deps["upload"] == ["deliver"]
+    assert deps["extract"] == ["upload"]
+    assert deps["review"] == ["extract"]
+
+
+def test_the_fields_outside_the_steps_round_trip_through_the_draft() -> None:
+    draft = _draft()
+    draft["workflow"]["steps"][1]["parameters"] = {"pages": 3}
+    old = _view(draft)
+    new = {
+        **old,
+        "name": "Supplier invoices",
+        "description": "Reads them",
+        "goal": "No typing",
+        "integration_targets": ["ERP"],
+        "steps": [
+            {**old["steps"][0], "component": "parser"},
+            {**old["steps"][1], "settings": {"pages": "3", "language": "fi"}},
+            *old["steps"][2:],
+        ],
+    }
+
+    edits = field_edits_from_v2_diff(old, new, v2_step_ids(old, new))
+    result = apply_operations(draft, edits).blueprint
+
+    # A setting shown as it was keeps its value: the number stays a number.
+    assert result["workflow"]["steps"][1]["parameters"] == {"pages": 3, "language": "fi"}
+    back = _view(result)
+    for key in ("name", "description", "goal", "integration_targets"):
+        assert back[key] == new[key]
+    assert back["steps"][0]["component"] == "parser"
+    assert back["steps"][1]["settings"] == {"pages": "3", "language": "fi"}
+    assert field_edits_from_v2_diff(back, new, v2_step_ids(back, new)) == []
+
+
+def test_an_ai_step_without_a_component_needs_one() -> None:
+    draft = _draft()
+    old = _view(draft)
+    new = {**old, "steps": [{**old["steps"][0], "type": "ai"}, *old["steps"][1:]]}
+
+    result = apply_operations(draft, operations_from_v2_diff(old, new))
+
+    assert "upload: needs a component" in result.needs_attention
+    # Shown as io without a component, unless remembered as an AI step.
+    assert _view(result.blueprint)["steps"][0]["type"] == "io"
+    remembered = artifact_sync.blueprint_from_draft(result.blueprint, frozenset({"upload"}))
+    assert remembered.steps[0]["type"] == "ai"

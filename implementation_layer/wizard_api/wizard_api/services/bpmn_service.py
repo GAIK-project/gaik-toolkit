@@ -104,6 +104,23 @@ def _render_draft(
     return xml, mapping, draft
 
 
+def data_object_labels(draft: dict[str, Any]) -> dict[str, str]:
+    """The name the diagram gives each of the draft's artifacts."""
+    from types import SimpleNamespace
+
+    from solution_wizard.bpmn_generator import _data_object_label
+
+    artifacts = draft.get("artifacts") if isinstance(draft.get("artifacts"), dict) else {}
+    return {
+        str(art_id): _data_object_label(
+            str(art_id),
+            SimpleNamespace(label=spec.get("label") or "", type=spec.get("type") or ""),
+        )
+        for art_id, spec in artifacts.items()
+        if isinstance(spec, dict)
+    }
+
+
 def with_agent_process(
     v1: dict[str, Any], v2_blueprint: dict[str, Any], agent_draft: dict[str, Any]
 ) -> dict[str, Any]:

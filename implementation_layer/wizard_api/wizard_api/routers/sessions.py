@@ -56,6 +56,7 @@ from wizard_api.services import (
     blueprint_service,
     session_service,
 )
+from wizard_api.services import blueprint_edit_service as edits
 from wizard_api.session_state import (
     GATE_KEYS,
     GateNotApprovedError,
@@ -131,15 +132,16 @@ def patch_blueprint(
 ) -> SessionDetailResponse:
     """Save the reduced blueprint the Blueprint form or the flow view edited.
 
-    With the agent's draft, what the save changed in the steps is applied to the
-    draft as operations (``blueprint_edit_service``), refused like an edit in the
-    diagram, and a change to what no operation can change is refused with 422
-    ``unsupported_edit``. Without a draft the content is stored as it is.
-    ``base_version``, when given, refuses a save over a newer version (409
-    ``changed_elsewhere``).
+    With the agent's draft, the save is applied to the draft through the flow
+    of an edit in the diagram (``blueprint_edit_service``): the steps' order,
+    names, types and descriptions as operations, and the other fields the
+    reduced blueprint shows (the use case's name, description and goal, the
+    integration targets, a step's component and settings, a data object's
+    label) carried into the draft. Only what the draft has no place for is
+    refused, with 422 ``unsupported_edit``. Without a draft the content is
+    stored as it is. ``base_version``, when given, refuses a save over a newer
+    version (409 ``changed_elsewhere``).
     """
-    from wizard_api.services import blueprint_edit_service as edits
-
     session = session_service.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
@@ -150,14 +152,21 @@ def patch_blueprint(
         shown = dict(active.content or {}) if active is not None else {}
         if payload.content != shown:
 
-            def operations_for(draft: dict[str, Any]) -> list[Any]:
-                view = edits.reduced_view(draft) or {"steps": []}
-                unsupported = _unsupported_fields(payload.content, shown, view)
+            def operations_for(draft: dict[str, Any]) -> edits.Edit:
+                ai = artifact_sync.ai_steps(session.session_metadata)
+                view = edits.reduced_view(draft, ai) or {"steps": []}
+                unsupported = _unsupported_fields(payload.content)
+                labels = _data_object_label_edits(
+                    draft,
+                    payload.content.get("data_objects"),
+                    shown.get("data_objects"),
+                    unsupported,
+                )
                 if unsupported:
                     raise edits.unsupported_edit(unsupported)
-                return blueprint_ops.operations_from_v2_diff(
-                    view, payload.content, reserved_ids=edits.other_ids(draft, view)
-                )
+                edit = edits.v2_edit(draft, view, payload.content)
+                edit.operations += labels
+                return edit
 
             edits.apply_edit(
                 db,
@@ -180,51 +189,65 @@ def patch_blueprint(
 
 def _edits_the_draft(session) -> bool:
     """Whether a save goes to the agent's draft: there is one, with a workflow."""
-    from wizard_api.services import blueprint_edit_service
-
     if not blueprint_ops.solution_wizard_available():
         return False
     draft = artifact_sync.read_draft_blueprint(session.output_dir)
-    return blueprint_edit_service.reduced_view(draft) is not None
+    return edits.reduced_view(draft) is not None
 
 
-#: What of a reduced step the operations change.
-_STEP_EDIT_KEYS = frozenset({"id", "name", "type", "description"})
+#: The reduced blueprint's fields the draft has a place for (``data_objects``
+#: and ``gateways`` are read separately).
+_CARRIED_KEYS = frozenset(
+    {"name", "description", "goal", "steps", "integration_targets", "data_objects", "gateways"}
+)
+_CARRIED_STEP_KEYS = frozenset({"id", "name", "type", "description", "component", "settings"})
 
 
-def _same(a: Any, b: Any) -> bool:
-    """Equal, a missing value and an empty one alike."""
+def _unsupported_fields(content: dict[str, Any]) -> list[str]:
+    """The fields of a save the draft has no place for, that the save gives a
+    value: a key the reduced blueprint does not have (one typed in the JSON
+    editor). Every other field is carried into the draft."""
     empty = (None, "", [], {})
-    return (a in empty and b in empty) or a == b
-
-
-def _unsupported_fields(
-    content: dict[str, Any], shown: dict[str, Any], view: dict[str, Any]
-) -> list[str]:
-    """What the save changes that no operation can: a field the save gives
-    another value than both the blueprint shown and the draft's reduced view."""
-
-    def changed(new: Any, *before: Any) -> bool:
-        return all(not _same(new, b) for b in before)
-
-    fields = [
-        key
-        for key in sorted(set(content) - {"steps"})
-        if changed(content.get(key), shown.get(key), view.get(key))
-    ]
-    shown_steps = {str(s.get("id")): s for s in shown.get("steps") or [] if isinstance(s, dict)}
-    view_steps = {str(s.get("id")): s for s in view.get("steps") or [] if isinstance(s, dict)}
+    fields = [key for key in sorted(set(content) - _CARRIED_KEYS) if content.get(key) not in empty]
     for step in content.get("steps") or []:
         if not isinstance(step, dict):
             continue
-        sid = str(step.get("id"))
-        before = (shown_steps.get(sid) or {}, view_steps.get(sid) or {})
         fields += [
-            f"steps[{sid}].{key}"
-            for key in sorted(set(step) - _STEP_EDIT_KEYS)
-            if changed(step.get(key), *(b.get(key) for b in before))
+            f"steps[{step.get('id')}].{key}"
+            for key in sorted(set(step) - _CARRIED_STEP_KEYS)
+            if step.get(key) not in empty
         ]
     return fields
+
+
+def _data_object_label_edits(
+    draft: dict[str, Any], labels: Any, shown: Any, unsupported: list[str]
+) -> list[Any]:
+    """The data objects' labels a save gives, as edits of the draft's artifacts.
+
+    A label for one of the draft's artifacts that differs from the name the
+    diagram gives it is carried into ``artifacts[id].label``. A label for an id
+    the draft has no artifact for (kept from a diagram drawn before the draft
+    was) has nowhere to go: it is left as it was, and refused (added to
+    ``unsupported``) when this save changes it.
+    """
+    from wizard_api.services import bpmn_service
+
+    if not isinstance(labels, dict):
+        return []
+    shown = shown if isinstance(shown, dict) else {}
+    drawn = bpmn_service.data_object_labels(draft)
+    found: list[Any] = []
+    for art, label in sorted(labels.items()):
+        text = label.strip() if isinstance(label, str) else label
+        if art in drawn:
+            if not isinstance(text, str):
+                unsupported.append(f"data_objects[{art}]")
+            elif text and text != drawn[art]:
+                found.append(blueprint_ops.SetField("artifact_label", text, art))
+        elif label != shown.get(art):
+            unsupported.append(f"data_objects[{art}]")
+    return found
 
 
 _DATA_OBJECTS_QUERY = Query(
@@ -305,9 +328,10 @@ def sync_session_bpmn(
     With the agent's draft, what the canvas changed in the steps is applied to
     the draft as operations (``blueprint_edit_service``): the canvas is read as
     the diagram drawn from the draft is read, and only the difference counts. A
-    change no operation can make (a data object or gateway renamed, a task the
+    change the draft has no place for (a task the
     generator draws for something other than a step) is refused with 422
-    ``unsupported_edit``. ``data_objects`` is the option the canvas was drawn
+    ``unsupported_edit``; a renamed data object becomes its artifact's label,
+    and a gateway's name is not kept. ``data_objects`` is the option the canvas was drawn
     with. Without a draft the synced blueprint is stored as it is.
     """
     from wizard_api.services import bpmn_service
@@ -339,6 +363,26 @@ def sync_session_bpmn(
     return session_service.session_detail(db, session)
 
 
+def _canvas_label_edits(
+    draft: dict[str, Any], before: dict[str, Any], after: dict[str, Any], unsupported: list[str]
+) -> list[Any]:
+    """The data objects renamed on the canvas, as edits of the draft's artifacts'
+    labels. The diagram draws the draft, so a data object is one of its
+    artifacts (``DataObjectRef_<artifact id>``); one that is not is refused."""
+    old_labels = before.get("data_objects") or {}
+    new_labels = after.get("data_objects") or {}
+    artifacts = draft.get("artifacts") if isinstance(draft.get("artifacts"), dict) else {}
+    found: list[Any] = []
+    for art in sorted(set(old_labels) & set(new_labels)):
+        if old_labels[art] == new_labels[art]:
+            continue
+        if art in artifacts and new_labels[art].strip():
+            found.append(blueprint_ops.SetField("artifact_label", new_labels[art].strip(), art))
+        else:
+            unsupported.append(f"data_objects[{art}]")
+    return found
+
+
 #: The description bpmn_sync gives a task drawn without one: not the user's words.
 _CANVAS_PLACEHOLDER_DESCRIPTION = "Added from BPMN canvas"
 
@@ -346,11 +390,12 @@ _CANVAS_PLACEHOLDER_DESCRIPTION = "Added from BPMN canvas"
 def _sync_bpmn_into_draft(
     db: Session, session, xml: str, include_data_objects: bool
 ) -> SessionDetailResponse:
-    from wizard_api.services import blueprint_edit_service as edits
     from wizard_api.services import bpmn_service
 
-    def operations_for(draft: dict[str, Any]) -> list[Any]:
-        view = edits.reduced_view(draft) or {"steps": []}
+    def operations_for(draft: dict[str, Any]) -> edits.Edit:
+        view = edits.reduced_view(draft, artifact_sync.ai_steps(session.session_metadata)) or {
+            "steps": []
+        }
         try:
             # The canvas compared with the diagram drawn from the draft, both
             # read by the same sync: what the reading itself changes (the order
@@ -373,11 +418,12 @@ def _sync_bpmn_into_draft(
             if isinstance(s, dict)
         }
         before, after, unsupported = _canvas_step_changes(before, after, step_ids)
+        labels = _canvas_label_edits(draft, before, after, unsupported)
         if unsupported:
             raise edits.unsupported_edit(unsupported)
-        return blueprint_ops.operations_from_v2_diff(
-            before, after, reserved_ids=edits.other_ids(draft, before)
-        )
+        edit = edits.v2_edit(draft, before, after)
+        edit.operations += labels
+        return edit
 
     edits.apply_edit(
         db, session, base_version=None, operations_for=operations_for, note="BPMN canvas sync"
@@ -389,24 +435,10 @@ def _canvas_step_changes(
     before: dict[str, Any], after: dict[str, Any], step_ids: set[str]
 ) -> tuple[dict[str, Any], dict[str, Any], list[str]]:
     """The two readings with only the draft's steps and the canvas's new tasks,
-    and what else the canvas changed, which no operation can make."""
+    and the tasks the canvas changed that are no step (a manual step...), which
+    the draft has no operation for. A gateway's name is the generator's (an
+    approval, a decision): a rename on the canvas is not kept, as before."""
     unsupported: list[str] = []
-    old_labels = before.get("data_objects") or {}
-    new_labels = after.get("data_objects") or {}
-    unsupported += [
-        f"data_objects[{art}]"
-        for art in sorted(set(old_labels) & set(new_labels))
-        if old_labels[art] != new_labels[art]
-    ]
-
-    def gateways(reading: dict[str, Any]) -> list[tuple[str, str, str]]:
-        return sorted(
-            (str(g.get("id")), str(g.get("name") or ""), str(g.get("type") or ""))
-            for g in reading.get("gateways") or []
-        )
-
-    if gateways(before) != gateways(after):
-        unsupported.append("gateways")
     # Tasks the generator draws for what is not a step (a manual step, ...).
     old_by_id = {str(s.get("id")): s for s in before.get("steps") or []}
     new_by_id = {str(s.get("id")): s for s in after.get("steps") or []}

@@ -284,23 +284,169 @@ def test_a_patch_while_the_agent_replies_answers_409(client, db_session, monkeyp
 
 
 @requires_postgres
-def test_a_patch_of_a_field_no_operation_covers_is_refused(client, db_session, not_busy) -> None:
+def test_every_field_of_the_form_round_trips_through_the_draft(
+    client, db_session, not_busy
+) -> None:
     created = _create(client, db_session)
-    before = _read_draft(created["output_dir"])
+    sid = created["id"]
+    content = copy.deepcopy(created["blueprint"])
+    content["name"] = "Supplier invoices"
+    content["description"] = "Reads supplier invoices"
+    content["goal"] = "Book invoices without typing"
+    content["integration_targets"] = ["Accounting system"]
+    content["steps"][1]["component"] = "extractor"
+    content["steps"][1]["settings"] = {"language": "fi"}
+
+    res = client.patch(f"/sessions/{sid}/blueprint", json={"content": content})
+
+    assert res.status_code == 200, res.text
+    on_disk = _read_draft(created["output_dir"])
+    assert on_disk["use_case"]["name"] == "Supplier invoices"
+    assert on_disk["use_case"]["description"] == "Reads supplier invoices"
+    assert on_disk["business_spec"]["poc_goal"] == "Book invoices without typing"
+    assert on_disk["technical_spec"]["integration_targets"] == ["Accounting system"]
+    extract = on_disk["workflow"]["steps"][1]
+    assert (extract["component"], extract["parameters"]) == ("extractor", {"language": "fi"})
+    # Back in the reduced view the form reads, as the form sent it.
+    body = res.json()
+    for key in ("name", "description", "goal", "integration_targets"):
+        assert body["blueprint"][key] == content[key]
+    shown = body["blueprint"]["steps"][1]
+    assert (shown["component"], shown["settings"]) == ("extractor", {"language": "fi"})
+    assert _versions(db_session, sid)[-1].draft == on_disk
+    # Told to the agent as the operations are.
+    assert body["metadata"]["pending_user_edits"] == [
+        'Renamed the use case to "Supplier invoices"',
+        "Changed the use case's description",
+        "Changed the goal of the proof of concept",
+        'Changed the integration targets to "Accounting system"',
+        'Set the component of step "Extract" to "extractor"',
+        'Changed the settings of step "Extract"',
+    ]
+    # Saved again as it came back: nothing changes.
+    again = client.patch(f"/sessions/{sid}/blueprint", json={"content": body["blueprint"]})
+    assert again.json()["active_version"] == body["active_version"]
+
+
+@requires_postgres
+def test_a_save_of_step_edits_and_the_goal_applies_both(client, db_session, not_busy) -> None:
+    created = _create(client, db_session)
     content = copy.deepcopy(created["blueprint"])
     content["goal"] = "Something new"
     content["steps"][0]["name"] = "Send the invoice"
-    content["steps"][1]["component"] = "other"
+
+    res = client.patch(f"/sessions/{created['id']}/blueprint", json={"content": content})
+
+    assert res.status_code == 200, res.text
+    on_disk = _read_draft(created["output_dir"])
+    assert on_disk["business_spec"]["poc_goal"] == "Something new"
+    assert on_disk["workflow"]["steps"][0]["name"] == "Send the invoice"
+
+
+@requires_postgres
+def test_a_step_made_ai_without_a_component_stays_ai(client, db_session, not_busy) -> None:
+    created = _create(client, db_session)
+    sid = created["id"]
+    content = copy.deepcopy(created["blueprint"])
+    content["steps"][0]["type"] = "ai"
+    content["steps"].append({"id": "tmp", "name": "Classify", "type": "ai"})
+
+    res = client.patch(f"/sessions/{sid}/blueprint", json={"content": content})
+
+    assert res.status_code == 200, res.text
+    on_disk = {s["id"]: s for s in _read_draft(created["output_dir"])["workflow"]["steps"]}
+    for step_id in ("upload", "classify"):
+        assert on_disk[step_id]["type"] == "automated_task"
+        assert not on_disk[step_id].get("component")
+    body = res.json()
+    types = {s["id"]: s["type"] for s in body["blueprint"]["steps"]}
+    assert (types["upload"], types["classify"]) == ("ai", "ai")
+    assert body["metadata"][artifact_sync.AI_STEPS_KEY] == ["classify", "upload"]
+    # The next chat turn, the agent's draft untouched, keeps what the user sees.
+    session = session_service.get_session(db_session, uuid.UUID(sid))
+    db_session.refresh(session)
+    assert artifact_sync.sync_blueprint_from_draft(db_session, session) is False
+    # Made io again, the step is a user task and no longer remembered as AI.
+    content = copy.deepcopy(body["blueprint"])
+    content["steps"][0]["type"] = "io"
+    res = client.patch(f"/sessions/{sid}/blueprint", json={"content": content})
+    assert res.status_code == 200, res.text
+    assert res.json()["blueprint"]["steps"][0]["type"] == "io"
+    assert res.json()["metadata"][artifact_sync.AI_STEPS_KEY] == ["classify"]
+
+
+@requires_postgres
+def test_a_key_the_draft_has_no_place_for_is_refused(client, db_session, not_busy) -> None:
+    created = _create(client, db_session)
+    before = _read_draft(created["output_dir"])
+    content = copy.deepcopy(created["blueprint"])
+    content["custom"] = "typed in the JSON editor"
+    content["steps"][0]["name"] = "Send the invoice"
 
     res = client.patch(f"/sessions/{created['id']}/blueprint", json={"content": content})
 
     assert res.status_code == 422
     detail = res.json()["detail"]
     assert detail["error"] == "unsupported_edit"
-    assert detail["fields"] == ["goal", "steps[extract].component"]
-    # Nothing of the edit is applied, the step's new name neither.
+    assert detail["fields"] == ["custom"]
+    # Nothing of the save is applied, the step's new name neither.
     assert _read_draft(created["output_dir"]) == before
     assert len(_versions(db_session, created["id"])) == len(created["versions"])
+
+
+def _legacy_version(db_session, sid: str, content: dict) -> None:
+    """A version the form saved before the saves went into the draft."""
+    session = session_service.get_session(db_session, uuid.UUID(sid))
+    blueprint_service.add_version(db_session, session, note="Blueprint päivitetty", content=content)
+    db_session.commit()
+
+
+@requires_postgres
+def test_an_earlier_form_edit_is_carried_into_the_draft(client, db_session, not_busy) -> None:
+    created = _create(client, db_session)
+    sid = created["id"]
+    legacy = copy.deepcopy(created["blueprint"])
+    legacy["goal"] = "Goal from an earlier save"
+    legacy["steps"][1]["component"] = "extractor"
+    _legacy_version(db_session, sid, legacy)
+    shown = client.get(f"/sessions/{sid}").json()["blueprint"]
+    content = copy.deepcopy(shown)
+    content["steps"][0]["name"] = "Send the invoice"
+
+    res = client.patch(f"/sessions/{sid}/blueprint", json={"content": content})
+
+    assert res.status_code == 200, res.text
+    on_disk = _read_draft(created["output_dir"])
+    assert on_disk["business_spec"]["poc_goal"] == "Goal from an earlier save"
+    assert on_disk["workflow"]["steps"][1]["component"] == "extractor"
+    body = res.json()["blueprint"]
+    assert body["goal"] == "Goal from an earlier save"
+    assert body["steps"][1]["component"] == "extractor"
+
+
+@requires_postgres
+def test_an_old_label_for_no_artifact_of_the_draft(client, db_session, not_busy) -> None:
+    created = _create(client, db_session)
+    sid = created["id"]
+    legacy = copy.deepcopy(created["blueprint"])
+    legacy["data_objects"] = {"out_1": "Old label", "fields": "Extracted fields"}
+    _legacy_version(db_session, sid, legacy)
+    shown = client.get(f"/sessions/{sid}").json()["blueprint"]
+
+    # Kept as it was, it has nowhere to go and is left; the label of an
+    # artifact the draft has is carried into it.
+    content = copy.deepcopy(shown)
+    content["steps"][0]["name"] = "Send the invoice"
+    res = client.patch(f"/sessions/{sid}/blueprint", json={"content": content})
+    assert res.status_code == 200, res.text
+    assert _read_draft(created["output_dir"])["artifacts"]["fields"]["label"] == "Extracted fields"
+
+    # Changed in this save, it is refused.
+    shown = res.json()["blueprint"]
+    content = {**copy.deepcopy(shown), "data_objects": {"out_1": "New label"}}
+    res = client.patch(f"/sessions/{sid}/blueprint", json={"content": content})
+    assert res.status_code == 422
+    assert res.json()["detail"]["fields"] == ["data_objects[out_1]"]
 
 
 @requires_postgres
@@ -370,19 +516,42 @@ def test_an_unchanged_canvas_with_a_draft_adds_no_version(client, db_session, no
 
 
 @requires_postgres
-def test_a_renamed_data_object_on_the_canvas_is_refused(client, db_session, not_busy) -> None:
+def test_a_renamed_data_object_on_the_canvas_becomes_its_label(
+    client, db_session, not_busy
+) -> None:
     created = _create(client, db_session)
     sid = created["id"]
-    before = _read_draft(created["output_dir"])
     xml = client.get(f"/sessions/{sid}/bpmn").text
     edited = xml.replace('name="Invoice fields"', 'name="All the fields"')
     assert edited != xml
 
-    res = client.post(f"/sessions/{sid}/bpmn/sync", json={"xml": edited})
+    res = client.post(
+        f"/sessions/{sid}/bpmn/sync", json={"xml": _rename_task(edited, "extract", "Read it")}
+    )
 
-    assert res.status_code == 422
-    assert res.json()["detail"]["error"] == "unsupported_edit"
-    assert _read_draft(created["output_dir"]) == before
+    assert res.status_code == 200, res.text
+    on_disk = _read_draft(created["output_dir"])
+    assert on_disk["artifacts"]["fields"]["label"] == "All the fields"
+    assert on_disk["workflow"]["steps"][1]["name"] == "Read it"
+    assert 'name="All the fields"' in client.get(f"/sessions/{sid}/bpmn").text
+
+
+@requires_postgres
+def test_a_renamed_gateway_on_the_canvas_is_ignored(client, db_session, not_busy) -> None:
+    created = _create(client, db_session)
+    sid = created["id"]
+    xml = client.get(f"/sessions/{sid}/bpmn").text
+    edited = xml.replace('name="Readable?"', 'name="Can it be read?"')
+    assert edited != xml
+
+    res = client.post(
+        f"/sessions/{sid}/bpmn/sync", json={"xml": _rename_task(edited, "extract", "Read it")}
+    )
+
+    assert res.status_code == 200, res.text
+    expected = _labelled_draft()
+    expected["workflow"]["steps"][1]["name"] = "Read it"
+    assert _read_draft(created["output_dir"]) == expected
 
 
 @requires_postgres

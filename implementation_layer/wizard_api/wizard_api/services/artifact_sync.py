@@ -51,6 +51,22 @@ UI_VIEW_BLUEPRINT_FILE = f"{UI_VIEW_DIR}/blueprint.json"
 #: version (see sync_blueprint_from_draft).
 ADOPTED_DRAFT_KEY = "agent_draft_digest"
 
+#: Session metadata key: steps the user made AI steps (``ai``) in the Blueprint
+#: form or the diagram that have no component yet. In the draft they are
+#: automated tasks, which ``v2_step_type`` shows as ``io`` without a component;
+#: these are shown as ``ai`` until the agent gives them one or the user changes
+#: the type.
+AI_STEPS_KEY = "ai_steps_without_component"
+
+
+def ai_steps(metadata: dict[str, Any] | None) -> frozenset[str]:
+    """The steps ``AI_STEPS_KEY`` names."""
+    stored = (metadata or {}).get(AI_STEPS_KEY)
+    if not isinstance(stored, list):
+        return frozenset()
+    return frozenset(s for s in stored if isinstance(s, str))
+
+
 #: The agent's package and the files it writes there as the phases go by.
 POC_DIR = "poc"
 SCHEMA_FILES = ("schemas/output_schema_requirements.json", "schemas/output_schema.py")
@@ -247,7 +263,9 @@ def _str_list(value: object) -> list[str]:
     return [item.strip() for item in value if isinstance(item, str) and item.strip()]
 
 
-def _steps_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
+def _steps_from_draft(
+    draft: dict[str, Any], ai: frozenset[str] = frozenset()
+) -> list[dict[str, Any]]:
     workflow = draft.get("workflow")
     raw_steps = workflow.get("steps") if isinstance(workflow, dict) else None
     if not isinstance(raw_steps, list):
@@ -262,10 +280,13 @@ def _steps_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
         if not step_id and not name:
             continue
         component = _str(raw.get("component"))
+        v1_type = _str(raw.get("type"))
         step: dict[str, Any] = {
             "id": step_id or name,
             "name": name or step_id,
-            "type": v2_step_type(_str(raw.get("type")), component),
+            "type": "ai"
+            if v1_type == "automated_task" and not component and step_id in ai
+            else v2_step_type(v1_type, component),
         }
         if component:
             step["component"] = component
@@ -281,14 +302,19 @@ def _steps_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
     return steps
 
 
-def blueprint_from_draft(draft: dict[str, Any]) -> BlueprintContent | None:
+def blueprint_from_draft(
+    draft: dict[str, Any], ai: frozenset[str] = frozenset()
+) -> BlueprintContent | None:
     """Map the agent's V1 draft blueprint onto the V2 blueprint the UI renders.
+
+    ``ai`` are the steps the user made AI steps without a component yet
+    (``AI_STEPS_KEY``), shown as ``ai``.
 
     Returns ``None`` when the draft carries no workflow yet — an early draft
     with only business framing must not overwrite the blueprint with an empty
     flow (the business framing is surfaced separately at Gate 1).
     """
-    steps = _steps_from_draft(draft)
+    steps = _steps_from_draft(draft, ai)
     if not steps:
         return None
 
@@ -457,11 +483,13 @@ def user_changed_blueprint(db: Session, session: WizardSession) -> bool:
     return active is not None and content_digest(active.content) != adopted
 
 
-def _draft_content(draft: dict[str, Any] | None) -> dict[str, Any] | None:
+def _draft_content(
+    draft: dict[str, Any] | None, ai: frozenset[str] = frozenset()
+) -> dict[str, Any] | None:
     """The blueprint content a draft maps to, or None when it maps to nothing."""
     if draft is None:
         return None
-    mapped = blueprint_from_draft(draft)
+    mapped = blueprint_from_draft(draft, ai)
     return mapped.model_dump() if mapped is not None else None
 
 
@@ -485,7 +513,7 @@ def sync_blueprint_from_draft(
     from_file = draft is None
     if from_file:
         draft = read_draft_blueprint(session.output_dir)
-    content = _draft_content(draft)
+    content = _draft_content(draft, ai_steps(session.session_metadata))
     if content is None:
         return False
     digest = content_digest(content)
@@ -502,7 +530,7 @@ def sync_blueprint_from_draft(
         # The draft too: one read before the lock could be older than a draft
         # another sync adopted meanwhile, and would be written over it.
         draft = read_draft_blueprint(session.output_dir)
-        content = _draft_content(draft)
+        content = _draft_content(draft, ai_steps(session.session_metadata))
         if content is None:
             db.commit()
             return False

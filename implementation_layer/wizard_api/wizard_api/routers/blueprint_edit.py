@@ -88,8 +88,8 @@ def apply_blueprint_operations(
         base_version=payload.base_version,
         operations_for=lambda draft: payload.operations,
     )
-    # Always some: the request has at least one operation.
-    assert result is not None
+    if result is None:  # not reached: a request has at least one operation
+        raise HTTPException(status_code=500, detail="the edit changed nothing")
     return OperationsResponse(
         session=session_service.session_detail(db, session),
         warnings=result.warnings,
