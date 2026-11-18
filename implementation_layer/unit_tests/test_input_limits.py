@@ -9,6 +9,7 @@ from __future__ import annotations
 import shutil
 import struct
 import subprocess
+import sys
 import zipfile
 import zlib
 from pathlib import Path
@@ -198,6 +199,38 @@ def test_a_playlist_in_a_recording_slot_is_refused(tmp_path, kind):
 
     with pytest.raises(ValueError, match="playlist or file list"):
         InputLimits().check_media(listing)
+
+
+def test_an_sdp_line_may_end_in_a_stray_carriage_return(tmp_path):
+    listing = tmp_path / "meeting.mp3"
+    listing.write_bytes(b"v=0\r\ns=x\r\r\nm=audio 9 RTP/AVP 0\r\n")
+
+    with pytest.raises(ValueError, match="playlist or file list"):
+        InputLimits().check_media(listing)
+
+
+def test_the_playlist_check_reads_a_long_text_head_in_linear_time(tmp_path):
+    # 64 KiB of short CRLF lines after "v=0" and no "m=" line: a check that took
+    # time exponential in the line count would not finish, so it runs in a child
+    # process with a time limit.
+    text = tmp_path / "notes.mp3"
+    text.write_bytes(b"v=0\r\n" + b"a\r\n" * 22_000)
+    script = (
+        "import sys, time\n"
+        "from gaik.software_components.input_limits import check_not_media_list\n"
+        "started = time.perf_counter()\n"
+        "check_not_media_list(sys.argv[1])\n"
+        "print(time.perf_counter() - started)\n"
+    )
+
+    done = subprocess.run(
+        [sys.executable, "-c", script, str(text)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    assert float(done.stdout) < 1.0
 
 
 def test_a_recording_passes_the_playlist_check(tmp_path):

@@ -97,7 +97,9 @@ _MEDIA_LIST_STARTS = (b"#EXTM3U", b"ffconcat version")
 # description, which names network streams.
 _MEDIA_LIST_HEAD_BYTES = 64 * 1024
 _MEDIA_LIST_XML = (b"<mpd", b"<compositionplaylist", b"<assetmap")
-_SDP = re.compile(rb"\Av=0\r?\n(?:.*\r?\n)*?m=", re.IGNORECASE)
+# A line is everything up to its newline, a carriage return included, so each
+# line matches in one way only and the match takes linear time in the head.
+_SDP = re.compile(rb"\Av=0\r?\n(?:[^\n]*\n)*?m=", re.IGNORECASE)
 
 
 def media_input_args(path: str | Path) -> list[str]:
