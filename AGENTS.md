@@ -207,5 +207,9 @@ expected.
   on that complete workflow succeeding. Do not tag, upload to PyPI, or deploy the
   demo until the applicable certification passes. Keep credentials, raw provider
   errors, and personal documents out of reports; use the synthetic fixtures.
+- The same release job then runs the `component-check` skill on Azure (schema generator,
+  extractor and vision extractor on its synthetic invoices); a failed case blocks the
+  publish like the certification does. Run it, or `gh workflow run live-smoke.yml`, before
+  tagging so that the tag does not find a failure first.
 - Once a release is on PyPI, offer to take it into the Solution Wizard v2 fork with the
   `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`.

@@ -138,6 +138,8 @@ release on PyPI, not this checkout, so a fix here reaches it only after a releas
    `scripts/release_smoke.py` and this runner on the chosen branch without a tag. Only the
    providers with keys in the repository's secrets can run there.
 4. The certification itself: `scripts/release_check.py --live --version X.Y.Z` (AGENTS.md).
+   On the tag, the release job runs it and then this runner on Azure (`--public`); a failed
+   case blocks the PyPI publish, so a case that fails at step 2 or 3 must be fixed first.
 
 ## Add or change a case
 
