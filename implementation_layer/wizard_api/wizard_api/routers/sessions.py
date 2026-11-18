@@ -1975,14 +1975,17 @@ def _user_blueprint_note(version: int, view_written: bool) -> str:
     package's state: it stays true until the agent's draft catches up.
     """
     draft = artifact_sync.DRAFT_BLUEPRINT_FILE
+    # The prompt says the server writes the user's workspace edits into the
+    # draft; this note is said only when it could not (no draft kept).
+    prefix = f"[This time the server could not write your changes into {draft}: "
     if not view_written:
         return (
-            f"[The user changed the blueprint in the workspace after your {draft} was last "
+            f"{prefix}the user changed the blueprint in the workspace after your {draft} was last "
             f"adopted; the current blueprint is version {version}, and your {draft} is not "
             "current. Ask the user what they changed before you rewrite it.]"
         )
     return (
-        f"[The user changed the blueprint in the workspace after your {draft} was last "
+        f"{prefix}the user changed the blueprint in the workspace after your {draft} was last "
         f"adopted; the current blueprint is version {version}. Its name, description, "
         f"workflow steps and integration targets as the user saved them are in "
         f"{artifact_sync.UI_VIEW_BLUEPRINT_FILE}, written by the server; the rest of that file "

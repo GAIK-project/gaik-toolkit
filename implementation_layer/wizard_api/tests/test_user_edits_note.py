@@ -241,3 +241,16 @@ def test_a_turn_without_a_reply_keeps_the_list(client, monkeypatch, not_busy) ->
     assert len(seen) == 1 and _note_lines(seen[0])
     metadata = client.get(f"/sessions/{sid}").json()["metadata"]
     assert metadata["pending_user_edits"] == [RENAMED]
+
+
+@pytest.mark.parametrize("view_written", [True, False])
+def test_the_draftless_note_says_the_server_could_not_write_the_file(view_written) -> None:
+    """The prompt says the server writes the user's edits into the draft; not this time."""
+    note = sessions_router._user_blueprint_note(7, view_written)
+
+    assert note.startswith(
+        "[This time the server could not write your changes into use_case.blueprint.json: "
+        "the user changed the blueprint in the workspace after your "
+        "use_case.blueprint.json was last adopted; the current blueprint is version 7"
+    )
+    assert note.endswith("]")
