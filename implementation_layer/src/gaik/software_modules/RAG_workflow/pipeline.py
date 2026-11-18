@@ -180,7 +180,8 @@ class RAGWorkflow:
         """Parse and index documents into the vector store.
 
         Each file is one document, with ``document_id`` its entry in
-        ``document_ids`` or else its path as passed here. The display name in
+        ``document_ids`` or else its path with forward slashes
+        (``Path(path).as_posix()``). The display name in
         ``filenames`` does not identify it, so two files with the same name are
         two documents. Indexing a document again replaces its chunks: the ones
         it no longer has are deleted, and unchanged ones are not stored twice.
@@ -209,8 +210,10 @@ class RAGWorkflow:
                 chunks = self.parser.convert_doc_to_chunks_with_vision(
                     str(file_path), document_name=doc_name
                 )
+            # The path in one spelling, so "docs/a.pdf" and Path("docs/a.pdf") (with
+            # backslashes on Windows) are the same document.
             document_id = check_document_id(
-                document_ids[i] if document_ids is not None else str(file_path)
+                document_ids[i] if document_ids is not None else Path(file_path).as_posix()
             )
             ids.append(document_id)
             for chunk in chunks:
@@ -258,7 +261,8 @@ class RAGWorkflow:
 
         Args:
             document_id: The id the document was indexed under: its entry in
-                ``document_ids``, or else its path as passed to ``index_documents``.
+                ``document_ids``, or else its path with forward slashes
+                (``Path(path).as_posix()``).
 
         Returns:
             The number of chunks deleted.

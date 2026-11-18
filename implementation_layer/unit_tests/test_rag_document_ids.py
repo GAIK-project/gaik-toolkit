@@ -346,6 +346,16 @@ def test_workflow_a_store_without_replace_gets_delete_then_add(workflow):
     assert calls == [("delete", "/in/a.pdf"), ("add", ["one"])]
 
 
+def test_workflow_one_path_spelled_two_ways_is_one_document(workflow):
+    workflow.parser.texts = {"in/a.pdf": ["one", "two"]}
+    workflow.index_documents(["./in/a.pdf"])
+    workflow.parser.texts["in/a.pdf"] = ["three"]
+    workflow.index_documents([Path("in/a.pdf")])
+
+    assert [d.page_content for d in workflow.vector_store._documents] == ["three"]
+    assert workflow.delete_document("in/a.pdf") == 1
+
+
 def test_workflow_delete_document_removes_one_file(workflow):
     workflow.parser.texts = {"/in/a.pdf": ["one", "two"], "/in/b.pdf": ["other"]}
     workflow.index_documents(["/in/a.pdf", "/in/b.pdf"])

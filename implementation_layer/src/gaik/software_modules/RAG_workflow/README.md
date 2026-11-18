@@ -89,7 +89,7 @@ index_result = workflow.index_documents(
     document_ids: list[str] | None = None,
 )
 # Each file is one document, identified by its entry in document_ids or else its
-# path; filenames are display names only, so two files with the same name are two
+# path with forward slashes (Path(path).as_posix()); filenames are display names only, so two files with the same name are two
 # documents. Indexing a document again replaces its chunks. Files saved under a new
 # temporary path each time need document_ids to be replaced.
 
