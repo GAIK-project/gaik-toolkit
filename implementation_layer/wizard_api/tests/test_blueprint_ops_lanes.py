@@ -7,6 +7,7 @@ diagram keeps the lanes it had.
 """
 
 import copy
+import json
 import os
 import re
 import uuid
@@ -454,15 +455,14 @@ def test_a_lane_the_user_adds_is_drawn_last_and_moves_no_other_lane(
     with open(os.path.join(created["output_dir"], "workflow.bpmn"), encoding="utf-8") as fh:
         assert 'name="New lane"' in fh.read()
 
-    # Removed, it is no user lane any more; an undo brings it back as one.
+    # Removed, it is no user lane any more. An undo brings the participant back,
+    # as a lane of the blueprint like any other (R26): drawn only when a step is in it.
     run({"op": "remove_lane", "lane_id": "new_lane"})
     assert artifact_sync.USER_LANES_KEY not in metadata()
     assert 'name="New lane"' not in client.get(f"/sessions/{sid}/bpmn").text
-    version = client.get(f"/sessions/{sid}").json()["active_version"]
-    undone = client.post(f"/sessions/{sid}/blueprint/undo", json={"base_version": version})
-    assert undone.status_code == 200, undone.text
-    assert metadata()[artifact_sync.USER_LANES_KEY] == ["new_lane"]
-    assert 'name="New lane"' in client.get(f"/sessions/{sid}/bpmn").text
+    _undo(client, sid)
+    assert artifact_sync.USER_LANES_KEY not in metadata()
+    assert 'name="New lane"' not in client.get(f"/sessions/{sid}/bpmn").text
 
 
 @requires_postgres
@@ -486,3 +486,116 @@ def test_the_user_lanes_are_server_owned(client) -> None:
     )
     assert res.status_code == 422
     assert res.json()["detail"]["error"] == "server_owned_metadata"
+
+
+# ---------------------------------------------------------------- R26: lanes only from add_lane
+
+
+def _undo(client, sid: str) -> None:
+    version = client.get(f"/sessions/{sid}").json()["active_version"]
+    res = client.post(f"/sessions/{sid}/blueprint/undo", json={"base_version": version})
+    assert res.status_code == 200, res.text
+
+
+def _agent_turn(db_session, created: dict, draft: dict) -> None:
+    """The agent writes ``draft`` and the chat turn's sync reads it."""
+    from test_patch_blueprint_writes_draft import _draft_path
+    from wizard_api.services import artifact_sync, session_service
+
+    with open(_draft_path(created["output_dir"]), "w", encoding="utf-8") as fh:
+        json.dump(draft, fh)
+    db_session.expire_all()
+    session = session_service.get_session(db_session, uuid.UUID(created["id"]))
+    artifact_sync.sync_blueprint_from_draft(db_session, session)
+
+
+def _user_lanes(db_session, sid: str):
+    from wizard_api.services import artifact_sync, session_service
+
+    db_session.expire_all()
+    metadata = session_service.get_session(db_session, uuid.UUID(sid)).session_metadata
+    return metadata.get(artifact_sync.USER_LANES_KEY)
+
+
+def _with_erp(draft: dict) -> dict:
+    draft["business_process"]["participants"].append({"id": "erp", "name": "ERP", "kind": "system"})
+    return draft
+
+
+@requires_postgres
+def test_a_participant_an_undo_brings_back_after_the_agent_dropped_it_is_no_user_lane(
+    client, db_session, monkeypatch
+) -> None:
+    from test_patch_blueprint_writes_draft import _create
+    from wizard_api.services import agent_service
+
+    monkeypatch.setattr(agent_service, "is_busy", lambda session_id: False)
+    created = _create(client, db_session, draft=_with_erp(_draft()))
+    sid = created["id"]
+    # The agent drops ERP in a turn (a new version); the user clicks Undo, which goes back over it.
+    dropped = _draft()
+    dropped["use_case"]["description"] = "d2"
+    _agent_turn(db_session, created, dropped)
+    _undo(client, sid)
+
+    assert "erp" in [p["id"] for p in _read(created)["business_process"]["participants"]]
+    assert _user_lanes(db_session, sid) is None
+    assert 'name="ERP"' not in client.get(f"/sessions/{sid}/bpmn").text
+
+
+@requires_postgres
+def test_a_user_lane_the_agent_drops_and_declares_again_is_no_user_lane(
+    client, db_session, monkeypatch
+) -> None:
+    from test_patch_blueprint_writes_draft import _create
+    from wizard_api.services import agent_service
+
+    monkeypatch.setattr(agent_service, "is_busy", lambda session_id: False)
+    created = _create(client, db_session, draft=_draft())
+    sid = created["id"]
+    version = client.get(f"/sessions/{sid}").json()["active_version"]
+    res = client.post(
+        f"/sessions/{sid}/blueprint/operations",
+        json={"base_version": version, "operations": [{"op": "add_lane", "name": "Legal"}]},
+    )
+    assert res.status_code == 200, res.text
+    assert _user_lanes(db_session, sid) == ["legal"]
+
+    # The agent's next draft has no Legal: it is no user lane any more.
+    _agent_turn(db_session, created, _draft())
+    assert _user_lanes(db_session, sid) is None
+    # A later draft declares "legal" again: the agent's participant, not drawn while empty.
+    again = _draft()
+    again["business_process"]["participants"].append({"id": "legal", "name": "Legal"})
+    again["use_case"]["description"] = "d2"
+    _agent_turn(db_session, created, again)
+    assert _user_lanes(db_session, sid) is None
+    assert 'name="Legal"' not in client.get(f"/sessions/{sid}/bpmn").text
+
+
+@requires_postgres
+def test_an_undone_add_lane_is_gone_from_the_user_lanes(client, db_session, monkeypatch) -> None:
+    from test_patch_blueprint_writes_draft import _create
+    from wizard_api.services import agent_service
+
+    monkeypatch.setattr(agent_service, "is_busy", lambda session_id: False)
+    created = _create(client, db_session, draft=_draft())
+    sid = created["id"]
+    version = client.get(f"/sessions/{sid}").json()["active_version"]
+    res = client.post(
+        f"/sessions/{sid}/blueprint/operations",
+        json={"base_version": version, "operations": [{"op": "add_lane", "name": "Legal"}]},
+    )
+    assert res.status_code == 200, res.text
+    assert _user_lanes(db_session, sid) == ["legal"]
+
+    _undo(client, sid)
+
+    assert _user_lanes(db_session, sid) is None
+    assert 'name="Legal"' not in client.get(f"/sessions/{sid}/bpmn").text
+
+
+def _read(created: dict) -> dict:
+    from test_patch_blueprint_writes_draft import _read_draft
+
+    return _read_draft(created["output_dir"])

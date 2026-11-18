@@ -203,14 +203,19 @@ def apply_edit(
         ai = artifact_sync.still_without_component(result.blueprint, marked | edit.ai_steps)
         if whole_save and result.blueprint == draft and ai == marked:
             return None
-        lanes = (artifact_sync.user_lanes(metadata) | set(result.lanes_added)) - set(
-            result.lanes_removed
-        )
+        # Only add_lane makes a user lane; remove_lane and the write's own
+        # participants (_write) take them away.
+        removed = set(result.lanes_removed)
+        lanes = [
+            lane
+            for lane in [*artifact_sync.user_lane_list(metadata), *result.lanes_added]
+            if lane not in removed
+        ]
         return _Write(
             blueprint=result.blueprint,
             summaries=list(result.summaries),
             ai=ai,
-            user_lanes=frozenset(lanes),
+            user_lanes=lanes,
             note=note
             if note is not None
             else "Workspace edit: " + "; ".join(result.summaries)[:_NOTE_SUMMARY_CHARS],
@@ -306,30 +311,9 @@ def undo(db: Session, session, *, base_version: int) -> None:
             ai=ai,
             note=UNDO_NOTE,
             undo_cursor=target.version,
-            user_lanes=_lanes_after_undo(metadata, draft, restored),
         )
 
     _write(db, session, base_version, change)
-
-
-def _participant_ids(blueprint: dict[str, Any]) -> set[str]:
-    process = blueprint.get("business_process") or {}
-    return {
-        str(p.get("id"))
-        for p in process.get("participants") or []
-        if isinstance(p, dict) and p.get("id")
-    }
-
-
-def _lanes_after_undo(
-    metadata: dict[str, Any], draft: dict[str, Any], restored: dict[str, Any]
-) -> frozenset[str]:
-    """The user's lanes after an undo: a lane the undone edit removed comes
-    back with its participant. A workspace edit removes a participant only with
-    ``remove_lane``, and only a lane nothing is in, which is a lane the user
-    added: so a participant the undo brings back is one of the user's lanes."""
-    back = _participant_ids(restored) - _participant_ids(draft)
-    return artifact_sync.user_lanes(metadata) | back
 
 
 def _ai_steps_of(version, draft: dict[str, Any]) -> frozenset[str]:
@@ -360,8 +344,9 @@ class _Write:
     #: What the caller gets back (an edit's ``blueprint_ops.OpsResult``).
     result: Any = None
     #: The lanes the user added once this write is made
-    #: (``artifact_sync.USER_LANES_KEY``); None keeps them as they are.
-    user_lanes: frozenset[str] | None = None
+    #: (``artifact_sync.USER_LANES_KEY``), before ``_write`` keeps only those
+    #: still participants; None keeps them as they are.
+    user_lanes: list[str] | None = None
 
 
 #: Makes the write from the draft and the session's metadata as read under the
@@ -431,21 +416,22 @@ def _apply(db: Session, session, base_version: int | None, change: _Change) -> _
         taken = draft_store.snapshot(output_dir)
         try:
             draft_store.write_draft(output_dir, written.blueprint)
-            lanes = (
+            # Every write (an edit, an undo, a save) keeps only the user's
+            # lanes that are still participants of what it writes.
+            metadata = artifact_sync.with_user_lanes(
+                metadata,
                 written.user_lanes
                 if written.user_lanes is not None
-                else artifact_sync.user_lanes(metadata)
+                else artifact_sync.user_lane_list(metadata),
+                written.blueprint,
             )
+            lanes = artifact_sync.user_lanes(metadata)
             draft_store.refresh_derived_files(output_dir, written.blueprint, extra_lane_ids=lanes)
             mapped = artifact_sync.blueprint_from_draft(written.blueprint, written.ai)
             content = mapped.model_dump() if mapped is not None else None
             blueprint_service.add_version(
                 db, session, note=written.note, content=content, draft=written.blueprint
             )
-            if lanes:
-                metadata[artifact_sync.USER_LANES_KEY] = sorted(lanes)
-            else:
-                metadata.pop(artifact_sync.USER_LANES_KEY, None)
             if written.ai:
                 metadata[artifact_sync.AI_STEPS_KEY] = sorted(written.ai)
             else:
