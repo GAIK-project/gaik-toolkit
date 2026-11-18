@@ -80,7 +80,7 @@ def test_keys_are_read_from_pg_catalog():
 
 
 def test_mixed_case_schema_name_is_folded_for_introspection():
-    agent = PostgresAgent(URL, schema_name="Sales")
+    agent = PostgresAgent(URL, schema_name="Sales", table_allowlist=["customers", "orders"])
     conn = FakeIntrospectionConn(schema="sales")
     agent._get_conn = lambda: conn
     assert agent.schema_name == "sales"
@@ -126,7 +126,7 @@ class FakeQueryConn:
 
 
 def _agent_returning(names, rows):
-    agent = PostgresAgent(URL)
+    agent = PostgresAgent(URL, table_allowlist=["customers", "orders"])
     agent._get_conn = lambda: FakeQueryConn(names, rows)
     return agent
 
@@ -143,7 +143,7 @@ def test_renamed_repeat_does_not_take_a_real_column_name():
 
 
 def test_cached_sample_rows_are_not_sent_with_later_questions(monkeypatch):
-    agent = PostgresAgent(URL)
+    agent = PostgresAgent(URL, table_allowlist=["customers", "orders"])
     agent._schema = SchemaInfo(
         schema_name="public",
         tables=[

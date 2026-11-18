@@ -165,7 +165,7 @@ or CSC Aitta account. Enter the model/deployment and key; Azure also needs its p
 resource endpoint. **Test connection** makes one small chat request. **Use this key**
 activates it for this browser tab until refresh, navigation away or sign-out. **Clear
 own model** returns to the server models. A run on an own key needs a signed-in account,
-approved or pending; it spends no trial run.
+approved, or pending with a confirmed e-mail address; it spends no trial run.
 
 Own settings apply to Extractor, Schema Generator, Classifier, LLM-based Parser modes,
 Vision Extractor, PostgreSQL Agent questions and single LLM Judge tasks.

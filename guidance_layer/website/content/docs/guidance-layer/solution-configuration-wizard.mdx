@@ -67,10 +67,10 @@ For developers who want to drive the wizard programmatically or from a terminal,
 ```bash
 cd implementation_layer/solution_wizard
 
-# Wizard asks for the output directory interactively:
+# The runner asks for the output folder before the session starts:
 python run_wizard_interactive.py
 
-# Pre-supply the output directory (skips that question):
+# Or give it (outside the repository):
 python run_wizard_interactive.py --output-dir ~/projects/my-use-case
 
 # Verify credentials before a full session:
@@ -78,6 +78,8 @@ python run_wizard_interactive.py --preflight
 ```
 
 Requires `pip install "gaik[wizard]"` (Claude Agent SDK + python-dotenv), the `claude` CLI on `PATH`, and Azure Foundry credentials (`CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE`) in `implementation_layer/.env` (one level above the wizard directory) or the shell environment. Use `--env-file` to read another file; the script's docstring lists the optional variables.
+
+A hook decides every tool call before it runs, including the calls the CLI would approve by itself. The agent reads only the output folder and the wizard's own files, writes only the output folder, never reads or writes a `.env` file, and runs only the wizard's scripts. Your own MCP servers and Claude Code settings are not loaded, and the agent gets the system basics plus the names the `.env` file sets, or without one the provider names the PoC template lists, and nothing else from your shell (`--pass-env NAME` hands on another).
 
 **Web interface — Wizard V2:**
 
