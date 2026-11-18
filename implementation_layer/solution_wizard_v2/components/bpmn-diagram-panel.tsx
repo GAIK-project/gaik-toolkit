@@ -382,8 +382,14 @@ export function BpmnDiagramPanel({
    * One edit: sent at once on the version the canvas shows, then the server's
    * diagram and mapping are read again. A refusal puts the server's diagram
    * back; a version written elsewhere meanwhile is read by the page too.
+   * `afterMade` runs once the edit is made, before the diagram is read again
+   * (a lane change drops the step's kept place then, and only then).
    */
-  async function run(kind: "ops" | "undo", operations: BlueprintOperation[] = []): Promise<boolean> {
+  async function run(
+    kind: "ops" | "undo",
+    operations: BlueprintOperation[] = [],
+    afterMade?: () => Promise<void>,
+  ): Promise<boolean> {
     // The one gate every edit passes (palette, context pad, keys, the name
     // field, Kumoa): none starts while a name is typed in place, or the
     // diagram drawn after it would be imported over the typed name.
@@ -405,6 +411,7 @@ export function BpmnDiagramPanel({
       stepsRef.current = result.blueprint.steps;
       // What this edit left for the wizard (an AI step without a component); an undo leaves nothing said.
       setNeedsAttention("needsAttention" in result ? result.needsAttention : []);
+      if (afterMade) await afterMade();
       let next: ServerDiagram | null = null;
       try {
         next = await readServerDiagram();
@@ -503,7 +510,7 @@ export function BpmnDiagramPanel({
   /**
    * Drops the kept places of `shapes` and the routes of `edges`, in both
    * drawing modes (`null` resets an id): a step put in another lane is drawn
-   * where its new lane puts it. Sent after what is pending, before the next edit.
+   * where its new lane puts it. Sent after what is pending.
    */
   function resetLayout(shapes: string[], edges: string[]): Promise<void> {
     if (!shapes.length && !edges.length) return layoutSending.current;
@@ -532,16 +539,17 @@ export function BpmnDiagramPanel({
 
   /**
    * A step put in another lane, dragged on the canvas or picked in its panel:
-   * its kept place goes, then `set_step_lane` through `run`. While nothing
-   * can be sent the server's diagram goes back on the canvas.
+   * `set_step_lane` through `run`, and once it is made the step's kept place
+   * and its flows' routes go, before the diagram is read again. A refused
+   * change keeps them. While nothing can be sent the server's diagram goes
+   * back on the canvas.
    */
   async function moveStepToLane(change: BpmnStepLaneChange): Promise<boolean> {
     if (busy.current || typing.current || !opsContext()) {
       void revert();
       return false;
     }
-    void resetLayout(change.shapes, change.edges);
-    return run("ops", [change.op]);
+    return run("ops", [change.op], () => resetLayout(change.shapes, change.edges));
   }
 
   // Dragged shapes are kept before the page goes: another page, or a reload

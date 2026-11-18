@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import { getWizardApiUrl, waitForApiHealthy } from "./helpers/api";
 import { draftSteps, openEditor, sessionAtBpmn, writeDraft } from "./helpers/bpmn-stack";
-import { centre, drag, focusStep, inLaneBelow, laneAt } from "./helpers/bpmn-canvas";
+import { centre, drag, focusStep, laneAt } from "./helpers/bpmn-canvas";
 
 const STACK_E2E = process.env.PLAYWRIGHT_STACK_E2E === "true";
 
@@ -49,6 +49,24 @@ async function freeSpot(page: Page, lane: string): Promise<[number, number]> {
   return point!;
 }
 
+/** The lanes on the canvas, top to bottom, with their names and places in diagram units. */
+async function lanePlaces(page: Page) {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<SVGGElement>('.bpmn-editable .djs-element[data-element-id^="Lane_"]')]
+      .map((g) => {
+        const m = g.transform.baseVal.consolidate()!.matrix;
+        return { name: g.querySelector("text")?.textContent ?? "", y: Math.round(m.f) };
+      })
+      .sort((a, b) => a.y - b.y),
+  );
+}
+
+/** A point inside the lane, on screen, at `x`. */
+async function inLane(page: Page, lane: string, x: number) {
+  const box = (await page.locator(`.bpmn-editable [data-element-id="${lane}"]`).first().boundingBox())!;
+  return { x, y: box.y + Math.min(50, box.height / 2) };
+}
+
 const operationAnswer = (page: Page) =>
   page.waitForResponse((r) => r.url().includes("/blueprint/operations") && r.request().method() === "POST");
 
@@ -67,19 +85,23 @@ test.describe("BPMN lanes (stack)", () => {
     await page.reload();
     await openEditor(page);
 
-    // Add lane: drawn empty, below the clerk's lane (the people's lanes come first).
+    // Add lane: drawn empty, below every other lane, which stay where they were.
+    const lanesBefore = await lanePlaces(page);
     const added = operationAnswer(page);
     await page.locator('.bpmn-editable .djs-palette .entry[data-action="gaik-add-lane"]').click();
     expect((await added).status()).toBe(200);
     await expect(page.locator(".bpmn-editable")).toHaveAttribute("aria-busy", "false");
     const lane = await laneNamed(page, "Uusi kaista");
+    const lanesAfter = await lanePlaces(page);
+    expect(lanesAfter.at(-1)!.name).toBe("Uusi kaista");
+    expect(lanesAfter.slice(0, -1)).toEqual(lanesBefore);
     expect(await participants(request, id)).toContainEqual(expect.objectContaining({ id: "uusi_kaista", name: "Uusi kaista" }));
 
     // The upload step goes into it, by a drag.
     await expect(page.locator('.bpmn-editable .djs-palette .entry[data-action="gaik-add-step"]')).toBeVisible();
     await focusStep(page, 0);
     const from = await centre(page, "Activity_upload");
-    const to = await inLaneBelow(page, from);
+    const to = await inLane(page, lane, from.x);
     expect(await laneAt(page, to)).toBe(lane);
     const resets: string[] = [];
     page.on("request", (r) => {
@@ -92,7 +114,8 @@ test.describe("BPMN lanes (stack)", () => {
     expect(answer.request().postDataJSON().operations).toEqual([
       { op: "set_step_lane", step_id: "upload", lane_id: "uusi_kaista" },
     ]);
-    expect(resets).toHaveLength(2);
+    // The step's kept place goes once the change is made.
+    await expect.poll(() => resets.length).toBe(2);
     expect(JSON.parse(resets[0]).shapes).toEqual({ Activity_upload: null });
     await expect.poll(async () => laneAt(page, await centre(page, "Activity_upload")), { timeout: 15_000 }).toBe(lane);
 

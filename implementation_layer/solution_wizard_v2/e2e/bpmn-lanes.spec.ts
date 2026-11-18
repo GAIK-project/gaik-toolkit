@@ -1,7 +1,13 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { resetMockSessions } from "./helpers/mock";
 import { loginAsDev } from "./helpers/auth";
-import { openBpmnView, selectWorkspaceTab, setChatOpen, unlockBpmnEditor } from "./helpers/workspace";
+import {
+  openBlueprintEditor,
+  openBpmnView,
+  selectWorkspaceTab,
+  setChatOpen,
+  unlockBpmnEditor,
+} from "./helpers/workspace";
 import { centre, drag, focusStep, inLaneBelow, laneAt } from "./helpers/bpmn-canvas";
 
 /**
@@ -9,8 +15,9 @@ import { centre, drag, focusStep, inLaneBelow, laneAt } from "./helpers/bpmn-can
  * wizard_api the canvas is read-only and offers no lane tools. With the
  * server's mapping stood in (each lane named by its participant), the
  * palette's "Add lane", a lane's Rename and Remove, a step dragged into
- * another lane and the step panel's lane select send their operations, and a
- * step's kept place is dropped before it changes lanes. That the edits are
+ * another lane and the step panel's lane select send their operations; once
+ * a lane change is made the step's kept place is dropped, and a refused one
+ * keeps it. That the edits are
  * kept over a reload is in e2e/bpmn-lanes-stack.spec.ts.
  */
 
@@ -76,6 +83,34 @@ const refused = (reason: string) => (route: Route) =>
     status: 422,
     contentType: "application/json",
     body: JSON.stringify({ detail: { error: "invalid_operation", message: "no", field: "operations[0].lane_id", code: reason } }),
+  });
+
+/** The session's blueprint, read from the form's JSON: what a made edit answers with. */
+async function readBlueprint(page: Page): Promise<unknown> {
+  await loginAsDev(page);
+  await page.goto("/sessions/ses_laskut");
+  await setChatOpen(page, false);
+  await openBlueprintEditor(page);
+  await page.getByTestId("blueprint-json-toggle").click();
+  const blueprint = JSON.parse(await page.getByTestId("blueprint-json-editor").inputValue()) as unknown;
+  await page.getByTestId("blueprint-done").click();
+  return blueprint;
+}
+
+const made = (blueprint: unknown) => (route: Route) =>
+  route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      session: {
+        id: "ses_laskut",
+        active_version: (route.request().postDataJSON() as { base_version: number }).base_version,
+        blueprint,
+      },
+      warnings: [],
+      needs_attention: [],
+      bpmn_changed: true,
+    }),
   });
 
 const operations = (sent: Sent[]) =>
@@ -155,11 +190,12 @@ test.describe("BPMN lanes", () => {
     ]);
   });
 
-  test("a step dragged into another lane drops its kept place in both drawings, then sends set_step_lane", async ({
+  test("a step dragged into another lane sends set_step_lane, and once it is made its kept place goes in both drawings", async ({
     page,
   }) => {
-    test.setTimeout(90_000);
-    const { sent } = await openEditable(page, refused("not_found"));
+    test.setTimeout(120_000);
+    const blueprint = await readBlueprint(page);
+    const { sent } = await openEditable(page, made(blueprint));
     await focusStep(page, 2);
     const from = await centre(page, "Activity_classify");
     const to = await inLaneBelow(page, from);
@@ -167,7 +203,11 @@ test.describe("BPMN lanes", () => {
     expect(target).not.toBe(await laneAt(page, from));
     await drag(page, from, to);
 
-    await expect.poll(() => sent.map((s) => s.kind)).toEqual(["layout", "layout", "ops"]);
+    // The operation first; the kept place goes only once it is made.
+    await expect.poll(() => sent.map((s) => s.kind)).toEqual(["ops", "layout", "layout"]);
+    expect(operations(sent)[0]).toEqual([
+      { op: "set_step_lane", step_id: "classify", lane_id: target!.replace(/^Lane_/, "") },
+    ]);
     const [zero, one] = sent.filter((s) => s.kind === "layout");
     expect([zero.url, one.url].map((u) => /data_objects=(\d)/.exec(u)![1])).toEqual(["0", "1"]);
     const reset = zero.body as { shapes: Record<string, null>; edges: Record<string, null> };
@@ -175,9 +215,19 @@ test.describe("BPMN lanes", () => {
     expect(Object.keys(reset.edges).length).toBeGreaterThan(0);
     expect(Object.values(reset.edges).every((v) => v === null)).toBe(true);
     expect(one.body).toEqual(zero.body);
-    expect(operations(sent)[0]).toEqual([
-      { op: "set_step_lane", step_id: "classify", lane_id: target!.replace(/^Lane_/, "") },
-    ]);
+    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu");
+  });
+
+  test("a refused lane change keeps the step's kept place: no layout is sent", async ({ page }) => {
+    test.setTimeout(90_000);
+    const { sent } = await openEditable(page, refused("not_found"));
+    await focusStep(page, 2);
+    const from = await centre(page, "Activity_classify");
+    await drag(page, from, await inLaneBelow(page, from));
+    await expect.poll(() => operations(sent).length).toBe(1);
+    await expect(page.getByTestId("bpmn-status")).toContainText("Muutosta ei");
+    await page.waitForTimeout(1_500);
+    expect(sent.map((s) => s.kind)).toEqual(["ops"]);
   });
 
   test("the step panel's lane select lists the lanes by name and sends set_step_lane", async ({ page }) => {
@@ -195,6 +245,8 @@ test.describe("BPMN lanes", () => {
     expect(operations(sent)[0]).toEqual([
       { op: "set_step_lane", step_id: "classify", lane_id: pick.id.replace(/^Lane_/, "") },
     ]);
-    expect(sent.filter((s) => s.kind === "layout")).toHaveLength(2);
+    // Refused: the step's kept place stays.
+    await expect(page.getByTestId("bpmn-status")).toContainText("Muutosta ei");
+    expect(sent.filter((s) => s.kind === "layout")).toHaveLength(0);
   });
 });
