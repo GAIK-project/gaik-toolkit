@@ -1,5 +1,7 @@
 import {
   SIGNED_IN_HEADER,
+  USER_HEADER,
+  namesItsUser,
   WIZARD_USER_HEADER,
   accessRefusal,
   handsOutStorageLink,
@@ -262,6 +264,14 @@ async function route(request: NextRequest): Promise<NextResponse> {
     if (wizardApi) {
       const { userId } = await accessState();
       if (userId) headers.set(WIZARD_USER_HEADER, userId);
+    }
+    // A generated result (PDF, subtitles, tabular session) belongs to the user
+    // whose run made it; the API serves it only to the same user. Set on every
+    // run and on every result download (namesItsUser), never copied from the browser.
+    // Other reads leave it out, so they do not read the session.
+    if (namesItsUser(request.method, pathname)) {
+      const { userId } = await accessState();
+      if (userId) headers.set(USER_HEADER, userId);
     }
 
     // Only the proxy sets this header (`headers` starts empty), and only after

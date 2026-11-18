@@ -152,6 +152,9 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   (`writesSharedData`), and the API serves no route that writes the shared
   video-search index. A video's playback and thumbnail links go to signed-in users
   only (`handsOutStorageLink`, checked again in `api/routers/video_search.py`).
+  A generated result (PDF, subtitles, tabular session) belongs to the user whose run
+  made it: the proxy sends the signed-in user in `X-GAIK-User`, and the API serves the
+  result by id only to that user (`api/utils/result_owner.py`).
 
 ## docs site (GitHub Pages)
 

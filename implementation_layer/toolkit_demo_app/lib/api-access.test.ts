@@ -12,6 +12,7 @@ import {
   needsApprovedUser,
   wizardRefusal,
   writesSharedData,
+  namesItsUser,
 } from "./api-access";
 
 const NON_READS = ["POST", "PUT", "PATCH", "DELETE", "delete"];
@@ -249,4 +250,18 @@ test("an e-mail address counts as confirmed only with a confirmation time", () =
   expect(isEmailConfirmed({ email_confirmed_at: null })).toBe(false);
   expect(isEmailConfirmed({})).toBe(false);
   expect(isEmailConfirmed(null)).toBe(false);
+});
+
+
+test("only runs and result downloads name their user", () => {
+  expect(namesItsUser("POST", "/api/pipeline/document")).toBe(true);
+  expect(namesItsUser("DELETE", "/api/tabular-agent/session/abc")).toBe(true);
+  expect(namesItsUser("GET", "/api/pipeline/pdf/abc")).toBe(true);
+  expect(namesItsUser("GET", "/api/diary/pdf/abc")).toBe(true);
+  expect(namesItsUser("GET", "/api/luvata-order/pdf/abc")).toBe(true);
+  expect(namesItsUser("GET", "/api/dental-transcribe/srt/abc")).toBe(true);
+  expect(namesItsUser("GET", "/api/dental-transcribe/vtt/abc")).toBe(true);
+  expect(namesItsUser("GET", "/api/video-search/videos/abc/thumbnail")).toBe(false);
+  expect(namesItsUser("GET", "/api/tabular-agent/status")).toBe(false);
+  expect(namesItsUser("GET", "/api/pipeline/pdf/abc/extra")).toBe(false);
 });
