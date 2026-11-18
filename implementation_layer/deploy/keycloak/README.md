@@ -25,8 +25,10 @@ browser ──> Route ──> oauth2-proxy (<stack>-signin) ──> web app ─�
 
 - `theme/gaik`: the sign-in pages in the Solution Wizard's look (logo, colours,
   card), on top of Keycloak's own theme. After changing it:
-  `PROJECT=gaik ./deploy.sh theme` (updates it and restarts Keycloak). Browsers
-  keep the old CSS for up to an hour (`KC_SPI_THEME__STATIC_MAX_AGE`); check a
+  `PROJECT=gaik ./deploy.sh theme` (updates it and restarts Keycloak). The
+  stylesheet's address carries a digest of its content, so browsers fetch a
+  changed one at once; other theme files are cached an hour
+  (`KC_SPI_THEME__STATIC_MAX_AGE`); check a
   change at several window widths, the layout changes at PatternFly's breakpoints.
 - `../openshift/signin-templates/error.html`: the proxy's error page. For a user
   still in `pending` it says the account awaits approval and offers a sign-out
