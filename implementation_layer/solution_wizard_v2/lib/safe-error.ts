@@ -70,6 +70,7 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   "nothing_to_undo",
   "cannot_undo",
   "readonly_section",
+  "invalid_draft",
   "needs_wizard_api",
   // a plain refusal: the route's own fixed words ("session not found")
   "not_found",

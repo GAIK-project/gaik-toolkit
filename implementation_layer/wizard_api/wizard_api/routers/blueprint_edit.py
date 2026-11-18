@@ -5,7 +5,8 @@ The diagram's edits reach it as a list of operations (``schemas/blueprint_ops``)
 that ``services/blueprint_ops`` applies with every reference repaired.
 ``services/blueprint_edit_service`` writes the result as the agent's file, keeps
 it with a new version and records what changed for the agent's next turn, for
-the old saves (PATCH /blueprint, /bpmn/sync) too. Where the user placed the
+the old saves (PATCH /blueprint, /bpmn/sync) and the JSON view's full save
+(PUT /blueprint/full) too. Where the user placed the
 diagram's shapes is no part of the blueprint: ``PUT /bpmn/layout`` keeps it
 apart (``services/bpmn_layout``).
 
@@ -28,12 +29,24 @@ from wizard_api.errors import api_error
 from wizard_api.ownership import session_belongs_to_requester
 from wizard_api.schemas.blueprint import SessionDetailResponse
 from wizard_api.schemas.blueprint_ops import (
+    MAX_BLUEPRINT_CHARS,
+    MAX_FULL_REQUEST_BYTES,
     MAX_REQUEST_BYTES,
+    READONLY_SECTIONS,
+    FullBlueprintRequest,
+    FullBlueprintResponse,
     OperationsRequest,
     OperationsResponse,
     UndoRequest,
 )
-from wizard_api.services import blueprint_edit_service, bpmn_layout, session_service
+from wizard_api.services import (
+    artifact_sync,
+    blueprint_edit_service,
+    blueprint_ops,
+    bpmn_layout,
+    draft_store,
+    session_service,
+)
 
 router = APIRouter(
     prefix="/sessions",
@@ -42,19 +55,19 @@ router = APIRouter(
 )
 
 
-async def _limited_body(request: Request, what: str) -> bytes:
-    """The request body, read only up to ``MAX_REQUEST_BYTES``.
+async def _limited_body(request: Request, what: str, limit: int = MAX_REQUEST_BYTES) -> bytes:
+    """The request body, read only up to ``limit`` bytes (``MAX_REQUEST_BYTES``).
 
     Read here rather than as a body parameter so a larger body is refused (413)
     at its first byte over the limit, also when it comes without a length.
     """
     declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > MAX_REQUEST_BYTES:
+    if declared and declared.isdigit() and int(declared) > limit:
         raise _too_large(what)
     body = bytearray()
     async for chunk in request.stream():
         body += chunk
-        if len(body) > MAX_REQUEST_BYTES:
+        if len(body) > limit:
             raise _too_large(what)
     return bytes(body)
 
@@ -71,7 +84,11 @@ async def _operations_body(request: Request) -> OperationsRequest:
 
 
 def _too_large(what: str) -> HTTPException:
-    return api_error(413, "too_large", what.format(kb=MAX_REQUEST_BYTES // 1024))
+    return api_error(
+        413,
+        "too_large",
+        what.format(kb=MAX_REQUEST_BYTES // 1024, chars=f"{MAX_BLUEPRINT_CHARS:,}"),
+    )
 
 
 @router.post("/{session_id}/blueprint/operations", response_model=OperationsResponse)
@@ -189,3 +206,115 @@ def put_bpmn_layout(
     except ValueError as exc:
         raise api_error(422, "invalid_layout", str(exc)) from exc
     return Response(status_code=204)
+
+
+_BLUEPRINT_TOO_LARGE = "A blueprint is at most {chars} characters as JSON."
+
+
+@router.get("/{session_id}/blueprint/full", response_model=FullBlueprintResponse)
+def get_full_blueprint(
+    session_id: uuid.UUID, db: Session = Depends(get_db)
+) -> FullBlueprintResponse:
+    """The agent's draft whole, the active version it belongs to, and the
+    top-level sections only the server writes (``READONLY_SECTIONS``), which a
+    save through ``PUT /blueprint/full`` must leave as they are.
+
+    Refused with 409 ``no_draft`` while the agent has not written the draft.
+    Changes nothing.
+    """
+    session = session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    draft = artifact_sync.read_draft_blueprint(session.output_dir)
+    if draft is None:
+        raise blueprint_edit_service.no_draft()
+    return FullBlueprintResponse(
+        version=session.active_version, draft=draft, readonly_sections=list(READONLY_SECTIONS)
+    )
+
+
+async def _full_body(request: Request) -> FullBlueprintRequest:
+    """The request body as ``FullBlueprintRequest``, its draft at most
+    ``MAX_BLUEPRINT_CHARS`` characters as JSON, measured as the blueprint
+    measures itself (solution_wizard's ``Blueprint._limit_total_size``)."""
+    body = await _limited_body(request, _BLUEPRINT_TOO_LARGE, MAX_FULL_REQUEST_BYTES)
+    try:
+        payload = FullBlueprintRequest.model_validate_json(body)
+    except ValidationError as exc:
+        raise RequestValidationError(
+            [{**e, "loc": ("body", *e["loc"])} for e in exc.errors(include_url=False)]
+        ) from None
+    if len(json.dumps(payload.draft, default=str, ensure_ascii=False)) > MAX_BLUEPRINT_CHARS:
+        raise _too_large(_BLUEPRINT_TOO_LARGE)
+    return payload
+
+
+def _readonly_section(section: str) -> HTTPException:
+    return api_error(
+        422,
+        "readonly_section",
+        f"The section {section} is kept by the wizard and cannot be edited here.",
+        field=section,
+    )
+
+
+def _invalid_draft(exc: ValidationError) -> HTTPException:
+    first = exc.errors(include_url=False)[0]
+    where = ".".join(str(part) for part in first["loc"]) or "blueprint"
+    return api_error(
+        422, "invalid_draft", f"The blueprint is not valid: {where}: {first['msg']}", field=where
+    )
+
+
+@router.put("/{session_id}/blueprint/full", response_model=OperationsResponse)
+def put_full_blueprint(
+    session_id: uuid.UUID,
+    payload: FullBlueprintRequest = Depends(_full_body),
+    db: Session = Depends(get_db),
+) -> OperationsResponse:
+    """Replace the agent's draft with ``draft``, as one edit of the workspace.
+
+    The body is ``{"base_version": int, "draft": {...}}``, the draft at most
+    ``MAX_BLUEPRINT_CHARS`` characters of JSON (413 ``too_large``; the 64 KB
+    of an edit of operations does not apply). It goes through the flow every
+    edit shares (``blueprint_edit_service.apply_edit``): the draft is written
+    and kept with a new version (note "Workspace edit: Edited the blueprint as
+    JSON"), the agent hears of it with its next turn, and an edit of what Gate
+    3 approved reopens the gate. Answers as ``POST /blueprint/operations``,
+    ``bpmn_changed`` saying whether the diagram has anything new to show. A
+    draft equal to the one on disk adds no version.
+
+    Refused with 409 ``no_draft``, ``agent_busy`` and ``changed_elsewhere`` as
+    an edit is; with 422 ``readonly_section`` (``field``: the first section of
+    ``READONLY_SECTIONS`` it changes, adds or removes), ``invalid_draft``
+    (``field``: where its first error is) when it is no valid blueprint, and
+    ``invalid_operation`` when it adds an error of a refusing validator rule or
+    a loop. Nothing changes when refused.
+    """
+    session = session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    submitted = payload.draft
+
+    def operations_for(draft: dict[str, Any]) -> list[Any]:
+        if submitted == draft:
+            return []
+        for section in READONLY_SECTIONS:
+            before = (section in draft, draft.get(section))
+            if before != (section in submitted, submitted.get(section)):
+                raise _readonly_section(section)
+        try:
+            draft_store.validate_draft(submitted)
+        except ValidationError as exc:
+            raise _invalid_draft(exc) from exc
+        return [blueprint_ops.ReplaceDraft(submitted)]
+
+    result = blueprint_edit_service.apply_edit(
+        db, session, base_version=payload.base_version, operations_for=operations_for
+    )
+    return OperationsResponse(
+        session=session_service.session_detail(db, session),
+        warnings=result.warnings if result is not None else [],
+        needs_attention=result.needs_attention if result is not None else [],
+        bpmn_changed=result.bpmn_changed if result is not None else False,
+    )

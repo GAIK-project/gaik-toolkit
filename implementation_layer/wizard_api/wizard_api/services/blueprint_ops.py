@@ -227,6 +227,22 @@ class SetField:
     target: str | None = None
 
 
+#: What the agent is told of a full save (``ReplaceDraft``).
+REPLACED_SUMMARY = "Edited the blueprint as JSON"
+
+
+@dataclass(frozen=True)
+class ReplaceDraft:
+    """The whole draft replaced by ``blueprint``: the JSON view's save.
+
+    Internal, not an API operation (``PUT /blueprint/full`` sends the draft
+    whole). It is applied and checked as the operations are: the result must
+    be a valid blueprint and add no error of a refusing rule, nor a loop.
+    """
+
+    blueprint: dict
+
+
 def operations_from_v2_diff(
     old: dict, new: dict, *, reserved_ids: set[str] | frozenset[str] = frozenset()
 ) -> list[Any]:
@@ -1262,6 +1278,11 @@ def _unlink_data(ctx: _Context, op: UnlinkData) -> None:
     ctx.summaries.append(f'Step "{_label(step)}" no longer {verb} data object "{name}"')
 
 
+def _replace_draft(ctx: _Context, op: ReplaceDraft) -> None:
+    ctx.blueprint = copy.deepcopy(op.blueprint)
+    ctx.summaries.append(REPLACED_SUMMARY)
+
+
 def _set_field(ctx: _Context, op: SetField) -> None:
     _FIELD_HANDLERS[op.field](ctx, op)
 
@@ -1378,4 +1399,5 @@ _HANDLERS: dict[type, Callable[[_Context, Any], None]] = {
     LinkData: _link_data,
     UnlinkData: _unlink_data,
     SetField: _set_field,
+    ReplaceDraft: _replace_draft,
 }

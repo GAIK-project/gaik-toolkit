@@ -465,6 +465,10 @@ export type Dict = {
   wsJsonSaved: string;
   wsJsonInvalid: string;
   wsJsonChangedElsewhere: string;
+  /** A full save refused as no valid blueprint (invalid_draft): "{field}" is where. */
+  wsJsonInvalidDraft: string;
+  /** A full save refused for a section only the wizard writes (readonly_section): "{field}". */
+  wsJsonReadonlySection: string;
   wsFormName: string;
   wsFormDescription: string;
   wsFormSteps: string;
@@ -1330,6 +1334,8 @@ const fi: Dict = {
   wsJsonSaved: "Tallennettu",
   wsJsonInvalid: "Ei tallennettu: JSON ei ole kelvollinen",
   wsJsonChangedElsewhere: "Blueprint muuttui muualla, kun muutoksesi olivat vielä tallentamatta.",
+  wsJsonInvalidDraft: "Ei tallennettu: blueprint ei ole kelvollinen kohdassa {field}.",
+  wsJsonReadonlySection: "Ei tallennettu: osiota {field} ylläpitää wizard, eikä sitä voi muokata täällä.",
   wsFormName: "Nimi",
   wsFormDescription: "Kuvaus",
   wsFormSteps: "Prosessin vaiheet",
@@ -2240,6 +2246,8 @@ const en: Dict = {
   wsJsonSaved: "Saved",
   wsJsonInvalid: "Not saved: the JSON is not valid",
   wsJsonChangedElsewhere: "The blueprint changed elsewhere while your changes were not saved yet.",
+  wsJsonInvalidDraft: "Not saved: the blueprint is not valid at {field}.",
+  wsJsonReadonlySection: "Not saved: the {field} section is kept by the wizard and cannot be edited here.",
   wsFormName: "Name",
   wsFormDescription: "Description",
   wsFormSteps: "Process steps",

@@ -8,7 +8,7 @@ is a new model here, added to the union, and a handler in the service.
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,6 +31,22 @@ MAX_BRANCHES = 5
 MAX_OUTCOME_CHARS = 300
 #: ``Artifact.label`` in solution_wizard's blueprint.
 MAX_LABEL_CHARS = 200
+#: The largest blueprint, as the characters of its JSON: ``MAX_BLUEPRINT_CHARS`` in
+#: solution_wizard's ``blueprint.py`` (a test keeps them equal), and the web app's.
+MAX_BLUEPRINT_CHARS = 1_000_000
+#: The largest body ``PUT /blueprint/full`` reads: a blueprint at its limit,
+#: with room for JSON escapes (``\uXXXX``, six bytes for one character).
+MAX_FULL_REQUEST_BYTES = 6 * MAX_BLUEPRINT_CHARS + 1024
+#: The top-level sections of the draft only the server writes; a full save
+#: that changes one is refused (``readonly_section``).
+READONLY_SECTIONS = (
+    "blueprint_version",
+    "metadata",
+    "visualizations",
+    "package",
+    "traceability",
+    "change_log",
+)
 #: How a step has a data object: it uses it (``inputs``) or makes it (``outputs``).
 DataRole = Literal["input", "output"]
 
@@ -247,6 +263,23 @@ class UndoRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     base_version: int
+
+
+class FullBlueprintRequest(BaseModel):
+    """``PUT /blueprint/full``: the edited draft, on the version the workspace shows."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    base_version: int
+    draft: dict[str, Any]
+
+
+class FullBlueprintResponse(BaseModel):
+    """``GET /blueprint/full``: the draft, its version and the sections the server owns."""
+
+    version: int
+    draft: dict[str, Any]
+    readonly_sections: list[str]
 
 
 class OperationsResponse(BaseModel):
