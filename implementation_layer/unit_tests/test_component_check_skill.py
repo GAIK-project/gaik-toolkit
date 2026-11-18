@@ -356,3 +356,9 @@ def test_a_public_run_keeps_no_provider_error_text():
 def test_the_judge_does_not_inherit_the_nesting_markers():
     kept = rc.judge_env({"PATH": "/bin", "CLAUDECODE": "1", "CLAUDE_CODE_ENTRYPOINT": "cli"})
     assert kept == {"PATH": "/bin"}
+
+
+def test_the_models_empty_enum_value_is_not_a_difference():
+    schema = _json_schema(currency_enum=("", "EUR", "USD"))
+    expect = {"fields": {"currency": ["str"]}, "enums": {"currency": ["EUR", "USD"]}}
+    assert rc.check_model(expect, schema) == []
