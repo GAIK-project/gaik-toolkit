@@ -234,6 +234,7 @@ either when the user names one. Use these labels:
 | `title` / `description` / `language` | Report title / Description / Report language |
 | `instructions` | Report-wide instructions |
 | `sources.primary` / `sources.secondary` | Primary sources / Secondary sources |
+| `source_precedence` | Which sources win a conflict (none: the user settles each one) |
 | `sample_report` | Sample report |
 | `sections[n].title` / `.instructions` / `.required_items` / `.depends_on` | Section title / Section instructions / Required items / Written from (depends on) |
 | `models.vision` / `models.transcription` | Vision model / Transcription model |

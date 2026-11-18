@@ -476,6 +476,18 @@ def test_a_writing_setting_flags_only_synthesis(tmp_path, capsys):
     assert stale and all(s.startswith("synthesize:") for s in stale)
 
 
+def test_a_source_precedence_set_after_curation_flags_curation(tmp_path, capsys):
+    spec, ws = write_spec(tmp_path), tmp_path / "ws"
+    full_run(capsys, spec, ws)
+    assert cli(capsys, "preflight", spec, ws)[1]["stale"] == []
+    data = json.loads(spec.read_text(encoding="utf-8"))
+    data["source_precedence"] = ["primary", "secondary"]
+    spec.write_text(json.dumps(data), encoding="utf-8")
+
+    stale = cli(capsys, "preflight", spec, ws)[1]["stale"]
+    assert {s.split(":")[0] for s in stale} == {"curate", "synthesize"}
+
+
 def test_a_changed_runtime_model_flags_the_stages_that_used_it(tmp_path, capsys, monkeypatch):
     spec, ws = write_spec(tmp_path), tmp_path / "ws"
     full_run(capsys, spec, ws)
@@ -1303,7 +1315,10 @@ def test_propose_spec_spells_out_every_key_and_leaves_the_spec_alone(
     code, out = propose(capsys, spec, tmp_path, "--provider", "openai")
     assert code == 0 and out["errors"] == []
     proposal = json.loads((tmp_path / "proposal.json").read_text(encoding="utf-8"))
-    assert list(proposal)[: len(rr.SPEC_KEYS)] == list(rr.SPEC_KEYS)
+    # source_precedence stays out unless the user states a priority: gaik 0.11.0 refuses it.
+    keys = [k for k in rr.SPEC_KEYS if k != "source_precedence"]
+    assert list(proposal)[: len(keys)] == keys
+    assert "source_precedence" not in proposal
     assert proposal["models"] == {
         "vision": None,
         "transcription": "gpt-4o-transcribe",
@@ -1440,6 +1455,27 @@ def test_apply_spec_names_the_stages_a_change_makes_stale(capsys, tmp_path, clea
     assert "synthesize must run again" in out["warnings"]
     assert "normalize must run again" not in out["warnings"]
     assert any("no gap-marker sentence" in w for w in out["warnings"])
+
+
+def test_apply_spec_shows_and_tracks_the_source_precedence(capsys, tmp_path, clean_model_env):
+    spec, ws = agreed_spec(tmp_path), tmp_path / "ws"
+    propose(capsys, spec, tmp_path, "--provider", "azure")
+    path = tmp_path / "proposal.json"
+    assert "source_precedence" in rr.SPEC_KEYS
+    code, out = apply_spec(capsys, spec, tmp_path, "--provider", "azure")
+    assert code == 0
+    assert any(line.startswith("  source_precedence: (none") for line in out["review"])
+    full_run(capsys, spec, ws)
+    changed = json.loads(path.read_text(encoding="utf-8"))
+    changed["source_precedence"] = ["primary", "secondary"]
+    path.write_text(json.dumps(changed), encoding="utf-8")
+
+    code, out = apply_spec(capsys, spec, tmp_path, "--provider", "azure", "--check")
+    assert code == 0
+    assert "  source_precedence: primary > secondary" in " ".join(out["review"])
+    assert "curate must run again" in out["warnings"]
+    assert "synthesize must run again" in out["warnings"]
+    assert "normalize must run again" not in out["warnings"]
 
 
 # ── Pandoc: check, and install only when asked ──────────────────────

@@ -32,7 +32,7 @@ spec = ReportSpec.load("report-runs/koivukuja/report_spec.json")
       "depends_on": ["building_services"]
     }
   ],
-  "instructions": "Site recordings are primary sources and outrank the documents. Cite each fact by its source file, and add the page, sheet or heading only when the source has one; recordings and photos have none, so cite them by file name alone. Use the (missing: ...) marker only for the items listed as missing and for a section's required items, never for other information the sources do not give.",
+  "instructions": "Cite each fact by its source file, and add the page, sheet or heading only when the source has one; recordings and photos have none, so cite them by file name alone. Use the (missing: ...) marker only for the items listed as missing and for a section's required items, never for other information the sources do not give.",
   "source_precedence": ["primary", "secondary"],
   "sources": {
     "primary": ["inputs/site_visit.m4a", "inputs/inspection_notes.txt"],
@@ -124,7 +124,8 @@ fact the curator filed under the section; the added wording stops that.
 `sources` accepts only `primary` and `secondary`. The curator copies the class onto every fact.
 Conflicts are decided in code from the model's citations, not by the model's own verdict: a conflict is resolved only when
 `source_precedence` ranks the class of one side above the other's, and the report then follows
-that side. Without `source_precedence`, or when both sides have the same class, the conflict stays
+that side. Without `source_precedence`, when both sides have the same class, or when the
+higher-ranked side is itself unsure (a fact of `low` confidence), the conflict stays
 unresolved and the report states both sides, marked `Unresolved:`, for the user to settle in the
 knowledge file. File type alone never decides the class: a recording is not automatically primary.
 

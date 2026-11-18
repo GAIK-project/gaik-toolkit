@@ -592,15 +592,16 @@ def stage_inputs(spec, stage: str) -> dict:
             ),
         }
     if stage == "curate":
-        return {
-            "spec": sha256_json(
-                {
-                    "sections": dump["sections"],
-                    "instructions": dump["instructions"],
-                    "options": dump["settings"]["curator"],
-                }
-            )
+        curate = {
+            "sections": dump["sections"],
+            "instructions": dump["instructions"],
+            "options": dump["settings"]["curator"],
         }
+        # The precedence decides the conflicts. Hashed only when set, so a run curated
+        # before the key existed stays current while the spec leaves it out.
+        if dump.get("source_precedence"):
+            curate["source_precedence"] = dump["source_precedence"]
+        return {"spec": sha256_json(curate)}
     settings = dump["settings"]
     return {
         "spec": sha256_json(
@@ -1295,7 +1296,7 @@ DEFAULT_TRANSCRIPTION = {"openai": "gpt-4o-transcribe", "azure": "gpt-4o-transcr
 MODEL_STEPS = ("vision", "transcription", "curator", "writer", "reviewer")
 SPEC_KEYS = (
     "title", "description", "language", "sections", "instructions", "sources",
-    "sample_report", "models", "settings",
+    "source_precedence", "sample_report", "models", "settings",
 )  # fmt: skip
 SECTION_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -1467,13 +1468,13 @@ def changed_stages(old: dict, new: dict, ws: Path) -> list[str]:
             value: Any = d
             for part in key.split("."):
                 value = value.get(part) if isinstance(value, dict) else None
-            out[key] = value
+            out[key] = value or None if key == "source_precedence" else value
         return sha256_json(out)
 
     normalize = (
         "sources", "models.vision", "models.transcription", "settings.transcription_language",
     )  # fmt: skip
-    curate = ("sections", "instructions", "models.curator", "settings.curator")
+    curate = ("sections", "instructions", "source_precedence", "models.curator", "settings.curator")
     synthesize = (
         "title", "language", "sections", "instructions", "sample_report", "models.writer",
         "models.reviewer", "settings.review_attempts", "settings.strict_review",
@@ -1504,6 +1505,15 @@ def review_lines(spec: dict, provider: str) -> list[str]:
     for cls in ("primary", "secondary"):
         files = spec["sources"].get(cls) or []
         lines.append(f"  sources.{cls}: {', '.join(files) if files else '(none)'}")
+    precedence = spec.get("source_precedence") or []
+    lines.append(
+        "  source_precedence: "
+        + (
+            " > ".join(precedence) + " (decides conflicts between these classes)"
+            if precedence
+            else "(none: every conflict is left for the user to settle)"
+        )
+    )
     lines.append(f"  sample_report: {spec.get('sample_report') or '(none)'}")
     lines.append("SECTIONS")
     titles = {s.get("id"): s.get("title") for s in spec["sections"] if isinstance(s, dict)}
