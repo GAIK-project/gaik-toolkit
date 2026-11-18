@@ -18,6 +18,7 @@ import subprocess
 import sys
 import threading
 import time
+import types
 import zipfile
 from pathlib import Path, PurePosixPath
 
@@ -1682,9 +1683,15 @@ def test_a_module_in_the_package_does_not_stand_in_for_the_standard_library(tmp_
         text=True,
         encoding="utf-8",
     )
+    # A server that never prints its address is stopped, so the read below ends.
+    stop = threading.Timer(30, server.kill)
+    stop.start()
     try:
         first = server.stdout.readline()
-        assert first.startswith("Test page: http://127.0.0.1:"), first + server.stdout.read()
+        stop.cancel()
+        if not first.startswith("Test page: http://127.0.0.1:"):
+            server.kill()
+            pytest.fail(f"the server did not start: {first}{server.stdout.read()}")
         port = int(first.strip().rsplit(":", 1)[1])
         assert _request("127.0.0.1", port, "GET", "/api/solution")[0] == 200
         status, _, _ = _request(
@@ -1692,6 +1699,7 @@ def test_a_module_in_the_package_does_not_stand_in_for_the_standard_library(tmp_
         )
         assert status == 403
     finally:
+        stop.cancel()
         server.kill()
         server.wait(timeout=10)
         server.stdout.close()
@@ -1889,3 +1897,41 @@ def test_every_ipv6_address_takes_ipv4_as_well_and_turns_the_source_download_off
         assert served.request("GET", "/api/source")[0] == 403
     finally:
         served.close()
+
+
+class _Connection:
+    """The socket under a handler: what each read was allowed to wait."""
+
+    def __init__(self):
+        self.timeouts = []
+
+    def settimeout(self, seconds):
+        self.timeouts.append(seconds)
+
+
+def test_no_read_of_the_files_waits_past_their_deadline(page, monkeypatch):
+    """The last read could wait the connection's full timeout after the deadline, and a
+    body that ended then was taken (found by a second reader on #220, round 2)."""
+    app = page.app
+    clock = {"now": 0.0}
+    monkeypatch.setattr(app.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(app, "BODY_TIMEOUT_SECONDS", 300)
+
+    def late_piece(size):
+        # The first piece comes 295 s in; the last one only after the deadline.
+        clock["now"] += 295 if clock["now"] == 0 else 10
+        return b"x"
+
+    handler = types.SimpleNamespace(
+        rfile=types.SimpleNamespace(read1=late_piece),
+        connection=_Connection(),
+        timeout=30,
+        close_connection=False,
+    )
+    with pytest.raises(app.RefusalError) as refused:
+        app.Handler._read_body(handler, 2)
+
+    assert (refused.value.status, refused.value.code) == (408, "too_slow")
+    assert handler.close_connection is True
+    # The second wait was held to the 5 s left, and the timeout is put back after.
+    assert handler.connection.timeouts == [30, 5, 30]
