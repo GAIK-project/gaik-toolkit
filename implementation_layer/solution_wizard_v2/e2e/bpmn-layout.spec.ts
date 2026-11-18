@@ -139,6 +139,64 @@ test.describe("BPMN layout", () => {
     expect(sent.slice(start)).toEqual([]);
   });
 
+  test("a step drawn outside its own lane can be dragged back into it, and not within the lane it is drawn in", async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    // The diagram draws Classification in the reviewers' lane, while the AI lane lists it (flowNodeRef):
+    // a place kept from before the step changed lanes.
+    await page.route("**/api/sessions/ses_laskut/bpmn", async (route) => {
+      const res = await route.fetch();
+      const xml = await res.text();
+      const boundsOf = (id: string) => {
+        const m = new RegExp(`bpmnElement="${id}"[^>]*>[^<]*<[^>]*Bounds x="([0-9.]+)" y="([0-9.]+)"`).exec(xml);
+        expect(m, id).toBeTruthy();
+        return { x: m![1], y: Number(m![2]) };
+      };
+      const task = boundsOf("Activity_classify");
+      const drop = boundsOf("Lane_reviewer").y - boundsOf("Lane_genai").y;
+      const moved = xml.replace(
+        new RegExp(`(bpmnElement="Activity_classify"[^>]*>[^<]*<[^>]*Bounds x="[0-9.]+" y=")[0-9.]+`),
+        `$1${task.y + drop}`,
+      );
+      await route.fulfill({ response: res, body: moved });
+    });
+    const sent = await openEditable(page, (route) => route.fulfill({ status: 500, body: "not in this test" }));
+    await focusStep(page, 2);
+    const from = await centre(page, "Activity_classify");
+    expect(await laneAt(page, from)).toBe("Lane_reviewer");
+    const before = await offset(page, "Activity_classify", "Activity_ingest");
+    const start = sent.length;
+
+    // Within the lane it is drawn in: refused.
+    await drag(page, from, { x: from.x + 40, y: from.y });
+    expect(await offset(page, "Activity_classify", "Activity_ingest")).toEqual(before);
+
+    // Back up into the AI lane: moved and kept.
+    // A free spot in the AI lane, where the drop lands on the lane itself and not on a flow.
+    const to = await page.evaluate((from) => {
+      const lane = document
+        .querySelector('.bpmn-editable .djs-element[data-element-id="Lane_genai"] .djs-visual')!
+        .getBoundingClientRect();
+      for (const dy of [60, 90, 120, 150]) {
+        for (const dx of [0, -40, 40, -80, 80, -120, 120, -160, 160]) {
+          const x = from.x + dx;
+          const y = lane.top + dy;
+          const hit = document.elementFromPoint(x, y)?.closest("[data-element-id]")?.getAttribute("data-element-id");
+          if (hit === "Lane_genai") return { x, y };
+        }
+      }
+      return null;
+    }, from);
+    expect(to, "a free spot in the AI lane").toBeTruthy();
+    expect(await laneAt(page, to!)).toBe("Lane_genai");
+    await drag(page, from, to!);
+    expect((await offset(page, "Activity_classify", "Activity_ingest")).y).toBeLessThan(before.y - 50);
+    await expect.poll(() => sent.slice(start).filter((s) => s.kind === "layout").length, { timeout: 5_000 }).toBe(1);
+    const body = sent.slice(start).find((s) => s.kind === "layout")!.body as { shapes: object };
+    expect(Object.keys(body.shapes)).toEqual(["Activity_classify"]);
+  });
+
   test("a drag not sent yet goes out before the next operation, and no drag starts while an operation is on its way", async ({
     page,
   }) => {

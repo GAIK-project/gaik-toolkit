@@ -92,6 +92,8 @@ type Shape = {
   height: number;
   labelTarget?: Shape;
   parent?: Element;
+  /** The BPMN element; a lane's lists the flow nodes in it (`flowNodeRef`). */
+  businessObject?: { id?: string; flowNodeRef?: unknown[] };
   incoming?: Connection[];
   outgoing?: Connection[];
   waypoints?: undefined;
@@ -364,12 +366,26 @@ function laneAt(lanes: Shape[], p: Point): Shape | null {
   return best;
 }
 
+/** The innermost lane that lists the shape (`flowNodeRef`); null for one no lane lists (a data object). */
+function ownLane(lanes: Shape[], shape: Shape): Shape | null {
+  const bo = shape.businessObject;
+  let best: Shape | null = null;
+  for (const lane of lanes) {
+    if (!bo || !lane.businessObject?.flowNodeRef?.includes(bo)) continue;
+    if (!best || lane.width * lane.height < best.width * best.height) best = lane;
+  }
+  return best;
+}
+
 /**
- * Whether a drag only moves shapes where the layout keeps them: each stays in
- * the lane (and the pool) it is drawn in, as its middle shows. A lane is who
- * does the step, which the blueprint says, so a drag into another lane would
- * be an edit the layout cannot keep (Task 17 makes that an operation); a
- * label is placed with its shape and is not kept on its own.
+ * Whether a drag only moves shapes where the layout keeps them: each lands,
+ * by its middle, in its own lane, the one whose `flowNodeRef` lists it. A
+ * lane is who does the step, which the blueprint says, so a drag into another
+ * lane would be an edit the layout cannot keep (Task 17 makes that an
+ * operation). A shape drawn outside its own lane may go back into it. A shape
+ * no lane lists (a data object) stays in the lane it is drawn in, or outside
+ * the lanes. A label is placed with its shape and is not kept on its own, and
+ * nothing is dropped onto another parent (out of the pool, onto a flow).
  */
 export function moveKeepsLanes(
   shapes: Element[],
@@ -383,7 +399,9 @@ export function moveKeepsLanes(
   if (!delta) return true;
   return moved.every((s) => {
     const middle = { x: s.x + s.width / 2, y: s.y + s.height / 2 };
-    return laneAt(lanes, middle) === laneAt(lanes, { x: middle.x + delta.x, y: middle.y + delta.y });
+    const lands = laneAt(lanes, { x: middle.x + delta.x, y: middle.y + delta.y });
+    const own = ownLane(lanes, s);
+    return lands === (own ?? laneAt(lanes, middle));
   });
 }
 
