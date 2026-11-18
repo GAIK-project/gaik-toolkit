@@ -119,6 +119,14 @@ set it. A provider without credentials on the server is left out, and
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
 
+With a GPT-6 model in use, on the server's key or the user's own, the menu also has a
+**Reasoning** row: Auto, Low, Medium or High. Auto sends nothing, and each model keeps the
+effort the API chooses for it. Another choice travels in `x-gaik-reasoning-effort` on the
+routes that take a picked model; the API accepts `low`, `medium` and `high`, treats
+anything else as Auto, and applies it to GPT-6 models only. The Report Writer and
+Knowledge Curator steps keep their own effort settings, and so does the Vision Extractor
+while it runs on its own model choice.
+
 A route that takes a model name in the request runs only the models it offers, and a
 team-only model only for the team, decided from the session as above. Which models are
 team-only follows the list above (a `DEMO_SERVER_MODELS` entry decides for the model it

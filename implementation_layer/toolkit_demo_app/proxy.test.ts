@@ -491,6 +491,34 @@ test("the API learns the model tier from the session, never from the browser", a
   expect(backendCalls).toBe(2);
 });
 
+test("the picked reasoning effort reaches the API only as low, medium or high", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const forwarded = async (url: string, effort: string, ownKey = false) => {
+    const response = await proxy(
+      new NextRequest(url, {
+        method: "POST",
+        headers: {
+          cookie,
+          "x-gaik-reasoning-effort": effort,
+          ...(ownKey ? { "x-gaik-model-settings": OWN_KEY } : {}),
+        },
+      }),
+    );
+    expect(response.status).toBe(200);
+    return backendHeaders?.get("x-gaik-reasoning-effort") ?? null;
+  };
+
+  expect(await forwarded("https://demo.test/api/extract", "high")).toBe("high");
+  // With an own key as well.
+  expect(await forwarded(OWN_KEY_RUN, "low", true)).toBe("low");
+  for (const value of ["none", "max", "HIGH", "high, low"])
+    expect(await forwarded("https://demo.test/api/extract", value)).toBeNull();
+  // A route that takes no picked model gets no effort either.
+  expect(
+    await forwarded("https://demo.test/api/tabular-agent/ask", "high"),
+  ).toBeNull();
+});
+
 test("a path that only begins like the wizard API meets the normal gate", async () => {
   const response = await proxy(
     new NextRequest("https://demo.test/api/wizardry/start", { method: "POST" }),
