@@ -144,6 +144,17 @@ def test_the_mapping_names_the_elements_of_the_diagram(client, db_session, data_
 
 
 @requires_postgres
+def test_the_mapping_says_whether_the_agent_has_written_its_draft(client, db_session) -> None:
+    with_draft = _create(client, db_session)
+    without = client.post("/sessions", json={"user_id": "patch-user", "title": "No draft"}).json()
+
+    assert client.get(f"/sessions/{with_draft['id']}/bpmn/mapping").json()["has_draft"] is True
+    res = client.get(f"/sessions/{without['id']}/bpmn/mapping")
+    assert res.status_code == 200, res.text
+    assert res.json()["has_draft"] is False
+
+
+@requires_postgres
 def test_the_mapping_is_served_to_the_owner_only(client, db_session) -> None:
     from wizard_api.ownership import USER_HEADER
 

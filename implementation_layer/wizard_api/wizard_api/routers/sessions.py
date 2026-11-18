@@ -314,12 +314,22 @@ def get_session_bpmn_mapping(
     data_objects: int = _DATA_OBJECTS_QUERY,
     db: Session = Depends(get_db),
 ) -> JSONResponse:
-    """``{"mapping": {element_id: {"kind": ..., "blueprint_path": ...}}}`` of the
-    diagram ``GET /bpmn`` serves with the same ``data_objects``. Drawn again
-    here, so its element ids are the ones in that XML; a mapping stored in the
-    draft can be from before an edit."""
+    """``{"mapping": {element_id: {"kind": ..., "blueprint_path": ...}}, "has_draft": bool}``
+    of the diagram ``GET /bpmn`` serves with the same ``data_objects``. Drawn
+    again here, so its element ids are the ones in that XML; a mapping stored in
+    the draft can be from before an edit. ``has_draft`` says whether the agent
+    has written its draft: without one the diagram's operations are refused
+    (409 ``no_draft``), so the editor offers none."""
     _, mapping = _session_bpmn_view(db, session_id, data_objects, with_mapping=True)
-    return JSONResponse({"mapping": mapping}, headers={"Cache-Control": "no-store"})
+    session = session_service.get_session(db, session_id)
+    has_draft = bool(
+        session is not None
+        and session.output_dir
+        and artifact_sync.read_draft_blueprint(session.output_dir) is not None
+    )
+    return JSONResponse(
+        {"mapping": mapping, "has_draft": has_draft}, headers={"Cache-Control": "no-store"}
+    )
 
 
 @router.post("/{session_id}/bpmn/sync", response_model=SessionDetailResponse)
