@@ -35,6 +35,16 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   `persist-credentials: false`, and token permissions are granted per job. The
   `Workflow security` job (zizmor) fails on medium or higher findings.
 
+## Claude Agent SDK
+
+The Solution Wizard's interactive runner (`run_wizard_interactive.py`, with its tool guard
+`agent_tool_guard.py`) and the demo's `api/routers/solution_wizard.py` drive Claude Code
+through `claude-agent-sdk`. Before changing their options, hooks or permissions, read the
+current docs (index: https://code.claude.com/docs/llms.txt) and the installed SDK's
+`ClaudeAgentOptions`: defaults change between versions. For example, `setting_sources`
+left unset loads the user's, project and local settings, and `env` is merged over the
+parent's environment.
+
 ## who owns a change
 
 The person who asked for a change owns it, also when an agent wrote it. They read the

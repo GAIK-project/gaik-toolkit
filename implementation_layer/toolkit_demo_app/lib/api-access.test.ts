@@ -122,7 +122,7 @@ test("a request with the user's own model key still needs an account", async () 
   const take = async () => {
     throw new Error("an own-key run must not spend a trial run");
   };
-  const ownKey = { noTrialRun: true };
+  const ownKey = { ownModelKey: true };
   expect(
     await accessRefusal(
       {
@@ -170,7 +170,7 @@ test("an own model key does not open a write to shared data", async () => {
   };
   expect(
     await accessRefusal({ ...signedIn, pending: true }, take, {
-      noTrialRun: true,
+      ownModelKey: true,
       sharedData: true,
     }),
   ).toEqual(SHARED_DATA_DENIAL);
@@ -219,13 +219,17 @@ test("a rejected or unknown user and a visitor are refused", async () => {
   ).toEqual({ status: 401, error: "Sign in to use this feature." });
 });
 
-test("a pending user without a confirmed e-mail address gets no trial run", async () => {
+test("a pending user without a confirmed e-mail address runs neither a trial run nor their own key", async () => {
   const take = async () => {
     throw new Error("the trial must not be touched");
   };
   const unconfirmed = { ...signedIn, pending: true, emailConfirmed: false };
   expect(await accessRefusal(unconfirmed, take)).toEqual(EMAIL_UNCONFIRMED);
-  // Their own model key spends no trial run, so it still works.
+  expect(await accessRefusal(unconfirmed, take, { ownModelKey: true })).toEqual(
+    EMAIL_UNCONFIRMED,
+  );
+  // A request that is no demo run, such as ending a wizard session, needs no
+  // confirmed address.
   expect(
     await accessRefusal(unconfirmed, take, { noTrialRun: true }),
   ).toBeNull();

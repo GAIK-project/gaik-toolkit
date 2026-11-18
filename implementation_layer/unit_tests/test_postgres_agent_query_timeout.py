@@ -30,6 +30,7 @@ from ._pg_agent_fake_client import FakeProviderClient  # noqa: E402
 
 
 def _make_agent(**kwargs) -> PostgresAgent:
+    kwargs.setdefault("table_allowlist", ["orders"])
     agent = PostgresAgent("postgresql://stub:stub@localhost:1/stub", **kwargs)
     agent._schema = SchemaInfo(
         schema_name=agent.schema_name,

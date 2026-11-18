@@ -81,7 +81,9 @@ when a step needs something outside it, stop and ask the user, saying what it wo
 
 ---
 - **A blueprint change makes an AI Act screening outdated.** Whenever you change
-  `use_case.blueprint.json` and `<output_dir>/ai_act_screening.json` exists, run
+  `use_case.blueprint.json` and `<output_dir>/ai_act_screening.json` exists, check it in that same
+  turn, right after you write the change and before you answer the user. Do not leave it until the
+  gates are approved again or the files are regenerated. Run
   `python <screening_dir>/scripts/check_screening.py --pack <output_dir> --status`. If it
   prints `outdated`, run `python <screening_dir>/scripts/render_brief.py --pack <output_dir>
   --outdated`, which puts the outdated line under the title of `docs/ai_act_screening.md`, tell
@@ -540,7 +542,7 @@ Every selected component exposes behaviour-changing options. Read each selected 
   - results must be re-sortable by a business field (date, price, priority), or several ranked lists must be merged into one → add `Ranker` (`order_by(field=..., direction="asc"|"desc")`, `fuse(*lists, weights=...)`). Note `Ranker` returns `list[tuple(Document, float)]` while `Retriever` returns `list[Document]` — use `Ranker.to_documents()` when handing results to `AnswerGenerator`. Do **not** add `Ranker` merely to rank one list from `PgVectorStore.search_hybrid()`, which already fuses with RRF server-side
   - citation/traceability requirement on answers from retrieved documents → `AnswerGenerator.citations = True` (or `RAGWorkflow.citations = True`); on extracted field values (the user wants each value linked to its quote in the source) → add `SourceTracing` (Step 3), not a RAG option. The blueprint's `traceability` section is a different thing: it maps requirements to components
   - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling"` (the accepted literals are `vision_parser`, `docling`, `pymupdf`, `docx` — only the first carries the `_parser` suffix; the registry component *ids* `docling_parser`/`pymupdf_parser`/`docx_parser` are a different namespace and raise `ValueError` if passed here)
-  - access controls on a database → `PostgresAgent.table_allowlist = [...]`
+  - access controls on a database → `PostgresAgent.table_allowlist = [...]` (required for every `PostgresAgent`: the tables the agent may read; collect them before the completeness gate)
   - source spreadsheets are human-facing reports (title rows, subtotals) → `TabularAgent.layout_inference = "auto"` (default; clean machine exports → `"never"` to skip the layout LLM call)
   - `ReportWriter`: its behaviour knobs are `ReportSpec` fields, not constructor or `run()` kwargs, so its card lists them under `spec_fields` and `spec_settings` (same shape as `options`) — read both. `human_review == yes` or accuracy-critical → `strict_review = True` and a separate `reviewer` model; `.docx` output requested → `docx = True` (needs the Pandoc binary; otherwise `docx = False`); audio sources → `transcription_language` from the input language and a `transcription` model; the report must read as an independent text with no source references (customer-facing, or the user says not to cite files or recordings) → `citations = False`, otherwise leave the default `True`
 - **Ask the user** when an option is `selection_relevant` but cannot be inferred from the requirements.
@@ -725,7 +727,8 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
    - Write `prompts/extraction_requirements.md` if the pipeline includes extraction (then run
      `generate_schema.py` as in Phase 4).
    - After wiring, and with the user's yes, confirm that
-     `python -c "import ast; ast.parse(open('poc/run_poc.py').read())"` passes.
+     `python -c "import ast; ast.parse(open('<output_dir>/poc/run_poc.py').read())"` passes (the full
+     path: Bash starts in the wizard folder).
    - **Match documents to a manifest with `document_manifest.py`; do not write your own lookup.**
      When the package gates documents with a manifest (access control, classification, a
      catalogue), load it with `DocumentManifest.load(manifest_path)` from the scaffolded
@@ -750,7 +753,6 @@ python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json 
      supplies a bundle, the package must run from that bundle as delivered: a finder that read
      only the top level of `sample_input/` did not start on the customer's layout (UC05,
      6 Oct 2026).
-
 **PDF report (when `technical_spec.output_types` includes `"pdf"`):** the scaffolder
 automatically copies `poc/pdf_report.py` (a ReportLab renderer), adds `reportlab` to
 `poc/requirements.txt`, and injects a block in `run_poc.py` that writes `output/result_report.pdf`
@@ -821,6 +823,9 @@ Before proposing any change, classify it using the table below. The rule is:
 | Small code fix: path, logging, formatting, off-by-one | **No** -- patch `poc/run_poc.py` directly | Note the fix; no blueprint or docs change needed |
 | Template wiring bug fixed but blueprint intent unchanged | **No** -- patch `poc/run_poc.py` or raise an issue against the template | Optionally update the component reference card; no blueprint or docs change needed |
 | Change prompted by an AI Act screening and accepted by the user: purpose, users, extracted fields, human review, output audience | **Yes** -- update the affected specs, and store the screening facts in `business_spec.ai_act_context` | Re-validate; regenerate the affected diagrams, docs and PoC files; then the screening is outdated (see Constraints) |
+
+After any change in the table above that touches the blueprint, check an existing AI Act screening
+in the same turn (see Constraints: a blueprint change makes an AI Act screening outdated).
 
 **When to update the docs during Gate 3:** only regenerate and re-fill the affected document(s) — do not regenerate all five unless the blueprint itself changes significantly.
 
@@ -925,6 +930,12 @@ Your complete solution package is in: <output_dir>/
 3. **Offer the AI Act screening (optional).** Ask:
 
    > Would you like a preliminary EU AI Act screening of this solution?
+
+   Put the question in your Phase 12 message itself, as its last paragraph, right after the
+   package listing above. Ask it for every solution, in these words, as a question and not as a
+   remark ("an optional screening is available", "ask me if you want one"). Do not judge whether
+   this use case needs one, and do not call it low-risk or out of scope: that is what the
+   screening is for. A user who does not answer has declined, and one who asks for it later gets it.
 
    If the user declines, the wizard is finished: nothing later depends on the screening. If they
    agree, load `<screening_dir>/SKILL.md` and follow it on `<output_dir>`. It screens the **intended

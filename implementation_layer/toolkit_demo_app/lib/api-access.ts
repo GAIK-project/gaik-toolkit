@@ -6,9 +6,10 @@
 // so the gate keys on the method being a read, not on POST.
 //
 // A user waiting for approval runs on the daily trial (lib/trial.ts) or on their
-// own model key. Both cover a run on the user's own input, never a write to data
-// that every visitor shares: that needs a signed-in user with the admin session
-// of /admin (lib/admin/session.ts). Approval alone lets a user search it.
+// own model key, once their e-mail address is confirmed. Both cover a run on the
+// user's own input, never a write to data that every visitor shares: that needs
+// a signed-in user with the admin session of /admin (lib/admin/session.ts).
+// Approval alone lets a user search it.
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -87,7 +88,7 @@ export interface GateState {
   approved: boolean;
   /** Waiting for approval: may run on the trial allowance (lib/trial.ts). */
   pending: boolean;
-  /** The sign-in e-mail address is confirmed; trial runs need it. */
+  /** The sign-in e-mail address is confirmed; a pending user's runs need it. */
   emailConfirmed: boolean;
   userId: string | null;
 }
@@ -109,7 +110,7 @@ export const SHARED_DATA_DENIAL: Refusal = {
 
 export const EMAIL_UNCONFIRMED: Refusal = {
   status: 403,
-  error: "Confirm your e-mail address to use the trial runs.",
+  error: "Confirm your e-mail address to run demos.",
 };
 
 /** Whether a Supabase user has confirmed their e-mail address. */
@@ -121,8 +122,13 @@ export function isEmailConfirmed(
 
 export interface GatedRequest {
   /**
-   * Spends no trial run: it runs on the user's own model key, or it is no demo
-   * run. It still needs the account.
+   * Runs on the user's own model key: spends no trial run, but a pending user
+   * still needs a confirmed e-mail address.
+   */
+  ownModelKey?: boolean;
+  /**
+   * Is no demo run, such as ending a wizard session: spends no trial run. It
+   * still needs the account.
    */
   noTrialRun?: boolean;
   /** Writes data that every visitor shares (`writesSharedData`). */
@@ -133,18 +139,24 @@ export interface GatedRequest {
 
 /**
  * Why a request that needs an account is refused, or null when it may run.
- * An approved user runs freely; a pending one with a confirmed e-mail address
- * spends a trial run, unless the request spends none (`noTrialRun`, such as a
- * run on their own model key), which needs the account but no trial run. A
- * write to shared data runs for a signed-in administrator only, and spends no
- * trial run.
+ * An approved user runs freely. A pending one with a confirmed e-mail address
+ * spends a trial run, or none on their own model key (`ownModelKey`). A request
+ * that is no demo run (`noTrialRun`) needs the pending account only. A visitor
+ * who is not signed in, or an account that is neither approved nor pending, is
+ * refused whatever the request carries. A write to shared data runs for a
+ * signed-in administrator only, and spends no trial run.
  */
 export async function accessRefusal(
   state: GateState,
   takeTrialRun: (
     userId: string,
   ) => Promise<{ ok: true } | ({ ok: false } & Refusal)>,
-  { noTrialRun = false, sharedData = false, admin = false }: GatedRequest = {},
+  {
+    ownModelKey = false,
+    noTrialRun = false,
+    sharedData = false,
+    admin = false,
+  }: GatedRequest = {},
 ): Promise<Refusal | null> {
   if (!state.loggedIn)
     return { status: 401, error: "Sign in to use this feature." };
@@ -153,6 +165,7 @@ export async function accessRefusal(
   if (!state.pending || !state.userId) return PENDING_DENIAL;
   if (noTrialRun) return null;
   if (!state.emailConfirmed) return EMAIL_UNCONFIRMED;
+  if (ownModelKey) return null;
   const trial = await takeTrialRun(state.userId);
   return trial.ok ? null : { status: trial.status, error: trial.error };
 }

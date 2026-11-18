@@ -152,8 +152,9 @@ async function route(request: NextRequest): Promise<NextResponse> {
     // A user still waiting for approval runs on the daily trial allowance
     // (lib/trial.ts). A request that carries the user's own model key on a
     // supported route runs on their credential: it still needs a signed-in
-    // account, approved or pending, but spends no trial run. Neither covers a
-    // write to data that every visitor shares: that needs the admin session.
+    // account, approved, or pending with a confirmed e-mail address, but spends
+    // no trial run. The header alone opens nothing. Neither covers a write to
+    // data that every visitor shares: that needs the admin session.
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
@@ -162,12 +163,12 @@ async function route(request: NextRequest): Promise<NextResponse> {
       // Starting Aitta's idle models is no demo run, and neither is ending a
       // wizard session: they spend no trial run.
       const noTrialRun =
-        ownModelKey ||
         pathname === "/api/model-settings/aitta/warm" ||
         (request.method === "DELETE" &&
           pathname.startsWith("/api/wizard/end/"));
       const sharedData = writesSharedData(request.method, pathname);
       const refusal = await accessRefusal(state, takeTrialRun, {
+        ownModelKey,
         noTrialRun,
         sharedData,
         admin:
