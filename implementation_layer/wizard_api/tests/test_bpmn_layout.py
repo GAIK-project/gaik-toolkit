@@ -178,14 +178,81 @@ def test_edges_of_a_moved_shape_are_rerouted_with_right_angles() -> None:
 def test_stored_waypoints_replace_the_edges_route() -> None:
     xml = _xml()
     flow = next(iter(_ends(xml)))
-    route = [[10, 20], [10, 400], [333.5, 400]]
-    task = _ends(xml)[flow][1]
+    src, task = _ends(xml)[flow]
+    place = _in_own_lane(xml, task)
+    sx, sy, sw, sh = _bounds(xml)[src]
+    w, h = _bounds(xml)[task][2:]
+    # From the source's right border, down 400 and across to the moved task's left border.
+    route = [[sx + sw, sy + sh / 2], [sx + sw + 10, sy + sh / 2], [sx + sw + 10, 400]]
+    route += [[place["x"] - 10, 400], [place["x"] - 10, place["y"] + h / 2]]
+    route += [[place["x"], place["y"] + h / 2]]
+    assert w > 0
 
-    moved = bpmn_layout.apply_layout(
-        xml, {"shapes": {task: _in_own_lane(xml, task)}, "edges": {flow: route}}
-    )
+    moved = bpmn_layout.apply_layout(xml, {"shapes": {task: place}, "edges": {flow: route}})
 
     assert _waypoints(moved)[flow] == [tuple(p) for p in route]
+
+
+def _all_ends(xml: str) -> dict[str, tuple[str, str]]:
+    """Each drawn connection's source and target: flows, message flows and data associations."""
+    return bpmn_layout._edge_ends(ET.fromstring(xml))
+
+
+def _near(point, rect, tolerance: float = 3.0) -> bool:
+    x, y, w, h = rect
+    return x - tolerance <= point[0] <= x + w + tolerance and (
+        y - tolerance <= point[1] <= y + h + tolerance
+    )
+
+
+def _assert_every_edge_sits_on_its_shapes(xml: str) -> None:
+    bounds, points = _bounds(xml), _waypoints(xml)
+    for edge, (src, tgt) in _all_ends(xml).items():
+        if edge not in points:
+            continue
+        assert _near(points[edge][0], bounds[src]), (edge, src, points[edge])
+        assert _near(points[edge][-1], bounds[tgt]), (edge, tgt, points[edge])
+
+
+def test_stored_routes_do_not_go_to_the_edge_that_now_has_their_id() -> None:
+    """Drag a step, keep its bends, add a step before it: the renumbered flows draw no old route."""
+    xml = _xml()
+    task = next(t for t in _tasks(xml) if "extract" in t)
+    dragged = bpmn_layout.apply_layout(xml, {"shapes": {task: _in_own_lane(xml, task, 80, 30)}})
+    # What the canvas stores after a drag: the shape's place and every edge's bends.
+    stored = {
+        "shapes": {task: {"x": _bounds(dragged)[task][0], "y": _bounds(dragged)[task][1]}},
+        "edges": {e: [list(p) for p in wps] for e, wps in _waypoints(dragged).items()},
+    }
+    before_ends = _all_ends(xml)
+
+    grown = dict(BLUEPRINT)
+    steps = list(BLUEPRINT["steps"])
+    steps.insert(1, {"id": "check", "name": "Check invoice", "type": "human_review"})
+    grown["steps"] = steps
+    redrawn = bpmn_service.generate_bpmn_xml(grown, session_id="s1", include_data_objects=True)
+    after_ends = _all_ends(redrawn)
+    renumbered = [e for e in after_ends if e in before_ends and after_ends[e] != before_ends[e]]
+    assert renumbered, "adding a step renumbers the flows after it"
+
+    out = bpmn_layout.apply_layout(redrawn, stored)
+
+    _assert_every_edge_sits_on_its_shapes(out)
+    for edge in renumbered:
+        assert _waypoints(out)[edge] != [tuple(p) for p in stored["edges"][edge]], edge
+
+
+def test_a_stored_route_whose_shapes_moved_away_is_not_applied() -> None:
+    """A route kept from an older drawing is dropped when its shapes are drawn elsewhere now."""
+    xml = _xml()
+    flow, (src, tgt) = next(iter(_ends(xml).items()))
+    sx, sy, sw, sh = _bounds(xml)[src]
+    stale = [[sx - 500, sy], [sx - 500, sy + 900], [sx - 400, sy + 900]]
+
+    out = bpmn_layout.apply_layout(xml, {"edges": {flow: stale}})
+
+    assert _waypoints(out)[flow] == _waypoints(xml)[flow]
+    _assert_every_edge_sits_on_its_shapes(out)
 
 
 def test_a_stored_place_outside_the_shapes_own_lane_is_not_applied() -> None:

@@ -274,6 +274,23 @@ def _inside(point: tuple[float, float], box: tuple[float, float, float, float]) 
     return x <= point[0] <= x + w and y <= point[1] <= y + h
 
 
+#: How far a stored edge's first or last waypoint may lie outside its shape's bounds.
+END_TOLERANCE = 3.0
+
+
+def _touches(point: list, box: tuple[float, float, float, float] | None) -> bool:
+    """Whether ``point`` lies on or in ``box``, give or take ``END_TOLERANCE``.
+
+    bpmn-js docks a connection on the outline of the shape (a task's border, a
+    gateway's diamond, an event's circle), which always lies within the bounds.
+    """
+    if box is None:
+        return False
+    x, y, w, h = box
+    t = END_TOLERANCE
+    return x - t <= point[0] <= x + w + t and y - t <= point[1] <= y + h + t
+
+
 def apply_layout(xml: str, layout: dict) -> str:
     """The drawing ``xml`` with the shapes and edges of ``layout`` placed as stored.
 
@@ -282,6 +299,14 @@ def apply_layout(xml: str, layout: dict) -> str:
     waypoints takes them; an edge that touches a moved shape and has none is
     drawn again with ``route_edge`` between the shapes' new bounds. Ids the
     drawing does not have are ignored.
+
+    Stored waypoints are taken only when the first lies on the edge's current
+    source shape and the last on its current target shape (``_touches``). The
+    generator numbers flows and associations in order (``Flow_5``), so after a
+    step is added, removed or moved the same id may name another connection,
+    and a neighbour may have moved to another column: such a route is ignored
+    and the edge is drawn as the generator draws it, or with ``route_edge``
+    when one of its shapes was moved.
 
     A stored place whose middle lies outside the lane that lists the shape
     (``flowNodeRef``) is not applied: the step went to another lane in the
@@ -336,13 +361,20 @@ def apply_layout(xml: str, layout: dict) -> str:
                 moved.add(element)
                 changed = True
         rects[element] = (x, y, w, h)
-    ends = _edge_ends(root) if moved or kept_drawn else {}
+    ends = _edge_ends(root) if moved or kept_drawn or edges else {}
     for edge in root.iter(_EDGE):
         element = edge.get("bpmnElement") or ""
-        if element in edges and not kept_drawn.intersection(ends.get(element, ())):
-            _set_waypoints(edge, edges[element])
-            changed = True
-            continue
+        route = edges.get(element)
+        if route is not None and element in ends:
+            src, tgt = ends[element]
+            if (
+                not kept_drawn.intersection((src, tgt))
+                and _touches(route[0], rects.get(src))
+                and _touches(route[-1], rects.get(tgt))
+            ):
+                _set_waypoints(edge, route)
+                changed = True
+                continue
         src, tgt = ends.get(element, ("", ""))
         if (src in moved or tgt in moved) and src in rects and tgt in rects:
             _set_waypoints(edge, route_edge(rects[src], rects[tgt]))
