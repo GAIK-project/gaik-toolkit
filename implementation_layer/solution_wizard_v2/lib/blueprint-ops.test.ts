@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   OperationRefused,
   postOperations,
+  postUndo,
   refusalOf,
   saveRefusal,
   type BlueprintOperation,
@@ -160,5 +161,31 @@ describe("saveRefusal (the form, flow and canvas saves)", () => {
     expect(saveRefusal(500, { detail: { error: "internal_error", message: "x" } })).toBeNull();
     expect(saveRefusal(422, { detail: [{ loc: ["body"], msg: "x" }] })).toBeNull();
     expect(saveRefusal(422, { detail: { error: "unsupported_edit", message: "" } })).toBeNull();
+  });
+});
+
+describe("postUndo", () => {
+  it("sends the base version to the undo route and gives the blueprint and the new version", async () => {
+    const fetchMock = answer(200, { id: "abc", active_version: 6, blueprint: BLUEPRINT });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await postUndo("abc", 5)).toEqual({ blueprint: BLUEPRINT, version: 6 });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/sessions/abc/blueprint/undo");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ base_version: 5 });
+  });
+
+  it("throws OperationRefused for nothing_to_undo", async () => {
+    vi.stubGlobal(
+      "fetch",
+      answer(409, { detail: { error: "nothing_to_undo", message: "There is nothing to undo." } }),
+    );
+    await expect(postUndo("abc", 5)).rejects.toMatchObject({ name: "OperationRefused", code: "nothing_to_undo" });
+  });
+
+  it("throws a plain error without wizard_api", async () => {
+    vi.stubGlobal("fetch", answer(503, { error: "needs_wizard_api" }));
+    await expect(postUndo("abc", 5)).rejects.not.toBeInstanceOf(OperationRefused);
   });
 });

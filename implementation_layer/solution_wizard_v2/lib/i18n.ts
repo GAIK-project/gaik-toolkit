@@ -185,16 +185,30 @@ export type Dict = {
   bpmnPaletteConnect: string;
   bpmnPadRename: string;
   bpmnPadDelete: string;
-  bpmnUnsaved: string;
-  /** "{names}": the tasks no flow from the start reaches. */
-  bpmnUnconnected: string;
-  bpmnUnnamed: string;
-  /** What the unconnected-task line calls a task that has no name yet. */
-  bpmnUnnamedTask: string;
-  /** Puts the canvas back to the diagram last saved. */
-  bpmnDiscard: string;
-  /** Under an editable canvas, on one line: what saves by itself, what waits for the button, and the undo. */
+  /** A step's context pad: a new step right after it. */
+  bpmnPadAppend: string;
+  /** A step's context pad: one place earlier or later in the process. */
+  bpmnPadMoveEarlier: string;
+  bpmnPadMoveLater: string;
+  /** A step's context pad: draw a line from it to another step. */
+  bpmnPadConnect: string;
+  /** Over an element the blueprint draws from elsewhere (start, gateway, lane, data): why it is not edited here. */
+  bpmnDerivedElement: string;
+  /** Under the canvas when there is no wizard_api to send edits to: read only. */
+  bpmnNeedsWizardApi: string;
+  /** Takes back the last change to the blueprint (wizard_api's undo). */
+  bpmnUndo: string;
+  bpmnUndone: string;
+  bpmnNothingToUndo: string;
+  /** An edit refused while the wizard writes its reply. */
+  bpmnAgentBusy: string;
+  /** An edit refused for one field: "{field}" in plain words (blueprintFieldNames). */
+  bpmnOpRefusedField: string;
+  bpmnOpRefused: string;
+  /** Under an editable canvas, on one line: each change saves at once, and Undo. */
   bpmnEditHelp: string;
+  /** A refused edit's field in plain words, keyed by its last name (lib/blueprint-field-names). */
+  blueprintFieldNames: Record<string, string>;
   /** After a save of the diagram: saved, and when the wizard hears of it. */
   bpmnSaved: string;
   /** "{n}": the step's number in the process. */
@@ -357,12 +371,9 @@ export type Dict = {
   wsBpmnLoading: string;
   wsBpmnError: string;
   wsStepList: string;
-  wsBpmnSave: string;
   wsBpmnSaving: string;
   wsBpmnSaveError: string;
   wsBpmnSaved: string;
-  wsBpmnLintBlocked: string;
-  wsBpmnLintWarnings: string;
   wsBpmnZoomIn: string;
   wsBpmnZoomOut: string;
   wsBpmnToolbar: string;
@@ -978,16 +989,34 @@ const fi: Dict = {
   flowFullViewExit: "Pienennä kaavio",
   bpmnMinimap: "Kaavion pienoiskartta",
   bpmnShowData: "Näytä data",
-  bpmnPaletteAddTask: "Lisää tehtävä: pudota se nuolen päälle, niin se liitetään prosessiin",
+  bpmnPaletteAddTask: "Lisää vaihe prosessin loppuun",
   bpmnPaletteConnect: "Yhdistä vaiheet: vedä vaiheesta toiseen",
   bpmnPadRename: "Nimeä uudelleen",
   bpmnPadDelete: "Poista",
-  bpmnUnsaved: "Muutoksia ei ole tallennettu",
-  bpmnUnconnected: "Yhdistä nuolella prosessiin ennen tallennusta: {names}",
-  bpmnUnnamed: "Anna tehtävälle nimi ennen tallennusta.",
-  bpmnUnnamedTask: "nimetön tehtävä",
-  bpmnDiscard: "Hylkää muutokset",
-  bpmnEditHelp: "Nimi tallentuu itsestään, muut muutokset Tallenna-napista. Ctrl+Z peruu.",
+  bpmnPadAppend: "Lisää vaihe tämän jälkeen",
+  bpmnPadMoveEarlier: "Siirrä aiemmaksi",
+  bpmnPadMoveLater: "Siirrä myöhemmäksi",
+  bpmnPadConnect: "Yhdistä toiseen vaiheeseen",
+  bpmnDerivedElement:
+    "Tämä osa piirretään blueprintin muista tiedoista, joten sitä ei muokata kaaviossa. Pyydä muutosta wizardilta.",
+  bpmnNeedsWizardApi: "Vain luku: kaavion muokkaus tarvitsee wizardin palvelun, joka ei ole nyt käytössä.",
+  bpmnUndo: "Kumoa",
+  bpmnUndone: "Viimeisin muutos kumottu.",
+  bpmnNothingToUndo: "Ei kumottavaa.",
+  bpmnAgentBusy: "Wizard vastaa juuri. Tee muutos uudelleen, kun vastaus on valmis.",
+  bpmnOpRefusedField: "Muutosta ei tehty: tarkista {field}.",
+  bpmnOpRefused: "Muutosta ei voitu tehdä.",
+  bpmnEditHelp: "Jokainen muutos tallentuu heti. Kumoa peruu viimeisimmän.",
+  blueprintFieldNames: {
+    step_id: "vaihe",
+    name: "vaiheen nimi",
+    after: "edeltävä vaihe",
+    before: "seuraava vaihe",
+    source: "vaihe, josta nuoli lähtee",
+    target: "vaihe, johon nuoli päättyy",
+    type: "vaiheen tyyppi",
+    description: "vaiheen kuvaus",
+  },
   bpmnSaved: "Tallennettu. Wizard näkee muutoksen seuraavasta chat-viestistäsi.",
   bpmnStepTitle: "Vaihe {n}",
   editorRetry: "Yritä uudelleen",
@@ -1122,12 +1151,9 @@ const fi: Dict = {
   wsBpmnLoading: "Ladataan kaaviota…",
   wsBpmnError: "Kaaviota ei saatu ladattua.",
   wsStepList: "Prosessin vaiheet",
-  wsBpmnSave: "Tallenna muutokset",
   wsBpmnSaving: "Tallennetaan…",
   wsBpmnSaveError: "Tallennus epäonnistui",
   wsBpmnSaved: "Tallennettu",
-  wsBpmnLintBlocked: "Ei tallennettu: kaaviossa on virheitä",
-  wsBpmnLintWarnings: "Huomioita kaaviosta",
   wsBpmnZoomIn: "Lähennä",
   wsBpmnZoomOut: "Loitonna",
   wsBpmnToolbar: "Näkymä ja zoomaus",
@@ -1804,16 +1830,34 @@ const en: Dict = {
   flowFullViewExit: "Shrink the diagram",
   bpmnMinimap: "Diagram minimap",
   bpmnShowData: "Show data",
-  bpmnPaletteAddTask: "Add a task: drop it on an arrow to put it into the process",
+  bpmnPaletteAddTask: "Add a step at the end of the process",
   bpmnPaletteConnect: "Connect steps: drag from one step to another",
   bpmnPadRename: "Rename",
   bpmnPadDelete: "Delete",
-  bpmnUnsaved: "Unsaved changes",
-  bpmnUnconnected: "Connect to the process with an arrow before saving: {names}",
-  bpmnUnnamed: "Name the task before saving.",
-  bpmnUnnamedTask: "unnamed task",
-  bpmnDiscard: "Discard changes",
-  bpmnEditHelp: "A name saves by itself, other changes with Save changes. Ctrl+Z undoes.",
+  bpmnPadAppend: "Add a step after this one",
+  bpmnPadMoveEarlier: "Move earlier",
+  bpmnPadMoveLater: "Move later",
+  bpmnPadConnect: "Connect to another step",
+  bpmnDerivedElement:
+    "This part is drawn from other parts of the blueprint, so it is not edited on the diagram. Ask the wizard to change it.",
+  bpmnNeedsWizardApi: "Read only: editing the diagram needs the wizard service, which is not running now.",
+  bpmnUndo: "Undo",
+  bpmnUndone: "The last change was undone.",
+  bpmnNothingToUndo: "Nothing to undo.",
+  bpmnAgentBusy: "The wizard is replying. Make the change again once the reply is done.",
+  bpmnOpRefusedField: "The change was not made: check the {field}.",
+  bpmnOpRefused: "The change could not be made.",
+  bpmnEditHelp: "Each change saves at once. Undo takes back the last one.",
+  blueprintFieldNames: {
+    step_id: "step",
+    name: "step name",
+    after: "previous step",
+    before: "next step",
+    source: "step the arrow starts from",
+    target: "step the arrow ends at",
+    type: "step type",
+    description: "step description",
+  },
   bpmnSaved: "Saved. The wizard sees the change from your next chat message.",
   bpmnStepTitle: "Step {n}",
   editorRetry: "Try again",
@@ -1948,12 +1992,9 @@ const en: Dict = {
   wsBpmnLoading: "Loading the diagram…",
   wsBpmnError: "The diagram could not be loaded.",
   wsStepList: "Process steps",
-  wsBpmnSave: "Save changes",
   wsBpmnSaving: "Saving…",
   wsBpmnSaveError: "Save failed",
   wsBpmnSaved: "Saved",
-  wsBpmnLintBlocked: "Not saved: the diagram has errors",
-  wsBpmnLintWarnings: "Notes on the diagram",
   wsBpmnZoomIn: "Zoom in",
   wsBpmnZoomOut: "Zoom out",
   wsBpmnToolbar: "View and zoom",

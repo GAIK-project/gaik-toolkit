@@ -150,3 +150,32 @@ export async function postOperations(
     version: data.session.active_version,
   };
 }
+
+/**
+ * Undoes the last write to the session's blueprint (`POST .../blueprint/undo`),
+ * made on `baseVersion`: wizard_api goes back to the version before it, as a
+ * new version. Refusals (nothing_to_undo, changed_elsewhere, agent_busy...)
+ * are thrown as `OperationRefused`; anything else, the 503 without wizard_api
+ * included, as a plain Error.
+ */
+export async function postUndo(
+  sessionId: string,
+  baseVersion: number,
+): Promise<{ blueprint: Blueprint; version: number }> {
+  const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/blueprint/undo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base_version: baseVersion }),
+  });
+  const body = (await res.json().catch(() => null)) as unknown;
+  if (res.status === 409 || res.status === 422) {
+    const refusal = refusalOf(body);
+    if (refusal) throw new OperationRefused(res.status, refusal);
+  }
+  if (!res.ok) throw new Error(`the undo failed (${res.status})`);
+  const data = body as { blueprint?: Blueprint; active_version?: number } | null;
+  if (!data?.blueprint || typeof data.active_version !== "number") {
+    throw new Error("the undo's answer has no blueprint");
+  }
+  return { blueprint: data.blueprint, version: data.active_version };
+}

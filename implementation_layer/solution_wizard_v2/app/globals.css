@@ -562,6 +562,14 @@ body {
   padding: 0;
   border: none;
 }
+/* A step's tool that has nothing to do there (the first step cannot move earlier). */
+.bpmn-editable .djs-context-pad .entry.gaik-pad-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.bpmn-editable .djs-context-pad .entry.gaik-pad-disabled:hover {
+  background: none;
+}
 /* A phone has no room for the tools; the diagram is for reading there. */
 @media (max-width: 767px) {
   .bpmn-editable .djs-palette {

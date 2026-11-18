@@ -658,7 +658,6 @@ function WorkflowFlowTab({
             <BpmnDiagramPanel
               sessionId={sessionId}
               xml={bpmnXml}
-              blueprint={blueprint}
               baseVersion={blueprintVersion}
               steps={blueprint.steps}
               pocNoteLabel={pocNoteLabel}
@@ -676,11 +675,11 @@ function WorkflowFlowTab({
                 saveBpmnShowData(show);
                 setShowData(show);
               }}
-              // Other tabs get a change once it is saved, never while it is being typed.
-              onSynced={({ blueprint: synced, version }) => {
+              // Other tabs get a change once the server has it, never while it is being typed.
+              onSynced={({ blueprint: synced, version, via }) => {
                 onBlueprintChange(synced);
                 onVersionChange(version);
-                onSaved("save");
+                onSaved(via ?? "save");
               }}
               t={t}
             />
