@@ -312,9 +312,11 @@ export async function postMessage(
   id: string,
   userContent: string,
   assistantContent: string,
+  /** The reply was stopped by the user: the note its text ends with (lib/chat-stopped). */
+  stoppedNote?: string,
 ): Promise<WizardSession | undefined> {
   if (!wizardApiEnabled()) {
-    return mock.postMessage(id, userContent, assistantContent);
+    return mock.postMessage(id, userContent, assistantContent, stoppedNote);
   }
   try {
     const detail = await apiPostMessages(id, userContent, assistantContent);

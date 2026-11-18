@@ -842,6 +842,98 @@
     "technical_spec": {
       "additionalProperties": true,
       "default": {},
+      "properties": {
+        "external_services": {
+          "items": {
+            "additionalProperties": false,
+            "description": "An API or framework outside GAIK that one need of the use case depends on.",
+            "properties": {
+              "name": {
+                "description": "The service or framework, e.g. 'Tavily web search'.",
+                "maxLength": 80,
+                "pattern": "^[^\\x00-\\x1f\\x7f\\x85\\u2028\\u2029]+$",
+                "title": "Name",
+                "type": "string"
+              },
+              "purpose": {
+                "description": "The need it meets in this use case.",
+                "maxLength": 300,
+                "title": "Purpose",
+                "type": "string"
+              },
+              "python_package": {
+                "anyOf": [
+                  {
+                    "maxLength": 100,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "The pip requirement the PoC installs, e.g. 'tavily-python>=0.5'. A plain PyPI name with optional [extras] and version specifiers, and not one the PoC installs for itself (gaik, pydantic, python-dotenv, pyyaml, reportlab); omit it when the service is called with what the PoC already has.",
+                "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?(?:\\[[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?(?:,[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)*\\])?(?:(?:~=|==|!=|<=|>=|<|>)[0-9][0-9A-Za-z.!+*]*(?:,(?:~=|==|!=|<=|>=|<|>)[0-9][0-9A-Za-z.!+*]*)*)?$",
+                "title": "Python Package"
+              },
+              "env_vars": {
+                "description": "Names of the service's own keys and settings, set in .env.",
+                "items": {
+                  "maxLength": 64,
+                  "pattern": "^[A-Z][A-Z0-9_]*$",
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "title": "Env Vars",
+                "type": "array"
+              },
+              "docs_url": {
+                "anyOf": [
+                  {
+                    "maxLength": 300,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "The service's documentation (https).",
+                "pattern": "^https://[^\\s]+$",
+                "title": "Docs Url"
+              },
+              "data_sent": {
+                "description": "What leaves for the third party. For a library that runs locally write 'none' and nothing more ('nothing' and 'no data' count the same); any other wording counts as data sent.",
+                "maxLength": 300,
+                "title": "Data Sent",
+                "type": "string"
+              },
+              "user_can_provide": {
+                "description": "The user's answer: they can get the account, key and terms for it.",
+                "title": "User Can Provide",
+                "type": "boolean"
+              },
+              "fallback": {
+                "description": "What the PoC does without the service, as in the sandbox, which has no key.",
+                "maxLength": 300,
+                "title": "Fallback",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "purpose",
+              "data_sent",
+              "user_can_provide",
+              "fallback"
+            ],
+            "title": "ExternalService",
+            "type": "object"
+          },
+          "maxItems": 20,
+          "type": "array"
+        }
+      },
       "title": "Technical Spec",
       "type": "object"
     },

@@ -172,6 +172,14 @@ describe("renderMarkdown — links", () => {
 });
 
 describe("renderMarkdown — formatting", () => {
+  it("ends on a line that starts with a number too long to be a list item", () => {
+    // Ten digits and a dot: no list item (at most nine digits), so a paragraph.
+    expect(renderMarkdown("1234567890. tilaus")).toBe("<p>1234567890. tilaus</p>");
+    expect(renderMarkdown("Tilaukset:\n12345678901. ensimmäinen\n2. toinen")).toContain(
+      "12345678901. ensimmäinen",
+    );
+  });
+
   it("renders headings two levels down, capped at h6", () => {
     expect(renderMarkdown("# Title")).toBe("<h3>Title</h3>");
     expect(renderMarkdown("#### Deep")).toBe("<h6>Deep</h6>");
@@ -182,6 +190,53 @@ describe("renderMarkdown — formatting", () => {
     expect(renderMarkdown("**bold**")).toContain("<strong>bold</strong>");
     expect(renderMarkdown("*italic*")).toContain("<em>italic</em>");
     expect(renderMarkdown("`code`")).toContain("<code>code</code>");
+  });
+
+  it("keeps a round of questions one numbered list, with each question's options inside its item", () => {
+    // The options used to end the numbered list, so every question was "1.".
+    expect(renderMarkdown("1. Q\n   - a\n   - b\n2. Q\n   - c\n3. Q")).toBe(
+      "<ol><li>Q<ul><li>a</li><li>b</li></ul></li><li>Q<ul><li>c</li></ul></li><li>Q</li></ol>",
+    );
+  });
+
+  it("nests a numbered list under a bullet, and goes back out to the outer list", () => {
+    expect(renderMarkdown("- a\n  1. x\n  2. y\n- b")).toBe(
+      "<ul><li>a<ol><li>x</li><li>y</li></ol></li><li>b</li></ul>",
+    );
+    expect(renderMarkdown("1. a\n   - x\n     - deep\n2. b")).toBe(
+      "<ol><li>a<ul><li>x<ul><li>deep</li></ul></li></ul></li><li>b</li></ol>",
+    );
+  });
+
+  it("a numbered list that goes on after something at the margin keeps its own number", () => {
+    // Bullets at the margin are a list of their own; the question after them is still the second.
+    expect(renderMarkdown("1. Q\n- a\n- b\n2. Q")).toBe(
+      '<ol><li>Q</li></ol><ul><li>a</li><li>b</li></ul><ol start="2"><li>Q</li></ol>',
+    );
+    expect(renderMarkdown("1. one\n\nBetween.\n\n2. two\n3. three")).toBe(
+      '<ol><li>one</li></ol><p>Between.</p><ol start="2"><li>two</li><li>three</li></ol>',
+    );
+    // Only digits reach the attribute.
+    expect(renderMarkdown('7. "><b>x')).toBe('<ol start="7"><li>&quot;&gt;&lt;b&gt;x</li></ol>');
+  });
+
+  it("an item less indented than a nested list's first item is not drawn at its depth", () => {
+    // c stands between a and b: it is a's, not b's sibling.
+    expect(renderMarkdown("- a\n    - b\n  - c")).toBe(
+      "<ul><li>a<ul><li>b</li></ul><ul><li>c</li></ul></li></ul>",
+    );
+  });
+
+  it("a long staircase of indented items stops nesting and still ends", () => {
+    const lines = Array.from({ length: 3000 }, (_, i) => `${" ".repeat(i * 2)}- level ${i}`);
+    const html = renderMarkdown(lines.join("\n"));
+    expect(html).toContain("level 2999");
+    expect(html.split("<ul>").length - 1).toBeLessThanOrEqual(7);
+  });
+
+  it("items of one kind are one list whatever their indentation at the start", () => {
+    expect(renderMarkdown("  - one\n- two")).toBe("<ul><li>one</li><li>two</li></ul>");
+    expect(renderMarkdown(" 1. one\n2. two")).toBe("<ol><li>one</li><li>two</li></ol>");
   });
 
   it("renders an unordered and an ordered list", () => {

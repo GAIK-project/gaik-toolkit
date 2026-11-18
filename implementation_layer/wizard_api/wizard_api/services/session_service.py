@@ -49,6 +49,8 @@ SERVER_OWNED_METADATA_KEYS = frozenset(
         "gate_replay",
         "voided_runs",
         "approved_content",
+        "user_edits",
+        "agent_seen_edit",
     }
 )
 
@@ -83,6 +85,15 @@ UNKNOWN_RUN_PACKAGE = "unknown"
 #: when Gate 3 was approved. A chat turn that leaves either different has
 #: changed what the gates approved, and the gate that covers it reopens.
 APPROVED_CONTENT_KEY = "approved_content"
+#: Session metadata key: the package files the user saved in the PoC tab's
+#: editor, each with its path and time, the latest last. The record of who
+#: changed the package by hand; the agent is told of the ones it has not heard of.
+USER_EDITS_KEY = "user_edits"
+#: Session metadata key: the time of the latest of those edits the agent has
+#: been told about (like ``agent_seen_run`` for a run).
+AGENT_SEEN_EDIT_KEY = "agent_seen_edit"
+#: How many edits the record keeps.
+MAX_USER_EDITS = 50
 
 
 class ServerOwnedMetadataError(ValueError):
@@ -389,6 +400,40 @@ def update_session(db: Session, session: WizardSession, payload: SessionUpdate) 
     return session
 
 
+def record_user_edit(db: Session, session: WizardSession, path: str) -> WizardSession:
+    """Add a file the user saved in the editor to the session's record of edits.
+
+    Read under the row lock like every other metadata write (``lock_fresh``):
+    a chat turn or a run recorded meanwhile is kept.
+    """
+    lock_fresh(db, session)
+    metadata = dict(session.session_metadata)
+    edits = [e for e in metadata.get(USER_EDITS_KEY) or [] if isinstance(e, dict)]
+    # Always with microseconds, so two times compare as text.
+    edits.append({"path": path, "at": datetime.now(UTC).isoformat(timespec="microseconds")})
+    metadata[USER_EDITS_KEY] = edits[-MAX_USER_EDITS:]
+    session.session_metadata = metadata
+    session.updated_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(session)
+    return session
+
+
+def unseen_user_edits(metadata: dict | None) -> list[dict[str, str]]:
+    """The recorded edits the agent has not been told of: one per file, its latest."""
+    metadata = metadata or {}
+    seen = metadata.get(AGENT_SEEN_EDIT_KEY)
+    seen = seen if isinstance(seen, str) else ""
+    latest: dict[str, str] = {}
+    for edit in metadata.get(USER_EDITS_KEY) or []:
+        if not isinstance(edit, dict):
+            continue
+        path, at = edit.get("path"), edit.get("at")
+        if isinstance(path, str) and isinstance(at, str) and at > seen:
+            latest[path] = max(at, latest.get(path, ""))
+    return [{"path": path, "at": at} for path, at in sorted(latest.items(), key=lambda e: e[1])]
+
+
 class GateNotReopenableError(ValueError):
     """Only an approved gate can be reopened."""
 
@@ -476,7 +521,15 @@ def append_messages(
     session: WizardSession,
     user_content: str,
     assistant_content: str,
+    *,
+    stopped: dict | None = None,
 ) -> WizardSession:
+    """Store one exchange. ``stopped`` marks a reply the user stopped.
+
+    Its ``note`` is the short line the stored text ends with ("(Pysäytetty)"),
+    so a reader that does not know the flag still sees that the reply is not
+    whole, and ``tool`` the kind of tool call that was running, if one was.
+    """
     lock_fresh(db, session)
     metadata = dict(session.session_metadata)
     messages = list(metadata.get("messages") or [])
@@ -489,14 +542,18 @@ def append_messages(
             "createdAt": ts,
         }
     )
-    messages.append(
-        {
-            "id": f"msg_{uuid.uuid4().hex[:8]}",
-            "role": "assistant",
-            "content": assistant_content,
-            "createdAt": ts,
-        }
-    )
+    reply = {
+        "id": f"msg_{uuid.uuid4().hex[:8]}",
+        "role": "assistant",
+        "content": assistant_content,
+        "createdAt": ts,
+    }
+    if stopped is not None:
+        reply["stopped"] = True
+        reply["stoppedNote"] = stopped.get("note") or ""
+        if stopped.get("tool"):
+            reply["stoppedDuring"] = stopped["tool"]
+    messages.append(reply)
     metadata["messages"] = messages
     session.session_metadata = metadata
     session.updated_at = datetime.now(UTC)

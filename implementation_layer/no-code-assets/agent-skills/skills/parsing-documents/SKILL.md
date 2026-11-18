@@ -16,8 +16,8 @@ description: >-
 # Parsing documents with gaik
 
 ```bash
-pip install "gaik[parser]==0.10.0"              # PyMuPDF, python-docx, Docling
-pip install "gaik[multimodal-parser]==0.10.0"   # multi-provider vision parsing
+pip install "gaik[parser]==0.11.0"              # PyMuPDF, python-docx, Docling
+pip install "gaik[multimodal-parser]==0.11.0"   # multi-provider vision parsing
 # Add llm-google for shared Google/Vertex configs, or llm-litellm for LiteLLM.
 ```
 
@@ -180,8 +180,7 @@ column-collapse and page-drop, which both otherwise read as fine prose.
   produces — and a crashed write downstream looks exactly like a bad parse.
 - A parser returning fluent text is not evidence it read the whole document. Only the
   per-page check is.
-- From the gaik release after 0.10.0 (the pins above install 0.10.0, which has none of
-  this), every parser takes `limits=InputLimits(...)` from
+- Since gaik 0.11.0, every parser takes `limits=InputLimits(...)` from
   `gaik.software_components.input_limits` and refuses a file over a limit before it
   parses or sends anything, with `InputLimitError`: a `ValueError` whose message names
   the file and the limit. Defaults: 100 MiB per file; for `VisionParser` and

@@ -57,6 +57,20 @@ const chatReferences = (page: Page) =>
 
 const isSync = (r: { url(): string; method(): string }) => r.url().includes("/bpmn/sync") && r.method() === "POST";
 
+/** "Lisää tehtävä" dragged from the palette into an empty part of the lane below the process. */
+async function addTaskFromPalette(page: Page) {
+  const tool = page.locator('.bpmn-editable .djs-palette .entry[data-action="create.task"]');
+  // After "Muokkaa kaaviota" the modeler takes the viewer's place: its palette comes with it.
+  await expect(tool).toBeVisible();
+  await expect(page.locator(".bpmn-editable")).toHaveAttribute("aria-busy", "false");
+  const entry = (await tool.boundingBox())!;
+  const box = (await canvas(page).boundingBox())!;
+  await page.mouse.move(entry.x + entry.width / 2, entry.y + entry.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.8, { steps: 10 });
+  await page.mouse.up();
+}
+
 /** The first save of the test waits at the server until `release()`; later ones go through. */
 async function holdFirstSync(page: Page) {
   let release!: () => void;
@@ -195,7 +209,10 @@ test.describe("Workflow tab", () => {
     await expect(rows.nth(2)).toContainText("Classification");
     expect((await sync).status()).toBe(200);
 
-    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu");
+    // The save says when the wizard hears of it.
+    await expect(page.getByTestId("bpmn-status")).toContainText(
+      "Tallennettu. Wizard näkee muutoksen seuraavasta chat-viestistäsi.",
+    );
     await expect(rows.nth(2)).toContainText("Cost centre proposal");
     // The field keeps the cursor and the text through the save.
     await expect(name).toBeFocused();
@@ -633,6 +650,8 @@ test.describe("Workflow tab", () => {
 
     // A task the generator draws by itself is not a step: a save would undo a
     // rename or a delete, so it has neither, by the pad, the name field or the keys.
+    // The step's properties are closed first: over the fitted diagram they can lie on the task.
+    await page.getByTestId("bpmn-properties").getByRole("button", { name: "Sulje" }).click();
     await page.getByTestId("bpmn-zoom-controls").getByRole("button", { name: "Sovita näkymään" }).click();
     const generated = page.locator('.bpmn-editable [data-element-id="Activity_submit_finance_system"]');
     await generated.click();
@@ -644,6 +663,108 @@ test.describe("Workflow tab", () => {
     await expect(page.locator(".bpmn-editable .djs-direct-editing-parent")).toHaveCount(0);
     await expect(generated).toBeVisible();
     await expect(page.getByTestId("bpmn-status")).toHaveCount(0);
+  });
+
+  test("a task added from the palette and deleted leaves nothing behind, and Hylkää muutokset or Ctrl+Z takes an edit back", async ({
+    page,
+  }) => {
+    await openFlow(page);
+    await waitForDiagram(page);
+    let syncs = 0;
+    page.on("request", (r) => {
+      if (isSync(r)) syncs += 1;
+    });
+    const tasks = page.locator('.bpmn-editable .djs-shape[data-element-id^="Activity_"]');
+    const before = await tasks.count();
+    const previews = page.locator(".bpmn-editable .djs-drag-group");
+    const status = page.getByTestId("bpmn-status");
+
+    // How the editor keeps edits is said under it.
+    await expect(page.getByTestId("bpmn-editing")).toContainText("Nimi tallentuu itsestään");
+
+    // Dropped beside the process: it cannot be saved there, and the line names it without its id.
+    await addTaskFromPalette(page);
+    await expect(tasks).toHaveCount(before + 1);
+    await expect(status).toContainText("Yhdistä nuolella prosessiin ennen tallennusta: nimetön tehtävä");
+    await expect(status).not.toContainText("Activity_");
+    // The preview that followed the pointer went with the drop. It stayed on the
+    // canvas as a box no delete reached (a listener stopped the drag's cleanup).
+    await expect(previews).toHaveCount(0);
+
+    // Deleted again: nothing of it stays, and there is nothing to save.
+    await page.locator('.djs-context-pad .entry[data-action="delete"]').click();
+    await expect(tasks).toHaveCount(before);
+    await expect(previews).toHaveCount(0);
+    await expect(status).toHaveCount(0);
+
+    // Hylkää muutokset: back to the diagram last saved.
+    await addTaskFromPalette(page);
+    await expect(tasks).toHaveCount(before + 1);
+    await status.getByTestId("bpmn-discard").click();
+    await expect(tasks).toHaveCount(before);
+    await expect(status).toHaveCount(0);
+
+    // Ctrl+Z, as the line under the editor says.
+    await addTaskFromPalette(page);
+    await expect(tasks).toHaveCount(before + 1);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Control+z");
+    await expect(tasks).toHaveCount(before);
+    await expect(status).toHaveCount(0);
+    expect(syncs).toBe(0);
+  });
+
+  test("after Gate 2 Lopeta muokkaus closes the diagrams again, once their edits are saved or discarded", async ({
+    page,
+  }) => {
+    await loginAsDev(page);
+    await page.goto("/sessions/ses_laskut");
+    await setChatOpen(page, false);
+    await selectWorkspaceTab(page, "Työnkulku");
+    await openBpmnView(page, { edit: false });
+    await waitForDiagram(page, { edit: false });
+
+    await page.getByTestId("bpmn-locked").getByRole("button", { name: "Muokkaa kaaviota" }).click();
+    const done = page.getByTestId("bpmn-editing").getByRole("button", { name: "Lopeta muokkaus" });
+    await expect(done).toBeEnabled();
+    await expect(page.getByTestId("bpmn-locked")).toHaveCount(0);
+
+    // An unsaved edit is saved or discarded first.
+    await addTaskFromPalette(page);
+    await expect(done).toBeDisabled();
+    await page.getByTestId("bpmn-discard").click();
+    await expect(done).toBeEnabled();
+
+    // An emptied name cannot be saved: Hylkää muutokset is the way back, and the field has the name again.
+    await page.getByTestId("flow-step-list").locator("li").nth(2).getByRole("button").first().click();
+    const name = page.getByTestId("bpmn-property-name");
+    await expect(name).toHaveValue("Classification");
+    await name.fill("");
+    await expect(page.getByTestId("bpmn-status")).toContainText("Anna tehtävälle nimi ennen tallennusta.");
+    await expect(done).toBeDisabled();
+    await page.getByTestId("bpmn-discard").click();
+    await expect(name).toHaveValue("Classification");
+    await expect(page.locator('.bpmn-editable [data-element-id="Activity_classify"]')).toContainText("Classification");
+    await expect(done).toBeEnabled();
+
+    await done.click();
+    await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-locked", "true");
+    await expect(page.getByTestId("bpmn-locked")).toBeVisible();
+    await expect(page.getByTestId("bpmn-editing")).toHaveCount(0);
+    await expect(page.locator(".bpmn-editable .djs-palette")).toHaveCount(0);
+
+    // One lock for both: the simple flow is read-only again too, and opens and closes the same way.
+    await page.getByTestId("flow-view-diagram").click();
+    await expect(page.getByTestId("simple-flow-locked")).toBeVisible();
+    await page.getByTestId("simple-flow-locked").getByRole("button", { name: "Muokkaa kaaviota" }).click();
+    await expect(page.getByTestId("simple-flow-editing")).toContainText("Jokainen muutos tallentuu heti");
+    // A removal leaves "Kumoa"; closing the flow takes it away, so nothing saves into a locked flow.
+    await page.getByTestId("simple-flow-node-3").click();
+    await page.getByTestId("simple-flow-remove").click();
+    await expect(page.getByTestId("simple-flow-undo")).toBeVisible();
+    await page.getByTestId("simple-flow-editing").getByRole("button", { name: "Lopeta muokkaus" }).click();
+    await expect(page.getByTestId("simple-flow-locked")).toBeVisible();
+    await expect(page.getByTestId("simple-flow-undo")).toHaveCount(0);
   });
 
   test("Yhdistä draws the order of the steps, and no line to or from a data object", async ({ page }) => {

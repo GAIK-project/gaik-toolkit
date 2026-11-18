@@ -52,7 +52,13 @@ def find_documents(config: dict) -> list:
     sample_dir = Path(__file__).parent / config.get("paths", {}).get("sample_input", "sample_input")
     # RAGWorkflow uses VisionRagParser which expects PDF files.
     # Subfolders too: a case's documents often sit in documents/ under the bundle (#255).
-    docs = [f for f in sample_dir.rglob("*") if f.is_file() and f.suffix.lower() == ".pdf"]
+    # Only files that stay inside sample_input/ once links are resolved.
+    root = sample_dir.resolve()
+    docs = [
+        f
+        for f in sample_dir.rglob("*")
+        if f.is_file() and f.suffix.lower() == ".pdf" and f.resolve().is_relative_to(root)
+    ]
     return sorted(docs)
 
 

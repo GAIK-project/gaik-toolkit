@@ -79,16 +79,19 @@ def test_a_flat_layout_still_matches_by_name(dm, tmp_path):
 
 
 def test_paths_relative_to_the_bundle_resolve_with_a_search_root(dm, tmp_path):
+    """The documents are not under the manifest's folder: only the search root finds them."""
     manifest_path = _write(
-        tmp_path / "poc_input" / "access_manifest.json",
+        tmp_path / "meta" / "access_manifest.json",
         {"documents": [{"file": "poc_input/documents/a.pdf"}]},
     )
-    _write(tmp_path / "poc_input" / "documents" / "a.pdf", "%PDF")
+    _write(tmp_path / "bundle" / "poc_input" / "documents" / "a.pdf", "%PDF")
 
-    manifest = dm.DocumentManifest.load(manifest_path, search_roots=[tmp_path])
+    without = dm.DocumentManifest.load(manifest_path)
+    manifest = dm.DocumentManifest.load(manifest_path, search_roots=[tmp_path / "bundle"])
 
+    assert without.missing_documents() == ["poc_input/documents/a.pdf"]
     assert manifest.missing_documents() == []
-    assert manifest.require(tmp_path / "poc_input" / "documents" / "a.pdf")
+    assert manifest.require(tmp_path / "bundle" / "poc_input" / "documents" / "a.pdf")
 
 
 def test_two_files_with_one_name_are_told_apart_by_path_not_guessed(dm, tmp_path):

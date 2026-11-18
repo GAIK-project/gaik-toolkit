@@ -22,15 +22,30 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   "gate_not_ready",
   "agent_busy",
   "agent_capacity",
+  "no_reply_running",
   "blueprint_change_required",
   "server_owned_metadata",
   // the package
   "poc_package_incomplete",
   "no_successful_run",
+  "package_changed_since_run",
   "blueprint_placeholder",
   "blueprint_not_scaffoldable",
   "package_folder",
   "invalid_blueprint",
+  // one package file in the editor
+  "invalid_path",
+  "secrets_not_stored",
+  "file_read_only",
+  "file_type_not_editable",
+  "file_not_text",
+  "file_too_large",
+  "file_changed",
+  "wizard_responding",
+  "key_value_not_stored",
+  "code_edit_needs_own_runner_key",
+  // a message sent while a package file was being saved
+  "file_being_saved",
   // the sandbox
   "sandbox_busy",
   // input files
@@ -68,7 +83,7 @@ const INTERNAL_CODES: Record<string, keyof ErrorStrings> = {
 };
 
 /** The extra keys a person needs to act on a refusal; nothing else is passed on. */
-const EXTRA_KEYS = ["gate", "gate_step", "status", "missing", "problems", "keys", "feedback"] as const;
+const EXTRA_KEYS = ["gate", "gate_step", "status", "missing", "problems", "keys", "feedback", "variables"] as const;
 
 export const MESSAGE_MAX_CHARS = 300;
 const MAX_LIST_ITEMS = 20;

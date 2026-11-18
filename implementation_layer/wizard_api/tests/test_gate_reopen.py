@@ -337,9 +337,10 @@ def test_the_tool_guard_lets_the_wizards_own_tool_through(tmp_path):
 
 def test_the_agent_gets_the_tool_only_with_its_session(tmp_path):
     pytest.importorskip("claude_agent_sdk")
+    guard = ToolGuard(tmp_path, tmp_path)
 
-    with_session = agent_service._build_options(tmp_path, tmp_path, session_id="s-3")
-    without = agent_service._build_options(tmp_path, tmp_path)
+    with_session = agent_service._build_options(tmp_path, tmp_path, session_id="s-3", guard=guard)
+    without = agent_service._build_options(tmp_path, tmp_path, guard=guard)
 
     assert agent_service.REOPEN_GATE_TOOL in with_session.allowed_tools
     assert "wizard" in with_session.mcp_servers
@@ -720,3 +721,94 @@ def test_a_draft_written_down_again_has_the_digest_it_had() -> None:
 
     assert artifact_sync.solution_digest(rewritten) == artifact_sync.solution_digest(draft)
     assert artifact_sync.solution_digest(changed) != artifact_sync.solution_digest(draft)
+
+
+_SEARCH = {
+    "name": "Web search",
+    "purpose": "Finds public news about the supplier",
+    "python_package": "tavily-python>=0.5",
+    "env_vars": ["SEARCH_API_KEY"],
+    "data_sent": "The supplier's company name",
+    "user_can_provide": True,
+    "fallback": "The news field is left empty",
+}
+
+
+def test_a_new_or_changed_external_service_is_a_changed_solution() -> None:
+    """A third party that gets the case's data is part of what Gate 2 approved."""
+    from wizard_api.services import artifact_sync
+
+    draft = {"technical_spec": {"input_types": ["pdf"]}, "workflow": {"steps": []}}
+    empty = {**draft, "technical_spec": {"input_types": ["pdf"], "external_services": []}}
+    added = {**draft, "technical_spec": {"input_types": ["pdf"], "external_services": [_SEARCH]}}
+    sends_more = {
+        **draft,
+        "technical_spec": {
+            "input_types": ["pdf"],
+            "external_services": [{**_SEARCH, "data_sent": "The whole invoice"}],
+        },
+    }
+
+    # A session approved before the list existed, or without services, is unchanged.
+    assert artifact_sync.solution_digest(empty) == artifact_sync.solution_digest(draft)
+    assert artifact_sync.solution_digest(added) != artifact_sync.solution_digest(draft)
+    assert artifact_sync.solution_digest(sends_more) != artifact_sync.solution_digest(added)
+
+
+def _with_service(service: dict) -> dict:
+    return {"technical_spec": {"input_types": ["pdf"], "external_services": [service]}}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"name": "Other web search"},
+        {"python_package": "other-search>=1"},
+        {"env_vars": ["SEARCH_API_KEY", "SEARCH_BASE_URL"]},
+        {"data_sent": "The supplier's company name and business ID"},
+    ],
+)
+def test_another_service_package_key_or_data_sent_is_a_changed_solution(change) -> None:
+    from wizard_api.services import artifact_sync
+
+    approved = artifact_sync.solution_digest(_with_service(_SEARCH))
+
+    assert artifact_sync.solution_digest(_with_service({**_SEARCH, **change})) != approved
+
+
+def test_a_reworded_external_service_is_the_same_solution() -> None:
+    """The purpose, fallback and docs are wording the agent rewrites freely; a reworded
+    sentence does not reopen Gate 2."""
+    from wizard_api.services import artifact_sync
+
+    # Two keys, so that writing them in the other order is a real reordering.
+    service = {**_SEARCH, "env_vars": ["SEARCH_API_KEY", "SEARCH_REGION"]}
+    reworded = {
+        **service,
+        "purpose": "Looks up recent public news on the supplier",
+        "fallback": "Without it the news field stays empty",
+        "docs_url": "https://docs.example.com/search",
+        "env_vars": ["SEARCH_REGION", "SEARCH_API_KEY"],
+        "data_sent": f"  {service['data_sent']} ",
+    }
+
+    assert artifact_sync.solution_digest(_with_service(reworded)) == (
+        artifact_sync.solution_digest(_with_service(service))
+    )
+
+
+@requires_postgres
+def test_a_turn_that_adds_an_external_service_reopens_gate_2(client, db_session) -> None:
+    created, session = _session_past_gate_3(client, db_session)
+    sid = created["id"]
+
+    _edit_draft(
+        created["output_dir"],
+        lambda draft: draft.setdefault("technical_spec", {}).update(external_services=[_SEARCH]),
+    )
+    sessions_router._sync_artifacts_and_advance(db_session, session)
+
+    detail = client.get(f"/sessions/{sid}").json()
+    assert detail["gate_statuses"]["gate_2"] == "pending"
+    assert detail["metadata"]["gate_reopened"]["gate"] == "gate_2"
+    assert detail["metadata"]["gate_reopened"]["by"] == "change"

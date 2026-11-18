@@ -29,6 +29,9 @@ const labels: ChatActivityLabels = {
   panel: {
     gatePlaceholder: "",
     referenceRemove: "",
+    stop: "",
+    stopping: "",
+    stopped: "",
     background: "",
     nonTechnical: "",
     nonTechnicalText: "",

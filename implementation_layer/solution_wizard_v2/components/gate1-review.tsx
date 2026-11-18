@@ -3,6 +3,7 @@ import type { Assumption, BusinessContext } from "@/lib/sessions";
 import { fillTemplate, quoteOneLine } from "@/lib/chat-template";
 import { ChangeInPlace } from "@/components/ask-in-chat-button";
 import { Icon } from "@/components/icons";
+import { PointMark } from "@/components/point-mark";
 import type { ChangeChoices } from "@/lib/change-choice";
 import { KNOWLEDGE_PROCESSES, known, knownList, knowledgeProcess, type KnowledgeProcess } from "@/lib/known-values";
 import { plainLabel, plainLabelCapitalized } from "@/lib/plain-label";
@@ -177,14 +178,14 @@ export function Gate1Review({
             {items.map((q, i) => {
               const done = i < answered;
               return (
-                <li key={i} className="flex items-start gap-2.5 text-sm">
-                  <Icon
-                    name={done ? "check" : "circle"}
-                    size={15}
-                    className={`mt-0.5 shrink-0 ${done ? "text-brand-text" : "text-border-strong"}`}
+                <li key={i} className="flex items-start gap-2 text-sm">
+                  <PointMark
+                    number={i + 1}
+                    done={done}
+                    labels={{ answered: t.pointAnswered, open: t.pointOpen }}
                   />
                   <span className="min-w-0 [overflow-wrap:anywhere]">
-                    <span className={`block ${done ? "text-text" : "text-text-muted"}`}>{q}</span>
+                    <span className={`block ${done ? "text-text" : "text-text-secondary"}`}>{q}</span>
                     {done && answers[i] && (
                       <span className="mt-0.5 block text-text-secondary">{answers[i]}</span>
                     )}

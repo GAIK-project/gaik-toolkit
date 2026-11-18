@@ -143,6 +143,20 @@ export async function openRunningChatStream(id: string): Promise<Response> {
   });
 }
 
+/**
+ * Stop the reply that is being written for a session (POST /chat/stop): 202
+ * when the stop was passed on to the agent, 409 when no reply is running.
+ * Returns the raw Response, like openAgentChatStream.
+ */
+export async function stopAgentChat(id: string): Promise<Response> {
+  const base = getWizardApiUrl() ?? DEFAULT_API_URL;
+  return fetch(`${base}/sessions/${encodeURIComponent(id)}/chat/stop`, {
+    method: "POST",
+    headers: await outgoingHeaders(),
+    cache: "no-store",
+  });
+}
+
 async function wizardFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const base = getWizardApiUrl() ?? DEFAULT_API_URL;
   const res = await fetch(`${base}${path}`, {
@@ -438,6 +452,39 @@ export type ApiPocFiles = {
 /** List the files the PoC scaffolder produced (empty until it has run). */
 export async function apiGetPocFiles(id: string): Promise<ApiPocFiles> {
   return wizardFetch<ApiPocFiles>(`/sessions/${encodeURIComponent(id)}/poc/files`);
+}
+
+/**
+ * One file of the package as text, for the PoC tab's editor. `path` is
+ * relative to poc/. Raw Response: the route relays the file, or the api's
+ * refusal (a path outside the package, an environment file, a binary).
+ */
+export async function apiGetPocFile(id: string, path: string): Promise<Response> {
+  const base = getWizardApiUrl() ?? DEFAULT_API_URL;
+  return fetch(`${base}/sessions/${encodeURIComponent(id)}/poc/file?path=${encodeURIComponent(path)}`, {
+    headers: await outgoingHeaders(),
+    cache: "no-store",
+  });
+}
+
+/**
+ * Save the editor's text over one file of the package. `baseDigest` is the
+ * digest the file was read with: the api answers 409 when the file changed
+ * since (the agent rewrote it).
+ */
+export async function apiPutPocFile(
+  id: string,
+  path: string,
+  content: string,
+  baseDigest: string,
+): Promise<Response> {
+  const base = getWizardApiUrl() ?? DEFAULT_API_URL;
+  return fetch(`${base}/sessions/${encodeURIComponent(id)}/poc/file?path=${encodeURIComponent(path)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...(await outgoingHeaders()) },
+    body: JSON.stringify({ content, base_digest: baseDigest }),
+    cache: "no-store",
+  });
 }
 
 /** One file in the package's sample_input/, as wizard_api lists it (#95). */

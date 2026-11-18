@@ -50,8 +50,84 @@ NEXT_PUBLIC_DEV_AUTH=true
 | `PATCH` | `/sessions/{id}` | Update `step`, `gate_statuses`, `metadata` |
 | `POST` | `/sessions/{id}/messages` | Append chat messages (Sprint 1 stub) |
 | `POST` | `/sessions/{id}/versions` | New blueprint version |
+| `GET` | `/sessions/{id}/poc/file?path=` | One file of the package as UTF-8 text (up to 256 KB), with the digest a save names |
+| `PUT` | `/sessions/{id}/poc/file?path=` | Save `{content, base_digest}` over that file |
 
 Steps are **1–13** (matches V2 UI phase stepper). Gate keys: `gate_1` … `gate_4`.
+
+### One package file (the PoC tab's editor)
+
+`path` is relative to the session's `poc/`. Only the session's own regular files are
+read or written: no absolute path, no `..`, no backslash, no symlink on the way
+(`poc_service.package_file_path`, `regular_file`). A save needs an existing file with
+one of the suffixes in `poc_service.EDITABLE_SUFFIXES` (or `.env.example`); the AI
+marker, everything under `sample_input/` and `output/`, files in a hidden folder or
+`__pycache__`, and the package's test page (`app.py` at the root and everything under
+`ui/`, the scaffolder's templates) are read-only (`file_read_only`, 403), other types
+`file_type_not_editable` (422). The package's code (every `.py` file and
+`requirements.txt`) and `config.yaml`, which names the model endpoints a run calls
+(`poc_service.is_package_code`), are saved only when the test runs use
+a runner key of their own (`WIZARD_POC_RUNNER_SECRET` names a Secret other than the
+shared `gaik-demo-api-keys`, `sandbox_runner.runs_use_shared_key`): user-written code
+runs only with a separate runner key. With the shared key those files are read-only
+with `read_only_reason` `code_edit_needs_own_runner_key` and a save answers 403 with that
+code; the prompts, the schema's JSON files, `.env.example` and the package's other
+files stay editable. `.env` and every `.env*` name except `.env.example` is
+refused for reading and writing with 422 `secrets_not_stored`: the server keeps no keys
+for a user, the web app adds `poc/.env` to the downloaded package in the browser. For
+the same reason a save of `.env.example` that gives a credential a value answers 422
+`key_value_not_stored` with the `variables` it names (rule below). A save whose
+`base_digest` is not the file's answers 409 `file_changed`, and one sent while the
+wizard is replying 409 `wizard_responding`.
+
+A save and the start of a chat turn exclude each other (`agent_service.editor_save`, a
+lock per session): the save checks for a running turn and records the edit under the
+lock, and a turn registered meanwhile waits for it before it reads the edits it tells
+the agent of, so the agent never writes over an edit it has not heard of. A turn that
+waits more than 30 seconds answers 409 `file_being_saved`.
+
+A saved edit is a package change like one of the agent's. The package digest
+(`package_digest` in `GET /poc/files`) covers every file of the package but its README
+files, so an edit to any other file (code, settings, prompts, `.env.example`, a data
+file such as a `labels.json` the run reads) makes the earlier run a run of another
+package, closes `/poc/deployable` until a new run has passed, and where Gate 3 was
+approved it reopens that gate. An edit to a `README.md` (outside `prompts/`) does
+neither: no run reads it, while the prompts are Markdown too and a run reads them.
+
+The digest (`poc_service._version_files`, `_in_version`; scheme 3) covers every file of
+`poc/` but README files, the test page's `ui/` folder (the page runs where the package
+is taken; no sandbox run reads it), the AI marker, the wizard's own records,
+environment files with keys, the editor's temporary files, compiled Python,
+`sample_input/`, `output/`, hidden folders and `__pycache__`. It is the preflight's version too, so the PoC tab
+checks the package again after any such change. Scheme 2 covered Python files,
+`schemas/` and `prompts/` only; a session approved under it is re-based on the package
+as it is, and a run recorded under it is asked for again before Gate 3 or the
+download. The editor says by a file's name whether saving it changes the digest
+(`counts_for_package_digest`, held to the digest by a test). Before a save the approved
+content is compared once, so that an approval recorded under an older digest scheme is
+re-based on the package as it was before the edit, not after it.
+
+`.env.example` lists the variables a package needs, without values. A save is refused
+when a credential has a value there, also on a commented-out line: a variable whose
+name has a part (between underscores) ending in `KEY`, `SECRET`, `TOKEN` or `PASSWORD`
+(`AZURE_API_KEY`, `HF_TOKEN`, `OPENAI_APIKEY`; not `MAX_TOKENS`), or
+`GOOGLE_SERVICE_ACCOUNT_JSON`. Empty, `<…>`, a value starting with `your`
+(`your-key-here`) and `xxxx`-style values are placeholders and stay allowed, and other
+variables keep their example values (`poc_service.env_example_key_values`; the web app
+applies the same rule before it sends the text, `lib/env-file.ts`).
+
+Environment files that would hold keys (`.env` in any spelling but `.env.example`) are
+left out of the package's listing and of both zips (`poc_service.package_files`), and
+so never reach the sandbox either. The session export still carries every file held. Each save is recorded in the session's metadata
+(`user_edits`, server-owned) and the agent is told once, with the next chat message.
+
+`GET /sessions/{id}/poc/deployable` hands the package over only when the run recorded as
+successful tested it as it is now: the digest kept with that run against the package's
+digest, the comparison Gate 3 makes. After a change to a file in the digest it answers
+409 `package_changed_since_run` until a new run has succeeded. Once Gate 3 is approved
+the approval holds the package instead (a change reopens the gate and takes the run
+away), so a run recorded under an older digest scheme does not lock an approved
+session's download.
 
 ### Errors
 
@@ -166,6 +242,10 @@ every chat message is a billed model call. Limits on them:
 | `WIZARD_MAX_CHAT_TURNS_PER_MINUTE` | `0` (off) | chat messages one user may send in a sliding minute |
 | `WIZARD_MAX_CHAT_MESSAGE_CHARS` | `20000` | characters in one chat message |
 | `WIZARD_AGENT_MAX_TURNS` | `100` | model calls the agent may make for one message |
+| `WIZARD_MAX_METERED_CALLS_PER_TURN` | `10` | metered tool calls (below) the agent may make for one message |
+| `WIZARD_MAX_METERED_CALLS_PER_USER_PER_HOUR` | `60` (`0` turns it off) | metered tool calls one user's agents may make in a sliding hour, across all their sessions |
+| `WIZARD_AGENT_MAX_BUDGET_USD` | off (unset or `0`) | estimated USD one agent may spend from its start or resume (below) |
+| `WIZARD_AGENT_FALLBACK_MODEL` | off (unset) | the model the agent switches to when its own fails or is unavailable |
 | `WIZARD_POC_MODEL_TIMEOUT_SECONDS` | `120` | seconds a PoC waits for one model call in its extraction and judge stages, unless the package names its own limit |
 
 A user is the session's owner (the user named in `X-Wizard-User-Id`).
@@ -184,9 +264,78 @@ A user is the session's owner (the user named in `X-Wizard-User-Id`).
   before an agent is woken, and only accepted turns are counted (a `409` while
   the agent is still replying does not use one up).
 
-The counts live in the API process, as the agents do; with more than one API
-replica each counts its own. The sandbox's run limits (`WIZARD_MAX_ACTIVE_RUNS`,
+**Metered tool calls.** `WIZARD_AGENT_MAX_TURNS` counts the agent's own model
+calls, not the ones its tools make. The tool guard (`services/agent_tool_guard.py`)
+counts every call that reaches a model or the web another way: a run of a wizard
+script that calls a model itself (`generate_schema.py`, through gaik's
+`SchemaGenerator`; no other script the agent may run does), `WebSearch`,
+`WebFetch`, and the tools of any MCP server other than the wizard's own
+`mcp__wizard__*`. The web tools and outside MCP servers are refused today; they
+are counted by name, so they fall under both limits the moment they are allowed.
+Only calls the guard lets run are counted, per message (with its quiet "Please
+continue." nudges) and per user in a sliding hour. Over a limit the call is
+refused with a message the agent passes on in plain words (it carries on without
+the tool, or asks the user to wait or to send another message), a warning is
+logged and `wizard.agent.tool_calls` counts it with reason `turn_limit` or
+`user_limit`. One run of `generate_schema.py` is one metered call: the model
+calls inside it (two for a flat schema, one more for each kind of repeated
+record in a nested one, each tried at most four times) are bounded by gaik's own
+code, which has no setting for them.
+
+**Cost limit.** `WIZARD_AGENT_MAX_BUDGET_USD` is the agent SDK's `max_budget_usd`.
+Its CLI counts the cost for the whole agent process, across messages, from its
+start or its resume, not for one message: the wizard keeps one agent per session
+for many messages, and the CLI has no way to start the count again per message.
+The cost is the CLI's estimate from its own price table, not what the provider
+bills (Foundry prices need not match), and it is checked between steps, so the
+step that crosses the limit is still paid. When the agent reaches it, the CLI
+stops the message; the chat says so in the session's language ("stopped because it
+reached its cost limit … send a message and it goes on"), with no "Please
+continue." after it. The agent is then ended: the next message resumes it from
+its transcript with its context, and the count starts from zero there. A warning
+is logged and `wizard.agent.budget_stops` counts it. It is off by default:
+`WIZARD_AGENT_MAX_TURNS` and the metered-call limits already bound one message,
+and a default would stop ordinary long sessions at whatever point their spend
+reached it. Set it as a ceiling for a runaway agent, a few times what a whole
+session costs (the `gaik.cost.usd` of the `wizard.turn` spans shows that).
+
+**Fallback model.** With `WIZARD_AGENT_FALLBACK_MODEL` set to a model other than
+the agent's own (see Model below), the SDK's `fallback_model` lets the CLI
+switch to it when the agent's model is not found, not permitted, overloaded or
+failing. The CLI reports the switch, and it is logged at `INFO` with both models
+and the trigger. The deployment must offer that model (on Foundry, a deployment
+of that name).
+
+Every tool call the guard decides is one line on the logger
+`wizard_api.services.agent_tool_guard`, for example
+`tool call tool=Bash kind=model_script script=generate_schema.py decision=allowed reason=ok`:
+the tool's name, its kind, the wizard script it runs, the decision and a reason
+code, never the command, a path, an input, a URL or who the user is. Allowed
+calls and refusals by the rules are `INFO`, refusals at a limit `WARNING`, a call
+the guard could not decide `ERROR`. The pod prints them at `WIZARD_LOG_LEVEL`
+(below).
+
+The counts, metered calls included, live in the API process, as the agents do:
+the API runs as one replica, and with more than one each would count its own. A
+restart of the API starts them again from zero, so the hourly window of metered
+calls and the chat turn minute begin anew with it.
+The sandbox's run limits (`WIZARD_MAX_ACTIVE_RUNS`,
 `WIZARD_MAX_ACTIVE_RUNS_PER_USER`, `429 sandbox_busy`) follow the same pattern.
+
+### Stopping a reply
+
+`POST /sessions/{id}/chat/stop` stops the reply that is being written for a
+session of the caller. The agent is interrupted (`ClaudeSDKClient.interrupt()`),
+the turn's stream ends with `{"stopped": true, "tool": <kind or null>}`, and
+what was written so far is stored as the reply with `stopped: true` and a
+short note at the end of its text (`stoppedNote`, "(Pysäytetty)"). It answers
+`202 {"stopping": true}`, or `409 no_reply_running` when no reply is being
+written. A stopped turn is counted as `stopped` in `wizard.turns`, not as
+failed, and is not nudged to continue. The agent keeps its place and takes the
+next message, which tells it in a server line that its previous reply was
+stopped, and whether a tool call was running. An agent that does not take the
+interrupt within 10 seconds, or whose turn has not ended 20 seconds after it,
+is ended instead; the next message starts it again.
 
 ## Telemetry for the WP5 stack
 
@@ -200,13 +349,27 @@ nothing is sent:
   progress and the oldest one's age, sandbox runs active and their limit, refusals by
   error code, ownership denials, sessions created (by owner id), deletions by reason and
   outcome, turns by outcome and their duration, agent failures by kind (rate limit,
-  overload, server error, timeout), gate changes, the components of solutions at Gate 2,
+  overload, server error, timeout), agent tool calls by kind, decision and reason (metered
+  calls refused at a limit among them), gate changes, the components of solutions at Gate 2,
   sandbox runs by phase, the sessions volume's use and size, the database size, the api
   container's memory and its limit, sessions by state (total, active, overdue for
   removal), session rows and folders without each other, and whether sandbox runs still
   use the shared model key.
 - **Log records** at `WIZARD_OTEL_LOG_LEVEL` (`WARNING` unless set) and above, because
   a shared project gives no way to collect the pod's own output.
+
+### The pod's own log
+
+The API's loggers (`wizard_api.*`) print to stderr at `WIZARD_LOG_LEVEL` (`INFO`
+unless set; `DEBUG`, `INFO`, `WARNING` or `ERROR`), each line as
+`<time> <LEVEL> <logger>: <message>`. Uvicorn configures only its own loggers, so
+without this the API's `INFO` lines, such as each tool call the agent's guard
+decides, were dropped. The level is set when the app is imported
+(`telemetry.configure_logging`). No handler is added when one that prints is
+already on the root (a `basicConfig`, a uvicorn `--log-config`), so no line is
+printed twice. The collector's handler keeps its own level: an `INFO` line
+reaches the collector only with `WIZARD_OTEL_LOG_LEVEL=INFO`, which now works for
+the API's lines even where the pod prints warnings only.
 
 No metric or log label carries an e-mail address or what anyone wrote. Checks that read
 the database or walk the sessions volume run at most every `WIZARD_OPS_CHECK_SECONDS`

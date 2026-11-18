@@ -175,6 +175,75 @@ def test_the_skills_own_commands_are_allowed(guard) -> None:
         assert guard.check("Bash", {"command": command}) is None, command
 
 
+def test_the_ai_act_screening_scripts_are_allowed(guard) -> None:
+    """SKILL.md Phase 12 has the agent check and render the screening it wrote."""
+    s = guard.session
+    check = "python ai_act_screening/scripts/check_screening.py"
+    render = "python3 ai_act_screening/scripts/render_brief.py"
+    for command in (
+        f"{check} --pack {s}",
+        f"{check} --pack {s} --status",
+        f"{check} --pack {s} --hash",
+        f"{check} --pack {s} --transcript {s}/conversation.md",
+        f"{check} --pack {s} --screening {s}/ai_act_screening.json",
+        f"{render} --pack {s}",
+        f"{render} --pack {s} --outdated",
+    ):
+        assert guard.check("Bash", {"command": command}) is None, command
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # a path outside the session
+        "python ai_act_screening/scripts/check_screening.py --pack {other}",
+        "python ai_act_screening/scripts/check_screening.py --pack {session} --transcript /etc/x",
+        "python ai_act_screening/scripts/render_brief.py --pack /etc",
+        # an option the script does not have, an abbreviation, a value on a flag
+        "python ai_act_screening/scripts/render_brief.py --pack {session} --output {session}/x.md",
+        "python ai_act_screening/scripts/check_screening.py --pack {session} --stat",
+        "python ai_act_screening/scripts/check_screening.py --pack {session} --status=yes",
+        # nothing may be chained on
+        "python ai_act_screening/scripts/check_screening.py --pack {session} --status; env",
+        "python ai_act_screening/scripts/render_brief.py --pack {session} > /tmp/x",
+    ],
+)
+def test_the_screening_scripts_keep_to_the_session_and_their_own_options(guard, command) -> None:
+    command = command.format(session=guard.session, other=guard.other)
+
+    assert guard.check("Bash", {"command": command})
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # a screening script's name, from the folder of the wizard's own scripts
+        "python scripts/check_screening.py --pack {session}",
+        "python scripts/render_brief.py --pack {session}",
+        # the screening folder is not another place for the wizard's scripts
+        "python ai_act_screening/scripts/validate_blueprint.py --blueprint {session}/b.json",
+        # a file of that name in the session, or beside the references
+        "python {session}/render_brief.py --pack {session}",
+        "python ai_act_screening/references/render_brief.py --pack {session}",
+        "python ai_act_screening/scripts/../../scripts/render_brief.py --pack {session}",
+    ],
+)
+def test_a_script_is_run_only_from_its_own_folder(guard, command) -> None:
+    command = command.format(session=guard.session)
+
+    assert guard.check("Bash", {"command": command})
+
+
+def test_the_screening_scripts_are_not_metered(guard) -> None:
+    """They call no model and no network, so they fall under no metered limit."""
+    command = f"python ai_act_screening/scripts/render_brief.py --pack {guard.session}"
+
+    assert agent_tool_guard.call_kind("Bash", {"command": command}) == (
+        "command",
+        "render_brief.py",
+    )
+
+
 def test_model_ids_endpoints_and_continued_lines_are_allowed(guard) -> None:
     s = guard.session
     command = (
@@ -236,7 +305,8 @@ def test_the_agent_is_started_with_the_hook(tmp_path) -> None:
 
     if not agent_service._SDK_AVAILABLE:
         pytest.skip("claude_agent_sdk is not installed")
-    options = agent_service._build_options(tmp_path, tmp_path / "out")
+    guard = agent_tool_guard.ToolGuard(tmp_path, tmp_path / "out")
+    options = agent_service._build_options(tmp_path, tmp_path / "out", guard=guard)
 
     [matcher] = options.hooks["PreToolUse"]
     assert matcher.matcher is None  # every tool, not only Bash

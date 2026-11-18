@@ -119,7 +119,8 @@ function StandingText({ row, labels }: { row: SessionRow; labels: SessionListLab
     row.standing === "done"
       ? [labels.done, "text-success-text"]
       : row.standing === "waiting"
-        ? [labels.waiting, "text-brand-text"]
+        ? // Not the brand's blue: in a row that is a link, blue words read as a link of their own.
+          [labels.waiting, "text-text-secondary"]
         : [labels.rejected, "text-danger-text"];
   return (
     <span data-testid="session-standing" title={text} className={`min-w-0 truncate font-medium ${tone}`}>

@@ -8,7 +8,9 @@ its quota.
 |---|---|
 | `kustomization.yaml` | The base, plus Rahti's images, Routes and sign-in |
 | `buildconfigs.yaml` | Builds the MLflow and sink images on Rahti from this repository |
-| `mlflow-auth.yaml`, `mlflow-auth-nginx.conf` | Basic auth in front of MLflow, which has no sign-in of its own |
+| `mlflow-signin.yaml` | Sign-in in front of MLflow (oauth2-proxy, the GAIK Keycloak); MLflow has none of its own |
+| `mlflow-auth.yaml`, `mlflow-auth-nginx.conf` | Between the sign-in and MLflow: keeps deleting closed |
+| `patch-grafana-oidc.yaml` | Grafana signs in at the GAIK Keycloak; its groups give the organisations and roles |
 | `routes.yaml` | `https://grafana-gaik-aiops.2.rahtiapp.fi` and `https://mlflow-gaik-aiops.2.rahtiapp.fi`, the only place the host names are written |
 | `patch-rahti-seccomp.yaml` | Drops the base's `RuntimeDefault` seccomp request; Rahti's SCC gives every pod its own profile anyway |
 | `patch-rahti-cpu-requests.yaml` | Raises CPU requests to Rahti's limit range: at least 50m, limit at most five times the request |
@@ -49,20 +51,43 @@ builds take the `develop` branch (`spec.source.git.ref`). After `oc apply`, the 
 
 ## Signing in
 
-Read passwords in your own terminal: `oc extract` prints them there. Hand them to reviewers outside
-git and outside public channels.
+People sign in with their GAIK account at the Keycloak in the `gaik` project
+(`implementation_layer/deploy/keycloak/README.md`). Two groups there decide what they get:
 
-- **Grafana:** user `admin`, password from `oc extract secret/aiops-grafana --keys=admin-password --to=-`.
-  Give reviewers their own users (Administration, Users and access, Users, New user) with the Viewer
-  role in the main organisation, for the monitoring dashboards. Do not add them to the *Security*
-  organisation: by design only the admin joins it, because any member can run their own queries on
-  the audit store through its datasource. Show the audit trail as admin.
-- **MLflow:** one shared sign-in, from `oc extract secret/aiops-mlflow-auth --keys=username,password --to=-`.
-  It can read and change, but not delete: the proxy answers 403 to the `DELETE` method and to MLflow's
-  `…/delete` and `…/delete-<what>` endpoints. MLflow's own pages need other write requests, so it cannot
-  be made read-only. Delete as a project member instead, through
-  `oc port-forward svc/mlflow 5000:5000`. To add a user, add a line made with `htpasswd -nB -C 4 <user>`
-  to the Secret's `htpasswd` key and restart `deployment/mlflow-auth`. OIDC (WP4) replaces this.
+| Keycloak group | Grafana | MLflow |
+|---|---|---|
+| `aiops-admin` | Main Org.: Admin, *Security*: Viewer (audit trail) | read and change, not delete |
+| `aiops-viewer` | Main Org.: Viewer | read and change, not delete |
+| neither | sign-in refused | 403 |
+
+An approver adds people to the groups in the realm console (`/admin/gaik/console/`) or with
+`deploy.sh add-users` (`someone@example.org,aiops-viewer`). Only `aiops-admin` joins the *Security*
+organisation, because any member can run their own queries on the audit store through its datasource.
+
+Register the two clients once, from the repository root, logged in to both projects:
+
+```bash
+SECRET_NAMESPACE=gaik-aiops PROJECT=gaik implementation_layer/deploy/keycloak/deploy.sh \
+  add-client aiops-grafana https://grafana-gaik-aiops.2.rahtiapp.fi /login/generic_oauth
+SECRET_NAMESPACE=gaik-aiops PROJECT=gaik implementation_layer/deploy/keycloak/deploy.sh \
+  add-client aiops-mlflow https://mlflow-gaik-aiops.2.rahtiapp.fi
+```
+
+They make the Secrets `aiops-grafana-signin` and `aiops-mlflow-signin` here; apply the overlay after.
+On a new stack, restart Grafana once after `grafana-setup` has created the *Security* organisation
+(`oc rollout restart deployment/grafana`): Grafana looks the organisation up by name when it starts,
+and until then `aiops-admin` gets no *Security* membership.
+
+- **No local Grafana users for people.** Grafana does not link a local user to a GAIK sign-in with the
+  same address (insecure email lookup is off); that person's sign-in would fail. Add people in Keycloak.
+- **Grafana's local admin** (`admin`, `oc extract secret/aiops-grafana --keys=admin-password --to=-`)
+  stays: `grafana-setup` signs in with it, and it is the way in when Keycloak is down.
+- **MLflow** cannot delete through the Route: `mlflow-auth` answers 403 to the `DELETE` method and to
+  MLflow's `…/delete` and `…/delete-<what>` endpoints. MLflow's own pages need other write requests, so
+  it cannot be made read-only. Delete as a project member instead, through
+  `oc port-forward svc/mlflow 5000:5000`.
+- The Secret `aiops-mlflow-auth` of the earlier shared sign-in is no longer used; delete it after the
+  switch (`oc delete secret aiops-mlflow-auth`).
 
 ## Test event
 
@@ -117,8 +142,9 @@ gives every user a new pseudonym and cuts the link to earlier events; change it 
 `aiops-grafana` sets the admin password only on Grafana's first start, but `grafana-setup` keeps
 signing in with it. To change it, change it in Grafana (your profile, *Change password*), then put the
 same value in the Secret and run `oc rollout restart deployment/grafana-setup`; otherwise
-`grafana-setup` fails and stops maintaining the *Security* organisation. `aiops-mlflow-auth` can
-change at any time (password and its hash together), followed by a restart of `deployment/mlflow-auth`.
+`grafana-setup` fails and stops maintaining the *Security* organisation. The sign-in Secrets
+`aiops-grafana-signin` and `aiops-mlflow-signin` follow their Keycloak clients: after regenerating a
+client's secret in Keycloak, put it in the Secret and restart the Deployment that reads it.
 
 ## Quota
 

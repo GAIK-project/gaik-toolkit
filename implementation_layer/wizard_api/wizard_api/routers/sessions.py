@@ -23,7 +23,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from starlette.background import BackgroundTask
@@ -304,7 +304,7 @@ def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
     # The record of which inputs the user added is the api's own, not a file of the package.
     files = [
         f
-        for f in poc_service.regular_files(poc)
+        for f in poc_service.package_files(poc)
         if os.path.basename(f) != poc_service.UPLOADED_NAMES_FILE
     ]
     # `generated` says files exist; `ready` says they add up to a package worth
@@ -329,6 +329,197 @@ def list_poc_files(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict
         # a result whose digest differs from this one is of an older package.
         "package_digest": _approved_package_digest(poc),
     }
+
+
+def _max_file_chars() -> int:
+    from wizard_api.services import poc_service
+
+    return poc_service.MAX_PACKAGE_FILE_BYTES
+
+
+class PocFileWrite(BaseModel):
+    # In characters, which are never more than the bytes the service counts
+    # (413 ``file_too_large``): a body far over the limit is refused as it is
+    # validated, not carried further.
+    content: str = Field(max_length=_max_file_chars())
+    # The digest the editor was given with the text it changed.
+    base_digest: str = Field(min_length=1, max_length=128)
+
+
+def _package_file_error(exc: Any) -> HTTPException:
+    """A refused read or save of a package file (PackageFileError), in the one error shape."""
+    return api_error(exc.status, exc.code, str(exc), **exc.extra)
+
+
+def _session_poc_dir(db: Session, session_id: uuid.UUID) -> tuple[Any, str]:
+    """The session and its package folder, or 404 for either that is not there."""
+    session = session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    poc = _poc_dir(session.output_dir)
+    if not poc or not os.path.isdir(poc) or os.path.islink(os.path.join(session.output_dir, "poc")):
+        raise HTTPException(status_code=404, detail="no PoC generated yet")
+    return session, poc
+
+
+_POC_FILE_PATH = Query(min_length=1, max_length=512)
+
+
+@router.get("/{session_id}/poc/file")
+def read_poc_file(
+    session_id: uuid.UUID,
+    path: str = _POC_FILE_PATH,
+    db: Session = Depends(get_db),
+) -> Response:
+    """One file of the package as text, for the PoC tab's editor.
+
+    ``path`` is relative to ``poc/``. Only the session's own regular files
+    (no ``..``, no absolute path, no symlink on the way), only UTF-8 text up to
+    ``poc_service.MAX_PACKAGE_FILE_BYTES``, and never an environment file that
+    would hold keys. The answer says whether the editor may save the file and
+    whether a change to it changes the package a test run is tied to.
+
+    The AI marker is shown as the deployable package will carry it: the
+    download writes it in place of any file of that name.
+    """
+    from wizard_api.services import ai_marking, poc_service
+
+    session, poc = _session_poc_dir(db, session_id)
+    try:
+        normalised = poc_service.package_file_path(path)
+        if normalised == ai_marking.MARKER_FILE:
+            data = ai_marking.marker_json(session, "poc-package-deployable").encode()
+            answer = {
+                **poc_service.package_file_answer(normalised, data),
+                "content": data.decode(),
+            }
+        else:
+            answer = poc_service.read_package_file(poc, normalised)
+    except poc_service.PackageFileError as exc:
+        raise _package_file_error(exc) from exc
+    # The text of a file is not for a cache between the api and the browser.
+    return JSONResponse(answer, headers={"Cache-Control": "no-store"})
+
+
+@router.put("/{session_id}/poc/file")
+def write_poc_file(
+    session_id: uuid.UUID,
+    payload: PocFileWrite,
+    path: str = _POC_FILE_PATH,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Save the editor's text over one existing file of the package.
+
+    The same path rules as the read, and further: only the kinds of file a
+    person edits by hand (``poc_service.EDITABLE_SUFFIXES`` and
+    ``.env.example``), not the AI marker, the test material or a run's output,
+    no code while the test runs use the shared runner key (403
+    ``code_edit_needs_own_runner_key``, ``poc_service.package_file_read_only``),
+    and 409 ``file_changed`` when the file is no longer what the editor read.
+    Not while the wizard is replying: it may be rewriting the same files, and
+    it is told of an edit only with the next message. A save and the start of
+    a chat turn exclude each other (``agent_service.editor_save``): a message
+    sent while a save is going on waits for it, so the agent is told of the
+    edit before it can write over it.
+
+    A saved edit is a change to the package like one of the agent's. The
+    package's digest follows every file but a README
+    (``_approved_package_digest``), so the PoC tab checks the new package and
+    asks for a new test run; where Gate 3 was approved on the old one, that
+    gate reopens exactly as after a chat turn
+    (``_reopen_if_approved_content_changed``). The edit is recorded in the
+    session's metadata and the agent is told with the next message
+    (``_user_edits_note``). ``.env.example`` is refused with a key's value in
+    it (``poc_service.env_example_key_values``): keys are not kept here.
+    """
+    session, poc = _session_poc_dir(db, session_id)
+    with agent_service.editor_save(str(session_id)) as free:
+        if not free:
+            raise api_error(
+                409,
+                "wizard_responding",
+                "The wizard is still responding and may be changing the package; "
+                "save again when it has replied.",
+            )
+        return _save_package_file(db, session, poc, path, payload)
+
+
+def _save_package_file(db: Session, session, poc: str, path: str, payload: PocFileWrite) -> dict:
+    """The save of ``write_poc_file``, while no chat turn can start."""
+    from wizard_api.services import poc_service
+
+    # Before the file changes, the comparison a chat turn ends with. An
+    # approval recorded under an older digest scheme is re-based there on the
+    # package as it is (``package_scheme``): done after the save, that would
+    # take this edit into the approval instead of seeing it.
+    try:
+        _reopen_if_approved_content_changed(db, session)
+    except Exception:  # noqa: BLE001 - compared again after the save and after every turn
+        logger.warning("approved content could not be compared before an edit", exc_info=True)
+        db.rollback()
+    try:
+        saved = poc_service.write_package_file(poc, path, payload.content, payload.base_digest)
+    except poc_service.PackageFileError as exc:
+        raise _package_file_error(exc) from exc
+    session = session_service.record_user_edit(db, session, f"poc/{saved['path']}")
+    reopened = None
+    try:
+        if _reopen_if_approved_content_changed(db, session):
+            noted = session.session_metadata.get(session_service.REOPENED_KEY) or {}
+            reopened = noted.get("gate")
+    except Exception:  # noqa: BLE001 - the file is saved; the approval must not outlive it
+        logger.error("approved content could not be compared after an edit", exc_info=True)
+        db.rollback()
+        reopened = _reopen_gate_3_after_unchecked_edit(db, session, saved)
+    # The session's own id, not the request's; the audit record in the web app
+    # names the path.
+    logger.info("session %s: the user saved a package file in the editor", session.id)
+    return {
+        **saved,
+        "package_digest": _approved_package_digest(poc),
+        "gate_reopened": reopened,
+    }
+
+
+def _reopen_gate_3_after_unchecked_edit(db: Session, session, saved: dict) -> str | None:
+    """Take Gate 3's approval back when an edit could not be compared with it.
+
+    The file is saved and the comparison that would have reopened the gate
+    failed. Left there, the approval would cover an edit nobody tested and the
+    deployable package would be handed over with it. So for a file the digest
+    covers the gate is reopened without the comparison: asking for one test
+    run too many is the safe side. Should this fail as well, the download
+    still refuses (``_approved_package_changed``).
+    """
+    if not saved.get("affects_package"):
+        return None
+    try:
+        db.refresh(session)
+        if session.gate_statuses.get("gate_3") != "approved":
+            return None
+        session_service.reopen_gate(db, session, "gate_3", by="change")
+        logger.info("session %s: gate_3 reopened after an edit that was not compared", session.id)
+        return "gate_3"
+    except Exception:  # noqa: BLE001 - logged; the download's own check holds
+        logger.error("gate_3 could not be reopened after an edit", exc_info=True)
+        db.rollback()
+        return None
+
+
+def _approved_package_changed(session, poc: str) -> bool:
+    """Whether the package differs from the one Gate 3's approval was recorded on.
+
+    Read only, for the download: the comparison that reopens the gate runs
+    after every chat turn and every save in the editor, and this is what
+    stands when one of those failed. An approval of an older digest scheme, or
+    none on record, is not held against the package.
+    """
+    approved = (session.session_metadata or {}).get(session_service.APPROVED_CONTENT_KEY)
+    if not isinstance(approved, dict):
+        return False
+    if approved.get("package_scheme") != _PACKAGE_DIGEST_SCHEME:
+        return False
+    return approved.get("package") != _approved_package_digest(poc)
 
 
 @router.get("/{session_id}/poc")
@@ -390,7 +581,9 @@ def download_poc(
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         # Real files only: a symlink planted in the session would otherwise
         # pull a file of its choosing into the archive.
-        for rel in poc_service.regular_files(poc):
+        # ...and no environment file with keys (``package_files``): the
+        # sandbox gets the server's own model key, never a file from here.
+        for rel in poc_service.package_files(poc):
             # A case run reads only its own input, and starts from no output.
             if case_files is not None and rel.split(os.sep)[0] in (
                 poc_service.SAMPLE_INPUT_DIR,
@@ -716,10 +909,11 @@ def _gate_span(session, payload: SessionUpdate) -> Iterator[None]:
         ops_metrics.record_gate_changes(session, changes)
 
 
-#: What the package digest covers. 2: every Python file and every file in
-#: ``schemas/`` (``poc_service._version_files``); before it, a fixed list. A
+#: What the package digest covers. 3: every file of the package but its
+#: README files (``poc_service._in_version``); 2: every Python file and every
+#: file in ``schemas/``, and the prompts; 1: a fixed list and the prompts. A
 #: package approved under another scheme is not comparable with today's digest.
-_PACKAGE_DIGEST_SCHEME = 2
+_PACKAGE_DIGEST_SCHEME = 3
 
 
 def _approved_content(session) -> dict[str, str | int] | None:
@@ -734,23 +928,16 @@ def _approved_content(session) -> dict[str, str | int] | None:
 
 
 def _approved_package_digest(poc: str) -> str:
-    """The package as approved: what a preflight reads, and the prompts the run reads.
+    """The package as approved and tested: every file of it but its README files.
 
-    ``package_version`` covers the code, the settings and the schema. The
-    extraction instructions under ``prompts/`` are read at run time and decide
-    the result as much as the code does, so a change to them after Gate 3 is a
-    change to what was accepted too.
+    ``package_version`` covers the code, the settings, the schema, the
+    extraction instructions under ``prompts/`` and the data files the run
+    reads, so a change to any of them after a test run or Gate 3 is a change
+    to what was tested and accepted.
     """
     from wizard_api.services import poc_service
 
-    digest = hashlib.sha256(poc_service.package_version(poc).encode())
-    prompts = os.path.join(poc, "prompts")
-    if os.path.isdir(prompts) and not os.path.islink(prompts):
-        for name in poc_service.regular_files(prompts):
-            digest.update(name.encode())
-            with open(os.path.join(prompts, name), "rb") as fh:
-                digest.update(fh.read())
-    return digest.hexdigest()[:16]
+    return hashlib.sha256(poc_service.package_version(poc).encode()).hexdigest()[:16]
 
 
 def _gate_reopened_by_turn(db: Session, session) -> str | None:
@@ -1100,6 +1287,16 @@ async def chat(
     turn = agent_service.begin_turn(str(session_id), payload.message)
 
     try:
+        # A save in the PoC tab's editor that began before the turn was
+        # registered is waited for, so its edit is recorded before this turn
+        # reads the edits it tells the agent of; a later one is refused while
+        # the turn runs (``write_poc_file``).
+        if not await agent_service.wait_for_editor_save(str(session_id)):
+            raise api_error(
+                409,
+                "file_being_saved",
+                "A file of the package is being saved; send your message again in a moment.",
+            )
         # The agent was started above, which takes a while: a gate reopened or
         # approved in the panel meanwhile is what this turn is told.
         await asyncio.to_thread(db.refresh, session)
@@ -1123,13 +1320,16 @@ async def chat(
         lang = (payload.locale or "fi").split("-")[0].lower()
         reopened_note = _reopened_gate_note(session, lang)
         gate1_note = await asyncio.to_thread(_gate1_missing_note, session)
+        edits_note, seen_edit = _user_edits_note(session)
         notes = [
             note
             for note in (
+                _stopped_reply_note(session),
                 reopened_note,
                 gate1_note,
                 run_note,
                 package_note,
+                edits_note,
                 view_note,
                 blueprint_note,
             )
@@ -1175,6 +1375,8 @@ async def chat(
             parts.append(notice_text)
             yield agent_service.sse({"delta": notice_text})
         replied = False
+        # The frame that says the user stopped this reply, once it has come.
+        stopped: dict | None = None
         async for frame in agent_service.stream_turn_for(agent, agent_message, parts):
             if (
                 agent.get("resumed") == "sdk"
@@ -1213,11 +1415,17 @@ async def chat(
                 parts.clear()
                 parts.append(notice_text)
                 yield agent_service.sse({"delta": notice_text})
+                if turn.stop_requested:
+                    # Stopped while the agent was being started again: the new
+                    # one is interrupted as soon as it has the message.
+                    agent["stop_requested"] = True
                 async for retry_frame in agent_service.stream_turn_for(agent, agent_message, parts):
+                    stopped = stopped or agent_service.frame_stopped(retry_frame)
                     yield retry_frame
                 break
             if '"delta"' in frame:
                 replied = True
+            stopped = stopped or agent_service.frame_stopped(frame)
             yield frame
         agent["resume_verified"] = True
         sdk_id = agent.get("sdk_session_id")
@@ -1238,6 +1446,18 @@ async def chat(
             reopened_text = agent_service.reopened_notice(lang, reopened)
             assistant_text = f"{assistant_text}\n\n{reopened_text}"
             yield agent_service.sse({"delta": f"\n\n{reopened_text}"})
+        mark = None
+        if stopped is not None:
+            # What was written so far is the reply, marked as stopped; with
+            # nothing written the note alone, so the user's message is kept.
+            note = agent_service.stopped_note(lang)
+            mark = {"note": note, "tool": stopped.get("tool")}
+            assistant_text = f"{assistant_text}\n\n{note}" if assistant_text else note
+            logger.info(
+                "session %s: reply stopped by the user (%s)",
+                session_id,
+                "during a tool call" if stopped.get("tool") else "while writing",
+            )
         if assistant_text:
             # Persist off the event loop (sync SQLAlchemy commit).
             await asyncio.to_thread(
@@ -1246,6 +1466,7 @@ async def chat(
                 turn_session,
                 user_message,
                 assistant_text,
+                stopped=mark,
             )
             if seen_run:
                 # Told once: the next message does not repeat the same run.
@@ -1254,6 +1475,14 @@ async def chat(
                     turn_db,
                     turn_session,
                     SessionUpdate(metadata={"agent_seen_run": seen_run}),
+                )
+            if seen_edit:
+                # Told once, like a run: an edit saved since is told next time.
+                await asyncio.to_thread(
+                    session_service.update_session,
+                    turn_db,
+                    turn_session,
+                    SessionUpdate(metadata={session_service.AGENT_SEEN_EDIT_KEY: seen_edit}),
                 )
         # The agent writes its artifacts to disk as the conversation moves;
         # pull them into the session so the workspace keeps up (#141).
@@ -1300,6 +1529,7 @@ async def chat(
                     turn_agents,
                     agent_service._model(),
                     _turn_failed,
+                    lambda frame: agent_service.frame_stopped(frame) is not None,
                 ):
                     # Each reader keeps its own connection alive (Turn.subscribe).
                     if not agent_service.is_heartbeat(frame):
@@ -1368,6 +1598,27 @@ async def end_agent(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dic
     if ended:
         logger.info("session %s: agent ended by the user", session_id)
     return {"ended": ended}
+
+
+@router.post("/{session_id}/chat/stop", status_code=202)
+async def stop_chat(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    """Stop the reply that is being written for this session.
+
+    The agent is interrupted and its turn ends: what it had written is stored
+    as the reply, marked as stopped, and the session takes the next message.
+    The answer comes when the stop has been passed on (202); the turn's own
+    stream says when it has ended (a ``stopped`` frame, then the stream closes
+    once the exchange is stored). 409 ``no_reply_running`` when no reply is
+    being written, so a caller can tell "nothing to stop" from "stopping".
+    """
+    session = session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    # Not held while the agent is being interrupted.
+    await asyncio.to_thread(db.commit)
+    if not await agent_service.stop_turn(str(session_id)):
+        raise api_error(409, "no_reply_running", "No reply is being written right now.")
+    return {"stopping": True}
 
 
 @router.get("/{session_id}/chat/stream")
@@ -1478,6 +1729,43 @@ def _latest_run_note(session) -> tuple[str | None, str | None]:
     except Exception:  # noqa: BLE001 - see the docstring
         logger.warning("latest run %s could not be read for the agent", run_id, exc_info=True)
         return None, None
+
+
+def _user_edits_note(session) -> tuple[str | None, str | None]:
+    """The line about package files the user saved in the editor, and the latest edit's time.
+
+    The agent wrote the package and goes on from the files it remembers: told
+    nothing, it would write its own version back over the user's change. Told
+    once, with the first message after the edit; the caller marks the time as
+    told when the turn is through. The names are the package's own, which the
+    agent may have chosen from a document's text, so they are quoted as data.
+    """
+    from wizard_api.services import run_context
+
+    edits = session_service.unseen_user_edits(session.session_metadata)
+    if not edits:
+        return None, None
+    files = ", ".join(f"{run_context.quoted(e['path'])} at {e['at'][:19]}Z" for e in edits[-10:])
+    return (
+        f"[The user edited {files} in the PoC tab editor after your last reply; what is on "
+        "disk is the user's version. Read a file again before you change it, and keep the "
+        "user's edits unless they ask for something else.]",
+        edits[-1]["at"],
+    )
+
+
+def _stopped_reply_note(session) -> str | None:
+    """A line for the agent when the user stopped its previous reply, else None.
+
+    Read from the stored conversation, so it holds across an agent restart, and
+    said with every message until a reply after the stopped one is stored.
+    """
+    messages = session.session_metadata.get("messages")
+    last = messages[-1] if isinstance(messages, list) and messages else None
+    if not isinstance(last, dict) or not last.get("stopped"):
+        return None
+    tool = last.get("stoppedDuring")
+    return agent_service.stopped_reply_line(tool if isinstance(tool, str) else None)
 
 
 def _gate1_missing_note(session) -> str | None:
@@ -2392,6 +2680,33 @@ def download_deployable_poc(session_id: uuid.UUID, db: Session = Depends(get_db)
     poc = _poc_dir(session.output_dir)
     if not poc or not os.path.isdir(poc):
         raise HTTPException(status_code=404, detail="no PoC generated yet")
+    # The run that passed must have tested the package as it is now, the way
+    # Gate 3 asks (``_successful_run_is_of_another_package``). The download was
+    # gated on a run having succeeded at all: after it the agent, or the user
+    # in the PoC tab's editor, could change run_poc.py and the changed package
+    # was still handed over as the tested one. Only a change to a README, which
+    # the digest leaves out, leaves the download open.
+    #
+    # Until Gate 3 is approved. From then on the approval is what holds the
+    # package: a change to it reopens the gate and takes the run away
+    # (``_reopen_if_approved_content_changed``, after every chat turn and every
+    # save in the editor), and a run recorded under an older digest scheme
+    # (the scheme is kept with the approval, not with the run) does not lock an
+    # approved session's download. The package is then compared with the
+    # approval's own record here too, read only: should that comparison have
+    # failed after an edit, the edit is still not handed over.
+    gate_3_approved = session.gate_statuses.get("gate_3") == "approved"
+    if (
+        _approved_package_changed(session, poc)
+        if gate_3_approved
+        else _successful_run_is_of_another_package(session)
+    ):
+        raise api_error(
+            409,
+            "package_changed_since_run",
+            "the package was changed after the test run that passed; "
+            "run the test again before taking the package",
+        )
     problems = poc_service.package_problems(poc)
     if problems:
         raise HTTPException(

@@ -95,7 +95,8 @@
         "document"
       ],
       "outputs": [
-        "structured_json"
+        "structured_json",
+        "parsed_text"
       ],
       "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_modules/documents_to_structured_data/README.md"
     },
@@ -222,7 +223,10 @@
         "structured_json",
         "text",
         "transcript",
-        "enhanced_transcript"
+        "enhanced_transcript",
+        "parsed_text",
+        "pdf",
+        "image"
       ],
       "outputs": [
         "validation_report",
@@ -235,7 +239,8 @@
       "name": "LLMJudgePanel",
       "inputs": [
         "structured_json",
-        "text"
+        "pdf",
+        "image"
       ],
       "outputs": [
         "validation_report",

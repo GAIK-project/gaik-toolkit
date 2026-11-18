@@ -349,9 +349,18 @@ export const BpmnModeler = forwardRef<
       modelerRef.current = m;
 
       const eventBus = m.get("eventBus") as EventBus;
+      // diagram-js stops an event at the first listener that returns anything
+      // but undefined, and a drag fires its prefixed event (create.cleanup,
+      // shape.move.cleanup) with the event drag.cleanup was stopped in. A
+      // listener here that returned setTimeout's id left every drag's preview
+      // on the canvas: a box after "Lisää tehtävä" that no delete took away.
+      // So these listeners only listen.
       const on = (event: string, cb: (e: unknown) => void) => {
-        eventBus.on(event, cb);
-        listeners.push([event, cb]);
+        const listen = (e: unknown) => {
+          cb(e);
+        };
+        eventBus.on(event, listen);
+        listeners.push([event, listen]);
       };
       on("selection.changed", () => {
         if (!importing.current) callbacks.current.onSelectionChange?.(selectionFromModeler(m));

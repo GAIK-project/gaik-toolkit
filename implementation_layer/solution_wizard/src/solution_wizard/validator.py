@@ -9,21 +9,22 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from .blueprint import ArtifactSource, AssumptionStatus, Blueprint
+from .blueprint import (
+    ArtifactSource,
+    AssumptionStatus,
+    Blueprint,
+    external_services,
+    sends_nothing,
+)
 from .registry import Registry, get_registry
 
 # Components whose job is to check an extracted result against its source (Rule 14).
 _VALIDATOR_COMPONENTS = {"LLMJudge", "LLMJudgePanel"}
 
-# Artifact types that can serve as grounding evidence for a hallucination check:
-# the source text the extracted values must be traceable back to (Rule 14).
-_GROUNDING_ARTIFACT_TYPES = {
-    "text",
-    "transcript",
-    "enhanced_transcript",
-    "parsed_text",
-    "document_collection",
-}
+# The record a judge checks (Rule 14). Every other input type the registry lets a
+# judge take is a source it checks against: a text for LLMJudge.detect_hallucinations,
+# the pages of a PDF or image for validate(source_pages=...).
+_JUDGED_TYPES = {"structured_json"}
 
 
 @dataclass
@@ -455,8 +456,15 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     # still reads true, and nothing downstream notices that the check can no
     # longer run. Catch that here instead of shipping a blueprint whose diagram
     # and documentation describe a check the pipeline cannot perform.
-    if blueprint.validation.get("hallucination_check"):
-        validating_steps = [s for s in steps if s.component in _VALIDATOR_COMPONENTS]
+    if steps and blueprint.validation.get("hallucination_check"):
+        judges = {}
+        for s in steps:
+            entry = s.component and (
+                registry.lookup_by_id(s.component) or registry.lookup_by_name(s.component)
+            )
+            if entry and entry.get("name") in _VALIDATOR_COMPONENTS:
+                judges[s.id] = entry
+        validating_steps = [s for s in steps if s.id in judges]
         if not validating_steps:
             warnings.append(
                 Issue(
@@ -468,19 +476,66 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
             )
         for step in validating_steps:
             input_types = {artifacts[a].type for a in step.inputs if a in artifacts}
-            if not (input_types & _GROUNDING_ARTIFACT_TYPES):
+            sources = set(judges[step.id].get("input_artifact_types", [])) - _JUDGED_TYPES
+            if not (input_types & sources):
                 errors.append(
                     Issue(
                         14,
                         f"Step '{step.id}' performs the declared hallucination check but "
                         f"receives no grounding evidence: its inputs are of type(s) "
-                        f"{sorted(input_types) or '[]'}, none of which is a source text "
-                        f"({', '.join(sorted(_GROUNDING_ARTIFACT_TYPES))}). Add the source "
-                        "artifact to this step's inputs, or set "
-                        "validation.hallucination_check to false.",
+                        f"{sorted(input_types) or '[]'}, none of which is a source "
+                        f"{judges[step.id]['name']} checks against "
+                        f"({', '.join(sorted(sources))}). Add the source artifact to this "
+                        "step's inputs, or set validation.hallucination_check to false.",
                         step_id=step.id,
                     )
                 )
 
+    # ------------------------------------------------------------------
+    # Rule 15: external services (technical_spec.external_services). The model
+    # has already refused a package or a variable name that is not plain; this
+    # rule checks what the user and the governance flags said about each one.
+    _check_external_services(blueprint, errors, warnings)
+
     ok = len(errors) == 0
     return ValidationResult(ok=ok, errors=errors, warnings=warnings)
+
+
+def _check_external_services(blueprint: Blueprint, errors: list, warnings: list) -> None:
+    try:
+        services = external_services(blueprint)
+    except ValueError as exc:
+        # The spec was changed after the blueprint was loaded.
+        errors.append(Issue(15, str(exc)))
+        return
+    handling = blueprint.governance.data_handling
+    for index, service in enumerate(services):
+        where = f"technical_spec.external_services[{index}] ({service.name})"
+        sends = not sends_nothing(service.data_sent)
+        if sends and handling.local_processing_required:
+            errors.append(
+                Issue(
+                    15,
+                    f"governance.data_handling.local_processing_required is true, but {where} "
+                    f"sends {service.data_sent!r} to a third party. Leave the service out, "
+                    "use one that runs locally (data_sent 'none'), or change the governance "
+                    "flag with the data owner.",
+                )
+            )
+        elif sends and not handling.external_model_api_allowed:
+            warnings.append(
+                Issue(
+                    15,
+                    f"governance.data_handling.external_model_api_allowed is false and {where} "
+                    f"sends {service.data_sent!r} to a third party. Confirm with the data "
+                    "owner that this may leave the organisation.",
+                )
+            )
+        if not service.user_can_provide:
+            warnings.append(
+                Issue(
+                    15,
+                    f"{where}: the user cannot provide it yet, so the PoC runs without it "
+                    f"({service.fallback}). Record it as an open item in assumptions.",
+                )
+            )
