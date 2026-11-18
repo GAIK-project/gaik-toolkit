@@ -33,6 +33,11 @@ FFPROBE_TIMEOUT_SECONDS = PROBE_TIMEOUT_SECONDS
 DECODE_TIMEOUT_SECONDS = 600
 
 
+# A chunk this small holds next to no audio: the encoder writes at a constant
+# bitrate, silence included.
+_NEAR_EMPTY_CHUNK_MB = 0.1
+
+
 def _clock(seconds: float) -> str:
     """``seconds`` as ``H:MM:SS``, for naming a stretch of a recording."""
     whole = int(seconds)
@@ -366,8 +371,9 @@ def split_into_chunks(
 
     Failed chunks are retried sequentially before giving up. A chunk that still
     fails stops the split and names its time range. A near-empty chunk before the
-    last one (0.1 MB or less) is skipped and logged, as before this check: a file
-    whose header overstates its length can produce one past the real end.
+    last one (0.1 MB or less) with no audio in any later chunk is skipped and
+    logged: a file whose header overstates its length produces such chunks past
+    its real end. A near-empty chunk with audio after it fails the split as well.
 
     Args:
         audio_file_path: Source audio (or video when *strip_video* is True).
@@ -473,7 +479,7 @@ def split_into_chunks(
                 return {"error": msg, "index": spec.index}
 
             chunk_size_mb = chunk_path.stat().st_size / (1024 * 1024)
-            if chunk_size_mb <= 0.1 and not spec.is_last:
+            if chunk_size_mb <= _NEAR_EMPTY_CHUNK_MB and not spec.is_last:
                 logger.warning(
                     "Chunk %d too small (%.1f MB), skipping",
                     spec.index + 1,
@@ -520,6 +526,7 @@ def split_into_chunks(
 
     successful = [r for r in results if "file" in r]
     failed = [r for r in results if "error" in r]
+    skipped = [r for r in results if r.get("skipped")]
 
     # ── Sequential retry for failed chunks ────────────────────────
     if failed:
@@ -535,9 +542,27 @@ def split_into_chunks(
             if "file" in retry:
                 logger.info("Chunk %d recovered on retry", spec.index + 1)
                 successful.append(retry)
+            elif retry.get("skipped"):
+                skipped.append(retry)
             else:
                 still_failed.append(retry)
         failed = still_failed
+
+    # A near-empty chunk is the end of a file whose header overstates its length
+    # only when no later chunk has audio; with audio after it, it is a gap.
+    last_with_audio = max(
+        (
+            r["metadata"]["index"]
+            for r in successful
+            if Path(r["file"]).stat().st_size / (1024 * 1024) > _NEAR_EMPTY_CHUNK_MB
+        ),
+        default=-1,
+    )
+    for skip in skipped:
+        if skip["index"] < last_with_audio:
+            failed.append(
+                {"error": "chunk nearly empty, with audio after it", "index": skip["index"]}
+            )
 
     successful.sort(key=lambda r: r["metadata"]["index"])
 

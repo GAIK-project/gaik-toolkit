@@ -119,7 +119,8 @@ after its retries stops the run too. A chunk the provider transcribes as empty t
 an error, so a stretch of speech the provider returns nothing for looks like silence;
 compare the transcript's timestamps with the recording where a gap matters. A chunk of
 0.1 MB or less before the last one, which a file whose header overstates its length can
-produce past the real end of the audio, is skipped and logged, as before.
+produce past the real end of the audio, is skipped and logged when no later chunk has
+audio; with audio after it, it is a missing stretch and stops the run like a failed chunk.
 
 ### TranscriptionConfig
 

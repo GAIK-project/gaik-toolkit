@@ -204,25 +204,59 @@ class TestSplitIntoChunksNoGaps:
         assert attempts.count("chunk_01.mp3") == 2  # the parallel pass and the retry
 
 
-@patch(
+_FFMPEG_AVAILABLE = patch(
     "gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available",
     return_value=True,
 )
-def test_a_near_empty_chunk_before_the_last_is_skipped_not_fatal(_mock_ffmpeg, tmp_path: Path):
-    # A header that overstates the length gives a near-empty chunk past the real end.
+
+
+def _split(tmp_path: Path, sizes: dict[str, list[int | None]]):
+    """Split three chunks; each attempt at a chunk writes the next size in its list,
+    or fails when the size is None. Chunk files are named chunk_00.mp3 to chunk_02.mp3."""
     specs = [_make_spec(0, tmp_path), _make_spec(1, tmp_path), _make_spec(2, tmp_path)]
     specs[2].is_last = True
+    attempts = {name: iter(values) for name, values in sizes.items()}
 
     def fake_popen(cmd, **kwargs):
         chunk_path = Path(cmd[-1])
-        size = 10 if chunk_path.name == "chunk_01.mp3" else 200_000
-        chunk_path.write_bytes(b"\x00" * size)
+        size = next(attempts[chunk_path.name]) if chunk_path.name in attempts else 200_000
         mock = MagicMock()
-        mock.returncode = 0
-        mock.communicate.return_value = ("", "")
+        if size is None:
+            mock.returncode = 1
+            mock.communicate.return_value = ("", "busy")
+        else:
+            chunk_path.write_bytes(b"\x00" * size)
+            mock.returncode = 0
+            mock.communicate.return_value = ("", "")
         return mock
 
-    with patch("subprocess.Popen", side_effect=fake_popen):
-        chunks = split_into_chunks(str(tmp_path / "input.mp3"), specs)
+    with _FFMPEG_AVAILABLE, patch("subprocess.Popen", side_effect=fake_popen):
+        return split_into_chunks(str(tmp_path / "input.mp3"), specs)
+
+
+def test_near_empty_chunks_past_the_real_end_are_skipped(tmp_path: Path):
+    # A header that overstates the length gives near-empty chunks past the real end.
+    chunks = _split(tmp_path, {"chunk_01.mp3": [10], "chunk_02.mp3": [10]})
 
     assert [c["metadata"]["index"] for c in chunks] == [0, 2]
+
+
+def test_a_near_empty_chunk_with_audio_after_it_raises_with_its_time_range(tmp_path: Path):
+    with pytest.raises(RuntimeError) as raised:
+        _split(tmp_path, {"chunk_01.mp3": [10]})
+
+    message = str(raised.value)
+    assert "1 of 3 chunks could not be created" in message
+    assert "(0:00:55-0:02:00)" in message
+    assert "nearly empty" in message
+
+
+def test_a_retried_chunk_that_comes_out_near_empty_at_the_end_is_skipped(tmp_path: Path):
+    chunks = _split(tmp_path, {"chunk_01.mp3": [None, 10], "chunk_02.mp3": [10]})
+
+    assert [c["metadata"]["index"] for c in chunks] == [0, 2]
+
+
+def test_a_retried_chunk_that_comes_out_near_empty_before_audio_raises(tmp_path: Path):
+    with pytest.raises(RuntimeError, match=r"\(0:00:55-0:02:00\)"):
+        _split(tmp_path, {"chunk_01.mp3": [None, 10]})
