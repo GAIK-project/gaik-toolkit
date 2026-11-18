@@ -173,7 +173,7 @@
       "output": "JSON (20 fields)",
       "then": "Paste your transcript in the next message.",
       "variants": [
-        { "label": "Työmaapäiväkirja", "file": "prompt.txt" },
+        { "label": "Finnish", "file": "prompt.txt" },
         { "label": "English", "file": "English-prompt.txt" }
       ]
     },

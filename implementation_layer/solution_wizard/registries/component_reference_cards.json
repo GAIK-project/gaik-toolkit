@@ -259,17 +259,17 @@
         "name": "temperature",
         "type": "float | None",
         "default": 0.0,
-        "effect": "None omits temperature from the API request. For recognized GPT-6 and GPT-5.6 families, the shared compatibility layer removes sampling controls unless reasoning_effort='none'. GPT-6 Astra does not accept 'none'; Sol/Luna do. Set model_family in a config for custom Azure deployment aliases. Other model families retain their own API rules; do not infer support from version-number ordering.",
+        "effect": "None omits temperature from the API request. With a temperature set and no reasoning_effort, the requirements parses send GPT-6 Sol/Luna and GPT-5.6 Sol/Luna/Terra reasoning_effort='none', so the temperature applies and they do not reason; with reasoning and free sampling these models sometimes kept only the first field of a task. Structure detection keeps the model's default. Other GPT-6 models (Astra, gpt-6-rosalind, gpt-6.x) reject 'none': they reason and the compatibility layer drops the temperature. Set model_family in a config for custom Azure deployment aliases. Other model families retain their own API rules; do not infer support from version-number ordering.",
         "selection_relevant": true,
-        "infer_from": "Use temperature=None with the default GPT-6 family unless explicitly disabling supported reasoning; tune other families only after checking their API."
+        "infer_from": "Keep the default 0.0 for GPT-6 Sol/Luna and GPT-5.6 so schema generation stays deterministic; set None only together with an active reasoning_effort, and tune other families only after checking their API."
       },
       {
         "name": "reasoning_effort",
         "type": "str | None",
         "default": null,
-        "effect": "Model-specific reasoning setting, not a universal provider option. GPT-6 supports low/medium/high/xhigh/max, plus none on Sol/Luna (not Astra). Omission uses the model default, not a promise of no reasoning. For OpenAI-compatible GPT-6/GPT-5.6 calls, sampling options are removed while reasoning is enabled. Native Google/Anthropic settings must follow their adapter's documented options.",
+        "effect": "Model-specific reasoning setting, not a universal provider option. GPT-6 supports low/medium/high/xhigh/max, plus none on Sol/Luna (not Astra or gpt-6.x). Left unset with a temperature, the requirements parses send 'none' to GPT-6 Sol/Luna and GPT-5.6 Sol/Luna/Terra themselves; an effort in the constructor or in config['reasoning_effort'] is sent as given to every call. Other models get no effort, which uses the model default, not a promise of no reasoning. For OpenAI-compatible GPT-6/GPT-5.6 calls, sampling options are removed while reasoning is enabled. Native Google/Anthropic settings must follow their adapter's documented options.",
         "selection_relevant": true,
-        "infer_from": "Choose a supported effort for the exact model and quality/cost requirement; otherwise leave omitted."
+        "infer_from": "Leave omitted unless the use case needs a reasoning model to reason while designing the schema; then choose a supported effort for the exact model with temperature=None."
       },
       {
         "name": "model",
@@ -953,7 +953,15 @@
         "default": null,
         "effect": "Per-connection hnsw.iterative_scan ('relaxed_order', 'strict_order' or 'off'; pgvector 0.8+). Without it, a search with a selective filters argument can return fewer rows than asked, or none: the HNSW index picks its nearest candidates first and the filter is applied afterwards. Measured: 0 of 20 rows on a 20,000-row table where 40 rows matched, 20 of 20 with 'relaxed_order'.",
         "selection_relevant": true,
-        "infer_from": "searches pass filters (per-tenant, per-document, per-category retrieval) -> 'relaxed_order'; unfiltered search -> leave None"
+        "infer_from": "searches pass filters (per-tenant, per-document, per-category retrieval) -> 'relaxed_order'; unfiltered search -> leave None; with owner set it defaults to relaxed_order"
+      },
+      {
+        "name": "owner",
+        "type": "str | None",
+        "default": null,
+        "effect": "A user or session id. Rows added are recorded for it (metadata gaik_owner), and every search_*(), count() and delete() sees only that owner's rows, whatever the filters say; several owners can share one table. Sets hnsw_iterative_scan='relaxed_order' unless given (pgvector 0.8+), since the owner filters every HNSW search. health() and relemmatize() stay table-wide. Without it every caller reads the whole table, add() refuses metadata naming an owner and delete() removes any owner's rows. A filter in gaik, not database access control: any other client of the table reads every row.",
+        "selection_relevant": true,
+        "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ]
   },
@@ -1267,7 +1275,7 @@
   },
   "PostgresAgent": {
     "import": "from gaik.software_components.postgres_agent import PostgresAgent",
-    "construct": "agent = PostgresAgent(connection_string=connection_string, config=get_stage_config(config, 'answer'), temperature=None)",
+    "construct": "agent = PostgresAgent(connection_string=connection_string, table_allowlist=table_allowlist, config=get_stage_config(config, 'answer'), temperature=None)",
     "call": "with agent:\n        ar = agent.ask(user_query)\n    answer = ar.answer",
     "returns": "AnswerResult(.answer, .generated_sql, .query_result)",
     "install_extra": "postgres-agent",
@@ -1275,10 +1283,10 @@
       {
         "name": "table_allowlist",
         "type": "list[str]",
-        "default": null,
-        "effect": "Restrict which tables the agent may query (security).",
+        "required": true,
+        "effect": "Required: the tables and views the agent may read, as PostgreSQL stores their names (case-sensitive). Only these reach the LLM's schema, and a query that touches any other table, view or system catalog (information_schema, pg_catalog), also through a CTE, subquery, join or UNION, is refused before it runs. Type casts are checked against the list too: a cast to an oid or reg* type, or to a type that is neither built in nor a listed table, is refused, as are session and server details such as version() and current_user. A listed table's rows include those of its partitions and of tables created with INHERITS from it, so list a parent only if its child tables may be read. Since the release after gaik 0.11.0, constructing the agent without it raises TypeError and an empty list raises ValueError; earlier releases read every table in schema_name.",
         "selection_relevant": true,
-        "infer_from": "security_constraints / access controls"
+        "infer_from": "the tables the use case's questions need (data sources / security_constraints); ask the user to name them -- never leave it out or list every table"
       },
       {
         "name": "answer_language",
@@ -1433,7 +1441,8 @@
     "import": "from gaik.software_components.form_understander import FormUnderstander",
     "construct": "understander = FormUnderstander(config=get_stage_config(config, 'extraction'))",
     "call": "labels = understander.clean_labels(field_ids)",
-    "returns": "mapping of cryptic form-field ids -> human-readable labels",
+    "call_page_labels": "described = understander.describe_labels(field_ids)  # [CleanedLabel(.id, .label, .original, .changed, .truncated)]; ids must be unique",
+    "returns": "clean_labels: mapping of cryptic form-field ids -> human-readable labels (max 60 chars, invisible characters removed). describe_labels: [CleanedLabel(.id, .label, .original, .changed, .truncated)] in input order; show .original beside .label where .changed or .truncated. .changed means other words, not a wrong label",
     "install_extra": "",
     "options": [
       {
@@ -1488,7 +1497,7 @@
         "name": "transcriber_ctor",
         "type": "dict",
         "default": null,
-        "effect": "Constructor kwargs forwarded to the internal Transcriber -- the general form of the enhanced_transcript option above. This is the only way to configure transcription inside the module; read the Transcriber reference card for its option names. NOTE the module drives the hosted Transcriber path, so whisper_local options (diarization, speaker_count) do not produce speaker labels here -- see the LIMITATION in the note.",
+        "effect": "Constructor kwargs forwarded to the internal Transcriber -- the general form of the enhanced_transcript option above. This is the only way to configure transcription inside the module; read the Transcriber reference card for its option names. Every name must be a Transcriber constructor parameter (an unknown one raises ValueError before the run starts), and api_config is refused here: pass the audio provider config to the module constructor as transcription_config (or the shared api_config). NOTE the module drives the hosted Transcriber path, so whisper_local options (diarization, speaker_count) do not produce speaker labels here -- see the LIMITATION in the note.",
         "selection_relevant": true,
         "infer_from": "any Transcriber option that would have been set on a standalone transcription step, e.g. {'enhanced_transcript': True, 'language': 'fi'}"
       },
@@ -1504,9 +1513,9 @@
         "name": "extractor_ctor",
         "type": "dict",
         "default": null,
-        "effect": "DataExtractor constructor kwargs. model and config select the shared schema-generation/extraction configuration; other kwargs (temperature, reasoning_effort) apply to DataExtractor only. Use extraction_config['reasoning_effort'] or ['model_family'] when both internal clients need the same model-family configuration.",
+        "effect": "DataExtractor constructor kwargs: model, temperature, reasoning_effort -- nothing else. model is the only key that also reaches the internal SchemaGenerator; temperature and reasoning_effort apply to DataExtractor only. The provider config is NOT set here: config, api_config and openai_config are refused with a ValueError before the run starts, as is any name DataExtractor does not take. Pass the provider config to the module constructor as extraction_config (or the shared api_config), and put reasoning_effort or model_family in extraction_config when both internal clients need the same model-family configuration.",
         "selection_relevant": true,
-        "infer_from": "Choose extraction_config for provider/model choices; pre-generate schema and requirements to avoid repeat schema generation."
+        "infer_from": "Choose the provider and model in the module's extraction_config, not here; use extractor_ctor only for a model override or DataExtractor sampling options. Pre-generate schema and requirements to avoid repeat schema generation."
       },
       {
         "name": "extract_options",
@@ -1579,25 +1588,25 @@
         "name": "parser_ctor",
         "type": "dict",
         "default": null,
-        "effect": "Constructor kwargs forwarded to the parser selected by parser_choice, e.g. parser_ctor={'enable_ocr': True} for docling or {'dpi': 300} for vision_parser. This is the only way to configure the internal parser -- read the chosen parser's own reference card for its option names.",
+        "effect": "Constructor kwargs forwarded to the parser selected by parser_choice, e.g. parser_ctor={'enable_ocr': True} for docling or {'use_context': True} for vision_parser. Every name must be a constructor parameter of the chosen parser (an unknown one raises ValueError before anything is parsed), and openai_config/config/api_config are refused: pass the vision provider config to the module constructor as parser_config (or the shared api_config). Read the chosen parser's own reference card for its option names.",
         "selection_relevant": true,
-        "infer_from": "any parser option that would have been set on a standalone parser step -- scanned inputs -> {'enable_ocr': True}; low-DPI scans with vision_parser -> {'dpi': 300}"
+        "infer_from": "any parser option that would have been set on a standalone parser step -- scanned inputs -> {'enable_ocr': True}; low-DPI scans with vision_parser -> parse_options={'dpi': 300}, not parser_ctor"
       },
       {
         "name": "parse_options",
         "type": "dict",
         "default": null,
-        "effect": "Call-time kwargs for the parser's parse method (as opposed to its constructor). Most parsers take no useful call-time options; prefer parser_ctor.",
+        "effect": "Call-time kwargs for the parser's parse method (as opposed to its constructor); the module sets the file path itself. For vision_parser this is convert_pdf: dpi, clean_output, first_pages. Most other parsers take no useful call-time options. A name the parse method does not take raises ValueError before anything is parsed.",
         "selection_relevant": false,
-        "infer_from": "leave null unless the chosen parser documents a call-time option"
+        "infer_from": "leave null unless the chosen parser documents a call-time option -- low-DPI scans with vision_parser -> {'dpi': 300}"
       },
       {
         "name": "extractor_ctor",
         "type": "dict",
         "default": null,
-        "effect": "DataExtractor constructor kwargs. model and config select the shared schema-generation/extraction configuration; other kwargs (temperature, reasoning_effort) apply to DataExtractor only. Use extraction_config['reasoning_effort'] or ['model_family'] when both internal clients need the same model-family configuration.",
+        "effect": "DataExtractor constructor kwargs: model, temperature, reasoning_effort -- nothing else. model is the only key that also reaches the internal SchemaGenerator; temperature and reasoning_effort apply to DataExtractor only. The provider config is NOT set here: config, api_config and openai_config are refused with a ValueError before the run starts, as is any name DataExtractor does not take. Pass the provider config to the module constructor as extraction_config (or the shared api_config), and put reasoning_effort or model_family in extraction_config when both internal clients need the same model-family configuration.",
         "selection_relevant": true,
-        "infer_from": "Choose extraction_config for provider/model choices; pre-generate schema and requirements to avoid repeat schema generation."
+        "infer_from": "Choose the provider and model in the module's extraction_config, not here; use extractor_ctor only for a model override or DataExtractor sampling options. Pre-generate schema and requirements to avoid repeat schema generation."
       },
       {
         "name": "extract_options",
@@ -1797,6 +1806,14 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "owner",
+        "type": "str | None",
+        "default": null,
+        "effect": "A user or session id. Documents indexed are recorded for it (metadata gaik_owner), and ask() retrieves only that owner's documents, also from a collection or folder other owners share (Chroma or in memory). A filter in gaik, not access control. The conversation history is kept on the workflow object, so create one RAGWorkflow per user or session.",
+        "selection_relevant": true,
+        "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ],
     "note": "End-to-end module: embeds, stores in an internal Chroma VectorStore, retrieves, and answers. Do NOT also add Embedder / Retriever / AnswerGenerator as separate steps. PgVectorStore is a separate PostgreSQL component and is not subsumed by this module."
@@ -3101,6 +3118,14 @@
         "effect": "Chroma collection name when persist=True; use one name per knowledge base so indexes do not mix.",
         "selection_relevant": false,
         "infer_from": "several knowledge bases in one persist_path -> one collection_name each"
+      },
+      {
+        "name": "owner",
+        "type": "str | None",
+        "default": null,
+        "effect": "A user or session id. Chunks added are recorded for it (metadata gaik_owner), and search() and count() see only that owner's chunks, whatever the filters say; several owners can share one collection or folder. A filter in gaik, not access control: any other client of the folder reads every chunk. Without it every caller of the collection reads every chunk, and add() refuses metadata that already names an owner.",
+        "selection_relevant": true,
+        "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ],
     "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. Since gaik 0.11.0, a persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored."

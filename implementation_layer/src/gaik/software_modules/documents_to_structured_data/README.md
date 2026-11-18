@@ -52,14 +52,15 @@ The configured parsing model must support image input. Text extraction can use a
 - `file_path`: Path to the document to parse (PDF/image/DOCX).
 - `user_requirements`: Natural-language description of fields to extract.
 - `parser_choice`: `vision_parser`, `docling`, `pymupdf`, or `docx`.
-- `parser_ctor`: Dict passed to the chosen parser constructor (e.g., `clean_output` for VisionParser).
-- `parse_options`: Dict passed to the parser call (if applicable).
+- `parser_ctor`: Dict passed to the chosen parser constructor (e.g., `custom_prompt` for VisionParser, `enable_ocr` for Docling).
+- `parse_options`: Dict passed to the parser's read call (e.g., `dpi` or `clean_output` for VisionParser's `convert_pdf`, `use_markdown` for the others).
 - `extractor_ctor`: Dict passed to `DataExtractor(...)` (e.g., `model` override, applied to schema gen and extraction).
 - `extract_options`: Dict passed to `DataExtractor.extract(...)` (e.g., `save_json`, `json_path`). The example also uses:
   - `generate_schema` (bool): If `True`, generate a new schema; if `False`, try to load from disk via `load_schema`.
   - `schema_name` (str): Base filename (no `.py`) for saving/loading schema; defaults to `schema`.
 - `schema`: Optional pre-generated schema model to reuse.
 - `requirements`: Optional `ExtractionRequirements` matching the schema.
+- Every name in these dicts must be a parameter of the component it goes to, and stage configs (`config`, `api_config`, `openai_config`) are refused: pass them to the constructor (`api_config`, `parser_config`, `extraction_config`). A `ValueError` names the option before anything is parsed.
 
 ### Returns (`PipelineResult`)
 - `parsed_documents`: List of parsed text strings.

@@ -39,8 +39,19 @@ print(schema.model_json_schema())
 print(generator.item_requirements)
 ```
 
-For reasoning models that do not accept a custom temperature, omit it from the
-provider request and set an appropriate reasoning effort:
+With a temperature (the default `0.0`) and no `reasoning_effort`, the
+requirements parses send GPT-6 Sol/Luna and GPT-5.6 Sol/Luna/Terra (by name, or
+by `model_family` in the config) `reasoning_effort="none"`, so the temperature
+applies and they do not reason. With reasoning and free sampling these models
+sometimes kept only the first field of a task. The structure detection call keeps
+the model's default: without reasoning it often ignored a list name the task
+gave. An effort in the call or in the config is sent as given to every call.
+Other models get no effort, including GPT-6 Astra, gpt-6-rosalind and gpt-6.x,
+which reject `"none"`. Through LiteLLM both the routed name and `model_family`
+must be on that list, since LiteLLM refuses `"none"` for a name it does not know.
+
+To have a reasoning model reason, omit the temperature from the provider request
+and set an appropriate reasoning effort:
 
 ```python
 generator = SchemaGenerator(

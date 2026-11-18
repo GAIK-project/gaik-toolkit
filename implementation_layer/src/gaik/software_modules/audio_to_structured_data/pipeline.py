@@ -27,6 +27,7 @@ from gaik.software_components.extractor.saved_schema import (
 )
 from gaik.software_components.extractor.schema import print_pydantic_schema
 from gaik.software_components.transcriber import Transcriber, TranscriptionResult
+from gaik.software_modules._options import EXTRACT_SET_BY_MODULE, checked_options
 
 
 @dataclass
@@ -110,19 +111,34 @@ class AudioToStructuredData:
             extract_options: Call-time args for DataExtractor.extract().
             schema: Optional pre-generated schema model to reuse.
             requirements: Optional ExtractionRequirements corresponding to the schema.
+
+        Every option name must be a parameter of the component it goes to.
+        Stage configs (``config``, ``api_config``) come from the constructor
+        and are refused here; a :class:`ValueError` is raised before anything
+        is transcribed.
         """
-        transcriber_ctor = dict(transcriber_ctor or {})
+        transcriber_ctor = checked_options(transcriber_ctor, Transcriber, what="transcriber_ctor")
+        transcribe_options = checked_options(
+            transcribe_options,
+            getattr(Transcriber, "transcribe", None),
+            what="transcribe_options",
+            set_by_module=("file_path",),
+        )
+        extractor_ctor = checked_options(extractor_ctor, DataExtractor, what="extractor_ctor")
+        extract_options = checked_options(
+            extract_options,
+            getattr(DataExtractor, "extract", None),
+            what="extract_options",
+            set_by_module=EXTRACT_SET_BY_MODULE,
+        )
         transcriber_ctor.setdefault("enhanced_transcript", False)
-        transcriber_ctor.setdefault("api_config", self.transcription_config)
-        transcriber = Transcriber(**transcriber_ctor)
-        transcribe_options = transcribe_options or {}
+        transcriber = Transcriber(api_config=self.transcription_config, **transcriber_ctor)
         transcription = transcriber.transcribe(
             file_path=file_path,
             **transcribe_options,
         )
 
-        extractor_ctor = dict(extractor_ctor or {})
-        extractor_cfg = dict(extractor_ctor.pop("config", self.extraction_config))
+        extractor_cfg = dict(self.extraction_config)
         model_override = extractor_ctor.get("model")
         if model_override:
             extractor_cfg["model"] = model_override

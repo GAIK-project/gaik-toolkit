@@ -2,10 +2,31 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 # OpenAI reasoning families that accept only max_completion_tokens.
 _REASONING_PREFIXES = ("o1", "o3", "o4", "gpt-5")
+# Models known to accept reasoning_effort="none", with an optional snapshot date. Other
+# GPT-6 models, such as Astra, gpt-6-rosalind and the gpt-6.x generation, reject it.
+_EFFORT_NONE_MODELS = re.compile(
+    r"(gpt-6-(sol|luna)|gpt-5\.6-(sol|luna|terra))(-\d{4}-\d{2}-\d{2})?"
+)
+
+
+def _family(model: str, config: dict) -> str:
+    return str(config.get("model_family") or model).rsplit("/", 1)[-1].lower()
+
+
+def _accepts_effort_none(model: str, config: dict | None = None) -> bool:
+    """True for a model known to accept ``reasoning_effort="none"``.
+
+    GPT-6 Sol/Luna and GPT-5.6 Sol/Luna/Terra, by name or ``model_family``, with or
+    without a snapshot date. For an effort gaik picks itself, so it is an allowlist:
+    an unknown name, a deployment alias without ``model_family`` and every other
+    model give False.
+    """
+    return _EFFORT_NONE_MODELS.fullmatch(_family(model, config or {})) is not None
 
 
 def normalize_chat_kwargs(
@@ -27,7 +48,7 @@ def normalize_chat_kwargs(
     config = config or {}
     if "reasoning_effort" not in result and config.get("reasoning_effort") is not None:
         result["reasoning_effort"] = config["reasoning_effort"]
-    family = str(config.get("model_family") or model).rsplit("/", 1)[-1].lower()
+    family = _family(model, config)
     is_gpt6 = family.startswith(("gpt-6-", "gpt-6."))
     is_reasoning_family = is_gpt6 or family.startswith("gpt-5.6-")
     is_openai_reasoning = _is_openai_api(config) and family.startswith(_REASONING_PREFIXES)

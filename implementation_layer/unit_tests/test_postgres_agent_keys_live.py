@@ -60,7 +60,11 @@ def readonly_url():
 
 def test_select_only_role_sees_primary_and_foreign_keys(readonly_url):
     url, schema = readonly_url
-    with PostgresAgent(url, schema_name=schema) as agent:
+    with PostgresAgent(
+        url,
+        schema_name=schema,
+        table_allowlist=["customers", "products", "regions", "orders", "lines"],
+    ) as agent:
         tables = {t.name: {c.name: c for c in t.columns} for t in agent.get_schema().tables}
     assert tables["customers"]["id"].is_primary_key
     assert tables["regions"]["country"].is_primary_key
