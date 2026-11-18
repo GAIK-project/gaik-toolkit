@@ -4,7 +4,6 @@ import io
 import logging
 import os
 import posixpath
-import re
 import tempfile
 import uuid
 import zipfile
@@ -1611,7 +1610,8 @@ def _write_ui_view(blueprint: dict[str, Any], session_id: str, output_dir: str) 
 
 #: How long the list of the user's changes in ``_blueprint_edits_note`` may be.
 MAX_BLUEPRINT_EDITS_NOTE_CHARS = 2000
-_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
+#: How much of one change's summary is quoted before it is cut.
+MAX_BLUEPRINT_EDIT_CHARS = 600
 
 
 def _blueprint_edits_note(summaries: list[str]) -> str | None:
@@ -1620,14 +1620,29 @@ def _blueprint_edits_note(summaries: list[str]) -> str | None:
     A workspace edit writes the agent's own use_case.blueprint.json
     (``blueprint_edit``). The agent goes on from the file it remembers: told
     nothing, it would write its version back over the user's change. The
-    summaries carry the user's step names, so they stay data: on the note's one
-    line, and no longer than ``MAX_BLUEPRINT_EDITS_NOTE_CHARS``.
+    summaries quote step names, the old ones written by the agent and possibly
+    taken from a document's text, so each summary is quoted as data
+    (``run_context.quoted``): no name can close this line or add one. Whole
+    changes are told until ``MAX_BLUEPRINT_EDITS_NOTE_CHARS``; "…" says more
+    were left out.
     """
+    from wizard_api.services import run_context
+
     if not summaries:
         return None
-    told = "; ".join(_CONTROL_CHARS.sub(" ", summary) for summary in summaries)
-    if len(told) > MAX_BLUEPRINT_EDITS_NOTE_CHARS:
-        told = told[: MAX_BLUEPRINT_EDITS_NOTE_CHARS - 1] + "…"
+    more = "; …"
+    parts: list[str] = []
+    size = 0
+    for summary in summaries:
+        part = run_context.quoted(summary, MAX_BLUEPRINT_EDIT_CHARS)
+        added = len(part) + (2 if parts else 0)
+        if size + added > MAX_BLUEPRINT_EDITS_NOTE_CHARS - len(more):
+            break
+        parts.append(part)
+        size += added
+    told = "; ".join(parts)
+    if len(parts) < len(summaries):
+        told = f"{told}{more}" if parts else "…"
     return (
         f"[The user changed the solution in the workspace: {told}. These changes are already "
         f"in {artifact_sync.DRAFT_BLUEPRINT_FILE}; read it again before you edit it, and keep "
