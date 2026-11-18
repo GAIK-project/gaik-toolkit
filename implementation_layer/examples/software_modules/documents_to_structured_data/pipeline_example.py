@@ -50,11 +50,15 @@ def main() -> None:
         user_requirements=USER_REQUIREMENTS,
         parser_choice="vision_parser",  # vision_parser | docling | pymupdf | docx
         parser_ctor={
-            # Example: {"clean_output": True} for VisionParser
+            # Parser constructor options, e.g. {"use_context": True} for VisionParser.
+            # The provider config goes to DocumentsToStructuredData(parser_config=...).
         },
-        parse_options={},
+        parse_options={
+            # Parse-call options, e.g. {"dpi": 300, "clean_output": True} for VisionParser.
+        },
         extractor_ctor={
             # Optional: override model; applies to schema generation and extraction.
+            # The provider config goes to DocumentsToStructuredData(extraction_config=...).
             # "model": "gpt-5.2"
         },
         extract_options=extract_options,
