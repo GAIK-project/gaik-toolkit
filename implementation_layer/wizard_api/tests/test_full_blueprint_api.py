@@ -44,10 +44,22 @@ READONLY = [
 SUMMARY = "Edited the blueprint as JSON"
 
 
-def _put(client, sid: str, base: int, draft: dict, headers: dict | None = None):
+def _put(
+    client,
+    sid: str,
+    base: int,
+    draft: dict,
+    *,
+    digest: str | None = None,
+    headers: dict | None = None,
+):
+    """A full save; without ``digest``, on the draft's digest as GET answers it now."""
+    if digest is None:
+        got = client.get(f"/sessions/{sid}/blueprint/full", headers=headers or {})
+        digest = got.json().get("draft_digest", "") if got.is_success else ""
     return client.put(
         f"/sessions/{sid}/blueprint/full",
-        json={"base_version": base, "draft": draft},
+        json={"base_version": base, "base_digest": digest, "draft": draft},
         headers=headers or {},
     )
 
@@ -89,6 +101,7 @@ def test_get_answers_the_draft_its_version_and_the_readonly_sections(
         "version": created["active_version"],
         "draft": _draft(),
         "readonly_sections": READONLY,
+        "draft_digest": artifact_sync.content_digest(_draft()),
     }
     assert len(_versions(db_session, created["id"])) == 1
 
@@ -317,6 +330,70 @@ def test_a_body_without_a_draft_is_refused(client, db_session, not_busy) -> None
     res = client.put(
         f"/sessions/{created['id']}/blueprint/full",
         json={"base_version": created["active_version"]},
+    )
+
+    assert res.status_code == 422
+
+
+# ---------------------------------------------------------------- the draft's digest
+
+
+def _agent_writes(output_dir: str, change) -> None:
+    """The agent changes its file in a way that adds no version (outside the reduced view)."""
+    on_disk = _on_disk(output_dir)
+    change(on_disk)
+    _write_draft(output_dir, on_disk)
+
+
+@requires_postgres
+def test_a_save_on_a_draft_the_agent_changed_since_is_refused(client, db_session, not_busy) -> None:
+    created = _create(client, "full-user")
+    sid = created["id"]
+    seen = client.get(f"/sessions/{sid}/blueprint/full").json()
+    _agent_writes(
+        created["output_dir"],
+        lambda d: d.__setitem__("target_output_spec", {"fields": ["total", "due_date"]}),
+    )
+    after_agent = _on_disk(created["output_dir"])
+    draft = copy.deepcopy(seen["draft"])
+    draft["workflow"]["steps"][1]["name"] = "Read the invoice"
+
+    res = _put(client, sid, seen["version"], draft, digest=seen["draft_digest"])
+
+    assert seen["version"] == created["active_version"]  # the agent added no version
+    assert res.status_code == 409
+    assert res.json()["detail"]["error"] == "changed_elsewhere"
+    assert _on_disk(created["output_dir"]) == after_agent
+    assert len(_versions(db_session, sid)) == 1
+
+
+@requires_postgres
+def test_a_change_log_the_agent_wrote_since_answers_changed_elsewhere(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client, "full-user")
+    sid = created["id"]
+    seen = client.get(f"/sessions/{sid}/blueprint/full").json()
+    _agent_writes(
+        created["output_dir"],
+        lambda d: d.__setitem__("change_log", [{"version": "1", "change": "Gate 2 approved"}]),
+    )
+    draft = copy.deepcopy(seen["draft"])
+    draft["use_case"]["description"] = "changed"
+
+    res = _put(client, sid, seen["version"], draft, digest=seen["draft_digest"])
+
+    assert res.status_code == 409
+    assert res.json()["detail"]["error"] == "changed_elsewhere"
+
+
+@requires_postgres
+def test_a_save_without_a_base_digest_is_refused(client, db_session, not_busy) -> None:
+    created = _create(client, "full-user")
+
+    res = client.put(
+        f"/sessions/{created['id']}/blueprint/full",
+        json={"base_version": created["active_version"], "draft": _draft()},
     )
 
     assert res.status_code == 422

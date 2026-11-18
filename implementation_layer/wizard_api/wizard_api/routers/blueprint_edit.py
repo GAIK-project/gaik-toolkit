@@ -215,9 +215,10 @@ _BLUEPRINT_TOO_LARGE = "A blueprint is at most {chars} characters as JSON."
 def get_full_blueprint(
     session_id: uuid.UUID, db: Session = Depends(get_db)
 ) -> FullBlueprintResponse:
-    """The agent's draft whole, the active version it belongs to, and the
+    """The agent's draft whole, the active version it belongs to, the
     top-level sections only the server writes (``READONLY_SECTIONS``), which a
-    save through ``PUT /blueprint/full`` must leave as they are.
+    save through ``PUT /blueprint/full`` must leave as they are, and the
+    draft's digest (``draft_digest``), which that save sends back.
 
     Refused with 409 ``no_draft`` while the agent has not written the draft.
     Changes nothing.
@@ -229,7 +230,10 @@ def get_full_blueprint(
     if draft is None:
         raise blueprint_edit_service.no_draft()
     return FullBlueprintResponse(
-        version=session.active_version, draft=draft, readonly_sections=list(READONLY_SECTIONS)
+        version=session.active_version,
+        draft=draft,
+        readonly_sections=list(READONLY_SECTIONS),
+        draft_digest=artifact_sync.content_digest(draft),
     )
 
 
@@ -274,7 +278,8 @@ def put_full_blueprint(
 ) -> OperationsResponse:
     """Replace the agent's draft with ``draft``, as one edit of the workspace.
 
-    The body is ``{"base_version": int, "draft": {...}}``, the draft at most
+    The body is ``{"base_version": int, "base_digest": str, "draft": {...}}``,
+    ``base_digest`` the ``draft_digest`` the draft was read with, the draft at most
     ``MAX_BLUEPRINT_CHARS`` characters of JSON (413 ``too_large``; the 64 KB
     of an edit of operations does not apply). It goes through the flow every
     edit shares (``blueprint_edit_service.apply_edit``): the draft is written
@@ -285,7 +290,10 @@ def put_full_blueprint(
     draft equal to the one on disk adds no version.
 
     Refused with 409 ``no_draft``, ``agent_busy`` and ``changed_elsewhere`` as
-    an edit is; with 422 ``readonly_section`` (``field``: the first section of
+    an edit is, ``changed_elsewhere`` also when the file is no longer the one of
+    ``base_digest`` (the agent changes parts of the draft without a new
+    version, and a save of the whole would undo them); with 422
+    ``readonly_section`` (``field``: the first section of
     ``READONLY_SECTIONS`` it changes, adds or removes), ``invalid_draft``
     (``field``: where its first error is) when it is no valid blueprint, and
     ``invalid_operation`` when it adds an error of a refusing validator rule or
@@ -297,6 +305,9 @@ def put_full_blueprint(
     submitted = payload.draft
 
     def operations_for(draft: dict[str, Any]) -> list[Any]:
+        # Under the session's lock, before anything is compared with the draft.
+        if artifact_sync.content_digest(draft) != payload.base_digest:
+            raise blueprint_edit_service.changed_elsewhere()
         if submitted == draft:
             return []
         for section in READONLY_SECTIONS:

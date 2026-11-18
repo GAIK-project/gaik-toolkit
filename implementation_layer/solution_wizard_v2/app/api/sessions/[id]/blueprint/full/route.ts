@@ -1,7 +1,10 @@
 // The session's full blueprint draft, read and saved whole. GET answers
-// `{version, draft, readonly_sections}`; PUT takes `{base_version, draft}` and
-// answers as an edit of operations does. The body may be as large as a
-// blueprint (MAX_BLUEPRINT_CHARS), not the 64 KB of an edit. Owner check,
+// `{version, draft, readonly_sections, draft_digest}`; PUT takes
+// `{base_version, base_digest, draft}` (`base_digest`: the `draft_digest` the
+// draft was read with) and answers as an edit of operations does. The body may
+// be as large as a blueprint, not the 64 KB of an edit: wizard_api counts the
+// blueprint's characters (MAX_BLUEPRINT_CHARS), this route only caps the bytes,
+// at the most those characters take in UTF-8. Owner check,
 // refusals through lib/safe-error; without wizard_api: 503 needs_wizard_api.
 
 import { NextRequest } from "next/server";
@@ -15,8 +18,9 @@ import { apiGetFullBlueprint, apiPutFullBlueprint, wizardApiEnabled } from "@/li
 
 export const dynamic = "force-dynamic";
 
-/** A blueprint as JSON, and the `{base_version, draft}` around it. */
-const MAX_BODY_BYTES = MAX_BLUEPRINT_CHARS + 1024;
+/** A blueprint as JSON at 4 bytes a character (UTF-8's most), and the
+ * `{base_version, base_digest, draft}` around it. */
+const MAX_BODY_BYTES = 4 * MAX_BLUEPRINT_CHARS + 1024;
 
 export const GET = withLogging(
   "blueprint.full.read",

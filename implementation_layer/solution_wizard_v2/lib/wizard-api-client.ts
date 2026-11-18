@@ -698,12 +698,16 @@ export async function apiGetBpmnMapping(
   return sendJson(sessionPath(id, `bpmn/mapping${dataObjectsQuery(dataObjects)}`), "GET");
 }
 
-/** `{version, draft, readonly_sections}`: the full draft; 409 no_draft before there is one. */
+/** `{version, draft, readonly_sections, draft_digest}`: the full draft; 409 no_draft before there is one. */
 export async function apiGetFullBlueprint(id: string): Promise<Response> {
   return sendJson(sessionPath(id, "blueprint/full"), "GET");
 }
 
-/** `{base_version, draft}`: the full draft saved whole; answers as the operations do. */
+/**
+ * `{base_version, base_digest, draft}`: the full draft saved whole, `base_digest`
+ * the `draft_digest` it was read with (409 changed_elsewhere once the file has
+ * changed since); answers as the operations do.
+ */
 export async function apiPutFullBlueprint(id: string, body: unknown): Promise<Response> {
   return sendJson(sessionPath(id, "blueprint/full"), "PUT", body);
 }

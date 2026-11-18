@@ -416,10 +416,10 @@ describe("blueprint edit calls (raw Responses, each with outgoingHeaders())", ()
     ],
     [
       "apiPutFullBlueprint",
-      () => apiPutFullBlueprint("s1", { base_version: 2, draft: { a: 1 } }),
+      () => apiPutFullBlueprint("s1", { base_version: 2, base_digest: "d1", draft: { a: 1 } }),
       "http://api.test/sessions/s1/blueprint/full",
       "PUT",
-      { base_version: 2, draft: { a: 1 } },
+      { base_version: 2, base_digest: "d1", draft: { a: 1 } },
     ],
   ])("%s sends its body with the service token", async (_name, run, url, method, body) => {
     await run();

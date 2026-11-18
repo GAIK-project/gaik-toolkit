@@ -18,6 +18,9 @@ import { requireOwnedSession } from "@/lib/session-access";
 import { apiGetFullBlueprint, apiPutFullBlueprint, wizardApiEnabled } from "@/lib/wizard-api-client";
 import { MAX_BLUEPRINT_CHARS } from "@/lib/blueprint-ops";
 
+/** The route's cap: a blueprint at 4 bytes a character (UTF-8's most), and the body around it. */
+const MAX_BODY_BYTES = 4 * MAX_BLUEPRINT_CHARS + 1024;
+
 const TRACE = "trace-full-0001";
 const params = { params: Promise.resolve({ id: "s1" }) };
 const url = "http://localhost/api/sessions/s1/blueprint/full";
@@ -64,7 +67,12 @@ describe("GET and PUT /sessions/[id]/blueprint/full", () => {
   });
 
   it("passes the draft on, uncached", async () => {
-    const full = { version: 3, draft: { workflow: { steps: [] } }, readonly_sections: ["metadata"] };
+    const full = {
+      version: 3,
+      draft: { workflow: { steps: [] } },
+      readonly_sections: ["metadata"],
+      draft_digest: "abc123",
+    };
     vi.mocked(apiGetFullBlueprint).mockResolvedValue(Response.json(full));
 
     const res = await get();
@@ -95,25 +103,48 @@ describe("GET and PUT /sessions/[id]/blueprint/full", () => {
     );
     const draft = { description: "x".repeat(200 * 1024) };
 
-    const res = await put({ base_version: 3, draft });
+    const res = await put({ base_version: 3, base_digest: "abc123", draft });
 
     expect(res.status).toBe(200);
-    expect(apiPutFullBlueprint).toHaveBeenCalledWith("s1", { base_version: 3, draft });
+    expect(apiPutFullBlueprint).toHaveBeenCalledWith("s1", { base_version: 3, base_digest: "abc123", draft });
     const body = await res.json();
     expect(body.session).toEqual({ id: "s1", step: 6, gate_statuses: {}, active_version: 4, blueprint: { name: "b" } });
   });
 
-  it("refuses a body over the blueprint's limit with 413", async () => {
-    const res = await put({ base_version: 3, draft: {} }, { "content-length": String(MAX_BLUEPRINT_CHARS + 64 * 1024) });
+  it("takes a blueprint of non-ASCII text over 1 MB in bytes: the api counts its characters", async () => {
+    vi.mocked(apiPutFullBlueprint).mockResolvedValue(
+      Response.json({ session: { id: "s1" }, warnings: [], needs_attention: [], bpmn_changed: false }),
+    );
+    // Under MAX_BLUEPRINT_CHARS characters, over it in UTF-8 bytes (ä is 2 bytes).
+    const draft = { description: "ä".repeat(MAX_BLUEPRINT_CHARS - 1024) };
+
+    const res = await put({ base_version: 3, base_digest: "abc123", draft });
+
+    expect(res.status).toBe(200);
+    expect(apiPutFullBlueprint).toHaveBeenCalled();
+  });
+
+  it("refuses a body over 4 bytes a character of the blueprint's limit with 413", async () => {
+    const res = await put({ base_version: 3, base_digest: "abc123", draft: {} }, { "content-length": String(MAX_BODY_BYTES + 1) });
     expect(res.status).toBe(413);
     expect(apiPutFullBlueprint).not.toHaveBeenCalled();
+  });
+
+  it("passes a 409 changed_elsewhere through unchanged", async () => {
+    const detail = { error: "changed_elsewhere", message: "The blueprint has changed.", trace_id: TRACE };
+    vi.mocked(apiPutFullBlueprint).mockResolvedValue(Response.json({ detail }, { status: 409 }));
+
+    const res = await put({ base_version: 3, base_digest: "old", draft: {} });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ detail });
   });
 
   it("passes a 422 readonly_section through unchanged", async () => {
     const detail = { error: "readonly_section", message: "metadata is the server's", field: "metadata", trace_id: TRACE };
     vi.mocked(apiPutFullBlueprint).mockResolvedValue(Response.json({ detail }, { status: 422 }));
 
-    const res = await put({ base_version: 3, draft: { metadata: {} } });
+    const res = await put({ base_version: 3, base_digest: "abc123", draft: { metadata: {} } });
 
     expect(res.status).toBe(422);
     expect(await res.json()).toEqual({ detail });

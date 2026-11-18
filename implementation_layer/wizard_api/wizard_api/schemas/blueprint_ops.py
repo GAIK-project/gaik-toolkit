@@ -266,11 +266,16 @@ class UndoRequest(BaseModel):
 
 
 class FullBlueprintRequest(BaseModel):
-    """``PUT /blueprint/full``: the edited draft, on the version the workspace shows."""
+    """``PUT /blueprint/full``: the edited draft, on the version and the draft
+    (``draft_digest`` of ``GET /blueprint/full``) the workspace shows."""
 
     model_config = ConfigDict(extra="forbid")
 
     base_version: int
+    #: The agent changes parts of the draft without a new version (the output
+    #: fields, the models, the change log...): only the digest says the file
+    #: is still the one the edit started from.
+    base_digest: str = Field(max_length=128)
     draft: dict[str, Any]
 
 
@@ -280,6 +285,9 @@ class FullBlueprintResponse(BaseModel):
     version: int
     draft: dict[str, Any]
     readonly_sections: list[str]
+    #: ``artifact_sync.content_digest`` of ``draft``: a save sends it back as
+    #: ``base_digest``.
+    draft_digest: str
 
 
 class OperationsResponse(BaseModel):
