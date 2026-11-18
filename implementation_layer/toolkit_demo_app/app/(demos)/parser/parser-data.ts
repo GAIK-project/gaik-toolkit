@@ -259,7 +259,7 @@ export function toPlainText(markdown: string): string {
             .join("\n");
         case "table":
           return [block.header, ...block.rows]
-            .map((row) => row.map(plain).join("\t"))
+            .map((row) => row.map((cell) => plain(cell)).join("\t"))
             .join("\n");
         case "hr":
           return "";
