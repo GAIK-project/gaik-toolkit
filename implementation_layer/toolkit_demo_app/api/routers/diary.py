@@ -34,7 +34,12 @@ try:
     from routers.pipeline import _pdf_path
 except ImportError:
     from api.routers.pipeline import _pdf_path
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+try:
+    from utils.result_owner import current_user, remember_owner, require_owner
+except ImportError:
+    from api.utils.result_owner import current_user, remember_owner, require_owner
 from fastapi.responses import FileResponse, StreamingResponse
 
 try:
@@ -113,6 +118,7 @@ async def diary_audio_pipeline_stream(
     enhanced: bool = Form(True),
     compress_audio: bool = Form(True),
     regenerate_schema: bool = Form(False),
+    user: str = Depends(current_user),
 ):
     """
     Process audio recording with SSE streaming progress updates.
@@ -120,6 +126,7 @@ async def diary_audio_pipeline_stream(
     Returns Server-Sent Events with progress updates and final result.
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
@@ -315,6 +322,7 @@ async def diary_text_pipeline_stream(
     user_requirements: str = Form(DIARY_REQUIREMENTS),
     generate_pdf: bool = Form(True),
     regenerate_schema: bool = Form(False),
+    user: str = Depends(current_user),
 ):
     """
     Extract structured data from text with SSE streaming progress updates.
@@ -322,6 +330,7 @@ async def diary_text_pipeline_stream(
     Returns Server-Sent Events with progress updates and final result.
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         steps = [
@@ -469,8 +478,9 @@ async def diary_text_pipeline_stream(
 
 
 @router.get("/pdf/{job_id}")
-async def download_diary_pdf(job_id: str):
-    """Download a generated PDF by job ID."""
+async def download_diary_pdf(job_id: str, user: str = Depends(current_user)):
+    """Download a generated PDF by job ID, only for the user whose run made it."""
+    require_owner(job_id, user, "PDF not found")
     if job_id not in PDF_STORAGE:
         raise HTTPException(status_code=404, detail="PDF not found")
 

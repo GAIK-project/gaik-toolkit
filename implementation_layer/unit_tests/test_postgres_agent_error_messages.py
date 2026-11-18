@@ -65,7 +65,7 @@ def test_a_failed_connection_names_no_connection_detail(monkeypatch, caplog, dsn
         raise error
 
     monkeypatch.setattr(agent_module.psycopg, "connect", fail)
-    agent = PostgresAgent(dsn)
+    agent = PostgresAgent(dsn, table_allowlist=["customers", "orders"])
 
     with caplog.at_level(logging.DEBUG, logger=agent_module.__name__):
         with pytest.raises(type(error)) as caught:
@@ -88,7 +88,9 @@ def test_redact_masks_every_password_form(dsn):
 
 
 def _agent_with_failing_query(error: Exception, prompts: list) -> PostgresAgent:
-    agent = PostgresAgent("postgresql://stub:stub@localhost:1/stub", max_retries=2)
+    agent = PostgresAgent(
+        "postgresql://stub:stub@localhost:1/stub", max_retries=2, table_allowlist=["t"]
+    )
     agent._schema = SchemaInfo(schema_name="public", tables=[TableInfo(name="t", columns=[])])
 
     def generate(**kwargs):

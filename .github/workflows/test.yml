@@ -10,6 +10,7 @@ on:
       - 'implementation_layer/**'
       - '.claude-plugin/**'
       - '.claude/skills/gaik-sync/**'
+      - '.claude/skills/component-check/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
       - '.github/workflows/test.yml'
@@ -25,6 +26,7 @@ on:
       - 'implementation_layer/**'
       - '.claude-plugin/**'
       - '.claude/skills/gaik-sync/**'
+      - '.claude/skills/component-check/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
       - '.github/workflows/test.yml'
@@ -116,7 +118,7 @@ jobs:
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
     - name: Install package
-      run: uv pip install --system ".[all,dev,llm-all]"
+      run: uv pip install --system ".[all,dev,llm-all,wizard]"
 
     # The Word export tests (test_report_writer.py, test_report_synthesizer.py) skip without Pandoc.
     - name: Install Pandoc
@@ -143,7 +145,9 @@ jobs:
     # The Solution Wizard's tests are outside `testpaths` and share a file name with
     # unit_tests/ (test_source_tracing.py), so they run in a pytest session of their own.
     # ReportLab is what a generated PoC installs for its PDF report (scaffolder.py); no
-    # gaik extra brings it, and without it test_pdf_report.py skips as a whole.
+    # gaik extra brings it, and without it test_pdf_report.py skips as a whole. The wizard
+    # extra (claude-agent-sdk) above lets the interactive runner's tool guard and its SDK
+    # contract tests run here too.
     - name: Run Solution Wizard tests
       run: |
         uv pip install --system "reportlab>=4.0"
@@ -329,11 +333,35 @@ jobs:
         case "$RELEASE_REF" in refs/tags/v*) ;; *) echo 'Release certification requires a version tag'; exit 1;; esac
         uv run python scripts/release_check.py --live --require-provider azure --version "${RELEASE_VERSION#v}"
 
+    # The tag must also pass the component check (.claude/skills/component-check): the
+    # schema generator, extractor and vision extractor on synthetic invoices, on Azure.
+    # --public keeps provider error text out of the published summary.
+    - name: Component check on Azure
+      timeout-minutes: 20
+      env:
+        RUN_DIR: ${{ runner.temp }}/component-check
+        RELEASE_AZURE_MODEL: ${{ vars.RELEASE_AZURE_MODEL || 'gpt-6-luna' }}
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+        AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
+      run: |
+        set -uo pipefail
+        status=0
+        uv run python .claude/skills/component-check/run_checks.py \
+          --providers azure --require-all --public --provider-timeout 600 \
+          --out "$RUN_DIR" || status=1
+        if [ -f "$RUN_DIR/summary.md" ]; then
+          cat "$RUN_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        fi
+        exit "$status"
+
     - name: Upload sanitized certification report
       if: always()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-certification-${{ github.sha }}
-        path: results/release-check.json
+        path: |
+          results/release-check.json
+          ${{ runner.temp }}/component-check/
         if-no-files-found: error
         retention-days: 90

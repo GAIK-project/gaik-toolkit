@@ -73,6 +73,7 @@ class RAGWorkflow:
         persist: bool = True,
         persist_path: str = "chroma_store",
         collection_name: str = "gaik_rag",
+        owner: str | None = None,
         embedding_model: str | None = None,
         retriever_top_k: int = 5,
         retriever_threshold: float | None = None,
@@ -103,6 +104,10 @@ class RAGWorkflow:
             persist: If True, use persistent Chroma vector store.
             persist_path: Directory for Chroma persistence.
             collection_name: Chroma collection name.
+            owner: A user or session id. Documents this workflow indexes are recorded
+                for it, and its questions retrieve only its own documents, also from a
+                collection that other owners share. Without it, every workflow on the
+                same collection and folder reads every document in it.
             embedding_model: Optional embedding model override.
             retriever_top_k: Number of chunks to retrieve.
             retriever_threshold: Optional score threshold.
@@ -110,7 +115,10 @@ class RAGWorkflow:
             retriever_rerank: Enable reranker for final ordering.
             citations: Include citations in generated answers.
             stream: Stream responses by default.
-            conversation_history: Maintain last n Q/A pairs.
+            conversation_history: Maintain last n Q/A pairs. The history is kept on
+                this object, so a service with several users needs one workflow per
+                user or session; a shared one answers each user with the others'
+                earlier questions in its prompt.
             last_n: Number of Q/A pairs to keep if conversation_history is True.
             limits: Input limits for the parser (file size, PDF pages, images
                 described); a document over one raises ``InputLimitError`` before it
@@ -152,6 +160,7 @@ class RAGWorkflow:
             persist=persist,
             persist_path=persist_path,
             collection_name=collection_name,
+            owner=owner,
         )
         self.retriever = Retriever(
             embedder=self.embedder,
