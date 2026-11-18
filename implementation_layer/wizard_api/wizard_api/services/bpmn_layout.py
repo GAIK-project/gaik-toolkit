@@ -251,6 +251,29 @@ def _set_waypoints(edge: ET.Element, points: list) -> None:
     edge[-1].tail = closing
 
 
+def _own_lanes(
+    root: ET.Element, drawn: dict[str, tuple[float, float, float, float]]
+) -> dict[str, tuple[float, float, float, float]]:
+    """The box of the lane each element is listed in (``flowNodeRef``), the innermost one."""
+    own: dict[str, tuple[float, float, float, float]] = {}
+    for lane in root.iter(f"{{{_MODEL}}}lane"):
+        box = drawn.get(lane.get("id") or "")
+        if box is None:
+            continue
+        for ref in lane.findall(f"{{{_MODEL}}}flowNodeRef"):
+            element = (ref.text or "").strip()
+            if element and (
+                element not in own or box[2] * box[3] < own[element][2] * own[element][3]
+            ):
+                own[element] = box
+    return own
+
+
+def _inside(point: tuple[float, float], box: tuple[float, float, float, float]) -> bool:
+    x, y, w, h = box
+    return x <= point[0] <= x + w and y <= point[1] <= y + h
+
+
 def apply_layout(xml: str, layout: dict) -> str:
     """The drawing ``xml`` with the shapes and edges of ``layout`` placed as stored.
 
@@ -258,7 +281,13 @@ def apply_layout(xml: str, layout: dict) -> str:
     its label moves with it; lanes and pools are not moved. An edge with stored
     waypoints takes them; an edge that touches a moved shape and has none is
     drawn again with ``route_edge`` between the shapes' new bounds. Ids the
-    drawing does not have are ignored. Without anything to change the XML is
+    drawing does not have are ignored.
+
+    A stored place whose middle lies outside the lane that lists the shape
+    (``flowNodeRef``) is not applied: the step went to another lane in the
+    blueprint, or lanes were added, since it was dragged. The shape stays
+    where the drawing puts it, and the stored routes of its edges are not
+    applied either; the entries stay stored. Without anything to change the XML is
     returned as it is; otherwise it is parsed with the hardened parser of
     ``bpmn_sync`` and written back without comments and without a DOCTYPE.
     """
@@ -268,8 +297,16 @@ def apply_layout(xml: str, layout: dict) -> str:
         return xml
     root = _parse(xml)
     kinds = {el.get("id"): el.tag for el in root.iter() if el.get("id")}
+    drawn = {
+        shape.get("bpmnElement") or "": _rect(shape.find(_BOUNDS))
+        for shape in root.iter(_SHAPE)
+        if shape.find(_BOUNDS) is not None
+    }
+    own_lanes = _own_lanes(root, drawn)
     rects: dict[str, tuple[float, float, float, float]] = {}
     moved: set[str] = set()
+    # Shapes whose stored place lies outside their own lane: left as drawn.
+    kept_drawn: set[str] = set()
     changed = False
     for shape in root.iter(_SHAPE):
         element = shape.get("bpmnElement") or ""
@@ -278,6 +315,14 @@ def apply_layout(xml: str, layout: dict) -> str:
             continue
         x, y, w, h = _rect(bounds)
         position = shapes.get(element)
+        lane = own_lanes.get(element)
+        if (
+            position is not None
+            and lane is not None
+            and not _inside((position["x"] + w / 2, position["y"] + h / 2), lane)
+        ):
+            kept_drawn.add(element)
+            position = None
         if position is not None and kinds.get(element) not in _FIXED_KINDS:
             dx, dy = position["x"] - x, position["y"] - y
             if dx or dy:
@@ -291,10 +336,10 @@ def apply_layout(xml: str, layout: dict) -> str:
                 moved.add(element)
                 changed = True
         rects[element] = (x, y, w, h)
-    ends = _edge_ends(root) if moved else {}
+    ends = _edge_ends(root) if moved or kept_drawn else {}
     for edge in root.iter(_EDGE):
         element = edge.get("bpmnElement") or ""
-        if element in edges:
+        if element in edges and not kept_drawn.intersection(ends.get(element, ())):
             _set_waypoints(edge, edges[element])
             changed = True
             continue

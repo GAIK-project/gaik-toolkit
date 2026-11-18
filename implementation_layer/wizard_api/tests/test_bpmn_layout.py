@@ -92,6 +92,25 @@ def _tasks(xml: str) -> list[str]:
     return [el.get("id") for tag in tags for el in root.iter(f"{{{NS['bpmn']}}}{tag}")]
 
 
+def _lane_of(xml: str) -> dict[str, str]:
+    """The lane that lists each element (``flowNodeRef``)."""
+    root = ET.fromstring(xml)
+    return {
+        (ref.text or "").strip(): lane.get("id")
+        for lane in root.iter(f"{{{NS['bpmn']}}}lane")
+        for ref in lane.findall("bpmn:flowNodeRef", NS)
+    }
+
+
+def _in_own_lane(xml: str, element: str, dx: float = 60, dy: float = 5) -> dict[str, float]:
+    """A place for ``element`` moved by (dx, dy), its middle still in its own lane."""
+    x, y, w, h = _bounds(xml)[element]
+    lx, ly, lw, lh = _bounds(xml)[_lane_of(xml)[element]]
+    cx, cy = x + dx + w / 2, y + dy + h / 2
+    assert lx <= cx <= lx + lw and ly <= cy <= ly + lh, "the test's place leaves the lane"
+    return {"x": x + dx, "y": y + dy}
+
+
 def _on_border(point, rect) -> bool:
     px, py = point
     x, y, w, h = rect
@@ -110,9 +129,11 @@ def test_apply_layout_moves_the_shape_and_keeps_its_size() -> None:
     task = _tasks(xml)[0]
     before = _bounds(xml)[task]
 
-    moved = bpmn_layout.apply_layout(xml, {"shapes": {task: {"x": 900.5, "y": 640}}})
+    place = _in_own_lane(xml, task, dx=60.5)
 
-    assert _bounds(moved)[task] == (900.5, 640.0, before[2], before[3])
+    moved = bpmn_layout.apply_layout(xml, {"shapes": {task: place}})
+
+    assert _bounds(moved)[task] == (place["x"], place["y"], before[2], before[3])
     assert "<!DOCTYPE" not in moved
     assert "bpmn:definitions" in moved
 
@@ -137,7 +158,7 @@ def test_edges_of_a_moved_shape_are_rerouted_with_right_angles() -> None:
     assert touching
     before = _waypoints(xml)
 
-    moved = bpmn_layout.apply_layout(xml, {"shapes": {task: {"x": 700, "y": 520}}})
+    moved = bpmn_layout.apply_layout(xml, {"shapes": {task: _in_own_lane(xml, task, 80, 30)}})
 
     bounds, points = _bounds(moved), _waypoints(moved)
     ends = _ends(moved)
@@ -161,10 +182,35 @@ def test_stored_waypoints_replace_the_edges_route() -> None:
     task = _ends(xml)[flow][1]
 
     moved = bpmn_layout.apply_layout(
-        xml, {"shapes": {task: {"x": 1000, "y": 1000}}, "edges": {flow: route}}
+        xml, {"shapes": {task: _in_own_lane(xml, task)}, "edges": {flow: route}}
     )
 
     assert _waypoints(moved)[flow] == [tuple(p) for p in route]
+
+
+def test_a_stored_place_outside_the_shapes_own_lane_is_not_applied() -> None:
+    """After a chat edit moves a dragged step to another lane, the step is drawn in its lane."""
+    xml = _xml()
+    lanes = _lane_of(xml)
+    tasks = [t for t in _tasks(xml) if t in lanes]
+    stray, other = tasks[0], next(t for t in tasks if lanes[t] != lanes[tasks[0]])
+    # A place in another lane than the one listing the step, as a layout dragged before the edit.
+    lx, ly, lw, lh = _bounds(xml)[lanes[other]]
+    w, h = _bounds(xml)[stray][2:]
+    elsewhere = {"x": lx + lw / 2 - w / 2, "y": ly + lh / 2 - h / 2}
+    flow = next(f for f, ends in _ends(xml).items() if stray in ends)
+    kept = _in_own_lane(xml, other)
+
+    out = bpmn_layout.apply_layout(
+        xml,
+        {"shapes": {stray: elsewhere, other: kept}, "edges": {flow: [[1, 2], [1, 900], [5, 900]]}},
+    )
+
+    # The step stays where the drawing puts it, and so does its edge's stored route.
+    assert _bounds(out)[stray] == _bounds(xml)[stray]
+    assert _waypoints(out)[flow] != [(1.0, 2.0), (1.0, 900.0), (5.0, 900.0)]
+    # A place inside its own lane is still applied.
+    assert _bounds(out)[other][:2] == (kept["x"], kept["y"])
 
 
 def test_unknown_ids_are_ignored() -> None:
@@ -288,24 +334,26 @@ def test_a_moved_shape_keeps_its_position_after_a_redraw(client, db_session, bus
     full = client.get(f"/sessions/{sid}/bpmn").text
     task = _tasks(full)[0]
     width, height = _bounds(full)[task][2:]
+    place = _in_own_lane(full, task, dx=70, dy=3)
+    px, py = place["x"], place["y"]
 
-    res = _put(client, sid, {"shapes": {task: {"x": 1234, "y": 567}}})
+    res = _put(client, sid, {"shapes": {task: place}})
 
     assert res.status_code == 204, res.text
     again = client.get(f"/sessions/{sid}/bpmn")
     assert again.status_code == 200
     assert again.headers["X-AI-Generated"] == "true"
     assert "<bpmn:definitions" in again.text
-    assert _bounds(again.text)[task] == (1234.0, 567.0, width, height)
+    assert _bounds(again.text)[task] == (px, py, width, height)
     assert _bounds(client.get(f"/sessions/{sid}/bpmn", params={"data_objects": 1}).text)[task] == (
-        1234.0,
-        567.0,
+        px,
+        py,
         width,
         height,
     )
     # The compact drawing has its own layout.
     compact = client.get(f"/sessions/{sid}/bpmn", params={"data_objects": 0}).text
-    assert _bounds(compact)[task][:2] != (1234.0, 567.0)
+    assert _bounds(compact)[task][:2] != (px, py)
     # No version: the blueprint did not change.
     assert len(_versions(db_session, sid)) == 1
 
@@ -316,16 +364,16 @@ def test_a_compact_position_does_not_move_the_full_drawing(client, db_session, b
     sid = created["id"]
     full_before = client.get(f"/sessions/{sid}/bpmn").text
     task = _tasks(full_before)[0]
+    compact_before = client.get(f"/sessions/{sid}/bpmn", params={"data_objects": 0}).text
+    place = _in_own_lane(compact_before, task, dx=42, dy=4)
 
-    assert (
-        _put(client, sid, {"shapes": {task: {"x": 42, "y": 43}}}, data_objects=0).status_code == 204
-    )
+    assert _put(client, sid, {"shapes": {task: place}}, data_objects=0).status_code == 204
 
     compact = client.get(f"/sessions/{sid}/bpmn", params={"data_objects": 0}).text
-    assert _bounds(compact)[task][:2] == (42.0, 43.0)
+    assert _bounds(compact)[task][:2] == (place["x"], place["y"])
     assert _bounds(client.get(f"/sessions/{sid}/bpmn").text) == _bounds(full_before)
     assert _stored(db_session, sid) == {
-        "compact": {"shapes": {task: {"x": 42.0, "y": 43.0}}, "edges": {}}
+        "compact": {"shapes": {task: {"x": float(place["x"]), "y": float(place["y"])}}, "edges": {}}
     }
 
 
