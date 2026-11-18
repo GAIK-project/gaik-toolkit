@@ -103,17 +103,24 @@ def _index(path: str, prefix: str) -> int | None:
 def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[str, Any]:
     """``mapping`` with what the editor needs beside the paths: each lane's
     ``participant_id`` (the id lane operations take, derived lanes included),
-    each step's ``performed_by`` ("" when its type decides its lane), and each
+    each step's ``performed_by`` ("" when its type decides its lane), each
     business decision's ``decision`` (its id, name, step and branches, which
-    the decision dialog edits)."""
+    the decision dialog edits), and the ``exception`` of each element that
+    draws a rework or rejection path (its id, name, step, condition and
+    outcome, which the path dialog edits): the path's gateway and end event,
+    and the approval gateway of a review step whose "No" is the path's loop."""
     process = drawn_from.get("business_process") or {}
     participants = process.get("participants") or []
     decisions = process.get("decision_points") or []
     steps = (drawn_from.get("workflow") or {}).get("steps") or []
+    paths = _paths_of(drawn_from)
     named: dict[str, Any] = {}
     for element_id, entry in mapping.items():
         entry = dict(entry) if isinstance(entry, dict) else entry
         path = entry.get("blueprint_path", "") if isinstance(entry, dict) else ""
+        exception = paths.get(path) if isinstance(entry, dict) else None
+        if exception is not None:
+            entry["exception"] = exception
         if isinstance(entry, dict) and entry.get("kind") == "lane":
             i = _index(path, "business_process.participants")
             if i is not None and i < len(participants):
@@ -130,6 +137,62 @@ def named_mapping(mapping: dict[str, Any], drawn_from: dict[str, Any]) -> dict[s
                 entry["performed_by"] = str(steps[i].get("performed_by") or "")
         named[element_id] = entry
     return named
+
+
+def _exception_entry(exception: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: str(exception.get(key) or default)
+        for key, default in (
+            ("id", ""),
+            ("name", ""),
+            ("attached_to", ""),
+            ("condition", ""),
+            ("outcome", "end"),
+        )
+    }
+
+
+def _paths_of(drawn_from: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Each rework or rejection path by the mapping paths of the elements that
+    draw it, as the generator records them: ``business_process.exceptions[i]``
+    for a path's own gateway and end event, ``business_process.exceptions.<id>``
+    for the end event of a rejection on a review step, and
+    ``derived:approval_after:<step id>`` for the approval gateway whose "No"
+    loops back as the review step's first rework path to a drawn step (the
+    generator draws that loop flow without a mapping entry)."""
+    process = drawn_from.get("business_process") or {}
+    exceptions = [e for e in process.get("exceptions") or [] if isinstance(e, dict)]
+    steps = [
+        s for s in (drawn_from.get("workflow") or {}).get("steps") or [] if isinstance(s, dict)
+    ]
+    drawn = {
+        str(s.get("id"))
+        for s in [*steps, *(process.get("manual_steps") or [])]
+        if isinstance(s, dict)
+    }
+    out: dict[str, dict[str, Any]] = {}
+    for i, exception in enumerate(process.get("exceptions") or []):
+        if isinstance(exception, dict):
+            out[f"business_process.exceptions[{i}]"] = _exception_entry(exception)
+    for exception in exceptions:
+        out.setdefault(
+            f"business_process.exceptions.{exception.get('id', '')}", _exception_entry(exception)
+        )
+    for step in steps:
+        if step.get("type") != "human_review":
+            continue
+        rework = next(
+            (
+                e
+                for e in exceptions
+                if e.get("attached_to") == step.get("id")
+                and str(e.get("outcome") or "").startswith("loop_to:")
+            ),
+            None,
+        )
+        if rework is not None and str(rework["outcome"]).split(":", 1)[1].strip() in drawn:
+            out[f"derived:approval_after:{step.get('id')}"] = _exception_entry(rework)
+    return out
 
 
 def _decision_entry(decision: dict[str, Any]) -> dict[str, Any]:

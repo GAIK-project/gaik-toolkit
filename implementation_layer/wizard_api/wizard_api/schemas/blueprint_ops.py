@@ -27,6 +27,8 @@ MAX_CONDITION_CHARS = 200
 #: A decision has 2 to 5 branches.
 MIN_BRANCHES = 2
 MAX_BRANCHES = 5
+#: ``"loop_to:"`` and a step id.
+MAX_OUTCOME_CHARS = 300
 
 
 class _Operation(BaseModel):
@@ -145,6 +147,33 @@ class RemoveDecision(_Operation):
     decision_id: str
 
 
+class AddReworkPath(_Operation):
+    """A rework or rejection path (``business_process.exceptions``) on the step
+    ``attached_to``: ``outcome`` is ``"end"`` or ``"loop_to:<step id>"``, back to
+    an earlier step or the same one."""
+
+    op: Literal["add_rework_path"]
+    attached_to: str
+    name: str = Field(max_length=MAX_NAME_CHARS)
+    condition: str = Field(default="", max_length=MAX_CONDITION_CHARS)
+    outcome: str = Field(max_length=MAX_OUTCOME_CHARS)
+
+
+class UpdateReworkPath(_Operation):
+    """A path's new name, condition or outcome; ``None`` keeps what it has."""
+
+    op: Literal["update_rework_path"]
+    exception_id: str
+    name: str | None = Field(default=None, max_length=MAX_NAME_CHARS)
+    condition: str | None = Field(default=None, max_length=MAX_CONDITION_CHARS)
+    outcome: str | None = Field(default=None, max_length=MAX_OUTCOME_CHARS)
+
+
+class RemoveReworkPath(_Operation):
+    op: Literal["remove_rework_path"]
+    exception_id: str
+
+
 Operation = Annotated[
     (
         RenameStep
@@ -162,6 +191,9 @@ Operation = Annotated[
         | AddDecision
         | UpdateDecision
         | RemoveDecision
+        | AddReworkPath
+        | UpdateReworkPath
+        | RemoveReworkPath
     ),
     Field(discriminator="op"),
 ]

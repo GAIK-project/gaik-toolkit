@@ -28,6 +28,7 @@ from pydantic import ValidationError
 from wizard_api.schemas.blueprint_ops import (
     AddDecision,
     AddLane,
+    AddReworkPath,
     AddStep,
     Branch,
     Connect,
@@ -35,6 +36,7 @@ from wizard_api.schemas.blueprint_ops import (
     MoveStep,
     RemoveDecision,
     RemoveLane,
+    RemoveReworkPath,
     RemoveStep,
     RenameLane,
     RenameStep,
@@ -42,6 +44,7 @@ from wizard_api.schemas.blueprint_ops import (
     SetStepLane,
     SetStepType,
     UpdateDecision,
+    UpdateReworkPath,
 )
 
 try:
@@ -1025,6 +1028,115 @@ def _remove_decision(ctx: _Context, op: RemoveDecision) -> None:
     ctx.summaries.append(f'Removed decision "{decision.get("name") or decision.get("id", "")}"')
 
 
+# ---------------------------------------------------------------- rework and rejection paths
+
+#: A path's outcome: back to a step (``loop_to:<step id>``), or the end.
+_LOOP_TO = "loop_to:"
+
+
+def _path(ctx: _Context, exception_id: str) -> dict:
+    for exception in ctx.process.get("exceptions") or []:
+        if exception.get("id") == exception_id:
+            return exception
+    raise OperationError("not_found", f'There is no path "{exception_id}"', "exception_id")
+
+
+def _path_name(value: str) -> str:
+    name = value.strip()
+    if not name:
+        raise OperationError("invalid", "A path needs a name", "name")
+    return name
+
+
+def _path_words(exception: dict) -> str:
+    rework = str(exception.get("outcome") or "").startswith(_LOOP_TO)
+    return "rework path" if rework else "rejection path"
+
+
+def _drawn_order(ctx: _Context) -> list[str]:
+    """The steps a path hangs off and leads back to, as ``_Flow`` orders them:
+    the workflow's steps, then the manual ones."""
+    manual = ctx.process.get("manual_steps") or []
+    return [str(s.get("id")) for s in [*ctx.steps, *manual] if isinstance(s, dict)]
+
+
+def _outcome(ctx: _Context, outcome: str, attached_to: str) -> str:
+    """``outcome`` as stored, or refused: neither ``"end"`` nor a loop
+    (``invalid``), a loop to an unknown step (``unknown_step``) or to a step
+    after ``attached_to`` (``invalid``). A rework path loops back; the
+    diagram draws it as a loop flow, so the loop check of decisions leaves it."""
+    if outcome == _END:
+        return outcome
+    if not outcome.startswith(_LOOP_TO):
+        raise OperationError(
+            "invalid", 'A path ends ("end") or loops back ("loop_to:<step id>")', "outcome"
+        )
+    target = outcome[len(_LOOP_TO) :]
+    order = _drawn_order(ctx)
+    if attached_to not in order:
+        raise OperationError("unknown_step", f'There is no step "{attached_to}"', "attached_to")
+    if target not in order:
+        raise OperationError("unknown_step", f'There is no step "{target}"', "outcome")
+    if order.index(target) > order.index(attached_to):
+        raise OperationError(
+            "invalid",
+            f'A rework path leads back to an earlier step or the same one, not to "{target}"',
+            "outcome",
+        )
+    return outcome
+
+
+def _add_rework_path(ctx: _Context, op: AddReworkPath) -> None:
+    order = _drawn_order(ctx)
+    if op.attached_to not in order:
+        raise OperationError("unknown_step", f'There is no step "{op.attached_to}"', "attached_to")
+    name = _path_name(op.name)
+    outcome = _outcome(ctx, op.outcome, op.attached_to)
+    exceptions = ctx.process.get("exceptions")
+    if not isinstance(exceptions, list):
+        exceptions = ctx.process["exceptions"] = []
+    # The generator draws a path as Gateway_exc_<id> and EndEvent_<id>, beside
+    # EndEvent_success and each review's EndEvent_rejected_<step id>.
+    taken = {e.get("id") for e in exceptions} | {"success"}
+    taken |= {f"rejected_{sid}" for sid in order}
+    slug_of = name if re.search(r"[a-z0-9]", name.lower()) else "path"
+    exception = {
+        "id": new_step_id(slug_of, taken),
+        "name": name,
+        "attached_to": op.attached_to,
+        "condition": op.condition.strip(),
+        "outcome": outcome,
+    }
+    exceptions.append(exception)
+    step = next(
+        s
+        for s in [*ctx.steps, *(ctx.process.get("manual_steps") or [])]
+        if s.get("id") == op.attached_to
+    )
+    ctx.summaries.append(f'Added {_path_words(exception)} "{name}" to step "{_label(step)}"')
+
+
+def _update_rework_path(ctx: _Context, op: UpdateReworkPath) -> None:
+    exception = _path(ctx, op.exception_id)
+    old_name = exception.get("name") or exception.get("id", "")
+    if op.outcome is not None:
+        exception["outcome"] = _outcome(ctx, op.outcome, str(exception.get("attached_to") or ""))
+    if op.condition is not None:
+        exception["condition"] = op.condition.strip()
+    if op.name is not None:
+        exception["name"] = _path_name(op.name)
+    name = exception.get("name") or exception.get("id", "")
+    renamed = f' (was "{old_name}")' if name != old_name else ""
+    ctx.summaries.append(f'Changed {_path_words(exception)} "{name}"{renamed}')
+
+
+def _remove_rework_path(ctx: _Context, op: RemoveReworkPath) -> None:
+    exception = _path(ctx, op.exception_id)
+    ctx.process["exceptions"] = [e for e in ctx.process["exceptions"] if e is not exception]
+    name = exception.get("name") or exception.get("id", "")
+    ctx.summaries.append(f'Removed {_path_words(exception)} "{name}"')
+
+
 def _set_field(ctx: _Context, op: SetField) -> None:
     _FIELD_HANDLERS[op.field](ctx, op)
 
@@ -1146,5 +1258,8 @@ _HANDLERS: dict[type, Callable[[_Context, Any], None]] = {
     AddDecision: _add_decision,
     UpdateDecision: _update_decision,
     RemoveDecision: _remove_decision,
+    AddReworkPath: _add_rework_path,
+    UpdateReworkPath: _update_rework_path,
+    RemoveReworkPath: _remove_rework_path,
     SetField: _set_field,
 }
