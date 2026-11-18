@@ -377,6 +377,10 @@ IMPORTANT INSTRUCTIONS FOR THIS WEB SESSION:
   user steps. A mapping path that starts with "derived:" means the lane or
   element was derived by that rule, not written in the blueprint. To change the
   diagram, change the blueprint.
+- THE USER EDITS THE SOLUTION TOO. The user can change the solution in the
+  workspace; the server writes those changes into use_case.blueprint.json and
+  tells you which. Read the file again before you edit it, and never undo a
+  change the user made unless they ask.
 - THE POC IS RUN IN THE PANEL'S SANDBOX. The panel starts a test run by itself
   once the package is complete and has passed its check, and again after you
   have changed the package, so do not ask the user to press Run: say that the
