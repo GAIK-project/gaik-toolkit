@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -92,6 +93,17 @@ def regular_file(path: str | os.PathLike, root: str | os.PathLike) -> bool:
     real_root = os.path.realpath(root)
     real = os.path.realpath(path)
     return real.startswith(real_root + os.sep)
+
+
+def package_files(poc_dir: str | os.PathLike) -> list[str]:
+    """The real files of ``poc/`` that the API lists and zips.
+
+    Without environment files that would hold keys (``is_secret_name``): one
+    the agent or a tool left in the package is never listed, downloaded or
+    sent to the sandbox. A package's settings without their values belong in
+    ``.env.example``.
+    """
+    return [relative for relative in regular_files(poc_dir) if not is_secret_name(relative)]
 
 
 def regular_files(root: str | os.PathLike) -> list[str]:
@@ -347,7 +359,7 @@ def _agent_package(poc_dir: Path) -> dict[str, Any]:
 
 
 def _relative_files(poc_dir: Path) -> list[str]:
-    return [f for f in regular_files(poc_dir) if "__pycache__" not in Path(f).parts]
+    return [f for f in package_files(poc_dir) if "__pycache__" not in Path(f).parts]
 
 
 def generate_poc(
@@ -998,15 +1010,58 @@ _VERSION_FILES = (
 
 #: Folders of a package that hold a run's inputs and outputs, not the package.
 _RUN_FOLDERS = frozenset({"sample_input", "output"})
+#: Documentation for people, which no run reads: the one kind of package file
+#: whose change leaves the tested package as it was. Only README files: the
+#: prompts under ``prompts/`` are Markdown too, and a run reads them.
+_README_NAME = "readme.md"
+#: The temporary file a save in the editor writes beside its file, for a moment.
+_EDIT_TEMP_PREFIX = ".edit-"
+_EDIT_TEMP_SUFFIX = ".tmp"
+#: The package's own test page: ``app.py`` at the root serves the page in
+#: ``ui/`` (its HTML, the solution's description, fonts and the mark). The page
+#: runs on the machine of whoever takes the package; no sandbox run reads
+#: ``ui/``, so it is outside the version. ``app.py`` is Python of the package
+#: and stays in it. Both are the scaffolder's templates, meant to stay as
+#: written (the test page's package check compares them with the templates), so
+#: the editor does not change them.
+_TEST_PAGE_ENTRY = "app.py"
+_TEST_PAGE_DIR = "ui"
+
+
+def _in_version(parts: list[str]) -> bool:
+    """Whether the package file at ``parts`` (POSIX parts, relative to poc/) counts for its version.
+
+    Every file of the package does, whatever its kind: run_poc.py may read a
+    data file (a root ``labels.json``), a setting or a template as much as a
+    module, so a change to any of them may change what runs. Left out is what
+    no run reads or is not part of the package: README files outside
+    ``prompts/``, the test page's ``ui/`` folder, the AI marker the download
+    writes, the wizard's own records, environment files with keys, the editor's
+    temporary files, compiled Python, the run's own folders, hidden folders and
+    ``__pycache__``.
+    """
+    folders, name = parts[:-1], parts[-1]
+    if folders and folders[0] in _RUN_FOLDERS:
+        return False
+    if folders and folders[0] == _TEST_PAGE_DIR:
+        return False
+    if any(folder.startswith(".") or folder == "__pycache__" for folder in folders):
+        return False
+    if name in _HIDDEN_NAMES or name == AI_MARKER_NAME or is_secret_name(name):
+        return False
+    if name.endswith((".pyc", ".pyo")):
+        return False
+    if name.startswith(_EDIT_TEMP_PREFIX) and name.endswith(_EDIT_TEMP_SUFFIX):
+        return False
+    return not (name.lower() == _README_NAME and not (folders and folders[0] == _PROMPTS))
 
 
 def _version_files(poc_dir: str) -> list[str]:
-    """``_VERSION_FILES``, every Python file of the package and every file in ``schemas/``.
+    """``_VERSION_FILES`` and every other file of the package that counts (``_in_version``).
 
-    run_poc.py imports the helpers the scaffolder copies in (``poc_output.py``,
-    ``document_manifest.py``, ``input_bundle.py``) and any module the agent adds, and
-    since gaik 0.11.0 the PoC loads ``schemas/output_schema_model.json``
-    rather than the .py file, so a change to any of them changes what runs.
+    It covered Python files and ``schemas/`` only: an edit to a data file
+    run_poc.py reads, in the PoC tab's editor or by the agent, left a test
+    run and Gate 3's approval standing on a package that had changed.
     """
     names = set(_VERSION_FILES)
     for folder, dirs, files in os.walk(poc_dir):
@@ -1022,8 +1077,7 @@ def _version_files(poc_dir: str) -> list[str]:
         for name in files:
             path = os.path.join(folder, name)
             relpath = os.path.normpath(os.path.join(rel, name))
-            in_schemas = relpath.split(os.sep, 1)[0] == "schemas"
-            if (name.endswith(".py") or in_schemas) and regular_file(path, poc_dir):
+            if _in_version(relpath.split(os.sep)) and regular_file(path, poc_dir):
                 names.add(relpath)
     return sorted(names)
 
@@ -1228,7 +1282,9 @@ def is_deployable_path(relative_path: str) -> bool:
     if parts[0] in _NOT_DEPLOYABLE_DIRS:
         return False
     name = parts[-1]
-    if name in _NOT_DEPLOYABLE_NAMES:
+    # ``.env`` in any spelling: ``.env.local``, ``.env.production``, ``.envrc``,
+    # ``.ENV``. Only ``.env.example`` is part of a package.
+    if name in _NOT_DEPLOYABLE_NAMES or is_secret_name(relative_path):
         return False
     return not name.endswith(_NOT_DEPLOYABLE_SUFFIXES)
 
@@ -1236,6 +1292,381 @@ def is_deployable_path(relative_path: str) -> bool:
 def deployable_files(poc_dir: str) -> list[str]:
     """The package as someone else receives it, relative to poc/."""
     return [rel for rel in regular_files(poc_dir) if is_deployable_path(rel)]
+
+
+# ---------------------------------------------------------------------------
+# One package file, read and saved in the PoC tab's editor
+# ---------------------------------------------------------------------------
+
+#: The files a person may change by hand: source, settings and documentation as text.
+EDITABLE_SUFFIXES = (
+    ".py",
+    ".md",
+    ".txt",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".toml",
+    ".cfg",
+    ".ini",
+    ".html",
+    ".css",
+    ".js",
+)
+#: The list of the variables the package needs, without their values. The one
+#: ``.env*`` name the editor opens: it is where a key's *name* is added.
+ENV_EXAMPLE_NAME = ".env.example"
+#: The AI marker (``ai_marking.MARKER_FILE``, which imports the agent: a test
+#: holds the two names together). The download writes it; nobody edits it.
+AI_MARKER_NAME = "AI-GENERATED.json"
+#: The largest file the editor reads or saves.
+MAX_PACKAGE_FILE_BYTES = 256 * 1024
+#: The longest path the editor is given.
+MAX_PACKAGE_PATH_CHARS = 512
+#: Folders whose files are shown but not changed by hand: the test material
+#: (replaced through its own upload, which scans it) and a run's result.
+_READ_ONLY_DIRS = (SAMPLE_INPUT_DIR, "output")
+#: The wizard's own records inside or beside the package; never a file of it.
+_HIDDEN_NAMES = (MANIFEST_NAME, UPLOADED_NAMES_FILE)
+_PROMPTS = "prompts"
+_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
+
+
+class PackageFileError(ValueError):
+    """A package file the editor may not read or save, with the answer's status and code.
+
+    ``extra`` goes into the error's detail as it is (``variables`` for a key
+    given a value in ``.env.example``).
+    """
+
+    def __init__(self, status: int, code: str, message: str, **extra: Any) -> None:
+        self.status = status
+        self.code = code
+        self.extra = extra
+        super().__init__(message)
+
+
+# A variable of ``.env.example`` as the web app's form reads it (lib/env-file.ts):
+# ``NAME=value`` and ``export NAME=value``, or commented out, ``# NAME=value``.
+_ENV_ASSIGNMENT = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
+_ENV_COMMENTED_ASSIGNMENT = re.compile(r"^\s*#\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+_ENV_QUOTED = re.compile(r"^([\"'])(.*)\1\s*(?:#.*)?$")
+#: A part of a variable's name (between underscores) ending in one of these
+#: names a credential: AZURE_API_KEY, HF_TOKEN, CLIENT_SECRET, OPENAI_APIKEY,
+#: DOCLING_API_PASSWORD. ``MAX_TOKENS`` and ``KEYWORDS`` do not.
+_CREDENTIAL_WORDS = ("KEY", "SECRET", "TOKEN", "PASSWORD")
+#: Credentials the generated ``.env.example`` lists under a name with no such part.
+_CREDENTIAL_NAMES = frozenset({"GOOGLE_SERVICE_ACCOUNT_JSON"})
+
+
+def _env_value(raw: str) -> str:
+    """A value as ``.env.example`` writes it, without its quotes or a trailing comment."""
+    text = raw.strip()
+    if text.startswith("#"):  # ``NAME=  # a comment``: no value
+        return ""
+    quoted = _ENV_QUOTED.match(text)
+    if quoted:
+        return quoted.group(2)
+    # ``value  # a comment``: a ``#`` after white space starts the comment. Found
+    # by a scan, not a regex, which backtracks on a long run of spaces.
+    for at, char in enumerate(text):
+        if char == "#" and at > 0 and text[at - 1].isspace():
+            return text[:at].rstrip()
+    return text
+
+
+def _is_credential_name(name: str) -> bool:
+    upper = name.upper()
+    if upper in _CREDENTIAL_NAMES:
+        return True
+    return any(part.endswith(_CREDENTIAL_WORDS) for part in upper.split("_") if part)
+
+
+def _is_placeholder(value: str) -> bool:
+    """A value that is plainly no key: empty, ``<your key>``, ``your-key-here``, ``xxxx``."""
+    value = value.strip()
+    if not value:
+        return True
+    if value.startswith("<") and value.endswith(">"):
+        return True
+    if value.lower().startswith("your"):
+        return True
+    return set(value) <= set("xX*.-_")
+
+
+def env_example_key_values(text: str) -> list[str]:
+    """The variables of ``.env.example`` that give a credential a value, by name.
+
+    ``.env.example`` lists what the package needs, without values: the keys
+    are typed where the package is downloaded and go into its ``.env`` in the
+    browser. A key typed into ``.env.example`` would be kept on the server and
+    shipped in both zips. A credential (``_is_credential_name``) may stand
+    there empty or with a placeholder (``_is_placeholder``), also commented
+    out; any other value is refused. Other variables (a model name, an API
+    version, an endpoint) keep their example values.
+    """
+    found: list[str] = []
+    for line in text.splitlines():
+        match = _ENV_COMMENTED_ASSIGNMENT.match(line) or _ENV_ASSIGNMENT.match(line)
+        if match is None:
+            continue
+        name, raw = match.group(1), match.group(2)
+        if _is_credential_name(name) and not _is_placeholder(_env_value(raw)):
+            if name not in found:
+                found.append(name)
+    return found
+
+
+def is_secret_name(relative_path: str) -> bool:
+    """Whether a path names an environment file that would hold keys.
+
+    ``.env``, every ``.env*`` name but ``.env.example`` and every ``*.env``
+    name, in any folder and any case. The server keeps no such file for a
+    user: the keys are added to the downloaded package in the browser.
+    """
+    name = relative_path.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if name == ENV_EXAMPLE_NAME:
+        return False
+    # ``.env``, ``.env.local``, ``.envrc``, and the other way round:
+    # ``prod.env``, ``local.env``, ``keys.env``.
+    return name.startswith(".env") or name.endswith(".env")
+
+
+def package_file_path(relative: Any) -> str:
+    """``relative`` as a plain path inside ``poc/``; PackageFileError for anything else.
+
+    No absolute path, no ``..``, no backslash (a Windows separator would be one
+    file name here and another path there), no control character.
+    """
+    invalid = PackageFileError(422, "invalid_path", "the path is not a file of the package")
+    if (
+        not isinstance(relative, str)
+        or len(relative) > MAX_PACKAGE_PATH_CHARS
+        or "\\" in relative
+        or any(ord(ch) < 32 or ord(ch) == 127 for ch in relative)
+        or relative.startswith("/")
+        or _DRIVE_PREFIX.match(relative)
+    ):
+        raise invalid
+    normalised = _normalise(relative)
+    if normalised is None:
+        raise invalid
+    if is_secret_name(normalised):
+        raise PackageFileError(
+            422,
+            "secrets_not_stored",
+            "environment files with keys are not kept on the server; "
+            "add the keys to the package when you download it",
+        )
+    return normalised
+
+
+def _package_file(poc_dir: str, relative: Any) -> tuple[str, str]:
+    """The normalised path and the real file it names inside ``poc_dir``.
+
+    The file must be the session's own regular file: not a symlink and not
+    reached through one (``_linked_part``, ``regular_file``).
+    """
+    normalised = package_file_path(relative)
+    missing = PackageFileError(404, "not_found", "file not found")
+    if normalised.rsplit("/", 1)[-1] in _HIDDEN_NAMES:
+        raise missing
+    root = Path(poc_dir)
+    if _linked_part(root, normalised) is not None:
+        raise missing
+    target = root / normalised
+    if not regular_file(target, poc_dir):
+        raise missing
+    return normalised, str(target)
+
+
+def package_file_read_only(normalised: str) -> str | None:
+    """Why the editor may not save this file, as an error code; None when it may.
+
+    Nor a file in a hidden folder or ``__pycache__``: those are outside the
+    package digest (``_in_version``), and every saved edit must count as a
+    change to the package a test run is tied to, but a README's. Nor the test
+    page (``app.py`` at the root and everything under ``ui/``), which is the
+    scaffolder's template as it is. Nor, while the test runs use the project's
+    shared runner key, the package's code and ``config.yaml``
+    (``is_package_code``, ``code_edit_needs_own_runner_key``): user-written code
+    and endpoints run only with a runner key of its own. The other files stay
+    editable.
+    """
+    parts = normalised.split("/")
+    if parts[-1] == AI_MARKER_NAME or parts[0] in _READ_ONLY_DIRS:
+        return "file_read_only"
+    if any(folder.startswith(".") or folder == "__pycache__" for folder in parts[:-1]):
+        return "file_read_only"
+    if parts == [_TEST_PAGE_ENTRY] or (len(parts) > 1 and parts[0] == _TEST_PAGE_DIR):
+        return "file_read_only"
+    if parts[-1] != ENV_EXAMPLE_NAME and not parts[-1].lower().endswith(EDITABLE_SUFFIXES):
+        return "file_type_not_editable"
+    if is_package_code(normalised) and _code_edits_wait():
+        return CODE_NEEDS_OWN_RUNNER_KEY
+    return None
+
+
+#: Why code is not saved: the test runs use the project's shared runner key.
+CODE_NEEDS_OWN_RUNNER_KEY = "code_edit_needs_own_runner_key"
+#: Besides every Python file, what decides what a run installs (requirements.txt)
+#: and where it sends its model calls, with the runner's key (config.yaml).
+_CODE_LIKE_NAMES = frozenset({"requirements.txt", "config.yaml", "config.yml"})
+
+
+def is_package_code(normalised: str) -> bool:
+    """Whether a package file is code, or settings that decide where the key goes.
+
+    Every Python file (the run imports the package's modules and loads
+    ``schemas/output_schema.py`` with importlib), ``requirements.txt``, and
+    ``config.yaml``, which names the model endpoints the run calls with the
+    runner's key. The other files a run reads are data to it: the prompts as
+    text and the schema's JSON files as JSON, and the run installs nothing
+    (the runner image has its packages).
+    """
+    name = normalised.rsplit("/", 1)[-1].lower()
+    return name.endswith(".py") or name in _CODE_LIKE_NAMES
+
+
+def _code_edits_wait() -> bool:
+    """True while the editor saves no code: user-written code runs only with a runner key
+    of its own (``sandbox_runner.runs_use_shared_key``)."""
+    from wizard_api.services import sandbox_runner
+
+    return sandbox_runner.runs_use_shared_key()
+
+
+def counts_for_package_digest(normalised: str) -> bool:
+    """Whether a change to this file changes the digest a test run is tied to.
+
+    By its name, the rule ``_version_files`` walks by (``_in_version``): every
+    file of the package but a README outside ``prompts/`` and what is not part
+    of the package. So every file the editor saves but a README does.
+    """
+    if normalised in {name.replace(os.sep, "/") for name in _VERSION_FILES}:
+        return True
+    return _in_version(normalised.split("/"))
+
+
+def content_digest(data: bytes) -> str:
+    """What a save is compared against: the file as the editor read it."""
+    return hashlib.sha256(data).hexdigest()
+
+
+def package_file_answer(normalised: str, data: bytes) -> dict[str, Any]:
+    """What the editor is told about a file beside its text."""
+    reason = package_file_read_only(normalised)
+    return {
+        "path": normalised,
+        "digest": content_digest(data),
+        "bytes": len(data),
+        "editable": reason is None,
+        "read_only_reason": reason,
+        "affects_package": counts_for_package_digest(normalised),
+    }
+
+
+def _text(data: bytes) -> str:
+    """``data`` as the text the editor shows; PackageFileError for anything but UTF-8 text."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        text = None
+    if text is None or "\x00" in text:
+        raise PackageFileError(415, "file_not_text", "the file is not text and cannot be shown")
+    return text
+
+
+def _read_capped(target: str) -> bytes:
+    """Up to one byte over the limit of ``target``, never through a link.
+
+    The file was checked to be a regular one; ``O_NOFOLLOW`` (where the
+    platform has it) keeps a link put in its place since then from being read.
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    try:
+        fd = os.open(target, flags)
+    except OSError as exc:  # gone, or a link now
+        raise PackageFileError(404, "not_found", "file not found") from exc
+    with os.fdopen(fd, "rb") as fh:
+        return fh.read(MAX_PACKAGE_FILE_BYTES + 1)
+
+
+def read_package_file(poc_dir: str, relative: Any) -> dict[str, Any]:
+    """One file of the package as text, with the digest a later save names."""
+    normalised, target = _package_file(poc_dir, relative)
+    data = _read_capped(target)
+    if len(data) > MAX_PACKAGE_FILE_BYTES:
+        raise PackageFileError(413, "file_too_large", "the file is too large to open here")
+    return {**package_file_answer(normalised, data), "content": _text(data)}
+
+
+def write_package_file(
+    poc_dir: str, relative: Any, content: str, base_digest: str
+) -> dict[str, Any]:
+    """Save the editor's text over an existing package file.
+
+    Only a file that is already there, of a kind a person edits by hand, and
+    only while it is still what the editor read (``base_digest``): the agent
+    rewrites the package during its turns, and a save over its newer version
+    would lose that silently. The new content replaces the file in one step (a
+    temporary file beside it, then a rename), so a run or a zip never reads
+    half of it, and a link put in the file's place is replaced, not followed.
+    """
+    # By its name first: the AI marker is refused whether or not one is on disk.
+    reason = package_file_read_only(package_file_path(relative))
+    if reason == "file_read_only":
+        raise PackageFileError(403, reason, "this file is not changed by hand")
+    if reason == CODE_NEEDS_OWN_RUNNER_KEY:
+        raise PackageFileError(
+            403,
+            reason,
+            "the package's code and config.yaml can be edited here once the test runs use "
+            "their own key",
+        )
+    if reason is not None:
+        raise PackageFileError(422, reason, "files of this type cannot be edited here")
+    normalised, target = _package_file(poc_dir, relative)
+    not_text = PackageFileError(422, "file_not_text", "the content is not text")
+    if "\x00" in content:
+        raise not_text
+    try:
+        data = content.encode("utf-8")
+    except UnicodeEncodeError as exc:  # a lone surrogate
+        raise not_text from exc
+    if len(data) > MAX_PACKAGE_FILE_BYTES:
+        raise PackageFileError(413, "file_too_large", "the file is too large to save here")
+    if normalised.rsplit("/", 1)[-1] == ENV_EXAMPLE_NAME:
+        valued = env_example_key_values(content)
+        if valued:
+            raise PackageFileError(
+                422,
+                "key_value_not_stored",
+                "a key's value is not kept on the server: leave "
+                + ", ".join(valued)
+                + " empty in .env.example and give the value when you download the package",
+                variables=valued,
+            )
+    if content_digest(_read_capped(target)) != base_digest:
+        raise PackageFileError(
+            409,
+            "file_changed",
+            "the file was changed after you opened it; open it again to see the new version",
+        )
+    mode = os.stat(target).st_mode & 0o777
+    fd, temporary = tempfile.mkstemp(
+        dir=os.path.dirname(target), prefix=_EDIT_TEMP_PREFIX, suffix=_EDIT_TEMP_SUFFIX
+    )
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.chmod(temporary, mode)
+        os.replace(temporary, target)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
+    return package_file_answer(normalised, data)
 
 
 #: The folder the wizard writes the solution's documentation into (step 12).
@@ -1250,6 +1681,12 @@ SOLUTION_DOC_NAMES = (
     "developer_guide",
     "evaluation_plan",
 )
+#: What the AI Act screening writes when the user asks for one (SKILL.md Phase 12): the
+#: data beside the blueprint and the brief in ``docs/``. Optional, and not among the
+#: documents ``generate_docs.py`` writes, so :data:`SOLUTION_DOC_NAMES` stays as that
+#: script has it.
+SCREENING_DATA_NAME = "ai_act_screening.json"
+SCREENING_BRIEF_NAME = f"{SOLUTION_DOCS_DIR}/ai_act_screening.md"
 #: The diagram's name in the deployable package. It is drawn from the session's
 #: blueprint when the package is taken, not copied, see :func:`stored_bpmn`.
 SOLUTION_BPMN_NAME = artifact_sync.WORKFLOW_BPMN_FILE
@@ -1273,9 +1710,10 @@ def solution_files(output_dir: str | None) -> list[tuple[str, str]]:
     session: the blueprint the wizard wrote (the use case, the business and
     technical specification with the model provider and preferences, the
     components and the workflow), the workflow as a Mermaid diagram, and the
-    documents ``generate_docs.py`` writes (:data:`SOLUTION_DOC_NAMES`). Only
-    those: anything else in ``docs/`` (a ``.env``, ``__pycache__``, a copy of a
-    test document) stays out. The BPMN diagram is not here; it is drawn when the
+    documents ``generate_docs.py`` writes (:data:`SOLUTION_DOC_NAMES`), and the AI Act
+    screening with its brief when the user asked for one. Only those: anything
+    else in ``docs/`` (a ``.env``, ``__pycache__``, a copy of a test document)
+    stays out. The BPMN diagram is not here; it is drawn when the
     package is taken (:data:`SOLUTION_BPMN_NAME`).
 
     Real files only, as in the package: a symlink the agent left is not
@@ -1286,8 +1724,12 @@ def solution_files(output_dir: str | None) -> list[tuple[str, str]]:
     root = os.path.realpath(output_dir)
     wanted = [artifact_sync.DRAFT_BLUEPRINT_FILE, artifact_sync.WORKFLOW_MMD_FILE]
     docs = os.path.join(root, SOLUTION_DOCS_DIR)
-    if os.path.isdir(docs) and not os.path.islink(docs):
+    docs_ok = os.path.isdir(docs) and not os.path.islink(docs)
+    if docs_ok:
         wanted += [f"{SOLUTION_DOCS_DIR}/{name}.md" for name in SOLUTION_DOC_NAMES]
+    wanted.append(SCREENING_DATA_NAME)
+    if docs_ok:
+        wanted.append(SCREENING_BRIEF_NAME)
     found: list[tuple[str, str]] = []
     for name in wanted:
         path = _solution_file(root, name)

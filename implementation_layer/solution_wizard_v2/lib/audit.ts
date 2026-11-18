@@ -25,6 +25,7 @@ export type AuditEvent =
   | "poc.generate"
   | "poc.download"
   | "poc.deployable"
+  | "poc.file.save"
   | "poc.input.upload"
   | "poc.input.delete"
   | "case.create"

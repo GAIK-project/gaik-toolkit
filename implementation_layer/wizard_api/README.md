@@ -50,8 +50,84 @@ NEXT_PUBLIC_DEV_AUTH=true
 | `PATCH` | `/sessions/{id}` | Update `step`, `gate_statuses`, `metadata` |
 | `POST` | `/sessions/{id}/messages` | Append chat messages (Sprint 1 stub) |
 | `POST` | `/sessions/{id}/versions` | New blueprint version |
+| `GET` | `/sessions/{id}/poc/file?path=` | One file of the package as UTF-8 text (up to 256 KB), with the digest a save names |
+| `PUT` | `/sessions/{id}/poc/file?path=` | Save `{content, base_digest}` over that file |
 
 Steps are **1–13** (matches V2 UI phase stepper). Gate keys: `gate_1` … `gate_4`.
+
+### One package file (the PoC tab's editor)
+
+`path` is relative to the session's `poc/`. Only the session's own regular files are
+read or written: no absolute path, no `..`, no backslash, no symlink on the way
+(`poc_service.package_file_path`, `regular_file`). A save needs an existing file with
+one of the suffixes in `poc_service.EDITABLE_SUFFIXES` (or `.env.example`); the AI
+marker, everything under `sample_input/` and `output/`, files in a hidden folder or
+`__pycache__`, and the package's test page (`app.py` at the root and everything under
+`ui/`, the scaffolder's templates) are read-only (`file_read_only`, 403), other types
+`file_type_not_editable` (422). The package's code (every `.py` file and
+`requirements.txt`) and `config.yaml`, which names the model endpoints a run calls
+(`poc_service.is_package_code`), are saved only when the test runs use
+a runner key of their own (`WIZARD_POC_RUNNER_SECRET` names a Secret other than the
+shared `gaik-demo-api-keys`, `sandbox_runner.runs_use_shared_key`): user-written code
+runs only with a separate runner key. With the shared key those files are read-only
+with `read_only_reason` `code_edit_needs_own_runner_key` and a save answers 403 with that
+code; the prompts, the schema's JSON files, `.env.example` and the package's other
+files stay editable. `.env` and every `.env*` name except `.env.example` is
+refused for reading and writing with 422 `secrets_not_stored`: the server keeps no keys
+for a user, the web app adds `poc/.env` to the downloaded package in the browser. For
+the same reason a save of `.env.example` that gives a credential a value answers 422
+`key_value_not_stored` with the `variables` it names (rule below). A save whose
+`base_digest` is not the file's answers 409 `file_changed`, and one sent while the
+wizard is replying 409 `wizard_responding`.
+
+A save and the start of a chat turn exclude each other (`agent_service.editor_save`, a
+lock per session): the save checks for a running turn and records the edit under the
+lock, and a turn registered meanwhile waits for it before it reads the edits it tells
+the agent of, so the agent never writes over an edit it has not heard of. A turn that
+waits more than 30 seconds answers 409 `file_being_saved`.
+
+A saved edit is a package change like one of the agent's. The package digest
+(`package_digest` in `GET /poc/files`) covers every file of the package but its README
+files, so an edit to any other file (code, settings, prompts, `.env.example`, a data
+file such as a `labels.json` the run reads) makes the earlier run a run of another
+package, closes `/poc/deployable` until a new run has passed, and where Gate 3 was
+approved it reopens that gate. An edit to a `README.md` (outside `prompts/`) does
+neither: no run reads it, while the prompts are Markdown too and a run reads them.
+
+The digest (`poc_service._version_files`, `_in_version`; scheme 3) covers every file of
+`poc/` but README files, the test page's `ui/` folder (the page runs where the package
+is taken; no sandbox run reads it), the AI marker, the wizard's own records,
+environment files with keys, the editor's temporary files, compiled Python,
+`sample_input/`, `output/`, hidden folders and `__pycache__`. It is the preflight's version too, so the PoC tab
+checks the package again after any such change. Scheme 2 covered Python files,
+`schemas/` and `prompts/` only; a session approved under it is re-based on the package
+as it is, and a run recorded under it is asked for again before Gate 3 or the
+download. The editor says by a file's name whether saving it changes the digest
+(`counts_for_package_digest`, held to the digest by a test). Before a save the approved
+content is compared once, so that an approval recorded under an older digest scheme is
+re-based on the package as it was before the edit, not after it.
+
+`.env.example` lists the variables a package needs, without values. A save is refused
+when a credential has a value there, also on a commented-out line: a variable whose
+name has a part (between underscores) ending in `KEY`, `SECRET`, `TOKEN` or `PASSWORD`
+(`AZURE_API_KEY`, `HF_TOKEN`, `OPENAI_APIKEY`; not `MAX_TOKENS`), or
+`GOOGLE_SERVICE_ACCOUNT_JSON`. Empty, `<…>`, a value starting with `your`
+(`your-key-here`) and `xxxx`-style values are placeholders and stay allowed, and other
+variables keep their example values (`poc_service.env_example_key_values`; the web app
+applies the same rule before it sends the text, `lib/env-file.ts`).
+
+Environment files that would hold keys (`.env` in any spelling but `.env.example`) are
+left out of the package's listing and of both zips (`poc_service.package_files`), and
+so never reach the sandbox either. The session export still carries every file held. Each save is recorded in the session's metadata
+(`user_edits`, server-owned) and the agent is told once, with the next chat message.
+
+`GET /sessions/{id}/poc/deployable` hands the package over only when the run recorded as
+successful tested it as it is now: the digest kept with that run against the package's
+digest, the comparison Gate 3 makes. After a change to a file in the digest it answers
+409 `package_changed_since_run` until a new run has succeeded. Once Gate 3 is approved
+the approval holds the package instead (a change reopens the gate and takes the run
+away), so a run recorded under an older digest scheme does not lock an approved
+session's download.
 
 ### Errors
 

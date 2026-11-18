@@ -287,3 +287,14 @@ describe("what stands under a question and is no option", () => {
     });
   });
 });
+
+describe("the message shape the chat draws as one numbered list", () => {
+  it("still gives three questions under their own numbers, the bullets as options", () => {
+    expect(questionsIn("1. Q?\n   - a\n   - b\n2. Q2?\n   - c\n3. Q3?")).toEqual([
+      { n: 1, text: "Q?", options: ["a", "b"] },
+      // One bullet is not a choice: it stays with its question as written.
+      { n: 2, text: "Q2?", details: ["c"] },
+      { n: 3, text: "Q3?" },
+    ]);
+  });
+});

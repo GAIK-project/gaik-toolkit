@@ -9,6 +9,9 @@
   --color-surface-muted: #ebeef6;
   --color-border: #e0e4ee;
   --color-border-strong: #c6ccdb;
+  /* The edge of a small control that stands among text (a chip, an option, an
+     inline action): 3:1 on the three grounds, so the edge alone says "press". */
+  --color-border-control: #8791a7;
   --color-text: #111b28;
   --color-text-strong: #05080b;
   --color-text-secondary: #333d4f;
@@ -143,6 +146,22 @@ body {
   }
 }
 
+/* Tailwind leaves a button with the arrow cursor. Here what can be pressed
+   says so under the pointer; a utility (disabled:cursor-not-allowed) still wins. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role^="menuitem"]:not([aria-disabled="true"]),
+  summary,
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  label:has(> input[type="checkbox"], > input[type="radio"]) {
+    cursor: pointer;
+  }
+}
+
 @layer components {
   .sr-only {
     position: absolute;
@@ -210,6 +229,77 @@ body {
   /* An icon-only control: give it aria-label and title. */
   .icon-btn {
     @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-muted transition-[background-color,color,transform] duration-150 hover:bg-surface-muted hover:text-text active:scale-95 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* --- Small controls that stand among content. One look for each kind, so
+     what can be pressed is told from the text and the status marks around it:
+     an edge that is seen, a fill under the pointer, 32 px tall under a mouse
+     and 44 px under a finger. Their chosen state follows aria-pressed (or
+     aria-expanded), so what is drawn and what is announced cannot differ. --- */
+
+  /* An action beside the thing it acts on ("Answer in the chat", "Change",
+     "Skip"). data-tone="brand" marks the one to press next; "quiet" is for a
+     column of the same action, one on every row, where the full edge thirteen
+     times over would be louder than the rows themselves. */
+  .btn-inline {
+    @apply inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border-control bg-surface px-2.5 py-1 text-xs font-medium text-text-secondary transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:bg-brand-soft hover:text-brand-text active:scale-[0.97] aria-pressed:border-brand aria-pressed:bg-brand-soft aria-pressed:text-brand-text aria-expanded:border-brand aria-expanded:bg-brand-soft aria-expanded:text-brand-text disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 pointer-coarse:min-h-11 pointer-coarse:px-3;
+  }
+
+  .btn-inline[data-tone="brand"] {
+    @apply border-brand bg-brand-soft text-brand-text hover:bg-brand-soft-border/70;
+  }
+
+  .btn-inline[data-tone="quiet"] {
+    @apply border-border-strong hover:border-brand;
+  }
+
+  /* A chip: a choice that is on or off (an example, a start choice's menu). */
+  .chip {
+    @apply inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-border-control bg-surface px-3 py-1 text-xs font-medium text-text transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:bg-brand-soft hover:text-brand-text active:scale-[0.97] aria-pressed:border-brand aria-pressed:bg-brand-soft aria-pressed:text-brand-text aria-expanded:border-brand aria-expanded:bg-brand-soft aria-expanded:text-brand-text disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 pointer-coarse:min-h-11 pointer-coarse:px-3.5;
+  }
+
+  /* A chip that still waits for its choice ("Taustasi") is quieter than one
+     that shows a choice. */
+  .chip[data-empty] {
+    @apply text-text-secondary;
+  }
+
+  /* One of the answers a question offers: a mark that fills when it is chosen,
+     then its words. Not a pill, so it is not read as a tag. */
+  .choice {
+    @apply inline-flex min-h-8 max-w-full items-center gap-2 rounded-lg border border-border-control bg-surface py-1 pl-2 pr-3 text-left text-[0.8125rem] leading-5 text-text transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:bg-brand-soft active:scale-[0.98] aria-pressed:border-brand aria-pressed:bg-brand-soft aria-pressed:text-brand-text disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100 pointer-coarse:min-h-11;
+  }
+
+  .choice-mark {
+    @apply flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border-control bg-surface text-transparent transition-[background-color,border-color,color] duration-150 ease-out;
+  }
+
+  .choice:hover .choice-mark {
+    @apply border-brand;
+  }
+
+  .choice[aria-pressed="true"] .choice-mark {
+    @apply border-brand bg-brand text-on-brand;
+  }
+
+  /* A control smaller than a finger keeps its size and is pressed from 44 px
+     around its middle on a touch screen. Opt-in, for a control that stands
+     alone: on buttons set side by side (a step's up and down, a toolbar) the
+     areas would overlap and a press on one's edge would go to its neighbour. */
+  @media (pointer: coarse) {
+    .hit-area {
+      position: relative;
+    }
+
+    .hit-area::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 2.75rem);
+      height: max(100%, 2.75rem);
+      transform: translate(-50%, -50%);
+    }
   }
 
   .badge {
@@ -428,6 +518,17 @@ body {
   --context-pad-entry-hover-background-color: var(--color-surface-muted);
 }
 
+/* bpmn-js focuses the canvas on a click, for its keys (Delete, Ctrl+Z), and the
+   browser drew its own thick outline round the whole diagram. A click shows
+   nothing; keyboard focus shows the brand ring the rest of the page uses. */
+.bpmn-viewer-themed .djs-container svg:focus {
+  outline: none;
+}
+.bpmn-viewer-themed .djs-container svg:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -2px;
+}
+
 /* The palette holds the two tools a save keeps ("Lisää tehtävä", "Yhdistä"): a small
    bar in the canvas's corner, like the zoom controls opposite it. */
 .bpmn-editable .djs-palette {
@@ -538,6 +639,15 @@ body {
 }
 .chat-md-body li {
   margin: 0.12em 0;
+}
+/* A list under an item (the options under a question) sits close to it. */
+.chat-md-body li > ul,
+.chat-md-body li > ol {
+  margin: 0.2em 0 0.1em;
+}
+.chat-md-body li > ul > li + li,
+.chat-md-body li > ol > li + li {
+  margin-top: 0.15em;
 }
 .chat-md-body li + li {
   margin-top: 0.45em;

@@ -439,7 +439,12 @@ test.describe("Gates 2–4 — the same decision bar", () => {
 
     await setMockSessionStep(request, baseURL as string, "ses_laskut", 10, "run-1");
     await page.reload();
-    await expect(page.getByTestId("now-line")).toHaveText("Testi onnistui. Tarkista tulos PoC-välilehdellä.");
+    await expect(page.getByTestId("now-line")).toContainText(
+      "Testi onnistui. Tarkista tulos PoC-välilehdellä ja valitse sitten alareunasta Hyväksy testiajo tai Pyydä muutoksia.",
+    );
+    // The line points at the bar it names: the approve button takes the focus.
+    await page.getByTestId("now-line").getByRole("button", { name: "Näytä hyväksyntä sivulla" }).click();
+    await expect(page.getByTestId("gate3-actions").getByRole("button", { name: "Hyväksy testiajo" })).toBeFocused();
     await expect(page.getByRole("button", { name: "Seuraava vaihe" })).toHaveCount(0);
     const bar = page.getByTestId("gate3-actions");
     await bar.getByRole("button", { name: "Hyväksy testiajo" }).click();

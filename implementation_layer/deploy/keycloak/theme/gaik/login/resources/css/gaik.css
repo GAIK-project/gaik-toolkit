@@ -1,0 +1,190 @@
+/* The GAIK look on Keycloak's own sign-in pages (keycloak.v2, PatternFly 5).
+   Colours, card and backdrop follow the Solution Wizard's sign-in page
+   (solution_wizard_v2/app/globals.css: --color-*, .start-backdrop, .btn-brand).
+   No web font is loaded: a font from another site would tell it who signs in. */
+
+:root {
+  --gaik-brand: #0277c0;
+  --gaik-brand-hover: #016aad;
+  --gaik-brand-active: #015c97;
+  --gaik-surface: #ffffff;
+  --gaik-border: #e0e4ee;
+  --gaik-border-strong: #c6ccdb;
+  --gaik-text: #111b28;
+  --gaik-text-strong: #05080b;
+  --gaik-text-secondary: #333d4f;
+  --gaik-text-muted: #566076;
+  --gaik-danger-bg: #fbe6e5;
+  --gaik-danger-border: #edb3b1;
+  --gaik-danger-text: #c0322f;
+  --gaik-font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --pf-v5-global--FontFamily--text: var(--gaik-font);
+  --pf-v5-global--FontFamily--heading: var(--gaik-font);
+  --pf-v5-global--primary-color--100: var(--gaik-brand);
+  --pf-v5-global--primary-color--200: var(--gaik-brand-active);
+  --pf-v5-global--link--Color: var(--gaik-brand);
+  --pf-v5-global--link--Color--hover: var(--gaik-brand-active);
+  --pf-v5-global--Color--100: var(--gaik-text);
+  --pf-v5-global--Color--200: var(--gaik-text-muted);
+  --pf-v5-global--BorderColor--100: var(--gaik-border-strong);
+  --pf-v5-global--BorderRadius--sm: 6px;
+}
+
+/* Backdrop: white, a dot grid fading out from the card, two soft glows. */
+body#keycloak-bg {
+  background: var(--gaik-surface);
+  background-image: none;
+  color: var(--gaik-text);
+  font-family: var(--gaik-font);
+}
+body#keycloak-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgb(26 104 182 / 0.3) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(ellipse 64% 60% at 50% 42%, #000 0%, rgb(0 0 0 / 0.55) 45%, transparent 80%);
+  mask-image: radial-gradient(ellipse 64% 60% at 50% 42%, #000 0%, rgb(0 0 0 / 0.55) 45%, transparent 80%);
+}
+body#keycloak-bg::after {
+  content: "";
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  width: min(64rem, 140%);
+  height: 36rem;
+  translate: -50% -50%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 46% 48% at 43% 46%, rgb(2 119 192 / 0.13), transparent 72%),
+    radial-gradient(ellipse 40% 44% at 60% 58%, rgb(138 35 135 / 0.08), transparent 72%);
+}
+
+.pf-v5-c-login {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  /* Room around the card on every screen; on a phone the card would touch the edges. */
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+}
+/* One column at every width. PatternFly's wide layout puts the header beside
+   the card and pads the container on both sides; with the card's own width
+   capped that padding squeezed the card to a few words per line. */
+.pf-v5-c-login__container {
+  width: 100%;
+  max-width: 26rem;
+  padding-inline: 0;
+  column-gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "header" "main" "footer";
+}
+.pf-v5-c-login__header,
+.pf-v5-c-login__main {
+  width: 100%;
+  max-width: none;
+}
+
+/* The GAIK wordmark in place of the realm name. */
+#kc-header-wrapper {
+  font-size: 0;
+  color: transparent;
+  width: 160px;
+  height: 55px;
+  margin: 0 auto 1.25rem;
+  background: url("../img/gaik-wordmark.svg") no-repeat center / contain;
+}
+#kc-header {
+  justify-content: center;
+}
+
+/* The card, as on the wizard's own sign-in page. */
+.pf-v5-c-login__main {
+  background: var(--gaik-surface);
+  border: 1px solid var(--gaik-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgb(17 27 40 / 0.06), 0 2px 4px -2px rgb(17 27 40 / 0.05);
+  padding-top: 0.5rem;
+}
+.pf-v5-c-login__main-header {
+  padding-top: 1.5rem;
+  border-top: 0;
+}
+#kc-page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--gaik-text-strong);
+}
+
+.pf-v5-c-form__label-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gaik-text-secondary);
+}
+/* A field has a border all round, as in the wizard, not PatternFly's underline. */
+.pf-v5-c-form-control {
+  border-radius: 6px;
+}
+.pf-v5-c-form-control::before {
+  border: 1px solid var(--gaik-border-strong) !important;
+  border-radius: 6px;
+}
+.pf-v5-c-form-control::after {
+  border: 0 !important;
+}
+.pf-v5-c-form-control:hover::before {
+  border-color: var(--gaik-text-muted) !important;
+}
+.pf-v5-c-form-control:focus-within::before {
+  border-color: var(--gaik-brand) !important;
+}
+.pf-v5-c-form-control.pf-m-error::before {
+  border-color: var(--gaik-danger-text) !important;
+}
+/* The password field and its show button read as one field. */
+.pf-v5-c-input-group .pf-m-fill .pf-v5-c-form-control,
+.pf-v5-c-input-group .pf-m-fill .pf-v5-c-form-control::before {
+  border-radius: 6px 0 0 6px;
+}
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control,
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control::after {
+  border-radius: 0 6px 6px 0;
+}
+.pf-v5-c-button.pf-m-control::after {
+  border-color: var(--gaik-border-strong);
+}
+
+/* One solid primary button; the logo's gradient stays in the logo. */
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--gaik-brand);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--gaik-brand-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--gaik-brand-hover);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--gaik-brand-active);
+  --pf-v5-c-button--BorderRadius: 6px;
+  font-weight: 500;
+}
+.pf-v5-c-button.pf-m-tertiary,
+.pf-v5-c-button.pf-m-secondary {
+  --pf-v5-c-button--BorderRadius: 6px;
+  --pf-v5-c-button--after--BorderColor: var(--gaik-border-strong);
+  --pf-v5-c-button--m-secondary--Color: var(--gaik-text);
+  --pf-v5-c-button--m-tertiary--Color: var(--gaik-text);
+}
+
+.pf-v5-c-alert.pf-m-danger,
+.pf-v5-c-alert.pf-m-error {
+  background: var(--gaik-danger-bg);
+  border: 1px solid var(--gaik-danger-border);
+  border-radius: 6px;
+  --pf-v5-c-alert__title--Color: var(--gaik-danger-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--gaik-brand);
+  outline-offset: 2px;
+}

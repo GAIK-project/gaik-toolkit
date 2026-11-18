@@ -1,4 +1,5 @@
-# The sign-in in front of MLflow (mlflow-auth-nginx.conf). Red Hat's UBI nginx image runs under any UID.
+# The proxy between the sign-in (mlflow-signin.yaml) and MLflow: keeps deleting closed
+# (mlflow-auth-nginx.conf). Red Hat's UBI nginx image runs under any UID.
 apiVersion: v1
 kind: Service
 metadata:
@@ -32,7 +33,6 @@ spec:
           ports: [{containerPort: 8080}]
           volumeMounts:
             - {name: config, mountPath: /etc/nginx-proxy, readOnly: true}
-            - {name: htpasswd, mountPath: /etc/nginx-auth, readOnly: true}
           readinessProbe:
             httpGet: {path: /healthz, port: 8080}
             periodSeconds: 5
@@ -51,7 +51,3 @@ spec:
       volumes:
         - name: config
           configMap: {name: mlflow-auth-nginx}
-        - name: htpasswd
-          secret:
-            secretName: aiops-mlflow-auth
-            items: [{key: htpasswd, path: htpasswd}]

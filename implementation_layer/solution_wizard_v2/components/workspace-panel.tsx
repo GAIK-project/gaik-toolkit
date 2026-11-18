@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { Blueprint, BlueprintStepType } from "@/lib/mock-sessions";
 import {
   nextTabForStepChange,
@@ -43,12 +44,14 @@ import { sourceTraceIn, sourcesForField } from "@/lib/poc-source-trace";
 import {
   CHAT_REFERENCE_EVENT,
   CHAT_REPLYING_EVENT,
+  DEPLOYABLE_DOWNLOAD_EVENT,
   WORKSPACE_SHOW_EVENT,
   type WorkspacePlace,
 } from "@/lib/chat-events";
 import {
   handoverState,
   inputsChangedSinceRun,
+  packageChangedSinceRun,
   publishResultStale,
   publishRunWarnings,
   resultIsStale,
@@ -82,6 +85,10 @@ import { SolutionPlanView } from "@/components/solution-plan-view";
 import { AskStepButton, StepNumber, StepTypeTag, stepTypeLabels } from "@/components/step-type";
 import { FileIcon } from "@/components/file-icon";
 import { FileTree } from "@/components/file-tree";
+import { PocFileEditor } from "@/components/poc-file-editor";
+import { PocEnvForm } from "@/components/poc-env-form";
+import { composeEnv, envLayout, hasEnvValues, layoutVariables, type ExtraVariable } from "@/lib/env-file";
+import { ENV_EXAMPLE_NAME, pocFileFrom, pocPathOf, type PocFileSaved } from "@/lib/poc-file";
 import { BlueprintModeBar } from "@/components/blueprint-mode-bar";
 import { Icon, type IconName } from "@/components/icons";
 
@@ -358,7 +365,9 @@ function WorkflowFlowTab({
   // After Gate 2 the flow opens read-only, as the Blueprint tab does; "Muokkaa" opens it for this visit.
   // The Blueprint tab's rule: a change then no longer matches the tested package. One lock for both diagrams.
   const [flowUnlocked, setFlowUnlocked] = useState(false);
-  const locked = wizardStep >= POC_STEP && !flowUnlocked;
+  // "Lopeta muokkaus" closes it again: the way back to the read-only view it opened in.
+  const lockable = wizardStep >= POC_STEP;
+  const locked = lockable && !flowUnlocked;
   const [diagramShown, setDiagramShown] = useState(false);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ stepId: string; seq: number } | null>(null);
@@ -572,6 +581,7 @@ function WorkflowFlowTab({
                 bpmnXml={bpmnXml}
                 locked={locked}
                 onUnlock={() => setFlowUnlocked(true)}
+                onLock={lockable ? () => setFlowUnlocked(false) : undefined}
                 update={blueprintUpdate}
                 pocNoteLabel={pocNoteLabel}
                 selectedStepId={selectedStepId}
@@ -609,6 +619,7 @@ function WorkflowFlowTab({
               reloading={loading}
               locked={locked}
               onUnlock={() => setFlowUnlocked(true)}
+              onLock={lockable ? () => setFlowUnlocked(false) : undefined}
               update={blueprintUpdate}
               focusRequest={focusRequest}
               onSelectedStepChange={setSelectedStepId}
@@ -636,6 +647,8 @@ type Tab = WorkspaceTab;
 const NEXT_ROW =
   "focus-inset flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-medium text-text transition-colors hover:bg-surface-muted/70 active:bg-surface-muted";
 const NO_FIELDS: FieldSpec[] = [];
+/** The step of Gate 3 (PoC validation): a session past it has that gate approved. */
+const GATE_3_STEP = 11;
 type PocStatus = "idle" | "running" | "success" | "failed";
 /** A sandbox run's own lifecycle, reported by wizard_api — not derived here. */
 type RunPhase =
@@ -1030,6 +1043,133 @@ export function WorkspacePanel({
   const preflightRetryTimer = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const baseId = useId();
+  const router = useRouter();
+
+  // The package file open in the editor, by its path inside poc/; null for none.
+  const [editorPath, setEditorPath] = useState<string | null>(null);
+  // The .env for the deployable package. The variables are read from the
+  // package's .env.example; the values are typed here and stay in this
+  // state: never stored, never sent, added to the downloaded zip in the
+  // browser (lib/zip-env) and dropped when the PoC tab is left.
+  const [envExample, setEnvExample] = useState("");
+  const [envValues, setEnvValues] = useState<Record<string, string>>({});
+  const [envExtra, setEnvExtra] = useState<ExtraVariable[]>([]);
+  const [envOpen, setEnvOpen] = useState<boolean | null>(null);
+  const [envBusy, setEnvBusy] = useState(false);
+  const [envProblem, setEnvProblem] = useState(false);
+  // Bumped when .env.example is saved in the editor, to read it again.
+  const [envRevision, setEnvRevision] = useState(0);
+  const hasEnvExample = pocFiles.includes(`poc/${ENV_EXAMPLE_NAME}`);
+  // Of the package as it is listed now: a package without the file has no variables.
+  const envText = hasEnvExample ? envExample : "";
+  // The package's config.yaml says which provider it uses: that provider's
+  // variables are shown first and the others folded away (lib/env-file). Null
+  // when it could not be read: every variable is then listed, as before.
+  const [envConfig, setEnvConfig] = useState<string | null>(null);
+  const hasConfig = pocFiles.includes("poc/config.yaml");
+  const envShape = useMemo(() => envLayout(envText, hasConfig ? envConfig : null), [envText, hasConfig, envConfig]);
+  const envVariables = useMemo(() => layoutVariables(envShape), [envShape]);
+  useEffect(() => {
+    if (!pocActive || !runRecorded || !hasEnvExample || wizardReplying) return;
+    let cancelled = false;
+    fetch(`/api/sessions/${sessionId}/poc/file?path=${encodeURIComponent(ENV_EXAMPLE_NAME)}`, {
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: unknown) => {
+        if (!cancelled) setEnvExample(pocFileFrom(d)?.content ?? "");
+      })
+      .catch(() => {
+        if (!cancelled) setEnvExample("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pocActive, runRecorded, hasEnvExample, wizardReplying, sessionId, envRevision, pocVersion]);
+  useEffect(() => {
+    if (!pocActive || !runRecorded || !hasEnvExample || !hasConfig || wizardReplying) return;
+    let cancelled = false;
+    fetch(`/api/sessions/${sessionId}/poc/file?path=config.yaml`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: unknown) => {
+        if (!cancelled) setEnvConfig(pocFileFrom(d)?.content ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setEnvConfig(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pocActive, runRecorded, hasEnvExample, hasConfig, wizardReplying, sessionId, envRevision, pocVersion]);
+  // Leaving the tab forgets what was typed (state adjusted as the tab changes,
+  // not in an effect: the values are gone from the first render without it).
+  const [envTabOpen, setEnvTabOpen] = useState(pocActive);
+  if (envTabOpen !== pocActive) {
+    setEnvTabOpen(pocActive);
+    if (!pocActive) {
+      setEnvValues({});
+      setEnvExtra([]);
+      setEnvProblem(false);
+    }
+  }
+  const envTyped = hasEnvValues(envValues, envExtra);
+
+  /** The deployable zip with poc/.env added in the browser, saved as a download. */
+  async function downloadWithEnv() {
+    if (envBusy) return;
+    setEnvBusy(true);
+    setEnvProblem(false);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/poc/deployable`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`deployable ${res.status}`);
+      const zip = new Uint8Array(await res.arrayBuffer());
+      const { attachmentName, saveBytes, zipWithEnv } = await import("@/lib/zip-env");
+      const withEnv = await zipWithEnv(zip, composeEnv(envText, envValues, envExtra, envVariables));
+      saveBytes(
+        withEnv,
+        attachmentName(res.headers.get("content-disposition"), `poc-${sessionId}-deployable.zip`),
+      );
+    } catch {
+      setEnvProblem(true);
+    } finally {
+      setEnvBusy(false);
+    }
+  }
+  // With nothing typed the link downloads as it always did; with a value the
+  // zip is fetched, given its .env here and saved.
+  function onDeployableClick(e: MouseEvent) {
+    if (!envTyped) return;
+    e.preventDefault();
+    void downloadWithEnv();
+  }
+
+  // The finished solution's banner has the download and cannot see what is
+  // typed here: it asks first, and with a value typed this tab does the
+  // download, so there is one download and it always carries the values.
+  const bannerDownload = useRef<() => boolean>(() => false);
+  useEffect(() => {
+    bannerDownload.current = () => {
+      if (!envTyped) return false;
+      void downloadWithEnv();
+      return true;
+    };
+  });
+  useEffect(() => {
+    const onDownload = (e: Event) => {
+      if (bannerDownload.current()) e.preventDefault();
+    };
+    window.addEventListener(DEPLOYABLE_DOWNLOAD_EVENT, onDownload);
+    return () => window.removeEventListener(DEPLOYABLE_DOWNLOAD_EVENT, onDownload);
+  }, []);
+
+  function onFileSaved(saved: PocFileSaved) {
+    // The package is another one now: read it again, so the check and the
+    // test run follow its new digest as after a change by the wizard.
+    setPocRefresh((n) => n + 1);
+    if (saved.path === ENV_EXAMPLE_NAME || saved.path === "config.yaml") setEnvRevision((n) => n + 1);
+    // A reopened gate is the page's to show (the gate bar, the step).
+    if (saved.gateReopened) router.refresh();
+  }
 
   // Chat runs its own turns (router.refresh() after each message) and can carry the
   // session past a milestone — BPMN generated, PoC reached — without the user ever
@@ -1881,7 +2021,16 @@ export function WorkspacePanel({
   // "Lataa työversio" beside it carries the test input too, which is said.
   const fileList = (
     <>
-      <FileTree paths={pocFiles} testId="poc-file-tree" />
+      <FileTree
+        paths={pocFiles}
+        testId="poc-file-tree"
+        open={{
+          // The package's own files; what lies beside poc/ is not opened here.
+          canOpen: (path) => pocPathOf(path) !== null,
+          onOpen: (path) => setEditorPath(pocPathOf(path)),
+          label: t.pocFileOpen,
+        }}
+      />
       {pocWorkOnly.length > 0 && (
         <p className="mt-1.5 text-xs text-text-muted" data-testid="poc-work-only">
           {t.pocWorkOnly.replace("{names}", pocWorkOnly.join(", "))}
@@ -2572,7 +2721,47 @@ export function WorkspacePanel({
   // is not called a success here either: the step says what to do about it,
   // and trying the solution comes before taking the package (which stays
   // possible: warnings inform, they do not block).
-  const handover = handoverState({ packageReady: pocReady, runRecorded, shownRunHasWarnings });
+  // The api hands the package over only when the run that passed tested it as
+  // it is now (409 package_changed_since_run otherwise): after a change to
+  // the package the download waits for a new run, and the step says so.
+  // Until Gate 3 is approved, as the api: from then on the approval holds the
+  // package (a change reopens the gate and takes the run away), and a run
+  // recorded under an older digest scheme must not lock an approved session.
+  const packageChanged =
+    runRecorded && wizardStep <= GATE_3_STEP && packageChangedSinceRun(packageDigest, testedDigest);
+  const deployableOpen = runRecorded && !packageChanged;
+  const deployableLockedHint = packageChanged ? t.pocDeployableChanged : t.pocDeployableHint;
+  const handover = handoverState({ packageReady: pocReady, runRecorded: deployableOpen, shownRunHasWarnings });
+  // The keys the package needs, asked where the package is taken. Open when
+  // .env.example lists variables, until the user folds it.
+  const envSection = pocReady && deployableOpen && (
+    <details
+      className="group @container border-t border-border"
+      data-testid="poc-env"
+      open={envOpen ?? envVariables.length > 0}
+      onToggle={(e) => setEnvOpen(e.currentTarget.open)}
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-text-secondary transition-colors hover:text-text [&::-webkit-details-marker]:hidden">
+        <Icon
+          name="chevronRight"
+          size={13}
+          className="transition-transform duration-150 ease-out group-open:rotate-90"
+        />
+        {t.pocEnvTitle}
+      </summary>
+      <div className="px-4 pb-3">
+        <PocEnvForm
+          layout={envShape}
+          values={envValues}
+          extra={envExtra}
+          onValue={(name, value) => setEnvValues((now) => ({ ...now, [name]: value }))}
+          onExtra={setEnvExtra}
+          problem={envProblem ? t.pocEnvDownloadFailed : null}
+          t={t}
+        />
+      </div>
+    </details>
+  );
   // How to try the package on one's own computer: under "try it" before the
   // run, and in the finished run's card after it, where the package is taken.
   const testPageHint = pocReady && (
@@ -2584,7 +2773,7 @@ export function WorkspacePanel({
     <StepCard
       n={4}
       title={t.pocStepUse}
-      done={pocReady && runRecorded}
+      done={pocReady && deployableOpen}
       attention={handover === "check"}
       muted={!pocReady}
       testId="poc-step-use"
@@ -2593,7 +2782,7 @@ export function WorkspacePanel({
           {
             {
               no_package: t.pocNeedsPackage,
-              locked: t.pocDeployableHint,
+              locked: deployableLockedHint,
               check: t.pocUseCheck,
               ready: t.pocUseReady,
             }[handover]
@@ -2614,21 +2803,23 @@ export function WorkspacePanel({
             <Icon name="users" size={16} />
             {t.pocOpenCases}
           </a>
-          {runRecorded ? (
+          {deployableOpen ? (
             <a
               href={`/api/sessions/${sessionId}/poc/deployable`}
               download
+              onClick={onDeployableClick}
+              aria-busy={envBusy || undefined}
               className="btn-secondary"
               data-testid="poc-deployable"
             >
-              <Icon name="download" size={16} />
+              <Icon name={envBusy ? "loaderCircle" : "download"} size={16} className={envBusy ? "animate-spin" : ""} />
               {t.pocDeployable}
             </a>
           ) : (
             <button
               type="button"
               disabled
-              title={t.pocDeployableHint}
+              title={deployableLockedHint}
               className="btn-secondary"
               data-testid="poc-deployable"
             >
@@ -2638,6 +2829,7 @@ export function WorkspacePanel({
           )}
         </div>
       )}
+      {envSection}
       {testPageHint}
     </StepCard>
   );
@@ -2645,21 +2837,27 @@ export function WorkspacePanel({
   // The package's row in the finished run's card.
   const deployableRow = (
     <li>
-      {runRecorded ? (
+      {deployableOpen ? (
         <a
           href={`/api/sessions/${sessionId}/poc/deployable`}
           download
+          onClick={onDeployableClick}
+          aria-busy={envBusy || undefined}
           className={NEXT_ROW}
           data-testid="poc-deployable"
         >
-          <Icon name="download" size={16} className="text-text-muted" />
+          <Icon
+            name={envBusy ? "loaderCircle" : "download"}
+            size={16}
+            className={`text-text-muted ${envBusy ? "animate-spin" : ""}`}
+          />
           <span className="min-w-0 flex-1">{t.pocDeployable}</span>
         </a>
       ) : (
         <button
           type="button"
           disabled
-          title={t.pocDeployableHint}
+          title={deployableLockedHint}
           className={`${NEXT_ROW} disabled:cursor-not-allowed disabled:opacity-60`}
           data-testid="poc-deployable"
         >
@@ -2746,6 +2944,7 @@ export function WorkspacePanel({
         {shownRunHasWarnings && !handoverInBanner && deployableRow}
       </ul>
       )}
+      {envSection}
       {testPageHint}
       <div className="border-t border-border px-2.5 py-1.5">
         <button
@@ -2998,6 +3197,18 @@ export function WorkspacePanel({
                     </div>
                     <div className="flex min-w-0 flex-col gap-3">{resultCard}</div>
                   </div>
+                  {editorPath !== null && (
+                    <PocFileEditor
+                      key={editorPath}
+                      sessionId={sessionId}
+                      path={editorPath}
+                      // Past Gate 3's step: that gate is approved.
+                      gate3Approved={wizardStep > GATE_3_STEP}
+                      t={t}
+                      onClose={() => setEditorPath(null)}
+                      onSaved={onFileSaved}
+                    />
+                  )}
                 </div>
               )}
           </div>

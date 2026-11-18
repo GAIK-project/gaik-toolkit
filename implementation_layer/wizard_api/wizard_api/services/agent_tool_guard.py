@@ -86,6 +86,18 @@ _SCRIPTS: dict[str, dict[str, str]] = {
         "--skip-validation": _FLAG,
     },
     "validate_blueprint.py": {"--blueprint": _PATH},
+    # The AI Act screening (SKILL.md Phase 12, ai_act_screening/scripts/). The
+    # checker only reads; the brief renderer writes ai_act_screening.json and
+    # docs/ai_act_screening.md under --pack. Both use the standard library only: no
+    # model call, no network, no subprocess.
+    "check_screening.py": {
+        "--pack": _PATH,
+        "--screening": _PATH,
+        "--transcript": _PATH,
+        "--hash": _FLAG,
+        "--status": _FLAG,
+    },
+    "render_brief.py": {"--pack": _PATH, "--outdated": _FLAG},
     # refresh_schema_model.py (SKILL.md Step 4.5) is left out: it imports the
     # session's output_schema.py, and every script here runs the wizard's own code
     # only. The PoC loads output_schema_model.json and writes it again itself when
@@ -94,6 +106,13 @@ _SCRIPTS: dict[str, dict[str, str]] = {
 }
 #: Scripts that turn the blueprint into code, so they get its text checked first.
 _SCAFFOLDING_SCRIPTS = frozenset({"scaffold_poc.py"})
+#: Where a script is, under the wizard directory, when that is not ``scripts/``: the
+#: AI Act screening is a skill of its own next to SKILL.md. A name is run only from
+#: its own folder, so a file of the same name anywhere else is not that script.
+_SCRIPT_FOLDERS = {
+    "check_screening.py": "ai_act_screening/scripts",
+    "render_brief.py": "ai_act_screening/scripts",
+}
 _PYTHON = frozenset({"python", "python3"})
 #: The two one-liners SKILL.md uses: a syntax check and an import check.
 _ONE_LINERS = (
@@ -403,8 +422,10 @@ class ToolGuard:
         if len(argv) < 2 or argv[0] not in _PYTHON:
             return allowed
         script = argv[1]
-        options = _SCRIPTS.get(Path(script).name)
-        if options is None or not _inside(script, [self.cwd / "scripts"], self.cwd):
+        name = Path(script).name
+        options = _SCRIPTS.get(name)
+        folder = self.cwd / _SCRIPT_FOLDERS.get(name, "scripts")
+        if options is None or not _inside(script, [folder], self.cwd):
             return allowed
         given = self._options(argv[2:], options)
         if isinstance(given, str):

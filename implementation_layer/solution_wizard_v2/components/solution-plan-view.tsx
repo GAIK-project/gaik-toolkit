@@ -122,13 +122,13 @@ function StepCard({
             that this is how a step is changed. */}
         <button
           type="button"
-          className="-mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md p-1.5 text-xs font-medium text-text-muted transition-[background-color,color,transform] duration-150 ease-out hover:bg-brand-soft hover:text-brand-text active:scale-[0.97] @md:px-2"
+          className="btn-inline -mt-0.5 px-2"
           onClick={() => askInChat(reference)}
           aria-label={`${t.planAskInChat}: ${reference.label}`}
           title={t.planAskInChat}
           data-testid={`plan-step-${index}-ask`}
         >
-          <Icon name="messageSquareText" size={16} />
+          <Icon name="messageSquareText" size={14} />
           <span className="hidden @md:inline" aria-hidden>
             {t.planAskInChat}
           </span>

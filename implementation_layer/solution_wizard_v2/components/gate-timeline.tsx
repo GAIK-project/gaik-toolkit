@@ -331,9 +331,7 @@ export function GateTimeline({
                     aria-label={`${guide.checksTitle} ${topic}`}
                     title={`${guide.checksTitle} ${topic}`}
                     data-testid={`gate-checks-toggle-${gate}`}
-                    className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded transition-colors hover:bg-surface-muted hover:text-text ${
-                      showChecks ? "text-brand-text" : "text-text-muted"
-                    }`}
+                    className={`icon-btn hit-area h-7 w-7 ${showChecks ? "bg-brand-soft text-brand-text" : ""}`}
                   >
                     <Icon name="listChecks" size={14} />
                   </button>
@@ -367,9 +365,7 @@ export function GateTimeline({
             }}
             aria-label={fillTemplate(guide.changeLabel, { topic })}
             data-testid={`gate-change-${gate}`}
-            className={`mb-2 inline-flex items-center gap-1.5 rounded px-1 py-0.5 text-[12px] font-medium text-brand-text underline-offset-2 hover:underline ${
-              inRow ? "ml-[22px]" : "ml-[31px]"
-            }`}
+            className={`btn-inline mb-2 mt-0.5 ${inRow ? "ml-[22px]" : "ml-[31px]"}`}
           >
             <Icon name="pencil" size={12} />
             {guide.change}
@@ -447,7 +443,7 @@ export function GateTimeline({
                   aria-expanded={!isCollapsed}
                   data-testid={gate ? `timeline-stage-${gate}` : undefined}
                   data-state={state}
-                  className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-muted"
+                  className="flex min-h-11 w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface-muted active:bg-border"
                 >
                   {stageMark(state, gate)}
                   <span
@@ -464,7 +460,7 @@ export function GateTimeline({
                   <Icon
                     name="chevronDown"
                     size={14}
-                    className={`text-text-muted transition-transform duration-150 motion-reduce:transition-none ${isCollapsed ? "-rotate-90" : ""}`}
+                    className={`text-text-secondary transition-transform duration-150 motion-reduce:transition-none ${isCollapsed ? "-rotate-90" : ""}`}
                   />
                 </button>
                 {!isCollapsed && <div className="reveal-in">{stageBody(st)}</div>}
@@ -551,7 +547,9 @@ export function GateTimeline({
                   aria-controls={`${panelId}-${gate}`}
                   data-testid={`timeline-stage-${gate}`}
                   data-state={state}
-                  className={`flex items-center gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-surface-muted pointer-coarse:py-2 ${
+                  // A menu button: its ground fills under the pointer and while
+                  // its panel is open, and the chevron darkens with it.
+                  className={`group/stage flex min-h-9 items-center gap-2 rounded-lg px-1.5 py-1.5 transition-colors duration-150 hover:bg-surface-muted active:bg-border pointer-coarse:min-h-11 ${
                     open ? "bg-surface-muted" : ""
                   }`}
                 >
@@ -573,8 +571,8 @@ export function GateTimeline({
                   <Icon
                     name="chevronDown"
                     size={14}
-                    className={`-ml-0.5 text-text-muted transition-transform duration-150 motion-reduce:transition-none ${
-                      open ? "rotate-180" : ""
+                    className={`-ml-0.5 transition-[color,transform] duration-150 group-hover/stage:text-text motion-reduce:transition-none ${
+                      open ? "rotate-180 text-text" : "text-text-secondary"
                     } ${state === "current" ? "" : "max-xl:hidden"}`}
                   />
                 </button>

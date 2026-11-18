@@ -14,7 +14,7 @@ export function ShowInWorkspaceButton({ place, label }: { place: WorkspacePlace;
       type="button"
       data-testid={`show-${place}`}
       onClick={() => window.dispatchEvent(new CustomEvent<WorkspacePlace>(WORKSPACE_SHOW_EVENT, { detail: place }))}
-      className="inline-flex shrink-0 items-center gap-1.5 font-medium underline underline-offset-2"
+      className="btn-inline"
     >
       <Icon name="play" size={14} />
       {label}
