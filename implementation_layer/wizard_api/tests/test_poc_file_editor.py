@@ -9,6 +9,7 @@ no file that would hold keys.
 
 import asyncio
 import os
+import runpy
 import threading
 import time
 import uuid
@@ -291,6 +292,38 @@ def test_a_value_with_a_long_run_of_spaces_is_read_at_once() -> None:
     # The comment rule is the same: a "#" after white space starts it, one inside a value does not.
     assert poc_service.env_example_key_values("HF_TOKEN=\t# from the portal\n") == []
     assert poc_service.env_example_key_values("HF_TOKEN=abc#def\n") == ["HF_TOKEN"]
+
+
+def test_the_test_page_leaves_env_example_out_of_its_zip_by_this_rule() -> None:
+    """The package's app.py keeps a .env.example that gives a key a value out of its
+    source zip. It is standard library only, so it has its own copy of this rule."""
+    pytest.importorskip("solution_wizard.scaffolder")
+    from solution_wizard.scaffolder import TEMPLATES_DIR, TEST_PAGE_TEMPLATES
+
+    page = runpy.run_path(str(TEMPLATES_DIR / TEST_PAGE_TEMPLATES["app.py"]), run_name="poc_app")
+    page_rule = page["_env_example_key_values"]
+    cases = [
+        "AZURE_OPENAI_API_KEY=\n",
+        "AZURE_OPENAI_API_KEY=abc123\n",
+        "export HF_TOKEN='hf_abc'\n",
+        "# CLIENT_SECRET=s3cr3t\n",
+        "#CLIENT_SECRET=s3cr3t\n",
+        "OPENAI_API_KEY=your-key-here\n",
+        "OPENAI_API_KEY=<key>\n",
+        "OPENAI_API_KEY=xxxx  # put yours here\n",
+        "OPENAI_API_KEY=  # a comment\n",
+        'OPENAI_API_KEY="abc" # quoted\n',
+        "OPENAI_API_KEY=''\n",
+        "HF_TOKEN=abc#def\n",
+        "HF_TOKEN=\t# from the portal\n",
+        "GOOGLE_SERVICE_ACCOUNT_JSON={}\n",
+        "MAX_TOKENS=4000\nKEYWORDS=a,b\nAZURE_OPENAI_API_VERSION=2024-10-21\n",
+        "openai_apikey=abc\nDOCLING_API_PASSWORD=p\nA_KEY=1\nA_KEY=2\n",
+        (TEMPLATES_DIR / "_common" / "env.example.tmpl").read_text(encoding="utf-8"),
+    ]
+
+    for text in cases:
+        assert page_rule(text) == poc_service.env_example_key_values(text), text
 
 
 def test_only_the_list_of_variables_is_read_for_values(tmp_path) -> None:

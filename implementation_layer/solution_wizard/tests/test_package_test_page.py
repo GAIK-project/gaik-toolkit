@@ -19,7 +19,7 @@ import sys
 import threading
 import time
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -261,7 +261,7 @@ class Page:
         spec.loader.exec_module(self.app)
         self.server = self.app.create_server(poc, host, 0, **limits)
         self.address, self.port = self.server.server_address[:2]
-        if host == "0.0.0.0":
+        if host in ("0.0.0.0", "::"):
             # Listening on every address: this computer reaches it on its loopback.
             self.address = "127.0.0.1"
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -1142,6 +1142,10 @@ def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
         "schemas/credentials.json",
         "prompts/service_account.json",
         "api_secrets.py",
+        # ... an API key's own name (second review of #229) ...
+        "prompts/api_key.txt",
+        "openai_apikey.json",
+        "schemas/api-keys.yaml",
     ):
         (poc / name).write_text(f'{{"key": "{secret}"}}\n', encoding="utf-8")
     # ... the user's own ground truth for the evaluation ...
@@ -1149,6 +1153,10 @@ def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
         f'{{"customer": "{secret}"}}', encoding="utf-8"
     )
     (poc / "evals" / "ground_truth" / "check.py").write_text(f"# {secret}\n", encoding="utf-8")
+    # ... also where the folder's name is written in another case: on Windows and
+    # macOS it is the same folder (second review of #229).
+    (poc / "Evals" / "Ground_Truth").mkdir(parents=True, exist_ok=True)
+    (poc / "Evals" / "Ground_Truth" / "case_2.py").write_text(f"# {secret}\n", encoding="utf-8")
     # ... and a file nobody thought of: not code, a setting or a schema.
     (poc / "notes.md").write_text(f"The user's own note: {secret}\n", encoding="utf-8")
     (poc / "ui" / "notes.txt").write_text(secret, encoding="utf-8")
@@ -1156,6 +1164,10 @@ def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
     assert page.run(files=[("order.pdf", b"%PDF " + secret.encode())])[0] == 200
 
     headers, files = _source(page)
+    # Written by the scaffolder where the installed gaik has saved_schema (not in
+    # CI, which installs the wizard without gaik): it is the package's own schema.
+    with_gaik = ["schemas/output_schema_model.json"]
+    from_gaik = [name for name in with_gaik if (poc / name).is_file()]
 
     assert headers["Content-Type"] == "application/zip"
     assert (
@@ -1184,6 +1196,7 @@ def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
         "ui/index.html",
         "ui/solution.json",
         *PAGE_ASSETS,
+        *from_gaik,
     }
     assert not any(secret.encode() in content for content in files.values())
     # What is in the zip is the package's files, byte for byte.
@@ -1757,3 +1770,122 @@ def test_files_that_trickle_in_are_refused_once_they_take_too_long(page, monkeyp
     assert answer["error"]["code"] == "too_slow"
     assert page.get_json("/api/status")[1]["busy"] is False
     assert page.run(files=[("order.pdf", b"%PDF")])[0] == 200
+
+
+# ---------------------------------------------------------------------------
+# Second review of #229, round 2 (17 Nov 2026)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "Sample_Input/notes.py",
+        "OUTPUT/result.py",
+        "Evals/Ground_Truth/case.py",
+        "EVALS/GROUND_TRUTH/case.py",
+        "Venv/Lib/site.py",
+        "schemas/__PYCACHE__/x.py",
+        "prompts/API_KEY.txt",
+        "ApiKey.py",
+    ],
+)
+def test_a_folder_or_name_in_another_case_is_not_source_either(page, relative):
+    """Compared case by case, Output/ on Windows or macOS was not output/."""
+    assert page.app._is_source(PurePosixPath(relative)) is False
+
+
+def test_code_named_like_a_key_word_is_still_source(page):
+    for relative in ("tokenizer.py", "keyword_rules.py", "schemas/output_schema.py", "api.py"):
+        assert page.app._is_source(PurePosixPath(relative)) is True, relative
+
+
+def test_an_env_example_that_gives_a_key_a_value_is_not_in_the_source_zip(page):
+    """The value check wizard_api makes on .env.example was not made here."""
+    example = page.poc / ".env.example"
+    folder = "purchase_order_extraction-source/"
+    template = example.read_text(encoding="utf-8")
+
+    example.write_text(template + "AZURE_OPENAI_API_KEY=not-a-real-key-7f3a\n", encoding="utf-8")
+    _, files = _source(page)
+    assert folder + ".env.example" not in files
+    assert not any(b"not-a-real-key-7f3a" in content for content in files.values())
+
+    placeholders = "AZURE_OPENAI_API_KEY=<your key>\nHF_TOKEN=\n# OPENAI_API_KEY=xxxx\n"
+    example.write_text(template + placeholders + "MAX_TOKENS=4000\n", encoding="utf-8")
+    _, files = _source(page)
+    assert files[folder + ".env.example"] == example.read_bytes()
+
+
+@pytest.mark.parametrize(
+    ("text", "valued"),
+    [
+        ("AZURE_OPENAI_API_KEY=\n", []),
+        ("AZURE_OPENAI_API_KEY=abc123\n", ["AZURE_OPENAI_API_KEY"]),
+        ("export HF_TOKEN='hf_abc'\n", ["HF_TOKEN"]),
+        ("# CLIENT_SECRET=s3cr3t\n", ["CLIENT_SECRET"]),
+        ("OPENAI_API_KEY=your-key-here\n", []),
+        ("OPENAI_API_KEY=<key>\n", []),
+        ("OPENAI_API_KEY=xxxx  # put yours here\n", []),
+        ("OPENAI_API_KEY=  # a comment\n", []),
+        ('OPENAI_API_KEY="abc" # quoted\n', ["OPENAI_API_KEY"]),
+        ("GOOGLE_SERVICE_ACCOUNT_JSON={}\n", ["GOOGLE_SERVICE_ACCOUNT_JSON"]),
+        ("MAX_TOKENS=4000\nKEYWORDS=a,b\nAZURE_OPENAI_API_VERSION=2024-10-21\n", []),
+    ],
+)
+def test_the_env_example_check_reads_keys_as_wizard_api_does(page, text, valued):
+    """The rule of wizard_api's poc_service.env_example_key_values; its tests hold the two equal."""
+    assert page.app._env_example_key_values(text) == valued
+
+
+def test_a_head_request_is_refused_as_get_is_over_the_limits(page, monkeypatch):
+    """HEAD answered 200 for a package GET refuses with 413."""
+    monkeypatch.setattr(page.app, "MAX_SOURCE_FILES", 1)
+
+    status, _, _ = page.request("HEAD", "/api/source")
+    assert status == 413
+    assert page.request("GET", "/api/source")[0] == 413
+
+
+def _can_listen_on(address: str) -> bool:
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as probe:
+            probe.bind((address, 0))
+    except (AttributeError, OSError):
+        return False
+    return True
+
+
+def test_an_ipv6_loopback_address_is_listened_on(tmp_path):
+    """--host ::1 failed to start: the server listened on IPv4 only."""
+    if not _can_listen_on("::1"):
+        pytest.skip("::1 cannot be listened on here")
+    served = Page(_scaffold(tmp_path), host="::1")
+    try:
+        assert served.server.address_family == socket.AF_INET6
+        status, _, body = served.request("GET", "/api/solution")
+        assert status == 200
+        assert json.loads(body)["source_download"] is True
+        assert served.request("GET", "/api/source")[0] == 200
+        # The Host check holds on IPv6 as well.
+        status, _, _ = served.request("GET", "/", headers={"Host": "attacker.example"})
+        assert status == 403
+    finally:
+        served.close()
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="listening on every address makes the Windows firewall ask for leave on screen",
+)
+def test_every_ipv6_address_takes_ipv4_as_well_and_turns_the_source_download_off(tmp_path):
+    if not _can_listen_on("::"):
+        pytest.skip(":: cannot be listened on here")
+    served = Page(_scaffold(tmp_path), host="::")
+    try:
+        # Reached on 127.0.0.1: the IPv4 addresses are in as well.
+        assert served.request("GET", "/")[0] == 200
+        assert served.server.source_download is False
+        assert served.request("GET", "/api/source")[0] == 403
+    finally:
+        served.close()

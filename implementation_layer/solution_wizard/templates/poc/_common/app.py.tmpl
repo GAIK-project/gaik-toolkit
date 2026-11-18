@@ -25,11 +25,12 @@ A request that sends no file runs on the examples in the package's ``sample_inpu
 
 ``GET /api/source`` zips what the package is made of, and only that: its Python files
 (this server among them), ``README.md``, ``config.yaml``, ``requirements.txt``,
-``.env.example`` and ``.gitignore``, the text files in ``schemas/`` and ``prompts/``,
-and this page's own files in ``ui/``. Nothing else goes in: no other hidden file
-(``.env`` and its keys among them), no file whose name says it holds a credential,
-nothing from ``sample_input/``, ``output/`` or ``evals/ground_truth/``, no virtual
-environment, run folder or link. It is off while the server listens on the network.
+``.env.example`` (unless it gives a key a value) and ``.gitignore``, the text files in
+``schemas/`` and ``prompts/``, and this page's own files in ``ui/``. Nothing else goes
+in: no other hidden file (``.env`` and its keys among them), no file whose name says it
+holds a credential, nothing from ``sample_input/``, ``output/`` or ``evals/ground_truth/``
+whatever the case of their names, no virtual environment, run folder or link. It is off
+while the server listens on the network.
 
 There is no sign-in. The server listens on this computer only (127.0.0.1) unless you
 start it with ``--host``; do that only on a network you trust. Ctrl+C, SIGTERM and
@@ -170,13 +171,15 @@ _PAGE_FILES = {
     "fonts/sora-latin-ext-wght-normal.woff2",
 }
 #: ... and anywhere else, the package's Python files. Never what is under these
-#: folders: the inputs, the results and the user's own ground truth ...
+#: folders, whatever the case of their names (on Windows and macOS ``Output/`` is
+#: ``output/``): the inputs, the results and the user's own ground truth ...
 _NOT_SOURCE_PATHS = (SAMPLE_DIR, OUTPUT_DIR, "evals/ground_truth")
 #: ... nor in a folder of these names, at any depth (or a hidden one) ...
 _NOT_SOURCE_DIRS = {"__pycache__", "venv", "env", "node_modules", "site-packages"}
 #: ... nor a file whose name says it holds a credential, whatever its kind.
 _CREDENTIAL_NAME = re.compile(
-    r"credential|secret|passw|service[-_]?account|private[-_]?key|(^|[-_.])tokens?([-_.]|$)"
+    r"credential|secret|passw|api[-_]?key|service[-_]?account|private[-_]?key"
+    r"|(^|[-_.])tokens?([-_.]|$)"
     r"|^id_(rsa|dsa|ecdsa|ed25519)|\.(pem|key|p12|pfx|jks|keystore)$",
     re.IGNORECASE,
 )
@@ -330,10 +333,64 @@ def _source_too_large() -> RefusalError:
 
 def _not_source_folder(relative: PurePosixPath) -> bool:
     """Whether nothing under this folder of the package goes into the source zip."""
-    path = relative.as_posix()
+    path = relative.as_posix().lower()
     if any(path == top or path.startswith(top + "/") for top in _NOT_SOURCE_PATHS):
         return True
-    return any(part in _NOT_SOURCE_DIRS or part.startswith(".") for part in relative.parts)
+    return any(part.lower() in _NOT_SOURCE_DIRS or part.startswith(".") for part in relative.parts)
+
+
+# A variable of ``.env.example`` as wizard_api's check reads it
+# (poc_service.env_example_key_values, which keeps a key out of the file there):
+# ``NAME=value`` and ``export NAME=value``, or commented out, ``# NAME=value``.
+_ENV_ASSIGNMENT = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
+_ENV_COMMENTED_ASSIGNMENT = re.compile(r"^\s*#\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+_ENV_QUOTED = re.compile(r"^([\"'])(.*)\1\s*(?:#.*)?$")
+#: A part of a variable's name ending in one of these names a credential:
+#: AZURE_API_KEY, HF_TOKEN, CLIENT_SECRET. MAX_TOKENS and KEYWORDS do not.
+_ENV_CREDENTIAL_WORDS = ("KEY", "SECRET", "TOKEN", "PASSWORD")
+_ENV_CREDENTIAL_NAMES = frozenset({"GOOGLE_SERVICE_ACCOUNT_JSON"})
+
+
+def _env_value(raw: str) -> str:
+    """A value as ``.env.example`` writes it, without its quotes or a trailing comment."""
+    text = raw.strip()
+    if text.startswith("#"):
+        return ""
+    quoted = _ENV_QUOTED.match(text)
+    if quoted:
+        return quoted.group(2)
+    for at, char in enumerate(text):
+        if char == "#" and at > 0 and text[at - 1].isspace():
+            return text[:at].rstrip()
+    return text
+
+
+def _env_example_key_values(text: str) -> list[str]:
+    """The variables of ``.env.example`` that give a credential a value, by name.
+
+    A credential may stand there empty or with a placeholder (``<your key>``,
+    ``your-key-here``, ``xxxx``), also commented out; a model name, an API version
+    or an endpoint keeps its example value.
+    """
+    found: list[str] = []
+    for line in text.splitlines():
+        match = _ENV_COMMENTED_ASSIGNMENT.match(line) or _ENV_ASSIGNMENT.match(line)
+        if match is None:
+            continue
+        name, value = match.group(1), _env_value(match.group(2)).strip()
+        upper = name.upper()
+        credential = upper in _ENV_CREDENTIAL_NAMES or any(
+            part.endswith(_ENV_CREDENTIAL_WORDS) for part in upper.split("_") if part
+        )
+        placeholder = (
+            not value
+            or (value.startswith("<") and value.endswith(">"))
+            or value.lower().startswith("your")
+            or set(value) <= set("xX*.-_")
+        )
+        if credential and not placeholder and name not in found:
+            found.append(name)
+    return found
 
 
 def _is_source(relative: PurePosixPath) -> bool:
@@ -342,8 +399,10 @@ def _is_source(relative: PurePosixPath) -> bool:
     An allow-list, so a file nobody thought of stays out: the Python files, at the
     root ``README.md``, ``config.yaml``, ``requirements.txt``, ``.env.example`` and
     ``.gitignore``, the text files in ``schemas/`` and ``prompts/``, and the test
-    page's own files in ``ui/``. Never a file under ``sample_input/``, ``output/``
-    or ``evals/ground_truth/``, in a hidden folder, an environment or a cache; never
+    page's own files in ``ui/`` (:meth:`Solution.source_zip` leaves out a
+    ``.env.example`` that gives a key a value). Never a file under ``sample_input/``,
+    ``output/`` or ``evals/ground_truth/``, in a hidden folder, an environment or a
+    cache; never
     another hidden file (``.env``, ``.netrc``, ``.npmrc``, ``.pypirc``,
     ``.git-credentials``); never a file whose name says it holds a credential
     (``credentials.json``, ``service-account.json``, ``secrets.toml``, ``id_rsa``).
@@ -865,7 +924,9 @@ class Solution:
         """``(file name, bytes)`` of the package's source code as a zip, in one folder.
 
         Built in memory, so what is read is held to ``MAX_SOURCE_BYTES`` in all,
-        also when a file grew after :meth:`source_files` looked at it.
+        also when a file grew after :meth:`source_files` looked at it. A
+        ``.env.example`` that gives a key a value stays out: the key would go
+        wherever the zip goes.
         """
         folder = self.source_name()
         buffer = io.BytesIO()
@@ -881,6 +942,10 @@ class Solution:
                 except OSError:
                     continue
                 if len(data) > MAX_SOURCE_FILE_BYTES:
+                    continue
+                if name == ".env.example" and _env_example_key_values(
+                    data.decode("utf-8", "replace")
+                ):
                     continue
                 budget -= len(data)
                 if budget < 0:
@@ -1020,7 +1085,9 @@ class Handler(BaseHTTPRequestHandler):
             # The name is the solution's id cut down to letters, digits, ".", "_" and "-".
             disposition = f'attachment; filename="{self.solution.source_name()}.zip"'
             if self.command == "HEAD":
-                # Answered without building the zip.
+                # Answered without building the zip, but refused as GET is when the
+                # package is over the limits (listing it reads no file).
+                self.solution.source_files()
                 self._send(200, None, "application/zip", {"Content-Disposition": disposition})
                 return
             _, body = self.solution.source_zip()
@@ -1188,11 +1255,33 @@ def _host_name(header: str) -> str:
     return (match.group(1) or match.group(2)).lower()
 
 
+class _IPv6Server(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
+class _DualStackServer(_IPv6Server):
+    """``--host ::``: every address of this computer, its IPv4 ones as well."""
+
+    def server_bind(self):
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        except (AttributeError, OSError):
+            pass  # IPv6 alone where the system has no dual stack
+        super().server_bind()
+
+
+def _server_class(host: str) -> type[ThreadingHTTPServer]:
+    """IPv4 for a name or an IPv4 address, IPv6 for an IPv6 one, both for ``::``."""
+    if host == "::":
+        return _DualStackServer
+    return _IPv6Server if ":" in host else ThreadingHTTPServer
+
+
 def create_server(
     package_dir: Path = PACKAGE_DIR, host: str = "127.0.0.1", port: int = 8000, **limits
 ) -> ThreadingHTTPServer:
     """The server for the package in ``package_dir``; ``limits`` go to :class:`Solution`."""
-    server = ThreadingHTTPServer((host, port), Handler)
+    server = _server_class(host)((host, port), Handler)
     server.daemon_threads = True
     server.host_names = _host_names(host, server.server_address[0])  # type: ignore[attr-defined]
     server.every_address = host in _EVERY_ADDRESS  # type: ignore[attr-defined]
@@ -1253,6 +1342,8 @@ def main() -> None:
         print("Try another port: python app.py --port 8080", file=sys.stderr)
         sys.exit(1)
     shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
+    if ":" in shown_host:
+        shown_host = f"[{shown_host}]"
     print(f"Test page: http://{shown_host}:{server.server_address[1]}", flush=True)
     if args.host not in _LOOPBACK_NAMES:
         print(

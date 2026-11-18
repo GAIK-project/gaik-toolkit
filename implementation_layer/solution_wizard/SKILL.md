@@ -908,8 +908,8 @@ A run that fails or gives a wrong result is fixed and run again in Phase 11.
    the entrypoint must keep reading its inputs from `sample_input/` and writing its results to
    `output/`. If you change what the solution takes in or the steps it runs, edit
    `ui/solution.json` to match. The page's "Download source code" hands out a zip of the
-   package's Python files, `README.md`, `config.yaml`, `requirements.txt`, `.env.example`,
-   `.gitignore`, the text files in `schemas/` and `prompts/` and the page's own files, and
+   package's Python files, `README.md`, `config.yaml`, `requirements.txt`, `.env.example`
+   (left out if it gives a key a value), `.gitignore`, the text files in `schemas/` and `prompts/` and the page's own files, and
    nothing else: never another hidden file, a credential-named file, `sample_input/`,
    `output/` or `evals/ground_truth/`. Keep code and settings in those places and names.
 
