@@ -455,3 +455,57 @@ def test_a_session_file_is_readable_by_the_api_user_only(tmp_path) -> None:
         fh.write("{}")
 
     assert (tmp_path / "probe.json").stat().st_mode & 0o077 == 0
+
+
+@requires_postgres
+def test_the_chat_sync_forgets_an_ai_step_the_agent_has_settled(client, db_session) -> None:
+    """``ai_steps_without_component``: a step the user made an AI step is shown as
+    one only while the agent's draft has it as an automated task without a
+    component."""
+    draft = json.loads(json.dumps(DRAFT))
+    draft["workflow"]["steps"][2] = {"id": "review", "name": "Review", "type": "automated_task"}
+    session, detail = _adopted_session_with(client, db_session, "AI steps", draft)
+    session.session_metadata = {
+        **session.session_metadata,
+        artifact_sync.AI_STEPS_KEY: ["review"],
+    }
+    db_session.commit()
+
+    # The agent gives it a component: an AI step by its own right, no longer remembered.
+    draft["workflow"]["steps"][2]["component"] = "Classifier"
+    write_draft(session.output_dir, draft)
+    artifact_sync.sync_blueprint_from_draft(db_session, session)
+    assert artifact_sync.AI_STEPS_KEY not in session.session_metadata
+
+    # Taken away again, the step is plain automated work: io, not ai.
+    del draft["workflow"]["steps"][2]["component"]
+    write_draft(session.output_dir, draft)
+    artifact_sync.sync_blueprint_from_draft(db_session, session)
+    shown = client.get(f"/sessions/{detail['id']}").json()["blueprint"]
+    assert {s["id"]: s["type"] for s in shown["steps"]}["review"] == "io"
+
+
+@requires_postgres
+def test_the_chat_sync_keeps_an_ai_step_the_agent_has_not_settled(client, db_session) -> None:
+    draft = json.loads(json.dumps(DRAFT))
+    draft["workflow"]["steps"][2] = {"id": "review", "name": "Review", "type": "automated_task"}
+    session, detail = _adopted_session_with(client, db_session, "AI kept", draft)
+    session.session_metadata = {**session.session_metadata, artifact_sync.AI_STEPS_KEY: ["review"]}
+    db_session.commit()
+
+    # The agent renames another step: the remembered one is still without a component.
+    draft["workflow"]["steps"][0]["name"] = "Collect the note"
+    write_draft(session.output_dir, draft)
+    artifact_sync.sync_blueprint_from_draft(db_session, session)
+
+    assert session.session_metadata[artifact_sync.AI_STEPS_KEY] == ["review"]
+    shown = client.get(f"/sessions/{detail['id']}").json()["blueprint"]
+    assert {s["id"]: s["type"] for s in shown["steps"]}["review"] == "ai"
+
+
+def _adopted_session_with(client, db_session, title: str, draft: dict):
+    created = client.post("/sessions", json={"user_id": "edits", "title": title}).json()
+    session = session_service.get_session(db_session, uuid.UUID(created["id"]))
+    write_draft(session.output_dir, draft)
+    artifact_sync.sync_blueprint_from_draft(db_session, session)
+    return session, client.get(f"/sessions/{created['id']}").json()

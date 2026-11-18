@@ -275,3 +275,37 @@ def test_an_ai_step_without_a_component_needs_one() -> None:
     assert _view(result.blueprint)["steps"][0]["type"] == "io"
     remembered = artifact_sync.blueprint_from_draft(result.blueprint, frozenset({"upload"}))
     assert remembered.steps[0]["type"] == "ai"
+
+
+def test_an_ai_step_whose_component_is_cleared_stays_ai() -> None:
+    from wizard_api.services import blueprint_edit_service
+
+    draft = _draft()
+    old = _view(draft)
+    assert old["steps"][1]["type"] == "ai"
+    new = {
+        **old,
+        "steps": [
+            old["steps"][0],
+            {k: v for k, v in old["steps"][1].items() if k != "component"},
+            *old["steps"][2:],
+        ],
+    }
+
+    edit = blueprint_edit_service.v2_edit(draft, old, new)
+
+    assert edit.ai_steps == {"extract"}
+    result = apply_operations(draft, edit.operations)
+    assert "extract: needs a component" in result.needs_attention
+    shown = artifact_sync.blueprint_from_draft(result.blueprint, frozenset(edit.ai_steps))
+    assert shown.steps[1]["type"] == "ai"
+
+
+def test_an_ai_step_kept_with_its_component_is_not_remembered() -> None:
+    from wizard_api.services import blueprint_edit_service
+
+    draft = _draft()
+    old = _view(draft)
+    new = {**old, "steps": [{**old["steps"][0], "name": "Upload it"}, *old["steps"][1:]]}
+
+    assert blueprint_edit_service.v2_edit(draft, old, new).ai_steps == set()

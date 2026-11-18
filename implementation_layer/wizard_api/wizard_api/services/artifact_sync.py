@@ -67,6 +67,31 @@ def ai_steps(metadata: dict[str, Any] | None) -> frozenset[str]:
     return frozenset(s for s in stored if isinstance(s, str))
 
 
+def still_without_component(
+    draft: dict[str, Any] | None, steps: frozenset[str] | set[str]
+) -> frozenset[str]:
+    """Of ``steps``, the draft's automated tasks that have no component: the
+    ones ``AI_STEPS_KEY`` still applies to. A step given a component, made
+    another type or removed is no longer one."""
+    workflow = (draft or {}).get("workflow")
+    raw = workflow.get("steps") if isinstance(workflow, dict) else None
+    return frozenset(
+        str(s.get("id"))
+        for s in raw or []
+        if isinstance(s, dict)
+        and str(s.get("id")) in steps
+        and s.get("type") == "automated_task"
+        and not s.get("component")
+    )
+
+
+def _with_ai_steps(metadata: dict[str, Any], ai: frozenset[str]) -> dict[str, Any]:
+    out = {k: v for k, v in metadata.items() if k != AI_STEPS_KEY}
+    if ai:
+        out[AI_STEPS_KEY] = sorted(ai)
+    return out
+
+
 #: The agent's package and the files it writes there as the phases go by.
 POC_DIR = "poc"
 SCHEMA_FILES = ("schemas/output_schema_requirements.json", "schemas/output_schema.py")
@@ -513,12 +538,16 @@ def sync_blueprint_from_draft(
     from_file = draft is None
     if from_file:
         draft = read_draft_blueprint(session.output_dir)
-    content = _draft_content(draft, ai_steps(session.session_metadata))
+    # The AI steps the agent has given a component, made another type or
+    # removed since are no longer shown as AI steps without one.
+    marked = ai_steps(session.session_metadata)
+    ai = still_without_component(draft, marked)
+    content = _draft_content(draft, ai)
     if content is None:
         return False
     digest = content_digest(content)
     # The common turn, an unchanged draft, takes no lock.
-    if (session.session_metadata or {}).get(ADOPTED_DRAFT_KEY) == digest:
+    if (session.session_metadata or {}).get(ADOPTED_DRAFT_KEY) == digest and ai == marked:
         return False
 
     # Metadata is one JSONB object: read it fresh and hold the row until the
@@ -530,11 +559,13 @@ def sync_blueprint_from_draft(
         # The draft too: one read before the lock could be older than a draft
         # another sync adopted meanwhile, and would be written over it.
         draft = read_draft_blueprint(session.output_dir)
-        content = _draft_content(draft, ai_steps(session.session_metadata))
-        if content is None:
-            db.commit()
-            return False
-        digest = content_digest(content)
+    # And the AI steps as stored now.
+    ai = still_without_component(draft, ai_steps(session.session_metadata))
+    content = _draft_content(draft, ai)
+    if content is None:
+        db.commit()
+        return False
+    digest = content_digest(content)
     adopted = (session.session_metadata or {}).get(ADOPTED_DRAFT_KEY)
     # A session whose draft was adopted before the digest was kept: a draft the
     # sync has already written as a version is not new, whatever came after it.
@@ -548,7 +579,8 @@ def sync_blueprint_from_draft(
     )
     if added:
         blueprint_service.add_version(db, session, note=note, content=content, draft=draft)
-    session.session_metadata = {**session.session_metadata, ADOPTED_DRAFT_KEY: digest}
+    metadata = _with_ai_steps(dict(session.session_metadata or {}), ai)
+    session.session_metadata = {**metadata, ADOPTED_DRAFT_KEY: digest}
     db.commit()
     db.refresh(session)
     return added

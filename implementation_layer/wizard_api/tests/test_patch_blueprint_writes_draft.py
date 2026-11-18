@@ -567,3 +567,60 @@ def test_a_canvas_save_while_the_agent_replies_answers_409(client, db_session, m
 
     assert res.status_code == 409
     assert res.json()["detail"]["error"] == "agent_busy"
+
+
+@requires_postgres
+def test_an_ai_step_whose_component_is_cleared_in_the_form_stays_ai(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client, db_session)
+    content = copy.deepcopy(created["blueprint"])
+    assert content["steps"][1]["type"] == "ai"
+    del content["steps"][1]["component"]
+
+    res = client.patch(f"/sessions/{created['id']}/blueprint", json={"content": content})
+
+    assert res.status_code == 200, res.text
+    extract = _read_draft(created["output_dir"])["workflow"]["steps"][1]
+    assert (extract["type"], extract.get("component")) == ("automated_task", None)
+    body = res.json()
+    assert body["blueprint"]["steps"][1]["type"] == "ai"
+    assert body["metadata"][artifact_sync.AI_STEPS_KEY] == ["extract"]
+    assert 'Removed the component of step "Extract"' in body["metadata"]["pending_user_edits"]
+
+
+@requires_postgres
+def test_an_emptied_label_in_the_form_clears_the_artifacts_label(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client, db_session)
+    content = {**copy.deepcopy(created["blueprint"]), "data_objects": {"fields": ""}}
+
+    res = client.patch(f"/sessions/{created['id']}/blueprint", json={"content": content})
+
+    assert res.status_code == 200, res.text
+    assert "label" not in _read_draft(created["output_dir"])["artifacts"]["fields"]
+    assert res.json()["metadata"]["pending_user_edits"] == [
+        'Cleared the name of data object "fields"'
+    ]
+
+
+@requires_postgres
+def test_an_emptied_label_on_the_canvas_clears_the_artifacts_label(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client, db_session)
+    sid = created["id"]
+    xml = client.get(f"/sessions/{sid}/bpmn").text
+    edited = xml.replace('name="Invoice fields"', 'name=""')
+    assert edited != xml
+
+    res = client.post(f"/sessions/{sid}/bpmn/sync", json={"xml": edited})
+
+    assert res.status_code == 200, res.text
+    assert "label" not in _read_draft(created["output_dir"])["artifacts"]["fields"]
+    assert res.json()["metadata"]["pending_user_edits"] == [
+        'Cleared the name of data object "fields"'
+    ]
+    # The diagram names the data object itself again.
+    assert 'name="Invoice fields"' not in client.get(f"/sessions/{sid}/bpmn").text

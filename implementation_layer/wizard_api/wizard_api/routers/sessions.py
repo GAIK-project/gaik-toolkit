@@ -243,7 +243,8 @@ def _data_object_label_edits(
         if art in drawn:
             if not isinstance(text, str):
                 unsupported.append(f"data_objects[{art}]")
-            elif text and text != drawn[art]:
+            elif text != drawn[art]:
+                # Emptied, the label is cleared and the diagram names it again.
                 found.append(blueprint_ops.SetField("artifact_label", text, art))
         elif label != shown.get(art):
             unsupported.append(f"data_objects[{art}]")
@@ -364,23 +365,45 @@ def sync_session_bpmn(
 
 
 def _canvas_label_edits(
-    draft: dict[str, Any], before: dict[str, Any], after: dict[str, Any], unsupported: list[str]
+    draft: dict[str, Any],
+    before: dict[str, Any],
+    after: dict[str, Any],
+    xml: str,
+    unsupported: list[str],
 ) -> list[Any]:
     """The data objects renamed on the canvas, as edits of the draft's artifacts'
     labels. The diagram draws the draft, so a data object is one of its
-    artifacts (``DataObjectRef_<artifact id>``); one that is not is refused."""
+    artifacts (``DataObjectRef_<artifact id>``); one that is not is refused. A
+    name emptied on the canvas clears the label (bpmn_sync reads no empty
+    names, so those are read from the XML here), as an emptied one in the form."""
     old_labels = before.get("data_objects") or {}
-    new_labels = after.get("data_objects") or {}
+    new_labels = dict(after.get("data_objects") or {})
+    for art in _unnamed_data_objects(xml):
+        new_labels.setdefault(art, "")
     artifacts = draft.get("artifacts") if isinstance(draft.get("artifacts"), dict) else {}
     found: list[Any] = []
     for art in sorted(set(old_labels) & set(new_labels)):
         if old_labels[art] == new_labels[art]:
             continue
-        if art in artifacts and new_labels[art].strip():
+        if art in artifacts:
             found.append(blueprint_ops.SetField("artifact_label", new_labels[art].strip(), art))
         else:
             unsupported.append(f"data_objects[{art}]")
     return found
+
+
+def _unnamed_data_objects(xml: str) -> list[str]:
+    """The artifact ids of the canvas's data objects that have no name."""
+    from solution_wizard.bpmn_sync import _local, _parse
+
+    prefix = "DataObjectRef_"
+    return [
+        el.get("id", "")[len(prefix) :]
+        for el in _parse(xml).iter()
+        if _local(el.tag) == "dataObjectReference"
+        and el.get("id", "").startswith(prefix)
+        and not (el.get("name") or "").strip()
+    ]
 
 
 #: The description bpmn_sync gives a task drawn without one: not the user's words.
@@ -418,7 +441,7 @@ def _sync_bpmn_into_draft(
             if isinstance(s, dict)
         }
         before, after, unsupported = _canvas_step_changes(before, after, step_ids)
-        labels = _canvas_label_edits(draft, before, after, unsupported)
+        labels = _canvas_label_edits(draft, before, after, xml, unsupported)
         if unsupported:
             raise edits.unsupported_edit(unsupported)
         edit = edits.v2_edit(draft, before, after)

@@ -750,8 +750,13 @@ def _set_artifact_label(ctx: _Context, op: SetField) -> None:
         raise OperationError("not_found", f'There is no artifact "{op.target}"', "data_objects")
     if (artifact.get("label") or "") == op.value:
         return
-    artifact["label"] = op.value
-    ctx.summaries.append(f'Renamed data object "{op.target}" to "{op.value}"')
+    if op.value:
+        artifact["label"] = op.value
+        ctx.summaries.append(f'Renamed data object "{op.target}" to "{op.value}"')
+    else:
+        # No label: the diagram names the data object itself again.
+        artifact.pop("label", None)
+        ctx.summaries.append(f'Cleared the name of data object "{op.target}"')
 
 
 _FIELD_HANDLERS: dict[str, Callable[[_Context, SetField], None]] = {

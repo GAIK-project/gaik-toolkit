@@ -124,20 +124,29 @@ def v2_edit(draft: dict[str, Any], old: dict[str, Any], new: dict[str, Any]) -> 
     other fields the reduced blueprint shows (the use case's name and
     description, the goal, the integration targets, each step's component and
     settings) carried into the draft, see ``blueprint_ops.field_edits_from_v2_diff``.
-    A step ``new`` makes ``ai``, which was not, is remembered as one: without a
-    component the draft's automated task would show as ``io``.
+    A step ``new`` makes ``ai`` (it was not, or it was with a component that
+    ``new`` takes away) is remembered as one: without a component the draft's
+    automated task would show as ``io``.
     """
     reserved = other_ids(draft, old)
     operations = blueprint_ops.operations_from_v2_diff(old, new, reserved_ids=reserved)
     ids = blueprint_ops.v2_step_ids(old, new, reserved_ids=reserved)
     fields = blueprint_ops.field_edits_from_v2_diff(old, new, ids)
-    old_types = {str(s.get("id")): s.get("type") for s in old.get("steps") or []}
-    made_ai = {
-        ids[str(s.get("id"))]
-        for s in new.get("steps") or []
-        if isinstance(s, dict) and s.get("type") == "ai" and old_types.get(str(s.get("id"))) != "ai"
+    old_steps = {str(s.get("id")): s for s in old.get("steps") or [] if isinstance(s, dict)}
+
+    def made_ai(step: dict[str, Any]) -> bool:
+        if step.get("type") != "ai":
+            return False
+        before = old_steps.get(str(step.get("id")))
+        if before is None or before.get("type") != "ai":
+            return True
+        # Still ai, with the component cleared.
+        return bool(before.get("component")) and not step.get("component")
+
+    made = {
+        ids[str(s.get("id"))] for s in new.get("steps") or [] if isinstance(s, dict) and made_ai(s)
     }
-    return Edit([*operations, *fields], made_ai)
+    return Edit([*operations, *fields], made)
 
 
 def apply_edit(
@@ -233,7 +242,7 @@ def _apply(
             raise _invalid(exc) from exc
         metadata = dict(session.session_metadata or {})
         marked = artifact_sync.ai_steps(metadata)
-        ai = _still_without_component(result.blueprint, marked | edit.ai_steps)
+        ai = artifact_sync.still_without_component(result.blueprint, marked | edit.ai_steps)
         if whole_save and result.blueprint == draft and ai == marked:
             db.rollback()
             return None
@@ -277,17 +286,3 @@ def _apply(
         raise
     logger.info("session %s: %d blueprint operations applied", session.id, len(operations))
     return result
-
-
-def _still_without_component(
-    blueprint: dict[str, Any], steps: frozenset[str] | set[str]
-) -> frozenset[str]:
-    """Of ``steps``, the automated tasks that have no component."""
-    return frozenset(
-        str(s.get("id"))
-        for s in (blueprint.get("workflow") or {}).get("steps") or []
-        if isinstance(s, dict)
-        and str(s.get("id")) in steps
-        and s.get("type") == "automated_task"
-        and not s.get("component")
-    )
