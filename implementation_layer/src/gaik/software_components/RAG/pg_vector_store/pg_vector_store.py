@@ -37,6 +37,8 @@ from gaik.software_components.RAG._chunk_ids import (
 if TYPE_CHECKING:
     from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
 
+from ..vector_store.vector_store import OWNER_KEY, check_owner, refuse_foreign_owner
+
 logger = logging.getLogger(__name__)
 
 # How a natural-language query becomes a tsquery. See `gaik_tsquery` in SQL.
@@ -213,7 +215,13 @@ class PgVectorStore:
             connection: ``"relaxed_order"``, ``"strict_order"`` or ``"off"``.
             With a selective ``filters`` argument an HNSW scan otherwise returns
             fewer rows than asked, or none. Needs pgvector 0.8+. ``None`` keeps
-            the database's setting.
+            the database's setting, except with ``owner``, where it means
+            ``"relaxed_order"``: the owner is such a filter on every search.
+        owner: A user or session id. Rows this store adds are recorded for it
+            (metadata ``gaik_owner``), and every search, ``count()`` and ``delete()``
+            sees only its rows. ``health()`` and ``relemmatize()`` are table-wide
+            maintenance and read every owner's rows. Without an owner, ``add()``
+            refuses metadata that names one.
 
     Example::
 
@@ -245,6 +253,7 @@ class PgVectorStore:
         hnsw_ef_search: int | None = None,
         vector_type: str = "vector",
         hnsw_iterative_scan: str | None = None,
+        owner: str | None = None,
     ) -> None:
         if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", table_name):
             raise ValueError(
@@ -302,6 +311,7 @@ class PgVectorStore:
                 f"Invalid hnsw_iterative_scan {hnsw_iterative_scan!r}: expected one of "
                 f"{', '.join(sorted(_ITERATIVE_SCAN_MODES))}"
             )
+        self.owner = check_owner(owner)
         self.connection_string = connection_string
         self.table_name = table_name
         self.embedding_dim = embedding_dim
@@ -310,6 +320,11 @@ class PgVectorStore:
         self.tsquery_mode = tsquery_mode
         self.hnsw_ef_search = hnsw_ef_search
         self.vector_type = vector_type
+        # The owner is a filter on every search, and an HNSW scan applies a filter only
+        # after it has picked its candidates: on a table other owners share, a search
+        # would return fewer rows than asked, or none. Iterative scans keep looking.
+        if hnsw_iterative_scan is None and self.owner is not None:
+            hnsw_iterative_scan = "relaxed_order"
         self.hnsw_iterative_scan = hnsw_iterative_scan
         self._conn: psycopg.Connection | None = None
         self._has_chunk_key: bool | None = None
@@ -830,7 +845,7 @@ class PgVectorStore:
         Each row gets a ``chunk_key`` from its document, its owner and its
         text: the document is ``metadata["document_id"]``, else ``source``, else
         ``document_name``, and is stored in the metadata as ``document_id``; the
-        owner is ``metadata["gaik_owner"]`` when set.
+        owner is the store's ``owner``.
         Adding a chunk that is already stored updates its row instead of
         inserting a second one. A chunk whose metadata names no document gets no
         ``chunk_key`` and is inserted each time, as before. A table made by an older gaik gets the
@@ -860,6 +875,18 @@ class PgVectorStore:
 
         if not documents:
             return []
+        if self.owner is None:
+            refuse_foreign_owner(documents)
+        else:
+            # The owner is stamped before the chunk keys are made: it is part of
+            # them, so two owners' identical chunks keep separate rows.
+            documents = [
+                Document(
+                    page_content=doc.page_content,
+                    metadata={**(doc.metadata or {}), OWNER_KEY: self.owner},
+                )
+                for doc in documents
+            ]
 
         conn = self._get_conn()
         has_chunk_key = self._chunk_key_column(conn)
@@ -937,10 +964,20 @@ class PgVectorStore:
 
     @_rolls_back_on_error
     def count(self) -> int:
-        """Return the total number of documents in the store."""
+        """Return the number of documents in the store (this owner's, with one)."""
         conn = self._get_conn()
-        row = conn.execute(f"SELECT COUNT(*) AS cnt FROM {self.table_name}").fetchone()
+        clause, params = _build_filter_clause(self._scoped(None))
+        row = conn.execute(
+            f"SELECT COUNT(*) AS cnt FROM {self.table_name} WHERE TRUE {clause}", params
+        ).fetchone()
+        conn.commit()
         return row["cnt"] if row else 0
+
+    def _scoped(self, filters: dict | None) -> dict | None:
+        """``filters`` with this store's owner added; the owner wins over a caller's key."""
+        if self.owner is None:
+            return filters
+        return {**(filters or {}), OWNER_KEY: self.owner}
 
     @_rolls_back_on_error
     def delete(self, document_ids: list[int]) -> int:
@@ -953,9 +990,10 @@ class PgVectorStore:
             return 0
 
         conn = self._get_conn()
+        clause, params = _build_filter_clause(self._scoped(None))
         result = conn.execute(
-            f"DELETE FROM {self.table_name} WHERE id = ANY(%s)",
-            (document_ids,),
+            f"DELETE FROM {self.table_name} WHERE id = ANY(%s) {clause}",
+            (document_ids, *params),
         )
         conn.commit()
         return result.rowcount
@@ -1044,6 +1082,7 @@ class PgVectorStore:
         """
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
+        filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
 
         rows = conn.execute(
@@ -1054,6 +1093,7 @@ class PgVectorStore:
             """,
             (vec_str, threshold, top_k, filter_json),
         ).fetchall()
+        conn.commit()
 
         return self._rows_to_results(rows, score_key="similarity")
 
@@ -1076,7 +1116,7 @@ class PgVectorStore:
             List of ``(Document, ts_rank_score)`` tuples, highest first.
         """
         conn = self._get_conn()
-        filter_clause, filter_params = _build_filter_clause(filters)
+        filter_clause, filter_params = _build_filter_clause(self._scoped(filters))
         effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
@@ -1095,6 +1135,7 @@ class PgVectorStore:
             """,
             (effective_query, effective_query, *filter_params, top_k),
         ).fetchall()
+        conn.commit()
 
         return self._rows_to_results(rows, score_key="score")
 
@@ -1134,6 +1175,7 @@ class PgVectorStore:
         """
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
+        filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
         effective_query = self._lemmatize_query(query_text)
 
@@ -1164,6 +1206,7 @@ class PgVectorStore:
                 self.tsquery_mode,
             ),
         ).fetchall()
+        conn.commit()
 
         return self._rows_to_results(
             rows,
@@ -1204,6 +1247,7 @@ class PgVectorStore:
         """
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
+        filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
         effective_query = self._lemmatize_query(query_text)
 
@@ -1227,6 +1271,7 @@ class PgVectorStore:
                 self.tsquery_mode,
             ),
         ).fetchall()
+        conn.commit()
 
         return self._rows_to_results(
             rows,
@@ -1241,6 +1286,9 @@ class PgVectorStore:
     @_rolls_back_on_error
     def health(self, *, sample_rows: int = 5) -> HealthReport:
         """Check, against the live database, that both search arms can work.
+
+        Table-wide maintenance: it reads every owner's rows (counts and sample row
+        ids), whatever this store's ``owner`` is, so do not show it to one user.
 
         Either arm of a hybrid search can stop contributing without an error,
         because the other keeps filling the page. This reads the table as it
@@ -1289,6 +1337,7 @@ class PgVectorStore:
             (table,),
         ).fetchall()
         if not columns:
+            conn.commit()
             return HealthReport(
                 False, [f"table {table!r} does not exist: call setup() first"], details
             )
@@ -1470,11 +1519,15 @@ class PgVectorStore:
                 "pgvector 0.8 or newer, and a transaction pooler drops session settings"
             )
 
+        conn.commit()
         return HealthReport(not problems, problems, details)
 
     @_rolls_back_on_error
     def relemmatize(self, *, batch_size: int = 500) -> int:
         """Recompute the lemma column for every row with the current ``text_processor``.
+
+        Table-wide maintenance: it rewrites every owner's rows, whatever this store's
+        ``owner`` is.
 
         Use it after changing the processor's backend or its ``decompound``
         setting, or to fill rows whose lemmas are missing. The index and the

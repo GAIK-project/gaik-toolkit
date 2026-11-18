@@ -68,10 +68,12 @@ test.each([false, true])("a report run keeps its run token when staff is %p", as
     return new Response("bad", { status: 400 });
   }) as typeof fetch;
 
-  await forwardReportRun("/report-writer/run", new FormData(), staff, async () => {});
+  await forwardReportRun("/report-writer/run", new FormData(), staff, async () => {}, "u1");
 
   expect(sent.get("x-gaik-report-run")).toBe("sample-run-token");
   expect(sent.get("x-gaik-model-tier")).toBe(staff ? "staff" : null);
+  // the API's audit line names the user of the run
+  expect(sent.get("x-gaik-user")).toBe("u1");
 });
 
 test("an unreachable backend is reported with an id, not the connection error", async () => {

@@ -1,0 +1,34 @@
+{
+  "_comment": "Request body limits of the demo API, read by the API (utils/upload_limits.py) and by the Next proxy (lib/upload-limits.ts). A route is matched by its API path, or by a prefix ending in '/'. max_mb is the whole request in MiB, multipart fields included; max_files is the number of file parts one request may carry. A route not listed here takes the default, which carries no files. The largest max_mb must stay within proxyClientMaxBodySize in next.config.ts and proxy-body-size in openshift/route.yaml.",
+  "default": {
+    "max_mb": 10,
+    "max_files": 0,
+    "message": "The request is too large."
+  },
+  "routes": {
+    "/parse": { "max_mb": 22, "max_files": 1, "message": "File too large. Maximum size is 20MB" },
+    "/classify": { "max_mb": 22, "max_files": 1, "message": "File too large. Maximum size is 20MB" },
+    "/llm-judge/validate": { "max_mb": 22, "max_files": 1, "message": "File too large. Maximum size is 20MB" },
+    "/pipeline/document": { "max_mb": 22, "max_files": 1, "message": "File too large. Maximum size is 20MB" },
+    "/pipeline/document/stream": { "max_mb": 22, "max_files": 1, "message": "File too large. Maximum size is 20MB" },
+    "/tabular-agent/upload": { "max_mb": 22, "max_files": 1, "message": "File too large. Maximum size is 20MB" },
+    "/luvata-order/example/single/extract": { "max_mb": 22, "max_files": 1, "message": "File too large. Maximum size is 20MB" },
+    "/transcribe": { "max_mb": 52, "max_files": 1, "message": "File too large. Maximum size is 50MB. For a video file, extract the audio track first: ffmpeg -i video.mp4 -vn -ac 1 -ar 16000 -b:a 64k audio.mp3" },
+    "/pipeline/audio": { "max_mb": 52, "max_files": 1, "message": "File too large. Maximum size is 50MB. For a video file, extract the audio track first: ffmpeg -i video.mp4 -vn -ac 1 -ar 16000 -b:a 64k audio.mp3" },
+    "/pipeline/audio/stream": { "max_mb": 52, "max_files": 1, "message": "File too large. Maximum size is 50MB. For a video file, extract the audio track first: ffmpeg -i video.mp4 -vn -ac 1 -ar 16000 -b:a 64k audio.mp3" },
+    "/diary/audio/stream": { "max_mb": 52, "max_files": 1, "message": "File too large. Maximum size is 50MB. For a video file, extract the audio track first: ffmpeg -i video.mp4 -vn -ac 1 -ar 16000 -b:a 64k audio.mp3" },
+    "/dental-transcribe/stream": { "max_mb": 52, "max_files": 1, "message": "File too large. Maximum size is 50MB. For a video file, extract the audio track first: ffmpeg -i video.mp4 -vn -ac 1 -ar 16000 -b:a 64k audio.mp3" },
+    "/extract/trace": { "max_mb": 102, "max_files": 5, "message": "Uploads exceed the 100 MB limit" },
+    "/extract-vision": { "max_mb": 102, "max_files": 20, "message": "Uploads exceed the 100 MB limit" },
+    "/rag/index": { "max_mb": 102, "max_files": 20, "message": "Uploads exceed the 100 MB limit" },
+    "/luvata-order/process": { "max_mb": 102, "max_files": 12, "message": "Uploads exceed the 100 MB limit" },
+    "/luvata-order/custom/extract": { "max_mb": 102, "max_files": 11, "message": "Uploads exceed the 100 MB limit" },
+    "/wizard/message/": { "max_mb": 68, "max_files": 0, "message": "Attachments exceed the limit: at most 5 files of 10 MB each." },
+    "/knowledge-curator/verify": { "max_mb": 128, "max_files": 1, "message": "Uploads exceed the 100 MB limit" },
+    "/knowledge-curator/run": { "max_mb": 128, "max_files": 1, "message": "Uploads exceed the 100 MB limit" },
+    "/knowledge-synthesis/run": { "max_mb": 128, "max_files": 2, "message": "Uploads exceed the 100 MB limit" },
+    "/report-writer/run": { "max_mb": 128, "max_files": 51, "message": "Uploads exceed the 100 MB limit" },
+    "/report-writer-v2/run": { "max_mb": 128, "max_files": 52, "message": "Uploads exceed the 100 MB limit" },
+    "/source-normalizer/run": { "max_mb": 128, "max_files": 20, "message": "Uploads exceed the 100 MB limit" }
+  }
+}

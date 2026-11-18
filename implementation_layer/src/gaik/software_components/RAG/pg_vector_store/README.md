@@ -186,9 +186,9 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 |--------|-------------|
 | `setup()` | Create extensions, table, indexes, SQL functions; concurrent calls on one database run one after another |
 | `add(documents, embeddings, *, replace=False)` | Insert documents, or update the rows of chunks already stored; returns list of IDs. `replace=True` first deletes each document's rows of the same owner, in the same transaction |
-| `count()` | Total document count |
-| `delete(document_ids)` | Delete by row ID, returns deleted count |
-| `delete_document(document_id, *, owner=None)` | Delete one document's rows (metadata `document_id`, compared exactly) of one owner (metadata `gaik_owner`; without one, rows that name no owner), returns deleted count |
+| `count()` | Document count (this owner's, with `owner`) |
+| `delete(document_ids)` | Delete by row ID (this owner's rows, with `owner`), returns deleted count |
+| `delete_document(document_id, *, owner=None)` | Delete one document's rows (metadata `document_id`, compared exactly) of one owner (metadata `gaik_owner`; the store's `owner` when it has one; without one, rows that name no owner), returns deleted count |
 | `search(query_embedding, *, top_k, filters)` | VectorStore-compatible semantic search |
 | `search_semantic(query_embedding, *, top_k, threshold, filters)` | Pure vector search; `threshold` (default 0.7) drops rows below that similarity |
 | `search_keyword(query_text, *, top_k, filters)` | Pure FTS keyword search |
@@ -204,8 +204,8 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 from the chunk's document, owner and text: the document is `metadata["document_id"]`,
 else `source`, else `document_name`, and is stored in the metadata as `document_id`; a
 `document_id` must be a string (an int is stored as its string), other types raise
-`ValueError`. The owner is `metadata["gaik_owner"]` when set, so two owners who index
-a document under the same id keep separate rows, and `replace=True` and
+`ValueError`. The owner is the store's `owner` (recorded as `metadata["gaik_owner"]`),
+so two owners who index a document under the same id keep separate rows, and `replace=True` and
 `delete_document` touch the rows of one owner only.
 Adding a document's chunks again updates their rows instead of inserting copies;
 `replace=True` also deletes the rows a changed document no longer has; and
@@ -291,6 +291,26 @@ to hold against a `RelevanceGate` floor.
 ### Connection String
 
 Standard PostgreSQL URI: `postgresql://user:password@host:port/database`
+
+### Owner
+
+`PgVectorStore(..., owner="user-42")` records the owner in each row's `metadata`
+(`gaik_owner`) and adds it to the metadata filter of every search, `count()` and
+`delete()`, so one table can hold several users' documents. A caller's `filters` are
+combined with it and cannot replace it. Without `owner` the store reads the whole table,
+and its `add()` refuses metadata that already names an owner. A store without an owner
+also deletes rows of any owner by id.
+
+This is a filter in gaik, not database access control. Every client of the table (a
+store without an owner, an older gaik, psql, the application's own SQL) reads and writes
+every owner's rows. For tenants that must be kept apart in the database itself, use
+separate tables or PostgreSQL row-level security.
+
+The owner is a filter on every search, and an HNSW scan filters only after picking its
+candidates, so a store with `owner` sets `hnsw_iterative_scan="relaxed_order"` unless you
+pass another value (pgvector 0.8+; on an older pgvector the setting is skipped with a
+warning and `health()` names it). `health()` and `relemmatize()` stay table-wide
+maintenance: they read and rewrite every owner's rows.
 
 ### FTS Language
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -31,11 +32,13 @@ def _chunks(document: str, texts: list[str]) -> list[Document]:
     ]
 
 
-def _owned(document: str, texts: list[str], owner: str) -> list[Document]:
-    chunks = _chunks(document, texts)
-    for chunk in chunks:
-        chunk.metadata["gaik_owner"] = owner
-    return chunks
+def _add_as(store, owner: str | None, chunks, embeddings, **kwargs) -> None:
+    """``store.add`` as a store with ``owner`` that shares this store's chunks."""
+    store.owner = owner
+    try:
+        store.add(chunks, embeddings, **kwargs)
+    finally:
+        store.owner = None
 
 
 def _texts(store, document: str) -> list[str]:
@@ -124,19 +127,19 @@ def test_an_own_document_id_is_kept(store):
 
 
 def test_two_owners_with_the_same_document_keep_separate_chunks(store):
-    store.add(_owned("report", ["alpha", "beta"], "user-a"), [A1, B1])
-    store.add(_owned("report", ["alpha", "beta"], "user-b"), [A1, B1])
+    _add_as(store, "user-a", _chunks("report", ["alpha", "beta"]), [A1, B1])
+    _add_as(store, "user-b", _chunks("report", ["alpha", "beta"]), [A1, B1])
 
     assert store.count() == 4
 
-    store.add(_owned("report", ["gamma"], "user-a"), [C1], replace=True)
+    _add_as(store, "user-a", _chunks("report", ["gamma"]), [C1], replace=True)
     assert _texts(store, "report") == ["alpha", "beta", "gamma"]
     assert store.count() == 3
 
 
 def test_delete_document_deletes_only_the_given_owners_chunks(store):
-    store.add(_owned("report", ["alpha"], "user-a"), [A1])
-    store.add(_owned("report", ["beta"], "user-b"), [B1])
+    _add_as(store, "user-a", _chunks("report", ["alpha"]), [A1])
+    _add_as(store, "user-b", _chunks("report", ["beta"]), [B1])
     store.add(_chunks("report", ["gamma"]), [C1])
 
     assert store.delete_document("report") == 1
@@ -146,15 +149,15 @@ def test_delete_document_deletes_only_the_given_owners_chunks(store):
 
 
 def test_replace_without_an_owner_leaves_the_owners_chunks(store):
-    store.add(_owned("report", ["alpha"], "user-a"), [A1])
+    _add_as(store, "user-a", _chunks("report", ["alpha"]), [A1])
     store.add(_chunks("report", ["beta"]), [B1], replace=True)
 
     assert _texts(store, "report") == ["alpha", "beta"]
 
 
 def test_a_store_with_an_owner_deletes_with_it(store):
-    store.add(_owned("report", ["alpha"], "user-a"), [A1])
-    store.add(_owned("report", ["beta"], "user-b"), [B1])
+    _add_as(store, "user-a", _chunks("report", ["alpha"]), [A1])
+    _add_as(store, "user-b", _chunks("report", ["beta"]), [B1])
     store.owner = "user-a"
 
     with pytest.raises(ValueError):
@@ -216,6 +219,24 @@ def test_the_occurrence_is_counted_within_one_call(store):
     assert store.count() == 1
 
 
+def test_an_owner_is_part_of_the_chunk_id_when_set_by_the_store(store):
+    _add_as(store, "user-a", _chunks("report", ["alpha"]), [A1])
+    store.add(_chunks("report", ["alpha"]), [A1])
+
+    assert store.count() == 2
+    assert store.delete_document("report") == 1
+    assert store.delete_document("report", owner="user-a") == 1
+
+
+def test_a_store_without_an_owner_refuses_chunks_that_name_one(store):
+    [chunk] = _chunks("report", ["alpha"])
+    chunk.metadata["gaik_owner"] = "user-a"
+
+    with pytest.raises(ValueError):
+        store.add([chunk], [A1])
+    assert store.count() == 0
+
+
 # ── RAGWorkflow ──────────────────────────────────────────────────────
 
 
@@ -231,7 +252,7 @@ class _FakeParser:
     def convert_doc_to_chunks(self, path, document_name=None):
         return [
             Document(page_content=text, metadata={"source": str(path), "document_name": "x"})
-            for text in self.texts[str(path)]
+            for text in self.texts[Path(path).as_posix()]
         ]
 
 
@@ -356,11 +377,11 @@ class _Recorder:
         pass
 
 
-def _pg(has_chunk_key: bool = True):
+def _pg(has_chunk_key: bool = True, owner: str | None = None):
     pytest.importorskip("psycopg")
     from gaik.software_components.RAG.pg_vector_store import PgVectorStore
 
-    store = PgVectorStore("postgresql://unused", embedding_dim=3)
+    store = PgVectorStore("postgresql://unused", embedding_dim=3, owner=owner)
     store._conn = recorder = _Recorder(has_chunk_key=has_chunk_key)
     return store, recorder
 
@@ -396,9 +417,9 @@ def test_pg_replace_deletes_the_documents_rows_before_inserting():
     assert calls[1][0].startswith("INSERT")
 
 
-def test_pg_replace_deletes_only_the_rows_of_the_added_chunks_owner():
-    store, recorder = _pg()
-    store.add(_owned("report", ["alpha"], "user-a"), [A1], replace=True)
+def test_pg_replace_deletes_only_the_rows_of_the_stores_owner():
+    store, recorder = _pg(owner="user-a")
+    store.add(_chunks("report", ["alpha"]), [A1], replace=True)
 
     sql, params = recorder.calls[1]
     assert sql == PG_DELETE + "= %s"
@@ -435,13 +456,22 @@ def test_pg_add_refuses_a_document_id_that_is_not_text():
 
 
 def test_pg_two_owners_get_different_keys_for_the_same_chunk():
-    store, recorder = _pg()
-    store.add(_owned("report", ["alpha"], "user-a"), [A1])
-    store.add(_owned("report", ["alpha"], "user-b"), [A1])
-    store.add(_chunks("report", ["alpha"]), [A1])
-
-    keys = [params[-1] for _, params in _inserts(recorder)]
+    keys = []
+    for owner in ("user-a", "user-b", None):
+        store, recorder = _pg(owner=owner)
+        store.add(_chunks("report", ["alpha"]), [A1])
+        keys += [params[-1] for _, params in _inserts(recorder)]
     assert len(set(keys)) == 3
+
+
+def test_pg_a_store_without_an_owner_refuses_chunks_that_name_one():
+    store, recorder = _pg()
+    [chunk] = _chunks("report", ["alpha"])
+    chunk.metadata["gaik_owner"] = "user-a"
+
+    with pytest.raises(ValueError):
+        store.add([chunk], [A1])
+    assert not _inserts(recorder)
 
 
 def test_pg_a_table_without_chunk_key_is_inserted_into_as_before():

@@ -23,6 +23,33 @@ except ImportError as exc:
     ) from exc
 
 
+OWNER_KEY = "gaik_owner"
+"""Metadata key under which a store with an ``owner`` records it on every chunk."""
+
+
+def check_owner(owner: str | None) -> str | None:
+    """``owner`` as given, or raise ``ValueError`` for a blank or non-string one."""
+    if owner is None:
+        return None
+    if not isinstance(owner, str) or not owner.strip():
+        raise ValueError("owner must be a non-blank string, such as a user or session id")
+    return owner
+
+
+def refuse_foreign_owner(documents) -> None:
+    """Raise ``ValueError`` if a document's metadata already names an owner.
+
+    A store without an owner would store such a chunk as it is, and it would then show
+    up in that owner's searches: content planted into another user's view.
+    """
+    for doc in documents:
+        if OWNER_KEY in (doc.metadata or {}):
+            raise ValueError(
+                f"metadata key {OWNER_KEY!r} is set by a store with an owner; "
+                "add these documents through a store created with owner=..."
+            )
+
+
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     norm_a = math.sqrt(sum(x * x for x in a))
@@ -33,7 +60,16 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 class VectorStore:
-    """Store embeddings with metadata and provide similarity search."""
+    """Store embeddings with metadata and provide similarity search.
+
+    With ``owner`` (a user or session id), every chunk this store adds is recorded
+    for that owner, and :meth:`search` and :meth:`count` see only that owner's
+    chunks, whatever the caller's filters say. This is a filter in gaik, not access
+    control: every process that can open the folder (a store without an owner, an
+    older gaik, chromadb itself) still reads and writes every chunk, so it is trusted
+    the same. Separate users who must not reach each other's data with separate
+    collections or folders.
+    """
 
     def __init__(
         self,
@@ -41,10 +77,12 @@ class VectorStore:
         persist: bool = False,
         persist_path: str = "chroma_store",
         collection_name: str = "gaik_rag",
+        owner: str | None = None,
     ) -> None:
         self.persist = persist
         self.persist_path = persist_path
         self.collection_name = collection_name
+        self.owner = check_owner(owner)
 
         self._embeddings: list[list[float]] = []
         self._documents: list[Document] = []
@@ -91,9 +129,9 @@ class VectorStore:
         Each chunk's id comes from its document, its owner and its text (see
         ``_chunk_ids``): the document is ``metadata["document_id"]``, else
         ``source``, else ``document_name``, and is stored as ``document_id``;
-        the owner is ``metadata["gaik_owner"]`` when set. Adding a chunk that is
-        already stored updates it instead of storing a second copy. A chunk
-        whose metadata names no document is stored as a new one each time.
+        the owner is the store's ``owner``. Adding a chunk that is already stored
+        updates it instead of storing a second copy. A chunk whose metadata
+        names no document is stored as a new one each time.
 
         Args:
             documents: The chunks. A ``document_id`` in the metadata must be a
@@ -109,6 +147,8 @@ class VectorStore:
         """
         if len(documents) != len(embeddings):
             raise ValueError("documents and embeddings must have the same length")
+        documents = self._owned(documents)
+
         if not documents:
             return
 
@@ -211,14 +251,31 @@ class VectorStore:
         for start in range(0, len(ids), batch):
             self._collection.delete(ids=ids[start : start + batch])  # type: ignore[union-attr]
 
+    def _owned(self, documents: list[Document]) -> list[Document]:
+        """``documents`` recorded for this store's owner (copies; the caller's are kept)."""
+        if self.owner is None:
+            refuse_foreign_owner(documents)
+            return documents
+        return [
+            Document(
+                page_content=doc.page_content,
+                metadata={**(doc.metadata or {}), OWNER_KEY: self.owner},
+            )
+            for doc in documents
+        ]
+
     def count(self) -> int:
-        """Return the number of documents in the vector store."""
+        """Return the number of documents in the vector store (this owner's, with one)."""
         if not self.persist:
-            return len(self._documents)
+            if self.owner is None:
+                return len(self._documents)
+            return sum(1 for d in self._documents if d.metadata.get(OWNER_KEY) == self.owner)
 
         if self._collection is None:
             return 0
 
+        if self.owner is not None:
+            return len(self._collection.get(where={OWNER_KEY: self.owner}, include=[])["ids"])
         return self._collection.count()
 
     def search(
@@ -232,6 +289,8 @@ class VectorStore:
             scored = []
             for idx, embedding in enumerate(self._embeddings):
                 doc = self._documents[idx]
+                if self.owner is not None and doc.metadata.get(OWNER_KEY) != self.owner:
+                    continue
                 if filters and not _match_filters(doc.metadata, filters):
                     continue
                 score = _cosine_similarity(query_embedding, embedding)
@@ -246,7 +305,13 @@ class VectorStore:
         }
         if self._space != "cosine":
             query_kwargs["include"].append("embeddings")
-        if filters:
+        if self.owner is not None:
+            # The owner is always one of the conditions, so a filter cannot widen it.
+            owner_where = {OWNER_KEY: self.owner}
+            query_kwargs["where"] = (
+                {"$and": [owner_where, _chroma_where(filters)]} if filters else owner_where
+            )
+        elif filters:
             query_kwargs["where"] = _chroma_where(filters)
 
         results = self._collection.query(  # type: ignore[union-attr]

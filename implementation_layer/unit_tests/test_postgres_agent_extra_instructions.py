@@ -29,6 +29,7 @@ from ._pg_agent_fake_client import FakeProviderClient  # noqa: E402
 
 def _make_agent(**kwargs) -> PostgresAgent:
     """Build a PostgresAgent without opening a real DB connection."""
+    kwargs.setdefault("table_allowlist", ["customers", "orders"])
     agent = PostgresAgent("postgresql://stub:stub@localhost:1/stub", **kwargs)
     agent._schema = SchemaInfo(
         schema_name=agent.schema_name,
