@@ -177,15 +177,37 @@ def test_the_scraper_and_the_jev_classifier_read_no_dotenv():
             environment_proxy_mounts()
         except ImportError:
             pass
+        # No base_url, so the classifier reads TYPESAFE_BASE_URL; the endpoint check
+        # runs before the SDK import, so the read happens without the extra too.
+        os.environ.pop("TYPESAFE_BASE_URL", None)
         try:
             from gaik.software_components.jev_classifier import JevClassifier
-            JevClassifier(api_key="k", base_url="https://example.test")
+            JevClassifier(api_key="k", base_url=None)
         except ImportError:
-            pass
-        except Exception:
             pass
         print(json.dumps({"loads": len(loads)}))
         """
     )
 
     assert result["loads"] == 0
+
+
+def test_the_unit_test_setup_loads_the_repository_dotenv():
+    # The live tests read their keys at import, so the setup loads the file first.
+    from pathlib import Path
+
+    conftest = Path(__file__).with_name("conftest.py")
+    result = _run(
+        f"""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("unit_test_setup", {str(conftest)!r})
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        print(json.dumps({{
+            "loads": len(loads), "value": os.environ.get("GAIK_TEST_FROM_DOTENV")
+        }}))
+        """
+    )
+
+    assert result["loads"] == 1
+    assert result["value"] == "yes"
