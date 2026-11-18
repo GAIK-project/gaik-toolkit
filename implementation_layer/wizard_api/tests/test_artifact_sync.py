@@ -423,28 +423,25 @@ def test_the_agent_hears_that_the_user_changed_the_blueprint(
     client.post(f"/sessions/{sid}/chat", json={"message": "Hei"})
     assert _blueprint_note(seen[-1]) is None
 
+    # The form's save goes into the agent's draft (Task 10) ...
     edited = _save_user_edit(client, sid, detail["blueprint"])
+    with open(
+        os.path.join(session.output_dir, artifact_sync.DRAFT_BLUEPRINT_FILE), encoding="utf-8"
+    ) as fh:
+        on_disk = json.load(fh)
+    assert USER_STEP_NAME in [s["name"] for s in on_disk["workflow"]["steps"]]
     client.post(f"/sessions/{sid}/chat", json={"message": "Jatketaan"})
 
+    # ... and the next turn names the change and the file it is in.
     note = _blueprint_note(seen[-1])
     assert note is not None
-    assert artifact_sync.UI_VIEW_BLUEPRINT_FILE in note
+    assert USER_STEP_NAME in note
     assert artifact_sync.DRAFT_BLUEPRINT_FILE in note
-    # Written for the agent before the turn, also before the BPMN step (here 4).
-    assert client.get(f"/sessions/{sid}").json()["step"] < artifact_sync.STEP_BPMN
-    with open(
-        os.path.join(session.output_dir, artifact_sync.UI_VIEW_BLUEPRINT_FILE), encoding="utf-8"
-    ) as fh:
-        view = json.load(fh)
-    assert USER_STEP_NAME in [s["name"] for s in view["workflow"]["steps"]]
     # The turn itself left the user's version in place.
     assert client.get(f"/sessions/{sid}").json()["active_version"] == 3
 
-    # The agent takes the user's change into its draft: nothing new to adopt,
-    # and nothing left to tell.
-    caught_up = json.loads(json.dumps(DRAFT))
-    caught_up["workflow"]["steps"][1]["name"] = USER_STEP_NAME
-    write_draft(session.output_dir, caught_up)
+    # The agent goes on from its draft, which has the change: nothing new to
+    # adopt, and nothing left to tell.
     client.post(f"/sessions/{sid}/chat", json={"message": "Kiitos"})
     after = client.get(f"/sessions/{sid}").json()
     assert after["active_version"] == 3

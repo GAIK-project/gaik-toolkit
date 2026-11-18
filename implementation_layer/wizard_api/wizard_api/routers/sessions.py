@@ -52,6 +52,7 @@ from wizard_api.schemas.session import (
 from wizard_api.services import (
     agent_service,
     artifact_sync,
+    blueprint_ops,
     blueprint_service,
     session_service,
 )
@@ -109,6 +110,8 @@ class VersionCreate(BaseModel):
 class BlueprintPatch(BaseModel):
     content: dict
     note: str = Field(default="Blueprint päivitetty", max_length=512)
+    #: The version the edit was made on; a save over a newer one is refused (409).
+    base_version: int | None = None
 
 
 # Same ceiling as solution_wizard.bpmn_sync.MAX_BPMN_XML_CHARS, checked here so an
@@ -126,9 +129,44 @@ def patch_blueprint(
     payload: BlueprintPatch,
     db: Session = Depends(get_db),
 ) -> SessionDetailResponse:
+    """Save the reduced blueprint the Blueprint form or the flow view edited.
+
+    With the agent's draft, what the save changed in the steps is applied to the
+    draft as operations (``blueprint_edit_service``), refused like an edit in the
+    diagram, and a change to what no operation can change is refused with 422
+    ``unsupported_edit``. Without a draft the content is stored as it is.
+    ``base_version``, when given, refuses a save over a newer version (409
+    ``changed_elsewhere``).
+    """
+    from wizard_api.services import blueprint_edit_service as edits
+
     session = session_service.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
+    if payload.base_version is not None and payload.base_version != session.active_version:
+        raise edits.changed_elsewhere()
+    if _edits_the_draft(session):
+        active = blueprint_service.get_active_version(db, session)
+        shown = dict(active.content or {}) if active is not None else {}
+        if payload.content != shown:
+
+            def operations_for(draft: dict[str, Any]) -> list[Any]:
+                view = edits.reduced_view(draft) or {"steps": []}
+                unsupported = _unsupported_fields(payload.content, shown, view)
+                if unsupported:
+                    raise edits.unsupported_edit(unsupported)
+                return blueprint_ops.operations_from_v2_diff(
+                    view, payload.content, reserved_ids=edits.other_ids(draft, view)
+                )
+
+            edits.apply_edit(
+                db,
+                session,
+                base_version=payload.base_version,
+                operations_for=operations_for,
+                note=payload.note,
+            )
+        return session_service.session_detail(db, session)
     blueprint_service.add_version(
         db,
         session,
@@ -140,31 +178,100 @@ def patch_blueprint(
     return session_service.session_detail(db, session)
 
 
-@router.get("/{session_id}/bpmn")
-def get_session_bpmn(
-    session_id: uuid.UUID,
-    data_objects: int = Query(
-        1, ge=0, le=1, description="1 draws the data objects, 0 a compact diagram without them."
-    ),
-    db: Session = Depends(get_db),
-) -> Response:
-    from wizard_api.services import ai_marking, bpmn_service
+def _edits_the_draft(session) -> bool:
+    """Whether a save goes to the agent's draft: there is one, with a workflow."""
+    from wizard_api.services import blueprint_edit_service
+
+    if not blueprint_ops.solution_wizard_available():
+        return False
+    draft = artifact_sync.read_draft_blueprint(session.output_dir)
+    return blueprint_edit_service.reduced_view(draft) is not None
+
+
+#: What of a reduced step the operations change.
+_STEP_EDIT_KEYS = frozenset({"id", "name", "type", "description"})
+
+
+def _same(a: Any, b: Any) -> bool:
+    """Equal, a missing value and an empty one alike."""
+    empty = (None, "", [], {})
+    return (a in empty and b in empty) or a == b
+
+
+def _unsupported_fields(
+    content: dict[str, Any], shown: dict[str, Any], view: dict[str, Any]
+) -> list[str]:
+    """What the save changes that no operation can: a field the save gives
+    another value than both the blueprint shown and the draft's reduced view."""
+
+    def changed(new: Any, *before: Any) -> bool:
+        return all(not _same(new, b) for b in before)
+
+    fields = [
+        key
+        for key in sorted(set(content) - {"steps"})
+        if changed(content.get(key), shown.get(key), view.get(key))
+    ]
+    shown_steps = {str(s.get("id")): s for s in shown.get("steps") or [] if isinstance(s, dict)}
+    view_steps = {str(s.get("id")): s for s in view.get("steps") or [] if isinstance(s, dict)}
+    for step in content.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        sid = str(step.get("id"))
+        before = (shown_steps.get(sid) or {}, view_steps.get(sid) or {})
+        fields += [
+            f"steps[{sid}].{key}"
+            for key in sorted(set(step) - _STEP_EDIT_KEYS)
+            if changed(step.get(key), *(b.get(key) for b in before))
+        ]
+    return fields
+
+
+_DATA_OBJECTS_QUERY = Query(
+    1, ge=0, le=1, description="1 draws the data objects, 0 a compact diagram without them."
+)
+
+
+def _session_bpmn_view(
+    db: Session, session_id: uuid.UUID, data_objects: int, *, with_mapping: bool = False
+) -> tuple[str, dict[str, Any]]:
+    """The session's diagram, drawn now, and with ``with_mapping`` its element →
+    blueprint mapping (else ``{}``)."""
+    from wizard_api.services import bpmn_service
 
     session = session_service.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
     detail = session_service.session_detail(db, session)
+    drawing = {
+        "session_id": str(session_id),
+        "agent_draft": artifact_sync.read_draft_blueprint(session.output_dir),
+        "include_data_objects": bool(data_objects),
+    }
     try:
-        xml = bpmn_service.generate_bpmn_xml(
-            detail.blueprint.model_dump(),
-            session_id=str(session_id),
-            agent_draft=artifact_sync.read_draft_blueprint(session.output_dir),
-            include_data_objects=bool(data_objects),
-        )
+        if with_mapping:
+            xml, mapping, _ = bpmn_service.generate_bpmn_view(
+                detail.blueprint.model_dump(), **drawing
+            )
+        else:
+            xml = bpmn_service.generate_bpmn_xml(detail.blueprint.model_dump(), **drawing)
+            mapping = {}
     except bpmn_service.BpmnGenerationError as exc:
         raise internal_error(
             503, "bpmn_unavailable", "The BPMN diagram could not be produced right now.", exc
         ) from exc
+    return xml, mapping
+
+
+@router.get("/{session_id}/bpmn")
+def get_session_bpmn(
+    session_id: uuid.UUID,
+    data_objects: int = _DATA_OBJECTS_QUERY,
+    db: Session = Depends(get_db),
+) -> Response:
+    from wizard_api.services import ai_marking
+
+    xml, _ = _session_bpmn_view(db, session_id, data_objects)
     return Response(
         content=xml,
         media_type="application/xml; charset=utf-8",
@@ -172,17 +279,44 @@ def get_session_bpmn(
     )
 
 
+@router.get("/{session_id}/bpmn/mapping")
+def get_session_bpmn_mapping(
+    session_id: uuid.UUID,
+    data_objects: int = _DATA_OBJECTS_QUERY,
+    db: Session = Depends(get_db),
+) -> JSONResponse:
+    """``{"mapping": {element_id: {"kind": ..., "blueprint_path": ...}}}`` of the
+    diagram ``GET /bpmn`` serves with the same ``data_objects``. Drawn again
+    here, so its element ids are the ones in that XML; a mapping stored in the
+    draft can be from before an edit."""
+    _, mapping = _session_bpmn_view(db, session_id, data_objects, with_mapping=True)
+    return JSONResponse({"mapping": mapping}, headers={"Cache-Control": "no-store"})
+
+
 @router.post("/{session_id}/bpmn/sync", response_model=SessionDetailResponse)
 def sync_session_bpmn(
     session_id: uuid.UUID,
     payload: BpmnSyncRequest,
+    data_objects: int = _DATA_OBJECTS_QUERY,
     db: Session = Depends(get_db),
 ) -> SessionDetailResponse:
+    """Save the diagram edited on the canvas.
+
+    With the agent's draft, what the canvas changed in the steps is applied to
+    the draft as operations (``blueprint_edit_service``): the canvas is read as
+    the diagram drawn from the draft is read, and only the difference counts. A
+    change no operation can make (a data object or gateway renamed, a task the
+    generator draws for something other than a step) is refused with 422
+    ``unsupported_edit``. ``data_objects`` is the option the canvas was drawn
+    with. Without a draft the synced blueprint is stored as it is.
+    """
     from wizard_api.services import bpmn_service
 
     session = session_service.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")
+    if _edits_the_draft(session):
+        return _sync_bpmn_into_draft(db, session, payload.xml, bool(data_objects))
     detail = session_service.session_detail(db, session)
     current = detail.blueprint.model_dump()
     try:
@@ -203,6 +337,102 @@ def sync_session_bpmn(
     db.commit()
     db.refresh(session)
     return session_service.session_detail(db, session)
+
+
+#: The description bpmn_sync gives a task drawn without one: not the user's words.
+_CANVAS_PLACEHOLDER_DESCRIPTION = "Added from BPMN canvas"
+
+
+def _sync_bpmn_into_draft(
+    db: Session, session, xml: str, include_data_objects: bool
+) -> SessionDetailResponse:
+    from wizard_api.services import blueprint_edit_service as edits
+    from wizard_api.services import bpmn_service
+
+    def operations_for(draft: dict[str, Any]) -> list[Any]:
+        view = edits.reduced_view(draft) or {"steps": []}
+        try:
+            # The canvas compared with the diagram drawn from the draft, both
+            # read by the same sync: what the reading itself changes (the order
+            # along the flows, the types it infers) is in both.
+            drawn = bpmn_service.generate_bpmn_xml(
+                view,
+                session_id=str(session.id),
+                agent_draft=draft,
+                include_data_objects=include_data_objects,
+            )
+            before = bpmn_service.sync_blueprint_from_bpmn(view, drawn)
+            after = bpmn_service.sync_blueprint_from_bpmn(view, xml)
+        except bpmn_service.BpmnGenerationError as exc:
+            raise internal_error(
+                503, "bpmn_unavailable", "The BPMN diagram could not be produced right now.", exc
+            ) from exc
+        step_ids = {
+            str(s.get("id"))
+            for s in (draft.get("workflow") or {}).get("steps") or []
+            if isinstance(s, dict)
+        }
+        before, after, unsupported = _canvas_step_changes(before, after, step_ids)
+        if unsupported:
+            raise edits.unsupported_edit(unsupported)
+        return blueprint_ops.operations_from_v2_diff(
+            before, after, reserved_ids=edits.other_ids(draft, before)
+        )
+
+    edits.apply_edit(
+        db, session, base_version=None, operations_for=operations_for, note="BPMN canvas sync"
+    )
+    return session_service.session_detail(db, session)
+
+
+def _canvas_step_changes(
+    before: dict[str, Any], after: dict[str, Any], step_ids: set[str]
+) -> tuple[dict[str, Any], dict[str, Any], list[str]]:
+    """The two readings with only the draft's steps and the canvas's new tasks,
+    and what else the canvas changed, which no operation can make."""
+    unsupported: list[str] = []
+    old_labels = before.get("data_objects") or {}
+    new_labels = after.get("data_objects") or {}
+    unsupported += [
+        f"data_objects[{art}]"
+        for art in sorted(set(old_labels) & set(new_labels))
+        if old_labels[art] != new_labels[art]
+    ]
+
+    def gateways(reading: dict[str, Any]) -> list[tuple[str, str, str]]:
+        return sorted(
+            (str(g.get("id")), str(g.get("name") or ""), str(g.get("type") or ""))
+            for g in reading.get("gateways") or []
+        )
+
+    if gateways(before) != gateways(after):
+        unsupported.append("gateways")
+    # Tasks the generator draws for what is not a step (a manual step, ...).
+    old_by_id = {str(s.get("id")): s for s in before.get("steps") or []}
+    new_by_id = {str(s.get("id")): s for s in after.get("steps") or []}
+    others = {sid for sid in old_by_id if sid not in step_ids}
+    unsupported += [
+        f"steps[{sid}]" for sid in sorted(others) if old_by_id[sid] != new_by_id.get(sid)
+    ]
+
+    def steps(reading: dict[str, Any], *, new: bool) -> list[dict[str, Any]]:
+        kept = []
+        for step in reading.get("steps") or []:
+            sid = str(step.get("id"))
+            if sid in others:
+                continue
+            step = dict(step)
+            placeholder = step.get("description") == _CANVAS_PLACEHOLDER_DESCRIPTION
+            if new and sid not in old_by_id and placeholder:
+                step.pop("description")
+            kept.append(step)
+        return kept
+
+    return (
+        {**before, "steps": steps(before, new=False)},
+        {**after, "steps": steps(after, new=True)},
+        unsupported,
+    )
 
 
 def _busy(exc: Exception) -> HTTPException:

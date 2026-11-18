@@ -1155,8 +1155,15 @@ PACKAGE_DRAFT = {
                 "component": "AudioToStructuredData",
                 "inputs": ["report_audio"],
                 "outputs": ["ticket"],
+                "depends_on": ["record"],
             },
-            {"id": "review", "name": "Review ticket", "type": "human_review", "inputs": ["ticket"]},
+            {
+                "id": "review",
+                "name": "Review ticket",
+                "type": "human_review",
+                "inputs": ["ticket"],
+                "depends_on": ["extract"],
+            },
         ]
     },
     "business_process": {

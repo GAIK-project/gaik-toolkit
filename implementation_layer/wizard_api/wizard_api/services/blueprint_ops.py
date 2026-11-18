@@ -166,6 +166,116 @@ def bpmn_relevant_digest(blueprint: dict) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+#: The V1 type an operation sets for each type of the reduced (V2) blueprint. An
+#: ``io`` step becomes a user task, which drops a component: an automated step
+#: without one is ``io`` as well, but a step the user made ``io`` is no AI step.
+_V2_TO_V1_TYPE = {"io": "user_task", "ai": "automated_task", "human_review": "human_review"}
+
+
+def _operation(model: type, **fields: Any) -> Any:
+    try:
+        return model(**fields)
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        where = ".".join(str(p) for p in first["loc"]) or None
+        raise OperationError("invalid", f"{where}: {first['msg']}", where) from None
+
+
+def _v1_type(step: dict) -> str:
+    v2_type = str(step.get("type") or "")
+    if v2_type not in _V2_TO_V1_TYPE:
+        raise OperationError("invalid", f'Step "{step.get("id")}" has an unknown type', "type")
+    return _V2_TO_V1_TYPE[v2_type]
+
+
+def operations_from_v2_diff(
+    old: dict, new: dict, *, reserved_ids: set[str] | frozenset[str] = frozenset()
+) -> list[Any]:
+    """The operations that turn ``old``'s steps into ``new``'s, matched by ``id``.
+
+    ``old`` and ``new`` are reduced (V2) blueprints: the draft's reduced view and
+    the one a save sends. Only the steps are compared: their ids, order, names,
+    types and, where ``new``'s step has one, descriptions. The order is removes,
+    then adds (each after the step before it in ``new``, or at the start), then
+    moves for the order changes left, then renames, descriptions and types.
+
+    A new step's id is the one ``apply_operations`` will give it (``new_step_id``
+    of its name), so a later operation can name it; ``reserved_ids`` are ids the
+    draft has besides ``old``'s steps (manual steps, steps the view leaves out),
+    which a new step does not get. Raises ``OperationError`` for a step the
+    operations cannot express (an unknown type, a name over the limit).
+    """
+    old_steps = [s for s in old.get("steps") or [] if isinstance(s, dict)]
+    new_steps = [s for s in new.get("steps") or [] if isinstance(s, dict)]
+    old_by_id = {str(s.get("id")): s for s in old_steps}
+    new_ids = [str(s.get("id")) for s in new_steps]
+    kept = set(new_ids)
+    if len(kept) != len(new_ids):
+        twice = next(sid for sid in new_ids if new_ids.count(sid) > 1)
+        raise OperationError("invalid", f'Two steps have the id "{twice}"', "steps")
+
+    ops: list[Any] = []
+    order = [sid for sid in old_by_id if sid in kept]
+    for sid in old_by_id:
+        if sid not in kept:
+            ops.append(_operation(RemoveStep, op="remove_step", step_id=sid))
+
+    # The id each step of ``new`` has in the draft once added.
+    taken = set(order) | set(reserved_ids)
+    real: dict[str, str] = {sid: sid for sid in order}
+    for position, step in enumerate(new_steps):
+        sid = new_ids[position]
+        if sid in old_by_id:
+            continue
+        after = real[new_ids[position - 1]] if position else None
+        name = str(step.get("name") or "")
+        add = _operation(
+            AddStep, op="add_step", name=name, type=_v1_type(step), after=after, before=None
+        )
+        new_id = new_step_id(add.name.strip() or "step", taken)
+        taken.add(new_id)
+        real[sid] = new_id
+        order.insert(order.index(after) + 1 if after else 0, new_id)
+        ops.append(add)
+
+    target = [real[sid] for sid in new_ids]
+    for position, sid in enumerate(target):
+        if order[position] == sid:
+            continue
+        after = target[position - 1] if position else None
+        ops.append(_operation(MoveStep, op="move_step", step_id=sid, after=after))
+        order.remove(sid)
+        order.insert(position, sid)
+
+    renames: list[Any] = []
+    descriptions: list[Any] = []
+    types: list[Any] = []
+    for step in new_steps:
+        # A step of ``old`` keeps its id; a new one is matched by the id it gets.
+        before = old_by_id.get(str(step.get("id")))
+        sid = real[str(step.get("id"))]
+        if before is not None:
+            name = str(step.get("name") or "")
+            if name != str(before.get("name") or ""):
+                renames.append(_operation(RenameStep, op="rename_step", step_id=sid, name=name))
+            if str(step.get("type") or "") != str(before.get("type") or ""):
+                types.append(
+                    _operation(SetStepType, op="set_step_type", step_id=sid, type=_v1_type(step))
+                )
+        description = str(step.get("description") or "")
+        was = str(before.get("description") or "") if before is not None else ""
+        if "description" in step and description != was:
+            descriptions.append(
+                _operation(
+                    SetStepDescription,
+                    op="set_step_description",
+                    step_id=sid,
+                    description=description,
+                )
+            )
+    return ops + renames + descriptions + types
+
+
 def apply_operations(draft: dict, ops: list[Any]) -> OpsResult:
     """Apply every operation to a deep copy of ``draft``, or raise ``OperationError``."""
     ctx = _Context(copy.deepcopy(draft))

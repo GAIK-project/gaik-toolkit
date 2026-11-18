@@ -50,13 +50,20 @@ def generate_bpmn_view(
     """The BPMN the UI shows, the element → blueprint mapping the generator
     records for it, and the V1 blueprint the mapping's paths point into.
 
-    With the agent's draft (``use_case.blueprint.json``), the roles and process
-    come from it, see :func:`with_agent_process`; a draft that does not fit is
-    dropped rather than failing the diagram. Without data objects
-    (``include_data_objects=False``) the diagram is drawn compact.
+    The agent's draft (``use_case.blueprint.json``) is the canonical blueprint:
+    when it is a valid blueprint with steps, the diagram is drawn from it as it
+    is, and the mapping's paths point into it. Otherwise the reduced blueprint is
+    drawn, with the roles and process of a draft that fits it, see
+    :func:`with_agent_process`; a draft that does not fit is dropped rather than
+    failing the diagram. Without data objects (``include_data_objects=False``)
+    the diagram is drawn compact.
     """
     if not _SOLUTION_WIZARD_AVAILABLE:
         raise BpmnGenerationError("solution_wizard package is not installed")
+    if agent_draft:
+        drawn = _render_draft(agent_draft, include_data_objects)
+        if drawn is not None:
+            return drawn
     v1 = v2_to_v1_dict(v2_blueprint, session_id=session_id)
     if agent_draft:
         try:
@@ -75,6 +82,26 @@ def _render(
     xml = ai_marking.mark_xml(generate_bpmn(blueprint, include_data_objects=include_data_objects))
     mapping = dict(blueprint.visualizations.get("bpmn_mapping") or {})
     return xml, mapping, v1
+
+
+def _render_draft(
+    draft: dict[str, Any], include_data_objects: bool
+) -> tuple[str, dict[str, Any], dict[str, Any]] | None:
+    """The diagram of the draft itself, or None when it is no blueprint with steps."""
+    workflow = draft.get("workflow")
+    if not isinstance(workflow, dict) or not workflow.get("steps"):
+        return None
+    try:
+        blueprint = Blueprint.model_validate(draft)
+    except Exception:  # noqa: BLE001 - a draft the model refuses falls back
+        return None
+    # The mapping is the one of this drawing: a stored one may be from before an edit.
+    visualizations = dict(blueprint.visualizations or {})
+    visualizations.pop("bpmn_mapping", None)
+    blueprint.visualizations = visualizations
+    xml = ai_marking.mark_xml(generate_bpmn(blueprint, include_data_objects=include_data_objects))
+    mapping = dict(blueprint.visualizations.get("bpmn_mapping") or {})
+    return xml, mapping, draft
 
 
 def with_agent_process(
