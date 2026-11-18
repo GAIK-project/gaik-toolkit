@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import posixpath
+import re
 import tempfile
 import uuid
 import zipfile
@@ -1234,8 +1235,13 @@ async def chat(
             )
             if view_written and session.step >= artifact_sync.STEP_BPMN:
                 view_note = _UI_VIEW_NOTE
-            if user_changed:
+            # A version that carries the agent's full draft was written to
+            # use_case.blueprint.json too; only one saved without it (the form,
+            # versions from before the drafts were kept) left that file behind.
+            if user_changed and blueprint_service.get_active_draft(db, session) is None:
                 blueprint_note = _user_blueprint_note(session.active_version, view_written)
+        told_blueprint_edits = session_service.pending_user_edits(session.session_metadata)
+        blueprint_edits_note = _blueprint_edits_note(told_blueprint_edits)
         package_note = await asyncio.to_thread(_package_note, session)
         lang = (payload.locale or "fi").split("-")[0].lower()
         reopened_note = _reopened_gate_note(session, lang)
@@ -1250,6 +1256,7 @@ async def chat(
                 run_note,
                 package_note,
                 edits_note,
+                blueprint_edits_note,
                 view_note,
                 blueprint_note,
             )
@@ -1403,6 +1410,14 @@ async def chat(
                     turn_db,
                     turn_session,
                     SessionUpdate(metadata={session_service.AGENT_SEEN_EDIT_KEY: seen_edit}),
+                )
+            if told_blueprint_edits:
+                # Told once; a change saved since stays for the next message.
+                await asyncio.to_thread(
+                    session_service.clear_told_user_edits,
+                    turn_db,
+                    turn_session,
+                    told_blueprint_edits,
                 )
         # The agent writes its artifacts to disk as the conversation moves;
         # pull them into the session so the workspace keeps up (#141).
@@ -1592,6 +1607,32 @@ def _write_ui_view(blueprint: dict[str, Any], session_id: str, output_dir: str) 
         logger.warning("UI diagram for the agent could not be generated", exc_info=True)
         return False
     return artifact_sync.write_ui_view(output_dir, xml, mapping, v1)
+
+
+#: How long the list of the user's changes in ``_blueprint_edits_note`` may be.
+MAX_BLUEPRINT_EDITS_NOTE_CHARS = 2000
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
+
+
+def _blueprint_edits_note(summaries: list[str]) -> str | None:
+    """The line naming the changes the user made to the blueprint in the workspace.
+
+    A workspace edit writes the agent's own use_case.blueprint.json
+    (``blueprint_edit``). The agent goes on from the file it remembers: told
+    nothing, it would write its version back over the user's change. The
+    summaries carry the user's step names, so they stay data: on the note's one
+    line, and no longer than ``MAX_BLUEPRINT_EDITS_NOTE_CHARS``.
+    """
+    if not summaries:
+        return None
+    told = "; ".join(_CONTROL_CHARS.sub(" ", summary) for summary in summaries)
+    if len(told) > MAX_BLUEPRINT_EDITS_NOTE_CHARS:
+        told = told[: MAX_BLUEPRINT_EDITS_NOTE_CHARS - 1] + "…"
+    return (
+        f"[The user changed the solution in the workspace: {told}. These changes are already "
+        f"in {artifact_sync.DRAFT_BLUEPRINT_FILE}; read it again before you edit it, and keep "
+        "them.]"
+    )
 
 
 def _user_blueprint_note(version: int, view_written: bool) -> str:

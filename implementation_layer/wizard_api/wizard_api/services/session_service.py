@@ -431,6 +431,37 @@ def record_user_edit(db: Session, session: WizardSession, path: str) -> WizardSe
     return session
 
 
+def pending_user_edits(metadata: dict | None) -> list[str]:
+    """The summaries of the user's blueprint changes the agent has not been told of."""
+    return [e for e in (metadata or {}).get(PENDING_USER_EDITS_KEY) or [] if isinstance(e, str)]
+
+
+def clear_told_user_edits(db: Session, session: WizardSession, told: list[str]) -> WizardSession:
+    """Drop the summaries the agent was told of from ``pending_user_edits``.
+
+    Read under the row lock (``lock_fresh``). Only the told ones go: a summary
+    recorded since stays for the next turn. The list keeps its last
+    ``MAX_PENDING_USER_EDITS`` only, so the head of what was told may have left
+    it meanwhile; the longest tail of ``told`` that the list starts with is
+    what is dropped.
+    """
+    if not told:
+        return session
+    lock_fresh(db, session)
+    current = pending_user_edits(session.session_metadata)
+    kept = current
+    for size in range(min(len(told), len(current)), 0, -1):
+        if current[:size] == told[-size:]:
+            kept = current[size:]
+            break
+    if kept != current:
+        session.session_metadata = {**session.session_metadata, PENDING_USER_EDITS_KEY: kept}
+        session.updated_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(session)
+    return session
+
+
 def unseen_user_edits(metadata: dict | None) -> list[dict[str, str]]:
     """The recorded edits the agent has not been told of: one per file, its latest."""
     metadata = metadata or {}
