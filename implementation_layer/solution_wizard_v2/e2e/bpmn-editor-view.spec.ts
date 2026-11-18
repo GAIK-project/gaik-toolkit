@@ -65,4 +65,27 @@ test.describe("BPMN editor view", () => {
     await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
     await expect.poll(async () => Math.round((await canvas(page).boundingBox())!.width)).toBe(Math.round(beside.width));
   });
+
+  test("the large view stays open when the browser leaves full screen by itself", async ({ page }) => {
+    await openEditor(page);
+    const viewport = page.viewportSize()!;
+    const box = page.getByTestId("flow-diagram-box");
+    await page.getByTestId("bpmn-zoom-controls").getByRole("button", { name: "Suurenna kaavio" }).click();
+    await expect(box).toHaveAttribute("data-full-view", "true");
+    // Headless Chromium grants full screen: the page is in it.
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true);
+
+    // The browser's own Esc or controls: the page cannot tell it from an Esc that cancels
+    // a rename, so the large view stays, as the box laid over the window.
+    await page.evaluate(() => document.fullscreenElement && document.exitFullscreen());
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+    await expect(box).toHaveAttribute("data-full-view", "true");
+    await expect.poll(async () => Math.round((await box.boundingBox())!.width)).toBe(viewport.width);
+    expect(Math.round((await box.boundingBox())!.height)).toBe(viewport.height);
+
+    // The button still closes it.
+    await page.getByTestId("bpmn-zoom-controls").getByRole("button", { name: "Pienennä kaavio" }).click();
+    await expect(box).toHaveAttribute("data-full-view", "false");
+  });
 });

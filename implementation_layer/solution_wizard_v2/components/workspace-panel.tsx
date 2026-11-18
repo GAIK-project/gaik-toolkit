@@ -438,38 +438,37 @@ function WorkflowFlowTab({
   }, [fullViewOn]);
   // The large view asks the browser for full screen as well; where the browser
   // says no, the box lays itself over the window (fixed inset-0) all the same.
-  // Leaving the browser's full screen (Esc, the browser's own controls) closes
-  // the large view, and closing the large view leaves the browser's full screen.
+  // When the browser leaves full screen by itself (its Esc, its own controls),
+  // the large view stays, as that box: the browser's Esc cannot be told apart
+  // from an Esc that cancels a name being typed or closes a step's menu. Only
+  // the page's own Esc (above) and the button close it, and closing it leaves
+  // the browser's full screen.
   // The page goes full screen, not the box: Chromium makes all but the full-screen
   // element inert, and the chat, which a step is handed to from the large view,
-  // could not take the cursor then. The box covers the page as it does without it.
+  // could not take the cursor then.
   useEffect(() => {
-    const box = diagramBox.current;
     const root = document.documentElement;
-    if (!fullViewOn || !box || typeof root.requestFullscreen !== "function") return;
-    let entered = false;
-    const onChange = () => {
-      if (document.fullscreenElement === root) {
-        entered = true;
-      } else if (entered) {
-        entered = false;
-        setFullViewChosen(false);
-        box.querySelector<HTMLElement>("[data-diagram-expand]")?.focus();
-      }
-    };
-    document.addEventListener("fullscreenchange", onChange);
-    if (!document.fullscreenElement) {
-      root.requestFullscreen().catch(() => {
-        /* refused: the CSS fallback covers the window */
-      });
-    }
-    return () => {
-      document.removeEventListener("fullscreenchange", onChange);
+    if (!fullViewOn || typeof root.requestFullscreen !== "function" || document.fullscreenElement) return;
+    let closed = false;
+    const leave = () => {
       if (document.fullscreenElement === root) {
         document.exitFullscreen().catch(() => {
           /* already left */
         });
       }
+    };
+    root.requestFullscreen().then(
+      // Closed while the browser was still deciding: it is left at once.
+      () => {
+        if (closed) leave();
+      },
+      () => {
+        /* refused: the CSS fallback covers the window */
+      },
+    );
+    return () => {
+      closed = true;
+      leave();
     };
   }, [fullViewOn]);
   useEffect(() => {
