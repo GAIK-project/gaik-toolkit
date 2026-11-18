@@ -208,6 +208,8 @@ def apply_edit(
 
 #: The note of the version an undo adds.
 UNDO_NOTE = "Undo"
+#: The note of the version an undo keeps the agent's unsaved file in.
+BEFORE_UNDO_NOTE = "Before undo"
 
 
 def nothing_to_undo() -> HTTPException:
@@ -228,7 +230,13 @@ def undo(db: Session, session, *, base_version: int) -> None:
     The draft restored is that of the newest version older than the active one
     that carries one, or, right after an undo, older than the version that undo
     restored (``blueprint_service.UNDO_CURSOR_KEY``): repeated undos walk back.
-    Any other write removes the cursor, so the walk starts again from it.
+    Any other write removes the cursor, so the walk starts again from it. A
+    version that shows the same draft and AI steps as now is passed over. The
+    AI steps without a component are those of the version restored.
+
+    When the agent's file differs from the active version's draft (the agent
+    changed what the reduced view does not show), it is first kept as a
+    version of its own (note ``"Before undo"``), so the undo loses no work.
 
     Goes through the flow of an edit, with its refusals (``no_draft``,
     ``agent_busy``, ``changed_elsewhere``); also refused with 409
@@ -243,27 +251,63 @@ def undo(db: Session, session, *, base_version: int) -> None:
         # that kept the cursor (a version stored without a draft) ends the walk.
         active = blueprint_service.get_active_version(db, session)
         walking = isinstance(cursor, int) and active is not None and active.note == UNDO_NOTE
-        target = blueprint_service.get_previous_draft_version(
-            db, session, before=cursor if walking else None
-        )
-        if target is None or not isinstance(target.draft, dict):
-            raise nothing_to_undo()
+        marked = artifact_sync.still_without_component(draft, artifact_sync.ai_steps(metadata))
+        before = cursor if walking else None
+        while True:
+            target = blueprint_service.get_previous_draft_version(db, session, before=before)
+            if target is None or not isinstance(target.draft, dict):
+                raise nothing_to_undo()
+            restored = target.draft
+            ai = _ai_steps_of(target, restored)
+            # A version that shows what is shown now is no step back.
+            if restored != draft or ai != marked:
+                break
+            before = target.version
         try:
-            draft_store.validate_draft(target.draft)
+            draft_store.validate_draft(restored)
         except ValidationError as exc:
             raise cannot_undo() from exc
-        restored = target.draft
+        if active is not None and active.draft is not None and active.draft != draft:
+            # The agent has changed its file since the active version without
+            # changing what the blueprint shows (a field the reduced view has
+            # no place for), so no version holds that work: keep it in one
+            # before the file is written over. Newer than the version restored,
+            # it is no step the walk goes back to.
+            mapped = artifact_sync.blueprint_from_draft(draft, marked)
+            blueprint_service.add_version(
+                db,
+                session,
+                note=BEFORE_UNDO_NOTE,
+                content=mapped.model_dump() if mapped is not None else None,
+                draft=draft,
+            )
+            # So the undo's own version is numbered after it.
+            db.flush()
         return _Write(
             blueprint=restored,
             summaries=[
                 f"Undid the last workspace edit: the blueprint is back to version {target.version}"
             ],
-            ai=artifact_sync.still_without_component(restored, artifact_sync.ai_steps(metadata)),
+            ai=ai,
             note=UNDO_NOTE,
             undo_cursor=target.version,
         )
 
     _write(db, session, base_version, change)
+
+
+def _ai_steps_of(version, draft: dict[str, Any]) -> frozenset[str]:
+    """The AI steps without a component (``artifact_sync.AI_STEPS_KEY``) as
+    ``version`` showed them: its steps of type ``ai`` that are automated tasks
+    without a component in its ``draft``. The session's marks cannot say: a
+    step leaves them for good once it gets a component."""
+    content = version.content if isinstance(version.content, dict) else {}
+    shown = {
+        str(s.get("id"))
+        for s in content.get("steps") or []
+        if isinstance(s, dict) and s.get("type") == "ai"
+    }
+    return artifact_sync.still_without_component(draft, shown)
 
 
 @dataclass

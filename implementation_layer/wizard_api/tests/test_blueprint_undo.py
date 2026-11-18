@@ -6,7 +6,9 @@ of an edit. Repeated undos walk back (``undo_cursor``); any other write starts
 the walk again from the newest version.
 """
 
+import copy
 import json
+import os
 
 import pytest
 from helpers import requires_postgres
@@ -244,3 +246,88 @@ def test_the_undo_cursor_is_server_owned(client, db_session, not_busy) -> None:
 
     assert res.status_code >= 400
     assert "undo_cursor" not in _session(db_session, created["id"]).session_metadata
+
+
+def _write_file(output_dir: str, draft: dict) -> None:
+    with open(os.path.join(output_dir, artifact_sync.DRAFT_BLUEPRINT_FILE), "w") as fh:
+        json.dump(draft, fh, indent=2)
+
+
+@requires_postgres
+def test_undo_keeps_the_agents_unsaved_work_in_a_version(client, db_session, not_busy) -> None:
+    created = _create(client)
+    sid = created["id"]
+    original = _on_disk(created["output_dir"])
+    _rename(client, sid, "First name")
+    after_first = _on_disk(created["output_dir"])
+    _rename(client, sid, "Second name")
+    # The agent changes what the reduced view does not show: no version is added.
+    agent_file = _on_disk(created["output_dir"])
+    agent_file["business_spec"]["current_process"] = "by hand, written by the agent"
+    _write_file(created["output_dir"], agent_file)
+    session = _session(db_session, sid)
+    assert artifact_sync.sync_blueprint_from_draft(db_session, session) is False
+    active = _active(client, sid)
+
+    assert _undo(client, sid, active).status_code == 200
+
+    assert _on_disk(created["output_dir"]) == after_first
+    by_number = {v.version: v for v in _versions(db_session, sid)}
+    kept = by_number[active + 1]
+    assert kept.note == "Before undo"
+    assert kept.draft == agent_file
+    assert kept.content == by_number[active].content
+    assert by_number[active + 2].note == "Undo"
+    # The walk goes on past the version restored, not to the kept one.
+    assert _undo(client, sid, _active(client, sid)).status_code == 200
+    assert _on_disk(created["output_dir"]) == original
+
+
+@requires_postgres
+def test_undo_brings_back_the_ai_step_marks_of_the_version_restored(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client)
+    sid = created["id"]
+    session = _session(db_session, sid)
+    artifact_sync.sync_blueprint_from_draft(db_session, session)
+    content = copy.deepcopy(client.get(f"/sessions/{sid}").json()["blueprint"])
+    assert content["steps"][0]["id"] == "upload"
+    content["steps"][0]["type"] = "ai"
+    marked = client.patch(f"/sessions/{sid}/blueprint", json={"content": content})
+    assert marked.status_code == 200, marked.text
+    assert marked.json()["metadata"][artifact_sync.AI_STEPS_KEY] == ["upload"]
+    content = copy.deepcopy(marked.json()["blueprint"])
+    content["steps"][0]["component"] = "custom"
+    given = client.patch(f"/sessions/{sid}/blueprint", json={"content": content})
+    assert given.status_code == 200, given.text
+    assert artifact_sync.AI_STEPS_KEY not in given.json()["metadata"]
+
+    res = _undo(client, sid, given.json()["active_version"])
+
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["blueprint"]["steps"][0]["type"] == "ai"
+    assert body["metadata"][artifact_sync.AI_STEPS_KEY] == ["upload"]
+
+
+@requires_postgres
+def test_undo_passes_over_a_version_that_shows_the_same(client, db_session, not_busy) -> None:
+    created = _create(client)
+    sid = created["id"]
+    original = _on_disk(created["output_dir"])
+    _rename(client, sid, "First name")
+    session = _session(db_session, sid)
+    # A version that changed nothing in the draft or its AI steps.
+    blueprint_service.add_version(
+        db_session,
+        session,
+        note="same again",
+        content=None,
+        draft=_on_disk(created["output_dir"]),
+    )
+    db_session.commit()
+
+    assert _undo(client, sid, _active(client, sid)).status_code == 200
+
+    assert _on_disk(created["output_dir"]) == original
