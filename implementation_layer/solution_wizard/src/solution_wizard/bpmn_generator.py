@@ -360,16 +360,28 @@ class _BpmnBuilder:
 
     # -- lanes ------------------------------------------------------------
 
-    def _participant_lane(self, predicate) -> Optional[Tuple[str, str]]:
-        """Return (lane_id, name) for the first business_process participant
-        matching predicate, or None."""
+    def _participant_lane(self, predicate) -> Optional[Tuple[str, str, int]]:
+        """Return (lane_id, name, priority) for the first business_process
+        participant matching predicate, or None."""
         for i, p in enumerate(self.bp.business_process.participants):
             if predicate(p):
                 lid = f"Lane_{_safe(p.id)}"
                 if lid not in self.mapping:
                     self._map(lid, "lane", f"business_process.participants[{i}]")
-                return lid, p.name
+                return lid, p.name, self._participant_priority(p)
         return None
+
+    @staticmethod
+    def _participant_priority(p) -> int:
+        """Lane order of a participant, from its role, so the lane keeps its
+        place however a node reaches it (a category or a step's performed_by):
+        users 0, the system 1, reviewers 2, as the derived lanes."""
+        lanes_for = getattr(p, "default_lane_for", [])
+        if getattr(p, "kind", "") == "system" or "automated_task" in lanes_for:
+            return _DERIVED_LANES["ai"][2]
+        if "human_review" in lanes_for and "user_task" not in lanes_for:
+            return _DERIVED_LANES["review"][2]
+        return _DERIVED_LANES["user"][2]
 
     def _ensure_lane(self, lid: str, name: str, priority: int) -> str:
         if lid not in self.lanes:
@@ -395,7 +407,7 @@ class _BpmnBuilder:
             )
         _, lid, priority, source = _DERIVED_LANES[category]
         if hit:
-            return self._ensure_lane(hit[0], hit[1], priority)
+            return self._ensure_lane(*hit)
         lid = self._ensure_lane(lid, _derived_participant(self.bp, category).name, priority)
         if lid not in self.mapping:
             self._map(lid, "lane", source)
@@ -405,10 +417,9 @@ class _BpmnBuilder:
         for i, p in enumerate(self.bp.business_process.participants):
             if p.id == participant_id:
                 lid = f"Lane_{_safe(p.id)}"
-                priority = 1 if getattr(p, "kind", "") == "system" else 0
                 if lid not in self.mapping:
                     self._map(lid, "lane", f"business_process.participants[{i}]")
-                return self._ensure_lane(lid, p.name, priority)
+                return self._ensure_lane(lid, p.name, self._participant_priority(p))
         if not self.bp.business_process.participants:
             # Derived lanes: a derived participant id names its lane.
             for category, (derived_id, _, _, _) in _DERIVED_LANES.items():

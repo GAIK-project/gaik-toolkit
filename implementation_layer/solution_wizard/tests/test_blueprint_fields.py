@@ -131,6 +131,43 @@ def test_derived_participants_redraw_the_same_lanes(name):
     assert _lane_names(generate_bpmn(bp)) == before
 
 
+def _lane_of_each_step(xml: str) -> dict:
+    root = ET.fromstring(xml)
+    lane_of = {}
+    for lane in root.findall(".//bpmn:lane", NS):
+        for ref in lane.findall("bpmn:flowNodeRef", NS):
+            lane_of[ref.text] = lane.get("id")
+    return lane_of
+
+
+@pytest.mark.parametrize("name", EXAMPLES + ["with_review"])
+def test_a_performer_naming_the_current_lane_keeps_the_lane_order(name):
+    bp = _with_review(_example()) if name == "with_review" else _example(name)
+    bp.business_process.participants = derived_participants(bp)
+    xml = generate_bpmn(bp)
+    before = _lane_names(xml)
+    lane_of = _lane_of_each_step(xml)
+    for step in bp.workflow.steps:
+        node = ("Gateway_" if step.type == "decision" else "Activity_") + step.id
+        step.performed_by = lane_of[node].removeprefix("Lane_")
+    assert _lane_names(generate_bpmn(bp)) == before
+
+
+def test_a_performer_naming_an_explicit_participant_keeps_the_lane_order():
+    bp = _with_review(_example())
+    bp.business_process.participants = [
+        Participant(id="clerk", name="Clerk", default_lane_for=["user_task"]),
+        Participant(id="manager", name="Manager", default_lane_for=["human_review"]),
+        Participant(id="bot", name="Bot", kind="system"),
+    ]
+    before = _lane_names(generate_bpmn(bp))
+    assert before == ["Clerk", "Bot", "Manager"]
+    _step(bp, "review_po").performed_by = "manager"
+    _step(bp, "extract_po_fields").performed_by = "bot"
+    _step(bp, "upload_po").performed_by = "clerk"
+    assert _lane_names(generate_bpmn(bp)) == before
+
+
 def test_derived_participants_ids_and_lane_roles():
     bp = _with_review(_example())
     by_id = {p.id: p for p in derived_participants(bp)}
