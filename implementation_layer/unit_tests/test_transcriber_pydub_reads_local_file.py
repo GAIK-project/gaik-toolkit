@@ -16,7 +16,8 @@ from pathlib import Path
 import httpx
 import pydub.utils
 import pytest
-from gaik.software_components.input_limits import InputLimits
+from gaik.software_components import input_limits
+from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.transcriber import transcriber as module
 
 # A relative name that ffmpeg and ffprobe would read as a protocol address.
@@ -121,7 +122,7 @@ def _recording() -> Path:
     return path
 
 
-def _assert_only_the_file_bytes_reach_the_media_tools(tools: _MediaTools) -> None:
+def _assert_decodes_open_only_the_absolute_local_path(tools: _MediaTools) -> None:
     """Every decode of the recording opens its absolute path under the file protocol.
 
     The other media calls are pydub's exports of the chunks, which read a WAV pydub
@@ -140,7 +141,7 @@ def _assert_only_the_file_bytes_reach_the_media_tools(tools: _MediaTools) -> Non
             assert absolute not in args, args  # exports read pydub's own files
 
 
-def test_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(media_tools, provider):
+def test_transcribe_decodes_only_the_absolute_local_path(media_tools, provider):
     config, requests = provider
     transcriber = module.Transcriber(
         config, output_dir="workspace", limits=InputLimits(max_media_seconds=None)
@@ -149,7 +150,7 @@ def test_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(media_too
 
     result = transcriber.transcribe(RECORDING_NAME)
 
-    _assert_only_the_file_bytes_reach_the_media_tools(media_tools)
+    _assert_decodes_open_only_the_absolute_local_path(media_tools)
     # The duration read and the chunking check each decode the file once.
     assert len(media_tools.decodes()) == 2
     assert result.audio_duration_s == SECONDS
@@ -157,9 +158,7 @@ def test_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(media_too
     assert len(requests) == 1
 
 
-def test_chunked_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(
-    media_tools, provider
-):
+def test_chunked_transcribe_decodes_only_the_absolute_local_path(media_tools, provider):
     config, requests = provider
     transcriber = module.Transcriber(
         config,
@@ -171,16 +170,14 @@ def test_chunked_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(
 
     result = transcriber.transcribe(RECORDING_NAME)
 
-    _assert_only_the_file_bytes_reach_the_media_tools(media_tools)
+    _assert_decodes_open_only_the_absolute_local_path(media_tools)
     # Duration read, chunking check and the decode the chunks are cut from.
     assert len(media_tools.decodes()) == 3
     assert "synthetic transcript" in result.raw_transcript
     assert len(requests) > 1
 
 
-def test_split_and_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name(
-    media_tools, provider
-):
+def test_split_and_transcribe_decodes_only_the_absolute_local_path(media_tools, provider):
     config, requests = provider
     _recording()
 
@@ -188,7 +185,7 @@ def test_split_and_transcribe_gives_pydub_the_file_bytes_and_never_the_file_name
         RECORDING_NAME, config, max_duration_seconds=1, transcription_model="whisper-1"
     )
 
-    _assert_only_the_file_bytes_reach_the_media_tools(media_tools)
+    _assert_decodes_open_only_the_absolute_local_path(media_tools)
     assert len(media_tools.decodes()) == 1
     assert "synthetic transcript" in transcript
     assert requests
@@ -244,3 +241,29 @@ def test_real_ffmpeg_decodes_a_wav_and_opens_no_stream_a_file_names(tmp_path, mo
     with pytest.raises(subprocess.CalledProcessError) as refused:
         module._decode_audio("call.mp3")
     assert b"whitelist" in refused.value.stderr or b"not on whitelist" in refused.value.stderr
+
+
+def test_a_wav_over_the_duration_limit_is_refused_without_ffmpeg(tmp_path, monkeypatch, provider):
+    # Neither ffprobe nor ffmpeg is installed: the WAV is still read in Python, so
+    # its duration is known and the limit holds before any request.
+    config, requests = provider
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(input_limits.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(module.AudioSegment, "converter", str(tmp_path / "no-ffmpeg"))
+    Path("speech.wav").write_bytes(_wav_bytes(3))
+    transcriber = module.Transcriber(
+        config, output_dir="workspace", limits=InputLimits(max_media_seconds=2)
+    )
+
+    with pytest.raises(InputLimitError, match="max_media_seconds"):
+        transcriber.transcribe("speech.wav")
+
+    assert requests == []
+
+
+def test_a_wav_is_read_without_ffmpeg(tmp_path, monkeypatch):
+    monkeypatch.setattr(module.AudioSegment, "converter", str(tmp_path / "no-ffmpeg"))
+    wav = tmp_path / "speech.mp3"  # the content decides, not the extension
+    wav.write_bytes(_wav_bytes(2))
+
+    assert len(module._decode_audio(wav)) == 2000
