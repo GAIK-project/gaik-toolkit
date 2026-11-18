@@ -98,6 +98,14 @@ class OperationsRequest(BaseModel):
     operations: list[Operation] = Field(min_length=1, max_length=MAX_OPERATIONS)
 
 
+class UndoRequest(BaseModel):
+    """``POST /blueprint/undo``: the version the workspace shows when it asks."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    base_version: int
+
+
 class OperationsResponse(BaseModel):
     """The session after the edit, and what the edit left for the agent to complete."""
 

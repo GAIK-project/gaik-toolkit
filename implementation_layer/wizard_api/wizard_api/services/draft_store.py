@@ -46,6 +46,13 @@ def _require_solution_wizard() -> None:
         raise RuntimeError("solution_wizard is not installed")
 
 
+def validate_draft(blueprint: dict[str, Any]) -> None:
+    """Raise ``pydantic.ValidationError`` unless ``blueprint`` is a valid draft:
+    the check :func:`write_draft` makes before it writes."""
+    _require_solution_wizard()
+    Blueprint.model_validate(blueprint)
+
+
 def write_draft(output_dir: str, blueprint: dict[str, Any]) -> None:
     """Validate ``blueprint`` and write it whole as the session's draft.
 
@@ -53,8 +60,7 @@ def write_draft(output_dir: str, blueprint: dict[str, Any]) -> None:
     ``ValueError`` when the draft's path is a symlink; nothing is written in
     either case.
     """
-    _require_solution_wizard()
-    Blueprint.model_validate(blueprint)
+    validate_draft(blueprint)
     target = artifact_path(output_dir, DRAFT_BLUEPRINT_FILE)
     if os.path.islink(target):
         raise ValueError(f"{DRAFT_BLUEPRINT_FILE} is a symlink; refusing to write it")

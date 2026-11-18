@@ -26,10 +26,12 @@ from sqlalchemy.orm import Session
 from wizard_api.db import get_db
 from wizard_api.errors import api_error
 from wizard_api.ownership import session_belongs_to_requester
+from wizard_api.schemas.blueprint import SessionDetailResponse
 from wizard_api.schemas.blueprint_ops import (
     MAX_REQUEST_BYTES,
     OperationsRequest,
     OperationsResponse,
+    UndoRequest,
 )
 from wizard_api.services import blueprint_edit_service, bpmn_layout, session_service
 
@@ -104,6 +106,45 @@ def apply_blueprint_operations(
         needs_attention=result.needs_attention,
         bpmn_changed=result.bpmn_changed,
     )
+
+
+async def _undo_body(request: Request) -> UndoRequest:
+    """The request body as ``UndoRequest``, at most ``MAX_REQUEST_BYTES``."""
+    body = await _limited_body(request, "An undo request is at most {kb} KB.")
+    try:
+        return UndoRequest.model_validate_json(body)
+    except ValidationError as exc:
+        raise RequestValidationError(
+            [{**e, "loc": ("body", *e["loc"])} for e in exc.errors(include_url=False)]
+        ) from None
+
+
+@router.post("/{session_id}/blueprint/undo", response_model=SessionDetailResponse)
+def undo_blueprint_edit(
+    session_id: uuid.UUID,
+    payload: UndoRequest = Depends(_undo_body),
+    db: Session = Depends(get_db),
+) -> SessionDetailResponse:
+    """Go back to the blueprint before the last write, as a new version (note "Undo").
+
+    The body is ``{"base_version": int}``, the version the workspace shows.
+    Repeated undos walk back through the versions that carry a draft; any
+    other write starts the walk again from the newest one. The draft is
+    written as the agent's file, the diagrams are redrawn from it and the
+    agent hears of the undo with its next turn, as after an edit; an undo of
+    what Gate 3 approved reopens the gate. The diagram's layout is kept.
+
+    Refused with 409 ``nothing_to_undo`` when no earlier version carries a
+    draft, ``cannot_undo`` when that draft is no longer a valid blueprint,
+    ``agent_busy`` while the agent replies, ``changed_elsewhere`` when
+    ``base_version`` is not the active version and ``no_draft`` while there is
+    no draft; nothing changes then. See ``blueprint_edit_service.undo``.
+    """
+    session = session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    blueprint_edit_service.undo(db, session, base_version=payload.base_version)
+    return session_service.session_detail(db, session)
 
 
 async def _layout_body(request: Request) -> Any:

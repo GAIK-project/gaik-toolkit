@@ -176,13 +176,28 @@ def get_active_draft(db: Session, session: WizardSession) -> dict | None:
     return active.draft if active is not None else None
 
 
-def get_previous_draft_version(db: Session, session: WizardSession) -> BlueprintVersion | None:
-    """The newest version older than the active one that carries a full draft."""
+#: Session metadata key: the version whose draft the last undo restored. The
+#: next undo goes back past it, so repeated undos walk back through the
+#: versions instead of toggling between the last two. Any other write of the
+#: blueprint removes it (:func:`without_undo_cursor`).
+UNDO_CURSOR_KEY = "undo_cursor"
+
+
+def without_undo_cursor(metadata: dict | None) -> dict:
+    """``metadata`` without ``UNDO_CURSOR_KEY``: for a write that is no undo."""
+    return {k: v for k, v in (metadata or {}).items() if k != UNDO_CURSOR_KEY}
+
+
+def get_previous_draft_version(
+    db: Session, session: WizardSession, *, before: int | None = None
+) -> BlueprintVersion | None:
+    """The newest version older than ``before`` (default: the active one) that
+    carries a full draft."""
     stmt = (
         select(BlueprintVersion)
         .where(
             BlueprintVersion.session_id == session.id,
-            BlueprintVersion.version < session.active_version,
+            BlueprintVersion.version < (session.active_version if before is None else before),
             BlueprintVersion.draft.is_not(None),
         )
         .order_by(BlueprintVersion.version.desc())

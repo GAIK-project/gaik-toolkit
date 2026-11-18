@@ -577,9 +577,13 @@ def sync_blueprint_from_draft(
     added = (
         adopted != digest and not adopted_before and (active is None or active.content != content)
     )
+    metadata = dict(session.session_metadata or {})
     if added:
         blueprint_service.add_version(db, session, note=note, content=content, draft=draft)
-    metadata = _with_ai_steps(dict(session.session_metadata or {}), ai)
+        # A new draft from the agent: an undo goes back from it, not from
+        # where an earlier undo had walked to.
+        metadata = blueprint_service.without_undo_cursor(metadata)
+    metadata = _with_ai_steps(metadata, ai)
     session.session_metadata = {**metadata, ADOPTED_DRAFT_KEY: digest}
     db.commit()
     db.refresh(session)

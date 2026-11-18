@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from wizard_api.errors import api_error, error_detail
@@ -173,6 +174,122 @@ def apply_edit(
     the edit does, and a turn that starts after it hears of the edit
     (``pending_user_edits``). An edit of what Gate 3 approved reopens the gate.
     """
+
+    def change(draft: dict[str, Any], metadata: dict[str, Any]) -> _Write | None:
+        try:
+            edit = operations_for(draft)
+            # A save of the whole reduced blueprint that changes nothing in the
+            # draft is no edit; typed operations are what the user asked for.
+            whole_save = isinstance(edit, Edit)
+            if not whole_save:
+                edit = Edit(list(edit))
+            if not edit.operations:
+                return None
+            result = blueprint_ops.apply_operations(draft, edit.operations)
+        except blueprint_ops.OperationError as exc:
+            raise _invalid(exc) from exc
+        marked = artifact_sync.ai_steps(metadata)
+        ai = artifact_sync.still_without_component(result.blueprint, marked | edit.ai_steps)
+        if whole_save and result.blueprint == draft and ai == marked:
+            return None
+        return _Write(
+            blueprint=result.blueprint,
+            summaries=list(result.summaries),
+            ai=ai,
+            note=note
+            if note is not None
+            else "Workspace edit: " + "; ".join(result.summaries)[:_NOTE_SUMMARY_CHARS],
+            result=result,
+        )
+
+    written = _write(db, session, base_version, change)
+    return written.result if written is not None else None
+
+
+#: The note of the version an undo adds.
+UNDO_NOTE = "Undo"
+
+
+def nothing_to_undo() -> HTTPException:
+    return api_error(409, "nothing_to_undo", "There is no earlier blueprint to go back to.")
+
+
+def cannot_undo() -> HTTPException:
+    return api_error(
+        409,
+        "cannot_undo",
+        "The earlier blueprint is no longer valid and cannot be restored; ask the wizard instead.",
+    )
+
+
+def undo(db: Session, session, *, base_version: int) -> None:
+    """Restore the draft of the version before the last write, as a new version.
+
+    The draft restored is that of the newest version older than the active one
+    that carries one, or, right after an undo, older than the version that undo
+    restored (``blueprint_service.UNDO_CURSOR_KEY``): repeated undos walk back.
+    Any other write removes the cursor, so the walk starts again from it.
+
+    Goes through the flow of an edit, with its refusals (``no_draft``,
+    ``agent_busy``, ``changed_elsewhere``); also refused with 409
+    ``nothing_to_undo`` when no older version carries a draft, and
+    ``cannot_undo`` when that draft is no longer a valid blueprint. Nothing
+    changes when refused.
+    """
+
+    def change(draft: dict[str, Any], metadata: dict[str, Any]) -> _Write:
+        cursor = metadata.get(blueprint_service.UNDO_CURSOR_KEY)
+        # Only while the active version is the one that undo added: a write
+        # that kept the cursor (a version stored without a draft) ends the walk.
+        active = blueprint_service.get_active_version(db, session)
+        walking = isinstance(cursor, int) and active is not None and active.note == UNDO_NOTE
+        target = blueprint_service.get_previous_draft_version(
+            db, session, before=cursor if walking else None
+        )
+        if target is None or not isinstance(target.draft, dict):
+            raise nothing_to_undo()
+        try:
+            draft_store.validate_draft(target.draft)
+        except ValidationError as exc:
+            raise cannot_undo() from exc
+        restored = target.draft
+        return _Write(
+            blueprint=restored,
+            summaries=[
+                f"Undid the last workspace edit: the blueprint is back to version {target.version}"
+            ],
+            ai=artifact_sync.still_without_component(restored, artifact_sync.ai_steps(metadata)),
+            note=UNDO_NOTE,
+            undo_cursor=target.version,
+        )
+
+    _write(db, session, base_version, change)
+
+
+@dataclass
+class _Write:
+    """What a write stores: the draft, what the agent is told, the version's note."""
+
+    blueprint: dict[str, Any]
+    summaries: list[str]
+    ai: frozenset[str]
+    note: str
+    #: The version an undo restored (``blueprint_service.UNDO_CURSOR_KEY``);
+    #: None for every other write, which removes the cursor.
+    undo_cursor: int | None = None
+    #: What the caller gets back (an edit's ``blueprint_ops.OpsResult``).
+    result: Any = None
+
+
+#: Makes the write from the draft and the session's metadata as read under the
+#: session's lock; None when there is nothing to write. It may refuse the write
+#: with an ``HTTPException``.
+_Change = Callable[[dict[str, Any], dict[str, Any]], "_Write | None"]
+
+
+def _write(db: Session, session, base_version: int | None, change: _Change) -> _Write | None:
+    """The flow every write from the workspace shares: the checks, the write
+    under the session's lock and, after it, the reopen check of Gate 3."""
     if not blueprint_ops.solution_wizard_available():
         raise unavailable()
     if artifact_sync.read_draft_blueprint(session.output_dir) is None:
@@ -182,8 +299,8 @@ def apply_edit(
             raise agent_busy()
         if base_version is not None and base_version != session.active_version:
             raise changed_elsewhere()
-        result = _apply(db, session, base_version, operations_for, note)
-    if result is None:
+        written = _apply(db, session, base_version, change)
+    if written is None:
         return None
     # As after a chat turn: an edit of what Gate 3 approved reopens the gate.
     # Best-effort; the edit is stored whatever happens here.
@@ -193,7 +310,7 @@ def apply_edit(
         logger.warning("approved content could not be compared after an edit", exc_info=True)
         db.rollback()
     db.refresh(session)
-    return result
+    return written
 
 
 def _invalid(exc: blueprint_ops.OperationError) -> HTTPException:
@@ -203,14 +320,8 @@ def _invalid(exc: blueprint_ops.OperationError) -> HTTPException:
     return HTTPException(status_code=422, detail={**detail, "code": exc.code})
 
 
-def _apply(
-    db: Session,
-    session,
-    base_version: int | None,
-    operations_for: OperationsFor,
-    note: str | None,
-) -> blueprint_ops.OpsResult | None:
-    """The edit under the session's row lock, committed whole or not at all.
+def _apply(db: Session, session, base_version: int | None, change: _Change) -> _Write | None:
+    """The write under the session's row lock, committed whole or not at all.
 
     The draft file is replaced before the version is stored. Should anything
     after that write fail, the files are put back as they were before the
@@ -226,54 +337,39 @@ def _apply(
         draft = artifact_sync.read_draft_blueprint(output_dir)
         if draft is None:
             raise no_draft()
-        try:
-            edit = operations_for(draft)
-            # A save of the whole reduced blueprint that changes nothing in the
-            # draft is no edit; typed operations are what the user asked for.
-            whole_save = isinstance(edit, Edit)
-            if not whole_save:
-                edit = Edit(list(edit))
-            operations = edit.operations
-            if not operations:
-                db.rollback()
-                return None
-            result = blueprint_ops.apply_operations(draft, operations)
-        except blueprint_ops.OperationError as exc:
-            raise _invalid(exc) from exc
         metadata = dict(session.session_metadata or {})
-        marked = artifact_sync.ai_steps(metadata)
-        ai = artifact_sync.still_without_component(result.blueprint, marked | edit.ai_steps)
-        if whole_save and result.blueprint == draft and ai == marked:
+        written = change(draft, metadata)
+        if written is None:
             db.rollback()
             return None
         # A version saved before migration 003 has no copy of the draft: keep
-        # the one this edit is about to replace, so it can be gone back to.
+        # the one this write is about to replace, so it can be gone back to.
         blueprint_service.backfill_active_draft(db, session, draft)
         taken = draft_store.snapshot(output_dir)
         try:
-            draft_store.write_draft(output_dir, result.blueprint)
-            draft_store.refresh_derived_files(output_dir, result.blueprint)
-            mapped = artifact_sync.blueprint_from_draft(result.blueprint, ai)
+            draft_store.write_draft(output_dir, written.blueprint)
+            draft_store.refresh_derived_files(output_dir, written.blueprint)
+            mapped = artifact_sync.blueprint_from_draft(written.blueprint, written.ai)
             content = mapped.model_dump() if mapped is not None else None
             blueprint_service.add_version(
-                db,
-                session,
-                note=note
-                if note is not None
-                else "Workspace edit: " + "; ".join(result.summaries)[:_NOTE_SUMMARY_CHARS],
-                content=content,
-                draft=result.blueprint,
+                db, session, note=written.note, content=content, draft=written.blueprint
             )
-            if ai:
-                metadata[artifact_sync.AI_STEPS_KEY] = sorted(ai)
+            if written.ai:
+                metadata[artifact_sync.AI_STEPS_KEY] = sorted(written.ai)
             else:
                 metadata.pop(artifact_sync.AI_STEPS_KEY, None)
             if content is not None:
                 # The next turn's sync finds this draft adopted already.
                 metadata[artifact_sync.ADOPTED_DRAFT_KEY] = artifact_sync.content_digest(content)
+            if written.undo_cursor is not None:
+                metadata[blueprint_service.UNDO_CURSOR_KEY] = written.undo_cursor
+            else:
+                metadata = blueprint_service.without_undo_cursor(metadata)
             key = session_service.PENDING_USER_EDITS_KEY
             pending = [e for e in metadata.get(key) or [] if isinstance(e, str)]
-            metadata[key] = [*pending, *result.summaries][-session_service.MAX_PENDING_USER_EDITS :]
+            metadata[key] = [*pending, *written.summaries][
+                -session_service.MAX_PENDING_USER_EDITS :
+            ]
             session.session_metadata = metadata
             session.updated_at = datetime.now(UTC)
             db.commit()
@@ -281,8 +377,8 @@ def _apply(
             draft_store.restore(output_dir, taken)
             raise
     except BaseException:
-        # Releases the row; a backfill goes with the rest of the edit.
+        # Releases the row; a backfill goes with the rest of the write.
         db.rollback()
         raise
-    logger.info("session %s: %d blueprint operations applied", session.id, len(operations))
-    return result
+    logger.info("session %s: blueprint written (%s)", session.id, written.note[:80])
+    return written

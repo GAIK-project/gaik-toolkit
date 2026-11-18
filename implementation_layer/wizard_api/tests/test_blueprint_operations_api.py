@@ -324,6 +324,13 @@ def test_the_first_edit_of_an_old_session_backs_up_its_draft(client, db_session,
     assert previous.version == created["active_version"]
     assert previous.draft == before
 
+    # And undo brings the file as it was before the edit back (Task 12).
+    undone = client.post(
+        f"/sessions/{sid}/blueprint/undo", json={"base_version": session.active_version}
+    )
+    assert undone.status_code == 200, undone.text
+    assert json.loads(_read_bytes(created["output_dir"])) == before
+
 
 @requires_postgres
 def test_a_session_with_a_stored_draft_is_not_backfilled(client, db_session, not_busy) -> None:

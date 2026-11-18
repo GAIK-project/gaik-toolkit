@@ -58,6 +58,7 @@ SERVER_OWNED_METADATA_KEYS = frozenset(
         "user_edits",
         "agent_seen_edit",
         "pending_user_edits",
+        blueprint_service.UNDO_CURSOR_KEY,
     }
 )
 
