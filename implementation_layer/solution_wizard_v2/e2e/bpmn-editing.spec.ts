@@ -238,12 +238,12 @@ test.describe("Workflow tab", () => {
     await expect(page.getByTestId("bpmn-save")).toHaveCount(0);
     await expect(page.getByTestId("bpmn-undo")).toHaveCount(0);
 
-    // A step's name is text, not a field, and its context pad is empty.
+    // A step's fields are shown but cannot be changed, and its context pad is empty.
     await rows.nth(2).getByRole("button").first().click();
     const task = page.locator('.bpmn-editable [data-element-id="Activity_classify"]');
     await expect(task).toHaveClass(/selected/);
-    await expect(page.getByTestId("bpmn-property-name-text")).toHaveText("Classification");
-    await expect(page.getByTestId("bpmn-property-name")).toHaveCount(0);
+    await expect(page.getByTestId("bpmn-property-name")).toHaveValue("Classification");
+    await expect(page.getByTestId("bpmn-property-name")).toBeDisabled();
     await expect(page.locator(".bpmn-editable .djs-context-pad .entry")).toHaveCount(0);
 
     // Typing in place, Delete and dragging a step do nothing.
@@ -289,14 +289,15 @@ test.describe("Workflow tab", () => {
     await expect(entries.nth(0)).toHaveAttribute("data-action", "gaik-add-step");
     await expect(entries.nth(1)).toHaveAttribute("title", /^Yhdistä/);
 
-    // The first step: rename, append, move (not earlier), connect, delete.
+    // The first step: rename, change type, append, move (not earlier), connect, delete.
     const rows = page.getByTestId("flow-step-list").locator("li");
     await rows.nth(0).getByRole("button").first().click();
     const pad = page.locator(".djs-context-pad .entry");
-    await expect(pad).toHaveCount(6);
+    await expect(pad).toHaveCount(7);
     const titles = await pad.evaluateAll((els) => els.map((el) => el.getAttribute("title")));
     expect(titles).toEqual([
       "Nimeä uudelleen",
+      "Vaihda vaiheen tyyppi",
       "Lisää vaihe tämän jälkeen",
       "Siirrä aiemmaksi",
       "Siirrä myöhemmäksi",
@@ -546,7 +547,8 @@ test.describe("Workflow tab", () => {
     );
     await expect(page.locator(".bpmn-editable .djs-palette")).toHaveCount(0);
     await page.getByTestId("flow-step-list").locator("li").nth(2).getByRole("button").first().click();
-    await expect(page.getByTestId("bpmn-property-name-text")).toHaveText("Classification");
+    await expect(page.getByTestId("bpmn-property-name")).toHaveValue("Classification");
+    await expect(page.getByTestId("bpmn-property-name")).toBeDisabled();
     expect(sent).toEqual([]);
   });
 
@@ -672,12 +674,12 @@ test.describe("Workflow tab", () => {
     // No tools to edit with.
     await expect(page.locator(".bpmn-editable .djs-palette")).toHaveCount(0);
 
-    // A step can be picked: its name is text, not a field, and nothing offers a rename or a delete.
+    // A step can be picked: its fields cannot be changed, and nothing offers a rename or a delete.
     const task = page.locator('.bpmn-editable [data-element-id="Activity_classify"]');
     await page.getByTestId("flow-step-list").locator("li").nth(2).getByRole("button").first().click();
     await expect(task).toHaveClass(/selected/);
-    await expect(page.getByTestId("bpmn-property-name-text")).toHaveText("Classification");
-    await expect(page.getByTestId("bpmn-property-name")).toHaveCount(0);
+    await expect(page.getByTestId("bpmn-property-name")).toHaveValue("Classification");
+    await expect(page.getByTestId("bpmn-property-name")).toBeDisabled();
     await expect(page.locator(".bpmn-editable .djs-context-pad .entry")).toHaveCount(0);
 
     // The step still leads to the wizard.
@@ -693,7 +695,8 @@ test.describe("Workflow tab", () => {
     await waitForDiagram(page, { edit: false });
     await expect(page.getByTestId("bpmn-readonly-editing")).toContainText("Vain luku: kaavion muokkaus tarvitsee");
     await expect(page.locator(".bpmn-editable .djs-palette")).toHaveCount(0);
-    await expect(page.getByTestId("bpmn-property-name-text")).toHaveText("Classification");
+    await expect(page.getByTestId("bpmn-property-name")).toHaveValue("Classification");
+    await expect(page.getByTestId("bpmn-property-name")).toBeDisabled();
 
     // One lock for the two diagrams: the simple flow is open for edits.
     await page.getByTestId("flow-view-diagram").click();

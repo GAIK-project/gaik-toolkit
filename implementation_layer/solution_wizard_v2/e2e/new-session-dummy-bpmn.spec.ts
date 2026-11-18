@@ -87,10 +87,10 @@ test.describe("New session dummy BPMN + collapsed chat", () => {
     ).toBeVisible({ timeout: 15_000 });
 
     // Pick the second step from the list beside the diagram. Without wizard_api
-    // (the mock store) the canvas is read-only: its name is text, not a field.
+    // (the mock store) the canvas is read-only: its fields cannot be changed.
     await workspacePanel.getByTestId("flow-step-1").getByRole("button").first().click();
-    await expect(workspacePanel.getByTestId("bpmn-property-name-text")).toBeVisible({ timeout: 10_000 });
-    await expect(workspacePanel.getByTestId("bpmn-property-name")).toHaveCount(0);
+    await expect(workspacePanel.getByTestId("bpmn-property-name")).toBeVisible({ timeout: 10_000 });
+    await expect(workspacePanel.getByTestId("bpmn-property-name")).toBeDisabled();
     await expect(workspacePanel.getByTestId("bpmn-readonly-editing")).toBeVisible();
 
     // The rename is made in the simple flow beside it, which saves itself.

@@ -182,7 +182,18 @@ def apply_edit(
             # draft is no edit; typed operations are what the user asked for.
             whole_save = isinstance(edit, Edit)
             if not whole_save:
-                edit = Edit(list(edit))
+                operations = list(edit)
+                # A step the user made an automated task is an AI step: without a
+                # component it would show as ``io`` (``artifact_sync.AI_STEPS_KEY``).
+                edit = Edit(
+                    operations,
+                    {
+                        op.step_id
+                        for op in operations
+                        if getattr(op, "op", None) == "set_step_type"
+                        and op.type == "automated_task"
+                    },
+                )
             if not edit.operations:
                 return None
             result = blueprint_ops.apply_operations(draft, edit.operations)

@@ -203,6 +203,16 @@ export type Dict = {
   bpmnTooLarge: string;
   /** A kept rename whose step was removed elsewhere meanwhile: "{name}" is the typed name. */
   bpmnRenameStepGone: string;
+  /** The same for a kept description: the step it was typed for was removed elsewhere. */
+  bpmnEditStepGone: string;
+  /** A step's context pad, and the title of the menu of step types it opens. */
+  bpmnPadChangeType: string;
+  /** The step panel: the description field, its count ("{n}" of "{max}" characters), and how a field saves. */
+  bpmnStepDescription: string;
+  bpmnStepDescriptionCount: string;
+  bpmnStepSaveHint: string;
+  /** The step panel: an AI step without a component. */
+  bpmnStepNeedsComponent: string;
   /** Takes back the last change to the blueprint (wizard_api's undo). */
   bpmnUndo: string;
   bpmnUndone: string;
@@ -1012,6 +1022,12 @@ const fi: Dict = {
   bpmnCannotUndo: "Viimeisintä muutosta ei voi kumota.",
   bpmnTooLarge: "Muutos on liian suuri tallennettavaksi.",
   bpmnRenameStepGone: "Nimeä ”{name}” ei tallennettu: vaihe poistettiin muualla.",
+  bpmnEditStepGone: "Vaiheen muutosta ei tallennettu: vaihe poistettiin muualla.",
+  bpmnPadChangeType: "Vaihda vaiheen tyyppi",
+  bpmnStepDescription: "Kuvaus",
+  bpmnStepDescriptionCount: "{n} / {max} merkkiä",
+  bpmnStepSaveHint: "Enter tai kentästä poistuminen tallentaa, Esc peruu.",
+  bpmnStepNeedsComponent: "Tekoälyvaihe tarvitsee komponentin: pyydä wizardia valitsemaan se.",
   bpmnUndo: "Kumoa",
   bpmnUndone: "Viimeisin muutos kumottu.",
   bpmnNothingToUndo: "Ei kumottavaa.",
@@ -1858,6 +1874,12 @@ const en: Dict = {
   bpmnCannotUndo: "The last change cannot be undone.",
   bpmnTooLarge: "The change is too large to save.",
   bpmnRenameStepGone: "The name “{name}” was not saved: the step was removed elsewhere.",
+  bpmnEditStepGone: "The change to the step was not saved: the step was removed elsewhere.",
+  bpmnPadChangeType: "Change the step's type",
+  bpmnStepDescription: "Description",
+  bpmnStepDescriptionCount: "{n} / {max} characters",
+  bpmnStepSaveHint: "Enter or leaving the field saves, Esc cancels.",
+  bpmnStepNeedsComponent: "This AI step needs a component: ask the wizard to choose one.",
   bpmnUndo: "Undo",
   bpmnUndone: "The last change was undone.",
   bpmnNothingToUndo: "Nothing to undo.",

@@ -383,3 +383,31 @@ def test_a_failure_after_the_write_puts_the_file_back(client, db_session, monkey
     # The backfill went with the rest of the transaction.
     assert versions[0].draft is None
     assert _session(db_session, sid).active_version == created["active_version"]
+
+
+@requires_postgres
+def test_a_step_made_an_ai_step_without_a_component_stays_an_ai_step(
+    client, db_session, not_busy
+) -> None:
+    """The diagram's type menu makes a step an AI step: until the agent gives it
+    a component, the page shows it as one (``AI_STEPS_KEY``), not as ``io``."""
+    created = _create(client)
+    sid = created["id"]
+    made_ai = {"op": "set_step_type", "step_id": "review", "type": "automated_task"}
+
+    res = _post(client, sid, created["active_version"], made_ai)
+
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert "review: needs a component" in body["needs_attention"]
+    types = {s["id"]: s["type"] for s in body["session"]["blueprint"]["steps"]}
+    assert types["review"] == "ai"
+    reloaded = client.get(f"/sessions/{sid}").json()
+    assert {s["id"]: s["type"] for s in reloaded["blueprint"]["steps"]}["review"] == "ai"
+
+    # Made a user task again, it is no AI step any more.
+    back = {"op": "set_step_type", "step_id": "review", "type": "user_task"}
+    res = _post(client, sid, body["session"]["active_version"], back)
+    assert res.status_code == 200, res.text
+    types = {s["id"]: s["type"] for s in res.json()["session"]["blueprint"]["steps"]}
+    assert types["review"] == "io"

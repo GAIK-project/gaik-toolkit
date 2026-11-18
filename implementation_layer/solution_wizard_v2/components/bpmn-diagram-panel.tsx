@@ -2,30 +2,40 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { OperationRefused, postOperations, postUndo, type BlueprintOperation } from "@/lib/blueprint-ops";
+import {
+  OperationRefused,
+  postOperations,
+  postUndo,
+  type BlueprintOperation,
+  type StepType,
+} from "@/lib/blueprint-ops";
 import { fieldInPlainWords } from "@/lib/blueprint-field-names";
 import { BpmnModeler, type BpmnModelerHandle, type BpmnSelectionInfo } from "@/components/bpmn-modeler";
 import { BpmnZoomControls } from "@/components/bpmn-viewer-toolbar";
 import { FlowEditingNote, FlowLockedNote, FlowUpdatedLine } from "@/components/flow-status";
-import { AskStepButton, StepNumber, StepTypeTag, stepTypeLabels } from "@/components/step-type";
+import { AskStepButton, StepNumber, stepTypeLabels } from "@/components/step-type";
+import { BpmnStepPanel } from "@/components/bpmn-step-panel";
 import { Icon } from "@/components/icons";
 import { stepIdToBpmnId, stepIndexForBpmnId } from "@/lib/bpmn-edit-state";
 import type { BpmnEditorOps, BpmnLayoutChange } from "@/lib/bpmn-editor-module";
 import { mappingFitsSteps, stepIdOf, type BpmnMapping } from "@/lib/bpmn-canvas-ops";
+import { keptPanelEdit, panelFields, panelOps, type KeptPanelEdit, type PanelValues } from "@/lib/step-panel-model";
 import type { BlueprintUpdate } from "@/lib/blueprint-update";
 import { bpmnDataObjectsQuery } from "@/lib/bpmn-show-data";
 import { fillTemplate } from "@/lib/chat-template";
 import type { Dict } from "@/lib/i18n";
 import type { Blueprint, BlueprintStep } from "@/lib/mock-sessions";
 
-/** How long a rename in the name field waits for more typing before it is sent. */
-const RENAME_SAVE_DELAY_MS = 800;
-
 /** How long dragged shapes wait for more dragging before their places are kept. */
 const LAYOUT_SAVE_DELAY_MS = 600;
 
 /** From this canvas width (Tailwind's @lg container, 32rem) the properties panel is a column at the right. */
 const PROPS_WIDE = 512;
+
+/** A step's description: the server's diagram draws it (`<bpmn:documentation>`), the page's step may carry it. */
+function descriptionOf(step: BlueprintStep, drawn: string | null | undefined): string {
+  return drawn || step.description || "";
+}
 
 /**
  * Whether edits can be sent: `on` once the server's mapping for the diagram
@@ -135,12 +145,12 @@ export function BpmnDiagramPanel({
   }
   const mappingSeq = useRef(0);
   const [mappingError, setMappingError] = useState(false);
-  const stepsRef = useRef<{ id: string; name?: string }[]>(steps);
+  const stepsRef = useRef<BlueprintStep[]>(steps);
   useEffect(() => {
     stepsRef.current = steps;
     modelerRef.current?.refreshOps();
     // A rename kept over a version written elsewhere goes out once the page has its steps.
-    latest.current?.flushRename();
+    latest.current?.flushPending();
   }, [steps]);
 
   // The version the next edit is made on: the page's, or the one the last edit wrote.
@@ -155,7 +165,7 @@ export function BpmnDiagramPanel({
     // A rename kept over that refusal goes out now, on the newer version: once
     // the page has also handed over that version's steps, which it does in an
     // effect of its own after this one.
-    const timer = window.setTimeout(() => latest.current?.flushRename(), 0);
+    const timer = window.setTimeout(() => latest.current?.flushPending(), 0);
     return () => window.clearTimeout(timer);
   }, [baseVersion]);
   const showDataRef = useRef(showData);
@@ -179,14 +189,20 @@ export function BpmnDiagramPanel({
   const readOnly = locked || ops !== "on";
 
   const [selection, setSelection] = useState<BpmnSelectionInfo>(null);
-  const [editName, setEditName] = useState("");
   const [propsClosed, setPropsClosed] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const pendingFocus = useRef<string | null>(null);
-  // Set when the canvas is put back to a server diagram; the next selection gives the name field its name.
-  const nameFromCanvas = useRef(false);
-  // A rename typed in the name field, or refused as changed elsewhere, and not sent yet.
-  const pendingRename = useRef<{ stepId: string; name: string } | null>(null);
+  // A name or description typed for a step and refused as changed elsewhere (or
+  // typed while the canvas could not take it), not sent yet.
+  const pendingEdit = useRef<KeptPanelEdit | null>(null);
+  // What the last edit left for the wizard to complete (wizard_api's needs_attention):
+  // in state for the step panel, in a ref for the type menu, which reads it when it opens.
+  const [needsAttention, setNeedsAttentionState] = useState<string[]>([]);
+  const needsAttentionRef = useRef<string[]>([]);
+  function setNeedsAttention(next: string[]) {
+    needsAttentionRef.current = next;
+    setNeedsAttentionState(next);
+  }
   // Places of dragged shapes not sent yet, per drawing mode.
   const pendingLayout = useRef<{ dataObjects: boolean; layout: BpmnLayoutChange } | null>(null);
   const layoutTimer = useRef<number | null>(null);
@@ -237,7 +253,7 @@ export function BpmnDiagramPanel({
         takeMapping(forXml, read);
         modelerRef.current?.refreshOps();
         // A kept rename waited for the mapping of the diagram now on the canvas.
-        latest.current?.flushRename();
+        latest.current?.flushPending();
       })
       .catch(() => {
         if (seq === mappingSeq.current) setMappingError(true);
@@ -259,7 +275,6 @@ export function BpmnDiagramPanel({
   }
 
   function showDiagram(next: ServerDiagram) {
-    nameFromCanvas.current = true;
     waitingXml.current = null;
     propXml.current = next.xml;
     mappingSeq.current += 1;
@@ -272,7 +287,6 @@ export function BpmnDiagramPanel({
 
   /** A diagram the page brought (a version from the chat, "Show data" switched). */
   function showPageDiagram(next: string) {
-    nameFromCanvas.current = true;
     waitingXml.current = null;
     propXml.current = next;
     setShownXml(next);
@@ -304,7 +318,7 @@ export function BpmnDiagramPanel({
     const next = waitingXml.current;
     if (next && !busy.current && !modelerRef.current?.isEditing()) showPageDiagram(next);
     // A name typed in the field meanwhile waited for the typing on the canvas to end.
-    else latest.current?.flushRename();
+    else latest.current?.flushPending();
   }
 
   /** The server's diagram goes back on the canvas: after a refused edit, or a change no operation describes. */
@@ -317,12 +331,11 @@ export function BpmnDiagramPanel({
       showDiagram(await readServerDiagram());
     } catch {
       // The diagram the canvas stood on, drawn again.
-      nameFromCanvas.current = true;
       setImportKey((k) => k + 1);
     } finally {
       reverting.current = false;
     }
-    latest.current?.flushRename();
+    latest.current?.flushPending();
   }
 
   /** What a refused edit says, in the UI language: never wizard_api's own (English) words. */
@@ -355,11 +368,11 @@ export function BpmnDiagramPanel({
    * diagram and mapping are read again. A refusal puts the server's diagram
    * back; a version written elsewhere meanwhile is read by the page too.
    */
-  async function run(kind: "ops" | "undo", operations: BlueprintOperation[] = []) {
+  async function run(kind: "ops" | "undo", operations: BlueprintOperation[] = []): Promise<boolean> {
     // The one gate every edit passes (palette, context pad, keys, the name
     // field, Kumoa): none starts while a name is typed in place, or the
     // diagram drawn after it would be imported over the typed name.
-    if (busy.current || typing.current) return;
+    if (busy.current || typing.current) return false;
     const base = canvasVersion.current;
     busy.current = true;
     setWorking(true);
@@ -375,6 +388,8 @@ export function BpmnDiagramPanel({
           : { ...(await postOperations(sessionId, base, operations)), via: "save" as const };
       canvasVersion.current = result.version;
       stepsRef.current = result.blueprint.steps;
+      // What this edit left for the wizard (an AI step without a component); an undo leaves nothing said.
+      setNeedsAttention("needsAttention" in result ? result.needsAttention : []);
       let next: ServerDiagram | null = null;
       try {
         next = await readServerDiagram();
@@ -390,6 +405,7 @@ export function BpmnDiagramPanel({
           ? { kind: kind === "undo" ? "undone" : "saved" }
           : { kind: "error", message: t.wsBpmnError, retry: () => void latest.current?.revert() },
       );
+      return true;
     } catch (err) {
       busy.current = false;
       if (err instanceof OperationRefused && err.code === "no_draft") {
@@ -397,11 +413,10 @@ export function BpmnDiagramPanel({
         setStatus({ kind: "idle" });
         setOps("no_draft");
       } else if (err instanceof OperationRefused && err.code === "changed_elsewhere") {
-        // A rename is not given up: it is made again on the newer version once the page has it.
-        const [only] = operations;
-        if (operations.length === 1 && only.op === "rename_step" && !pendingRename.current) {
-          pendingRename.current = { stepId: only.step_id, name: only.name };
-        }
+        // What was typed (a name, a description) is not given up: it is made
+        // again on the newer version once the page has it.
+        const kept = keptPanelEdit(operations);
+        if (kept && !pendingEdit.current) pendingEdit.current = kept;
         waitingForVersion.current = true;
         setChangedElsewhere(true);
         setStatus({ kind: "idle" });
@@ -411,11 +426,12 @@ export function BpmnDiagramPanel({
         setStatus({ kind: "error", message: refusalMessage(err) });
       }
       await revert();
+      return false;
     } finally {
       busy.current = false;
       setWorking(false);
       modelerRef.current?.refreshOps();
-      flushRename();
+      flushPending();
     }
   }
 
@@ -470,7 +486,8 @@ export function BpmnDiagramPanel({
     run: typeof run;
     revert: typeof revert;
     sendLayout: typeof sendLayout;
-    flushRename: () => void;
+    flushPending: () => void;
+    stepTypeOf: (stepId: string) => StepType | null;
   } | null>(null);
   const stableOps = useMemo<BpmnEditorOps>(
     () => ({
@@ -478,6 +495,7 @@ export function BpmnDiagramPanel({
       onOperation: (list) => void latest.current?.run("ops", list),
       onRevert: () => void latest.current?.revert(),
       onLayout: (change) => latest.current?.sendLayout(change),
+      stepType: (stepId) => latest.current?.stepTypeOf(stepId) ?? null,
     }),
     [],
   );
@@ -491,20 +509,10 @@ export function BpmnDiagramPanel({
   // The element's step, as the mapping names it: only a step's name can be edited here.
   const editableStep = !readOnly && selectedId && fitting ? stepIdOf(selectedId, fitting, steps) : null;
 
-  // A new element in the name field; the same one keeps what is typed.
+  // A newly picked element opens its properties.
   useEffect(() => {
-    setEditName(selection?.name ?? "");
     setPropsClosed(false);
-    // Only a different element replaces the field's text.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
-
-  // The canvas was put back to a server diagram: the field takes its name from it.
-  useEffect(() => {
-    if (!nameFromCanvas.current) return;
-    nameFromCanvas.current = false;
-    if (!pendingRename.current) setEditName(selection?.name ?? "");
-  }, [selection]);
 
   const stepId = step?.id ?? null;
   const onSelectedStep = useRef(onSelectedStepChange);
@@ -520,7 +528,7 @@ export function BpmnDiagramPanel({
    */
   function propsCover() {
     const width = canvasRef.current?.clientWidth ?? 0;
-    return width >= PROPS_WIDE ? { right: 312 } : { top: 216 };
+    return width >= PROPS_WIDE ? { right: 312 } : { top: 300 };
   }
 
   useEffect(() => {
@@ -536,43 +544,74 @@ export function BpmnDiagramPanel({
   }
 
   /**
-   * Sends the name typed in the field, once nothing else is on its way. While
-   * the canvas cannot take it (an edit is answered, the page has not read the
-   * version a refusal named yet) it is kept, and sent when it can be: on the
-   * newer version, where its step is still there.
+   * The step panel's values for `step` as the server has it now: its
+   * description as the canvas draws it.
    */
-  function flushRename() {
-    const pending = pendingRename.current;
+  function savedFields(step: BlueprintStep) {
+    const drawn = modelerRef.current?.documentationOf(stepIdToBpmnId(step.id));
+    return panelFields({ ...step, description: descriptionOf(step, drawn) }, needsAttentionRef.current);
+  }
+
+  /** The type a step has now, for the type menu: as the panel shows it. */
+  function stepTypeOf(stepId: string): StepType | null {
+    const step = stepsRef.current.find((s) => s.id === stepId);
+    return step ? savedFields(step).type : null;
+  }
+
+  /**
+   * Sends what was typed for a step and kept, once nothing else is on its
+   * way. While the canvas cannot take it (an edit is answered, the page has
+   * not read the version a refusal named yet) it is kept, and sent when it can
+   * be: on the newer version, where its step is still there.
+   */
+  function flushPending() {
+    const pending = pendingEdit.current;
     if (!pending || busy.current || reverting.current || typing.current || waitingForVersion.current) return;
-    const ctx = opsContext();
-    if (!ctx) return;
-    pendingRename.current = null;
-    const step = ctx.steps.find((s) => s.id === pending.stepId);
+    if (!opsContext()) return;
+    pendingEdit.current = null;
+    const step = stepsRef.current.find((s) => s.id === pending.stepId);
     if (!step) {
-      // Removed meanwhile, elsewhere: the name has nowhere to go, and the user hears so.
-      setStatus({ kind: "error", message: fillTemplate(t.bpmnRenameStepGone, { name: pending.name.trim() }) });
+      // Removed meanwhile, elsewhere: what was typed has nowhere to go, and the user hears so.
+      setStatus({
+        kind: "error",
+        message:
+          pending.name !== undefined
+            ? fillTemplate(t.bpmnRenameStepGone, { name: pending.name.trim() })
+            : t.bpmnEditStepGone,
+      });
       return;
     }
-    const name = pending.name.trim();
-    if (!name || name === step.name) return;
-    void run("ops", [{ op: "rename_step", step_id: step.id, name }]);
+    const before = savedFields(step);
+    const ops = panelOps(before, {
+      ...before,
+      name: pending.name ?? before.name,
+      description: pending.description ?? before.description,
+    });
+    if (ops.length) stableOps.onOperation(ops);
+  }
+
+  /**
+   * The step panel saved: what changed against the step as the server has
+   * it, as one edit through the same gate as the canvas's (`run`). Typed text
+   * that cannot go now is kept and sent later (flushPending). True once the
+   * edit is made, or when there was nothing to change.
+   */
+  async function savePanel(after: PanelValues): Promise<boolean> {
+    const step = stepsRef.current.find((s) => s.id === after.stepId);
+    if (!step || editableStep !== after.stepId) return false;
+    const ops = panelOps(savedFields(step), after);
+    if (!ops.length) return true;
+    if (busy.current || typing.current || reverting.current || waitingForVersion.current) {
+      const kept = keptPanelEdit(ops);
+      if (kept) pendingEdit.current = kept;
+      return false;
+    }
+    return run("ops", ops);
   }
 
   useEffect(() => {
-    latest.current = { opsContext, run, revert, sendLayout, flushRename };
+    latest.current = { opsContext, run, revert, sendLayout, flushPending, stepTypeOf };
   });
-
-  // A name typed in the field is sent once the typing stops.
-  useEffect(() => {
-    if (!pendingRename.current) return;
-    const timer = window.setTimeout(() => latest.current?.flushRename(), RENAME_SAVE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [editName]);
-
-  function applyNameChange(next: string) {
-    setEditName(next);
-    if (editableStep) pendingRename.current = { stepId: editableStep, name: next };
-  }
 
   /** "Lopeta muokkaus": the canvas is read-only again, as it opened. */
   function lock() {
@@ -634,7 +673,12 @@ export function BpmnDiagramPanel({
   if (seenUpdate !== update) {
     setSeenUpdate(update);
     if (update && (status.kind === "saved" || status.kind === "undone")) setStatus({ kind: "idle" });
+    // What the last edit here left for the wizard may be done in that version.
+    if (update) setNeedsAttentionState([]);
   }
+  useEffect(() => {
+    needsAttentionRef.current = needsAttention;
+  }, [needsAttention]);
 
   const opsOn = ops === "on" && !locked;
 
@@ -658,6 +702,12 @@ export function BpmnDiagramPanel({
             addTask: t.bpmnPaletteAddTask,
             connect: t.bpmnPaletteConnect,
             rename: t.bpmnPadRename,
+            changeType: t.bpmnPadChangeType,
+            stepTypes: {
+              user_task: typeLabel.io,
+              automated_task: typeLabel.ai,
+              human_review: typeLabel.human_review,
+            },
             remove: t.bpmnPadDelete,
             append: t.bpmnPadAppend,
             moveEarlier: t.bpmnPadMoveEarlier,
@@ -727,31 +777,31 @@ export function BpmnDiagramPanel({
                   typeName(selection.type)
                 )}
               </h4>
-              <button
-                type="button"
-                className="icon-btn h-7 w-7"
-                onClick={() => setPropsClosed(true)}
-                aria-label={t.wsBpmnPropertiesClose}
-                title={t.wsBpmnPropertiesClose}
-              >
-                <Icon name="x" size={14} />
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {step && <AskStepButton step={step} index={stepIndex} t={t} withLabel testId="bpmn-ask-step" />}
+                <button
+                  type="button"
+                  className="icon-btn h-7 w-7"
+                  onClick={() => setPropsClosed(true)}
+                  aria-label={t.wsBpmnPropertiesClose}
+                  title={t.wsBpmnPropertiesClose}
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              </div>
             </div>
-            {editableStep ? (
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-text-muted">{t.wsBpmnPropertiesName}</span>
-                <input
-                  type="text"
-                  className="input-field w-full text-sm"
-                  value={editName}
-                  onChange={(e) => applyNameChange(e.target.value)}
-                  onBlur={() => flushRename()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") flushRename();
-                  }}
-                  data-testid="bpmn-property-name"
-                />
-              </label>
+            {step ? (
+              // A step: its fields, read-only while the canvas is, or while an edit is on its way.
+              <BpmnStepPanel
+                key={step.id}
+                fields={panelFields(
+                  { ...step, description: descriptionOf(step, selection.documentation) },
+                  needsAttention,
+                )}
+                disabled={!editableStep || working || labelEditing}
+                onSave={savePanel}
+                t={t}
+              />
             ) : (
               <p className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-text-muted">{t.wsBpmnPropertiesName}</span>
@@ -763,19 +813,10 @@ export function BpmnDiagramPanel({
                 </span>
               </p>
             )}
-            {opsOn && !editableStep && fitting && (
+            {opsOn && !step && fitting && (
               <p className="mt-2 text-xs text-text-muted" data-testid="bpmn-derived-note">
                 {t.bpmnDerivedElement}
               </p>
-            )}
-            {step && (
-              <div className="mt-2.5 flex items-center justify-between gap-2">
-                <span className="text-xs text-text-muted">
-                  <span className="sr-only">{t.wsBpmnPropertiesType}: </span>
-                  <StepTypeTag type={step.type} label={typeLabel[step.type]} />
-                </span>
-                <AskStepButton step={step} index={stepIndex} t={t} withLabel testId="bpmn-ask-step" />
-              </div>
             )}
           </aside>
         )}

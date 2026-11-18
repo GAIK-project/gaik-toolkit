@@ -9,8 +9,12 @@
  * gateways, lanes, data) has no tools and says why when the pointer is on it.
  *
  * - Palette: "Add step" (after the last step) and the connect tool.
- * - A step's context pad: rename, append a step, move earlier and later,
- *   connect and delete. A flow between two steps: delete.
+ * - A step's context pad: rename, change its type, append a step, move
+ *   earlier and later, connect and delete. A flow between two steps: delete.
+ * - "Change type" opens the `gaik-step-type` menu: user task, AI step and
+ *   human review, each a `set_step_type`. bpmn-js's own replace menu stays
+ *   off: a user task and a review both draw as `bpmn:UserTask`, so changing
+ *   the drawn element says nothing of the step's type.
  * - A rename typed in place, a line drawn with the connect tool and the
  *   Delete key are bpmn-js commands: once one has run, it is read here and
  *   sent as its operation (or, when it means nothing for the blueprint, the
@@ -22,7 +26,8 @@
  */
 import type DiagramEventBus from "diagram-js/lib/core/EventBus";
 import RuleProvider from "diagram-js/lib/features/rules/RuleProvider";
-import type { BlueprintOperation } from "@/lib/blueprint-ops";
+import type { BlueprintOperation, StepType } from "@/lib/blueprint-ops";
+import { STEP_OP_TYPES } from "@/lib/step-panel-model";
 import {
   isOperationElement,
   opForAddStep,
@@ -41,6 +46,10 @@ export type BpmnEditorLabels = {
   addTask: string;
   connect: string;
   rename: string;
+  /** A step's context pad, and the title of the menu it opens. */
+  changeType: string;
+  /** The menu's entries, in the words the step list uses. */
+  stepTypes: Record<StepType, string>;
   remove: string;
   append: string;
   moveEarlier: string;
@@ -65,6 +74,8 @@ export type BpmnEditorOps = {
   /** The canvas changed in a way no operation describes: the server's diagram goes back on it. */
   onRevert: () => void;
   onLayout: (layout: BpmnLayoutChange) => void;
+  /** The type a step has now, as the step panel shows it; null when unknown. */
+  stepType: (stepId: string) => StepType | null;
 };
 
 type Config = { labels: BpmnEditorLabels; ops: BpmnEditorOps | null };
@@ -95,6 +106,11 @@ type Entries = Record<string, Entry>;
 
 type Palette = { registerProvider: (priority: number, provider: unknown) => void };
 type ContextPad = { registerProvider: (priority: number, provider: unknown) => void };
+type PopupMenu = {
+  registerProvider: (id: string, provider: unknown) => void;
+  open: (target: Element, providerId: string, position: { x: number; y: number }, options?: unknown) => void;
+  close: () => void;
+};
 type DirectEditing = { activate: (element: Element) => boolean };
 type ElementRegistry = {
   getAll: () => Element[];
@@ -140,6 +156,17 @@ const PENCIL = icon(
 const PLUS = icon('<path d="M5 12h14"/><path d="M12 5v14"/>');
 const ARROW_LEFT = icon('<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>');
 const ARROW_RIGHT = icon('<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>');
+const TYPE_ICONS: Record<StepType, string> = {
+  // arrowRightLeft, brain and userCheck: the step list's icons for the three types.
+  user_task: icon('<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'),
+  automated_task: icon(
+    '<path d="M12 18V5"/><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path d="M18 18a4 4 0 0 0 2-7.464"/><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path d="M6 18a4 4 0 0 1-2-7.464"/><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/>',
+  ),
+  human_review: icon('<path d="m16 11 2 2 4-4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'),
+};
+
+/** The step type menu's id with diagram-js's popup menu. */
+export const STEP_TYPE_MENU = "gaik-step-type";
 
 /** A context pad entry that is shown but does nothing (the first step cannot move earlier). */
 const disabled = (title: string, imageUrl: string): Entry => ({
@@ -184,15 +211,24 @@ class GaikPalette {
   }
 }
 
-/** A step: rename, append, move, connect, delete. A flow between steps: delete. Nothing else. */
+/** A step: rename, change type, append, move, connect, delete. A flow between steps: delete. Nothing else. */
 class GaikContextPad {
-  static $inject = ["contextPad", "directEditing", "config.gaikEditor"];
+  static $inject = ["contextPad", "directEditing", "popupMenu", "elementRegistry", "config.gaikEditor"];
   constructor(
     contextPad: ContextPad,
     private directEditing: DirectEditing,
+    private popupMenu: PopupMenu,
+    private registry: ElementRegistry,
     private config: Config,
   ) {
     contextPad.registerProvider(500, this);
+  }
+
+  /** The type menu, just under the step. */
+  private openTypeMenu(element: Element, event: MouseEvent) {
+    const rect = this.registry.getGraphics(element)?.getBoundingClientRect();
+    const position = rect ? { x: rect.left, y: rect.bottom + 8 } : { x: event.clientX, y: event.clientY };
+    this.popupMenu.open(element, STEP_TYPE_MENU, position, { title: this.config.labels.changeType, width: 240 });
   }
   getContextPadEntries(element: Element) {
     const { labels, ops } = this.config;
@@ -220,6 +256,12 @@ class GaikContextPad {
           imageUrl: PENCIL,
           title: labels.rename,
           action: { click: () => this.directEditing.activate(element) },
+        },
+        [STEP_TYPE_MENU]: {
+          group: "edit",
+          className: "bpmn-icon-screw-wrench",
+          title: labels.changeType,
+          action: { click: (event: MouseEvent) => this.openTypeMenu(element, event) },
         },
       };
       const append = opForAppend(element.id, labels.newStepName, mapping, steps);
@@ -255,6 +297,48 @@ class GaikContextPad {
   getMultiElementContextPadEntries() {
     // One operation at a time: several elements picked together get no tools.
     return (): Entries => ({});
+  }
+}
+
+/**
+ * The `gaik-step-type` menu: the three types a step can have, each sent as
+ * `set_step_type`; the step's own type is shown and does nothing. Only on a
+ * step (`workflow.steps`): what the blueprint draws from elsewhere and the
+ * manual steps get no menu. bpmn-js's replace menu is never opened.
+ */
+class GaikStepTypeMenu {
+  static $inject = ["eventBus", "popupMenu", "config.gaikEditor"];
+  constructor(
+    eventBus: DiagramEventBus,
+    private popupMenu: PopupMenu,
+    private config: Config,
+  ) {
+    popupMenu.registerProvider(STEP_TYPE_MENU, this);
+    eventBus.on("popupMenu.open.allowed", 2000, (e: { providerId?: string }) =>
+      e.providerId === "bpmn-replace" ? false : undefined,
+    );
+  }
+  getPopupMenuEntries(element: Element) {
+    const { labels, ops } = this.config;
+    const ctx = ops?.context();
+    const stepId = ops && ctx && element === owner(element) ? stepIdOf(element.id, ctx.mapping, ctx.steps) : null;
+    if (!ops || !stepId) return {};
+    const current = ops.stepType(stepId);
+    const entries: Entries = {};
+    for (const type of STEP_OP_TYPES) {
+      entries[`gaik-step-type-${type}`] = {
+        label: labels.stepTypes[type],
+        imageUrl: TYPE_ICONS[type],
+        // The step's own type: shown, as the one it has, and no edit.
+        disabled: type === current,
+        className: type === current ? "gaik-step-type-current" : undefined,
+        action: () => {
+          this.popupMenu.close();
+          if (type !== current) ops.onOperation([{ op: "set_step_type", step_id: stepId, type }]);
+        },
+      };
+    }
+    return entries;
   }
 }
 
@@ -451,9 +535,10 @@ class GaikOperations {
 }
 
 export const gaikEditorModule = {
-  __init__: ["gaikPalette", "gaikContextPad", "gaikRules", "gaikOperations"],
+  __init__: ["gaikPalette", "gaikContextPad", "gaikStepTypeMenu", "gaikRules", "gaikOperations"],
   gaikPalette: ["type", GaikPalette],
   gaikContextPad: ["type", GaikContextPad],
+  gaikStepTypeMenu: ["type", GaikStepTypeMenu],
   gaikRules: ["type", GaikRules],
   gaikOperations: ["type", GaikOperations],
 };

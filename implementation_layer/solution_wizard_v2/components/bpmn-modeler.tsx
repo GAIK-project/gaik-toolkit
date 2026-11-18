@@ -41,7 +41,7 @@ type DiagramElement = {
   width?: number;
   height?: number;
   labelTarget?: DiagramElement;
-  businessObject?: { id?: string; name?: string; $type?: string };
+  businessObject?: { id?: string; name?: string; $type?: string; documentation?: { text?: string }[] };
 };
 
 type Selection = {
@@ -73,7 +73,15 @@ export type BpmnSelectionInfo = {
   /** bpmn type without the "bpmn:" prefix ("ServiceTask"). */
   type: string;
   name: string;
+  /** The element's `<bpmn:documentation>`: a step's description, as the generator draws it. */
+  documentation: string;
 } | null;
+
+/** The text of an element's `<bpmn:documentation>`, "" without one. */
+function documentationOf(el: DiagramElement | undefined): string {
+  const docs = el?.businessObject?.documentation;
+  return Array.isArray(docs) ? docs.map((d) => d?.text ?? "").join("\n") : "";
+}
 
 export type BpmnModelerHandle = {
   zoomIn: () => void;
@@ -93,6 +101,8 @@ export type BpmnModelerHandle = {
   refreshOps: () => void;
   /** Open or close the large view (`onToggleFullscreen`): the diagram over the whole screen. */
   toggleFullscreen: () => void;
+  /** The `<bpmn:documentation>` of the element `id` on the canvas (a step's description); null when it is not there. */
+  documentationOf: (id: string) => string | null;
 };
 
 function selectionFromModeler(modeler: BpmnCanvas): BpmnSelectionInfo {
@@ -104,7 +114,7 @@ function selectionFromModeler(modeler: BpmnCanvas): BpmnSelectionInfo {
     const type = bo?.$type || el.type || "";
     const id = bo?.id || el.id;
     if (!isRenamableBpmnElement(type, id)) return null;
-    return { id, type: type.replace(/^bpmn:/, ""), name: bo?.name || "" };
+    return { id, type: type.replace(/^bpmn:/, ""), name: bo?.name || "", documentation: documentationOf(el) };
   } catch {
     return null;
   }
@@ -272,6 +282,16 @@ export const BpmnModeler = forwardRef<
         }
       },
       toggleFullscreen: () => callbacks.current.onToggleFullscreen?.(),
+      documentationOf: (id: string) => {
+        const m = modelerRef.current;
+        if (!m) return null;
+        try {
+          const el = (m.get("elementRegistry") as ElementRegistry).get(id);
+          return el ? documentationOf(el) : null;
+        } catch {
+          return null;
+        }
+      },
       refreshOps: () => {
         const m = modelerRef.current;
         if (!m || readOnlyRef.current) return;
