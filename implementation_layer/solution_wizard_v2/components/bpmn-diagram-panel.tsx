@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { BLUEPRINT_CHANGED_ELSEWHERE, blueprintBaseTag } from "@/lib/blueprint-draft";
+import { blueprintBaseTag } from "@/lib/blueprint-draft";
+import { saveRefusal } from "@/lib/blueprint-ops";
 import {
   BpmnModeler,
   type BpmnEditState,
@@ -48,6 +49,7 @@ export function BpmnDiagramPanel({
   sessionId,
   xml,
   blueprint,
+  baseVersion = null,
   steps,
   pocNoteLabel = null,
   reloading = false,
@@ -77,6 +79,8 @@ export function BpmnDiagramPanel({
   xml: string;
   /** The session's blueprint as the page has it: `xml` is drawn from it. */
   blueprint: Blueprint;
+  /** The session's active version as the page read it: a save by itself is made on it. */
+  baseVersion?: number | null;
   /** The blueprint's steps: their numbers, types and the chat reference. */
   steps: BlueprintStep[];
   /** Shown while saved changes are not in the PoC package yet. */
@@ -105,7 +109,8 @@ export function BpmnDiagramPanel({
   /** The step whose task is selected on the canvas, for the step list. */
   onSelectedStepChange?: (stepId: string | null) => void;
   /** After a save: the blueprint and diagram as the server has them now. */
-  onSynced: (result: { blueprint: Blueprint; xml: string }) => void;
+  /** `version`: the version the save wrote, when the server says. */
+  onSynced: (result: { blueprint: Blueprint; xml: string; version?: number }) => void;
   t: Dict;
 }) {
   const modelerRef = useRef<BpmnModelerHandle>(null);
@@ -146,6 +151,11 @@ export function BpmnDiagramPanel({
   // The blueprint the diagram on the canvas was drawn from: a save that starts
   // by itself names it, and is refused when the server holds a newer one.
   const canvasBlueprint = useRef(blueprint);
+  // Its version: the page's, or the one this canvas's last save wrote.
+  const canvasVersion = useRef(baseVersion);
+  useEffect(() => {
+    canvasVersion.current = baseVersion;
+  }, [baseVersion]);
   const router = useRouter();
   const newerBlueprint = useRef<Blueprint | null>(newerXml.current !== null ? blueprint : null);
   const savedOverNewer = useRef(false);
@@ -160,6 +170,8 @@ export function BpmnDiagramPanel({
   const [editingEnded, setEditingEnded] = useState(0);
   const [zoom, setZoom] = useState<number | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  // The server's own words for a save it refused (lib/safe-error); null: the generic line.
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [lint, setLint] = useState<{ errors: string[]; warnings: string[] }>({ errors: [], warnings: [] });
   const saving = useRef(false);
   const reloadingRef = useRef(reloading);
@@ -351,12 +363,19 @@ export function BpmnDiagramPanel({
         // By itself only over the version the canvas was drawn from; over a
         // newer one only by the user's choice.
         body: JSON.stringify(
-          overNewer ? { xml: body } : { xml: body, base: blueprintBaseTag(canvasBlueprint.current) },
+          overNewer
+            ? { xml: body }
+            : {
+                xml: body,
+                base: blueprintBaseTag(canvasBlueprint.current),
+                ...(typeof canvasVersion.current === "number" ? { base_version: canvasVersion.current } : {}),
+              },
         ),
       });
       const data = (await res.json().catch(() => null)) as {
         blueprint?: Blueprint;
         xml?: string;
+        version?: number;
         lint?: {
           errors?: { rule: string; id: string; message: string }[];
           warnings?: { rule: string; id: string; message: string }[];
@@ -366,16 +385,24 @@ export function BpmnDiagramPanel({
       const lines = (list?: { rule: string; id: string; message: string }[]) =>
         (list ?? []).map((e) => `${e.rule}${e.id ? ` (${e.id})` : ""}: ${e.message}`);
 
-      if (res.status === 409 && (data as { error?: string } | null)?.error === BLUEPRINT_CHANGED_ELSEWHERE) {
+      if (res.status === 422 && data?.error === "bpmn_lint_failed") {
+        setLint({ errors: lines(data.lint?.errors), warnings: lines(data.lint?.warnings) });
+        setSaveState("lint");
+        return;
+      }
+      const refused = saveRefusal(res.status, data);
+      if (refused?.kind === "refused") {
+        // The server's own words (a change only the wizard can make, the
+        // wizard is replying): the canvas keeps the edits.
+        setSaveError(refused.message);
+        setSaveState("error");
+        return;
+      }
+      if (refused?.kind === "changed") {
         // A version written since the canvas was drawn: the page reads it, and
         // the newer diagram comes in as one to choose between.
         setSaveState("idle");
         router.refresh();
-        return;
-      }
-      if (res.status === 422 && data?.error === "bpmn_lint_failed") {
-        setLint({ errors: lines(data.lint?.errors), warnings: lines(data.lint?.warnings) });
-        setSaveState("lint");
         return;
       }
       if (!res.ok || !data?.blueprint || !data.xml) throw new Error("sync failed");
@@ -395,9 +422,10 @@ export function BpmnDiagramPanel({
       } else if (newerXml.current) {
         savedOverNewer.current = true;
       }
-      onSynced({ blueprint: data.blueprint, xml: data.xml });
+      onSynced({ blueprint: data.blueprint, xml: data.xml, version: data.version });
       setDraftPending(false);
       canvasBlueprint.current = data.blueprint;
+      canvasVersion.current = typeof data.version === "number" ? data.version : null;
       // The server's diagram, as the blueprint now generates it: what the
       // canvas stands on from here, also for a draft kept over a tab switch.
       propXml.current = data.xml;
@@ -412,6 +440,7 @@ export function BpmnDiagramPanel({
       }
       setSaveState("saved");
     } catch {
+      setSaveError(null);
       setSaveState("error");
     } finally {
       saving.current = false;
@@ -444,10 +473,18 @@ export function BpmnDiagramPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: theirs, note: "Uudempi versio otettu käyttöön Työnkulku-välilehdellä" }),
         });
-        const data = (await res.json().catch(() => null)) as { blueprint?: Blueprint } | null;
+        const data = (await res.json().catch(() => null)) as { blueprint?: Blueprint; version?: number } | null;
+        const refused = saveRefusal(res.status, data);
+        if (refused?.kind === "refused") {
+          setSaveError(refused.message);
+          setSaveState("error");
+          return;
+        }
         if (!res.ok || !data?.blueprint) throw new Error("save failed");
-        onSynced({ blueprint: data.blueprint, xml: next });
+        if (typeof data.version === "number") canvasVersion.current = data.version;
+        onSynced({ blueprint: data.blueprint, xml: next, version: data.version });
       } catch {
+        setSaveError(null);
         setSaveState("error");
         return;
       } finally {
@@ -505,7 +542,7 @@ export function BpmnDiagramPanel({
   } else if (saveState === "error") {
     status = (
       <span className="inline-flex items-center gap-2 text-danger-text">
-        {t.wsBpmnSaveError}
+        {saveError ?? t.wsBpmnSaveError}
         <button
           type="button"
           className="font-medium underline underline-offset-2"

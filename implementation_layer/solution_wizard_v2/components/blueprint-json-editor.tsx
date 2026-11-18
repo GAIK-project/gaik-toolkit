@@ -4,9 +4,9 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type Reac
 import { useRouter } from "next/navigation";
 import type { Blueprint, BlueprintStep, BlueprintStepType } from "@/lib/mock-sessions";
 import { parseBlueprintJson } from "@/lib/blueprint-parse";
+import { saveRefusal } from "@/lib/blueprint-ops";
 import {
   BLUEPRINT_AUTOSAVE_DELAY_MS,
-  BLUEPRINT_CHANGED_ELSEWHERE,
   BLUEPRINT_KEEPALIVE_MAX_BYTES,
   blueprintBaseTag,
   blueprintDraftProblem,
@@ -103,6 +103,7 @@ function SettingKeyInput({
 export function BlueprintJsonEditor({
   sessionId,
   blueprint,
+  baseVersion = null,
   onSaved,
   onStuckChange,
   pocNoteLabel = null,
@@ -112,7 +113,10 @@ export function BlueprintJsonEditor({
 }: {
   sessionId: string;
   blueprint: Blueprint;
-  onSaved: (blueprint: Blueprint) => void;
+  /** The session's active version as the page read it: a save by itself is made on it. */
+  baseVersion?: number | null;
+  /** After a save: the blueprint as the server has it, and the version the save wrote when it says. */
+  onSaved: (blueprint: Blueprint, version?: number) => void;
   /**
    * Whether the form holds a draft it cannot save by itself: a step or the
    * blueprint has no name, the JSON does not parse, a save failed, or the
@@ -139,6 +143,14 @@ export function BlueprintJsonEditor({
   const parseErrorRef = useRef(parseError);
   parseErrorRef.current = parseError;
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  // The server's own words for a save it refused (lib/safe-error); null: the generic line.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // The version the draft's next save by itself is made on: the page's, or the
+  // one this form's last save wrote.
+  const versionRef = useRef(baseVersion);
+  useEffect(() => {
+    versionRef.current = baseVersion;
+  }, [baseVersion]);
   const [saved, setSaved] = useState(() => savedState(blueprint));
   const savedRef = useRef(saved);
   savedRef.current = saved;
@@ -218,9 +230,15 @@ export function BlueprintJsonEditor({
     onStuck.current?.(stuck);
   }, [stuck]);
 
-  // `base`: the tag of the blueprint the edit was made on (see blueprintBaseTag).
-  function sendBlueprint(payload: Blueprint, signal?: AbortSignal, base?: string) {
-    const body = JSON.stringify({ content: payload, note: "Blueprint päivitetty lomake-editorista", ...(base ? { base } : {}) });
+  // `base`: the tag of the blueprint the edit was made on (see blueprintBaseTag);
+  // `baseVersion`: its version, which wizard_api checks where the save is written.
+  function sendBlueprint(payload: Blueprint, signal?: AbortSignal, base?: string, baseVersion?: number | null) {
+    const body = JSON.stringify({
+      content: payload,
+      note: "Blueprint päivitetty lomake-editorista",
+      ...(base ? { base } : {}),
+      ...(typeof baseVersion === "number" ? { base_version: baseVersion } : {}),
+    });
     return fetch(`/api/sessions/${sessionId}/blueprint`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -258,10 +276,19 @@ export function BlueprintJsonEditor({
         payload,
         controller.signal,
         overNewer ? undefined : blueprintBaseTag(baseRef.current),
+        overNewer ? undefined : versionRef.current,
       );
-      if (res.status === 409) {
-        const refused = (await res.json().catch(() => null)) as { error?: string } | null;
-        if (refused?.error === BLUEPRINT_CHANGED_ELSEWHERE) {
+      if (res.status === 409 || res.status === 422) {
+        const refused = saveRefusal(res.status, await res.json().catch(() => null));
+        if (refused?.kind === "refused") {
+          // The server's own words (the wizard is replying, a change only the
+          // wizard can make): the draft is kept, and retried by the user.
+          failedKey.current = key;
+          setSaveError(refused.message);
+          setSaveState("error");
+          return;
+        }
+        if (refused?.kind === "changed") {
           // The agent (or another tab) wrote a version since: the page reads it,
           // and the form asks which one stays, as when it arrives by itself.
           // This draft is not sent again by itself meanwhile.
@@ -272,8 +299,10 @@ export function BlueprintJsonEditor({
         }
       }
       if (!res.ok) throw new Error("save failed");
-      const data = (await res.json()) as { blueprint: Blueprint };
+      const data = (await res.json()) as { blueprint: Blueprint; version?: number };
       failedKey.current = null;
+      setSaveError(null);
+      if (typeof data.version === "number") versionRef.current = data.version;
       // Only the user's choice ("keep mine") settles a newer version. One
       // that arrived while this save was on its way is still to be chosen
       // between: the save was not sent over it knowingly.
@@ -290,9 +319,10 @@ export function BlueprintJsonEditor({
       setSaved(next);
       baseRef.current = data.blueprint;
       setSaveState("idle");
-      onSaved(data.blueprint);
+      onSaved(data.blueprint, data.version);
     } catch {
       failedKey.current = key;
+      setSaveError(null);
       setSaveState("error");
     } finally {
       saving.current = false;
@@ -719,7 +749,7 @@ export function BlueprintJsonEditor({
       state: "error",
       body: (
         <span className="inline-flex items-center gap-2 text-danger-text">
-          {t.wsJsonSaveError}
+          {saveError ?? t.wsJsonSaveError}
           <button
             type="button"
             className="font-medium underline underline-offset-2"

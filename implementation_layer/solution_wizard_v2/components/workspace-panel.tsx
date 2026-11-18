@@ -333,9 +333,11 @@ function WorkflowFlowTab({
   sessionId,
   wizardStep,
   blueprint,
+  blueprintVersion,
   blueprintUpdate,
   bpmnRefreshKey,
   onBlueprintChange,
+  onVersionChange,
   pocNoteLabel,
   onSaved,
   t,
@@ -345,10 +347,14 @@ function WorkflowFlowTab({
   sessionTitle: string;
   wizardStep: number;
   blueprint: Blueprint;
+  /** The session's active version as the page read it: the diagrams' saves are made on it. */
+  blueprintVersion: number | null;
   /** `blueprint` is one the page brought (the wizard wrote it in the chat), not a save made in this panel. */
   blueprintUpdate: BlueprintUpdate | null;
   bpmnRefreshKey: number;
   onBlueprintChange: (blueprint: Blueprint) => void;
+  /** A save here wrote this version. */
+  onVersionChange: (version: number | undefined) => void;
   pocNoteLabel: ReactNode;
   onSaved: (via: "save" | "undo") => void;
   t: Dict;
@@ -616,6 +622,7 @@ function WorkflowFlowTab({
               <WorkflowFlowView
                 sessionId={sessionId}
                 blueprint={blueprint}
+                baseVersion={blueprintVersion}
                 bpmnXml={bpmnXml}
                 locked={locked}
                 onUnlock={() => setFlowUnlocked(true)}
@@ -625,8 +632,9 @@ function WorkflowFlowTab({
                 selectedStepId={selectedStepId}
                 onSelectedStepChange={setSelectedStepId}
                 fullView={fullView}
-                onSaved={(saved, via) => {
+                onSaved={(saved, via, version) => {
                   onBlueprintChange(saved);
+                  onVersionChange(version);
                   onSaved(via);
                   // The BPMN is generated again from the saved blueprint.
                   setRetry((n) => n + 1);
@@ -651,6 +659,7 @@ function WorkflowFlowTab({
               sessionId={sessionId}
               xml={bpmnXml}
               blueprint={blueprint}
+              baseVersion={blueprintVersion}
               steps={blueprint.steps}
               pocNoteLabel={pocNoteLabel}
               // Fetching again with a diagram on the canvas: the blueprint changed elsewhere.
@@ -668,8 +677,9 @@ function WorkflowFlowTab({
                 setShowData(show);
               }}
               // Other tabs get a change once it is saved, never while it is being typed.
-              onSynced={({ blueprint: synced }) => {
+              onSynced={({ blueprint: synced, version }) => {
                 onBlueprintChange(synced);
+                onVersionChange(version);
                 onSaved("save");
               }}
               t={t}
@@ -897,6 +907,18 @@ export function WorkspacePanel({
   function takeOwnBlueprint(saved: Blueprint) {
     setBlueprint(saved);
     setBlueprintUpdate(null);
+  }
+  // The version the form's and the diagrams' saves are made on: the page's, or
+  // the one a save made here wrote since (the page is not read again after
+  // one). Unknown after a save that did not say: a save then names none.
+  const [activeVersion, setActiveVersion] = useState(() => knownVersion(blueprintVersion));
+  const [pageVersion, setPageVersion] = useState(blueprintVersion);
+  if (pageVersion !== blueprintVersion) {
+    setPageVersion(blueprintVersion);
+    setActiveVersion(knownVersion(blueprintVersion));
+  }
+  function takeOwnVersion(version: number | undefined) {
+    setActiveVersion(knownVersion(version));
   }
   useEffect(() => {
     // Every reading of the session by the page comes through here: its
@@ -3140,9 +3162,11 @@ export function WorkspacePanel({
                   sessionTitle={sessionTitle}
                   wizardStep={wizardStep}
                   blueprint={blueprint}
+                  blueprintVersion={activeVersion}
                   blueprintUpdate={blueprintUpdate}
                   bpmnRefreshKey={bpmnRefreshKey}
                   onBlueprintChange={takeOwnBlueprint}
+                  onVersionChange={takeOwnVersion}
                   pocNoteLabel={pocNote}
                   onSaved={noteBlueprintSaved}
                   t={t}
@@ -3190,8 +3214,10 @@ export function WorkspacePanel({
                         }
                         sessionId={sessionId}
                         blueprint={blueprint}
-                        onSaved={(saved) => {
+                        baseVersion={activeVersion}
+                        onSaved={(saved, version) => {
                           takeOwnBlueprint(saved);
+                          takeOwnVersion(version);
                           setBpmnRefreshKey((k) => k + 1);
                           noteBlueprintSaved("save");
                         }}

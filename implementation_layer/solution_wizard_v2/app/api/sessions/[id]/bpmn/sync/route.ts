@@ -7,7 +7,8 @@ import { BPMN_XML_MAX_BYTES, BpmnLintBusyError, lintBpmnXml } from "@/lib/bpmn-l
 import { requireOwnedSession } from "@/lib/session-access";
 import { declaredLengthProblem } from "@/lib/upload-limits";
 import { saveBlueprintAfterBpmnSync } from "@/lib/sessions";
-import { wizardApiEnabled } from "@/lib/wizard-api-client";
+import { WizardApiError, wizardApiEnabled } from "@/lib/wizard-api-client";
+import { relayErrorBody } from "@/lib/safe-error";
 import { withLogging } from "@/lib/with-logging";
 import { audit } from "@/lib/audit";
 import { logger } from "@/lib/logger";
@@ -55,7 +56,7 @@ export const POST = withLogging(
       });
     }
 
-    let body: { xml?: string; force?: boolean; base?: unknown };
+    let body: { xml?: string; force?: boolean; base?: unknown; base_version?: unknown };
     try {
       body = await req.json();
     } catch {
@@ -67,7 +68,12 @@ export const POST = withLogging(
     // A save that started by itself names the blueprint the canvas was drawn
     // from: merged into a newer one the agent wrote, the canvas would drop the
     // steps it never showed.
-    if (baseIsStale(body.base, owned.session.blueprint)) {
+    // `base_version` is the version it was drawn from; wizard_api's /bpmn/sync
+    // takes none, so it is checked here only.
+    if (
+      baseIsStale(body.base, owned.session.blueprint) ||
+      (typeof body.base_version === "number" && body.base_version !== owned.session.activeVersion)
+    ) {
       return Response.json({ error: BLUEPRINT_CHANGED_ELSEWHERE }, { status: 409 });
     }
     if (Buffer.byteLength(body.xml, "utf8") > BPMN_XML_MAX_BYTES) {
@@ -125,8 +131,10 @@ export const POST = withLogging(
       // wizard_api's /bpmn/sync stores the version itself; saving again here
       // wrote a second, identical one on every diagram save. Only the mock
       // sync leaves the save to us.
+      // The version the save wrote: the base of the canvas's next save.
+      let activeVersion = result.version;
       if (!wizardApiEnabled()) {
-        await saveBlueprintAfterBpmnSync(id, result.blueprint);
+        activeVersion = (await saveBlueprintAfterBpmnSync(id, result.blueprint))?.activeVersion;
       }
       audit("bpmn.sync", {
         actor: owned.user.email,
@@ -137,8 +145,20 @@ export const POST = withLogging(
         blueprint: result.blueprint,
         xml: result.xml,
         lint,
+        ...(typeof activeVersion === "number" ? { version: activeVersion } : {}),
       });
     } catch (err) {
+      // wizard_api refused the canvas (unsupported_edit, agent_busy,
+      // changed_elsewhere): its own words, as lib/safe-error lets them through.
+      if (err instanceof WizardApiError && (err.status === 409 || err.status === 422)) {
+        audit("bpmn.sync", {
+          actor: owned.user.email,
+          resource: { type: "session", id },
+          outcome: "denied",
+          reason: err.code,
+        });
+        return relayErrorBody(err.status, err.body);
+      }
       logger.error({ traceId: getTraceId(), err, sessionId: id }, "bpmn.sync failed");
       audit("bpmn.sync", {
         actor: owned.user.email,

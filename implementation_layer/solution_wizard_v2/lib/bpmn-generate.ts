@@ -27,7 +27,7 @@ export async function syncSessionBpmn(
   blueprint: Blueprint,
   xml: string,
   { dataObjects = true }: BpmnDrawOptions = {},
-): Promise<{ blueprint: Blueprint; xml: string }> {
+): Promise<{ blueprint: Blueprint; xml: string; version?: number }> {
   if (wizardApiEnabled()) {
     const detail = await apiSyncSessionBpmn(sessionId, xml);
     const synced: Blueprint = {
@@ -38,7 +38,7 @@ export async function syncSessionBpmn(
       })),
     };
     const regenerated = await apiGetSessionBpmn(sessionId, { dataObjects });
-    return { blueprint: synced, xml: regenerated };
+    return { blueprint: synced, xml: regenerated, version: detail.active_version };
   }
 
   const synced = await syncBlueprintFromBpmnXml(blueprint, xml);
