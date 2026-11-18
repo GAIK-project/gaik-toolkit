@@ -833,3 +833,54 @@ def test_the_summary_names_the_embedding_model_and_why_a_case_was_skipped():
     text = rc.render_summary(summary)
     assert "| azure | m | - | text-embedding-3-small |  |" in text
     assert "## Skipped\n\n- anthropic / rag-invoice-total: no embeddings API" in text
+
+
+def test_a_typographic_dash_passes_with_a_warning():
+    warnings: list[str] = []
+    problems = rc.check_contains(["INV-2026-0042"], "Lasku INV\u20132026\u20130042", "md", warnings)
+    assert problems == []
+    assert warnings == ["md writes 'INV-2026-0042' with a typographic dash"]
+    exact: list[str] = []
+    assert rc.check_contains(["INV-2026-0042"], "INV-2026-0042", "md", exact) == []
+    assert exact == []
+    assert rc.check_contains(["INV-2026-0042"], "INV-2026-0043", "md", []) != []
+
+
+def test_the_summary_shows_extra_attempts_and_warnings():
+    summary = {
+        "started": "now",
+        "gaik_version": "x",
+        "gaik_from": "here",
+        "git_commit": "abc",
+        "git_dirty": False,
+        "judge": None,
+        "case_ids": ["s", "p"],
+        "providers": {
+            "azure": {
+                "model": "m",
+                "cases": {
+                    "s": {
+                        "status": "pass",
+                        "attempts": 2,
+                        "earlier_attempts": [
+                            {"status": "fail", "problems": ["fields: no field 'x'"]}
+                        ],
+                    },
+                    "p": {
+                        "status": "pass",
+                        "warnings": ["md writes 'A-1' with a typographic dash"],
+                    },
+                },
+            }
+        },
+    }
+    text = rc.render_summary(summary)
+    assert "| s | pass (attempt 2) |" in text
+    assert "| p | pass (warning) |" in text
+    assert "## Needed another attempt" in text and "attempt 1 fail: fields: no field 'x'" in text
+    assert "## Warnings" in text and "azure / p: md writes 'A-1'" in text
+
+
+def test_attempts_default_to_one():
+    assert rc.parse_args([]).attempts == 1
+    assert rc.parse_args(["--attempts", "2"]).attempts == 2

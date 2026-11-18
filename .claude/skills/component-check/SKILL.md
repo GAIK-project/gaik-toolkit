@@ -72,6 +72,11 @@ chunks the retriever returned: a citation that names no retrieved chunk is a fai
      since it started; its unfinished cases are errors and the summary is still written.
    - `--public` keeps only error types and status codes, no provider error text: for a run
      whose results are published, such as the live-smoke workflow.
+   - `--attempts 2` runs a case that failed or errored once more, as the demo's `api/smoke.py`
+     does. The summary marks the cell `(attempt 2)` and lists the first attempt's problems
+     under "Needed another attempt", so a flaky case stays visible (open issue #94: the
+     schema generator now and then keeps only the first field). The live-smoke workflow and
+     the release job use 2; a case that fails twice still fails the run.
    - `--judge claude|codex|agy` (below).
 4. Read `<out>/summary.md` and report from it.
 
@@ -123,6 +128,10 @@ The judge is advice. A `judge fail` on a case the fixed checks pass is a finding
 you have read the output and agree; say which.
 
 ## Read the result
+
+A cell marked `(warning)` passed with a note under "Warnings": the vision parser's markdown
+held a value only once its typographic dashes were read as hyphens (`INV–2026–0042` for
+`INV-2026-0042`). That is a fidelity defect of the model's copy, reported, not failed.
 
 `summary.md` has one row per case and a column per provider (`pass`, `fail`, `error`, `skip`,
 and the judge's verdict), then every failure with its problems and every skip with its reason.

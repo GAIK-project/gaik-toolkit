@@ -117,7 +117,7 @@ jobs:
         status=0
         # --public keeps no provider error text: the summary below is published.
         python .claude/skills/component-check/run_checks.py \
-          --providers "$PROVIDERS" --require-all --public --provider-timeout 600 \
+          --providers "$PROVIDERS" --require-all --public --provider-timeout 600 --attempts 2 \
           --out "$RUN_DIR" || status=1
         if [ -f "$RUN_DIR/summary.md" ]; then
           cat "$RUN_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"

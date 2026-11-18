@@ -349,7 +349,7 @@ jobs:
         set -uo pipefail
         status=0
         uv run python .claude/skills/component-check/run_checks.py \
-          --providers azure --require-all --public --provider-timeout 600 \
+          --providers azure --require-all --public --provider-timeout 600 --attempts 2 \
           --out "$RUN_DIR" || status=1
         if [ -f "$RUN_DIR/summary.md" ]; then
           cat "$RUN_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"

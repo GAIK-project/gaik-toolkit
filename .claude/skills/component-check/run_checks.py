@@ -359,7 +359,9 @@ def _plain_text(value: str) -> str:
     return _text(value).translate(_DASHES)
 
 
-def check_contains(wanted: list, text: str, where: str) -> list[str]:
+def check_contains(
+    wanted: list, text: str, where: str, warnings: list[str] | None = None
+) -> list[str]:
     """Each wanted string, or one of a list of alternatives, is in ``text``.
 
     Both sides are compared after normalising case and spaces, as compare_value does, and
@@ -368,11 +370,15 @@ def check_contains(wanted: list, text: str, where: str) -> list[str]:
     or digit still fails.
     """
     have = _plain_text(text or "")
+    exact = _text(text or "")
     problems = []
     for item in wanted:
         options = [item] if isinstance(item, str) else list(item)
         if not any(_plain_text(option) in have for option in options):
             problems.append(f"{where} has no {' or '.join(repr(o) for o in options)}")
+        elif warnings is not None and not any(_text(option) in exact for option in options):
+            # Found only with the dashes folded: the value is not copied exactly.
+            warnings.append(f"{where} writes {options[0]!r} with a typographic dash")
     return problems
 
 
@@ -473,9 +479,11 @@ def check_tabular(expect: dict, output: dict) -> list[str]:
     return problems
 
 
-def check_markdown(expect: dict, output: dict) -> list[str]:
+def check_markdown(expect: dict, output: dict, warnings: list[str] | None = None) -> list[str]:
     """Problems with a parser's markdown: the strings it must hold."""
-    return check_contains(expect.get("contains", []), output.get("markdown") or "", "the markdown")
+    return check_contains(
+        expect.get("contains", []), output.get("markdown") or "", "the markdown", warnings
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -824,9 +832,8 @@ def run_provider(
     schemas: dict[str, dict] = {}
     reuse = args.reuse_schemas / provider if args.reuse_schemas else None
 
-    for case in cases:
-        case_dir = out_dir / case["id"]
-        started = time.monotonic()
+    def attempt(case: dict, case_dir: Path) -> dict:
+        """One run of a case: its entry, with status pass, fail, error or skip."""
         entry: dict[str, Any] = {"component": case["component"], "title": case.get("title", "")}
         try:
             if case["component"] == "schema_generator":
@@ -846,10 +853,7 @@ def run_provider(
                     reason = rag_skip_reason(provider, config, embedding_model)
                     if reason:
                         entry.update(status="skip", reason=reason)
-                        _write_json(case_dir / "checks.json", entry)
-                        results[case["id"]] = entry
-                        say(f"[{provider}] {case['id']}: skip ({reason})")
-                        continue
+                        return entry
                     data, usage = _run_rag(case, config, embedding_model)
                     entry["problems"] = check_rag(case.get("expect", {}), data)
                 elif case["component"] == "tabular_agent":
@@ -857,7 +861,10 @@ def run_provider(
                     entry["problems"] = check_tabular(case.get("expect", {}), data)
                 else:
                     data, usage = _run_vision_parser(case, vision_config)
-                    entry["problems"] = check_markdown(case.get("expect", {}), data)
+                    warnings: list[str] = []
+                    entry["problems"] = check_markdown(case.get("expect", {}), data, warnings)
+                    if warnings:
+                        entry["warnings"] = warnings
                 _write_json(case_dir / "result.json", data)
                 entry["output"] = data
                 entry["usage"] = usage
@@ -865,14 +872,10 @@ def run_provider(
                 parent = schemas.get(case.get("schema_from", ""))
                 if parent is None:
                     entry.update(status="skip", reason=f"no schema from {case.get('schema_from')}")
-                    results[case["id"]] = entry
-                    say(f"[{provider}] {case['id']}: skip ({entry['reason']})")
-                    continue
+                    return entry
                 if parent.get("failed") and not args.keep_going:
                     entry.update(status="skip", reason=f"{case['schema_from']} failed its checks")
-                    results[case["id"]] = entry
-                    say(f"[{provider}] {case['id']}: skip ({entry['reason']})")
-                    continue
+                    return entry
                 if case["component"] == "extractor":
                     data, usage = _run_extractor(case, config, parent)
                 else:
@@ -882,11 +885,35 @@ def run_provider(
                 entry["usage"] = usage
                 entry["problems"] = check_extraction(case.get("expect", {}), data)
             entry["status"] = "fail" if entry["problems"] else "pass"
-            if case["component"] == "schema_generator" and entry["problems"]:
-                schemas[case["id"]]["failed"] = True
+            if case["component"] == "schema_generator":
+                schemas[case["id"]]["failed"] = bool(entry["problems"])
         except Exception as exc:
             entry.update(status="error", **_error(exc, secrets, public=args.public))
+        return entry
+
+    for case in cases:
+        case_dir = out_dir / case["id"]
+        started = time.monotonic()
+        earlier: list[dict] = []
+        tries = max(1, args.attempts)
+        for number in range(1, tries + 1):
+            entry = attempt(case, case_dir)
+            if entry["status"] not in ("fail", "error") or number == tries:
+                break
+            # Kept in the report, so a case that needed another attempt stays visible.
+            earlier.append(
+                {k: entry[k] for k in ("status", "problems", "error_type", "message") if k in entry}
+            )
+            say(f"[{provider}] {case['id']}: {entry['status']} on attempt {number}, trying again")
+        if earlier:
+            entry["attempts"] = len(earlier) + 1
+            entry["earlier_attempts"] = earlier
         entry["elapsed_s"] = round(time.monotonic() - started, 2)
+        if entry["status"] == "skip":
+            _write_json(case_dir / "checks.json", entry)
+            results[case["id"]] = entry
+            say(f"[{provider}] {case['id']}: skip ({entry['reason']})")
+            continue
 
         if args.judge and entry["status"] in ("pass", "fail"):
             entry["judge"] = judge_case(case, entry, args)
@@ -1396,6 +1423,10 @@ def render_summary(summary: dict) -> str:
         for provider in providers:
             entry = summary["providers"][provider]["cases"].get(case_id, {})
             cell = entry.get("status", "-")
+            if entry.get("attempts"):
+                cell += f" (attempt {entry['attempts']})"
+            if entry.get("warnings"):
+                cell += " (warning)"
             if entry.get("judge"):
                 cell += f" / judge {entry['judge'].get('verdict')}"
             cells.append(cell)
@@ -1415,6 +1446,27 @@ def render_summary(summary: dict) -> str:
                     details.append(f"- judge error: {judge.get('error', '')[:300]}")
     if details:
         lines += ["", "## Failures"] + details
+    retried = []
+    for provider in providers:
+        for case_id, entry in summary["providers"][provider]["cases"].items():
+            for number, earlier in enumerate(entry.get("earlier_attempts", []), 1):
+                reasons = earlier.get("problems") or [
+                    f"{earlier.get('error_type')}: {earlier.get('message', '')[:200]}"
+                ]
+                retried.append(
+                    f"- {provider} / {case_id}, attempt {number} {earlier['status']}: "
+                    + "; ".join(reasons)[:400]
+                )
+    if retried:
+        lines += ["", "## Needed another attempt", ""] + retried
+    warned = [
+        f"- {provider} / {case_id}: {warning}"
+        for provider in providers
+        for case_id, entry in summary["providers"][provider]["cases"].items()
+        for warning in entry.get("warnings", [])
+    ]
+    if warned:
+        lines += ["", "## Warnings", ""] + warned
     # The provider table already says which providers were not configured.
     skipped = [
         f"- {provider} / {case_id}: {entry.get('reason', '')}"
@@ -1495,6 +1547,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--reuse-schemas",
         type=Path,
         help="Use the schemas an earlier run folder generated, per provider",
+    )
+    parser.add_argument(
+        "--attempts",
+        type=int,
+        default=1,
+        help="Runs of a case that fails or errors, at most; the summary shows each extra one",
     )
     parser.add_argument(
         "--public",
