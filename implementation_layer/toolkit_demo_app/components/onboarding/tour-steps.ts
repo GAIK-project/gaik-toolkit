@@ -2,8 +2,8 @@ import type { DriveStep } from "driver.js";
 
 /**
  * Guided tour stops on the home page. Each `element` selector points at a
- * `data-tour` anchor rendered by the hero (hero.tsx) and the demo grid
- * (demo-cards.tsx).
+ * `data-tour` anchor rendered by the hero (hero.tsx), the demo grid
+ * (demo-cards.tsx) and the closing section (get-started.tsx).
  */
 export const TOUR_STEPS: DriveStep[] = [
   {
@@ -42,7 +42,7 @@ export const TOUR_STEPS: DriveStep[] = [
       title: "Solution Configuration Wizard",
       description:
         "Describe a use case in plain language and the Wizard designs a validated proof of concept. It's in private beta — open the link to request access.",
-      side: "bottom",
+      side: "top",
       align: "start",
     },
   },
