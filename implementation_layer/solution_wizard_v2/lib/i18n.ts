@@ -177,6 +177,8 @@ export type Dict = {
   /** The diagram at the size of the window, and back. */
   flowFullView: string;
   flowFullViewExit: string;
+  /** The minimap over the BPMN canvas, for a screen reader. */
+  bpmnMinimap: string;
   bpmnPaletteAddTask: string;
   bpmnPaletteConnect: string;
   bpmnPadRename: string;
@@ -972,6 +974,7 @@ const fi: Dict = {
   bpmnFitView: "Sovita näkymään",
   flowFullView: "Suurenna kaavio",
   flowFullViewExit: "Pienennä kaavio",
+  bpmnMinimap: "Kaavion pienoiskartta",
   bpmnPaletteAddTask: "Lisää tehtävä: pudota se nuolen päälle, niin se liitetään prosessiin",
   bpmnPaletteConnect: "Yhdistä vaiheet: vedä vaiheesta toiseen",
   bpmnPadRename: "Nimeä uudelleen",
@@ -1796,6 +1799,7 @@ const en: Dict = {
   bpmnFitView: "Fit to view",
   flowFullView: "Enlarge the diagram",
   flowFullViewExit: "Shrink the diagram",
+  bpmnMinimap: "Diagram minimap",
   bpmnPaletteAddTask: "Add a task: drop it on an arrow to put it into the process",
   bpmnPaletteConnect: "Connect steps: drag from one step to another",
   bpmnPadRename: "Rename",

@@ -116,11 +116,12 @@ test.describe("Workflow tab", () => {
     await openFlow(page);
     await waitForDiagram(page);
 
-    // One group: zoom out, the level (a figure), zoom in, fit, the large view. No mode pair, minimap, theme or save button.
+    // One group: zoom out, the level (a figure), zoom in, fit, the large view. No mode pair, theme or save button;
+    // the minimap is part of the canvas, always open, not a control in the group.
     const controls = page.getByTestId("bpmn-zoom-controls");
     await expect(controls.getByRole("button")).toHaveCount(4);
     await expect(page.getByRole("button", { name: /Koko prosessi|Luettava/ })).toHaveCount(0);
-    await expect(page.locator(".djs-minimap")).toHaveCount(0);
+    await expect(page.locator(".djs-minimap")).toHaveCount(1);
     await expect(page.getByTestId("bpmn-save")).toHaveCount(0);
 
     // The invoice process does not fit readably: it opens at the readable zoom, start event in view.

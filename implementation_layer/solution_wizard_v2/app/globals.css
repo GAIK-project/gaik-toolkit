@@ -569,6 +569,31 @@ body {
   }
 }
 
+/* The minimap is part of the editor's canvas, always open: the bottom-right corner,
+   above bpmn.io's mark (which bpmn-js's licence keeps visible), clear of the zoom
+   controls at the top. It has no switch. */
+.bpmn-editable .djs-minimap {
+  top: auto;
+  right: 12px;
+  bottom: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+.bpmn-editable .djs-minimap .map {
+  width: 200px;
+  height: 120px;
+}
+.bpmn-editable .djs-minimap .toggle {
+  display: none;
+}
+@media (max-width: 767px) {
+  .bpmn-editable .djs-minimap {
+    display: none;
+  }
+}
+
 /* The Workflow tab's simple flow (React Flow, components/workflow-flow-view): the canvas
    dotted like the BPMN one, the arrows in the app's colours. A node's handles are there
    only for React Flow to draw the arrows between; nothing is connected by hand. */

@@ -550,6 +550,8 @@ export function BpmnDiagramPanel({
           onZoomChange={setZoom}
           onImported={onImported}
           onEditingEnd={() => setEditingEnded((n) => n + 1)}
+          minimapLabel={t.bpmnMinimap}
+          onToggleFullscreen={fullView?.toggle}
         />
 
         <BpmnZoomControls

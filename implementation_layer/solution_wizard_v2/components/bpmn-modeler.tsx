@@ -29,9 +29,11 @@ import {
   type ModdleElement,
 } from "@/lib/bpmn-edit-state";
 import { gaikEditorModule, type BpmnEditorLabels } from "@/lib/bpmn-editor-module";
+import minimapModule from "diagram-js-minimap";
 import "bpmn-js/dist/assets/diagram-js.css";
 import "bpmn-js/dist/assets/bpmn-js.css";
 import "bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css";
+import "diagram-js-minimap/assets/diagram-js-minimap.css";
 
 type EventBus = {
   on: (event: string, cb: (e: unknown) => void) => void;
@@ -114,6 +116,8 @@ export type BpmnModelerHandle = {
    * revision does not count it.
    */
   isEditing: () => boolean;
+  /** Open or close the large view (`onToggleFullscreen`): the diagram over the whole screen. */
+  toggleFullscreen: () => void;
 };
 
 function selectionFromModeler(modeler: BpmnCanvas): BpmnSelectionInfo {
@@ -160,6 +164,10 @@ export const BpmnModeler = forwardRef<
     importKey?: number;
     /** The diagram can be looked at, moved and its elements picked, but not changed. */
     readOnly?: boolean;
+    /** The minimap's name for a screen reader, in the UI language. */
+    minimapLabel?: string;
+    /** Whoever owns the large view opens or closes it (`toggleFullscreen`). */
+    onToggleFullscreen?: () => void;
   }
 >(function BpmnModeler(
   {
@@ -175,13 +183,29 @@ export const BpmnModeler = forwardRef<
     onEditingEnd,
     importKey = 0,
     readOnly = false,
+    minimapLabel,
+    onToggleFullscreen,
   },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<BpmnCanvas | null>(null);
-  const callbacks = useRef({ onSelectionChange, onEditStateChange, onZoomChange, onImported, onEditingEnd });
-  callbacks.current = { onSelectionChange, onEditStateChange, onZoomChange, onImported, onEditingEnd };
+  const callbacks = useRef({
+    onSelectionChange,
+    onEditStateChange,
+    onZoomChange,
+    onImported,
+    onEditingEnd,
+    onToggleFullscreen,
+  });
+  callbacks.current = {
+    onSelectionChange,
+    onEditStateChange,
+    onZoomChange,
+    onImported,
+    onEditingEnd,
+    onToggleFullscreen,
+  };
   const labelsRef = useRef(editorLabels);
   labelsRef.current = editorLabels;
   const [modeler, setModeler] = useState<BpmnCanvas | null>(null);
@@ -309,6 +333,7 @@ export const BpmnModeler = forwardRef<
           return false;
         }
       },
+      toggleFullscreen: () => callbacks.current.onToggleFullscreen?.(),
     }),
     // The handle reads refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -335,7 +360,9 @@ export const BpmnModeler = forwardRef<
         if (cancelled) return;
         m = new BpmnModelerCtor({
           container,
-          additionalModules: [gaikEditorModule],
+          additionalModules: [gaikEditorModule, minimapModule],
+          // Always open: the minimap is part of the canvas, not a tool to switch on.
+          minimap: { open: true },
           // Read when a tool is drawn, so the tools follow the UI language.
           gaikEditor: {
             get labels() {
@@ -485,6 +512,15 @@ export const BpmnModeler = forwardRef<
     }
   }, [modeler, addTask, connect, rename, remove]);
 
+  // The minimap is named for a screen reader, in the UI language.
+  useEffect(() => {
+    const map = modeler && containerRef.current?.querySelector<HTMLElement>(".djs-minimap");
+    if (!map || !minimapLabel) return;
+    map.setAttribute("role", "group");
+    map.setAttribute("aria-label", minimapLabel);
+    map.setAttribute("title", minimapLabel);
+  }, [modeler, minimapLabel]);
+
   // A new size re-fits the start view and the fit; a view the user picked stays.
   useEffect(() => {
     if (!ready) return;
@@ -511,7 +547,7 @@ export const BpmnModeler = forwardRef<
         ref={containerRef}
         // isolate: bpmn-js's context pad (z-index 100) stays under the panels drawn over the canvas.
         // bpmn-editable is the Workflow tab's look (bpmn-js's own lane names), read-only or not.
-        className={`bpmn-viewer-themed bpmn-editable isolate h-full overflow-hidden [&_.bjs-powered-by]:hidden ${className}`}
+        className={`bpmn-viewer-themed bpmn-editable isolate h-full overflow-hidden ${className}`}
         role="application"
         aria-label={ariaLabel}
         aria-busy={!ready}
