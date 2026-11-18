@@ -19,10 +19,27 @@ except ImportError:
     from api.utils import get_rag_api_config, require_vision, sse_event
     from api.utils.model_settings import request_server_model
 import requests
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from langchain_core.documents import Document
 from pydantic import BaseModel
+
+try:
+    from utils.result_owner import (
+        current_user,
+        forget_owner,
+        owned_by,
+        remember_owner,
+        touch_owner,
+    )
+except ImportError:
+    from api.utils.result_owner import (
+        current_user,
+        forget_owner,
+        owned_by,
+        remember_owner,
+        touch_owner,
+    )
 
 try:
     from utils.upload_check import upload_problem
@@ -202,6 +219,21 @@ def _drop_collection(collection_id: str) -> None:
     RAG_INSTANCES.pop(collection_id, None)
     _USAGE.pop(collection_id, None)
     _collection_locks.pop(collection_id, None)
+    forget_owner(collection_id)
+
+
+def _reachable(collection_id: str, user: str) -> bool:
+    """A shared example, or a collection the user made (api/utils/result_owner.py).
+
+    Another user's collection is treated as one that does not exist, so its id tells
+    nothing; the user is the one the proxy names in X-GAIK-User.
+    """
+    if _is_shared_example(collection_id):
+        return True
+    if owned_by(collection_id, user):
+        touch_owner(collection_id)  # a collection in use keeps its owner
+        return True
+    return False
 
 
 def _is_shared_example(collection_id: str) -> bool:
@@ -578,6 +610,7 @@ async def index_documents(
     files: list[UploadFile] = File(...),
     collection_id: str | None = Form(None),
     parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("docling_rag"),
+    user: str = Depends(current_user),
 ):
     """
     Index PDF documents into the RAG vector store.
@@ -609,9 +642,14 @@ async def index_documents(
             )
 
     # An id the server does not know (a cleared or evicted collection, or one the client
-    # made up) starts a new collection under an id made here. The shared example
-    # collections take no uploads.
-    if collection_id and collection_id in RAG_INSTANCES and not _is_shared_example(collection_id):
+    # made up), or another user's collection, starts a new collection under an id made
+    # here. The shared example collections take no uploads.
+    if (
+        collection_id
+        and collection_id in RAG_INSTANCES
+        and not _is_shared_example(collection_id)
+        and owned_by(collection_id, user)
+    ):
         coll_id = collection_id
     else:
         evict_collections(make_room=True)
@@ -622,6 +660,7 @@ async def index_documents(
                 "Try again in a few minutes.",
             )
         coll_id = uuid.uuid4().hex
+        remember_owner(coll_id, user)
 
     # Acquire lock for this collection to prevent concurrent modifications
     lock = await _get_collection_lock(coll_id)
@@ -634,6 +673,11 @@ async def index_documents(
                 if workflow is None:
                     workflow = _build_demo_workflow(get_rag_api_config(), coll_id)
                     RAG_INSTANCES[coll_id] = workflow
+                    # Also when a clear or an eviction dropped it while this upload
+                    # waited for the lock: the collection is made again for its user.
+                    remember_owner(coll_id, user)
+                else:
+                    touch_owner(coll_id)
                 if parser_choice == "vision_plus":
                     require_vision(workflow.api_config)
                 indexed_docs: list[IndexedDocument] = []
@@ -707,6 +751,7 @@ async def query_rag(
     question: str = Form(...),
     collection_id: str = Form(...),
     top_k: int = Form(5),
+    user: str = Depends(current_user),
 ):
     """
     Query the RAG system with a question.
@@ -718,7 +763,7 @@ async def query_rag(
     if not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    workflow = RAG_INSTANCES.get(collection_id)
+    workflow = RAG_INSTANCES.get(collection_id) if _reachable(collection_id, user) else None
     if workflow is None:
         raise HTTPException(
             status_code=404, detail="Collection not found. Please index documents first."
@@ -764,6 +809,7 @@ async def query_rag_stream(
     question: str = Form(...),
     collection_id: str = Form(...),
     top_k: int = Form(5),
+    user: str = Depends(current_user),
 ):
     """
     Query the RAG system with SSE streaming response.
@@ -773,7 +819,7 @@ async def query_rag_stream(
     if not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    workflow = RAG_INSTANCES.get(collection_id)
+    workflow = RAG_INSTANCES.get(collection_id) if _reachable(collection_id, user) else None
     if workflow is None:
         raise HTTPException(
             status_code=404, detail="Collection not found. Please index documents first."
@@ -895,13 +941,13 @@ async def query_rag_stream(
 
 
 @router.get("/status/{collection_id}", response_model=StatusResponse)
-async def get_status(collection_id: str):
+async def get_status(collection_id: str, user: str = Depends(current_user)):
     """
     Get the status of a RAG collection.
 
     - **collection_id**: The collection to check
     """
-    if collection_id not in RAG_INSTANCES:
+    if collection_id not in RAG_INSTANCES or not _reachable(collection_id, user):
         return StatusResponse(
             collection_id=None,
             document_count=0,
@@ -923,7 +969,7 @@ async def get_status(collection_id: str):
 
 
 @router.delete("/clear/{collection_id}")
-async def clear_collection(collection_id: str):
+async def clear_collection(collection_id: str, user: str = Depends(current_user)):
     """
     Clear a RAG collection and free resources.
 
@@ -934,18 +980,24 @@ async def clear_collection(collection_id: str):
 
     - **collection_id**: The collection to clear
     """
-    if not _is_shared_example(collection_id):
+    if not _is_shared_example(collection_id) and owned_by(collection_id, user):
         _drop_collection(collection_id)
 
     return {"status": "success", "message": f"Collection {collection_id} cleared"}
 
 
 @router.delete("/clear")
-async def clear_collections(collection_ids: list[str] = Query(..., min_length=1)):
-    """Clear the collections the caller names; nobody else's are touched."""
+async def clear_collections(
+    collection_ids: list[str] = Query(..., min_length=1), user: str = Depends(current_user)
+):
+    """Clear the collections the caller names and owns; nobody else's are touched."""
     cleared = 0
     for collection_id in set(collection_ids):
-        if collection_id in RAG_INSTANCES and not _is_shared_example(collection_id):
+        if (
+            collection_id in RAG_INSTANCES
+            and not _is_shared_example(collection_id)
+            and owned_by(collection_id, user)
+        ):
             _drop_collection(collection_id)
             cleared += 1
 

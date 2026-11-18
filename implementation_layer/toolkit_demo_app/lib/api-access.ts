@@ -69,12 +69,14 @@ export const WIZARD_USER_HEADER = "x-gaik-wizard-user";
  */
 export const USER_HEADER = "x-gaik-user";
 
-/** The GET routes that hand out a result made by a user's run (api/utils/result_owner.py). */
+/** The GET routes that hand out a result made by a user's run, or tell about one
+ * (api/utils/result_owner.py). */
 const OWNED_RESULT_READS = [
   /^\/api\/pipeline\/pdf\/[^/]+$/,
   /^\/api\/diary\/pdf\/[^/]+$/,
   /^\/api\/luvata-order\/pdf\/[^/]+$/,
   /^\/api\/dental-transcribe\/(srt|vtt)\/[^/]+$/,
+  /^\/api\/rag\/status\/[^/]+$/,
 ];
 
 /**
