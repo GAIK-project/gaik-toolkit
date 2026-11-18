@@ -429,6 +429,9 @@ class VisionParser:
         mat = fitz.Matrix(zoom, zoom)
 
         with fitz.open(pdf_path) as doc:
+            # PyMuPDF opens other formats too; ask what it opened.
+            if not doc.is_pdf:
+                raise ValueError(f"The content of '{name}' is not a PDF document.")
             page_count = doc.page_count
             if first_pages is not None:
                 page_count = min(page_count, first_pages)

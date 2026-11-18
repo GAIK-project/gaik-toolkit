@@ -110,14 +110,18 @@ limit then applies to those pages.
 ## File type from the content
 
 Every parser reads a file's type from the start of its content
-([`gaik.software_components.file_type`](../file_type.py), standard library only) and
+([`gaik.software_components.file_type`](../file_type.py), standard library and PyMuPDF
+when installed) and
 refuses a file whose content is not the type its extension says, or not a type the
 parser reads, with `FileTypeMismatchError` (a `ValueError` naming the file, its
 extension and the detected type), before the file is parsed or sent to a model. A PDF
 named `.docx`, a ZIP archive named `.xlsx` or a PDF named `.png` is refused; a
 `VisionParser.convert_image` file without a suffix is sent with the image type its
-content has. Content of no recognised type in a `.pdf` file is left to the PDF parser,
-which reports a file it cannot read.
+content has. An image under another image extension (a PNG or WebP saved as `.jpg`) is
+read, and its MIME type comes from its content. Content of no recognised type in a
+`.pdf` file is left to the PDF parser, which reports a file it cannot read; when PyMuPDF
+is installed, content it opens as another format (SVG, HTML, XHTML, FB2) is refused
+as no PDF first.
 
 The size limit (`InputLimits.max_file_bytes`) is checked first, and the content check
 reads a bounded part of the file. Text is content without NUL bytes, or UTF-16 with or

@@ -90,6 +90,10 @@ def test_detect_file_type_reads_the_type_from_the_content(tmp_path, data, expect
         ("scan.png", PNG),
         ("photo.jpg", JPEG),
         ("photo.jpeg", JPEG),
+        # An image saved under another image extension: its content decides.
+        ("scan.png", JPEG),
+        ("photo.jpg", PNG),
+        ("photo.jpg", WEBP),
         ("scan.tif", TIFF),
         ("scan.tiff", b"II+\x00\x08\x00\x00\x00" + b"\x00" * 32),
         ("export.csv", "a;b\n1;2\n".encode("utf-16-le")),
@@ -111,7 +115,6 @@ def test_a_file_whose_content_matches_its_extension_is_accepted(tmp_path, name, 
         ("notes.docx", XLSX, "xlsx"),
         ("notes.docx", b"plain words", "text"),
         ("budget.xlsx", ZIP, "zip"),
-        ("scan.png", JPEG, "jpeg"),
         ("scan.png", PDF, "pdf"),
         ("photo.jpg", b"not an image", "text"),
         ("log.csv", ZIP, "zip"),
@@ -243,8 +246,8 @@ def test_chat_content_refuses_an_image_whose_content_differs_from_its_extension(
         build_chat_document_content,
     )
 
-    with pytest.raises(FileTypeMismatchError, match="is a GIF image, not a PNG image"):
-        build_chat_document_content([_file(tmp_path, "scan.png", GIF)], "Read this")
+    with pytest.raises(FileTypeMismatchError, match="is a PDF document, not an image"):
+        build_chat_document_content([_file(tmp_path, "scan.png", PDF)], "Read this")
 
 
 # -- a bounded read before the limits ------------------------------------------
@@ -444,3 +447,121 @@ def test_docling_vision_plus_and_multimodal_parsers_check_the_size_first(
     with pytest.raises(InputLimitError, match="max_file_bytes"):
         _parse(kind, parser, path)
     assert opened == []
+
+
+# -- markup named .pdf, images under another image extension -------------------
+
+SVG = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text y="5">hi</text></svg>'
+HTML = b"<html><body><p>Hello</p></body></html>"
+
+
+@pytest.mark.parametrize("data", [SVG, HTML], ids=["svg", "html"])
+def test_markup_named_pdf_is_refused_as_no_pdf(tmp_path, data):
+    pytest.importorskip("pymupdf")
+    with pytest.raises(FileTypeMismatchError, match=r"'x\.pdf' is plain text, not a PDF"):
+        check_file_type(_file(tmp_path, "x.pdf", data), {"pdf"})
+    with pytest.raises(FileTypeMismatchError):
+        check_file_type(_file(tmp_path, "x.pdf", data))
+
+
+@pytest.mark.parametrize("data", [SVG, HTML], ids=["svg", "html"])
+def test_markup_named_pdf_reaches_no_model_and_no_upload(tmp_path, monkeypatch, data):
+    pytest.importorskip("pymupdf")
+    from gaik.software_components.parsers import docling_api_client
+    from gaik.software_components.parsers.multimodal_parser.chat_content import (
+        build_chat_document_content,
+    )
+
+    path = _file(tmp_path, "x.pdf", data)
+    with pytest.raises(FileTypeMismatchError):
+        build_chat_document_content([path], "Read this")
+
+    parser, sent = _vision_parser(monkeypatch)
+    with pytest.raises(FileTypeMismatchError):
+        parser.convert_pdf(path)
+    assert sent == []
+
+    with pytest.raises(FileTypeMismatchError):
+        _multimodal_parser().parse(path)
+
+    calls = []
+    monkeypatch.setattr(docling_api_client._http, "get", lambda *args, **kwargs: calls.append(args))
+    monkeypatch.setattr(
+        docling_api_client._http, "post", lambda *args, **kwargs: calls.append(args)
+    )
+    client = docling_api_client.DoclingApiClientParser(
+        api_base="https://docling.example",
+        password="test",
+        allowed_endpoint_hosts="docling.example",
+    )
+    with pytest.raises(FileTypeMismatchError):
+        client.parse_document(path)
+    assert calls == []
+
+
+def test_vision_parser_reads_no_pdf_that_pymupdf_opens_as_another_format(tmp_path, monkeypatch):
+    pytest.importorskip("fitz")
+    parser, _sent = _vision_parser(monkeypatch)
+    with pytest.raises(ValueError, match="is not a PDF document"):
+        parser._pdf_to_images(_file(tmp_path, "x.pdf", SVG), dpi=72)
+
+
+@pytest.mark.parametrize(
+    ("data", "mime"), [(PNG, "image/png"), (WEBP, "image/webp")], ids=["png", "webp"]
+)
+def test_an_image_saved_as_jpg_is_sent_with_its_content_type(tmp_path, monkeypatch, data, mime):
+    from gaik.software_components.parsers.multimodal_parser.chat_content import (
+        build_chat_document_content,
+    )
+
+    # The pixel check needs a decodable image; these are headers only.
+    monkeypatch.setattr(
+        "gaik.software_components.input_limits.InputLimits.check_image_file",
+        lambda self, path: None,
+    )
+    path = _file(tmp_path, "photo.jpg", data)
+    parser, sent = _vision_parser(monkeypatch)
+    assert parser.convert_image(path) == "markdown"
+    assert sent == [mime]
+
+    content = build_chat_document_content([path], "Read this")
+    assert any(
+        part.get("type") == "image_url" and part["image_url"]["url"].startswith(f"data:{mime};")
+        for part in content
+        if isinstance(part, dict)
+    )
+
+
+def test_a_damaged_content_types_part_leaves_the_member_names_to_decide(tmp_path):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", "<Types>" + "x" * 2000 + "</Types>")
+        archive.writestr("word/document.xml", "<w:document/>")
+    data = bytearray(buffer.getvalue())
+    # Damage the deflate stream of the first member, keeping the archive's directory.
+    start = 30 + len("[Content_Types].xml")
+    data[start : start + 8] = b"\xff" * 8
+    assert detect_file_type(_file(tmp_path, "notes.docx", bytes(data))) == "docx"
+
+
+def test_an_office_file_with_a_utf16_manifest_and_a_renamed_main_part_is_read(tmp_path):
+    manifest = (
+        '<?xml version="1.0" encoding="UTF-16"?><Types><Override PartName="/word/main.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.'
+        'wordprocessingml.document.main+xml"/></Types>'
+    )
+    for encoded in (manifest.encode("utf-16"), manifest.encode("utf-16-le")):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("[Content_Types].xml", encoded)
+            archive.writestr("word/main.xml", "<w:document/>")
+        data = buffer.getvalue()
+        assert detect_file_type(_file(tmp_path, "notes.docx", data)) == "docx"
+
+
+def test_utf16_text_with_a_surrogate_pair_at_the_end_of_the_sample_is_text(tmp_path):
+    # The pair's four bytes start at byte 8188, so the 8 KiB sample ends inside it.
+    text = "a" * 4094 + "\U0001f601" + "b" * 100
+    data = text.encode("utf-16-le")
+    assert data[8188:8192] == "\U0001f601".encode("utf-16-le")
+    assert detect_file_type(_file(tmp_path, "notes.txt", data)) == "text"

@@ -4,7 +4,8 @@ The parsers pick how to read a file from its extension. Before they read it,
 they call :func:`check_file_type`, which reads the first bytes of the file and
 refuses it with :class:`FileTypeMismatchError` when the content is not what the
 extension says (a ZIP archive named ``.pdf``, a PDF named ``.png``) or not a
-type the parser reads at all. Only the standard library is used::
+type the parser reads at all. Only the standard library is used, and PyMuPDF
+when it is installed (see below)::
 
     from gaik.software_components.file_type import FileTypeMismatchError, detect_file_type
 
@@ -17,7 +18,13 @@ The detected types are ``"pdf"``, ``"docx"``, ``"xlsx"``, ``"pptx"``, ``"zip"``
 
 A PDF may start with other bytes before its ``%PDF-`` header, and PyMuPDF
 repairs a PDF without one, so content of no recognised type in a ``.pdf`` file
-is left to the parser, which reports a file it cannot read.
+is left to the parser, which reports a file it cannot read. When PyMuPDF is
+installed, it is asked first: content it opens as another format (SVG, HTML,
+XHTML, FB2 or plain text, which it reads too) is refused as no PDF.
+
+An image extension (``.png``, ``.jpg``, ...) accepts any of the image types:
+an image saved under another image extension is common, and the parsers take
+the image's MIME type from its content.
 
 Text is content without NUL bytes in its first 8 KiB, UTF-16 with a byte order
 mark, or UTF-16 without one whose NUL bytes fall only on every other byte. Other
@@ -32,8 +39,10 @@ against their input limits before they call it.
 
 from __future__ import annotations
 
+import codecs
 import struct
 import zipfile
+import zlib
 from collections.abc import Collection
 from pathlib import Path
 
@@ -58,14 +67,15 @@ EXTENSION_TYPES: dict[str, frozenset[str]] = {
     ".doc": frozenset({"ole", "docx"}),
     ".xls": frozenset({"ole", "xlsx"}),
     ".ppt": frozenset({"ole", "pptx"}),
-    ".png": frozenset({"png"}),
-    ".jpg": frozenset({"jpeg"}),
-    ".jpeg": frozenset({"jpeg"}),
-    ".gif": frozenset({"gif"}),
-    ".webp": frozenset({"webp"}),
-    ".tif": frozenset({"tiff"}),
-    ".tiff": frozenset({"tiff"}),
-    ".bmp": frozenset({"bmp"}),
+    # The image's MIME type comes from its content, so any image type is read.
+    ".png": IMAGE_TYPES,
+    ".jpg": IMAGE_TYPES,
+    ".jpeg": IMAGE_TYPES,
+    ".gif": IMAGE_TYPES,
+    ".webp": IMAGE_TYPES,
+    ".tif": IMAGE_TYPES,
+    ".tiff": IMAGE_TYPES,
+    ".bmp": IMAGE_TYPES,
     ".txt": TEXT_TYPES,
     ".csv": TEXT_TYPES,
     ".md": TEXT_TYPES,
@@ -112,6 +122,15 @@ _MAX_ZIP_DIRECTORY_BYTES = 2 * 1024 * 1024
 _MAX_ZIP_ENTRIES = 20_000
 # How far the first entries of an archive are read when its directory is not.
 _ZIP_HEAD_BYTES = 64 * 1024
+
+_ZIP_READ_ERRORS = (
+    zipfile.BadZipFile,
+    OSError,
+    RuntimeError,
+    NotImplementedError,
+    EOFError,
+    zlib.error,
+)
 
 _END_RECORD = struct.Struct("<4s4H2LH")
 _END_RECORD_64_LOCATOR = struct.Struct("<4sLQL")
@@ -213,8 +232,9 @@ def _looks_like_utf16(head: bytes) -> bool:
         if b"\x00" in other or zeros.count(0) * 2 < len(zeros):
             continue
         try:
-            # The sample may end inside a surrogate pair.
-            sample[:-2].decode(codec)
+            # The sample may end inside a character or a surrogate pair; a
+            # decoder that is not final keeps those bytes pending.
+            codecs.getincrementaldecoder(codec)().decode(sample, final=False)
         except UnicodeDecodeError:
             return False
         return True
@@ -225,22 +245,40 @@ def _zip_type(path: Path) -> str:
     directory = _zip_directory_size(path)
     if directory is None:
         return _zip_type_from_first_entries(path)
+    content_types = ""
     try:
         with zipfile.ZipFile(path) as archive:
             names = set(archive.namelist())
-            content_types = ""
             try:
                 info = archive.getinfo("[Content_Types].xml")
             except KeyError:
                 info = None
             if info is not None and info.file_size <= _MAX_CONTENT_TYPES_BYTES:
-                content_types = archive.read(info).decode("utf-8", "replace")
-    except (zipfile.BadZipFile, OSError, RuntimeError, NotImplementedError):
+                try:
+                    content_types = _xml_text(archive.read(info))
+                except _ZIP_READ_ERRORS:
+                    # A part that cannot be unpacked leaves the member names to
+                    # decide; the parser reports the damaged part.
+                    pass
+    except _ZIP_READ_ERRORS:
         return "zip"
     for member, content_type, kind in _OOXML_MAIN_PARTS:
         if member in names or content_type in content_types:
             return kind
     return "zip"
+
+
+def _xml_text(data: bytes) -> str:
+    """An XML part as text: UTF-8, or UTF-16 with or without a byte order mark."""
+    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        codec = "utf-16"
+    elif data.startswith(b"<\x00"):
+        codec = "utf-16-le"
+    elif data.startswith(b"\x00<"):
+        codec = "utf-16-be"
+    else:
+        codec = "utf-8"
+    return data.decode(codec, "replace")
 
 
 def _zip_directory_size(path: Path) -> tuple[int, int] | None:
@@ -297,7 +335,26 @@ def _zip_type_from_first_entries(path: Path) -> str:
     return "zip"
 
 
+def _mupdf_opens_as_pdf(path: Path) -> bool | None:
+    """Whether PyMuPDF opens the file as a PDF.
+
+    ``None`` when PyMuPDF is not installed or cannot open the file at all; the
+    PDF parser then reports what it cannot read.
+    """
+    try:
+        import pymupdf
+    except ImportError:
+        return None
+    try:
+        with pymupdf.open(path) as document:
+            return bool(document.is_pdf)
+    except Exception:
+        return None
+
+
 def _either(types: Collection[str]) -> str:
+    if frozenset(types) == IMAGE_TYPES:
+        return "an image (PNG, JPEG, GIF, WebP, TIFF or BMP)"
     return " or ".join(_LABELS.get(kind, kind) for kind in sorted(types))
 
 
@@ -332,10 +389,16 @@ def check_file_type(path: str | Path, accepted: Collection[str] | None = None) -
             expected=expected,
         )
 
+    opened_as_pdf: list[bool | None] = []
+
     def fits(expected: Collection[str]) -> bool:
         if detected in expected:
             return True
-        return "pdf" in expected and detected in _LEFT_TO_PDF_PARSER
+        if "pdf" not in expected or detected not in _LEFT_TO_PDF_PARSER:
+            return False
+        if not opened_as_pdf:
+            opened_as_pdf.append(_mupdf_opens_as_pdf(path))
+        return opened_as_pdf[0] is not False
 
     if by_extension is not None and not fits(by_extension):
         raise refuse(by_extension, f" as its extension {extension} says")

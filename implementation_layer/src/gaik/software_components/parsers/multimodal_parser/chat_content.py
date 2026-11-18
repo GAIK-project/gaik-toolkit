@@ -69,6 +69,9 @@ def build_chat_document_content(
             limits.check_file_size(path)
             check_file_type(path, {"pdf"})
             with fitz.open(path) as document:
+                # PyMuPDF opens other formats too; ask what it opened.
+                if not document.is_pdf:
+                    raise ValueError(f"The content of '{path.name}' is not a PDF document.")
                 for page_number, page in enumerate(document, start=1):
                     limits.check_rendered_page(
                         page, _PAGE_DPI / 72, f"{path.name}, page {page_number}"
