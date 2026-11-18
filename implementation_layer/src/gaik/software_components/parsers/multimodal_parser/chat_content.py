@@ -6,6 +6,7 @@ import base64
 import mimetypes
 from pathlib import Path
 
+from gaik.software_components._ligatures import expand_ligatures
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.source_material import SourceMaterial, clean_label
 
@@ -71,7 +72,11 @@ def build_chat_document_content(
                     content.append({"type": "text", "text": label})
                     image = page.get_pixmap(dpi=_PAGE_DPI, alpha=False).tobytes("png")
                     content.append(_image_part(image, "image/png"))
-                    text = page.get_text("text").strip() if include_text_layer else ""
+                    text = (
+                        expand_ligatures(page.get_text("text")).strip()
+                        if include_text_layer
+                        else ""
+                    )
                     if text:
                         block = material.wrap(text, label=f"text layer, {label}")
                         content.append({"type": "text", "text": _TEXT_LAYER.format(label, block)})
