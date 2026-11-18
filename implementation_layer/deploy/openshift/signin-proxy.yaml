@@ -84,7 +84,7 @@ items:
                 httpGet: { path: /ping, port: http }
                 periodSeconds: 30
               resources:
-                requests: { cpu: 25m, memory: 32Mi }
+                requests: { cpu: 100m, memory: 32Mi }
                 limits: { cpu: 500m, memory: 128Mi }
               volumeMounts:
                 - name: templates

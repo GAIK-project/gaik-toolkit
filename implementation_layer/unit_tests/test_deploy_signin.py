@@ -337,3 +337,28 @@ def test_grafana_maps_the_aiops_groups_and_refuses_everyone_else() -> None:
         )
     realm = json.loads((KEYCLOAK_DIR / "realm-gaik.json").read_text())
     assert {"aiops-admin", "aiops-viewer"} <= {g["name"] for g in realm["groups"]}
+
+
+def test_cpu_limits_stay_within_rahtis_ratio() -> None:
+    # Rahti's LimitRange refuses a container whose CPU limit is more than 8 times its request (the
+    # Keycloak database's pod was refused at 10). The AIOps project asks for 5 at most.
+    def millicores(value: str) -> float:
+        return float(value[:-1]) if value.endswith("m") else float(value) * 1000
+
+    containers = [
+        c
+        for d in keycloak_docs()
+        + render("signin-proxy.yaml", "kc")
+        + aiops_docs("mlflow-signin.yaml")
+        if d["kind"] == "Deployment"
+        for c in d["spec"]["template"]["spec"]["containers"]
+    ]
+    cron = yaml.safe_load((KEYCLOAK_DIR / "keycloak-maintenance.yaml").read_text())
+    containers += cron["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"]
+    for c in containers:
+        r = c["resources"]
+        assert (
+            millicores(r["limits"]["cpu"]) <= 5 * millicores(r["requests"]["cpu"])
+            or c["name"] == "keycloak"
+        ), c["name"]
+        assert millicores(r["limits"]["cpu"]) <= 8 * millicores(r["requests"]["cpu"]), c["name"]
