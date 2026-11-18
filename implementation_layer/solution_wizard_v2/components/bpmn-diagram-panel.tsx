@@ -27,7 +27,7 @@ import type { Dict } from "@/lib/i18n";
 import type { Blueprint, BlueprintStep } from "@/lib/mock-sessions";
 
 /** How long dragged shapes wait for more dragging before their places are kept. */
-const LAYOUT_SAVE_DELAY_MS = 600;
+const LAYOUT_SAVE_DELAY_MS = 800;
 
 /** From this canvas width (Tailwind's @lg container, 32rem) the properties panel is a column at the right. */
 const PROPS_WIDE = 512;
@@ -203,9 +203,11 @@ export function BpmnDiagramPanel({
     needsAttentionRef.current = next;
     setNeedsAttentionState(next);
   }
-  // Places of dragged shapes not sent yet, per drawing mode.
+  // Places of dragged shapes and bent flows not sent yet, per drawing mode.
   const pendingLayout = useRef<{ dataObjects: boolean; layout: BpmnLayoutChange } | null>(null);
   const layoutTimer = useRef<number | null>(null);
+  // The layout on its way: the next edit, or a diagram read again, waits for it.
+  const layoutSending = useRef<Promise<void>>(Promise.resolve());
 
   /** The mapping of the diagram on the canvas, when the page's steps are the ones it was drawn from. */
   function opsContext() {
@@ -287,6 +289,8 @@ export function BpmnDiagramPanel({
 
   /** A diagram the page brought (a version from the chat, "Show data" switched). */
   function showPageDiagram(next: string) {
+    // Drags not sent yet go now: the page's diagram replaces the canvas.
+    void flushLayout();
     waitingXml.current = null;
     propXml.current = next;
     setShownXml(next);
@@ -328,6 +332,8 @@ export function BpmnDiagramPanel({
     // Until the server's diagram is back, a kept rename would be matched against the old one.
     reverting.current = true;
     try {
+      // A drag made before it is kept, and the diagram read back has it.
+      await flushLayout();
       showDiagram(await readServerDiagram());
     } catch {
       // The diagram the canvas stood on, drawn again.
@@ -435,6 +441,12 @@ export function BpmnDiagramPanel({
     }
   }
 
+  /**
+   * A drag or a bent flow: merged with the others of the last 800 ms and
+   * kept with the drawing mode on screen. It writes no version and draws
+   * nothing again. The editor's rules let no move start while an edit is on
+   * its way, and `run` sends what is pending before its edit.
+   */
   function sendLayout(change: BpmnLayoutChange) {
     const dataObjects = showDataRef.current;
     const pending = pendingLayout.current;
@@ -447,37 +459,50 @@ export function BpmnDiagramPanel({
     layoutTimer.current = window.setTimeout(() => void flushLayout(), LAYOUT_SAVE_DELAY_MS);
   }
 
-  /** Keeps the places of dragged shapes (`PUT /bpmn/layout`); no blueprint version is written. */
-  async function flushLayout() {
+  /**
+   * Keeps the places of dragged shapes and bent flows (`PUT /bpmn/layout`);
+   * no blueprint version is written. Resolves once what was pending, and any
+   * layout already on its way, has been answered: a diagram read after it has
+   * the places.
+   */
+  function flushLayout(): Promise<void> {
     if (layoutTimer.current) window.clearTimeout(layoutTimer.current);
     layoutTimer.current = null;
     const pending = pendingLayout.current;
     pendingLayout.current = null;
-    if (!pending) return;
-    try {
-      const res = await fetch(
-        `/api/sessions/${sessionId}/bpmn/layout?data_objects=${pending.dataObjects ? 1 : 0}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(pending.layout),
-        },
-      );
-      if (!res.ok) throw new Error(`layout ${res.status}`);
-    } catch {
-      setStatus({ kind: "error", message: t.wsBpmnSaveError });
-    }
+    if (!pending) return layoutSending.current;
+    const sending = layoutSending.current.then(async () => {
+      try {
+        const res = await fetch(
+          `/api/sessions/${sessionId}/bpmn/layout?data_objects=${pending.dataObjects ? 1 : 0}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pending.layout),
+            keepalive: true,
+          },
+        );
+        if (!res.ok) throw new Error(`layout ${res.status}`);
+      } catch {
+        setStatus({ kind: "error", message: t.wsBpmnSaveError });
+      }
+    });
+    layoutSending.current = sending;
+    return sending;
   }
 
-  // Dragged shapes are kept before the page goes.
-  useEffect(
-    () => () => {
+  // Dragged shapes are kept before the page goes: another page, or a reload
+  // of this one (keepalive lets the request outlive it).
+  useEffect(() => {
+    const onPageHide = () => void latest.current?.flushLayout();
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
       void flushLayout();
-    },
+    };
     // flushLayout reads refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  }, []);
 
   // The functions above close over this render's props (t, onSynced): the
   // editor holds one object for its life, which calls the latest of them.
@@ -486,6 +511,7 @@ export function BpmnDiagramPanel({
     run: typeof run;
     revert: typeof revert;
     sendLayout: typeof sendLayout;
+    flushLayout: typeof flushLayout;
     flushPending: () => void;
     stepTypeOf: (stepId: string) => StepType | null;
   } | null>(null);
@@ -611,7 +637,7 @@ export function BpmnDiagramPanel({
   }
 
   useEffect(() => {
-    latest.current = { opsContext, run, revert, sendLayout, flushPending, stepTypeOf };
+    latest.current = { opsContext, run, revert, sendLayout, flushLayout, flushPending, stepTypeOf };
   });
 
   /** "Lopeta muokkaus": the canvas is read-only again, as it opened. */

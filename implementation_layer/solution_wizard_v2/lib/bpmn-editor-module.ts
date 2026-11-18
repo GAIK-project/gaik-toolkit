@@ -18,8 +18,10 @@
  * - A rename typed in place, a line drawn with the connect tool and the
  *   Delete key are bpmn-js commands: once one has run, it is read here and
  *   sent as its operation (or, when it means nothing for the blueprint, the
- *   panel puts the server's diagram back). Dragging shapes changes no
- *   blueprint: their new places are handed over as a layout.
+ *   panel puts the server's diagram back). Dragging shapes within their
+ *   lane and bending flows changes no blueprint: their new places are handed
+ *   over as a layout (`onLayout`), which the panel keeps with
+ *   `PUT /bpmn/layout`. A drag into another lane is refused.
  *
  * Labels and the operations come in through the modeler's `gaikEditor`
  * config, read each time they are needed.
@@ -89,6 +91,7 @@ type Shape = {
   width: number;
   height: number;
   labelTarget?: Shape;
+  parent?: Element;
   incoming?: Connection[];
   outgoing?: Connection[];
   waypoints?: undefined;
@@ -100,6 +103,7 @@ type Connection = {
   target: Shape;
   waypoints: { x: number; y: number }[];
   labelTarget?: undefined;
+  parent?: Element;
 };
 type Element = Shape | Connection;
 type Entry = Record<string, unknown>;
@@ -347,17 +351,56 @@ class GaikStepTypeMenu {
   }
 }
 
+/** A point on the diagram. */
+type Point = { x: number; y: number };
+
+/** The innermost lane whose box holds the point; null outside every lane. */
+function laneAt(lanes: Shape[], p: Point): Shape | null {
+  let best: Shape | null = null;
+  for (const lane of lanes) {
+    if (p.x < lane.x || p.x > lane.x + lane.width || p.y < lane.y || p.y > lane.y + lane.height) continue;
+    if (!best || lane.width * lane.height < best.width * best.height) best = lane;
+  }
+  return best;
+}
+
+/**
+ * Whether a drag only moves shapes where the layout keeps them: each stays in
+ * the lane (and the pool) it is drawn in, as its middle shows. A lane is who
+ * does the step, which the blueprint says, so a drag into another lane would
+ * be an edit the layout cannot keep (Task 17 makes that an operation); a
+ * label is placed with its shape and is not kept on its own.
+ */
+export function moveKeepsLanes(
+  shapes: Element[],
+  delta: Point | undefined,
+  target: Element | undefined,
+  lanes: Shape[],
+): boolean {
+  const moved = shapes.filter((s): s is Shape => !s.labelTarget && !isConnection(s));
+  if (!moved.length) return false;
+  if (target && moved.some((s) => s.parent && s.parent !== target)) return false;
+  if (!delta) return true;
+  return moved.every((s) => {
+    const middle = { x: s.x + s.width / 2, y: s.y + s.height / 2 };
+    return laneAt(lanes, middle) === laneAt(lanes, { x: middle.x + delta.x, y: middle.y + delta.y });
+  });
+}
+
 /**
  * What the keyboard and the mouse may still do: Delete removes one step or
  * one flow between steps; lines start and end at steps; nothing is created,
  * resized, copied or reconnected (no operation keeps that); lanes and pools
- * stay where the drawing puts them.
+ * stay where the drawing puts them. Shapes move within their lane, and a
+ * flow's bends move, as a layout; neither while an edit is on its way or a
+ * name is typed in place (the diagram drawn after it would drop the move).
  */
 class GaikRules extends RuleProvider {
-  static $inject = ["eventBus", "config.gaikEditor"];
+  static $inject = ["eventBus", "config.gaikEditor", "elementRegistry"];
   constructor(
     eventBus: DiagramEventBus,
     private config: Config,
+    private registry: ElementRegistry,
   ) {
     super(eventBus);
   }
@@ -380,8 +423,18 @@ class GaikRules extends RuleProvider {
       isStep(context.source) && isStep(context.target) && context.source !== context.target ? undefined : false,
     );
     this.addRule("connection.reconnect", 2000, () => false);
-    this.addRule("elements.move", 2000, (context: { shapes?: Element[] }) =>
-      (context.shapes ?? []).some((s) => FIXED.has(s.type)) ? false : undefined,
+    this.addRule(
+      "elements.move",
+      2000,
+      (context: { shapes?: Element[]; delta?: Point; target?: Element }) => {
+        const shapes = context.shapes ?? [];
+        if (!ctx() || shapes.some((s) => FIXED.has(s.type))) return false;
+        const lanes = this.registry.getAll().filter((el): el is Shape => el.type === "bpmn:Lane" && !isConnection(el));
+        return moveKeepsLanes(shapes, context.delta, context.target, lanes) ? undefined : false;
+      },
+    );
+    this.addRule("connection.updateWaypoints", 2000, (context: { connection?: Element }) =>
+      ctx() && context.connection && LAYOUT_ID.test(context.connection.id) ? undefined : false,
     );
   }
 }
