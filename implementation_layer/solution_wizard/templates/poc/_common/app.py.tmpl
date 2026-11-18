@@ -25,23 +25,36 @@ A request that sends no file runs on the examples in the package's ``sample_inpu
 There is no sign-in. The server listens on this computer only (127.0.0.1) unless you
 start it with ``--host``; do that only on a network you trust. Ctrl+C, SIGTERM and
 SIGHUP (the terminal closing) stop a run that is going and remove the working folders.
-Standard library only.
+Standard library only. Run as ``python app.py``, the package's folder heads ``sys.path``;
+the server takes it out before its other imports, so a file there named like a library
+module is not imported in the library's place.
 """
 
-from __future__ import annotations
+# The other imports wait until sys.path is cleaned.
+# ruff: noqa: E402
+import os
+import sys
+
+if __name__ == "__main__":
+    # A secrets.py or ipaddress.py next to this file would otherwise be imported
+    # in place of the standard library's and change what this unchanged server
+    # does. It needs no module of the package's: run_poc.py runs as a process of
+    # its own. os and sys are loaded before this file is.
+    _HERE = os.path.normcase(os.path.dirname(os.path.realpath(__file__)))
+    sys.path[:] = [
+        p for p in sys.path if os.path.normcase(os.path.realpath(p or os.curdir)) != _HERE
+    ]
 
 import argparse
 import atexit
 import ipaddress
 import json
-import os
 import re
 import secrets
 import shutil
 import signal
 import socket
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -60,6 +73,10 @@ MAX_FILES = 20
 MAX_TEXT_CHARS = 20_000
 #: How long one run may take before it is stopped, in seconds.
 RUN_TIMEOUT_SECONDS = 900
+#: How long a connection may send nothing, and how long a request's files may take
+#: to arrive in all, in seconds: a request that stops sending holds the one run.
+IDLE_TIMEOUT_SECONDS = 30
+BODY_TIMEOUT_SECONDS = 300
 #: Working folders of earlier runs kept for their download links.
 KEEP_RUNS = 3
 #: The end of the run's log that goes into an answer.
@@ -321,6 +338,8 @@ class Solution:
         # request's body (reserve), and run() takes it again in the same thread.
         self._lock = threading.RLock()
         self._runs: dict[str, Path] = {}
+        # Whether a request holds the run while its files arrive, and when it started.
+        self._reserved = False
         self._started: float | None = None
         self._log_path: Path | None = None
         # The process of the run that is going, and whether close() was called:
@@ -387,7 +406,8 @@ class Solution:
     def status(self) -> dict:
         started, log_path = self._started, self._log_path
         if started is None or log_path is None:
-            return {"busy": False, "elapsed_seconds": 0, "log_tail": ""}
+            # A request whose files are still arriving holds the run as well.
+            return {"busy": self._reserved, "elapsed_seconds": 0, "log_tail": ""}
         return {
             "busy": True,
             "elapsed_seconds": round(time.monotonic() - started, 1),
@@ -403,9 +423,13 @@ class Solution:
         would only be refused as busy do not each hold up to the upload limit in
         memory. Give it back with :meth:`release`.
         """
-        return self._lock.acquire(blocking=False)
+        if not self._lock.acquire(blocking=False):
+            return False
+        self._reserved = True
+        return True
 
     def release(self) -> None:
+        self._reserved = False
         self._lock.release()
 
     def run(self, fields: dict[str, str], files: list[tuple]) -> dict:
@@ -696,6 +720,8 @@ class Solution:
 class Handler(BaseHTTPRequestHandler):
     server_version = "PocTestPage"
     sys_version = ""
+    #: Each read and write on the connection waits this long at most.
+    timeout = IDLE_TIMEOUT_SECONDS
 
     @property
     def solution(self) -> Solution:
@@ -733,8 +759,10 @@ class Handler(BaseHTTPRequestHandler):
             action()
         except RefusalError as refusal:
             self._refuse(refusal)
-        except (BrokenPipeError, ConnectionError):
-            pass
+        except (BrokenPipeError, ConnectionError, TimeoutError):
+            # The other end went or stopped answering; a timeout leaves the
+            # connection in no state to be used again.
+            self.close_connection = True
         except Exception:
             # The terminal gets the details; the answer says only that it went wrong.
             traceback.print_exc()
@@ -807,12 +835,40 @@ class Handler(BaseHTTPRequestHandler):
             self._skip(length)
             raise RefusalError(409, "busy", _BUSY_MESSAGE)
         try:
-            body = self.rfile.read(length)
+            body = self._read_body(length)
             fields, files = parse_multipart(self.headers.get("Content-Type") or "", body)
             answer = self.solution.run(fields, files)
         finally:
             self.solution.release()
         self._json(200, answer)
+
+    def _read_body(self, length: int) -> bytes:
+        """The request's body, refused when it does not arrive in time.
+
+        It holds the one run while it arrives (see ``_post``), so it is read a
+        piece at a time against :data:`BODY_TIMEOUT_SECONDS`, and the connection's
+        own timeout ends a wait for a piece that does not come.
+        """
+        deadline = time.monotonic() + BODY_TIMEOUT_SECONDS
+        pieces: list[bytes] = []
+        remaining = length
+        try:
+            while remaining > 0:
+                if time.monotonic() > deadline:
+                    raise TimeoutError
+                # read1: at most one read from the connection, so the deadline is
+                # looked at between them however slowly the bytes come.
+                piece = self.rfile.read1(min(remaining, 1024 * 1024))
+                if not piece:
+                    break
+                pieces.append(piece)
+                remaining -= len(piece)
+        except TimeoutError:
+            self.close_connection = True
+            raise RefusalError(
+                408, "too_slow", "The files did not arrive in time. Send them again."
+            ) from None
+        return b"".join(pieces)
 
     def _skip(self, length: int) -> None:
         """Read ``length`` bytes of the body away, a piece at a time.
