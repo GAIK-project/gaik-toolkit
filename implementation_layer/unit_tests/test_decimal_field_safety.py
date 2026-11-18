@@ -239,7 +239,7 @@ class TestCleanDecimalStringEdgeCases:
             ("", None),
             ("   ", None),
             (None, None),
-            ("1 234,56 EUR", None),  # European space+comma formatting -- ambiguous, rejected
+            ("1 234,56 EUR", "1234.56"),  # space grouping, decimal comma (test_decimal_comma.py)
             ("abc1def2", None),  # multiple embedded numbers -- ambiguous, rejected
             ("not a number", None),
             ("42 dollars", None),  # "dollars" is not a recognized currency token
@@ -326,7 +326,8 @@ class TestSavedSchemaReload:
         schema = loaded.model_json_schema()
         assert "pattern" not in json.dumps(schema)
         assert loaded(price="EUR 1,234.56", fee="9.99").price == Decimal("1234.56")
-        assert loaded(price="1 234,56 EUR", fee="9.99").price is None
+        assert loaded(price="1 234,56 EUR", fee="9.99").price == Decimal("1234.56")
+        assert loaded(price="1 23,45", fee="9.99").price is None
 
         fee_info = loaded.model_fields["fee"]
         assert fee_info.annotation is Decimal

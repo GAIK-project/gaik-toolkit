@@ -1,0 +1,21 @@
+LASKU
+
+Laskun numero: INV-2026-0042
+Laskun päivämäärä: 14.3.2026
+Eräpäivä: 28.3.2026
+
+Toimittaja: Esimerkki Oy
+Y-tunnus: 1234567-8
+Osoite: Testikatu 1, 00100 Helsinki
+
+Asiakas: Demo Asiakas Ky
+Viitenumero: 12345
+
+Kuvaus                 Määrä   à-hinta   Yhteensä
+Pumpun huolto              2    150,00     300,00
+Tiivistesarja              5     18,90      94,50
+Matkakulut                 1     45,00      45,00
+
+Veroton yhteensä: 439,50 EUR
+ALV 25,5 %: 112,07 EUR
+Yhteensä: 551,57 EUR

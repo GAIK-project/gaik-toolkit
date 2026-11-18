@@ -1,4 +1,5 @@
-// The demos the home page lists. The hero reads it too, for its process overview.
+// The demos the home page lists.
+import { EuFlag } from "@/components/eu-flag";
 import {
   ACCESS,
   CAPTURE,
@@ -11,7 +12,6 @@ import {
   Bot,
   Braces,
   Calculator,
-  Cpu,
   Database,
   Download,
   FileBarChart,
@@ -23,7 +23,6 @@ import {
   FileUp,
   FolderKanban,
   Globe,
-  GraduationCap,
   HardHat,
   Headset,
   House,
@@ -41,6 +40,7 @@ import {
   Video,
   Volume2,
 } from "lucide-react";
+import type { ComponentType } from "react";
 
 export interface FeatureItem {
   label: string;
@@ -51,18 +51,14 @@ export interface Demo {
   title: string;
   description: string;
   href: string;
-  icon: LucideIcon;
+  /** A glyph, or a real mark such as the EU flag where one names the subject. */
+  icon: LucideIcon | ComponentType<{ className?: string }>;
   /** Knowledge process the demo belongs to; use cases span several and have none. */
   process?: KnowledgeProcess;
   image?: string;
   imagePosition?: string;
   featureList?: FeatureItem[];
   comingSoon?: boolean;
-}
-
-export interface ComingSoon {
-  title: string;
-  icon: LucideIcon;
 }
 
 // Use cases: the featured ones get an image card, the rest a compact card.
@@ -101,6 +97,13 @@ export const featuredUseCases: Demo[] = [
 
 export const useCases: Demo[] = [
   {
+    title: "EU AI Act Screening",
+    description:
+      "A preliminary AI Act risk class for your AI idea, pilot or product, and what you must do",
+    href: "/ai-act-screening",
+    icon: EuFlag,
+  },
+  {
     title: "Helpdesk Chatbot",
     description:
       "A customer service chatbot that answers from your own services and FAQ, and hands over to a person",
@@ -135,12 +138,6 @@ export const useCases: Demo[] = [
     href: "/diary",
     icon: HardHat,
   },
-];
-
-export const comingSoonUseCases: ComingSoon[] = [
-  { title: "Customer onboarding and sales assistant", icon: Headset },
-  { title: "Sales Proposal Generation", icon: FileBarChart },
-  { title: "Learning plans & recommendations", icon: GraduationCap },
 ];
 
 // Software modules, in the menu's order.
@@ -330,12 +327,6 @@ export const components: Demo[] = [
     icon: NotebookPen,
     process: SYNTHESIS,
   },
-];
-
-export const comingSoonComponents: ComingSoon[] = [
-  { title: "Retriever", icon: Search },
-  { title: "Embedder", icon: Cpu },
-  { title: "Vector Database", icon: Database },
 ];
 
 /** The demos of one knowledge process, in list order. */

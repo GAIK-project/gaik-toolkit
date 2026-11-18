@@ -70,6 +70,12 @@ export function PrivacyContent() {
           <li>Process and respond to your access request</li>
           <li>Provide you access to the GAIK Toolkit demo</li>
           <li>Improve the toolkit based on usage patterns (anonymized)</li>
+          <li>
+            Keep a log line of each demo run: your account id, the feature, the
+            time and whether it succeeded, never what you uploaded or asked. It
+            is used to look into misuse and to answer your requests about your
+            data, and kept as long as the service&apos;s logs are kept.
+          </li>
         </ul>
       </Section>
 
