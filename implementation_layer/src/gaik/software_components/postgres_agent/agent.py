@@ -33,6 +33,7 @@ from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 from .introspection import introspect_schema
 from .models import AnswerResult, GeneratedSQL, QueryResult, SchemaInfo
@@ -435,13 +436,19 @@ class PostgresAgent:
             self._schema_has_samples = include_samples
         return self._schema
 
-    def generate_sql(self, question: str, *, error_context: str | None = None) -> GeneratedSQL:
+    def generate_sql(
+        self, question: str, *, error_context: str | None = None, advice: str | None = None
+    ) -> GeneratedSQL:
         """Generate a read-only SQL query for ``question`` (no execution).
 
         Args:
             question: The natural-language question.
             error_context: Feedback from a previous failed attempt, fed back to
-                the LLM so it can correct the query.
+                the LLM so it can correct the query. It can quote the data, so it
+                goes in a data block.
+            advice: The caller's own guidance for the retry, such as how to make a
+                timed-out query cheaper. It is an instruction, so it stays outside
+                the data blocks.
 
         Returns:
             A :class:`~gaik.software_components.postgres_agent.models.GeneratedSQL`.
@@ -452,19 +459,24 @@ class PostgresAgent:
         schema = schema.model_copy(
             update={"tables": [t.model_copy(update={"sample_rows": []}) for t in schema.tables]}
         )
+        # Table and column names come from the database, and a database error can quote its
+        # data: each goes in a data block. The question and the caller's extra
+        # instructions stay outside the blocks.
+        material = SourceMaterial()
         user_prompt = (
             f"Database schema (active schema: {self.schema_name}):\n"
-            f"{schema.to_prompt_text()}\n\n"
-            f"Question: {question}"
+            + material.wrap(schema.to_prompt_text(), label="database schema")
+            + f"\n\nQuestion: {question}"
         )
         if self.extra_instructions:
             user_prompt += f"\n\nAdditional context:\n{self.extra_instructions}"
         if error_context:
-            user_prompt += f"\n\nThe previous attempt failed -- fix it.\n{error_context}"
-        messages = [
-            {"role": "system", "content": _SQL_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
+            user_prompt += "\n\nThe previous attempt failed -- fix it.\n" + material.wrap(
+                error_context, label="previous attempt"
+            )
+        if advice:
+            user_prompt += f"\n\n{advice}"
+        messages = source_material_messages(_SQL_SYSTEM_PROMPT, user_prompt)
 
         if isinstance(client, ProviderClient):
             parsed = _with_retries(
@@ -535,11 +547,13 @@ class PostgresAgent:
         result = QueryResult(question=question)
         self.get_schema()
         error_context: str | None = None
+        advice: str | None = None
 
         for attempt in range(1, self.max_retries + 1):
             result.attempts = attempt
             try:
-                generated = self.generate_sql(question, error_context=error_context)
+                generated = self.generate_sql(question, error_context=error_context, advice=advice)
+                advice = None
                 result.sql = generated.sql
                 result.reasoning = generated.reasoning
                 rows = self.run_sql(generated.sql)
@@ -564,7 +578,9 @@ class PostgresAgent:
                     error_context = (
                         f"PostgreSQL canceled the query after "
                         f"{self.statement_timeout_ms} ms (statement_timeout). "
-                        f"Failed SQL:\n{result.sql}\n\n"
+                        f"Failed SQL:\n{result.sql}"
+                    )
+                    advice = (
                         "Rewrite the query to do less work: prefer EXISTS over "
                         "correlated subqueries, narrow the date range, drop "
                         "unused JOINs, push filters into derived tables, or "
@@ -632,16 +648,16 @@ class PostgresAgent:
         if self.answer_language != "en":
             language = _LANGUAGE_NAMES.get(self.answer_language, self.answer_language)
             system_prompt += f" Reply in {language}."
+        # The rows are the database's content: a value cannot add to the rules for the answer.
+        material = SourceMaterial()
         user_prompt = (
             f"Question: {question}\n\n"
-            f"SQL query used:\n{query_result.sql}\n\n"
-            f"Query result ({query_result.row_count} row(s)):\n"
-            f"{_format_rows_for_prompt(query_result.rows)}"
+            "SQL query used:\n"
+            + material.wrap(query_result.sql or "", label="SQL query used")
+            + f"\n\nQuery result ({query_result.row_count} row(s)):\n"
+            + material.wrap(_format_rows_for_prompt(query_result.rows), label="query result")
         )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = source_material_messages(system_prompt, user_prompt)
 
         if isinstance(client, ProviderClient):
             response = _with_retries(
