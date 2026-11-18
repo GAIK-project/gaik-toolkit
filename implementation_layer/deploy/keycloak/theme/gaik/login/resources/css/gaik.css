@@ -69,10 +69,21 @@ body#keycloak-bg::after {
   z-index: 1;
   background: transparent;
 }
+/* One column at every width. PatternFly's wide layout puts the header beside
+   the card and pads the container on both sides; with the card's own width
+   capped that padding squeezed the card to a few words per line. */
 .pf-v5-c-login__container {
+  width: 100%;
   max-width: 26rem;
-  grid-template-columns: 1fr;
+  padding-inline: 0;
+  column-gap: 0;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "header" "main" "footer";
+}
+.pf-v5-c-login__header,
+.pf-v5-c-login__main {
+  width: 100%;
+  max-width: none;
 }
 
 /* The GAIK wordmark in place of the realm name. */

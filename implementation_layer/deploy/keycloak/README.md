@@ -25,7 +25,9 @@ browser ──> Route ──> oauth2-proxy (<stack>-signin) ──> web app ─�
 
 - `theme/gaik`: the sign-in pages in the Solution Wizard's look (logo, colours,
   card), on top of Keycloak's own theme. After changing it:
-  `PROJECT=gaik ./deploy.sh theme` (updates it and restarts Keycloak).
+  `PROJECT=gaik ./deploy.sh theme` (updates it and restarts Keycloak). Browsers
+  keep the old CSS for up to an hour (`KC_SPI_THEME__STATIC_MAX_AGE`); check a
+  change at several window widths, the layout changes at PatternFly's breakpoints.
 - `../openshift/signin-templates/error.html`: the proxy's error page. For a user
   still in `pending` it says the account awaits approval and offers a sign-out
   at Keycloak, so they can try another account.
@@ -43,8 +45,9 @@ PROJECT=gaik ./deploy.sh up       # Keycloak + database, realm gaik
 PROJECT=gaik ./deploy.sh setup    # groups in the tokens, approvers, nightly clean-up
 ```
 
-Keycloak is then at `https://gaik-keycloak-<project>.2.rahtiapp.fi`. The admin
-console is `/admin`; the first admin's password is in the Secret
+Keycloak is then at `https://gaik-keycloak-<project>.2.rahtiapp.fi`. The master
+admin's console is `/admin` (realm master: no GAIK account works there; approvers
+use `/admin/gaik/console/`); the first admin's password is in the Secret
 `gaik-keycloak-admin` (`oc extract secret/gaik-keycloak-admin --to=-`). Sign in
 once and change it (and then keep the Secret in step, or `setup`, `add-*` and
 `approve` cannot sign in).

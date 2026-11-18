@@ -144,6 +144,11 @@ items:
                   value: "true"
                 - name: KC_METRICS_ENABLED
                   value: "true"
+                # The sign-in pages' CSS and images are cached for an hour, not
+                # Keycloak's 30 days: their address does not change with the
+                # theme, so a theme change would otherwise reach browsers a month late.
+                - name: KC_SPI_THEME__STATIC_MAX_AGE
+                  value: "3600"
                 # The first admin; deploy.sh made the Secret. Change the password
                 # in the console after the first sign-in.
                 - name: KC_BOOTSTRAP_ADMIN_USERNAME

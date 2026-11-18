@@ -362,3 +362,11 @@ def test_cpu_limits_stay_within_rahtis_ratio() -> None:
             or c["name"] == "keycloak"
         ), c["name"]
         assert millicores(r["limits"]["cpu"]) <= 8 * millicores(r["requests"]["cpu"]), c["name"]
+
+
+def test_a_theme_change_reaches_browsers_within_the_hour() -> None:
+    keycloak = one(keycloak_docs(), "Deployment", "gaik-keycloak")["spec"]["template"]["spec"][
+        "containers"
+    ][0]
+    env = {e["name"]: e.get("value") for e in keycloak["env"]}
+    assert env["KC_SPI_THEME__STATIC_MAX_AGE"] == "3600"
