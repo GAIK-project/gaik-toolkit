@@ -60,6 +60,7 @@ Google, Anthropic and optional LiteLLM text models can be selected through the s
   - `schema_name` (str): Base filename (no `.py`) for saving/loading schema; defaults to `schema`.
 - `schema`: Optional pre-generated schema model to reuse.
 - `requirements`: Optional `ExtractionRequirements` matching the schema.
+- Every name in these dicts must be a parameter of the component it goes to, and stage configs (`config`, `api_config`, `openai_config`) are refused: pass them to the constructor (`api_config`, `transcription_config`, `extraction_config`). A `ValueError` names the option before anything is transcribed.
 
 ### Returns (`PipelineResult`)
 - `transcription`: `TranscriptionResult` with `raw_transcript`, `enhanced_transcript`, `job_id`.

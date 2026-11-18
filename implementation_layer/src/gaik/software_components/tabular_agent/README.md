@@ -178,8 +178,13 @@ security context. Validated SQL gives up charts and modelling in exchange for
 being auditable and deployable anywhere.
 
 Treat spreadsheet contents as untrusted input regardless: cell values reach the
-LLM prompt, so a hostile file can attempt prompt injection. The blast radius is
-bounded to "a wrong answer from your own data" by the two layers above.
+LLM prompt, so a hostile file can attempt prompt injection. Every piece of file
+content the model sees (the sheet grid for layout inference, table and column
+names with their example values, a DuckDB error, the query rows for the answer)
+goes in its own `<source_material>` data block, apart from the rules in the
+system message ([`source_material`](../source_material.py)). This lowers the
+chance that a cell steers the SQL or the answer; it does not remove it. The blast
+radius is bounded to "a wrong answer from your own data" by the two layers above.
 
 ## API
 

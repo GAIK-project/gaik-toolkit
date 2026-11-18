@@ -81,7 +81,9 @@ when a step needs something outside it, stop and ask the user, saying what it wo
 
 ---
 - **A blueprint change makes an AI Act screening outdated.** Whenever you change
-  `use_case.blueprint.json` and `<output_dir>/ai_act_screening.json` exists, run
+  `use_case.blueprint.json` and `<output_dir>/ai_act_screening.json` exists, check it in that same
+  turn, right after you write the change and before you answer the user. Do not leave it until the
+  gates are approved again or the files are regenerated. Run
   `python <screening_dir>/scripts/check_screening.py --pack <output_dir> --status`. If it
   prints `outdated`, run `python <screening_dir>/scripts/render_brief.py --pack <output_dir>
   --outdated`, which puts the outdated line under the title of `docs/ai_act_screening.md`, tell
@@ -540,7 +542,7 @@ Every selected component exposes behaviour-changing options. Read each selected 
   - results must be re-sortable by a business field (date, price, priority), or several ranked lists must be merged into one → add `Ranker` (`order_by(field=..., direction="asc"|"desc")`, `fuse(*lists, weights=...)`). Note `Ranker` returns `list[tuple(Document, float)]` while `Retriever` returns `list[Document]` — use `Ranker.to_documents()` when handing results to `AnswerGenerator`. Do **not** add `Ranker` merely to rank one list from `PgVectorStore.search_hybrid()`, which already fuses with RRF server-side
   - citation/traceability requirement on answers from retrieved documents → `AnswerGenerator.citations = True` (or `RAGWorkflow.citations = True`); on extracted field values (the user wants each value linked to its quote in the source) → add `SourceTracing` (Step 3), not a RAG option. The blueprint's `traceability` section is a different thing: it maps requirements to components
   - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling"` (the accepted literals are `vision_parser`, `docling`, `pymupdf`, `docx` — only the first carries the `_parser` suffix; the registry component *ids* `docling_parser`/`pymupdf_parser`/`docx_parser` are a different namespace and raise `ValueError` if passed here)
-  - access controls on a database → `PostgresAgent.table_allowlist = [...]`
+  - access controls on a database → `PostgresAgent.table_allowlist = [...]` (required for every `PostgresAgent`: the tables the agent may read; collect them before the completeness gate)
   - source spreadsheets are human-facing reports (title rows, subtotals) → `TabularAgent.layout_inference = "auto"` (default; clean machine exports → `"never"` to skip the layout LLM call)
   - `ReportWriter`: its behaviour knobs are `ReportSpec` fields, not constructor or `run()` kwargs, so its card lists them under `spec_fields` and `spec_settings` (same shape as `options`) — read both. `human_review == yes` or accuracy-critical → `strict_review = True` and a separate `reviewer` model; `.docx` output requested → `docx = True` (needs the Pandoc binary; otherwise `docx = False`); audio sources → `transcription_language` from the input language and a `transcription` model; the report must read as an independent text with no source references (customer-facing, or the user says not to cite files or recordings) → `citations = False`, otherwise leave the default `True`
 - **Ask the user** when an option is `selection_relevant` but cannot be inferred from the requirements.
@@ -613,7 +615,7 @@ Then fill the template in:
    - **Embeddings**: configure a separate embedding model/deployment, never the chat model. Anthropic/Foundry has no native embedding API; use another embedding provider. Aitta, custom compatible endpoints and LiteLLM require an explicit offered embedding model. Verify vector dimensions, use the same provider/model for ingestion and query embedding, and rebuild the collection when either changes.
    - **Optional backends**: add `gaik[llm-google]` for native Google/Vertex, `gaik[llm-anthropic]` for Anthropic/Foundry, or `gaik[llm-litellm]` for LiteLLM, alongside component extras. LiteLLM is an optional backend with an explicitly routed model ID such as `azure/<deployment>` or `openai/<model>`; do not add such prefixes to native provider model IDs. Generic OpenAI-compatible endpoints need an explicit `base_url` and model. Aitta uses CSC's documented `https://aitta-api.csc.fi/openai/v1` endpoint and may need its 600-second cold-start timeout.
    - **Endpoints**: Since gaik 0.11.0, a client sends its key only to the provider's own host, the address set in that provider's variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`; plain http works for that address, with a warning outside a private network), this machine for a local model server, Docling or Whisper, and hosts listed in `GAIK_ALLOWED_ENDPOINT_HOSTS`. Anything else raises `EndpointNotAllowedError` (a `ValueError`) when the component is built. The generated PoC's `get_stage_config` also allows a stage address on this machine and the hosts in `models.local_endpoints`, over http too. Read service addresses from those variables. When the user's server is not a self-hosted one on their own network, have them list its host in `GAIK_ALLOWED_ENDPOINT_HOSTS` in `.env` (`http://host` for plain http) rather than in `models.local_endpoints`, which also counts it as local processing; never build that list from user input.
-   - **Sampling and reasoning**: omit temperature (`temperature: null` for constructor parameters) for the default GPT-6 setup unless explicitly using a supported `reasoning_effort: none`. Recognized GPT-6/GPT-5.6 paths normalize incompatible sampling controls; do not describe every newer model as rejecting temperature unconditionally. GPT-6 supports `low`, `medium`, `high`, `xhigh`, and `max`; Sol/Luna also support `none`, Astra does not. Set `model_family` for a custom Azure deployment alias. PostgresAgent/TabularAgent drop their `0.0` default for GPT-6/GPT-5.6 automatically; pass `temperature=None` only for other reasoning deployments that reject it. For other model families and native Google/Anthropic, verify their own options rather than applying OpenAI rules globally.
+   - **Sampling and reasoning**: omit temperature (`temperature: null` for constructor parameters) for the default GPT-6 setup unless explicitly using a supported `reasoning_effort: none`. Recognized GPT-6/GPT-5.6 paths normalize incompatible sampling controls; do not describe every newer model as rejecting temperature unconditionally. GPT-6 supports `low`, `medium`, `high`, `xhigh`, and `max`; Sol/Luna also support `none`, Astra does not. Set `model_family` for a custom Azure deployment alias. PostgresAgent/TabularAgent drop their `0.0` default for GPT-6/GPT-5.6 automatically; pass `temperature=None` only for other reasoning deployments that reject it. SchemaGenerator is the exception to omitting temperature: keep its defaults, since with no effort its requirements parses send GPT-6 Sol/Luna and GPT-5.6 `reasoning_effort='none'` so their `temperature=0` applies (reasoning with free sampling dropped fields); give it an effort only when schema design should reason. For other model families and native Google/Anthropic, verify their own options rather than applying OpenAI rules globally.
    - Omit an unspecified reasoning effort rather than treating omission as guaranteed zero reasoning. With shared `api_config`, VisionExtractor/MultimodalParser read a configured effort from that dictionary; their legacy constructor defaults do not force that effort on the shared client. GPT-6 tool calling with reasoning requires the Responses API; the shared Chat Completions path does not make that combination available automatically.
    If a required provider, model or capability is unavailable, record the gap and resolve that stage's choice with the user before claiming the PoC is runnable.
 
@@ -822,6 +824,9 @@ Before proposing any change, classify it using the table below. The rule is:
 | Template wiring bug fixed but blueprint intent unchanged | **No** -- patch `poc/run_poc.py` or raise an issue against the template | Optionally update the component reference card; no blueprint or docs change needed |
 | Change prompted by an AI Act screening and accepted by the user: purpose, users, extracted fields, human review, output audience | **Yes** -- update the affected specs, and store the screening facts in `business_spec.ai_act_context` | Re-validate; regenerate the affected diagrams, docs and PoC files; then the screening is outdated (see Constraints) |
 
+After any change in the table above that touches the blueprint, check an existing AI Act screening
+in the same turn (see Constraints: a blueprint change makes an AI Act screening outdated).
+
 **When to update the docs during Gate 3:** only regenerate and re-fill the affected document(s) — do not regenerate all five unless the blueprint itself changes significantly.
 
 | Change type | Doc(s) to update |
@@ -925,6 +930,12 @@ Your complete solution package is in: <output_dir>/
 3. **Offer the AI Act screening (optional).** Ask:
 
    > Would you like a preliminary EU AI Act screening of this solution?
+
+   Put the question in your Phase 12 message itself, as its last paragraph, right after the
+   package listing above. Ask it for every solution, in these words, as a question and not as a
+   remark ("an optional screening is available", "ask me if you want one"). Do not judge whether
+   this use case needs one, and do not call it low-risk or out of scope: that is what the
+   screening is for. A user who does not answer has declined, and one who asks for it later gets it.
 
    If the user declines, the wizard is finished: nothing later depends on the screening. If they
    agree, load `<screening_dir>/SKILL.md` and follow it on `<output_dir>`. It screens the **intended

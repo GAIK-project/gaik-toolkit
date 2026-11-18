@@ -31,14 +31,17 @@ export default function SkillsPage() {
           Install the plugin
         </h2>
         <InstallPlugin />
-        <AgentLogos lead="Skills also work in" which={["cursor", "gemini"]}>
+        <AgentLogos
+          lead="Skills also work in"
+          which={["cursor", "gemini", "vscode", "chatgpt"]}
+        >
           <a
             href={installGuideUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-foreground flex items-center gap-1.5 underline underline-offset-4"
           >
-            VS Code, ChatGPT and other clients
+            Steps for these and other clients
             <ExternalLink className="size-3.5" aria-hidden="true" />
           </a>
         </AgentLogos>
