@@ -501,7 +501,8 @@ def sync_blueprint_from_draft(
     if from_file:
         # The draft too: one read before the lock could be older than a draft
         # another sync adopted meanwhile, and would be written over it.
-        content = _draft_content(read_draft_blueprint(session.output_dir))
+        draft = read_draft_blueprint(session.output_dir)
+        content = _draft_content(draft)
         if content is None:
             db.commit()
             return False
@@ -518,7 +519,7 @@ def sync_blueprint_from_draft(
         adopted != digest and not adopted_before and (active is None or active.content != content)
     )
     if added:
-        blueprint_service.add_version(db, session, note=note, content=content)
+        blueprint_service.add_version(db, session, note=note, content=content, draft=draft)
     session.session_metadata = {**session.session_metadata, ADOPTED_DRAFT_KEY: digest}
     db.commit()
     db.refresh(session)

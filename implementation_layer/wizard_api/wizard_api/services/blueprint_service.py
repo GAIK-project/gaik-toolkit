@@ -122,6 +122,7 @@ def add_version(
     *,
     note: str,
     content: dict | None = None,
+    draft: dict | None = None,
 ) -> BlueprintVersion:
     latest = get_latest_version(db, session.id)
     next_version = 1 if latest is None else latest.version + 1
@@ -135,6 +136,7 @@ def add_version(
         version=next_version,
         note=note,
         content=body,
+        draft=draft,
     )
     db.add(version)
     session.active_version = next_version
@@ -164,5 +166,26 @@ def get_active_version(db: Session, session: WizardSession) -> BlueprintVersion 
     stmt = select(BlueprintVersion).where(
         BlueprintVersion.session_id == session.id,
         BlueprintVersion.version == session.active_version,
+    )
+    return db.scalars(stmt).first()
+
+
+def get_active_draft(db: Session, session: WizardSession) -> dict | None:
+    """The full draft stored with the active version, or None when it has none."""
+    active = get_active_version(db, session)
+    return active.draft if active is not None else None
+
+
+def get_previous_draft_version(db: Session, session: WizardSession) -> BlueprintVersion | None:
+    """The newest version older than the active one that carries a full draft."""
+    stmt = (
+        select(BlueprintVersion)
+        .where(
+            BlueprintVersion.session_id == session.id,
+            BlueprintVersion.version < session.active_version,
+            BlueprintVersion.draft.is_not(None),
+        )
+        .order_by(BlueprintVersion.version.desc())
+        .limit(1)
     )
     return db.scalars(stmt).first()
