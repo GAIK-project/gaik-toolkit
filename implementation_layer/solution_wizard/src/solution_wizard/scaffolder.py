@@ -21,6 +21,7 @@ import hashlib
 import json
 import keyword
 import re
+import shutil
 import string
 from pathlib import Path
 from typing import Any
@@ -1582,6 +1583,14 @@ TEST_PAGE_TEMPLATES = {
     "app.py": "_common/app.py.tmpl",
     "ui/index.html": "_common/ui/index.html",
 }
+#: The page's own files beside index.html, copied as they are: the Sora font
+#: (SIL Open Font License 1.1, its text beside the files) and the GAIK mark.
+_PAGE_ASSETS = (
+    "fonts/sora-latin-wght-normal.woff2",
+    "fonts/sora-latin-ext-wght-normal.woff2",
+    "fonts/OFL.txt",
+    "gaik.svg",
+)
 
 
 def _short(value: Any, limit: int) -> str:
@@ -1653,6 +1662,51 @@ def _page_output_fields(spec: Any) -> list[dict[str, str]]:
     return fields
 
 
+#: workflow step type -> what the page calls the step. An automated task is "ai"
+#: when a gaik component does it and "auto" otherwise; anything else is a plain step.
+_STEP_KINDS = {
+    "user_task": "input",
+    "human_review": "review",
+    "decision": "decision",
+}
+_MAX_PAGE_STEPS = 30
+_MAX_STEP_ARTIFACTS = 6
+
+
+def _artifact_names(names: Any) -> list[str]:
+    """Artifact ids as words ("purchase_order_json" -> "purchase order json")."""
+    if not isinstance(names, list):
+        return []
+    shown = (_short(str(name).replace("_", " "), 80) for name in names[:_MAX_STEP_ARTIFACTS])
+    return [name for name in shown if name]
+
+
+def _page_steps(blueprint: Blueprint) -> list[dict[str, Any]]:
+    """The workflow's steps in the order they run, for the page's "how it works" strip.
+
+    Each step is its title, what kind of step it is, the gaik component that does
+    it (where one does) and the artifacts it uses and gives. A blueprint without
+    steps gives an empty list, and the page shows no strip.
+    """
+    steps: list[dict[str, Any]] = []
+    for step in _topo_order(list(blueprint.workflow.steps))[:_MAX_PAGE_STEPS]:
+        title = _short(step.name, 200) or _short(str(step.id).replace("_", " "), 200)
+        if not title:
+            continue
+        component = _short(step.component, 100)
+        if str(step.type) == "automated_task":
+            kind = "ai" if component else "auto"
+        else:
+            kind = _STEP_KINDS.get(str(step.type), "step")
+        item: dict[str, Any] = {"id": _short(step.id, 100), "title": title, "kind": kind}
+        if component:
+            item["component"] = component
+        item["uses"] = _artifact_names(step.inputs)
+        item["gives"] = _artifact_names(step.outputs)
+        steps.append(item)
+    return steps
+
+
 def _solution_description(
     blueprint: Blueprint, variables: dict[str, Any], pattern: str
 ) -> dict[str, Any]:
@@ -1673,6 +1727,7 @@ def _solution_description(
         "asks_question": asks_question,
         "question_label": _QUESTION_LABELS[ui_language] if asks_question else "",
         "output_fields": _page_output_fields(blueprint.target_output_spec),
+        "steps": _page_steps(blueprint),
     }
 
 
@@ -1692,11 +1747,12 @@ def _json_for_page(data: Any) -> str:
 def _write_test_page(
     blueprint: Blueprint, variables: dict[str, Any], pattern: str, poc_dir: Path
 ) -> list[Path]:
-    """Write the package's own test page: app.py, ui/index.html and ui/solution.json.
+    """Write the package's own test page: app.py and ui/ (the page, its assets, solution.json).
 
-    The server and the page are the same files in every package
-    (:data:`TEST_PAGE_TEMPLATES`); only ``ui/solution.json`` comes from the
-    blueprint, and as data. No blueprint value is written into the code or the markup.
+    The server and the page (:data:`TEST_PAGE_TEMPLATES`) and the page's assets
+    (its font files with their licence, the GAIK mark) are the same files in every
+    package; only ``ui/solution.json`` comes from the blueprint, and as data. No
+    blueprint value is written into the code or the markup.
     """
     written = []
     for relative, template in TEST_PAGE_TEMPLATES.items():
@@ -1708,7 +1764,14 @@ def _write_test_page(
     data_path.write_text(
         _json_for_page(_solution_description(blueprint, variables, pattern)), encoding="utf-8"
     )
-    return [*written, data_path]
+    written.append(data_path)
+    source_dir = TEMPLATES_DIR / "_common" / "ui"
+    for relative in _PAGE_ASSETS:
+        target = poc_dir / "ui" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_dir / relative, target)
+        written.append(target)
+    return written
 
 
 # ---------------------------------------------------------------------------

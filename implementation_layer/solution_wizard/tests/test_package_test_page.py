@@ -9,6 +9,7 @@ import ast
 import hashlib
 import http.client
 import importlib.util
+import io
 import json
 import os
 import signal
@@ -17,7 +18,9 @@ import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
+import types
+import zipfile
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -25,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from solution_wizard.blueprint import Blueprint  # noqa: E402
-from solution_wizard.scaffolder import scaffold_poc  # noqa: E402
+from solution_wizard.scaffolder import _artifact_names, scaffold_poc  # noqa: E402
 from test_hybrid_generic import _hybrid_blueprint  # noqa: E402
 
 WIZARD_DIR = Path(__file__).parent.parent
@@ -259,6 +262,9 @@ class Page:
         spec.loader.exec_module(self.app)
         self.server = self.app.create_server(poc, host, 0, **limits)
         self.address, self.port = self.server.server_address[:2]
+        if host in ("0.0.0.0", "::"):
+            # Listening on every address: this computer reaches it on its loopback.
+            self.address = "127.0.0.1"
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
@@ -911,6 +917,469 @@ def test_a_run_that_cannot_be_prepared_leaves_no_folder_and_no_keys(page, step):
 
 
 # ---------------------------------------------------------------------------
+# The steps, the page's own files and the source code
+# ---------------------------------------------------------------------------
+
+PAGE_ASSETS = (
+    "ui/fonts/sora-latin-wght-normal.woff2",
+    "ui/fonts/sora-latin-ext-wght-normal.woff2",
+    "ui/fonts/OFL.txt",
+    "ui/gaik.svg",
+)
+
+
+def _described(poc: Path) -> dict:
+    return json.loads((poc / "ui" / "solution.json").read_text(encoding="utf-8"))
+
+
+def _link(link: Path, target: Path) -> None:
+    """A symlink, or a skip where this account may not make one (Windows)."""
+    try:
+        link.symlink_to(target, target_is_directory=target.is_dir())
+    except (OSError, NotImplementedError):
+        pytest.skip("this account cannot make a symlink")
+
+
+def test_the_steps_are_the_workflow_in_the_order_it_runs(tmp_path):
+    bp = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
+    in_order = [step.id for step in bp.workflow.steps]
+    # The order comes from what each step depends on, not from the order they are written in.
+    bp.workflow.steps.reverse()
+    steps = _described(_scaffold(tmp_path, bp))["steps"]
+
+    assert [step["id"] for step in steps] == in_order
+    assert steps[0] == {
+        "id": "record_observation",
+        "title": "Record voice description and optional photo",
+        "kind": "input",
+        "uses": [],
+        "gives": ["incident audio", "incident photo"],
+    }
+    assert steps[1] == {
+        "id": "transcribe_audio",
+        "title": "Transcribe audio recording",
+        "kind": "ai",
+        "component": "Transcriber",
+        "uses": ["incident audio"],
+        "gives": ["raw transcript"],
+    }
+    by_id = {step["id"]: step for step in steps}
+    assert by_id["human_review"]["kind"] == "review"
+    assert "component" not in by_id["human_review"]
+
+
+def test_a_step_kind_follows_the_step_type_and_its_component(tmp_path):
+    bp = Blueprint.from_file(EXAMPLES / "document_extraction_blueprint.json")
+    upload, extract = bp.workflow.steps
+    extract.component = None
+    kinds = [step["kind"] for step in _described(_scaffold(tmp_path / "a", bp))["steps"]]
+    assert kinds == ["input", "auto"]
+
+    upload.type = "decision"
+    extract.type = "something_new"
+    kinds = [step["kind"] for step in _described(_scaffold(tmp_path / "b", bp))["steps"]]
+    assert kinds == ["decision", "step"]
+
+
+def test_hostile_step_text_is_inert_data_in_solution_json(tmp_path):
+    bp = Blueprint.from_file(EXAMPLES / "document_extraction_blueprint.json")
+    step = bp.workflow.steps[1]
+    step.name = HOSTILE + "\nsecond line third"
+    step.component = HOSTILE
+    poc = _scaffold(tmp_path, bp)
+
+    raw = (poc / "ui" / "solution.json").read_text(encoding="utf-8")
+    assert not any(char in raw for char in "<>&  ")
+    shown = json.loads(raw)["steps"][1]
+    assert shown["title"] == HOSTILE + " second line third"
+    assert shown["component"] == HOSTILE
+    assert shown["uses"] == ["source pdf"]
+    assert shown["gives"] == ["purchase order json"]
+    # An artifact name with markup in it never reaches a package (the scaffolder
+    # refuses the blueprint); the names are cut to plain one-line text all the same.
+    assert _artifact_names(["a_b", HOSTILE + "\nx", "", 7]) == ["a b", HOSTILE + " x", "7"]
+    assert _artifact_names(None) == []
+    # The page and the server are still the templates.
+    for written, template in (("ui/index.html", "ui/index.html"), ("app.py", "app.py.tmpl")):
+        assert (poc / written).read_text("utf-8") == (COMMON / template).read_text("utf-8")
+
+
+def test_a_blueprint_without_steps_gives_no_steps_and_the_page_shows_no_strip(tmp_path):
+    bp = Blueprint.from_file(EXAMPLES / "document_extraction_blueprint.json")
+    bp.workflow.steps = []
+    assert _described(_scaffold(tmp_path, bp))["steps"] == []
+
+    page = (COMMON / "ui" / "index.html").read_text(encoding="utf-8")
+    # The strip is hidden in the markup and shown only when there is a step to show.
+    assert '<section id="how" aria-labelledby="how-heading" hidden>' in page
+    assert 'show($("how"), steps.length > 0)' in page
+
+
+def test_the_pages_own_files_are_the_same_in_every_package(tmp_path):
+    result = scaffold_poc(
+        Blueprint.from_file(EXAMPLES / "document_extraction_blueprint.json"), tmp_path
+    )
+    poc = result["poc_dir"]
+
+    for name in PAGE_ASSETS:
+        assert poc / name in result["files"], name
+        assert (poc / name).read_bytes() == (COMMON / name).read_bytes(), name
+    # The font travels with its licence, and both font files are fonts.
+    assert "SIL OPEN FONT LICENSE Version 1.1" in (poc / "ui/fonts/OFL.txt").read_text("utf-8")
+    for name in PAGE_ASSETS[:2]:
+        assert (poc / name).read_bytes()[:4] == b"wOF2", name
+    page = (poc / "ui" / "index.html").read_text(encoding="utf-8")
+    for name in (*PAGE_ASSETS[:2], PAGE_ASSETS[3]):
+        assert f'"{name}"' in page, name
+
+
+def test_the_fonts_and_the_mark_are_served(page):
+    _, headers, _ = page.request("GET", "/")
+    assert "font-src 'self'" in headers["Content-Security-Policy"]
+
+    for name, content_type in (
+        ("ui/fonts/sora-latin-wght-normal.woff2", "font/woff2"),
+        ("ui/fonts/sora-latin-ext-wght-normal.woff2", "font/woff2"),
+        ("ui/gaik.svg", "image/svg+xml"),
+    ):
+        status, headers, body = page.request("GET", "/" + name)
+        assert status == 200, name
+        assert headers["Content-Type"] == content_type
+        assert headers["X-Content-Type-Options"] == "nosniff"
+        # Opened as a document of its own, the file runs nothing.
+        assert "default-src 'none'" in headers["Content-Security-Policy"]
+        assert "script-src" not in headers["Content-Security-Policy"]
+        assert body == (page.poc / name).read_bytes()
+
+    assert page.request("GET", "/ui/gaik.svg", headers={"Host": "attacker.example"})[0] == 403
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "../app.py",
+        "..%2Fapp.py",
+        "%2e%2e/app.py",
+        "..%5Capp.py",
+        "fonts/../../.env",
+        "fonts/..%2F..%2F.env",
+        "fonts%5C..%5C..%5C.env",
+        "fonts/%2e%2e/%2e%2e/config.yaml",
+        "/etc/passwd",
+        "%2Fetc%2Fpasswd",
+        "..%2Fsecret.woff2",
+        "fonts/..%2F..%2Fsecret.woff2",
+        "fonts/.hidden.woff2",
+        "fonts/OFL.txt",
+        "fonts/missing.woff2",
+        "fonts/",
+        "solution.json",
+        "index.html",
+        "",
+    ],
+)
+def test_the_assets_route_serves_the_pages_fonts_and_mark_only(page, name):
+    (page.poc / ".env").write_text("AZURE_OPENAI_API_KEY=not-a-real-key\n", encoding="utf-8")
+    # A file of a served kind outside ui/, and a hidden one inside it.
+    (page.poc / "secret.woff2").write_bytes(b"wOF2 outside ui")
+    (page.poc / "ui" / "fonts" / ".hidden.woff2").write_bytes(b"wOF2 hidden")
+
+    status, _, body = page.request("GET", f"/ui/{name}")
+
+    assert status == 404
+    assert json.loads(body)["error"]["code"] == "not_found"
+    assert b"not-a-real-key" not in body
+
+
+def test_a_link_among_the_fonts_is_not_served(page, tmp_path):
+    outside = tmp_path / "outside.woff2"
+    outside.write_bytes(b"wOF2 from outside the package")
+    _link(page.poc / "ui" / "fonts" / "linked.woff2", outside)
+
+    assert page.request("GET", "/ui/fonts/linked.woff2")[0] == 404
+
+
+def _source(page) -> tuple[dict, dict[str, bytes]]:
+    """The source zip's response headers and its entries by name."""
+    status, headers, body = page.request("GET", "/api/source")
+    assert status == 200
+    with zipfile.ZipFile(io.BytesIO(body)) as archive:
+        assert archive.testzip() is None
+        return headers, {name: archive.read(name) for name in archive.namelist()}
+
+
+def test_the_source_zip_is_the_package_without_keys_inputs_and_results(page):
+    poc = page.poc
+    secret = "not-a-real-key-7f3a"
+    for name in (".env", ".env.local", ".env.keys", "prod.env", "evals/.env"):
+        (poc / name).write_text(f"AZURE_OPENAI_API_KEY={secret}\n", encoding="utf-8")
+    (poc / "server.pem").write_text(secret, encoding="utf-8")
+    (poc / "sample_input").mkdir(exist_ok=True)
+    (poc / "sample_input" / "customer.pdf").write_bytes(b"%PDF " + secret.encode())
+    (poc / "output" / "earlier_result.json").write_text(f'{{"k": "{secret}"}}', encoding="utf-8")
+    for folder in ("__pycache__", "schemas/__pycache__", ".venv/Lib", "tryout", ".git", "venv"):
+        (poc / folder).mkdir(parents=True, exist_ok=True)
+    (poc / "__pycache__" / "run_poc.cpython-312.pyc").write_bytes(b"\x00")
+    (poc / "schemas" / "__pycache__" / "output_schema.cpython-312.pyc").write_bytes(b"\x00")
+    (poc / "schemas" / "stray.pyc").write_bytes(b"\x00")
+    (poc / ".venv" / "pyvenv.cfg").write_text("home = x\n", encoding="utf-8")
+    (poc / ".venv" / "Lib" / "site.py").write_text("# an environment's file\n", encoding="utf-8")
+    # A virtual environment under a name of the user's own.
+    (poc / "tryout" / "pyvenv.cfg").write_text("home = x\n", encoding="utf-8")
+    (poc / "tryout" / "site.py").write_text("# an environment's file\n", encoding="utf-8")
+    (poc / "venv" / "site.py").write_text("# an environment's file\n", encoding="utf-8")
+    (poc / ".git" / "config").write_text("[core]\n", encoding="utf-8")
+    # Hidden files other than .env that hold credentials (review of #229) ...
+    for name in (".netrc", ".npmrc", ".pypirc", ".git-credentials", "prompts/.netrc"):
+        (poc / name).write_text(f"password {secret}\n", encoding="utf-8")
+    # ... files whose name says they hold one, also where code and schemas live ...
+    for name in (
+        "credentials.json",
+        "service-account.json",
+        "secrets.toml",
+        "id_rsa",
+        "client_secret.json",
+        "token.json",
+        "schemas/credentials.json",
+        "prompts/service_account.json",
+        "api_secrets.py",
+        # ... an API key's own name (second review of #229) ...
+        "prompts/api_key.txt",
+        "openai_apikey.json",
+        "schemas/api-keys.yaml",
+    ):
+        (poc / name).write_text(f'{{"key": "{secret}"}}\n', encoding="utf-8")
+    # ... the user's own ground truth for the evaluation ...
+    (poc / "evals" / "ground_truth" / "order_1042.json").write_text(
+        f'{{"customer": "{secret}"}}', encoding="utf-8"
+    )
+    (poc / "evals" / "ground_truth" / "check.py").write_text(f"# {secret}\n", encoding="utf-8")
+    # ... also where the folder's name is written in another case: on Windows and
+    # macOS it is the same folder (second review of #229).
+    (poc / "Evals" / "Ground_Truth").mkdir(parents=True, exist_ok=True)
+    (poc / "Evals" / "Ground_Truth" / "case_2.py").write_text(f"# {secret}\n", encoding="utf-8")
+    # ... and a file nobody thought of: not code, a setting or a schema.
+    (poc / "notes.md").write_text(f"The user's own note: {secret}\n", encoding="utf-8")
+    (poc / "ui" / "notes.txt").write_text(secret, encoding="utf-8")
+    # A run before the download: its working folder and uploads are not the package's.
+    assert page.run(files=[("order.pdf", b"%PDF " + secret.encode())])[0] == 200
+
+    headers, files = _source(page)
+    # Written by the scaffolder where the installed gaik has saved_schema (not in
+    # CI, which installs the wizard without gaik): it is the package's own schema.
+    with_gaik = ["schemas/output_schema_model.json"]
+    from_gaik = [name for name in with_gaik if (poc / name).is_file()]
+
+    assert headers["Content-Type"] == "application/zip"
+    assert (
+        headers["Content-Disposition"]
+        == 'attachment; filename="purchase_order_extraction-source.zip"'
+    )
+    assert headers["X-Content-Type-Options"] == "nosniff"
+    folder = "purchase_order_extraction-source/"
+    assert all(name.startswith(folder) for name in files)
+    assert {name.removeprefix(folder) for name in files} == {
+        ".env.example",
+        "README.md",
+        "app.py",
+        "config.yaml",
+        "document_manifest.py",
+        "input_bundle.py",
+        "poc_output.py",
+        "provider_config.py",
+        "requirements.txt",
+        "run_poc.py",
+        "evals/run_basic_eval.py",
+        "prompts/extraction_requirements.md",
+        "schemas/output_schema.json",
+        "schemas/output_schema.py",
+        "schemas/output_schema_requirements.json",
+        "ui/index.html",
+        "ui/solution.json",
+        *PAGE_ASSETS,
+        *from_gaik,
+    }
+    assert not any(secret.encode() in content for content in files.values())
+    # What is in the zip is the package's files, byte for byte.
+    for name in ("app.py", "run_poc.py", "ui/index.html", "ui/fonts/sora-latin-wght-normal.woff2"):
+        assert files[folder + name] == (poc / name).read_bytes(), name
+
+
+def test_a_link_in_the_package_is_not_in_the_source_zip(page, tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "id_rsa.txt").write_text("a file outside the package", encoding="utf-8")
+    _link(page.poc / "linked.txt", outside / "id_rsa.txt")
+    _link(page.poc / "linked_folder", outside)
+    _link(page.poc / "prompts" / "linked.md", outside / "id_rsa.txt")
+
+    _, files = _source(page)
+
+    assert any(name.endswith("/run_poc.py") for name in files)
+    assert not any("linked" in name or "id_rsa" in name for name in files)
+    assert not any(b"outside the package" in content for content in files.values())
+
+
+def test_a_file_too_large_to_be_source_code_is_left_out(page):
+    (page.poc / "table_data.py").write_bytes(b"#" * (page.app.MAX_SOURCE_FILE_BYTES + 1))
+
+    _, files = _source(page)
+
+    assert not any(name.endswith("table_data.py") for name in files)
+    assert any(name.endswith("/run_poc.py") for name in files)
+
+
+def test_the_zips_page_files_are_the_ones_the_scaffolder_writes(page):
+    """app.py lists the page's files itself; it must name what the scaffolder writes."""
+    from solution_wizard.scaffolder import _PAGE_ASSETS, TEST_PAGE_TEMPLATES
+
+    written = {name.removeprefix("ui/") for name in TEST_PAGE_TEMPLATES if name.startswith("ui/")}
+    assert page.app._PAGE_FILES == written | set(_PAGE_ASSETS) | {"solution.json"}
+    _, files = _source(page)
+    assert {name.split("/", 1)[1] for name in files if "/ui/" in name} == {
+        f"ui/{name}" for name in page.app._PAGE_FILES
+    }
+
+
+def test_a_file_with_a_second_hard_link_is_not_in_the_source_zip(page, tmp_path):
+    """A hard link is a file from elsewhere under a name of the package's."""
+    outside = tmp_path / "outside.py"
+    outside.write_text("# a file outside the package\n", encoding="utf-8")
+    try:
+        os.link(outside, page.poc / "helper.py")
+    except (OSError, NotImplementedError):
+        pytest.skip("this file system cannot make a hard link")
+
+    _, files = _source(page)
+
+    assert not any(name.endswith("/helper.py") for name in files)
+    assert any(name.endswith("/run_poc.py") for name in files)
+
+
+def test_a_package_over_the_size_limit_is_refused_not_cut_short(page, monkeypatch):
+    """The zip is built in memory: there is a limit on what it holds in all."""
+    sizes = sorted(
+        (page.poc / name).stat().st_size for name, _ in page.server.solution.source_files()
+    )
+    monkeypatch.setattr(page.app, "MAX_SOURCE_BYTES", sum(sizes) - 1)
+
+    status, _, body = page.request("GET", "/api/source")
+
+    assert status == 413
+    assert json.loads(body)["error"]["code"] == "too_large"
+
+    monkeypatch.setattr(page.app, "MAX_SOURCE_BYTES", sum(sizes))
+    assert page.request("GET", "/api/source")[0] == 200
+
+
+def test_a_head_request_does_not_build_the_zip(page, monkeypatch):
+    def not_built():
+        raise AssertionError("HEAD built the zip")
+
+    monkeypatch.setattr(page.server.solution, "source_zip", not_built)
+
+    status, headers, body = page.request("HEAD", "/api/source")
+
+    assert status == 200
+    assert body == b""
+    assert headers["Content-Type"] == "application/zip"
+    assert headers["Content-Disposition"].startswith("attachment;")
+    assert "Content-Length" not in headers
+
+
+def test_the_source_download_is_on_while_the_server_listens_on_this_computer_only(page):
+    assert page.server.source_download is True
+    assert page.get_json("/api/solution")[1]["source_download"] is True
+    assert page.request("GET", "/api/source")[0] == 200
+    # The page shows its download only while the server says it is on.
+    html = (COMMON / "ui" / "index.html").read_text(encoding="utf-8")
+    assert 'show($("source"), solution.source_download !== false)' in html
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="listening on every address makes the Windows firewall ask for leave on screen",
+)
+def test_the_source_download_is_off_while_the_server_listens_on_the_network(tmp_path):
+    """With --host, /api/source handed the package tree to anyone who could reach it."""
+    served = Page(_scaffold(tmp_path), host="0.0.0.0")
+    try:
+        assert served.server.source_download is False
+        for method in ("GET", "HEAD"):
+            status, _, body = served.request(method, "/api/source")
+            assert status == 403, method
+        status, _, body = served.request("GET", "/api/source")
+        assert json.loads(body)["error"] == {
+            "code": "source_off",
+            "message": (
+                "The source code download is off while the test page listens on the network "
+                "(--host). Start it without --host to download the source code."
+            ),
+        }
+        assert served.get_json("/api/solution")[1]["source_download"] is False
+        # The rest of the page works as before.
+        assert served.request("GET", "/")[0] == 200
+    finally:
+        served.close()
+
+
+@pytest.mark.parametrize(
+    ("address", "loopback"),
+    [
+        ("127.0.0.1", True),
+        ("127.0.0.2", True),
+        ("::1", True),
+        ("0.0.0.0", False),
+        ("::", False),
+        ("192.168.1.20", False),
+        ("fe80::1%eth0", False),
+        ("", False),
+    ],
+)
+def test_only_a_loopback_address_keeps_the_source_download(page, address, loopback):
+    assert page.app._is_loopback(address) is loopback
+
+
+@pytest.mark.parametrize(
+    ("solution_id", "name"),
+    [
+        ('../..\\evil"\r\nSet-Cookie: x=1', "evil-Set-Cookie-x-1-source.zip"),
+        ("työ aika", "ty-aika-source.zip"),
+        ("", "solution-source.zip"),
+        (None, "solution-source.zip"),
+    ],
+)
+def test_the_source_zip_is_named_after_the_solution_in_safe_characters(page, solution_id, name):
+    described = _described(page.poc)
+    described["id"] = solution_id
+    (page.poc / "ui" / "solution.json").write_text(json.dumps(described), encoding="utf-8")
+
+    headers, files = _source(page)
+
+    assert headers["Content-Disposition"] == f'attachment; filename="{name}"'
+    assert "Set-Cookie" not in headers
+    assert all(entry.startswith(name.removesuffix(".zip") + "/") for entry in files)
+
+
+def test_a_page_on_another_site_cannot_take_the_source(page):
+    assert page.request("GET", "/api/source", headers={"Host": "attacker.example"})[0] == 403
+    foreign = {"Origin": "https://attacker.example"}
+    assert page.request("GET", "/api/source", headers=foreign)[0] == 403
+    own = {"Origin": f"http://127.0.0.1:{page.port}"}
+    assert page.request("GET", "/api/source", headers=own)[0] == 200
+
+
+def test_the_page_links_the_source_download_and_the_readme_names_it(tmp_path):
+    page = (COMMON / "ui" / "index.html").read_text(encoding="utf-8")
+    assert 'href="/api/source" download' in page
+    assert "Download source code" in page
+    assert "Lataa lähdekoodi" in page
+
+    readme = (_scaffold(tmp_path) / "README.md").read_text(encoding="utf-8")
+    assert "GET /api/source" in readme
+
+
+# ---------------------------------------------------------------------------
 # Second review (17 Nov 2026): stop signals, --host and a busy server
 # ---------------------------------------------------------------------------
 
@@ -1214,9 +1683,15 @@ def test_a_module_in_the_package_does_not_stand_in_for_the_standard_library(tmp_
         text=True,
         encoding="utf-8",
     )
+    # A server that never prints its address is stopped, so the read below ends.
+    stop = threading.Timer(30, server.kill)
+    stop.start()
     try:
         first = server.stdout.readline()
-        assert first.startswith("Test page: http://127.0.0.1:"), first + server.stdout.read()
+        stop.cancel()
+        if not first.startswith("Test page: http://127.0.0.1:"):
+            server.kill()
+            pytest.fail(f"the server did not start: {first}{server.stdout.read()}")
         port = int(first.strip().rsplit(":", 1)[1])
         assert _request("127.0.0.1", port, "GET", "/api/solution")[0] == 200
         status, _, _ = _request(
@@ -1224,6 +1699,7 @@ def test_a_module_in_the_package_does_not_stand_in_for_the_standard_library(tmp_
         )
         assert status == 403
     finally:
+        stop.cancel()
         server.kill()
         server.wait(timeout=10)
         server.stdout.close()
@@ -1302,3 +1778,211 @@ def test_files_that_trickle_in_are_refused_once_they_take_too_long(page, monkeyp
     assert answer["error"]["code"] == "too_slow"
     assert page.get_json("/api/status")[1]["busy"] is False
     assert page.run(files=[("order.pdf", b"%PDF")])[0] == 200
+
+
+# ---------------------------------------------------------------------------
+# Second review of #229, round 2 (17 Nov 2026)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "Sample_Input/notes.py",
+        "OUTPUT/result.py",
+        "Evals/Ground_Truth/case.py",
+        "EVALS/GROUND_TRUTH/case.py",
+        "Venv/Lib/site.py",
+        "schemas/__PYCACHE__/x.py",
+        "prompts/API_KEY.txt",
+        "ApiKey.py",
+    ],
+)
+def test_a_folder_or_name_in_another_case_is_not_source_either(page, relative):
+    """Compared case by case, Output/ on Windows or macOS was not output/."""
+    assert page.app._is_source(PurePosixPath(relative)) is False
+
+
+def test_code_named_like_a_key_word_is_still_source(page):
+    for relative in ("tokenizer.py", "keyword_rules.py", "schemas/output_schema.py", "api.py"):
+        assert page.app._is_source(PurePosixPath(relative)) is True, relative
+
+
+def test_an_env_example_that_gives_a_key_a_value_is_not_in_the_source_zip(page):
+    """The value check wizard_api makes on .env.example was not made here."""
+    example = page.poc / ".env.example"
+    folder = "purchase_order_extraction-source/"
+    template = example.read_text(encoding="utf-8")
+
+    example.write_text(template + "AZURE_OPENAI_API_KEY=not-a-real-key-7f3a\n", encoding="utf-8")
+    _, files = _source(page)
+    assert folder + ".env.example" not in files
+    assert not any(b"not-a-real-key-7f3a" in content for content in files.values())
+
+    # Saved with a byte order mark, as Windows editors do, or in UTF-16: the key on
+    # the first line was missed (found by a second reader on #229, round 2).
+    for written in (
+        b"\xef\xbb\xbfAZURE_OPENAI_API_KEY=not-a-real-key-7f3a\n",
+        "AZURE_OPENAI_API_KEY=not-a-real-key-7f3a\n".encode("utf-16"),
+    ):
+        example.write_bytes(written)
+        _, files = _source(page)
+        assert folder + ".env.example" not in files, written[:4]
+
+    placeholders = "AZURE_OPENAI_API_KEY=<your key>\nHF_TOKEN=\n# OPENAI_API_KEY=xxxx\n"
+    example.write_text(template + placeholders + "MAX_TOKENS=4000\n", encoding="utf-8")
+    _, files = _source(page)
+    assert files[folder + ".env.example"] == example.read_bytes()
+
+
+@pytest.mark.parametrize(
+    ("text", "valued"),
+    [
+        ("AZURE_OPENAI_API_KEY=\n", []),
+        ("AZURE_OPENAI_API_KEY=abc123\n", ["AZURE_OPENAI_API_KEY"]),
+        ("export HF_TOKEN='hf_abc'\n", ["HF_TOKEN"]),
+        ("# CLIENT_SECRET=s3cr3t\n", ["CLIENT_SECRET"]),
+        ("OPENAI_API_KEY=your-key-here\n", []),
+        ("OPENAI_API_KEY=<key>\n", []),
+        ("OPENAI_API_KEY=xxxx  # put yours here\n", []),
+        ("OPENAI_API_KEY=  # a comment\n", []),
+        ('OPENAI_API_KEY="abc" # quoted\n', ["OPENAI_API_KEY"]),
+        ("GOOGLE_SERVICE_ACCOUNT_JSON={}\n", ["GOOGLE_SERVICE_ACCOUNT_JSON"]),
+        ("MAX_TOKENS=4000\nKEYWORDS=a,b\nAZURE_OPENAI_API_VERSION=2024-10-21\n", []),
+    ],
+)
+def test_the_env_example_check_reads_keys_as_wizard_api_does(page, text, valued):
+    """The rule of wizard_api's poc_service.env_example_key_values; its tests hold the two equal."""
+    assert page.app._env_example_key_values(text) == valued
+
+
+def test_a_head_request_is_refused_as_get_is_over_the_limits(page, monkeypatch):
+    """HEAD answered 200 for a package GET refuses with 413."""
+    monkeypatch.setattr(page.app, "MAX_SOURCE_FILES", 1)
+
+    status, _, _ = page.request("HEAD", "/api/source")
+    assert status == 413
+    assert page.request("GET", "/api/source")[0] == 413
+
+
+def _can_listen_on(address: str) -> bool:
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as probe:
+            probe.bind((address, 0))
+    except (AttributeError, OSError):
+        return False
+    return True
+
+
+def test_an_ipv6_loopback_address_is_listened_on(tmp_path):
+    """--host ::1 failed to start: the server listened on IPv4 only."""
+    if not _can_listen_on("::1"):
+        pytest.skip("::1 cannot be listened on here")
+    served = Page(_scaffold(tmp_path), host="::1")
+    try:
+        assert served.server.address_family == socket.AF_INET6
+        status, _, body = served.request("GET", "/api/solution")
+        assert status == 200
+        assert json.loads(body)["source_download"] is True
+        assert served.request("GET", "/api/source")[0] == 200
+        # The Host check holds on IPv6 as well.
+        status, _, _ = served.request("GET", "/", headers={"Host": "attacker.example"})
+        assert status == 403
+    finally:
+        served.close()
+
+
+def _dual_stack_here() -> bool:
+    """Whether an IPv6 socket on every address takes IPv4 connections on this system."""
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            listener.bind(("::", 0))
+            listener.listen(1)
+            with socket.create_connection(("127.0.0.1", listener.getsockname()[1]), timeout=5):
+                return True
+    except (AttributeError, OSError):
+        return False
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="listening on every address makes the Windows firewall ask for leave on screen",
+)
+@pytest.mark.parametrize("ipv6_only", [False, True])
+def test_every_ipv6_address_answers_at_the_address_printed_and_has_no_source_download(
+    tmp_path, monkeypatch, ipv6_only
+):
+    """Where the system has no dual stack, --host :: printed 127.0.0.1, which did not
+    answer (second reader on #229, round 2). ``ipv6_only`` makes the dual stack fail."""
+    if not _can_listen_on("::"):
+        pytest.skip(":: cannot be listened on here")
+    dual_stack = _dual_stack_here() and not ipv6_only
+    if ipv6_only:
+        # No such option: setting it fails, as on a system without a dual stack.
+        monkeypatch.setattr(socket, "IPV6_V6ONLY", -1)
+    served = Page(_scaffold(tmp_path), host="::")
+    try:
+        assert served.server.dual_stack is dual_stack
+        served.address = served.app._shown_host("::", served.server).strip("[]")
+        assert served.address == ("127.0.0.1" if dual_stack else "::1")
+        assert served.request("GET", "/")[0] == 200
+        assert served.server.source_download is False
+        assert served.request("GET", "/api/source")[0] == 403
+    finally:
+        served.close()
+
+
+class _Connection:
+    """The socket under a handler: what each read was allowed to wait."""
+
+    def __init__(self):
+        self.timeouts = []
+
+    def settimeout(self, seconds):
+        self.timeouts.append(seconds)
+
+
+def test_no_read_of_the_files_waits_past_their_deadline(page, monkeypatch):
+    """The last read could wait the connection's full timeout after the deadline, and a
+    body that ended then was taken (found by a second reader on #220, round 2)."""
+    app = page.app
+    clock = {"now": 0.0}
+    monkeypatch.setattr(app.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(app, "BODY_TIMEOUT_SECONDS", 300)
+
+    def late_piece(size):
+        # The first piece comes 295 s in; the last one only after the deadline.
+        clock["now"] += 295 if clock["now"] == 0 else 10
+        return b"x"
+
+    handler = types.SimpleNamespace(
+        rfile=types.SimpleNamespace(read1=late_piece),
+        connection=_Connection(),
+        timeout=30,
+        close_connection=False,
+    )
+    with pytest.raises(app.RefusalError) as refused:
+        app.Handler._read_body(handler, 2)
+
+    assert (refused.value.status, refused.value.code) == (408, "too_slow")
+    assert handler.close_connection is True
+    # The second wait was held to the 5 s left, and the timeout is put back after.
+    assert handler.connection.timeouts == [30, 5, 30]
+
+
+@pytest.mark.parametrize(
+    ("host", "dual_stack", "shown"),
+    [
+        ("127.0.0.1", False, "127.0.0.1"),
+        ("0.0.0.0", False, "127.0.0.1"),
+        ("::", True, "127.0.0.1"),
+        # Listening on IPv6 alone, 127.0.0.1 does not answer (round 2 of #229).
+        ("::", False, "[::1]"),
+        ("::1", False, "[::1]"),
+        ("192.168.1.20", False, "192.168.1.20"),
+    ],
+)
+def test_the_address_printed_is_one_that_answers(page, host, dual_stack, shown):
+    server = types.SimpleNamespace(dual_stack=dual_stack)
+    assert page.app._shown_host(host, server) == shown

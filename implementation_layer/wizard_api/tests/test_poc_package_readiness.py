@@ -326,6 +326,9 @@ def test_the_test_page_travels_with_the_package():
     assert is_deployable_path("app.py")
     assert is_deployable_path("ui/index.html")
     assert is_deployable_path("ui/solution.json")
+    assert is_deployable_path("ui/fonts/sora-latin-wght-normal.woff2")
+    assert is_deployable_path("ui/fonts/OFL.txt")
+    assert is_deployable_path("ui/gaik.svg")
 
 
 def test_the_scaffolded_test_page_is_shipped_and_is_no_problem_of_the_package(tmp_path):
@@ -344,9 +347,15 @@ def test_the_scaffolded_test_page_is_shipped_and_is_no_problem_of_the_package(tm
     poc = scaffold_poc(Blueprint.from_file(example), tmp_path)["poc_dir"]
 
     shipped = set(poc_service.deployable_files(str(poc)))
-    assert {"app.py", "ui/index.html", "ui/solution.json"} <= {
-        name.replace("\\", "/") for name in shipped
-    }
+    assert {
+        "app.py",
+        "ui/index.html",
+        "ui/solution.json",
+        "ui/fonts/sora-latin-wght-normal.woff2",
+        "ui/fonts/sora-latin-ext-wght-normal.woff2",
+        "ui/fonts/OFL.txt",
+        "ui/gaik.svg",
+    } <= {name.replace("\\", "/") for name in shipped}
     with_page = package_problems(str(poc))
     assert not poc_service._package_transcribes(str(poc))
 
