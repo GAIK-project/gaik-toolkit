@@ -100,7 +100,9 @@ when a step needs something outside it, stop and ask the user, saying what it wo
 
 ---
 - **A blueprint change makes an AI Act screening outdated.** Whenever you change
-  `use_case.blueprint.json` and `<output_dir>/ai_act_screening.json` exists, run
+  `use_case.blueprint.json` and `<output_dir>/ai_act_screening.json` exists, check it in that same
+  turn, right after you write the change and before you answer the user. Do not leave it until the
+  gates are approved again or the files are regenerated. Run
   `python <screening_dir>/scripts/check_screening.py --pack <output_dir> --status`. If it
   prints `outdated`, run `python <screening_dir>/scripts/render_brief.py --pack <output_dir>
   --outdated`, which puts the outdated line under the title of `docs/ai_act_screening.md`, tell
@@ -1005,6 +1007,9 @@ Before proposing any change, classify it using the table below. The rule is:
 | Template wiring bug fixed but blueprint intent unchanged | **No** -- patch `poc/run_poc.py` or raise an issue against the template | Optionally update the component reference card; no blueprint or docs change needed |
 | Change prompted by an AI Act screening and accepted by the user: purpose, users, extracted fields, human review, output audience | **Yes** -- update the affected specs, and store the screening facts in `business_spec.ai_act_context` | Re-validate; regenerate the affected diagrams, docs and PoC files; then the screening is outdated (see Constraints) |
 
+After any change in the table above that touches the blueprint, check an existing AI Act screening
+in the same turn (see Constraints: a blueprint change makes an AI Act screening outdated).
+
 **When to update the docs during Gate 3:** only regenerate and re-fill the affected document(s) — do not regenerate all five unless the blueprint itself changes significantly.
 
 | Change type | Doc(s) to update |
@@ -1111,6 +1116,13 @@ Your complete solution package is in: <output_dir>/
 3. **Offer the AI Act screening (optional).** Ask:
 
    > Would you like a preliminary EU AI Act screening of this solution?
+
+   Put the question in your Phase 12 message itself, as its last paragraph above the line that
+   tells the user to approve the gate: in the web session that is the Gate 4 (Handover) message.
+   Ask it for every solution, in these words, as a question and not as a remark ("an optional
+   screening is available", "ask me if you want one"). Do not judge whether this use case needs
+   one, and do not call it low-risk or out of scope: that is what the screening is for. A user who
+   approves the gate without answering has declined, and one who asks for it later gets it.
 
    If the user declines, the wizard is finished: nothing later depends on the screening. If they
    agree, load `<screening_dir>/SKILL.md` and follow it on `<output_dir>`. It screens the **intended

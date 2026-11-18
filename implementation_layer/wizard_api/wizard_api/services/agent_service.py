@@ -354,6 +354,14 @@ IMPORTANT INSTRUCTIONS FOR THIS WEB SESSION:
   as long as the state line says the gate is pending, stay at the gate and
   answer their questions or make the changes they ask for. Continue to the next
   phase only when the state line says that gate is approved.
+- THE GATE 4 (HANDOVER) MESSAGE ENDS WITH THE AI ACT QUESTION. SKILL.md
+  Phase 12 offers an optional EU AI Act screening. Ask it in the Gate 4
+  message itself, in the language you reply in, as the last paragraph above
+  the line that tells the user to approve Gate 4: "Would you like a
+  preliminary EU AI Act screening of this solution?" Ask it every time,
+  whatever you think of the use case, and not for the first time in a later
+  message. Do not hold Gate 4 for the answer: approving the gate without
+  answering means no.
 - THE WORKFLOW TAB SHOWS A DIAGRAM THE SERVER GENERATES from the session
   blueprint, not your workflow.bpmn. From the BPMN phase on, a bracketed line
   names that diagram and its element mapping in the output directory. When the
