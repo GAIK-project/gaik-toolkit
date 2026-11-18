@@ -15,6 +15,7 @@ import { Gate1MissingForm } from "@/components/gate1-missing-form";
 import { GatheringView } from "@/components/gathering-view";
 import { ForgetWizardRelease, ReleaseWizardWhenDone } from "@/components/release-wizard";
 import { ShowInWorkspaceButton } from "@/components/show-in-workspace-button";
+import { ShowGateButton } from "@/components/show-gate-button";
 import { SolutionDoneBanner } from "@/components/solution-done-banner";
 import { FieldSchemaEditor } from "@/components/field-schema-editor";
 import { fieldSpecsFromTargetOutput } from "@/lib/target-output-spec";
@@ -110,6 +111,7 @@ export default async function SessionPage({
         : session.step,
     session.gateStatus,
     Boolean(session.lastSuccessfulRun),
+    packageChanged,
   );
 
   // The requirement questions come from the backend (session.requirements) and
@@ -291,6 +293,17 @@ export default async function SessionPage({
                   className="w-full text-sm text-text-secondary md:max-xl:pr-36 @5xl:w-auto @5xl:min-w-0 @5xl:flex-1"
                 >
                   {now}
+                  {/* At Gate 3 with a run that passed, the line names the
+                      decision; on a wide screen its bar is far off at the
+                      bottom right, and this points at it as the chat's
+                      "Näytä sivulla" does. Not while the approval waits for
+                      a run of a package changed since. */}
+                  {decisionGate === 3 && session.lastSuccessfulRun && !packageChanged && (
+                    <>
+                      {" "}
+                      <ShowGateButton label={t.gateShowMe} name={t.gateShowMeName} />
+                    </>
+                  )}
                 </p>
               )}
             </div>

@@ -761,7 +761,7 @@ function CaseView(p: ViewProps) {
               )}
               <button
                 type="button"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-brand-text underline-offset-2 hover:underline"
+                className="btn-inline mt-3"
                 onClick={() => p.changeInChat({ failure: c.status === "failed" ? c.run_message || s.status.failed : null })}
               >
                 <Icon name="messageSquareText" size={14} />
@@ -893,7 +893,7 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
                 as a quote, as a failed run's error does below. */}
             <button
               type="button"
-              className="mt-2 inline-flex items-center gap-1.5 rounded-sm font-medium text-brand-text underline-offset-2 hover:underline"
+              className="btn-inline mt-2"
               onClick={() => p.changeInChat({ comment: c.comment, rerun, draft: s.askFixReturnedDraft })}
               data-testid="case-ask-fix-returned"
             >
@@ -913,7 +913,7 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
                 solution is changed in the chat: the error goes along as a quote. */}
             <button
               type="button"
-              className="mt-2 inline-flex items-center gap-1.5 rounded-sm font-medium text-brand-text underline-offset-2 hover:underline"
+              className="btn-inline mt-2"
               onClick={() => p.changeInChat({ failure: c.run_message || s.status.failed })}
               data-testid="case-ask-fix"
             >
@@ -1045,7 +1045,7 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
               {" "}
               <button
                 type="button"
-                className="rounded font-medium text-brand-text underline-offset-2 hover:underline"
+                className="rounded font-medium text-brand-text underline underline-offset-2 hover:no-underline"
                 onClick={() => p.changeInChat({ draft: s.askFileTypesDraft })}
                 data-testid="case-ask-file-types"
               >
@@ -1083,7 +1083,7 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
         {reader && !noteOpen && (
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-text-secondary underline-offset-2 transition-colors hover:text-brand-text hover:underline"
+            className="btn-inline"
             onClick={() => setNoteOpen(true)}
             data-testid="case-add-note"
           >
@@ -1193,7 +1193,7 @@ function ReviewView(p: ViewProps & { onReviewed: (action: ReviewAction) => void 
           {changed && (
             <button
               type="button"
-              className="ml-auto rounded-sm text-sm font-medium text-text-secondary underline-offset-2 transition-colors hover:text-text hover:underline"
+              className="btn-inline ml-auto"
               onClick={() => setRec(structuredClone(original))}
               data-testid="case-restore-all"
             >
@@ -1247,7 +1247,7 @@ function ReviewView(p: ViewProps & { onReviewed: (action: ReviewAction) => void 
           <span id="case-hint-reject" className="text-xs text-text-muted">{s.decisionHints.reject.text}</span>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-sm font-medium text-brand-text underline-offset-2 hover:underline"
+            className="btn-inline"
             onClick={() => p.changeInChat()}
             data-testid="case-review-ask-wizard"
           >

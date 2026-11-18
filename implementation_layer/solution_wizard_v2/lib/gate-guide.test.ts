@@ -42,10 +42,42 @@ describe("nowLine", () => {
       const t = dictionary(loc);
       for (const step of GATE_STEPS) {
         for (const ran of [false, true]) {
+          // Gate 3 after a run that succeeded: see the next test.
+          if (step === GATE_STEPS[2] && ran) continue;
           expect(nowLine(t, step, buildGateStatus(step), ran)).not.toMatch(/hyväksy|approve/i);
         }
       }
     }
+  });
+
+  it("after a test run that succeeded names the decision bar's two buttons by their labels", () => {
+    for (const loc of LOCALES) {
+      const t = dictionary(loc);
+      const line = nowLine(t, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true);
+      expect(line).toContain(t.gateDecisions[2]);
+      expect(line).toContain(t.gateRequestChanges);
+      expect(line).not.toMatch(/\{\w+\}/);
+    }
+    expect(nowLine(fi, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true)).toBe(
+      "Testi onnistui. Tarkista tulos PoC-välilehdellä ja valitse sitten alareunasta Hyväksy testiajo tai Pyydä muutoksia.",
+    );
+  });
+
+  it("after a run of a package that changed since asks for a new run and names no approval", () => {
+    for (const loc of LOCALES) {
+      const t = dictionary(loc);
+      const line = nowLine(t, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true, true);
+      expect(line).toContain(t.wsTabPoc);
+      expect(line).not.toContain(t.gateDecisions[2]);
+      expect(line).not.toContain(t.gateRequestChanges);
+      expect(line).not.toMatch(/\{\w+\}/);
+    }
+    expect(nowLine(fi, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true, true)).toBe(
+      "PoC-paketti muuttui onnistuneen testiajon jälkeen. Aja testi uudelleen PoC-välilehdellä, niin testiajon voi hyväksyä.",
+    );
+    // Only Gate 3 waits for the run: an approved last gate is still done.
+    const done = { ...buildGateStatus(STEP_COUNT), [STEP_COUNT]: "approved" as const };
+    expect(nowLine(fi, STEP_COUNT, done, true, true)).toBe(fi.nowDone);
   });
 
   it("on an approved gate before the last points onwards instead of asking to check again", () => {

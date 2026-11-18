@@ -27,6 +27,14 @@ export const CHAT_SEND_DELIVERED_EVENT = "gaik-wizard:chat-send-delivered";
 export const CHAT_REPLYING_EVENT = "gaik-wizard:chat-replying";
 
 /**
+ * The deployable package is about to be downloaded by a link outside the PoC
+ * tab (the finished solution's banner). Cancelable: the PoC tab cancels it
+ * when values for the package's .env are typed there, and downloads the
+ * package with them itself, so every download carries what was typed.
+ */
+export const DEPLOYABLE_DOWNLOAD_EVENT = "gaik-wizard:deployable-download";
+
+/**
  * A message waiting for the chat panel to send it: one from CHAT_SEND_EVENT,
  * or the first message of a session started from the start view.
  */

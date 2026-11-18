@@ -1,0 +1,67 @@
+# Nightly clean-up of accounts nobody approved: an account that has waited in
+# the group `pending` for more than 7 days is deleted (prune-pending.sh). Such
+# accounts come from signing in with Google; keeping them would keep the
+# addresses of people who never got in, for no use.
+#
+# Runs as the realm's maintenance client (gaik-maintenance, a service account
+# that may only view and manage users of realm gaik), not as the admin. deploy.sh
+# setup makes the client, its Secret and the ConfigMap with the script.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gaik-keycloak-prune-pending
+  labels:
+    app: gaik-keycloak
+spec:
+  schedule: "15 3 * * *"
+  timeZone: Europe/Helsinki
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: gaik-keycloak-prune-pending
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: prune
+              # The same image as Keycloak: it has kcadm.sh.
+              image: quay.io/keycloak/keycloak:26.8.1
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/bash", "/scripts/prune-pending.sh", "7"]
+              env:
+                - name: KC_SERVER
+                  value: http://gaik-keycloak:8080
+                - name: KC_CLIENT_ID
+                  value: gaik-maintenance
+                - name: KC_CLI_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef: { name: gaik-keycloak-maintenance, key: client-secret }
+                - name: HOME
+                  value: /tmp
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests: { cpu: 100m, memory: 128Mi }
+                limits: { cpu: 500m, memory: 384Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+          volumes:
+            - name: scripts
+              configMap:
+                name: gaik-keycloak-scripts
+            - name: tmp
+              emptyDir: {}

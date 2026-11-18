@@ -1296,7 +1296,7 @@ export function ChatPanel({
               aria-label={panel ? `${panel.referenceRemove}: ${reference.label}` : reference.label}
               title={panel?.referenceRemove}
               data-testid="chat-reference-remove"
-              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-brand-text transition-colors duration-150 hover:bg-brand/10"
+              className="hit-area inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-brand-text transition-colors duration-150 hover:bg-brand/15 active:bg-brand/25"
             >
               <Icon name="x" size={13} />
             </button>

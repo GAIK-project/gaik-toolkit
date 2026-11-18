@@ -297,6 +297,9 @@ ${generic_input_loaders}
     # ===========================================================================
     # PIPELINE WIRING -- fill one call per labelled step block below.
     # Variable names come from the blueprint artifacts and already chain together.
+    # A step that needs a service outside GAIK gets its package from
+    # provider_config.external_service(name, module, env_vars); on None (no package
+    # or no key, as in the wizard's test run) it uses its fallback and the run goes on.
     # ===========================================================================
 
 ${generic_pipeline_skeleton}

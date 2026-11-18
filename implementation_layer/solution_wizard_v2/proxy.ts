@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { DEV_AUTH, DEV_COOKIE } from "@/lib/auth";
 import { verifyDevSession } from "@/lib/dev-session";
+import { ACCESS_TOKEN_HEADER, proxyAuthEnabled, verifyAccessToken } from "@/lib/proxy-auth";
 import { TRACE_HEADER } from "@/lib/trace-header";
 import { isPublicPage } from "@/lib/public-pages";
 import { isCrossSiteWrite } from "@/lib/same-origin";
@@ -41,6 +42,34 @@ async function route(request: NextRequest): Promise<NextResponse> {
     return withTraceId(request, new NextResponse("Cross-site request refused", { status: 403 }));
   }
 
+  // Proxy sign-in (lib/proxy-auth): oauth2-proxy in front has signed the user
+  // in; the forwarded token is checked here, not trusted. Without a valid one
+  // a page goes to the proxy's sign-in and an API call gets 401. The login page
+  // has nothing to do in this mode and sends the browser on as well.
+  if (proxyAuthEnabled()) {
+    const path = request.nextUrl.pathname;
+    const user = await verifyAccessToken(request.headers.get(ACCESS_TOKEN_HEADER));
+    if (user) {
+      if (path === "/login") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        url.search = "";
+        return withTraceId(request, NextResponse.redirect(url));
+      }
+      return nextWithTraceId(request);
+    }
+    if (isPublicPage(path) && path !== "/login") return nextWithTraceId(request);
+    if (path.startsWith("/api/")) {
+      return withTraceId(request, new NextResponse("Sign-in required", { status: 401 }));
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/oauth2/start";
+    // Back to the page asked for, its query included.
+    const back = path === "/login" ? "/" : `${path}${request.nextUrl.search}`;
+    url.search = `?rd=${encodeURIComponent(back)}`;
+    return withTraceId(request, NextResponse.redirect(url));
+  }
+
   // Dev mode: signed cookie check (lib/dev-session), no Supabase.
   if (DEV_AUTH) {
     const email = await verifyDevSession(request.cookies.get(DEV_COOKIE)?.value);
@@ -71,7 +100,8 @@ async function route(request: NextRequest): Promise<NextResponse> {
 
 export const config = {
   // No `runtime` here: a proxy always runs on Node.js (Next.js 16), and this
-  // one has to. The dev session is checked against WIZARD_DEV_USERS and signed
+  // one has to. WIZARD_AUTH_MODE and the WIZARD_OIDC_* settings are read the
+  // same way, at run time. The dev session is checked against WIZARD_DEV_USERS and signed
   // with NEXT_SERVER_ACTIONS_ENCRYPTION_KEY, both set when the pod starts; on
   // the Edge runtime only what was there at build time is seen, so on a
   // deployed stack every signed cookie was rejected and nobody could sign in.

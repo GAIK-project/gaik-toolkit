@@ -2,7 +2,7 @@
 #   grafana -> https://grafana-gaik-aiops.2.rahtiapp.fi  (Grafana's own sign-in)
 #   mlflow  -> https://mlflow-gaik-aiops.2.rahtiapp.fi   (basic auth in mlflow-auth, then MLflow)
 # spec.host is the one place they are written: kustomization.yaml copies them into Grafana's root URL
-# and MLflow's allowed hosts. The collector's OTLP port gets no Route yet (M2, see README.md).
+# and MLflow's allowed hosts. The collector's token-checked OTLP way in has its Route in otlp-ingress.yaml.
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -22,14 +22,14 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: mlflow
-  labels: {app.kubernetes.io/name: mlflow-auth}
+  labels: {app.kubernetes.io/name: mlflow-signin}
   annotations:
     haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
     haproxy.router.openshift.io/timeout: 5m
 spec:
   host: mlflow-gaik-aiops.2.rahtiapp.fi
-  to: {kind: Service, name: mlflow-auth, weight: 100}
-  port: {targetPort: 8080}
+  to: {kind: Service, name: mlflow-signin, weight: 100}
+  port: {targetPort: 4180}
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect

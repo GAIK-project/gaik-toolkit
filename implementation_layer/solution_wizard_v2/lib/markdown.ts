@@ -165,6 +165,61 @@ function tableRow(line: string): string[] {
 
 const isTableSep = (line: string) => /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(line) && line.includes("-");
 
+// A list item: its indentation, its number when it has one, its text.
+const LIST_ITEM = /^(\s*)(?:[-*]|(\d{1,9})\.)\s+(.*)$/;
+
+/** How much deeper than its parent an item stands to be a list under it. */
+const NESTED = 2;
+
+/** Lists inside lists, at most. */
+const MAX_DEPTH = 6;
+
+/**
+ * The list that starts at `lines[at]`, and the index of the line after it.
+ * Items of the same kind follow each other; an item indented under one (two
+ * columns or more) starts a list inside that item, bulleted or numbered. So
+ * a round of questions with the options under each stays one numbered list:
+ * drawn as lists of their own, the options cut it into three that each
+ * began at "1.".
+ *
+ * A numbered list begins at the number its first item has. Where something
+ * at the margin does come between (a paragraph, bullets that are not
+ * indented), the list after it goes on from its own number.
+ */
+function renderList(lines: string[], at: number, nested = false, depth = 0): [string, number] {
+  const first = LIST_ITEM.exec(lines[at]);
+  if (!first) return ["", at + 1];
+  const base = first[1].length;
+  const ordered = first[2] !== undefined;
+  // A list inside an item ends at an item that stands further out than its
+  // own first one; the item around it takes that one up as a list of its own.
+  // At the margin, a first item that happens to be indented starts the list.
+  const min = nested ? base : 0;
+  const items: string[] = [];
+  let i = at;
+  while (i < lines.length) {
+    const m = LIST_ITEM.exec(lines[i]);
+    // Another kind of item at this level is another list.
+    if (!m || (m[2] !== undefined) !== ordered || m[1].length < min) break;
+    let item = inline(m[3].trim());
+    i++;
+    // Whatever is indented under the item is its own, down to MAX_DEPTH
+    // levels; deeper items are drawn as items of the deepest list, so a long
+    // staircase of indented lines cannot recurse without end.
+    for (;;) {
+      const under = i < lines.length ? LIST_ITEM.exec(lines[i]) : null;
+      if (!under || under[1].length < base + NESTED || depth >= MAX_DEPTH) break;
+      const [html, next] = renderList(lines, i, true, depth + 1);
+      item += html;
+      i = next;
+    }
+    items.push(`<li>${item}</li>`);
+  }
+  const tag = ordered ? "ol" : "ul";
+  const start = ordered && Number(first[2]) !== 1 ? ` start="${Number(first[2])}"` : "";
+  return [`<${tag}${start}>${items.join("")}</${tag}>`, i];
+}
+
 export function renderMarkdown(src: string): string {
   const lines = escapeHtml(src.replace(/\u0000/g, "")).replace(/\r\n?/g, "\n").split("\n");
   const out: string[] = [];
@@ -224,21 +279,11 @@ export function renderMarkdown(src: string): string {
       continue;
     }
 
-    // unordered / ordered list (consecutive items)
-    const ul = line.match(/^\s*[-*]\s+(.*)$/);
-    const ol = line.match(/^\s*\d+\.\s+(.*)$/);
-    if (ul || ol) {
-      const ordered = !!ol;
-      const items: string[] = [];
-      while (i < lines.length) {
-        const m = ordered
-          ? lines[i].match(/^\s*\d+\.\s+(.*)$/)
-          : lines[i].match(/^\s*[-*]\s+(.*)$/);
-        if (!m) break;
-        items.push(`<li>${inline(m[1].trim())}</li>`);
-        i++;
-      }
-      out.push(`<${ordered ? "ol" : "ul"}>${items.join("")}</${ordered ? "ol" : "ul"}>`);
+    // unordered / ordered list
+    if (LIST_ITEM.test(line)) {
+      const [html, next] = renderList(lines, i);
+      out.push(html);
+      i = next;
       continue;
     }
 
@@ -255,10 +300,17 @@ export function renderMarkdown(src: string): string {
       lines[i].trim() !== "" &&
       !/^```/.test(lines[i].trim()) &&
       !/^(#{1,6})\s+/.test(lines[i]) &&
-      !/^\s*[-*]\s+/.test(lines[i]) &&
-      !/^\s*\d+\.\s+/.test(lines[i]) &&
+      // The same test the list branch above uses: a line it does not take as
+      // a list item (say "1234567890. id", past its nine digits) is text here.
+      !LIST_ITEM.test(lines[i]) &&
       !(lines[i].includes("|") && i + 1 < lines.length && isTableSep(lines[i + 1]))
     ) {
+      para.push(inline(lines[i]));
+      i++;
+    }
+    // Every branch above must take at least one line; should a later change
+    // let them disagree again, the line is text rather than a loop that never ends.
+    if (para.length === 0) {
       para.push(inline(lines[i]));
       i++;
     }

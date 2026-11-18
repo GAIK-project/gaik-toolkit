@@ -1,6 +1,6 @@
 import type { Dict } from "@/lib/i18n";
+import { PointMark } from "./point-mark";
 import { RequirementAnswer } from "./requirement-answer";
-import { Icon } from "./icons";
 
 // Gathering-phase center view (steps 1–2). No technical blueprint yet — that
 // belongs to the design phase (step 5+). The session starts in the chat, open
@@ -25,6 +25,7 @@ export function GatheringView({
     chip: t.gatheringAskChip,
     prefix: t.gatheringAskPrefix,
   };
+  const markLabels = { answered: t.pointAnswered, open: t.pointOpen };
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -53,15 +54,11 @@ export function GatheringView({
           {items.map((q, i) => {
             const done = i < answered;
             return (
-              <li key={i} className="group/point flex items-start gap-2.5 px-4 py-2.5">
-                {done ? (
-                  <Icon name="circleCheck" size={16} className="mt-0.5 shrink-0 text-brand-strong" />
-                ) : (
-                  <Icon name="circle" size={16} className="mt-0.5 shrink-0 text-border-strong" />
-                )}
+              <li key={i} className="flex items-start gap-2 px-4 py-1.5">
+                <PointMark number={i + 1} done={done} labels={markLabels} className="sm:mt-1.5" />
                 <span className="min-w-0 flex-1 sm:flex sm:items-start sm:justify-between sm:gap-4">
-                  <span className="block min-w-0">
-                    <span className={`block text-sm ${done ? "text-text" : "text-text-muted"}`}>
+                  <span className="block min-w-0 sm:py-1.5">
+                    <span className={`block text-sm ${done ? "text-text" : "text-text-secondary"}`}>
                       {q}
                     </span>
                     {done && answers[i] && (
@@ -70,8 +67,8 @@ export function GatheringView({
                       </span>
                     )}
                   </span>
-                  {/* The point the wizard is on shows its button; the others show
-                      theirs under the pointer or the focus (always on a touch screen). */}
+                  {/* Every open point has its button, in view without the
+                      pointer; the point the wizard is on has the marked one. */}
                   {!done && (
                     <RequirementAnswer
                       number={i + 1}

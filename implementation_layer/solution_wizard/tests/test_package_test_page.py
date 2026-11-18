@@ -1638,3 +1638,122 @@ def test_a_stop_signal_stops_the_run_and_removes_its_working_folder(tmp_path, se
     # It stopped on its own, through its cleanup, with nothing raised in it.
     assert server.returncode == 0, log
     assert "Stopped." in log and "Traceback" not in log
+
+
+# ---------------------------------------------------------------------------
+# Second review, round 2 (17 Nov 2026): the package's own modules, a stalled request
+# ---------------------------------------------------------------------------
+
+
+def test_a_module_in_the_package_does_not_stand_in_for_the_standard_library(tmp_path):
+    """``python app.py`` puts the package's folder first on sys.path.
+
+    An ipaddress.py there was imported in place of the library's, so a file the
+    agent wrote changed what the unchanged server does (its Host check, here).
+    """
+    poc = _scaffold(tmp_path / "package")
+    marker = tmp_path / "shadow-ran"
+    (poc / "ipaddress.py").write_text(
+        f"open({str(marker)!r}, 'w').close()\nraise SystemExit(7)\n", encoding="utf-8"
+    )
+    temp = tmp_path / "temp"
+    temp.mkdir()
+    env = {**os.environ, "TMPDIR": str(temp), "TEMP": str(temp), "TMP": str(temp)}
+    server = subprocess.Popen(
+        [sys.executable, "app.py", "--port", "0"],
+        cwd=poc,
+        env={**env, "PYTHONUNBUFFERED": "1"},
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+    )
+    try:
+        first = server.stdout.readline()
+        assert first.startswith("Test page: http://127.0.0.1:"), first + server.stdout.read()
+        port = int(first.strip().rsplit(":", 1)[1])
+        assert _request("127.0.0.1", port, "GET", "/api/solution")[0] == 200
+        status, _, _ = _request(
+            "127.0.0.1", port, "GET", "/api/solution", headers={"Host": "attacker.example"}
+        )
+        assert status == 403
+    finally:
+        server.kill()
+        server.wait(timeout=10)
+        server.stdout.close()
+    assert not marker.exists()
+
+
+def _stalled_post(served: Page, sent: bytes, length: int) -> socket.socket:
+    """A POST /api/run that says ``length`` bytes are coming and sends ``sent`` of them."""
+    connection = socket.create_connection((served.address, served.port), timeout=30)
+    connection.sendall(
+        (
+            "POST /api/run HTTP/1.1\r\n"
+            f"Host: 127.0.0.1:{served.port}\r\n"
+            "Content-Type: multipart/form-data; boundary=x\r\n"
+            f"Content-Length: {length}\r\n\r\n"
+        ).encode()
+        + sent
+    )
+    return connection
+
+
+def _answer(connection: socket.socket) -> tuple[int, dict]:
+    response = http.client.HTTPResponse(connection)
+    response.begin()
+    return response.status, json.loads(response.read())
+
+
+def test_a_request_that_stops_sending_gives_the_run_back(page, monkeypatch):
+    """The run was taken before the body was read and no read had a time limit, so
+    a connection that stopped sending held it while /api/status said it was free.
+    """
+    monkeypatch.setattr(page.app.Handler, "timeout", 1)
+    stalled = _stalled_post(page, b"--x\r\n", 10_000)
+    try:
+        deadline = time.monotonic() + 5
+        while not page.get_json("/api/status")[1]["busy"]:
+            assert time.monotonic() < deadline, "the stalled request never held the run"
+            time.sleep(0.05)
+        assert page.run(files=[("order.pdf", b"%PDF")])[0] == 409
+
+        status, answer = _answer(stalled)
+    finally:
+        stalled.close()
+
+    assert status == 408
+    assert answer["error"]["code"] == "too_slow"
+    assert page.get_json("/api/status")[1]["busy"] is False
+    assert page.run(files=[("order.pdf", b"%PDF")])[0] == 200
+
+
+def test_files_that_trickle_in_are_refused_once_they_take_too_long(page, monkeypatch):
+    """A byte every so often never tripped a wait for the next one."""
+    monkeypatch.setattr(page.app.Handler, "timeout", 2)
+    monkeypatch.setattr(page.app, "BODY_TIMEOUT_SECONDS", 1)
+    trickling = _stalled_post(page, b"-", 10_000)
+    started = time.monotonic()
+    try:
+        trickling.settimeout(0.2)
+        status = None
+        while status is None:
+            assert time.monotonic() - started < 15, "the trickle was never cut off"
+            try:
+                trickling.sendall(b"-")
+            except OSError:
+                pass  # the server has answered and closed its end
+            try:
+                if trickling.recv(1, socket.MSG_PEEK):
+                    trickling.settimeout(10)
+                    status, answer = _answer(trickling)
+            except TimeoutError:
+                pass
+    finally:
+        trickling.close()
+
+    assert status == 408
+    assert answer["error"]["code"] == "too_slow"
+    assert page.get_json("/api/status")[1]["busy"] is False
+    assert page.run(files=[("order.pdf", b"%PDF")])[0] == 200

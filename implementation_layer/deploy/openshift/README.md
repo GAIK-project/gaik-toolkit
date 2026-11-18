@@ -57,7 +57,11 @@ cp secrets.yaml.example secrets.yaml     # secrets.yaml is gitignored
 > `sandbox-job.yaml` read it as `optional: true`. Sandbox runs can read their
 > Azure settings from another Secret with the same keys, for example one with a
 > spending cap: set `WIZARD_POC_RUNNER_SECRET=<secret name>` on the api
-> Deployment. The api and the agent keep the shared Secret.
+> Deployment. The api and the agent keep the shared Secret. Setting it to a
+> Secret with its own capped key also turns on code editing in the PoC tab's
+> editor: user-written code (`.py`, `requirements.txt`) and `config.yaml` run
+> only with a separate runner key, so with the shared Secret those files stay
+> read-only.
 
 ## Deploy
 
@@ -200,6 +204,16 @@ to deploy, with the `instance` input set. A `wizard-v2*` tag deploys nothing. Th
 live deployments carry settings the manifests lack, so a release reaches staging
 target by target: build the api and web images from the tag, then restart each
 deployment. Do not run `deploy.sh all` against a live stack.
+
+## Sign-in through Keycloak (signin-proxy.yaml)
+
+Instead of the dev accounts, a stack can sign its users in at the GAIK Keycloak
+(`../keycloak`, its README says how to bring it up, add accounts and add
+Google). `PROJECT=<project> INSTANCE=<name> ./deploy.sh signin` runs an
+oauth2-proxy in front of the web app, points the stack's Route at it and sets
+the web app's `WIZARD_AUTH_MODE=proxy` and `WIZARD_OIDC_*`; `signin-off` undoes
+it. The web app does not take the proxy's word for who the user is: it checks the
+forwarded access token itself (`lib/proxy-auth.ts`).
 
 ## Environment variables
 

@@ -45,7 +45,7 @@ def test_the_session_id_is_pseudonymised_before_it_names_the_mlflow_session():
             hashed = f'set({context}.attributes["{name}"], SHA256(Concat(["<key>", "session:"'
             assert any(hashed in s for s in statements), (context, name)
     # The copy to session.id runs after the privacy processor, so it copies the pseudonym.
-    assert "processors: [transform/privacy, transform/session, batch]" in base
+    assert "processors: [memory_limiter, transform/privacy, transform/session, batch]" in base
     # The overlay overrides transform/privacy only; the session rule lives in the base config.
     assert "transform/session" not in (COMPOSE / "openbao" / "otel-collector.openbao.yaml").read_text()
 

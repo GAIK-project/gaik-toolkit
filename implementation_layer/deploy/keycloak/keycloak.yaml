@@ -1,0 +1,228 @@
+# Keycloak for the GAIK apps: one realm (realm-gaik.json), one sign-in for all of
+# them. Each app is a client in the realm and has its own oauth2-proxy in front
+# (deploy/openshift/signin-proxy.yaml for the Solution Wizard); the apps never
+# speak OIDC themselves, so the identity source behind Keycloak (its own
+# accounts, Google, later an organisation's IdP) can change without touching them.
+#
+# Not instance-scoped like the wizard stacks: one Keycloak serves the project.
+# Its own Postgres, so the wizard stacks' databases never hold accounts.
+#
+# The Secrets gaik-keycloak-db and gaik-keycloak-admin are not defined here:
+# deploy.sh creates them with random values the first time and never prints them.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: gaik-keycloak-db-data
+      labels:
+        app: gaik-keycloak-db
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 2Gi
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: gaik-keycloak-db
+      labels:
+        app: gaik-keycloak-db
+    spec:
+      replicas: 1
+      strategy:
+        type: Recreate
+      selector:
+        matchLabels:
+          app: gaik-keycloak-db
+      template:
+        metadata:
+          labels:
+            app: gaik-keycloak-db
+        spec:
+          containers:
+            - name: postgresql
+              # The same image as the wizard stacks' databases (postgres.yaml):
+              # it runs under OpenShift's random UID.
+              image: docker.io/pgvector/pgvector:pg17
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 5432
+              env:
+                - name: POSTGRES_DB
+                  value: keycloak
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef: { name: gaik-keycloak-db, key: database-user }
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: gaik-keycloak-db, key: database-password }
+                - name: PGDATA
+                  value: /var/lib/postgresql/data/pgdata
+              volumeMounts:
+                - name: data
+                  mountPath: /var/lib/postgresql/data
+              readinessProbe:
+                exec:
+                  command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d keycloak"]
+                initialDelaySeconds: 5
+                periodSeconds: 10
+              resources:
+                requests: { cpu: 100m, memory: 128Mi }
+                limits: { cpu: 500m, memory: 512Mi }
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: gaik-keycloak-db-data
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: gaik-keycloak-db
+      labels:
+        app: gaik-keycloak-db
+    spec:
+      selector:
+        app: gaik-keycloak-db
+      ports:
+        - port: 5432
+          targetPort: 5432
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: gaik-keycloak
+      labels:
+        app: gaik-keycloak
+    spec:
+      replicas: 1
+      strategy:
+        type: Recreate
+      selector:
+        matchLabels:
+          app: gaik-keycloak
+      template:
+        metadata:
+          labels:
+            app: gaik-keycloak
+        spec:
+          containers:
+            - name: keycloak
+              # Pinned; update deliberately (release notes) and in this file only.
+              image: quay.io/keycloak/keycloak:26.8.1
+              imagePullPolicy: IfNotPresent
+              # The realm is imported on the first start only: an existing realm
+              # is left as it is, so changes made in the admin console stay.
+              args: ["start", "--import-realm"]
+              ports:
+                - name: http
+                  containerPort: 8080
+                - name: management
+                  containerPort: 9000
+              env:
+                - name: KC_DB
+                  value: postgres
+                - name: KC_DB_URL
+                  value: jdbc:postgresql://gaik-keycloak-db:5432/keycloak
+                - name: KC_DB_USERNAME
+                  valueFrom:
+                    secretKeyRef: { name: gaik-keycloak-db, key: database-user }
+                - name: KC_DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: gaik-keycloak-db, key: database-password }
+                # The public address tokens are issued for. The Rahti router
+                # terminates TLS and forwards plain HTTP with X-Forwarded-*.
+                - name: KC_HOSTNAME
+                  value: https://gaik-keycloak-PROJECT_PLACEHOLDER.2.rahtiapp.fi
+                - name: KC_HTTP_ENABLED
+                  value: "true"
+                - name: KC_PROXY_HEADERS
+                  value: xforwarded
+                - name: KC_HEALTH_ENABLED
+                  value: "true"
+                - name: KC_METRICS_ENABLED
+                  value: "true"
+                # The sign-in pages' CSS and images are cached for an hour, not
+                # Keycloak's 30 days: their address does not change with the
+                # theme, so a theme change would otherwise reach browsers a month late.
+                - name: KC_SPI_THEME__STATIC_MAX_AGE
+                  value: "3600"
+                # The first admin; deploy.sh made the Secret. Change the password
+                # in the console after the first sign-in.
+                - name: KC_BOOTSTRAP_ADMIN_USERNAME
+                  valueFrom:
+                    secretKeyRef: { name: gaik-keycloak-admin, key: username }
+                - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: gaik-keycloak-admin, key: password }
+              volumeMounts:
+                - name: realm
+                  mountPath: /opt/keycloak/data/import
+                  readOnly: true
+                # The GAIK look of the sign-in pages (theme/gaik, realm loginTheme).
+                # Keycloak caches themes: restart the pod after changing them.
+                - name: theme
+                  mountPath: /opt/keycloak/themes/gaik
+                  readOnly: true
+              startupProbe:
+                httpGet: { path: /health/started, port: management }
+                periodSeconds: 10
+                failureThreshold: 30
+              readinessProbe:
+                httpGet: { path: /health/ready, port: management }
+                periodSeconds: 10
+              livenessProbe:
+                httpGet: { path: /health/live, port: management }
+                periodSeconds: 30
+              resources:
+                requests: { cpu: 250m, memory: 768Mi }
+                limits: { cpu: "2", memory: 1536Mi }
+          volumes:
+            - name: realm
+              configMap:
+                name: gaik-keycloak-realm
+            # A ConfigMap is flat; items put each file where the theme expects it.
+            - name: theme
+              configMap:
+                name: gaik-keycloak-theme
+                items:
+                  - { key: theme.properties, path: login/theme.properties }
+                  - { key: gaik.css, path: login/resources/css/gaik.css }
+                  - { key: gaik-wordmark.svg, path: login/resources/img/gaik-wordmark.svg }
+                  - { key: messages_fi.properties, path: login/messages/messages_fi.properties }
+                  - { key: messages_en.properties, path: login/messages/messages_en.properties }
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: gaik-keycloak
+      labels:
+        app: gaik-keycloak
+    spec:
+      selector:
+        app: gaik-keycloak
+      ports:
+        - name: http
+          port: 8080
+          targetPort: 8080
+
+  # Only the HTTP port is public; the management port (health, metrics) is not.
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name: gaik-keycloak
+      labels:
+        app: gaik-keycloak
+      annotations:
+        haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
+    spec:
+      to:
+        kind: Service
+        name: gaik-keycloak
+      port:
+        targetPort: http
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect

@@ -11,14 +11,12 @@
 set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-gaik-aiops}"
-MLFLOW_USER="${MLFLOW_USER:-gaik-reviewer}"
 
 current="$(oc project -q)"
 if [ "$current" != "$NAMESPACE" ]; then
   echo "oc is on project '$current', not '$NAMESPACE'. Run: oc project $NAMESPACE" >&2
   exit 1
 fi
-command -v htpasswd >/dev/null || { echo "htpasswd is missing (on Debian/Ubuntu: apache2-utils)" >&2; exit 1; }
 
 rand() { openssl rand -hex 24; }
 
@@ -42,16 +40,16 @@ printf '  key: "%s"\n' "$(openssl rand -hex 32)" | create aiops-pseudonym
 
 printf '  admin-password: "%s"\n' "$(rand)" | create aiops-grafana
 
-# The MLflow sign-in: the password in plain text, so it can be handed to reviewers, and its bcrypt hash
-# for nginx. Cost 4, bcrypt's lowest: nginx checks the hash on every request, and a 192-bit random
-# password needs no slow hash.
-mlflow_password="$(rand)"
-mlflow_htpasswd="$(printf '%s' "$mlflow_password" | htpasswd -niB -C 4 "$MLFLOW_USER" | head -n 1)"
-printf '  username: "%s"\n  password: "%s"\n  htpasswd: '"'"'%s'"'"'\n' "$MLFLOW_USER" "$mlflow_password" "$mlflow_htpasswd" |
-  create aiops-mlflow-auth
-unset mlflow_password mlflow_htpasswd
+# The bearer token for the OTLP way in from other projects (otlp-ingress.yaml). The producer's own
+# project gets the same value in a Secret of its own (README.md, "The wizard's way in").
+printf '  token: "%s"\n' "$(openssl rand -hex 32)" | create aiops-otlp-ingress
+
+# Sign-in for people goes through the GAIK Keycloak: its deploy.sh add-client makes the Secrets
+# aiops-grafana-signin and aiops-mlflow-signin here (README.md, Signing in).
+for s in aiops-grafana-signin aiops-mlflow-signin; do
+  oc get secret "$s" -n "$NAMESPACE" >/dev/null 2>&1 || echo "missing $s: register the client in Keycloak (README.md)"
+done
 
 echo
-echo "Read a sign-in when you need it, in your own terminal (it prints the password there):"
+echo "Grafana's local admin, for grafana-setup and break-glass access; read it in your own terminal:"
 echo "  oc extract secret/aiops-grafana --keys=admin-password --to=-          # Grafana user: admin"
-echo "  oc extract secret/aiops-mlflow-auth --keys=username,password --to=-   # MLflow"
