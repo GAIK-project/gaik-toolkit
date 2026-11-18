@@ -216,26 +216,34 @@ def _schema_effort(
     temperature: float | None,
     reasoning_effort: str | None,
 ) -> str | None:
-    """The reasoning effort a schema-generation call sends.
+    """The reasoning effort a requirements parse sends.
 
-    GPT-6 Sol/Luna and GPT-5.6 reason unless told not to, and while they reason
-    the compatibility layer drops ``temperature``. Reasoning with free sampling made
-    the requirements parse keep only the first field of a task in some calls, with
-    no error (issue #94). So when the caller asks for a temperature and sets no
-    effort, in the call or in the config, a model that accepts ``"none"`` gets
-    ``"none"`` and the temperature (``0`` by default) applies. An effort the caller
-    sets is sent as given, and ``temperature=None`` leaves the model's own default.
-    Models that reject ``"none"`` (GPT-6 Astra, gpt-6.x) and other families get no
-    effort, as before.
+    GPT-6 and GPT-5.6 reason unless told not to, and while they reason the
+    compatibility layer drops ``temperature``. Reasoning with free sampling made the
+    requirements parse keep only the first field of a task, or of a child list, in
+    some calls, with no error (issue #94). So when the caller asks for a temperature
+    and sets no effort, in the call or in the config, a model known to accept
+    ``"none"`` (GPT-6 Sol/Luna, GPT-5.6 Sol/Luna/Terra) gets ``"none"`` and the
+    temperature (``0`` by default) applies. An effort the caller sets is sent as
+    given, and ``temperature=None`` leaves the model's own default. Other models,
+    including GPT-6 Astra, gpt-6-rosalind and gpt-6.x, which reject ``"none"``, get
+    no effort, as before. Structure detection does not use this; see
+    :func:`detect_structure_type`.
     """
     if reasoning_effort is not None or temperature is None:
         return reasoning_effort
     # A provider adapter keeps its own config, which may set the effort or the
     # family of a deployment alias; the config passed in wins over it.
-    client_config = getattr(client, "_config", None) if isinstance(client, ProviderClient) else None
+    adapter = isinstance(client, ProviderClient)
+    client_config = getattr(client, "_config", None) if adapter else None
     settings = {**(client_config if isinstance(client_config, dict) else {}), **(config or {})}
     if settings.get("reasoning_effort") is not None:
         return None
+    provider = client.provider if adapter else settings.get("provider")
+    if provider == "litellm":
+        # LiteLLM checks "none" against the routed name, so an alias such as
+        # azure/gpt-6-luna-prod is refused before the request, model_family or not.
+        settings.pop("model_family", None)
     return "none" if _accepts_effort_none(model, settings) else None
 
 
@@ -507,10 +515,10 @@ def detect_structure_type(
     """
     Analyze if the extraction requires a nested list structure or flat structure.
 
-    ``temperature`` / ``reasoning_effort`` are passed to :func:`_parse_with`; see
-    it for how the two interact on reasoning deployments. Without an effort, a
-    model that accepts ``"none"`` gets it, so the temperature applies
-    (:func:`_schema_effort`).
+    ``temperature`` / ``reasoning_effort`` are passed straight to
+    :func:`_parse_with`; see it for how the two interact on reasoning
+    deployments. Unlike the requirements parses, this call gets no ``"none"`` by
+    default: without reasoning, GPT-6 Luna often ignored a list name the task gave.
 
     When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
     LLM call is appended to it. This is an internal hook used by
@@ -536,13 +544,10 @@ def detect_structure_type(
         ],
         response_format=StructureAnalysis,
         temperature=temperature,
-        reasoning_effort=_schema_effort(
-            client=client,
-            model=model,
-            config=config,
-            temperature=temperature,
-            reasoning_effort=reasoning_effort,
-        ),
+        # Not _schema_effort: at effort "none", gpt-6-luna named a list the task
+        # calls inventory_items "records" in 4 of 5 runs. Only the requirements
+        # parses dropped fields (#94).
+        reasoning_effort=reasoning_effort,
         config=config,
     )
     analysis = resp.choices[0].message.parsed
@@ -2409,12 +2414,13 @@ class SchemaGenerator:
                 two settings are coupled: GPT-6 and GPT-5.6 accept a
                 temperature only at effort ``"none"``. When this is ``None``
                 (the default), ``config`` sets no effort and a temperature is
-                set, GPT-6 Sol/Luna and GPT-5.6 (by name or ``model_family``)
-                are sent ``"none"`` so the temperature applies; reasoning with
-                free sampling sometimes dropped all but the first field. Other
-                models get no effort, since the non-reasoning ones reject it.
-                Pass an active effort, with ``temperature=None``, to make a
-                reasoning model reason. See :func:`_schema_effort`.
+                set, the requirements parses send GPT-6 Sol/Luna and GPT-5.6
+                Sol/Luna/Terra (by name or ``model_family``) ``"none"`` so the
+                temperature applies; reasoning with free sampling sometimes
+                dropped all but the first field. Structure detection and other
+                models get no effort, since the non-reasoning models reject it.
+                Pass an active effort, with ``temperature=None``, to make every
+                call reason. See :func:`_schema_effort`.
         """
         self.config = config
         self.model = model if model else self.config["model"]

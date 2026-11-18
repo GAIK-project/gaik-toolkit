@@ -249,10 +249,21 @@ class _RecordingProvider:
 
 
 def _parsed_for(response_format):
-    from gaik.software_components.extractor.schema import ExtractionRequirements
+    from gaik.software_components.extractor.schema import (
+        ExtractionRequirements,
+        StructureAnalysis,
+    )
 
     if response_format is ExtractionRequirements:
         return _flat_requirements()
+    if response_format is StructureAnalysis:
+        return StructureAnalysis(
+            structure_type="flat",
+            parent_container_name="record",
+            parent_description="One record",
+            item_description="One record",
+            reasoning="Scalar fields only.",
+        )
     return _Answer(answer="ok")
 
 
@@ -299,7 +310,8 @@ class TestSchemaGenerationIsDeterministicWhereTheModelAllows:
     """
 
     @pytest.mark.parametrize(
-        "model", ["gpt-6-luna", "gpt-6-sol", "gpt-5.6-sol", "azure/gpt-6-luna"]
+        "model",
+        ["gpt-6-luna", "gpt-6-sol", "gpt-6-luna-2026-09-22", "gpt-5.6-sol", "azure/gpt-6-luna"],
     )
     def test_default_sends_effort_none_and_temperature_zero(self, model):
         sent = _sent_by_parse_user_requirements(model)
@@ -314,10 +326,12 @@ class TestSchemaGenerationIsDeterministicWhereTheModelAllows:
         assert sent["model"] == "production"
         assert (sent["reasoning_effort"], sent["temperature"]) == ("none", 0.0)
 
-    @pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6.1-sol", "gpt-6.2-sol"])
+    @pytest.mark.parametrize(
+        "model", ["gpt-6-astra", "gpt-6.1-sol", "gpt-6.2-sol", "gpt-6-rosalind"]
+    )
     def test_model_that_rejects_none_gets_no_effort(self, model):
-        # Sending "none" would fail before the request; these always reason, so the
-        # temperature is dropped as before.
+        # "none" would be refused; these reason, so the temperature is dropped as
+        # before. gpt-6-rosalind is a GPT-6 name outside the allowlist.
         sent = _sent_by_parse_user_requirements(model)
         assert "reasoning_effort" not in sent
         assert "temperature" not in sent
@@ -364,8 +378,12 @@ class TestSchemaGenerationIsDeterministicWhereTheModelAllows:
         sent = _sent_by_parse_user_requirements("gpt-6-luna", reasoning_effort="none")
         assert (sent["reasoning_effort"], sent["temperature"]) == ("none", 0.0)
 
-    def test_every_schema_generator_call_gets_it(self, monkeypatch):
-        """Structure detection, the parent parse and each child parse, from the class."""
+    def test_every_requirements_parse_gets_it_but_structure_detection_does_not(self, monkeypatch):
+        """The parent and child parses from the class; detection keeps the model default.
+
+        At effort "none" the structure detector often ignored the list name a task gave,
+        so it is left as it was.
+        """
         from gaik.software_components.extractor import schema as schema_module
 
         client = _RecordingSchemaClient()
@@ -400,8 +418,20 @@ class TestSchemaGenerationIsDeterministicWhereTheModelAllows:
 
         formats = [call["response_format"].__name__ for call in client.calls]
         assert formats == ["StructureAnalysis", "ExtractionRequirements", "ExtractionRequirements"]
-        for call in client.calls:
+        detection, *parses = client.calls
+        assert "reasoning_effort" not in detection
+        assert "temperature" not in detection
+        for call in parses:
             assert (call["reasoning_effort"], call["temperature"]) == ("none", 0.0)
+
+    def test_structure_detection_still_takes_a_caller_effort(self):
+        from gaik.software_components.extractor.schema import detect_structure_type
+
+        client = _RecordingSchemaClient()
+        detect_structure_type(
+            "Extract `po_number`.", client=client, model="gpt-6-luna", reasoning_effort="none"
+        )
+        assert (client.last["reasoning_effort"], client.last["temperature"]) == ("none", 0.0)
 
     @pytest.mark.parametrize("provider", ["openai_compatible", "aitta", "litellm"])
     def test_provider_adapter_gets_it_for_a_gpt6_model(self, provider):
@@ -410,6 +440,22 @@ class TestSchemaGenerationIsDeterministicWhereTheModelAllows:
         client = _RecordingProvider(provider, "gpt-6-luna")
         parse_user_requirements("Extract `po_number`.", client=client, model="gpt-6-luna")
         assert client.calls[0] == {"temperature": 0.0, "reasoning_effort": "none"}
+
+    @pytest.mark.parametrize(
+        ("model", "config"),
+        [
+            ("azure/gpt-6-luna-prod", {"model_family": "gpt-6-luna"}),
+            ("openai/gpt-6-rosalind", None),
+        ],
+    )
+    def test_litellm_gets_no_none_for_a_name_it_would_refuse(self, model, config):
+        # LiteLLM checks "none" against the routed name and refuses these before any
+        # request, so the parse sends no effort, as before.
+        from gaik.software_components.extractor.schema import parse_user_requirements
+
+        client = _RecordingProvider("litellm", model, config)
+        parse_user_requirements("Extract `po_number`.", client=client, model=model)
+        assert "reasoning_effort" not in client.calls[0]
 
     def test_provider_adapter_config_effort_wins(self):
         from gaik.software_components.extractor.schema import parse_user_requirements

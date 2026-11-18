@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 # OpenAI reasoning families that accept only max_completion_tokens.
 _REASONING_PREFIXES = ("o1", "o3", "o4", "gpt-5")
-# Families that reason by default and take sampling controls only at effort "none".
-_SAMPLING_AT_NONE_PREFIXES = ("gpt-6-", "gpt-6.", "gpt-5.6-")
-# Of those, the ones that always reason: Astra and the gpt-6.x generation reject "none".
-_ALWAYS_REASONING_PREFIXES = ("gpt-6-astra", "gpt-6.")
+# Models known to accept reasoning_effort="none", with an optional snapshot date. Other
+# GPT-6 models, such as Astra, gpt-6-rosalind and the gpt-6.x generation, reject it.
+_EFFORT_NONE_MODELS = re.compile(
+    r"(gpt-6-(sol|luna)|gpt-5\.6-(sol|luna|terra))(-\d{4}-\d{2}-\d{2})?"
+)
 
 
 def _family(model: str, config: dict) -> str:
@@ -17,15 +19,14 @@ def _family(model: str, config: dict) -> str:
 
 
 def _accepts_effort_none(model: str, config: dict | None = None) -> bool:
-    """True for a family that reasons by default and can be told not to with "none".
+    """True for a model known to accept ``reasoning_effort="none"``.
 
-    GPT-6 Sol/Luna and GPT-5.6 qualify; GPT-6 Astra, the gpt-6.x generation, other
-    families and a custom deployment name without ``model_family`` do not.
+    GPT-6 Sol/Luna and GPT-5.6 Sol/Luna/Terra, by name or ``model_family``, with or
+    without a snapshot date. For an effort gaik picks itself, so it is an allowlist:
+    an unknown name, a deployment alias without ``model_family`` and every other
+    model give False.
     """
-    family = _family(model, config or {})
-    return family.startswith(_SAMPLING_AT_NONE_PREFIXES) and not family.startswith(
-        _ALWAYS_REASONING_PREFIXES
-    )
+    return _EFFORT_NONE_MODELS.fullmatch(_family(model, config or {})) is not None
 
 
 def normalize_chat_kwargs(
@@ -49,7 +50,7 @@ def normalize_chat_kwargs(
         result["reasoning_effort"] = config["reasoning_effort"]
     family = _family(model, config)
     is_gpt6 = family.startswith(("gpt-6-", "gpt-6."))
-    is_reasoning_family = family.startswith(_SAMPLING_AT_NONE_PREFIXES)
+    is_reasoning_family = is_gpt6 or family.startswith("gpt-5.6-")
     is_openai_reasoning = _is_openai_api(config) and family.startswith(_REASONING_PREFIXES)
     if "max_tokens" in result and (is_reasoning_family or is_openai_reasoning):
         if "max_completion_tokens" in result:
@@ -59,7 +60,8 @@ def normalize_chat_kwargs(
         return result
     effort = result.get("reasoning_effort")
     allowed = {"low", "medium", "high", "xhigh", "max"}
-    if _accepts_effort_none(model, config):
+    # Astra and the gpt-6.x generation always reason: they reject "none".
+    if not family.startswith(("gpt-6-astra", "gpt-6.")):
         allowed.add("none")
     if is_gpt6 and effort is not None and effort not in allowed:
         raise ValueError(f"{family} reasoning_effort must be one of {sorted(allowed)}")

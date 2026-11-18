@@ -196,9 +196,10 @@ a custom temperature. Supported reasoning-effort values are model-specific;
 check the selected model's OpenAI documentation.
 
 With its defaults (`temperature=0.0`, no `reasoning_effort`), `SchemaGenerator`
-sends GPT-6 Sol/Luna and GPT-5.6 `reasoning_effort="none"`, so its temperature
-applies; with reasoning and free sampling these models sometimes kept only the
-first field of a task. `DataExtractor` sends no effort unless you set one.
+sends GPT-6 Sol/Luna and GPT-5.6 `reasoning_effort="none"` in its requirements
+parses, so their temperature applies; with reasoning and free sampling these
+models sometimes kept only the first field of a task. Its structure detection and
+`DataExtractor` send no effort unless you set one.
 
 ---
 
