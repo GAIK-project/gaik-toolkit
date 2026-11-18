@@ -1,0 +1,16 @@
+INVOICE
+
+Invoice number: INV-2026-0107
+Invoice date: 2 April 2026
+Due date: 2 May 2026
+
+Supplier: Sample Supplies Ltd
+Address: 10 Example Road, Leeds
+
+Bill to: Demo Customer Oy
+
+Description              Qty   Unit price      Amount
+Safety gloves (box)       10        25.00      250.00
+Hard hat                   8       125.00    1,000.00
+
+Total: 1,250.00 EUR

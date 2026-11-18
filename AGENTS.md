@@ -31,6 +31,12 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   before pushing a front-end change.
 - Solution Wizard, after the same `uv sync --all-extras`:
   `uv run pytest implementation_layer/solution_wizard/tests -q`.
+- Components with real providers: the `component-check` skill
+  (`.claude/skills/component-check/`) runs the schema generator, extractor and vision
+  extractor on synthetic invoices with each provider whose keys it gets, and can have
+  Claude Code, Codex or Antigravity judge the outputs on their own subscription login.
+  Before a tag, `gh workflow run live-smoke.yml -f providers=azure` runs it with the
+  release smoke checks on a branch; it is not the release gate.
 - Workflows: actions are pinned to commit SHAs with a version comment, checkouts set
   `persist-credentials: false`, and token permissions are granted per job. The
   `Workflow security` job (zizmor) fails on medium or higher findings.

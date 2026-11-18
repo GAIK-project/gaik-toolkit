@@ -1,0 +1,165 @@
+{
+  "about": "Synthetic cases for run_checks.py. Each case runs once per provider. A case with schema_from reuses the schema its schema case generated for the same provider; when that case failed, the dependent case is skipped. Values in expect are compared after normalising case, spaces, number formats and dates (see compare_value in run_checks.py).",
+  "cases": [
+    {
+      "id": "schema-invoice-types",
+      "component": "schema_generator",
+      "title": "Flat invoice schema keeps date, number and enum types (Finnish task)",
+      "requirements": "Poimi laskusta nämä kentät. Käytä täsmälleen näitä kenttänimiä: invoice_number (laskun numero, teksti), invoice_date (laskun päivämäärä, päivämäärä muodossa VVVV-KK-PP), supplier (toimittajan nimi, teksti), total_amount (laskun loppusumma veroineen, desimaaliluku), currency (valuutta, yksi arvoista EUR, USD tai SEK).",
+      "expect": {
+        "structure_type": "flat",
+        "fields": {
+          "invoice_number": ["str"],
+          "invoice_date": ["date"],
+          "supplier": ["str"],
+          "total_amount": ["float", "decimal"],
+          "currency": ["str"]
+        },
+        "exact_fields": true,
+        "enums": {"currency": ["EUR", "USD", "SEK"]}
+      },
+      "rubric": "Five fields with exactly the requested names. invoice_date is a date in YYYY-MM-DD, total_amount a number, currency limited to EUR, USD and SEK. Descriptions say what each field holds; nothing is added or dropped."
+    },
+    {
+      "id": "schema-invoice-lines",
+      "component": "schema_generator",
+      "title": "Invoice header with a nested list of line items",
+      "requirements": "Poimi laskun otsikkotiedot ja jokainen laskurivi. Otsikkotiedot: invoice_number (laskun numero, teksti) ja supplier (toimittajan nimi, teksti). Laskurivit listana nimeltä line_items; jokaisella rivillä description (rivin kuvaus, teksti), quantity (määrä, kokonaisluku), unit_price (yksikköhinta, desimaaliluku) ja line_total (rivin summa, desimaaliluku).",
+      "expect": {
+        "structure_type": "parent_with_nested_list",
+        "fields": {
+          "invoice_number": ["str"],
+          "supplier": ["str"]
+        },
+        "child_container": "line_items",
+        "child_fields": {
+          "description": ["str"],
+          "quantity": ["int"],
+          "unit_price": ["float", "decimal"],
+          "line_total": ["float", "decimal"]
+        }
+      },
+      "rubric": "A parent record with invoice_number and supplier, and a list called line_items whose items have description (text), quantity (integer), unit_price and line_total (numbers). The line items are not flattened into the parent."
+    },
+    {
+      "id": "extract-invoice-text",
+      "component": "extractor",
+      "title": "Text extraction from a Finnish invoice (Finnish date and decimal comma)",
+      "schema_from": "schema-invoice-types",
+      "documents": ["fixtures/invoice-fi.txt"],
+      "expect": {
+        "records": [
+          {
+            "invoice_number": "INV-2026-0042",
+            "invoice_date": "2026-03-14",
+            "supplier": "Esimerkki Oy",
+            "total_amount": 551.57,
+            "currency": "EUR"
+          }
+        ]
+      },
+      "rubric": "One record. total_amount is the total including VAT (551,57), not the net 439,50 or the VAT 112,07. invoice_date is the invoice date 14.3.2026, not the due date 28.3.2026."
+    },
+    {
+      "id": "extract-two-documents",
+      "component": "extractor",
+      "title": "Two documents in two languages give two records in order",
+      "schema_from": "schema-invoice-types",
+      "documents": ["fixtures/invoice-fi.txt", "fixtures/invoice-en.txt"],
+      "expect": {
+        "records": [
+          {
+            "invoice_number": "INV-2026-0042",
+            "invoice_date": "2026-03-14",
+            "supplier": "Esimerkki Oy",
+            "total_amount": 551.57,
+            "currency": "EUR"
+          },
+          {
+            "invoice_number": "INV-2026-0107",
+            "invoice_date": "2026-04-02",
+            "supplier": "Sample Supplies Ltd",
+            "total_amount": 1250.0,
+            "currency": "EUR"
+          }
+        ]
+      },
+      "rubric": "Two records, the Finnish invoice first. The English invoice's '2 April 2026' becomes 2026-04-02 and '1,250.00' becomes 1250. No value of one document appears in the other's record."
+    },
+    {
+      "id": "extract-invoice-lines",
+      "component": "extractor",
+      "title": "Line items from the invoice text into the nested schema",
+      "schema_from": "schema-invoice-lines",
+      "documents": ["fixtures/invoice-fi.txt"],
+      "expect": {
+        "parent": {"invoice_number": "INV-2026-0042", "supplier": "Esimerkki Oy"},
+        "items_key": "line_items",
+        "items": [
+          {"description": "Pumpun huolto", "quantity": 2, "unit_price": 150.0, "line_total": 300.0},
+          {"description": "Tiivistesarja", "quantity": 5, "unit_price": 18.9, "line_total": 94.5},
+          {"description": "Matkakulut", "quantity": 1, "unit_price": 45.0, "line_total": 45.0}
+        ]
+      },
+      "rubric": "Exactly three line items in the invoice's order with their own quantities and prices. The net total, VAT and total rows are not line items."
+    },
+    {
+      "id": "vision-invoice-pdf",
+      "component": "vision_extractor",
+      "title": "Vision extraction from the PDF invoice",
+      "schema_from": "schema-invoice-types",
+      "files": ["fixtures/invoice-fi.pdf"],
+      "source_text": "fixtures/invoice-fi.txt",
+      "expect": {
+        "records": [
+          {
+            "invoice_number": "INV-2026-0042",
+            "invoice_date": "2026-03-14",
+            "supplier": "Esimerkki Oy",
+            "total_amount": 551.57,
+            "currency": "EUR"
+          }
+        ]
+      },
+      "rubric": "Same values as the text case: total including VAT 551,57 and the invoice date 14.3.2026, read from the page image."
+    },
+    {
+      "id": "vision-invoice-png",
+      "component": "vision_extractor",
+      "title": "Vision extraction from a scanned (PNG) invoice",
+      "schema_from": "schema-invoice-types",
+      "files": ["fixtures/invoice-fi.png"],
+      "source_text": "fixtures/invoice-fi.txt",
+      "expect": {
+        "records": [
+          {
+            "invoice_number": "INV-2026-0042",
+            "invoice_date": "2026-03-14",
+            "supplier": "Esimerkki Oy",
+            "total_amount": 551.57,
+            "currency": "EUR"
+          }
+        ]
+      },
+      "rubric": "Same values as the PDF case, from an image with no text layer."
+    },
+    {
+      "id": "vision-invoice-lines",
+      "component": "vision_extractor",
+      "title": "Vision extraction of line items from the PDF",
+      "schema_from": "schema-invoice-lines",
+      "files": ["fixtures/invoice-fi.pdf"],
+      "source_text": "fixtures/invoice-fi.txt",
+      "expect": {
+        "parent": {"invoice_number": "INV-2026-0042", "supplier": "Esimerkki Oy"},
+        "items_key": "line_items",
+        "items": [
+          {"description": "Pumpun huolto", "quantity": 2, "unit_price": 150.0, "line_total": 300.0},
+          {"description": "Tiivistesarja", "quantity": 5, "unit_price": 18.9, "line_total": 94.5},
+          {"description": "Matkakulut", "quantity": 1, "unit_price": 45.0, "line_total": 45.0}
+        ]
+      },
+      "rubric": "Three line items read from the page, same as the text case."
+    }
+  ]
+}
