@@ -361,6 +361,8 @@ deploy_signin() {
     # Proxy first, then the Route, then the web app: at no point does the Route
     # lead to a web app that expects a proxy that is not there.
     apply_manifest signin-proxy.yaml
+    # oauth2-proxy reads its pages when it starts: a changed page needs a restart.
+    oc rollout restart "deployment/$SIGNIN_DEPLOYMENT" -n "$PROJECT" >/dev/null
     oc rollout status "deployment/$SIGNIN_DEPLOYMENT" -n "$PROJECT" --timeout=300s
     apply_manifest route-signin.yaml
     set_signin_env
