@@ -949,11 +949,11 @@ export function SiteNav({
     <header className="border-border/60 bg-card/95 sticky top-0 z-50 border-b shadow-sm backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 md:px-6 md:py-4">
         {/* Left: Logo */}
-        <div className="flex min-w-0 flex-1 items-center">
+        <div className="flex min-w-0 flex-1 items-center md:min-w-fit">
           {/* The wordmark, so the header says GAIK; the monogram alone read
               as an abstract shape. The file has a white background, which
               multiply blends into the header. The label completes the site's
-              name where the menu leaves room for it. */}
+              name on phones; from md the menu needs the room. */}
           <Link
             href="/"
             aria-label="GAIK Toolkit home"
@@ -967,7 +967,7 @@ export function SiteNav({
               className="h-7 w-auto mix-blend-multiply md:h-8"
               priority
             />
-            <span className="text-muted-foreground text-sm font-medium md:hidden xl:inline">
+            <span className="text-muted-foreground text-sm font-medium md:hidden">
               Toolkit
             </span>
           </Link>
