@@ -5,6 +5,7 @@ import {
   PENDING_DENIAL,
   SHARED_DATA_DENIAL,
 } from "./lib/api-access";
+import { createAdminSessionValue } from "./lib/admin/session";
 
 // A demo run from a page left open past the access token's lifetime: the API
 // gate refreshes the session, and the browser must get the new cookies, or its
@@ -487,7 +488,8 @@ test("the generic proxy does not pass on the report run header", async () => {
 });
 
 // A user waiting for approval runs demos on the trial, which never covers a
-// write to the video-search index that every visitor searches. Without Redis the
+// write to the video-search index that every visitor searches (nor does
+// approval: that takes the admin session, tested below). Without Redis the
 // trial is off here and this user's e-mail address is unconfirmed, so the
 // refusal is told apart by its reason; that it holds with trial runs left is in
 // lib/api-access.test.ts.
@@ -518,4 +520,69 @@ test("a pending user's DELETE /api/video-search/clear is refused", async () => {
     expect(await response.json()).toEqual({ error: SHARED_DATA_DENIAL.error });
   }
   expect(backendCalls).toBe(0);
+});
+
+test("an approved user's write to the shared video index needs the admin session", async () => {
+  const savedSecret = process.env.ADMIN_SESSION_SECRET;
+  process.env.ADMIN_SESSION_SECRET = "test-admin-key";
+  try {
+    const session = sessionCookie("r1", fresh());
+    const clear = (cookie: string) =>
+      proxy(
+        new NextRequest("https://demo.test/api/video-search/clear", {
+          method: "DELETE",
+          headers: { cookie },
+        }),
+      );
+    for (const cookie of [session, `${session}; admin_session=authenticated`]) {
+      const refused = await clear(cookie);
+      expect(refused.status).toBe(SHARED_DATA_DENIAL.status);
+      expect(await refused.json()).toEqual({ error: SHARED_DATA_DENIAL.error });
+    }
+    expect(backendCalls).toBe(0);
+
+    const admin = await clear(
+      `${session}; admin_session=${createAdminSessionValue()}`,
+    );
+    expect(admin.status).toBe(200);
+    expect(backendCalls).toBe(1);
+  } finally {
+    if (savedSecret === undefined) delete process.env.ADMIN_SESSION_SECRET;
+    else process.env.ADMIN_SESSION_SECRET = savedSecret;
+  }
+});
+
+test("a video's playback link is handed out to a signed-in user only", async () => {
+  for (const path of [
+    "/api/video-search/videos/v1/play",
+    "/api/video-search/videos/v1/thumbnail",
+    "/api/video-search/%76ideos/v1/play",
+  ]) {
+    const anonymous = await proxy(
+      new NextRequest(`https://demo.test${path}`, {
+        headers: { "x-gaik-signed-in": "1" },
+      }),
+    );
+    expect(anonymous.status).toBe(401);
+  }
+  expect(backendCalls).toBe(0);
+
+  accessRow = { status: "pending", wizard_access: false };
+  const signedIn = await proxy(
+    new NextRequest("https://demo.test/api/video-search/videos/v1/play", {
+      headers: { cookie: sessionCookie("r1", fresh()) },
+    }),
+  );
+  expect(signedIn.status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-signed-in")).toBe("1");
+
+  // An open read does not carry the header, whatever the browser sends.
+  const list = await proxy(
+    new NextRequest("https://demo.test/api/video-search/videos", {
+      headers: { "x-gaik-signed-in": "1" },
+    }),
+  );
+  expect(list.status).toBe(200);
+  expect(backendHeaders?.has("x-gaik-signed-in")).toBe(false);
+  expect(backendCalls).toBe(2);
 });

@@ -1,6 +1,8 @@
 import {
+  SIGNED_IN_HEADER,
   WIZARD_USER_HEADER,
   accessRefusal,
+  handsOutStorageLink,
   isStateChanging,
   isWizardApiPath,
   needsApprovedUser,
@@ -21,6 +23,7 @@ import {
   MODEL_TIER_HEADER,
   isModelStaff,
 } from "@/lib/model-tier";
+import { verifyAdminSessionValue } from "@/lib/admin/session";
 import { isAnalyticsPath } from "@/lib/analytics-path";
 import { backendTarget, isApiPath } from "@/lib/backend-target";
 import { routedPath } from "@/lib/request-path";
@@ -129,6 +132,21 @@ async function route(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // A signed storage link (a video's playback or thumbnail) is handed to a
+    // signed-in user only; the API checks the header set further down.
+    const storageLink = handsOutStorageLink(request.method, pathname);
+    if (storageLink && !(await accessState()).loggedIn) {
+      console.warn(
+        `[api-gate] 401 ${request.method} ${pathname} loggedIn=false`,
+      );
+      return reply(
+        NextResponse.json(
+          { error: "Sign in to use this feature." },
+          { status: 401 },
+        ),
+      );
+    }
+
     // Require login + approval for every backend request that changes state,
     // not just POST: a DELETE clears data.
     // A user still waiting for approval runs on the daily trial allowance
@@ -136,7 +154,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
     // supported route runs on their credential: it still needs a signed-in
     // account, approved, or pending with a confirmed e-mail address, but spends
     // no trial run. The header alone opens nothing. Neither covers a write to
-    // data that every visitor shares.
+    // data that every visitor shares: that needs the admin session.
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
@@ -148,10 +166,16 @@ async function route(request: NextRequest): Promise<NextResponse> {
         pathname === "/api/model-settings/aitta/warm" ||
         (request.method === "DELETE" &&
           pathname.startsWith("/api/wizard/end/"));
+      const sharedData = writesSharedData(request.method, pathname);
       const refusal = await accessRefusal(state, takeTrialRun, {
         ownModelKey,
         noTrialRun,
-        sharedData: writesSharedData(request.method, pathname),
+        sharedData,
+        admin:
+          sharedData &&
+          verifyAdminSessionValue(
+            request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+          ),
       });
       if (refusal) {
         // Why a run was refused, without who: the page shows the same text.
@@ -213,6 +237,10 @@ async function route(request: NextRequest): Promise<NextResponse> {
       const { userId } = await accessState();
       if (userId) headers.set(WIZARD_USER_HEADER, userId);
     }
+
+    // Only the proxy sets this header (`headers` starts empty), and only after
+    // the check above found the user signed in.
+    if (storageLink) headers.set(SIGNED_IN_HEADER, "1");
 
     // A server model the user picked. The API checks it against its own list.
     const serverModel = request.headers.get(SERVER_MODEL_HEADER);
