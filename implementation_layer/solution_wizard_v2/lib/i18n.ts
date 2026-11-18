@@ -207,6 +207,8 @@ export type Dict = {
   bpmnRenameStepGone: string;
   /** The same for a kept description: the step it was typed for was removed elsewhere. */
   bpmnEditStepGone: string;
+  /** A type kept for a step that is a decision on the newer version: it is not sent. */
+  bpmnTypeStepIsDecision: string;
   /** A step's context pad, and the title of the menu of step types it opens. */
   bpmnPadChangeType: string;
   /** The step panel: the description field, its count ("{n}" of "{max}" characters), and how a field saves. */
@@ -1129,6 +1131,7 @@ const fi: Dict = {
   bpmnTooLarge: "Muutos on liian suuri tallennettavaksi.",
   bpmnRenameStepGone: "Nimeä ”{name}” ei tallennettu: vaihe poistettiin muualla.",
   bpmnEditStepGone: "Vaiheen muutosta ei tallennettu: vaihe poistettiin muualla.",
+  bpmnTypeStepIsDecision: "Vaiheen ”{name}” tyyppiä ei vaihdettu: se on muualla tehdyn muutoksen jälkeen päätös.",
   bpmnPadChangeType: "Vaihda vaiheen tyyppi",
   bpmnStepDescription: "Kuvaus",
   bpmnStepDescriptionCount: "{n} / {max} merkkiä",
@@ -2071,6 +2074,7 @@ const en: Dict = {
   bpmnTooLarge: "The change is too large to save.",
   bpmnRenameStepGone: "The name “{name}” was not saved: the step was removed elsewhere.",
   bpmnEditStepGone: "The change to the step was not saved: the step was removed elsewhere.",
+  bpmnTypeStepIsDecision: "The type of “{name}” was not changed: a change made elsewhere made it a decision.",
   bpmnPadChangeType: "Change the step's type",
   bpmnStepDescription: "Description",
   bpmnStepDescriptionCount: "{n} / {max} characters",

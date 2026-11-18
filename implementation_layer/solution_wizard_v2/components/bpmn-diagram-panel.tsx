@@ -36,12 +36,22 @@ import {
   opForDecision,
   mappingFitsSteps,
   performedByOf,
+  isDecisionStep,
   stepIdOf,
   type BpmnMapping,
   type DecisionValues,
   type ReworkValues,
 } from "@/lib/bpmn-canvas-ops";
-import { keptPanelEdit, panelFields, panelOps, type KeptPanelEdit, type PanelValues } from "@/lib/step-panel-model";
+import {
+  keptEditOps,
+  keptPanelEdits,
+  mergeKeptEdits,
+  panelFields,
+  panelOps,
+  waitsForVersion,
+  type KeptPanelEdit,
+  type PanelValues,
+} from "@/lib/step-panel-model";
 import type { BlueprintUpdate } from "@/lib/blueprint-update";
 import { bpmnDataObjectsQuery } from "@/lib/bpmn-show-data";
 import { fillTemplate } from "@/lib/chat-template";
@@ -181,9 +191,12 @@ export function BpmnDiagramPanel({
   // Set when an edit was refused as changed elsewhere: until the page has read
   // the newer version, an edit would be made on the old one and refused again.
   const waitingForVersion = useRef(false);
+  // The page's version as it is now, for a refusal that comes after the page already read a newer one.
+  const pageVersion = useRef(baseVersion);
   const reverting = useRef(false);
   useEffect(() => {
     canvasVersion.current = baseVersion;
+    pageVersion.current = baseVersion;
     waitingForVersion.current = false;
     // A rename kept over that refusal goes out now, on the newer version: once
     // the page has also handed over that version's steps, which it does in an
@@ -225,9 +238,10 @@ export function BpmnDiagramPanel({
   const [propsClosed, setPropsClosed] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null);
   const pendingFocus = useRef<string | null>(null);
-  // A name, description or type given a step and refused as changed elsewhere
-  // (or given while the canvas could not take it), not sent yet.
-  const pendingEdit = useRef<KeptPanelEdit | null>(null);
+  // The names, descriptions and types given steps and refused as changed
+  // elsewhere (or given while the canvas could not take them), not sent yet:
+  // one entry a step, so an edit of another step does not replace them.
+  const pendingEdits = useRef<KeptPanelEdit[]>([]);
   // What the last edit left for the wizard to complete (wizard_api's needs_attention):
   // in state for the step panel, in a ref for the type menu, which reads it when it opens.
   const [needsAttention, setNeedsAttentionState] = useState<string[]>([]);
@@ -472,9 +486,11 @@ export function BpmnDiagramPanel({
       } else if (err instanceof OperationRefused && err.code === "changed_elsewhere") {
         // What the user gave the step (a name, a description, a type) is not
         // given up: it is made again on the newer version once the page has it.
-        const kept = keptPanelEdit(operations);
-        if (kept && !pendingEdit.current) pendingEdit.current = kept;
-        waitingForVersion.current = true;
+        // What the user typed for the same step meanwhile is newer and stays.
+        pendingEdits.current = mergeKeptEdits(pendingEdits.current, keptPanelEdits(operations), { older: true });
+        // The page may have read the newer version while the edit was on its
+        // way: then no newer one comes, and the kept edits go out on it now.
+        waitingForVersion.current = waitsForVersion(base, pageVersion.current);
         lastRefusal.current = t.wsJsonChangedElsewhere;
         setChangedElsewhere(true);
         setStatus({ kind: "idle" });
@@ -736,30 +752,36 @@ export function BpmnDiagramPanel({
    * be: on the newer version, where its step is still there.
    */
   function flushPending() {
-    const pending = pendingEdit.current;
-    if (!pending || busy.current || reverting.current || typing.current || waitingForVersion.current) return;
-    if (!opsContext()) return;
-    pendingEdit.current = null;
-    const step = stepsRef.current.find((s) => s.id === pending.stepId);
-    if (!step) {
-      // Removed meanwhile, elsewhere: what was typed has nowhere to go, and the user hears so.
-      setStatus({
-        kind: "error",
-        message:
-          pending.name !== undefined
-            ? fillTemplate(t.bpmnRenameStepGone, { name: pending.name.trim() })
-            : t.bpmnEditStepGone,
-      });
+    const kept = pendingEdits.current;
+    if (!kept.length || busy.current || reverting.current || typing.current || waitingForVersion.current) return;
+    const context = opsContext();
+    if (!context) return;
+    pendingEdits.current = [];
+    const isDecision = (stepId: string) =>
+      Object.keys(context.mapping).some(
+        (elementId) =>
+          isDecisionStep(elementId, context.mapping) && stepIdOf(elementId, context.mapping, context.steps) === stepId,
+      );
+    const { ops, gone, decisionTypes } = keptEditOps(kept, stepsRef.current, savedFields, isDecision);
+    // Removed meanwhile, elsewhere: what was typed has nowhere to go, and the
+    // user hears so. A step that became a decision keeps its type: a type
+    // change would turn its gateway into a task.
+    const notes = [
+      ...gone.map((edit) =>
+        edit.name !== undefined ? fillTemplate(t.bpmnRenameStepGone, { name: edit.name.trim() }) : t.bpmnEditStepGone,
+      ),
+      ...decisionTypes.map(({ step }) => fillTemplate(t.bpmnTypeStepIsDecision, { name: step.name })),
+    ];
+    const tell = () => {
+      if (notes.length) setStatus({ kind: "error", message: notes.join(" ") });
+    };
+    if (!ops.length) {
+      tell();
       return;
     }
-    const before = savedFields(step);
-    const ops = panelOps(before, {
-      ...before,
-      name: pending.name ?? before.name,
-      description: pending.description ?? before.description,
-      type: pending.type ?? before.type,
+    void run("ops", ops).then((made) => {
+      if (made) tell();
     });
-    if (ops.length) stableOps.onOperation(ops);
   }
 
   /**
@@ -794,8 +816,7 @@ export function BpmnDiagramPanel({
     const ops = panelOps(savedFields(step), after);
     if (!ops.length) return true;
     if (busy.current || typing.current || reverting.current || waitingForVersion.current) {
-      const kept = keptPanelEdit(ops);
-      if (kept) pendingEdit.current = kept;
+      pendingEdits.current = mergeKeptEdits(pendingEdits.current, keptPanelEdits(ops));
       return false;
     }
     return run("ops", ops);

@@ -311,4 +311,129 @@ test.describe("BPMN step panel", () => {
     });
     await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu");
   });
+
+  test("edits of two steps kept over a refusal are both made once the page has the newer version", async ({ page }) => {
+    test.setTimeout(150_000);
+    await openFlow(page);
+    const blueprint = await readBlueprint(page);
+    const sent: Body[] = [];
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await standInForWizardApi(page, async (route, body) => {
+      sent.push(body);
+      if (sent.length === 1) {
+        await held;
+        const refused = { detail: { error: "changed_elsewhere", message: "reload" } };
+        await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify(refused) });
+        return;
+      }
+      await route.fulfill(made(blueprint, body));
+    });
+    await page.reload();
+    await setChatOpen(page, false);
+    await selectWorkspaceTab(page, "Työnkulku");
+    await openBpmnView(page);
+    await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-ops", "on", { timeout: 30_000 });
+
+    // Step A is renamed; the edit is held while version 8 is written elsewhere.
+    await rows(page).nth(0).getByRole("button").first().click();
+    const name = page.getByTestId("bpmn-property-name");
+    await expect(name).toBeEnabled();
+    await name.fill("Ingest renamed");
+    await name.press("Enter");
+    await expect.poll(() => sent.length).toBe(1);
+    const res = await page.request.patch("/api/sessions/ses_laskut/blueprint", {
+      data: { content: { ...blueprint, goal: `${blueprint.goal} Reviewed weekly.` }, note: "e2e: written elsewhere" },
+    });
+    expect(res.status()).toBe(200);
+    // The page's read of version 8 is held too, so step B is edited before the page has it.
+    let releaseRefresh!: () => void;
+    const refreshHeld = new Promise<void>((resolve) => (releaseRefresh = resolve));
+    await page.route(
+      (url) => url.pathname === "/sessions/ses_laskut",
+      async (route) => {
+        if (route.request().headers()["rsc"] === "1") await refreshHeld;
+        await route.fallback();
+      },
+    );
+    release();
+    await expect(page.getByTestId("bpmn-changed-elsewhere")).toBeVisible();
+
+    // Step B's description is given while the canvas waits for version 8.
+    await rows(page).nth(1).getByRole("button").first().click();
+    const description = page.getByTestId("bpmn-step-description");
+    await expect(description).toBeEnabled();
+    await description.fill("Reads the invoice fields.");
+    await description.blur();
+    await page.waitForTimeout(500);
+    expect(sent.length).toBe(1);
+
+    releaseRefresh();
+    // Both kept edits go out on version 8: B's did not replace A's.
+    await expect.poll(() => sent.length, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+    const resent = sent.slice(1).flatMap((body) => {
+      expect(body.base_version).toBe(8);
+      return body.operations;
+    });
+    expect(resent).toEqual(
+      expect.arrayContaining([
+        { op: "rename_step", step_id: "ingest", name: "Ingest renamed" },
+        { op: "set_step_description", step_id: "extract", description: "Reads the invoice fields." },
+      ]),
+    );
+    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu");
+  });
+
+  test("a refusal that comes after the page already read the newer version does not hold later saves back", async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await openFlow(page);
+    const blueprint = await readBlueprint(page);
+    const sent: Body[] = [];
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await standInForWizardApi(page, async (route, body) => {
+      sent.push(body);
+      if (sent.length === 1) {
+        await held;
+        const refused = { detail: { error: "changed_elsewhere", message: "reload" } };
+        await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify(refused) });
+        return;
+      }
+      await route.fulfill(made(blueprint, body));
+    });
+    await page.reload();
+    await setChatOpen(page, false);
+    await selectWorkspaceTab(page, "Työnkulku");
+    await openBpmnView(page);
+    await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-ops", "on", { timeout: 30_000 });
+
+    await rows(page).nth(0).getByRole("button").first().click();
+    const type = page.getByTestId("bpmn-step-type");
+    await expect(type).toHaveValue("user_task");
+    await type.selectOption("human_review");
+    await expect.poll(() => sent.length).toBe(1);
+    expect(sent[0].base_version).toBe(7);
+    // Version 8 is written elsewhere, and the page reads it (a chat turn) while the edit is on its way.
+    const res = await page.request.patch("/api/sessions/ses_laskut/blueprint", {
+      data: { content: { ...blueprint, goal: `${blueprint.goal} Reviewed weekly.` }, note: "e2e: written elsewhere" },
+    });
+    expect(res.status()).toBe(200);
+    const pageRead = page.waitForResponse(
+      (r) => new URL(r.url()).pathname === "/sessions/ses_laskut" && r.request().headers()["rsc"] === "1",
+    );
+    await chatTurn(page);
+    await pageRead;
+    // The page has version 8 before the refusal of the edit made on 7 comes.
+    await page.waitForTimeout(1_000);
+    release();
+    // No newer version comes after the refusal: the kept type goes out on version 8 at once.
+    await expect.poll(() => sent.length, { timeout: 20_000 }).toBe(2);
+    expect(sent[1]).toEqual({
+      base_version: 8,
+      operations: [{ op: "set_step_type", step_id: "ingest", type: "human_review" }],
+    });
+    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu");
+  });
 });

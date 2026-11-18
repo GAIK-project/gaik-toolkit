@@ -89,18 +89,85 @@ export function panelOps(before: PanelValues, after: PanelValues): BlueprintOper
 export type KeptPanelEdit = { stepId: string; name?: string; description?: string; type?: StepType };
 
 /**
- * What a refused edit set for one step: its name, description and type.
- * Null for anything else, and for edits of more than one step.
+ * What a refused edit set for each step: its name, description and type, one
+ * entry a step in the order the edit named them. Empty when the edit did
+ * anything else as well: only these fields are made again later.
  */
-export function keptPanelEdit(ops: BlueprintOperation[]): KeptPanelEdit | null {
-  let kept: KeptPanelEdit | null = null;
+export function keptPanelEdits(ops: BlueprintOperation[]): KeptPanelEdit[] {
+  const kept = new Map<string, KeptPanelEdit>();
   for (const op of ops) {
-    if (op.op !== "rename_step" && op.op !== "set_step_description" && op.op !== "set_step_type") return null;
-    if (kept && kept.stepId !== op.step_id) return null;
-    kept ??= { stepId: op.step_id };
-    if (op.op === "rename_step") kept.name = op.name;
-    if (op.op === "set_step_description") kept.description = op.description;
-    if (op.op === "set_step_type") kept.type = op.type;
+    if (op.op !== "rename_step" && op.op !== "set_step_description" && op.op !== "set_step_type") return [];
+    const edit = kept.get(op.step_id) ?? { stepId: op.step_id };
+    if (op.op === "rename_step") edit.name = op.name;
+    if (op.op === "set_step_description") edit.description = op.description;
+    if (op.op === "set_step_type") edit.type = op.type;
+    kept.set(op.step_id, edit);
   }
-  return kept;
+  return [...kept.values()];
+}
+
+/**
+ * `kept` with `edits` merged in, one entry a step: an edit of a step already
+ * kept adds its fields to that entry, and the edits of other steps stay. The
+ * fields of `edits` win, unless they are `older` than what is kept (an edit
+ * refused after the user had typed more for the same step meanwhile).
+ */
+export function mergeKeptEdits(
+  kept: KeptPanelEdit[],
+  edits: KeptPanelEdit[],
+  { older = false }: { older?: boolean } = {},
+): KeptPanelEdit[] {
+  const merged = new Map(kept.map((edit) => [edit.stepId, { ...edit }]));
+  for (const edit of edits) {
+    const current = merged.get(edit.stepId);
+    merged.set(edit.stepId, current ? (older ? { ...edit, ...current } : { ...current, ...edit }) : { ...edit });
+  }
+  return [...merged.values()];
+}
+
+/**
+ * The kept edits as operations on the steps of a newer version: each step's
+ * fields against what that step has now (`fieldsOf`). A step that is not
+ * there any more is `gone`; a step that is a decision on that version
+ * (`isDecision`) keeps its type, and a type kept for it is in `decisionTypes`:
+ * set_step_type would turn its gateway into a task.
+ */
+export function keptEditOps<S extends { id: string }>(
+  kept: KeptPanelEdit[],
+  steps: S[],
+  fieldsOf: (step: S) => PanelValues,
+  isDecision: (stepId: string) => boolean,
+): { ops: BlueprintOperation[]; gone: KeptPanelEdit[]; decisionTypes: { edit: KeptPanelEdit; step: S }[] } {
+  const ops: BlueprintOperation[] = [];
+  const gone: KeptPanelEdit[] = [];
+  const decisionTypes: { edit: KeptPanelEdit; step: S }[] = [];
+  for (const edit of kept) {
+    const step = steps.find((s) => s.id === edit.stepId);
+    if (!step) {
+      gone.push(edit);
+      continue;
+    }
+    const before = fieldsOf(step);
+    const decision = isDecision(step.id);
+    if (decision && edit.type !== undefined) decisionTypes.push({ edit, step });
+    ops.push(
+      ...panelOps(before, {
+        ...before,
+        name: edit.name ?? before.name,
+        description: edit.description ?? before.description,
+        type: decision ? before.type : (edit.type ?? before.type),
+      }),
+    );
+  }
+  return { ops, gone, decisionTypes };
+}
+
+/**
+ * Whether an edit refused as changed elsewhere on `refusedBase` waits for the
+ * page to read a newer version. Not when the page already has one
+ * (`pageVersion`, read while the edit was on its way): no newer one may come.
+ */
+export function waitsForVersion(refusedBase: number | null | undefined, pageVersion: number | null | undefined): boolean {
+  if (typeof refusedBase !== "number" || typeof pageVersion !== "number") return true;
+  return pageVersion <= refusedBase;
 }
