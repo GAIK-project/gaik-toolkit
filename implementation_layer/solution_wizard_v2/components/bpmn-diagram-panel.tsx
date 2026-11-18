@@ -15,11 +15,12 @@ import { BpmnZoomControls } from "@/components/bpmn-viewer-toolbar";
 import { FlowEditingNote, FlowLockedNote, FlowUpdatedLine } from "@/components/flow-status";
 import { AskStepButton, StepNumber, stepTypeLabels } from "@/components/step-type";
 import { BpmnStepPanel } from "@/components/bpmn-step-panel";
-import { BpmnBranchDialog } from "@/components/bpmn-branch-dialog";
+import { BpmnBranchDialog, BpmnReworkDialog } from "@/components/bpmn-branch-dialog";
 import { Icon } from "@/components/icons";
 import { stepIdToBpmnId, stepIndexForBpmnId } from "@/lib/bpmn-edit-state";
 import type {
   BpmnDecisionRequest,
+  BpmnReworkRequest,
   BpmnEditorOps,
   BpmnLayoutChange,
   BpmnStepLaneChange,
@@ -27,6 +28,10 @@ import type {
 import {
   decisionOf,
   decisionProblem,
+  exceptionOf,
+  opForRework,
+  reworkProblem,
+  reworkTargets,
   laneIdOf,
   opForDecision,
   mappingFitsSteps,
@@ -34,6 +39,7 @@ import {
   stepIdOf,
   type BpmnMapping,
   type DecisionValues,
+  type ReworkValues,
 } from "@/lib/bpmn-canvas-ops";
 import { keptPanelEdit, panelFields, panelOps, type KeptPanelEdit, type PanelValues } from "@/lib/step-panel-model";
 import type { BlueprintUpdate } from "@/lib/blueprint-update";
@@ -194,6 +200,9 @@ export function BpmnDiagramPanel({
   // The branch dialog: open for a new decision after a step, or for a decision to edit.
   const [decisionDialog, setDecisionDialog] = useState<BpmnDecisionRequest | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  // The path dialog: open for a new rework or rejection path on a step, or for a path to edit.
+  const [reworkDialog, setReworkDialog] = useState<BpmnReworkRequest | null>(null);
+  const [reworkError, setReworkError] = useState<string | null>(null);
   // What the last refused edit said, for the branch dialog, which stays open over it.
   const lastRefusal = useRef<string | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -592,6 +601,26 @@ export function BpmnDiagramPanel({
     return made;
   }
 
+  /** A step's "Add rework path" or a path's Edit: the path dialog opens, while the canvas can take an edit. */
+  function openRework(request: BpmnReworkRequest) {
+    if (!opsContext()) return;
+    setReworkError(null);
+    setReworkDialog(request);
+  }
+
+  /** The path dialog's Save: one edit through `run`. A refusal keeps the dialog open and says why. */
+  async function saveRework(values: ReworkValues): Promise<boolean> {
+    const request = reworkDialog;
+    if (!request || reworkProblem(values)) return false;
+    const op = opForRework(values, request);
+    // An edit that changes nothing: the dialog closes, nothing is sent.
+    if (!op) return true;
+    setReworkError(null);
+    const made = await run("ops", [op]);
+    if (!made) setReworkError(lastRefusal.current ?? t.bpmnOpRefused);
+    return made;
+  }
+
   // Dragged shapes are kept before the page goes: another page, or a reload
   // of this one (keepalive lets the request outlive it).
   useEffect(() => {
@@ -617,6 +646,7 @@ export function BpmnDiagramPanel({
     stepTypeOf: (stepId: string) => StepType | null;
     moveStepToLane: typeof moveStepToLane;
     openDecision: typeof openDecision;
+    openRework: typeof openRework;
   } | null>(null);
   const stableOps = useMemo<BpmnEditorOps>(
     () => ({
@@ -626,6 +656,7 @@ export function BpmnDiagramPanel({
       onLayout: (change) => latest.current?.sendLayout(change),
       onStepLane: (change) => void latest.current?.moveStepToLane(change),
       onDecision: (request) => latest.current?.openDecision(request),
+      onRework: (request) => latest.current?.openRework(request),
       stepType: (stepId) => latest.current?.stepTypeOf(stepId) ?? null,
     }),
     [],
@@ -773,6 +804,7 @@ export function BpmnDiagramPanel({
       stepTypeOf,
       moveStepToLane,
       openDecision,
+      openRework,
     };
   });
 
@@ -847,6 +879,7 @@ export function BpmnDiagramPanel({
 
   // The canvas turned read-only (locked, no wizard_api, no draft): the branch dialog goes with its tools.
   if (decisionDialog && !opsOn) setDecisionDialog(null);
+  if (reworkDialog && !opsOn) setReworkDialog(null);
 
   return (
     <section
@@ -888,6 +921,9 @@ export function BpmnDiagramPanel({
             addDecision: t.bpmnPadAddDecision,
             editDecision: t.bpmnPadEditDecision,
             removeDecision: t.bpmnPadRemoveDecision,
+            addRework: t.bpmnPadAddRework,
+            editRework: t.bpmnPadEditRework,
+            removeRework: t.bpmnPadRemoveRework,
           }}
           ops={stableOps}
           onSelectionChange={setSelection}
@@ -989,7 +1025,7 @@ export function BpmnDiagramPanel({
                 </span>
               </p>
             )}
-            {opsOn && !step && fitting && !decisionOf(selection.id, fitting) && (
+            {opsOn && !step && fitting && !decisionOf(selection.id, fitting) && !exceptionOf(selection.id, fitting) && (
               <p className="mt-2 text-xs text-text-muted" data-testid="bpmn-derived-note">
                 {t.bpmnDerivedElement}
               </p>
@@ -1036,6 +1072,29 @@ export function BpmnDiagramPanel({
           error={decisionError}
           onSave={saveDecision}
           onClose={() => setDecisionDialog(null)}
+          t={t}
+        />
+      )}
+      {reworkDialog && (
+        <BpmnReworkDialog
+          mode={"attachedTo" in reworkDialog ? "add" : "edit"}
+          initial={
+            "attachedTo" in reworkDialog
+              ? { name: "", condition: "", outcome: "" }
+              : {
+                  name: reworkDialog.exception.name,
+                  condition: reworkDialog.exception.condition,
+                  outcome: reworkDialog.exception.outcome,
+                }
+          }
+          steps={reworkTargets(
+            "attachedTo" in reworkDialog ? reworkDialog.attachedTo : reworkDialog.exception.attached_to,
+            steps,
+          ).map((s) => ({ id: s.id, name: s.name }))}
+          busy={working}
+          error={reworkError}
+          onSave={saveRework}
+          onClose={() => setReworkDialog(null)}
           t={t}
         />
       )}

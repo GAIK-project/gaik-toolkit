@@ -41,6 +41,13 @@ export const MAX_NAME_CHARS = 200;
 /** The target of a branch that ends the process. */
 export const DECISION_END = "end";
 
+/**
+ * A rework or rejection path's outcome: `"end"`, or back to a step,
+ * `"loop_to:<step id>"` (an earlier step or the same one).
+ */
+export const REWORK_END = "end";
+export const REWORK_LOOP_TO = "loop_to:";
+
 /** One way out of a business decision: its condition and the step it leads to, or `"end"`. */
 export type DecisionBranch = { condition: string; target: string };
 
@@ -61,7 +68,17 @@ export type BlueprintOperation =
   /** A business decision (`business_process.decision_points`) after the step `after`. */
   | { op: "add_decision"; after: string; name: string; branches: DecisionBranch[] }
   | { op: "update_decision"; decision_id: string; name?: string | null; branches?: DecisionBranch[] | null }
-  | { op: "remove_decision"; decision_id: string };
+  | { op: "remove_decision"; decision_id: string }
+  /** A rework or rejection path (`business_process.exceptions`) on the step `attached_to`. */
+  | { op: "add_rework_path"; attached_to: string; name: string; condition?: string; outcome: string }
+  | {
+      op: "update_rework_path";
+      exception_id: string;
+      name?: string | null;
+      condition?: string | null;
+      outcome?: string | null;
+    }
+  | { op: "remove_rework_path"; exception_id: string };
 
 export type OperationsResult = {
   blueprint: Blueprint;

@@ -19,6 +19,14 @@ describe("blueprint field names", () => {
     }
   });
 
+  it("says the fields of a rework or rejection path in plain words, in both languages", () => {
+    expect(fieldInPlainWords("operations[0].outcome", dictionary("en"))).toBe("where the path leads");
+    for (const key of ["attached_to", "outcome", "exception_id"]) {
+      expect(dictionary("fi").blueprintFieldNames[key], key).toBeTruthy();
+      expect(dictionary("en").blueprintFieldNames[key], key).toBeTruthy();
+    }
+  });
+
   it("is null for a field it has no words for", () => {
     expect(fieldInPlainWords("operations[0].mystery", dictionary("en"))).toBeNull();
   });

@@ -15,12 +15,21 @@
  * step's `performed_by`, so a lane can be renamed or removed and a step put
  * in another lane. Business decisions: the mapping names the decision behind
  * a `decision_point` gateway (`decision`), so it can be edited and removed,
- * and a step can get a decision after it.
+ * and a step can get a decision after it. Rework and rejection paths: the
+ * mapping names the path (`exception`) behind the elements that draw it (its
+ * gateway, its end event, or the approval gateway whose "No" loops back), so
+ * it can be edited and removed, and a step can get a new one.
  */
 import { MAX_BRANCHES, MIN_BRANCHES, type BlueprintOperation, type DecisionBranch } from "@/lib/blueprint-ops";
 
 /** A business decision (`business_process.decision_points[i]`), as the mapping names it. */
 export type DecisionRef = { id: string; name: string; after: string; branches: DecisionBranch[] };
+
+/**
+ * A rework or rejection path (`business_process.exceptions[i]`), as the
+ * mapping names it: `outcome` is `"end"` or `"loop_to:<step id>"`.
+ */
+export type ExceptionRef = { id: string; name: string; attached_to: string; condition: string; outcome: string };
 
 export type BpmnMapping = Record<
   string,
@@ -33,6 +42,8 @@ export type BpmnMapping = Record<
     performed_by?: string;
     /** A business decision's gateway (`decision_point`): the decision it stands for. */
     decision?: DecisionRef;
+    /** An element that draws a rework or rejection path: the path. */
+    exception?: ExceptionRef;
   }
 >;
 
@@ -114,7 +125,11 @@ export function opForConnection(
   return { op: "connect", source, target };
 }
 
-/** Delete: remove_step for a step's task, remove_decision for a business decision, disconnect for a flow between two steps. */
+/**
+ * Delete: remove_step for a step's task, remove_decision for a business
+ * decision, remove_rework_path for an element that draws a path, disconnect
+ * for a flow between two steps.
+ */
 export function opForDelete(
   element: CanvasElement,
   mapping: BpmnMapping,
@@ -128,14 +143,20 @@ export function opForDelete(
   }
   const decision = decisionOf(element.id, mapping);
   if (decision) return { op: "remove_decision", decision_id: decision.id };
+  const path = exceptionOf(element.id, mapping);
+  if (path) return { op: "remove_rework_path", exception_id: path.id };
   const stepId = stepIdOf(element.id, mapping, steps);
   return stepId ? { op: "remove_step", step_id: stepId } : null;
 }
 
-/** Whether the canvas offers edits on `element`: a step's task, a business decision, or a flow between two steps. */
+/** Whether the canvas offers edits on `element`: a step's task, a business decision, a path, or a flow between two steps. */
 export function isOperationElement(element: CanvasElement, mapping: BpmnMapping, steps: StepRef[]): boolean {
   if (element.type === "bpmn:SequenceFlow") return opForDelete(element, mapping, steps) !== null;
-  return stepIdOf(element.id, mapping, steps) !== null || decisionOf(element.id, mapping) !== null;
+  return (
+    stepIdOf(element.id, mapping, steps) !== null ||
+    decisionOf(element.id, mapping) !== null ||
+    exceptionOf(element.id, mapping) !== null
+  );
 }
 
 /** The palette's "Add step": a new step after the last one. */
@@ -292,4 +313,59 @@ export function opForDecision(
     ...(name !== was.name ? { name } : {}),
     ...(sameBranches ? {} : { branches }),
   };
+}
+
+/**
+ * The rework or rejection path behind `elementId`: its gateway, its end
+ * event, or a review's approval gateway whose "No" is the path's loop back.
+ * Null for anything else.
+ */
+export function exceptionOf(elementId: string, mapping: BpmnMapping): ExceptionRef | null {
+  const path = entryOf(elementId, mapping)?.exception;
+  return path && typeof path.id === "string" && path.id ? path : null;
+}
+
+/**
+ * The steps a rework path on `attachedTo` can lead back to: the steps up to
+ * it and itself, in order. A step the steps do not have (a manual step, drawn
+ * after them all) can lead back to any of them.
+ */
+export function reworkTargets<S extends StepRef>(attachedTo: string, steps: S[]): S[] {
+  const index = steps.findIndex((s) => s.id === attachedTo);
+  return index < 0 ? steps : steps.slice(0, index + 1);
+}
+
+/** What the path dialog holds; `outcome` is `"end"` or `"loop_to:<step id>"`. */
+export type ReworkValues = { name: string; condition: string; outcome: string };
+
+/** What keeps the dialog's values from being a path, or null when they are one. */
+export type ReworkProblem = "name" | "outcome";
+
+export function reworkProblem(values: ReworkValues): ReworkProblem | null {
+  if (!values.name.trim()) return "name";
+  if (!values.outcome) return "outcome";
+  return null;
+}
+
+/**
+ * The dialog's values as an operation: add_rework_path on a step, or
+ * update_rework_path for a path with only what changed. Null while they are
+ * no path (`reworkProblem`), and for an update that changes nothing.
+ */
+export function opForRework(
+  values: ReworkValues,
+  of: { attachedTo: string } | { exception: ExceptionRef },
+): BlueprintOperation | null {
+  if (reworkProblem(values)) return null;
+  const name = values.name.trim();
+  const condition = values.condition.trim();
+  const { outcome } = values;
+  if ("attachedTo" in of) return { op: "add_rework_path", attached_to: of.attachedTo, name, condition, outcome };
+  const was = of.exception;
+  const changed = {
+    ...(name !== was.name ? { name } : {}),
+    ...(condition !== was.condition ? { condition } : {}),
+    ...(outcome !== was.outcome ? { outcome } : {}),
+  };
+  return Object.keys(changed).length ? { op: "update_rework_path", exception_id: was.id, ...changed } : null;
 }

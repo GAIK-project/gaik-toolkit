@@ -318,8 +318,9 @@ def get_session_bpmn_mapping(
 ) -> JSONResponse:
     """``{"mapping": {element_id: {"kind": ..., "blueprint_path": ...}}, "has_draft": bool}``
     of the diagram ``GET /bpmn`` serves with the same ``data_objects``. A lane's
-    entry also has its ``participant_id``, a step's its ``performed_by`` and a
-    business decision's its ``decision`` (id, name, step and branches). Drawn
+    entry also has its ``participant_id``, a step's its ``performed_by``, a
+    business decision's its ``decision`` (id, name, step and branches), and an
+    element that draws a rework or rejection path its ``exception``. Drawn
     again here, so its element ids are the ones in that XML; a mapping stored in
     the draft can be from before an edit. ``has_draft`` says whether the agent
     has written its draft: without one the diagram's operations are refused

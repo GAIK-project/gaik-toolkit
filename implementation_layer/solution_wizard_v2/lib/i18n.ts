@@ -244,6 +244,22 @@ export type Dict = {
   bpmnDecisionCancel: string;
   /** An edit refused because it would make the process loop back to an earlier step. */
   bpmnLoopRefused: string;
+  /** Rework and rejection paths: a step's pad ("add one"), a path's pad (edit, remove). */
+  bpmnPadAddRework: string;
+  bpmnPadEditRework: string;
+  bpmnPadRemoveRework: string;
+  /** The path dialog (BpmnReworkDialog in components/bpmn-branch-dialog): its titles, fields and buttons. */
+  bpmnReworkAddTitle: string;
+  bpmnReworkEditTitle: string;
+  /** Under the title: what a rework or rejection path is. */
+  bpmnReworkHelp: string;
+  bpmnReworkName: string;
+  bpmnReworkCondition: string;
+  /** The outcome select: back to a step ("{step}"), or the end. */
+  bpmnReworkOutcome: string;
+  bpmnReworkBackTo: string;
+  bpmnReworkEnd: string;
+  bpmnReworkSave: string;
   /** The step panel's lane select, and its entry for the lane of the step's type. */
   bpmnStepLane: string;
   bpmnStepLaneDefault: string;
@@ -1085,7 +1101,20 @@ const fi: Dict = {
   bpmnDecisionSave: "Tallenna päätös",
   bpmnDecisionCancel: "Peruuta",
   bpmnLoopRefused:
-    "Muutosta ei tehty: prosessi palaisi sen jälkeen aiempaan vaiheeseen. Haara ei voi johtaa taaksepäin; pyydä paluupolkua wizardilta.",
+    "Muutosta ei tehty: prosessi palaisi sen jälkeen aiempaan vaiheeseen. Haara ei voi johtaa taaksepäin; lisää vaiheelle korjauspolku.",
+  bpmnPadAddRework: "Lisää korjauspolku",
+  bpmnPadEditRework: "Muokkaa polkua",
+  bpmnPadRemoveRework: "Poista polku",
+  bpmnReworkAddTitle: "Lisää korjauspolku",
+  bpmnReworkEditTitle: "Muokkaa polkua",
+  bpmnReworkHelp:
+    "Kun ehto täyttyy, työ palaa korjattavaksi tähän tai aiempaan vaiheeseen, tai prosessi päättyy (hylkäys).",
+  bpmnReworkName: "Polun nimi",
+  bpmnReworkCondition: "Ehto",
+  bpmnReworkOutcome: "Mitä sitten",
+  bpmnReworkBackTo: "Takaisin vaiheeseen: {step}",
+  bpmnReworkEnd: "Prosessi päättyy",
+  bpmnReworkSave: "Tallenna polku",
   bpmnStepLane: "Kaista (kuka tekee)",
   bpmnStepLaneDefault: "Tyypin oletuskaista",
   bpmnUndo: "Kumoa",
@@ -1108,6 +1137,9 @@ const fi: Dict = {
     decision_id: "päätös",
     branches: "päätöksen haarat",
     condition: "haaran ehto",
+    attached_to: "vaihe, jolla polku on",
+    outcome: "polun jatko",
+    exception_id: "polku",
   },
   bpmnSaved: "Tallennettu. Wizard näkee muutoksen seuraavasta chat-viestistäsi.",
   bpmnStepTitle: "Vaihe {n}",
@@ -1967,7 +1999,20 @@ const en: Dict = {
   bpmnDecisionSave: "Save the decision",
   bpmnDecisionCancel: "Cancel",
   bpmnLoopRefused:
-    "The change was not made: the process would then loop back to an earlier step. A branch cannot lead back; ask the wizard for a rework path.",
+    "The change was not made: the process would then loop back to an earlier step. A branch cannot lead back; add a rework path to the step instead.",
+  bpmnPadAddRework: "Add a rework path",
+  bpmnPadEditRework: "Edit the path",
+  bpmnPadRemoveRework: "Remove the path",
+  bpmnReworkAddTitle: "Add a rework path",
+  bpmnReworkEditTitle: "Edit the path",
+  bpmnReworkHelp:
+    "When the condition holds, the work goes back to this step or an earlier one to be fixed, or the process ends (a rejection).",
+  bpmnReworkName: "Name of the path",
+  bpmnReworkCondition: "Condition",
+  bpmnReworkOutcome: "Then",
+  bpmnReworkBackTo: "Back to step: {step}",
+  bpmnReworkEnd: "The process ends",
+  bpmnReworkSave: "Save the path",
   bpmnStepLane: "Lane (who does it)",
   bpmnStepLaneDefault: "Default for its type",
   bpmnUndo: "Undo",
@@ -1990,6 +2035,9 @@ const en: Dict = {
     decision_id: "decision",
     branches: "decision's branches",
     condition: "branch condition",
+    attached_to: "step the path is on",
+    outcome: "where the path leads",
+    exception_id: "path",
   },
   bpmnSaved: "Saved. The wizard sees the change from your next chat message.",
   bpmnStepTitle: "Step {n}",

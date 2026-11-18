@@ -156,7 +156,7 @@ test.describe("BPMN step panel", () => {
 
     await rows(page).nth(3).getByRole("button").first().click();
     const pad = page.locator(".djs-context-pad .entry");
-    await expect(pad).toHaveCount(8);
+    await expect(pad).toHaveCount(9);
     const change = page.locator('.djs-context-pad .entry[data-action="gaik-step-type"]');
     await expect(change).toHaveAttribute("title", "Vaihda vaiheen tyyppi");
     await change.click();

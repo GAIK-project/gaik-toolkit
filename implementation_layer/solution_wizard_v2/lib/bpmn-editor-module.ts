@@ -32,6 +32,11 @@
  *   gateway the generator draws by itself (the approval after a review) has
  *   no tools; a decision step (a `workflow.steps` entry drawn as a gateway)
  *   keeps the step tools.
+ * - Rework and rejection paths: a step's "Add rework path" and a path's Edit
+ *   open the path dialog (`onRework`, in the panel); a path's Remove (and the
+ *   Delete key) is `remove_rework_path`. A path's elements are its gateway,
+ *   its end event, and the approval gateway of a review whose "No" is the
+ *   path's loop back.
  *
  * Labels and the operations come in through the modeler's `gaikEditor`
  * config, read each time they are needed.
@@ -42,6 +47,7 @@ import type { BlueprintOperation, StepType } from "@/lib/blueprint-ops";
 import { STEP_OP_TYPES } from "@/lib/step-panel-model";
 import {
   decisionOf,
+  exceptionOf,
   isDecisionStep,
   stepHasDecision,
   isOperationElement,
@@ -58,6 +64,7 @@ import {
   type BpmnMapping,
   type CanvasElement,
   type DecisionRef,
+  type ExceptionRef,
   type StepRef,
 } from "@/lib/bpmn-canvas-ops";
 
@@ -87,10 +94,17 @@ export type BpmnEditorLabels = {
   addDecision: string;
   editDecision: string;
   removeDecision: string;
+  /** A step's pad: a rework or rejection path on it; a path's pad: edit and remove it. */
+  addRework: string;
+  editRework: string;
+  removeRework: string;
 };
 
 /** What the branch dialog opens for: a new decision after a step, or a decision to edit. */
 export type BpmnDecisionRequest = { after: string } | { decision: DecisionRef };
+
+/** What the path dialog opens for: a new path on a step, or a path to edit. */
+export type BpmnReworkRequest = { attachedTo: string } | { exception: ExceptionRef };
 
 /**
  * A step put in another lane: the operation, and the drawn places that no
@@ -120,6 +134,8 @@ export type BpmnEditorOps = {
   onStepLane: (change: BpmnStepLaneChange) => void;
   /** Opens the branch dialog: it sends the decision through `onOperation`'s gate. */
   onDecision: (request: BpmnDecisionRequest) => void;
+  /** Opens the path dialog: it sends the path through `onOperation`'s gate. */
+  onRework: (request: BpmnReworkRequest) => void;
   /** The type a step has now, as the step panel shows it; null when unknown. */
   stepType: (stepId: string) => StepType | null;
 };
@@ -215,6 +231,8 @@ const ARROW_RIGHT = icon('<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>');
 const SPLIT = icon(
   '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/>',
 );
+// Lucide "undo-2": a path back to an earlier step.
+const UNDO = icon('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>');
 const TYPE_ICONS: Record<StepType, string> = {
   // arrowRightLeft, brain and userCheck: the step list's icons for the three types.
   user_task: icon('<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>'),
@@ -376,6 +394,23 @@ class GaikContextPad {
           },
         };
       }
+      const path = exceptionOf(element.id, mapping);
+      if (path) {
+        return {
+          "gaik-rework-edit": {
+            group: "edit",
+            imageUrl: PENCIL,
+            title: labels.editRework,
+            action: { click: () => ops.onRework({ exception: path }) },
+          },
+          "gaik-rework-remove": {
+            group: "edit",
+            className: "bpmn-icon-trash",
+            title: labels.removeRework,
+            action: { click: () => ops.onOperation([{ op: "remove_rework_path", exception_id: path.id }]) },
+          },
+        };
+      }
       const stepId = stepIdOf(element.id, mapping, steps);
       if (!stepId) return {};
       const out: Entries = {
@@ -413,6 +448,12 @@ class GaikContextPad {
           action: { click: () => ops.onDecision({ after: stepId }) },
         };
       }
+      out["gaik-add-rework"] = {
+        group: "edit",
+        imageUrl: UNDO,
+        title: labels.addRework,
+        action: { click: () => ops.onRework({ attachedTo: stepId }) },
+      };
       const earlier = opsForMove(element.id, "earlier", mapping, steps);
       out["move-earlier"] = earlier
         ? { group: "edit", imageUrl: ARROW_LEFT, title: labels.moveEarlier, action: { click: () => ops.onOperation(earlier) } }

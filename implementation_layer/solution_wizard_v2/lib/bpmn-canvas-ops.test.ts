@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  exceptionOf,
+  opForRework,
+  reworkProblem,
+  reworkTargets,
   decisionOf,
   decisionProblem,
   isDecisionStep,
@@ -380,6 +384,87 @@ describe("business decisions", () => {
       decision_id: "big",
       name: "B",
       branches,
+    });
+  });
+});
+
+describe("rework and rejection paths", () => {
+  const rework = {
+    id: "fields_wrong",
+    name: "Fields wrong",
+    attached_to: "review",
+    condition: "Wrong",
+    outcome: "loop_to:extract",
+  };
+  const rejection = { id: "unreadable", name: "Unreadable", attached_to: "extract", condition: "", outcome: "end" };
+  const withPaths: BpmnMapping = {
+    ...MAPPING,
+    Gateway_approval_review: { ...MAPPING.Gateway_approval_review, exception: rework },
+    Gateway_exc_unreadable: { kind: "exception_gateway", blueprint_path: "business_process.exceptions[1]", exception: rejection },
+    EndEvent_unreadable: { kind: "end_event", blueprint_path: "business_process.exceptions[1]", exception: rejection },
+  };
+
+  it("names the path behind its elements, and nothing else", () => {
+    expect(exceptionOf("Gateway_exc_unreadable", withPaths)).toEqual(rejection);
+    expect(exceptionOf("EndEvent_unreadable", withPaths)).toEqual(rejection);
+    expect(exceptionOf("Gateway_approval_review", withPaths)).toEqual(rework);
+    expect(exceptionOf("Gateway_approval_review", MAPPING)).toBeNull();
+    expect(exceptionOf("Activity_review", withPaths)).toBeNull();
+    expect(exceptionOf("toString", withPaths)).toBeNull();
+    // An entry without its path (an older wizard_api) gives no tools.
+    const bare: BpmnMapping = { X: { kind: "exception_gateway", blueprint_path: "business_process.exceptions[0]" } };
+    expect(exceptionOf("X", bare)).toBeNull();
+  });
+
+  it("deletes a path with remove_rework_path, and its elements are operation elements", () => {
+    expect(opForDelete({ id: "EndEvent_unreadable", type: "bpmn:EndEvent" }, withPaths, STEPS)).toEqual({
+      op: "remove_rework_path",
+      exception_id: "unreadable",
+    });
+    expect(isOperationElement({ id: "Gateway_exc_unreadable", type: "bpmn:ExclusiveGateway" }, withPaths, STEPS)).toBe(true);
+    expect(isOperationElement({ id: "Gateway_approval_review", type: "bpmn:ExclusiveGateway" }, withPaths, STEPS)).toBe(true);
+    expect(isOperationElement({ id: "Gateway_approval_review", type: "bpmn:ExclusiveGateway" }, MAPPING, STEPS)).toBe(false);
+  });
+
+  it("offers the steps up to the path's own as targets", () => {
+    expect(reworkTargets("extract", STEPS).map((s) => s.id)).toEqual(["upload", "extract"]);
+    expect(reworkTargets("review", STEPS).map((s) => s.id)).toEqual(["upload", "extract", "review"]);
+    // A path on a manual step (after every workflow step in the drawing): all of them.
+    expect(reworkTargets("archive", STEPS).map((s) => s.id)).toEqual(["upload", "extract", "review"]);
+  });
+
+  it("checks the dialog's values: a name and an outcome", () => {
+    const ok = { name: " Redo ", condition: "", outcome: "loop_to:upload" };
+    expect(reworkProblem(ok)).toBeNull();
+    expect(reworkProblem({ ...ok, outcome: "end" })).toBeNull();
+    expect(reworkProblem({ ...ok, name: "  " })).toBe("name");
+    expect(reworkProblem({ ...ok, outcome: "" })).toBe("outcome");
+  });
+
+  it("makes add_rework_path on a step, trimmed; null while the values are no path", () => {
+    expect(opForRework({ name: " Redo ", condition: " Wrong ", outcome: "loop_to:upload" }, { attachedTo: "extract" })).toEqual({
+      op: "add_rework_path",
+      attached_to: "extract",
+      name: "Redo",
+      condition: "Wrong",
+      outcome: "loop_to:upload",
+    });
+    expect(opForRework({ name: "", condition: "", outcome: "end" }, { attachedTo: "extract" })).toBeNull();
+  });
+
+  it("sends only what an edit changed, and nothing when nothing did", () => {
+    const same = { name: rework.name, condition: rework.condition, outcome: rework.outcome };
+    expect(opForRework({ ...same, name: " Fields wrong " }, { exception: rework })).toBeNull();
+    expect(opForRework({ ...same, name: "Redo" }, { exception: rework })).toEqual({
+      op: "update_rework_path",
+      exception_id: "fields_wrong",
+      name: "Redo",
+    });
+    expect(opForRework({ ...same, condition: "", outcome: "end" }, { exception: rework })).toEqual({
+      op: "update_rework_path",
+      exception_id: "fields_wrong",
+      condition: "",
+      outcome: "end",
     });
   });
 });
