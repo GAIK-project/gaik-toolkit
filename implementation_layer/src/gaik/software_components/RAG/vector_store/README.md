@@ -89,7 +89,8 @@ the last two), and `add()` stores it with the chunk as `document_id`. A
 `ValueError`, and document ids are compared exactly. The owner is the store's `owner`
 (recorded as `metadata["gaik_owner"]`).
 
-- Adding a document's chunks again updates them instead of storing a second copy.
+- Adding a document's chunks again replaces them, metadata included, instead of
+  storing a second copy.
   A text repeated inside one document keeps one chunk per occurrence, counted within
   one call: pass all of a document's chunks in one call.
 - `add(..., replace=True)` stores the chunks, then deletes the other stored chunks of

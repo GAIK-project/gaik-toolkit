@@ -197,7 +197,7 @@ def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):
         raise RuntimeError("store unavailable")
 
     if store.persist:
-        monkeypatch.setattr(store._collection, "upsert", fail)
+        monkeypatch.setattr(store._collection, "add", fail)
     else:
         monkeypatch.setattr(store, "_ids", _FailingList(store._ids))
     with pytest.raises(RuntimeError):
@@ -216,6 +216,19 @@ def test_the_occurrence_is_counted_within_one_call(store):
     store.add(_chunks("report", ["header"]), [A1])
     store.add(_chunks("report", ["header"]), [A1])
 
+    assert store.count() == 1
+
+
+def test_indexing_again_drops_a_metadata_key_the_chunk_no_longer_has(store):
+    [chunk] = _chunks("report", ["alpha"])
+    chunk.metadata["heading"] = "Old heading"
+    store.add([chunk], [A1])
+    [chunk] = _chunks("report", ["alpha"])
+    chunk.metadata["heading"] = None
+    store.add([chunk], [A1])
+
+    [(doc, _)] = store.search(A1, top_k=5)
+    assert doc.metadata.get("heading") is None
     assert store.count() == 1
 
 

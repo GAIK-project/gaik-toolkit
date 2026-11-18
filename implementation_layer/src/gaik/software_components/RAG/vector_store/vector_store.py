@@ -130,8 +130,8 @@ class VectorStore:
         ``_chunk_ids``): the document is ``metadata["document_id"]``, else
         ``source``, else ``document_name``, and is stored as ``document_id``;
         the owner is the store's ``owner``. Adding a chunk that is already stored
-        updates it instead of storing a second copy. A chunk whose metadata
-        names no document is stored as a new one each time.
+        replaces it, metadata included, instead of storing a second copy. A
+        chunk whose metadata names no document is stored as a new one each time.
 
         Args:
             documents: The chunks. A ``document_id`` in the metadata must be a
@@ -180,10 +180,15 @@ class VectorStore:
             metadatas = [_chroma_metadata(doc.metadata) for doc in stored]
             # Chroma rejects a single call above its maximum batch size, so send
             # slices. If one fails, the slices before it stay stored.
+            # An upsert would merge the new metadata into the stored one, and a key
+            # the new chunk lacks (a heading it no longer has) would stay. So the
+            # stored chunks with these ids are deleted and the chunks added anew; if
+            # that add fails, the slice's earlier versions are gone too.
             batch = _max_batch_size(self._client) or len(ids)
             for start in range(0, len(ids), batch):
                 end = start + batch
-                self._collection.upsert(  # type: ignore[union-attr]
+                self._collection.delete(ids=ids[start:end])  # type: ignore[union-attr]
+                self._collection.add(  # type: ignore[union-attr]
                     ids=ids[start:end],
                     embeddings=embeddings[start:end],
                     documents=texts[start:end],
