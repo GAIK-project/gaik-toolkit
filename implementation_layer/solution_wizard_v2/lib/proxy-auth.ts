@@ -179,9 +179,10 @@ export async function verifyAccessToken(
   if (claims.iss !== config.issuer) return null;
   if (typeof claims.exp !== "number" || claims.exp + CLOCK_SKEW_S < now) return null;
   if (typeof claims.nbf === "number" && claims.nbf - CLOCK_SKEW_S > now) return null;
-  // Keycloak names the client a token was issued to in azp; aud may name others.
-  const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (claims.azp !== config.clientId && !audiences.includes(config.clientId)) return null;
+  // Keycloak names the client a token was issued to in azp. The proxy signs in
+  // as this app's own client, so a token issued to any other client is refused,
+  // even when its aud also names this app.
+  if (claims.azp !== config.clientId) return null;
 
   const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
   // An address the identity provider has not confirmed is only a claim.
