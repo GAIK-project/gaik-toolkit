@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from api.routers import tabular_agent as route
+from api.utils.result_owner import USER_HEADER, remember_owner
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -51,6 +52,7 @@ def _session(tmp_path: Path, name: str, *, idle_for: float = 0.0, busy: int = 0)
         "tables": [],
     }
     route._SESSIONS[name] = session
+    remember_owner(name, "")  # the test client sends no user, like a call from the pod
     return session
 
 
@@ -217,3 +219,37 @@ def test_stored_names_drop_folders_and_keep_the_suffix() -> None:
     assert route._stored_name("C:\\Users\\me\\sales 2024.xlsx") == "sales 2024.xlsx"
     assert route._stored_name("../../etc/data.csv") == "data.csv"
     assert route._stored_name("x" * 400 + ".parquet").endswith(".parquet")
+
+
+def test_a_session_answers_only_its_owner(tmp_path, client) -> None:
+    _session(tmp_path, "s-owned")
+    remember_owner("s-owned", "user-a")
+
+    asked = client.post(
+        "/tabular-agent/ask",
+        json={"session_id": "s-owned", "question": "How many rows?"},
+        headers={USER_HEADER: "user-b"},
+    )
+    ended = client.delete("/tabular-agent/session/s-owned", headers={USER_HEADER: "user-b"})
+    anonymous = client.delete("/tabular-agent/session/s-owned")
+
+    assert asked.status_code == 404
+    assert ended.status_code == 404 and anonymous.status_code == 404
+    assert "s-owned" in route._SESSIONS  # still there for its owner
+    assert client.delete(
+        "/tabular-agent/session/s-owned", headers={USER_HEADER: "user-a"}
+    ).json() == {"status": "closed"}
+
+
+def test_an_upload_belongs_to_the_user_who_sent_it(monkeypatch, tmp_path, client) -> None:
+    _fake_load(monkeypatch)
+
+    uploaded = client.post(
+        "/tabular-agent/upload",
+        files={"file": ("data.csv", b"a,b\n1,2\n", "text/csv")},
+        headers={USER_HEADER: "user-a"},
+    )
+    session_id = uploaded.json()["session_id"]
+
+    assert route.owned_by(session_id, "user-a")
+    assert not route.owned_by(session_id, "user-b")

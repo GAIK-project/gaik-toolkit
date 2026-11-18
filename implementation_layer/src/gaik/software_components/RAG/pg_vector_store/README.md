@@ -186,7 +186,7 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 |--------|-------------|
 | `setup()` | Create extensions, table, indexes, SQL functions; concurrent calls on one database run one after another |
 | `add(documents, embeddings)` | Insert documents, returns list of IDs |
-| `count()` | Total document count |
+| `count()` | Document count (this owner's, with `owner`) |
 | `delete(document_ids)` | Delete by ID, returns deleted count |
 | `search(query_embedding, *, top_k, filters)` | VectorStore-compatible semantic search |
 | `search_semantic(query_embedding, *, top_k, threshold, filters)` | Pure vector search; `threshold` (default 0.7) drops rows below that similarity |
@@ -269,6 +269,26 @@ to hold against a `RelevanceGate` floor.
 ### Connection String
 
 Standard PostgreSQL URI: `postgresql://user:password@host:port/database`
+
+### Owner
+
+`PgVectorStore(..., owner="user-42")` records the owner in each row's `metadata`
+(`gaik_owner`) and adds it to the metadata filter of every search, `count()` and
+`delete()`, so one table can hold several users' documents. A caller's `filters` are
+combined with it and cannot replace it. Without `owner` the store reads the whole table,
+and its `add()` refuses metadata that already names an owner. A store without an owner
+also deletes rows of any owner by id.
+
+This is a filter in gaik, not database access control. Every client of the table (a
+store without an owner, an older gaik, psql, the application's own SQL) reads and writes
+every owner's rows. For tenants that must be kept apart in the database itself, use
+separate tables or PostgreSQL row-level security.
+
+The owner is a filter on every search, and an HNSW scan filters only after picking its
+candidates, so a store with `owner` sets `hnsw_iterative_scan="relaxed_order"` unless you
+pass another value (pgvector 0.8+; on an older pgvector the setting is skipped with a
+warning and `health()` names it). `health()` and `relemmatize()` stay table-wide
+maintenance: they read and rewrite every owner's rows.
 
 ### FTS Language
 
