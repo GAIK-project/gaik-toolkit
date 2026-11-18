@@ -318,6 +318,7 @@ signin_enabled() {
 set_signin_env() {
     # The web app checks the forwarded token itself (lib/proxy-auth.ts). The
     # keys come from Keycloak's Service; the issuer is its public address.
+    # The sign-in proxy is one more hop in X-Forwarded-For after the router.
     # Sign-out goes to the proxy's /oauth2/sign_out, which also ends the
     # Keycloak session (--backend-logout-url in signin-proxy.yaml).
     local issuer="https://$KEYCLOAK_HOST/realms/gaik"
@@ -326,7 +327,8 @@ set_signin_env() {
         WIZARD_OIDC_ISSUER="$issuer" \
         WIZARD_OIDC_JWKS_URL="http://gaik-keycloak:8080/realms/gaik/protocol/openid-connect/certs" \
         WIZARD_OIDC_CLIENT_ID="$NAME" \
-        WIZARD_OIDC_GROUP=wizard-user >/dev/null
+        WIZARD_OIDC_GROUP=wizard-user \
+        WIZARD_TRUSTED_PROXY_HOPS=2 >/dev/null
 }
 
 deploy_signin() {
@@ -354,7 +356,8 @@ deploy_signin() {
 remove_signin() {
     apply_manifest route.yaml
     oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" WIZARD_AUTH_MODE- WIZARD_OIDC_ISSUER- \
-        WIZARD_OIDC_JWKS_URL- WIZARD_OIDC_CLIENT_ID- WIZARD_OIDC_GROUP- WIZARD_OIDC_LOGOUT_URL- >/dev/null
+        WIZARD_OIDC_JWKS_URL- WIZARD_OIDC_CLIENT_ID- WIZARD_OIDC_GROUP- WIZARD_OIDC_LOGOUT_URL- \
+        WIZARD_TRUSTED_PROXY_HOPS=1 >/dev/null
     oc rollout status "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" --timeout=300s
     # Removed, not scaled down: `manifests` keys on the proxy's Deployment.
     # The Secret and the Keycloak client stay, so `signin` can turn it on again.
