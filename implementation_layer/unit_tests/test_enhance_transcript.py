@@ -135,6 +135,42 @@ def test_ordinary_finnish_fixes_pass_on_a_short_note():
         assert result.enhanced_text == after
 
 
+def test_accents_and_case_restored_across_a_long_segment_pass():
+    # every word's accent, case or punctuation is fixed, plus one real one-letter fix
+    words = " ".join(["tama tyomaa kayni hyvin"] * 105).split()
+    words[50] = "kayn"
+    before = " ".join(words)
+    after = " ".join(["Tämä työmaa käyni hyvin."] * 105)
+    result = _with_answers(after, after).enhance_text(before)
+
+    assert result.refused_passes == []
+    assert result.enhanced_text == after
+
+
+def test_one_letter_fixes_in_a_note_with_a_small_vocabulary_pass():
+    import random
+
+    words = "huolto kävi talossa ja vaihtoi suodattimen sitten lähti pois kotiin".split()
+    words += "asentaja tarkisti putket venttiilit hyvin kunnossa".split()
+    assert len(set(words)) == 16
+    rng = random.Random(7)
+    before = [rng.choice(words) for _ in range(1000)]
+    after = list(before)
+    for i in range(0, 1000, 50):  # 20 one-letter fixes
+        after[i] = after[i] + "n"
+    result = _with_answers(" ".join(after), " ".join(after)).enhance_text(" ".join(before))
+
+    assert result.refused_passes == []
+    assert result.enhanced_text == " ".join(after)
+
+
+def test_a_rewrite_that_keeps_the_words_folded_is_still_measured():
+    from gaik.software_components.enhance_transcript.enhance_transcript import _change_ratio
+
+    assert _change_ratio("Tämä työmaa", "tama tyomaa") == 0
+    assert _change_ratio("tama tyomaa kayni", "tama talo kayni") > 0.25
+
+
 def test_the_ratio_check_can_be_turned_off_but_not_the_digit_check(monkeypatch):
     monkeypatch.setattr(
         "gaik.software_components.enhance_transcript.enhance_transcript.build_compat_client",

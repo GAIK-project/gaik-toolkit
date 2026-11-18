@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
@@ -228,7 +228,7 @@ class TranscriptEnhancerResult(BaseModel):
     """Word-level changes between ``original_text`` and ``enhanced_text``; always set."""
     diff_chunks: list[DiffChunk] | None = None
     refused_passes: list[RefusedPass] = []
-    """Passes whose answer changed digits or too many words, so their input was kept."""
+    """Passes whose answer changed digits or too many letters, so their input was kept."""
 
 
 _DIGITS = re.compile(r"\d+")
@@ -248,6 +248,7 @@ def _digit_runs(text: str) -> list[str]:
 
 _NOT_LETTER = re.compile(r"[\W_]+")
 _MAX_SPAN_LETTERS = 2000
+_MAX_REALIGN_WORDS = 2000
 
 
 def _letters(text: str) -> str:
@@ -261,20 +262,50 @@ def _letters(text: str) -> str:
     return _NOT_LETTER.sub("", folded)
 
 
+def _changed_spans(
+    a: list[str], b: list[str], *, autojunk: bool = True
+) -> Iterator[tuple[list[str], list[str]]]:
+    """The spans of words where ``a`` and ``b`` differ, as ``(a_words, b_words)``.
+
+    The words both lists start and end with are set aside first, so a repeated phrase
+    cannot pull the alignment off by a repeat. The first alignment skips the most
+    common words (``autojunk``), which keeps a long transcript fast; each span it
+    leaves is aligned again with every word counted, so a note with a small
+    vocabulary, whose every word is common, still lines up word by word. A span longer
+    than ``_MAX_REALIGN_WORDS`` is not aligned again: that costs time in the square of
+    its length, and the span is then compared as a whole.
+    """
+    start = 0
+    while start < min(len(a), len(b)) and a[start] == b[start]:
+        start += 1
+    end = 0
+    while end < min(len(a), len(b)) - start and a[-1 - end] == b[-1 - end]:
+        end += 1
+    a, b = a[start : len(a) - end], b[start : len(b) - end]
+    for tag, i1, i2, j1, j2 in SequenceMatcher(a=a, b=b, autojunk=autojunk).get_opcodes():
+        if tag == "equal":
+            continue
+        if autojunk and tag == "replace" and max(i2 - i1, j2 - j1) <= _MAX_REALIGN_WORDS:
+            yield from _changed_spans(a[i1:i2], b[j1:j2], autojunk=False)
+        else:
+            yield a[i1:i2], b[j1:j2]
+
+
 def _change_ratio(original: str, changed: str) -> float:
     """Changed letters per letter of ``original``, after :func:`_letters`.
 
-    The words are aligned first, so a long transcript costs little; inside each
-    changed span the letters are compared, so a merged compound or a fixed accent
-    counts as nothing and a replaced word counts by how much of it changed.
+    The words are aligned first, so a long transcript costs little. They are aligned
+    as :func:`_letters` folds them, so a word whose case, accent or punctuation the pass
+    fixed still lines up (see :func:`_changed_spans`). Inside each changed span the
+    letters are compared, so a merged compound counts as nothing and a replaced word
+    counts by how much of it changed.
     """
-    a, b = original.split(), changed.split()
-    total = max(1, len(_letters(original)))
+    a = [w for w in map(_letters, original.split()) if w]
+    b = [w for w in map(_letters, changed.split()) if w]
+    total = max(1, sum(map(len, a)))
     edits = 0
-    for tag, i1, i2, j1, j2 in SequenceMatcher(a=a, b=b).get_opcodes():
-        if tag == "equal":
-            continue
-        x, y = _letters(" ".join(a[i1:i2])), _letters(" ".join(b[j1:j2]))
+    for a_words, b_words in _changed_spans(a, b):
+        x, y = "".join(a_words), "".join(b_words)
         if x == y:
             continue
         if max(len(x), len(y)) > _MAX_SPAN_LETTERS:
