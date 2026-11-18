@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import json
 import keyword
 import re
 import string
@@ -1529,6 +1530,188 @@ def _write_readme(variables: dict[str, Any], poc_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# The package's test page (app.py, ui/)
+# ---------------------------------------------------------------------------
+
+#: The file endings each wired entrypoint looks for in sample_input/.
+_DOCUMENT_SUFFIXES = [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png", ".tiff", ".tif"]
+_AUDIO_SUFFIXES = [".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm", ".mp4"]
+#: technical_spec.input_types -> (input kind, file endings) for a pipeline the
+#: agent wires itself. A type that is not listed takes any file.
+_INPUT_KINDS = {
+    "audio": ("audio", _AUDIO_SUFFIXES),
+    "video": ("audio", _AUDIO_SUFFIXES),
+    "pdf": ("document", _DOCUMENT_SUFFIXES),
+    "docx": ("document", _DOCUMENT_SUFFIXES),
+    "document": ("document", _DOCUMENT_SUFFIXES),
+    "image": ("document", _DOCUMENT_SUFFIXES),
+    "document_collection": ("document", [".pdf"]),
+    "text": ("text", [".txt", ".md"]),
+    "csv": ("table", [".csv", ".xlsx"]),
+    "xlsx": ("table", [".csv", ".xlsx"]),
+    "excel": ("table", [".csv", ".xlsx"]),
+    "spreadsheet": ("table", [".csv", ".xlsx"]),
+    "tabular": ("table", [".csv", ".xlsx"]),
+    "json": ("data", [".json"]),
+}
+_INPUT_LABELS = {
+    "en": {
+        "audio": "A recording",
+        "document": "A document",
+        "documents": "The documents to search",
+        "text": "A text file, or text typed below",
+        "table": "A table file",
+        "data": "A data file",
+        "file": "The solution's input files",
+    },
+    "fi": {
+        "audio": "Äänite",
+        "document": "Asiakirja",
+        "documents": "Asiakirjat, joista haetaan",
+        "text": "Tekstitiedosto tai alle kirjoitettu teksti",
+        "table": "Taulukkotiedosto",
+        "data": "Datatiedosto",
+        "file": "Ratkaisun syötetiedostot",
+    },
+}
+_QUESTION_LABELS = {"en": "Your question", "fi": "Kysymyksesi"}
+#: The test page's fixed files: their place in the package and their template under
+#: TEMPLATES_DIR. They are the same in every package, so wizard_api's package check
+#: (``poc_service.package_problems``) can tell a changed copy from the one written here.
+TEST_PAGE_TEMPLATES = {
+    "app.py": "_common/app.py.tmpl",
+    "ui/index.html": "_common/ui/index.html",
+}
+
+
+def _short(value: Any, limit: int) -> str:
+    """Free text for the page's data file: one line, no control characters, cut to ``limit``."""
+    text = " ".join(str(value if value is not None else "").split())
+    return "".join(ch for ch in text if ch.isprintable())[:limit]
+
+
+def _spec_list(spec: Any, key: str) -> list:
+    value = spec.get(key, []) if isinstance(spec, dict) else getattr(spec, key, [])
+    return value if isinstance(value, list) else []
+
+
+def _page_inputs(blueprint: Blueprint, pattern: str, ui_language: str) -> list[dict[str, Any]]:
+    """What the test page lets the user add, following what the entrypoint reads."""
+    labels = _INPUT_LABELS[ui_language]
+
+    def entry(kind: str, suffixes: list[str], multiple: bool, label: str | None = None) -> dict:
+        return {
+            "kind": kind,
+            "label": labels[label or kind],
+            "extensions": list(suffixes),
+            "multiple": multiple,
+        }
+
+    if pattern == "audio_to_structured":
+        return [entry("audio", _AUDIO_SUFFIXES, False)]
+    if pattern == "document_to_structured":
+        return [entry("document", _DOCUMENT_SUFFIXES, False)]
+    if pattern == "rag":
+        return [entry("document", [".pdf"], True, "documents")]
+    found: dict[str, dict] = {}
+    for input_type in _spec_list(blueprint.technical_spec, "input_types"):
+        kind, suffixes = _INPUT_KINDS.get(str(input_type).lower(), ("file", []))
+        if kind in found:
+            merged = found[kind]["extensions"]
+            merged.extend(s for s in suffixes if s not in merged)
+        else:
+            found[kind] = entry(kind, suffixes, True)
+    return list(found.values()) or [entry("file", [], True)]
+
+
+def _page_output_fields(spec: Any) -> list[dict[str, str]]:
+    """The output fields as the page labels them: key, label, type and description."""
+    if not isinstance(spec, dict):
+        return []
+    types = spec.get("field_types") if isinstance(spec.get("field_types"), dict) else {}
+    descriptions = (
+        spec.get("field_descriptions") if isinstance(spec.get("field_descriptions"), dict) else {}
+    )
+    fields: list[dict[str, str]] = []
+    for field in spec.get("fields") or []:
+        if isinstance(field, dict):
+            # A report's sections: {"id": ..., "title": ..., "instructions": ...}.
+            key = _short(field.get("id") or field.get("title") or "", 100)
+            label = _short(field.get("title") or key.replace("_", " ").capitalize(), 200)
+            field_type, description = "text", ""
+        else:
+            key = _short(field, 100)
+            label = key.replace("_", " ").capitalize()
+            field_type = _short(types.get(field, "string"), 40)
+            description = _short(descriptions.get(field, ""), 500)
+        if not key:
+            continue
+        item = {"key": key, "label": label, "type": field_type}
+        if description:
+            item["description"] = description
+        fields.append(item)
+    return fields
+
+
+def _solution_description(
+    blueprint: Blueprint, variables: dict[str, Any], pattern: str
+) -> dict[str, Any]:
+    """The data the test page reads: what the solution is, takes in and gives out."""
+    language = str(variables.get("language") or "en")
+    ui_language = "fi" if language.lower().startswith("fi") else "en"
+    # Only the RAG entrypoint reads a question from a text file beside the documents.
+    # A pipeline the agent wires takes typed text where its input_types say text.
+    asks_question = pattern == "rag"
+    return {
+        "id": blueprint.use_case.id,
+        "name": _short(blueprint.use_case.name, 200),
+        "purpose": _short(blueprint.use_case.description, 1000),
+        "language": ui_language,
+        "content_language": language,
+        "pattern": pattern,
+        "inputs": _page_inputs(blueprint, pattern, ui_language),
+        "asks_question": asks_question,
+        "question_label": _QUESTION_LABELS[ui_language] if asks_question else "",
+        "output_fields": _page_output_fields(blueprint.target_output_spec),
+    }
+
+
+def _json_for_page(data: Any) -> str:
+    """JSON whose text cannot end a tag or a script wherever a page puts it.
+
+    The page reads this file with fetch and shows its values as text. The angle
+    brackets and the ampersand are written as escapes all the same, so the file
+    stays data if a later front end inlines it.
+    """
+    text = json.dumps(data, indent=2, ensure_ascii=False)
+    for char in ("<", ">", "&", chr(0x2028), chr(0x2029)):
+        text = text.replace(char, f"\\u{ord(char):04x}")
+    return text + "\n"
+
+
+def _write_test_page(
+    blueprint: Blueprint, variables: dict[str, Any], pattern: str, poc_dir: Path
+) -> list[Path]:
+    """Write the package's own test page: app.py, ui/index.html and ui/solution.json.
+
+    The server and the page are the same files in every package
+    (:data:`TEST_PAGE_TEMPLATES`); only ``ui/solution.json`` comes from the
+    blueprint, and as data. No blueprint value is written into the code or the markup.
+    """
+    written = []
+    for relative, template in TEST_PAGE_TEMPLATES.items():
+        target = poc_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_read_template(*template.rsplit("/", 1)) or "", encoding="utf-8")
+        written.append(target)
+    data_path = poc_dir / "ui" / "solution.json"
+    data_path.write_text(
+        _json_for_page(_solution_description(blueprint, variables, pattern)), encoding="utf-8"
+    )
+    return [*written, data_path]
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -1668,6 +1851,9 @@ def scaffold_poc(
     # README
     _write_readme(variables, poc_dir)
     files_created.append(poc_dir / "README.md")
+
+    # The test page: a fixed server and page, and the blueprint's facts as data.
+    files_created.extend(_write_test_page(blueprint, variables, pattern, poc_dir))
 
     # Synthetic data for document/RAG patterns.
     # Both DocumentsToStructuredData (vision_parser) and RAGWorkflow (VisionRagParser)

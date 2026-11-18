@@ -523,6 +523,8 @@ export type Dict = {
   pocUseReady: string;
   /** In place of pocUseReady when the run in view finished with warnings. */
   pocUseCheck: string;
+  /** Under the last step: the package carries a test page; the command follows it. */
+  pocTestPageHint: string;
   pocDownloadHint: string;
   /** "{n} riviä": length of the run log behind its disclosure. */
   pocLogLines: string;
@@ -1285,6 +1287,7 @@ const fi: Dict = {
   pocNeedsPackage: "Avautuu, kun paketti on generoitu.",
   pocUseReady: "Testiajo onnistui: kokeile ratkaisua omilla tapauksilla tai lataa paketti käyttöönottoon.",
   pocUseCheck: "Testiajossa jäi tarkistettavaa: katso tulos ja kokeile sitten ratkaisua omilla tapauksilla tai aja testi uudelleen.",
+  pocTestPageHint: "Paketissa on mukana testisivu selaimeen. Käynnistä se paketin kansiossa komennolla",
   pocDownloadHint: "Paketti esimerkkisyötteineen omalle koneelle ajettavaksi.",
   pocLogLines: "{n} riviä",
   pocSuccess: "Onnistui",
@@ -2108,6 +2111,7 @@ const en: Dict = {
   pocNeedsPackage: "Opens once the package is generated.",
   pocUseReady: "The test run succeeded: try the solution on your own cases or download the package for deployment.",
   pocUseCheck: "The test run left things to check: look at the result, then try the solution on your own cases or run the test again.",
+  pocTestPageHint: "The package includes a test page for the browser. Start it in the package folder with",
   pocDownloadHint: "The package with its sample input, to run on your own machine.",
   pocLogLines: "{n} lines",
   pocSuccess: "Success",
