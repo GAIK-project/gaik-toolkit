@@ -41,14 +41,16 @@ def introspect_schema(
     Args:
         conn: An open psycopg connection.
         schema_name: The schema to introspect.
-        allowlist: When given, only these tables are included.
+        allowlist: When given, only these tables are included; an empty list
+            includes none, as in ``validate_read_only``. ``None`` includes
+            every table in the schema.
         include_samples: When True, attach up to three sample rows per table.
 
     Returns:
         A ``SchemaInfo`` describing every (allowed) base table and view.
     """
     # Exact names, as the SQL validator compares them: "Users" is not "users".
-    allowed = set(allowlist) if allowlist else None
+    allowed = set(allowlist) if allowlist is not None else None
 
     table_rows = conn.execute(
         """
@@ -115,9 +117,12 @@ def introspect_schema(
         """,
         (schema_name,),
     ).fetchall()
+    # A reference to a table the agent may not read is left out, so the prompt
+    # names only tables a query can use.
     foreign_keys = {
         (r["table_name"], r["column_name"]): f"{r['foreign_table']}.{r['foreign_column']}"
         for r in fk_rows
+        if allowed is None or r["foreign_table"] in allowed
     }
 
     columns_by_table: dict[str, list[ColumnInfo]] = {}

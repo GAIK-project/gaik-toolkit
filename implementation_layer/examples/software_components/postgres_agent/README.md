@@ -42,6 +42,6 @@ The example seeds an isolated `gaik_postgres_agent_demo` schema (4 customers,
 ## Notes
 
 `PostgresAgent` is **read-only** by design: it generates and runs only `SELECT`
-queries. For real databases, connect with a dedicated read-only role and pass a
-`table_allowlist` -- see the
+queries over the tables named in its required `table_allowlist`. For real
+databases, also connect with a dedicated read-only role -- see the
 [component README](../../../src/gaik/software_components/postgres_agent/README.md).

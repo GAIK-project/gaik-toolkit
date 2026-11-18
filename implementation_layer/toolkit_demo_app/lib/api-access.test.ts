@@ -5,6 +5,7 @@ import {
   PENDING_DENIAL,
   SHARED_DATA_DENIAL,
   accessRefusal,
+  handsOutStorageLink,
   isEmailConfirmed,
   isStateChanging,
   isWizardApiPath,
@@ -41,23 +42,42 @@ test("the wizard needs a signed-in user with the grant", () => {
   expect(wizardRefusal({ loggedIn: true, wizardAccess: true })).toBeNull();
 });
 
-test("every non-read method needs an approved user", async () => {
-  // The shared video index, with trial runs left: only an approved user passes.
+test("a write to the shared video index passes only a signed-in administrator", async () => {
+  // With trial runs left, an approved or pending user without the admin
+  // session is refused; the admin session alone does not stand in for sign-in.
   const path = "/api/video-search/clear";
   const trialLeft = async () => ({ ok: true as const });
   for (const method of NON_READS) {
     expect(needsApprovedUser(method)).toBe(true);
-    const gated = { sharedData: writesSharedData(method, path) };
-    const refusal = (state: GateState) =>
-      accessRefusal(state, trialLeft, gated);
-    expect(await refusal({ ...signedIn, approved: true })).toBeNull();
+    const sharedData = writesSharedData(method, path);
+    const refusal = (state: GateState, admin = false) =>
+      accessRefusal(state, trialLeft, { sharedData, admin });
+    expect(await refusal({ ...signedIn, approved: true }, true)).toBeNull();
+    expect(await refusal({ ...signedIn, approved: true })).toEqual(
+      SHARED_DATA_DENIAL,
+    );
     expect(await refusal({ ...signedIn, pending: true })).toEqual(
       SHARED_DATA_DENIAL,
     );
     expect(await refusal(signedIn)).toEqual(SHARED_DATA_DENIAL);
     expect(
-      await refusal({ ...signedIn, loggedIn: false, userId: null }),
+      await refusal({ ...signedIn, loggedIn: false, userId: null }, true),
     ).toEqual({ status: 401, error: "Sign in to use this feature." });
+  }
+});
+
+test("a video's playback and thumbnail links are told apart from the open reads", () => {
+  for (const kind of ["play", "thumbnail"]) {
+    const path = `/api/video-search/videos/v1/${kind}`;
+    expect(handsOutStorageLink("GET", path)).toBe(true);
+    expect(handsOutStorageLink("HEAD", path)).toBe(true);
+  }
+  for (const path of [
+    "/api/video-search/videos",
+    "/api/video-search/status",
+    "/api/video-search/search",
+  ]) {
+    expect(handsOutStorageLink("GET", path)).toBe(false);
   }
 });
 
@@ -103,7 +123,7 @@ test("a request with the user's own model key still needs an account", async () 
   const take = async () => {
     throw new Error("an own-key run must not spend a trial run");
   };
-  const ownKey = { noTrialRun: true };
+  const ownKey = { ownModelKey: true };
   expect(
     await accessRefusal(
       {
@@ -151,7 +171,7 @@ test("an own model key does not open a write to shared data", async () => {
   };
   expect(
     await accessRefusal({ ...signedIn, pending: true }, take, {
-      noTrialRun: true,
+      ownModelKey: true,
       sharedData: true,
     }),
   ).toEqual(SHARED_DATA_DENIAL);
@@ -200,13 +220,17 @@ test("a rejected or unknown user and a visitor are refused", async () => {
   ).toEqual({ status: 401, error: "Sign in to use this feature." });
 });
 
-test("a pending user without a confirmed e-mail address gets no trial run", async () => {
+test("a pending user without a confirmed e-mail address runs neither a trial run nor their own key", async () => {
   const take = async () => {
     throw new Error("the trial must not be touched");
   };
   const unconfirmed = { ...signedIn, pending: true, emailConfirmed: false };
   expect(await accessRefusal(unconfirmed, take)).toEqual(EMAIL_UNCONFIRMED);
-  // Their own model key spends no trial run, so it still works.
+  expect(await accessRefusal(unconfirmed, take, { ownModelKey: true })).toEqual(
+    EMAIL_UNCONFIRMED,
+  );
+  // A request that is no demo run, such as ending a wizard session, needs no
+  // confirmed address.
   expect(
     await accessRefusal(unconfirmed, take, { noTrialRun: true }),
   ).toBeNull();

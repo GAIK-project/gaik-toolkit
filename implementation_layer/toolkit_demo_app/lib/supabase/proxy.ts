@@ -37,7 +37,7 @@ export interface AccessState {
   approved: boolean;
   /** Signed up and waiting for approval: may run demos on a trial allowance (lib/trial.ts). */
   pending: boolean;
-  /** The sign-in e-mail address is confirmed; trial runs need it. */
+  /** The sign-in e-mail address is confirmed; a pending user's runs need it. */
   emailConfirmed: boolean;
   userId: string | null;
   /** Lowercased sign-in email, for the model tier (lib/model-tier.ts). */

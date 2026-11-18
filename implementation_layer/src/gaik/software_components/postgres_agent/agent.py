@@ -41,6 +41,26 @@ from .sql_safety import UnsafeSQLError, validate_read_only
 logger = logging.getLogger(__name__)
 
 _IDENTIFIER_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+_SYSTEM_SCHEMAS = frozenset({"information_schema", "pg_catalog", "pg_toast"})
+
+
+def _check_table_allowlist(table_allowlist: object) -> list[str]:
+    """Return the tables the agent may read, or raise when none are named."""
+    example = "for example table_allowlist=['customers', 'orders']"
+    if isinstance(table_allowlist, str):
+        raise ValueError(
+            f"table_allowlist must be a list of table names, not a string ({example})."
+        )
+    if not table_allowlist:
+        raise ValueError(
+            "PostgresAgent needs table_allowlist: the tables and views it may read, "
+            f"{example}. The agent reads no table that is not on the list."
+        )
+    names = list(table_allowlist)  # type: ignore[call-overload]
+    if not all(isinstance(name, str) and name.strip() for name in names):
+        raise ValueError(f"table_allowlist entries must be non-empty table names ({example}).")
+    return names
+
 
 # Caps on how much query output is fed to the LLM when synthesizing an answer.
 ANSWER_MAX_ROWS = 50
@@ -212,7 +232,10 @@ class PostgresAgent:
 
         from gaik.software_components.postgres_agent import PostgresAgent
 
-        with PostgresAgent("postgresql://user:pass@localhost:5432/db") as agent:
+        with PostgresAgent(
+            "postgresql://user:pass@localhost:5432/db",
+            table_allowlist=["customers", "orders"],
+        ) as agent:
             result = agent.ask("Which customer placed the most orders?")
             print(result.answer)
 
@@ -224,7 +247,19 @@ class PostgresAgent:
         max_retries: Attempts the agentic loop makes when SQL fails.
         max_rows: Hard cap on rows returned by :meth:`run_sql`.
         statement_timeout_ms: Per-statement timeout (0 disables it).
-        table_allowlist: When given, queries may only touch these tables.
+        table_allowlist: Required. The tables and views the agent may read, as
+            PostgreSQL stores their names (case-sensitive: ``"Users"`` is the
+            table created as ``"Users"``). Only these appear in the schema the
+            LLM sees, and a query that touches any other table, view or
+            system catalog is refused before it runs. Type casts are checked
+            against the list too: a cast to an ``oid`` or ``reg*`` type, or to
+            a type that is neither built in nor a listed table, is refused, as
+            are session and server details such as ``version()``. A listed
+            table's rows include those of its partitions and of tables that
+            inherit from it. A missing list raises
+            ``TypeError`` and an empty one ``ValueError`` at construction;
+            releases up to gaik 0.11.0 read every table in ``schema_name``
+            when no list was given.
         schema_name: The single schema the agent operates on.
         extra_instructions: Optional free-form text appended to the SQL-generation
             user prompt under "Additional context:". Use this for a domain glossary,
@@ -252,7 +287,7 @@ class PostgresAgent:
         max_retries: int = 3,
         max_rows: int = 100,
         statement_timeout_ms: int = 10_000,
-        table_allowlist: list[str] | None = None,
+        table_allowlist: list[str],
         schema_name: str = "public",
         extra_instructions: str | None = None,
         answer_language: str = "en",
@@ -265,6 +300,11 @@ class PostgresAgent:
                 f"Invalid schema_name '{schema_name}': "
                 "must contain only letters, digits, and underscores."
             )
+        if schema_name.lower() in _SYSTEM_SCHEMAS or schema_name.lower().startswith("pg_"):
+            raise ValueError(
+                f"schema_name '{schema_name}' is a PostgreSQL system schema; "
+                "the agent reads only tables in an application schema."
+            )
         self.connection_string = connection_string
         # An unquoted identifier, as in search_path and the validator: fold it once
         # so introspection looks for the schema PostgreSQL actually created.
@@ -272,7 +312,7 @@ class PostgresAgent:
         self.max_retries = max(1, max_retries)
         self.max_rows = max(1, max_rows)
         self.statement_timeout_ms = max(0, statement_timeout_ms)
-        self.table_allowlist = list(table_allowlist) if table_allowlist else None
+        self.table_allowlist = _check_table_allowlist(table_allowlist)
         self.extra_instructions = extra_instructions.strip() if extra_instructions else None
         self.answer_language = (answer_language or "en").strip().lower()
         self.temperature = temperature
