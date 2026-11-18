@@ -311,7 +311,12 @@ def describe_requirements(requirements: Any, structure_type: str) -> dict:
 
     def fields_of(spec) -> dict:
         return {
-            f.field_name: {"type": f.field_type, "enum": f.enum, "format": f.format}
+            f.field_name: {
+                "type": f.field_type,
+                "enum": f.enum,
+                "format": f.format,
+                "description": f.description,
+            }
             for f in spec.fields
         }
 
@@ -706,6 +711,11 @@ def judge_case(case: dict, entry: dict, args) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _plain(value: Any) -> Any:
+    """A value as it reads back from summary.json (Decimal and date as text)."""
+    return json.loads(json.dumps(value, ensure_ascii=False, default=str))
+
+
 def diff_baseline(current: dict, baseline: dict) -> list[str]:
     """Cases that passed in the baseline and do not now, and outputs that changed."""
     notes = []
@@ -719,7 +729,11 @@ def diff_baseline(current: dict, baseline: dict) -> list[str]:
                 continue
             if old["status"] == "pass" and entry["status"] != "pass":
                 notes.append(f"{provider} / {case_id}: was pass, now {entry['status']}")
-            if "output" in old and "output" in entry and old["output"] != entry["output"]:
+            if (
+                "output" in old
+                and "output" in entry
+                and _plain(old["output"]) != _plain(entry["output"])
+            ):
                 notes.append(f"{provider} / {case_id}: output differs from the baseline")
     return notes
 

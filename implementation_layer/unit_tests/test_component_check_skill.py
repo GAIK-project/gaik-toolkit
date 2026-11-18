@@ -227,3 +227,18 @@ def test_the_fixtures_are_synthetic():
     digits = [int(d) for d in "1234567"]
     remainder = sum(d * w for d, w in zip(digits, (7, 9, 10, 5, 8, 4, 2))) % 11
     assert "1234567-8" in text and str(11 - remainder) != "8"
+
+
+def test_the_baseline_reports_a_lost_pass_but_not_a_decimal_read_back_as_text():
+    from decimal import Decimal
+
+    def run(status, output):
+        return {"providers": {"azure": {"cases": {"c": {"status": status, "output": output}}}}}
+
+    baseline = run("pass", [{"total": "551.57"}])
+    assert rc.diff_baseline(run("pass", [{"total": Decimal("551.57")}]), baseline) == []
+    notes = rc.diff_baseline(run("fail", [{"total": "439.50"}]), baseline)
+    assert notes == [
+        "azure / c: was pass, now fail",
+        "azure / c: output differs from the baseline",
+    ]
