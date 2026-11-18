@@ -1,6 +1,6 @@
 ---
 name: component-check
-description: Runs gaik's schema generator, extractor and vision extractor on synthetic invoices (Finnish and English text, a PDF and a scanned PNG) with one or more providers (Azure, OpenAI, Google, Vertex, CSC Aitta, Anthropic, Anthropic on Foundry), checks each output against expected fields, types and values, can have a subscription CLI (Claude Code, Codex or Antigravity) judge every output without an API key, and compares a run with an earlier one. Also gives the browser steps for the same checks on the deployed demo's schema-generator, extractor and vision-extractor pages. Use before tagging a gaik release, after a change to the extractor, schema generator, vision extractor or LLM layer, to compare providers or models, or for "testaa komponentit", "aja komponenttitestit", "toimiiko extractor eri malleilla", "check the components before a release". Manual and local; the same runner also runs in the live-smoke workflow. The release certification gate is scripts/release_check.py, not this skill.
+description: Runs gaik's schema generator (flat, nested-list and two-list schemas, every field type, date formats and defaults), extractor, vision extractor, RAG pipeline (embedder, in-memory vector store, retriever, answer generator with citations), tabular agent and vision parser on synthetic invoices (Finnish and English text, a PDF, a scanned PNG and a CSV) with one or more providers (Azure, OpenAI, Google, Vertex, CSC Aitta, Anthropic, Anthropic on Foundry), checks each output against expected fields, types, values, numbers, citations and text, can have a subscription CLI (Claude Code, Codex or Antigravity) judge every output without an API key, and compares a run with an earlier one. Also gives the browser steps for the same checks on the deployed demo's schema-generator, extractor and vision-extractor pages. Use before tagging a gaik release, after a change to the extractor, schema generator, vision extractor, RAG components, tabular agent, vision parser or LLM layer, to compare providers or models, or for "testaa komponentit", "aja komponenttitestit", "toimiiko extractor eri malleilla", "check the components before a release". Manual and local; the same runner also runs in the live-smoke workflow. The release certification gate is scripts/release_check.py, not this skill.
 ---
 
 # Component check
@@ -8,8 +8,32 @@ description: Runs gaik's schema generator, extractor and vision extractor on syn
 `run_checks.py` runs the cases in `cases.json` once per provider, with the gaik that Python
 imports (in this repository, the editable checkout). Schema cases run first; an extraction case
 reuses the schema its `schema_from` case generated for the same provider, so a provider is tested
-end to end, the way the demo's pages chain them. Every input is synthetic (`fixtures/`, made by
-`make_fixtures.py`). Each output is checked by fixed rules, and optionally by a judge.
+end to end, the way the demo's pages chain them. The RAG, tabular agent and vision parser cases
+stand alone. Every input is synthetic (`fixtures/`, made by `make_fixtures.py`). Each output is
+checked by fixed rules, and optionally by a judge.
+
+## The cases
+
+| Case | Component | What it checks |
+| --- | --- | --- |
+| `schema-invoice-types` | schema generator | Flat schema from a Finnish task: date, decimal, a three-value enum, no extra field |
+| `schema-invoice-lines` | schema generator | Header fields with one nested list, `line_items` |
+| `schema-inventory-list` | schema generator | `nested_list`: only a list, named `inventory_items`, of records with an int, a decimal and an enum |
+| `schema-meeting-two-lists` | schema generator | Header fields with two separate lists, `participants` and `action_items` (with a date) |
+| `schema-field-rules` | schema generator | Flat: a bool, an int, a date with format `DD.MM.YYYY` (`%d.%m.%Y`), a `list[str]` and a stated default `"not given"` |
+| `extract-invoice-text` | extractor | Finnish invoice text: total with VAT, Finnish date and decimal comma |
+| `extract-two-documents` | extractor | A Finnish and an English invoice give two records in order |
+| `extract-invoice-lines` | extractor | The three line items into the nested schema |
+| `vision-invoice-pdf`, `-png` | vision extractor | The same values from the PDF and from a scan without a text layer |
+| `vision-invoice-lines` | vision extractor | The line items read from the PDF |
+| `rag-invoice-total` | RAG | Both invoices indexed in memory; the answer to "total including VAT of INV-2026-0042" holds 551,57 and a citation resolves to `invoice-fi.txt` |
+| `tabular-invoice-lines` | tabular agent | The sum of one invoice's `line_total` in `invoice-lines.csv`: 439.50 in the query rows and in the answer |
+| `parse-invoice-pdf` | vision parser | The PDF as markdown keeps INV-2026-0042, Esimerkki Oy, Tiivistesarja and 551,57 (a typographic dash counts as a hyphen; gpt-6-luna writes en dashes in the invoice number) |
+
+The RAG case builds its chunks itself (one per invoice, which is one page) and uses no parser.
+gaik's answer generator returns its answer as text, so the runner reads the citations in the
+form gaik asks for, `[document_name, page X]`, and resolves each against the metadata of the
+chunks the retriever returned: a citation that names no retrieved chunk is a failure.
 
 ## Run it
 
@@ -31,8 +55,13 @@ end to end, the way the demo's pages chain them. Every input is synthetic (`fixt
      chosen extraction case brings its schema case).
    - `--model azure=<deployment>` picks a model (repeatable). Otherwise `CHECK_<PROVIDER>_MODEL`,
      then `RELEASE_<PROVIDER>_MODEL`, then gaik's own default for the provider. A separate vision
-     model: `CHECK_<PROVIDER>_VISION_MODEL`. The summary names the model each provider used.
-     Check the provider's current model catalogue before naming one; do not copy an old example.
+     model (vision extractor and vision parser): `CHECK_<PROVIDER>_VISION_MODEL`. The RAG
+     case's embedding model: `CHECK_<PROVIDER>_EMBEDDING_MODEL`, then
+     `RELEASE_<PROVIDER>_EMBEDDING_MODEL`, then gaik's default (`EMBEDDING_MODEL`, else
+     `text-embedding-3-small` on Azure and OpenAI, `gemini-embedding-001` on Google and Vertex;
+     Azure has the deployments `text-embedding-3-small` and `text-embedding-3-large`). The
+     summary names the models each provider used. Check the provider's current model catalogue
+     before naming one; do not copy an old example.
    - `--baseline <earlier run folder>` adds a section on cases that passed then and do not now,
      outputs that changed, and generated schemas whose names, types, enums or structure changed
      (descriptions are ignored: their wording varies from run to run).
@@ -43,6 +72,11 @@ end to end, the way the demo's pages chain them. Every input is synthetic (`fixt
      since it started; its unfinished cases are errors and the summary is still written.
    - `--public` keeps only error types and status codes, no provider error text: for a run
      whose results are published, such as the live-smoke workflow.
+   - `--attempts 2` runs a case that failed or errored once more, as the demo's `api/smoke.py`
+     does. The summary marks the cell `(attempt 2)` and lists the first attempt's problems
+     under "Needed another attempt", so a flaky case stays visible (open issue #94: the
+     schema generator now and then keeps only the first field). The live-smoke workflow and
+     the release job use 2; a case that fails twice still fails the run.
    - `--judge claude|codex|agy` (below).
 4. Read `<out>/summary.md` and report from it.
 
@@ -56,9 +90,14 @@ end to end, the way the demo's pages chain them. Every input is synthetic (`fixt
 | `anthropic` | `ANTHROPIC_API_KEY` |
 | `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` |
 
+Anthropic and Anthropic on Foundry have no embeddings API, so their RAG case is a `skip` with
+that reason; Aitta's needs `CHECK_AITTA_EMBEDDING_MODEL` (or `AITTA_EMBEDDING_MODEL`), since
+gaik has no default embedding model there. The summary lists every such skip and its reason.
+
 The component calls go to the providers' APIs and use these keys: gaik has no subscription
-path. Azure is the Haaga-Helia default and costs the project nothing. A full run is about a
-dozen requests per provider.
+path. Azure is the Haaga-Helia default and costs the project nothing. A full run is about
+thirty requests per provider. The vision parser case also imports gaik's parsers package,
+which loads Docling: that takes half a minute or more the first time.
 
 ## The judge runs on a subscription
 
@@ -90,10 +129,18 @@ you have read the output and agree; say which.
 
 ## Read the result
 
+A cell marked `(warning)` passed with a note under "Warnings": the vision parser's markdown
+held a value only once its typographic dashes were read as hyphens (`INV–2026–0042` for
+`INV-2026-0042`). That is a fidelity defect of the model's copy, reported, not failed.
+
 `summary.md` has one row per case and a column per provider (`pass`, `fail`, `error`, `skip`,
-and the judge's verdict), then every failure with its problems. Beside it, per provider and
-case: `checks.json` (problems, usage, the judge's answer), `result.json` (an extractor's output)
-or `requirements.json` and `json_schema.json` (a generated schema).
+and the judge's verdict), then every failure with its problems and every skip with its reason.
+Beside it, per provider and case: `checks.json` (problems, usage, the judge's answer),
+`result.json` (an extractor's output; the RAG answer with the retrieved chunks and resolved
+citations; the tabular agent's answer, SQL and rows; the parser's markdown) or
+`requirements.json`, `json_schema.json` and `structure.json` (a generated schema; the last
+names a nested list's container). Embedder, answer generator and tabular agent report no token
+usage themselves, so the runner counts the usage of the calls made through their own client.
 
 - `fail` means the output broke a fixed check: quote the problems from the summary and the
   value from `result.json`. A schema case checks both the parsed requirements and the
@@ -143,15 +190,33 @@ release on PyPI, not this checkout, so a fix here reaches it only after a releas
 
 ## Add or change a case
 
-Edit `cases.json`: an `id`, a `component` (`schema_generator`, `extractor` or
-`vision_extractor`), a `title`, a `rubric` for the judge, and an `expect` block. A schema case has
-`requirements`; `expect` names its `fields` with the allowed types, `exact_fields`, `enums`,
-`structure_type` and for a nested schema `child_container` and `child_fields`. An extraction case
-has `schema_from` and `documents` (extractor) or `files` and `source_text` (vision), and
-`expect.records`, or `expect.parent` with `items_key` and `items` for a nested schema. Values are
-compared after normalising case, spaces, number formats (`1 234,50`, `1,250.00`) and dates.
-Inputs stay synthetic; a new PDF or image comes from `make_fixtures.py`. `--cases <file>` runs
-another case file of the same form, for example one the user keeps outside the repository.
+Edit `cases.json`: an `id`, a `component` (`schema_generator`, `extractor`, `vision_extractor`,
+`rag`, `tabular_agent` or `vision_parser`), a `title`, a `rubric` for the judge, and an `expect`
+block.
+
+- A schema case has `requirements`, written as a user would and naming every field and list;
+  `expect` names its `fields` with the allowed types, `exact_fields`, `enums`, `formats` (a
+  date's strftime format), `defaults` (a stated default, also in the model) and
+  `structure_type`. A `nested_list` names its list in `container`. A schema with child lists
+  has `children` (list name to fields, exact with `exact_fields`) or, for one list,
+  `child_container` and `child_fields`.
+- An extraction case has `schema_from` and `documents` (extractor) or `files` and `source_text`
+  (vision), and `expect.records`, or `expect.parent` with `items_key` and `items` for a nested
+  schema.
+- A `rag` case has `documents`, a `question` and optionally `top_k` (default 5, the
+  retriever's own); `expect.answer_contains` lists strings, or
+  lists of alternatives, the answer must hold, and `expect.cited_document` the document a
+  citation must resolve to.
+- A `tabular_agent` case has `files` and a `question` with one numeric answer,
+  `expect.number`, which must be in the query's rows and in the answer.
+- A `vision_parser` case has `files` and `source_text`; `expect.contains` lists what the
+  markdown must hold, like `answer_contains`.
+
+Values and texts are compared after normalising case, spaces, number formats (`1 234,50`,
+`1,250.00`) and dates; in `answer_contains` and `contains` a typographic dash also reads as a
+hyphen. Inputs stay synthetic; a new PDF or image comes from `make_fixtures.py`.
+`--cases <file>` runs another case file of the same form, for example one the user keeps
+outside the repository.
 
 `implementation_layer/unit_tests/test_component_check_skill.py` checks the runner's logic and
 that every case is consistent with its fixtures, offline; it runs in CI.

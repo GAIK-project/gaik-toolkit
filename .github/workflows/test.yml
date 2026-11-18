@@ -334,7 +334,8 @@ jobs:
         uv run python scripts/release_check.py --live --require-provider azure --version "${RELEASE_VERSION#v}"
 
     # The tag must also pass the component check (.claude/skills/component-check): the
-    # schema generator, extractor and vision extractor on synthetic invoices, on Azure.
+    # schema generator, extractor, vision extractor, RAG, tabular agent and vision parser
+    # on synthetic invoices, on Azure.
     # --public keeps provider error text out of the published summary.
     - name: Component check on Azure
       timeout-minutes: 20
@@ -348,7 +349,7 @@ jobs:
         set -uo pipefail
         status=0
         uv run python .claude/skills/component-check/run_checks.py \
-          --providers azure --require-all --public --provider-timeout 600 \
+          --providers azure --require-all --public --provider-timeout 600 --attempts 2 \
           --out "$RUN_DIR" || status=1
         if [ -f "$RUN_DIR/summary.md" ]; then
           cat "$RUN_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"

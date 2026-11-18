@@ -201,6 +201,8 @@ def test_every_case_is_consistent_with_its_fixtures():
         if case["component"] == "schema_generator":
             assert case["requirements"] and case["expect"].get("fields") is not None
             continue
+        if case["component"] not in rc.SCHEMA_CONSUMERS:
+            continue  # checked in test_the_new_component_cases_match_their_fixtures
         parent = ids[case["schema_from"]]
         assert parent["component"] == "schema_generator", case["id"]
         sources = case.get("documents") or [case["source_text"]]
@@ -362,3 +364,523 @@ def test_the_models_empty_enum_value_is_not_a_difference():
     schema = _json_schema(currency_enum=("", "EUR", "USD"))
     expect = {"fields": {"currency": ["str"]}, "enums": {"currency": ["EUR", "USD"]}}
     assert rc.check_model(expect, schema) == []
+
+
+# ---------------------------------------------------------------------------
+# Schema structures and field rules
+# ---------------------------------------------------------------------------
+
+
+def _spec(name, field_type, **extra):
+    from gaik.software_components.extractor import FieldSpec
+
+    return FieldSpec(field_name=name, field_type=field_type, description=name, **extra)
+
+
+def test_describe_requirements_keeps_the_list_name_defaults_and_nullability():
+    from gaik.software_components.extractor import ExtractionRequirements
+
+    requirements = ExtractionRequirements(
+        use_case_name="inspection",
+        fields=[
+            _spec("comment", "str", default="not given", has_explicit_default=True),
+            _spec("score", "int", nullable=True),
+        ],
+    )
+    nested = rc.describe_requirements(requirements, "nested_list", "inventory_items")
+    assert nested["container"] == "inventory_items"
+    comment, score = nested["fields"]["comment"], nested["fields"]["score"]
+    assert (comment["default"], comment["has_explicit_default"], comment["nullable"]) == (
+        "not given",
+        True,
+        False,
+    )
+    assert score["nullable"] is True and score["default"] is None
+    # Only a nested_list has a list name of its own.
+    assert "container" not in rc.describe_requirements(requirements, "flat", "records")
+
+
+def test_a_nested_list_schema_needs_its_list_name():
+    expect = {
+        "structure_type": "nested_list",
+        "container": "inventory_items",
+        "fields": {"quantity": ["int"]},
+        "exact_fields": True,
+    }
+    good = {**_observed({"quantity": ("int", None)}, "nested_list"), "container": "inventory_items"}
+    assert rc.check_schema(expect, good) == []
+    renamed = {**good, "container": "items"}
+    assert rc.check_schema(expect, renamed) == [
+        "records listed under 'items', not 'inventory_items'"
+    ]
+
+
+def _nested_list_model(container="inventory_items"):
+    """A nested_list model built the way gaik's parse_nested_requirements builds one."""
+    from gaik.software_components.extractor import ExtractionRequirements, create_extraction_model
+    from pydantic import Field, create_model
+
+    item = create_extraction_model(
+        ExtractionRequirements(
+            use_case_name="inventory",
+            fields=[
+                _spec("product_name", "str"),
+                _spec("category", "str", enum=["tools", "consumables"]),
+            ],
+        )
+    )
+    return create_model(
+        "Inventory_Collection", **{container: (list[item], Field(description="items"))}
+    )
+
+
+def test_the_model_of_a_nested_list_is_checked_inside_its_list():
+    expect = {
+        "container": "inventory_items",
+        "fields": {"product_name": ["str"], "category": ["str"]},
+        "enums": {"category": ["tools", "consumables"]},
+    }
+    assert rc.check_model(expect, _nested_list_model().model_json_schema()) == []
+    problems = rc.check_model(expect, _nested_list_model("records").model_json_schema())
+    assert problems == ["model: 'inventory_items' is not a list (got records)"]
+    wrong = {**expect, "fields": {"sku": ["str"]}, "enums": {"category": ["tools"]}}
+    problems = rc.check_model(wrong, _nested_list_model().model_json_schema())
+    assert any("model.inventory_items: no property 'sku'" in p for p in problems)
+    assert any("model.inventory_items.category: allows" in p for p in problems)
+
+
+def test_two_child_lists_are_checked_and_an_extra_one_is_reported():
+    expect = {
+        "structure_type": "parent_with_nested_list",
+        "fields": {"meeting_title": ["str"]},
+        "exact_fields": True,
+        "children": {"participants": {"name": ["str"]}, "action_items": {"task": ["str"]}},
+    }
+    children = {"participants": {"name": "str"}, "action_items": {"task": "str"}}
+    good = _observed({"meeting_title": ("str", None)}, "parent_with_nested_list", children)
+    assert rc.check_schema(expect, good) == []
+    merged = _observed(
+        {"meeting_title": ("str", None)},
+        "parent_with_nested_list",
+        {"participants": {"name": "str", "task": "str"}, "notes": {"text": "str"}},
+    )
+    problems = rc.check_schema(expect, merged)
+    assert "no child list 'action_items' (got participants, notes)" in problems
+    assert "participants: unexpected field(s) ['task']" in problems
+    assert "unexpected child list(s) ['notes']" in problems
+    # The single-child form keeps its old, non-exact check.
+    legacy = {"child_container": "participants", "child_fields": {"name": ["str"]}}
+    assert rc.check_schema(legacy, merged) == []
+
+
+def test_the_model_needs_every_child_list():
+    schema = {
+        "$defs": {
+            "P": {"properties": {"name": {"type": "string"}}, "type": "object"},
+            "A": {"properties": {"task": {"type": "string"}}, "type": "object"},
+        },
+        "properties": {
+            "participants": {"type": "array", "items": {"$ref": "#/$defs/P"}},
+            "action_items": {"type": "array", "items": {"$ref": "#/$defs/A"}},
+        },
+        "type": "object",
+    }
+    expect = {"children": {"participants": {"name": ["str"]}, "action_items": {"task": ["str"]}}}
+    assert rc.check_model(expect, schema) == []
+    del schema["properties"]["action_items"]
+    assert rc.check_model(expect, schema) == ["model: 'action_items' is not a list"]
+
+
+def test_a_date_format_and_a_stated_default_are_checked():
+    def observed(fmt, default, explicit):
+        result = _observed({"day": ("date", None), "comment": ("str", None)})
+        result["fields"]["day"]["format"] = fmt
+        result["fields"]["comment"].update(default=default, has_explicit_default=explicit)
+        return result
+
+    expect = {
+        "fields": {"day": ["date"], "comment": ["str"]},
+        "formats": {"day": "%d.%m.%Y"},
+        "defaults": {"comment": "not given"},
+    }
+    assert rc.check_schema(expect, observed("%d.%m.%Y", "Not given", True)) == []
+    problems = rc.check_schema(expect, observed("%Y-%m-%d", "not given", False))
+    assert problems == [
+        "fields.day: format '%Y-%m-%d', expected '%d.%m.%Y'",
+        "fields.comment: no explicit default, expected 'not given'",
+    ]
+    assert rc.check_schema(expect, observed("%d.%m.%Y", "", True)) == [
+        "fields.comment: default '', expected 'not given'"
+    ]
+
+
+def test_the_models_default_is_the_stated_one():
+    from gaik.software_components.extractor import ExtractionRequirements, create_extraction_model
+
+    def schema(**default):
+        requirements = ExtractionRequirements(
+            use_case_name="inspection", fields=[_spec("comment", "str", **default)]
+        )
+        return create_extraction_model(requirements).model_json_schema()
+
+    expect = {"fields": {"comment": ["str"]}, "defaults": {"comment": "not given"}}
+    assert rc.check_model(expect, schema(default="not given", has_explicit_default=True)) == []
+    # Without a stated default the text field is required and has no default at all.
+    assert rc.check_model(expect, schema()) == ["model.comment: default None, expected 'not given'"]
+
+
+def test_the_baseline_does_not_flag_what_an_older_run_did_not_record():
+    old = {"structure_type": "flat", "fields": {"a": {"type": "str", "enum": None}}}
+    new = {
+        "structure_type": "flat",
+        "fields": {
+            "a": {
+                "type": "str",
+                "enum": None,
+                "default": None,
+                "has_explicit_default": False,
+                "nullable": False,
+            }
+        },
+        "children": {},
+    }
+    assert rc._contract(old) == rc._contract(new)
+    new["fields"]["a"]["nullable"] = True
+    assert rc._contract(old) != rc._contract(new)
+
+
+def test_every_schema_task_names_what_its_case_expects():
+    """The tasks name every field and list, so the checks can be exact."""
+    for case in CASES:
+        if case["component"] != "schema_generator":
+            continue
+        task, expect = case["requirements"], case["expect"]
+        names = list(expect.get("fields", {})) + [expect.get("container") or ""]
+        for container, fields in rc.expected_children(expect).items():
+            names += [container, *fields]
+        for name in filter(None, names):
+            assert name in task, f"{case['id']}: {name!r} is not in its task"
+        for values in expect.get("enums", {}).values():
+            assert all(v in task for v in values), case["id"]
+        for value in expect.get("defaults", {}).values():
+            assert f'"{value}"' in task, case["id"]
+        for fmt in expect.get("formats", {}).values():
+            written = fmt.replace("%d", "DD").replace("%m", "MM").replace("%Y", "YYYY")
+            assert written in task, case["id"]
+
+
+# ---------------------------------------------------------------------------
+# RAG, the tabular agent and the vision parser
+# ---------------------------------------------------------------------------
+
+RETRIEVED = [
+    {"document_name": "invoice-en.txt", "page_number": 1, "source": "fixtures/invoice-en.txt"},
+    {"document_name": "invoice-fi.txt", "page_number": 1, "source": "fixtures/invoice-fi.txt"},
+]
+RAG_EXPECT = {
+    "answer_contains": [["551,57", "551.57"]],
+    "cited_document": "fixtures/invoice-fi.txt",
+}
+
+
+@pytest.mark.parametrize(
+    ("answer", "cited"),
+    [
+        ("Total 551,57 EUR [invoice-fi.txt, page 1].", [("invoice-fi.txt", "1")]),
+        ("551.57 [Document: invoice-fi.txt, Page: 1]", [("invoice-fi.txt", "1")]),
+        (
+            "See [invoice-fi.txt, page 1; invoice-en.txt, page 1]",
+            [("invoice-fi.txt", "1"), ("invoice-en.txt", "1")],
+        ),
+        ("The total is [EUR] 551,57 [invoice-fi.txt]", []),
+    ],
+)
+def test_citations_are_read_in_gaiks_form(answer, cited):
+    found = rc.parse_citations(answer)
+    assert [(c["document_name"], c["page"]) for c in found] == cited
+
+
+def test_a_rag_answer_must_cite_the_retrieved_document_it_used():
+    good = {"answer": "It is 551,57 EUR [invoice-fi.txt, page 1].", "retrieved": RETRIEVED}
+    assert rc.check_rag(RAG_EXPECT, good) == []
+    wrong_doc = {**good, "answer": "It is 551,57 EUR [invoice-en.txt, page 1]."}
+    assert rc.check_rag(RAG_EXPECT, wrong_doc) == [
+        "no citation resolves to fixtures/invoice-fi.txt (cited: ['invoice-en.txt, page 1'])"
+    ]
+    invented = {**good, "answer": "551,57 [invoice-fi.txt, page 1] [invoice-99.txt, page 2]"}
+    assert rc.check_rag(RAG_EXPECT, invented) == [
+        "citation(s) naming no retrieved chunk: ['invoice-99.txt, page 2']"
+    ]
+    wrong_page = {**good, "answer": "551,57 [invoice-fi.txt, page 3]"}
+    assert "no citation resolves" in rc.check_rag(RAG_EXPECT, wrong_page)[0]
+    uncited = {**good, "answer": "The total is 1,250.00 EUR."}
+    assert rc.check_rag(RAG_EXPECT, uncited) == [
+        "the answer has no '551,57' or '551.57'",
+        "the answer has no citation in the form [document_name, page X]",
+    ]
+    not_retrieved = {"answer": good["answer"], "retrieved": RETRIEVED[:1]}
+    problems = rc.check_rag(RAG_EXPECT, not_retrieved)
+    assert problems[0].startswith("the retriever did not return fixtures/invoice-fi.txt")
+
+
+@pytest.mark.parametrize(
+    ("text", "tokens"),
+    [
+        ("The sum is 439.50.", ["439.50"]),
+        ("Summa on 439,50 EUR", ["439,50"]),
+        ("Lines 300.00 + 94.50 + 45.00", ["300.00", "94.50", "45.00"]),
+        ("Total 1,250.00 or 1 250,00", ["1,250.00", "1 250,00"]),
+        ("Items 2, 5 and 1", ["2", "5", "1"]),
+    ],
+)
+def test_numbers_are_read_as_they_are_written(text, tokens):
+    assert rc.number_tokens(text) == tokens
+
+
+def test_a_tabular_answer_needs_the_number_in_its_rows_and_its_answer():
+    expect = {"number": 439.5}
+    good = {
+        "succeeded": True,
+        "rows": [{"sum(line_total)": 439.5}],
+        "answer": "The sum of line_total for INV-2026-0042 is 439.50 EUR.",
+    }
+    assert rc.check_tabular(expect, good) == []
+    from decimal import Decimal
+
+    assert rc.check_tabular(expect, {**good, "rows": [{"total": Decimal("439.50")}]}) == []
+    wrong = {**good, "rows": [{"total": 1689.5}], "answer": "The sum is 1,689.50."}
+    problems = rc.check_tabular(expect, wrong)
+    assert problems[0].startswith("the query result holds no 439.5")
+    assert problems[1].startswith("the answer states no 439.5")
+    failed = {"succeeded": False, "attempts": 3, "error": "Binder Error", "rows": [], "answer": ""}
+    assert rc.check_tabular(expect, failed)[0] == (
+        "the query failed after 3 attempt(s): Binder Error"
+    )
+    # The invoice number's digits are not the answer.
+    assert rc.check_tabular({"number": 42}, good)[1].startswith("the answer states no 42")
+
+
+def test_markdown_must_hold_each_string_or_one_of_its_alternatives():
+    expect = {"contains": ["INV-2026-0042", "Esimerkki Oy", ["551,57", "551.57"]]}
+    markdown = (
+        "# LASKU\n\n**Laskun numero:** INV-2026-0042\n\nToimittaja: Esimerkki  Oy\n| 551,57 |"
+    )
+    assert rc.check_markdown(expect, {"markdown": markdown}) == []
+    assert rc.check_markdown(expect, {"markdown": "INV-2026-0042 551.5"}) == [
+        "the markdown has no 'Esimerkki Oy'",
+        "the markdown has no '551,57' or '551.57'",
+    ]
+
+
+def test_a_typographic_dash_reads_as_a_hyphen_but_a_wrong_digit_does_not():
+    en_dash, minus = chr(0x2013), chr(0x2212)
+    expect = {"contains": ["INV-2026-0042"]}
+    for dash in (en_dash, minus, chr(0x2011)):
+        markdown = f"Laskun numero: INV{dash}2026{dash}0042"
+        assert rc.check_markdown(expect, {"markdown": markdown}) == []
+    wrong = {"markdown": f"INV{en_dash}2026{en_dash}0043"}
+    assert rc.check_markdown(expect, wrong) == ["the markdown has no 'INV-2026-0042'"]
+    assert rc.check_markdown(expect, {"markdown": "INV 2026 0042"}) != []
+
+
+def test_rag_skips_a_provider_without_embeddings():
+    assert "no embeddings API" in rc.rag_skip_reason("anthropic", {"model": "m"}, None)
+    assert "no embeddings API" in rc.rag_skip_reason("anthropic_foundry", {}, "x")
+    reason = rc.rag_skip_reason("aitta", {"embedding_model": ""}, None)
+    assert "CHECK_AITTA_EMBEDDING_MODEL" in reason
+    assert rc.rag_skip_reason("aitta", {"embedding_model": ""}, "bge-m3") is None
+    azure = {"embedding_model": "text-embedding-3-small"}
+    assert rc.rag_skip_reason("azure", azure, None) is None
+
+
+def test_embedding_model_precedence():
+    env = {"CHECK_AZURE_EMBEDDING_MODEL": "check", "RELEASE_AZURE_EMBEDDING_MODEL": "release"}
+    assert rc.embedding_model_for("azure", env) == "check"
+    assert rc.embedding_model_for("azure", {"RELEASE_AZURE_EMBEDDING_MODEL": "r"}) == "r"
+    assert rc.embedding_model_for("azure", {"CHECK_AZURE_EMBEDDING_MODEL": " "}) is None
+
+
+def test_usage_is_counted_on_a_raw_client_and_read_from_a_provider_client():
+    from types import SimpleNamespace
+
+    def response(**usage):
+        return SimpleNamespace(usage=SimpleNamespace(model_dump=lambda: usage))
+
+    completions = SimpleNamespace(
+        create=lambda **kw: response(
+            prompt_tokens=10,
+            completion_tokens=4,
+            total_tokens=14,
+            completion_tokens_details={"reasoning_tokens": 2},
+        )
+    )
+    raw = SimpleNamespace(
+        chat=SimpleNamespace(completions=completions),
+        embeddings=SimpleNamespace(create=lambda **kw: response(prompt_tokens=7, total_tokens=7)),
+    )
+    tap = rc.UsageTap()
+    tap.watch(raw)
+    raw.chat.completions.create(model="m")
+    raw.embeddings.create(model="e", input=["x"])
+    counts = {"input_tokens": 17, "output_tokens": 4, "thinking_tokens": 2, "total_tokens": 21}
+    assert tap.result() == counts
+
+    class Counter:
+        totals = {"prompt_tokens": 5}
+
+        def snapshot(self):
+            return dict(self.totals)
+
+    provider = SimpleNamespace(usage=Counter())
+    tap = rc.UsageTap()
+    tap.watch(provider)
+    provider.usage.totals = {"prompt_tokens": 8, "completion_tokens": 3}
+    assert tap.result() == {"input_tokens": 3, "output_tokens": 3}
+    assert rc.UsageTap().result() is None
+
+
+def test_cases_without_a_schema_need_no_schema_from():
+    standalone = [
+        {"id": "r", "component": "rag"},
+        {"id": "t", "component": "tabular_agent"},
+        {"id": "p", "component": "vision_parser"},
+    ]
+    assert [c["id"] for c in rc.check_cases(standalone)] == ["r", "t", "p"]
+    args = rc.parse_args(["--only", "parse-invoice-pdf"])
+    assert [c["id"] for c in rc.select_cases(args)] == ["parse-invoice-pdf"]
+
+
+def _case(component):
+    return next(c for c in CASES if c["component"] == component)
+
+
+def test_the_new_component_cases_match_their_fixtures():
+    import csv
+    import re
+
+    rag = _case("rag")
+    texts = {p: (SKILL / p).read_text(encoding="utf-8") for p in rag["documents"]}
+    cited = rag["expect"]["cited_document"]
+    assert cited in texts
+    for options in rag["expect"]["answer_contains"]:
+        assert any(o in texts[cited] for o in options)
+    # The question names an invoice that only the cited document holds.
+    invoice = re.search(r"INV-\d{4}-\d{4}", rag["question"]).group()
+    assert [p for p, t in texts.items() if invoice in t] == [cited]
+
+    tabular = _case("tabular_agent")
+    invoice = re.search(r"INV-\d{4}-\d{4}", tabular["question"]).group()
+    with (SKILL / tabular["files"][0]).open(encoding="utf-8", newline="") as handle:
+        lines = [row for row in csv.DictReader(handle) if row["invoice_number"] == invoice]
+    total = sum(float(row["line_total"]) for row in lines)
+    assert total == pytest.approx(tabular["expect"]["number"])
+    # Its lines are the Finnish invoice's, and their sum is its net total.
+    finnish = (SKILL / "fixtures/invoice-fi.txt").read_text(encoding="utf-8")
+    assert invoice in finnish and f"Veroton yhteensä: {total:.2f}".replace(".", ",") in finnish
+    for row in lines:
+        assert row["description"] in finnish
+        assert row["line_total"].replace(".", ",") in finnish
+
+    parser = _case("vision_parser")
+    assert all((SKILL / p).is_file() for p in parser["files"])
+    source = (SKILL / parser["source_text"]).read_text(encoding="utf-8")
+    for item in parser["expect"]["contains"]:
+        options = [item] if isinstance(item, str) else item
+        assert any(o in source for o in options), item
+
+
+def test_the_judge_sees_the_input_and_the_output_of_each_new_component():
+    outputs = {
+        "rag": {"answer": "ANSWER-TEXT", "retrieved": []},
+        "tabular_agent": {"answer": "ANSWER-TEXT", "sql": "SELECT 1", "rows": []},
+        "vision_parser": {"markdown": "ANSWER-TEXT"},
+    }
+    for component, output in outputs.items():
+        case = _case(component)
+        prompt = rc.judge_prompt(case, {"output": output, "problems": []})
+        assert "ANSWER-TEXT" in prompt and case["rubric"] in prompt
+        if component == "vision_parser":
+            assert "Esimerkki Oy" in prompt  # the text the PDF was rendered from
+        else:
+            assert case["question"] in prompt
+        if component == "tabular_agent":
+            assert "line_total" in prompt and "Tiivistesarja" in prompt  # the CSV itself
+    extraction = rc.judge_prompt(_case("extractor"), {"output": {}, "problems": []})
+    assert extraction.startswith("You check one output of a document-extraction component")
+
+
+def test_the_summary_names_the_embedding_model_and_why_a_case_was_skipped():
+    summary = {
+        "started": "now",
+        "gaik_version": "0",
+        "gaik_from": "src",
+        "git_commit": "abc",
+        "git_dirty": False,
+        "judge": None,
+        "case_ids": ["rag-invoice-total"],
+        "providers": {
+            "azure": {
+                "model": "m",
+                "embedding_model": "text-embedding-3-small",
+                "cases": {"rag-invoice-total": {"status": "pass"}},
+            },
+            "anthropic": {
+                "model": "c",
+                "cases": {"rag-invoice-total": {"status": "skip", "reason": "no embeddings API"}},
+            },
+        },
+    }
+    text = rc.render_summary(summary)
+    assert "| azure | m | - | text-embedding-3-small |  |" in text
+    assert "## Skipped\n\n- anthropic / rag-invoice-total: no embeddings API" in text
+
+
+def test_a_typographic_dash_passes_with_a_warning():
+    warnings: list[str] = []
+    problems = rc.check_contains(["INV-2026-0042"], "Lasku INV\u20132026\u20130042", "md", warnings)
+    assert problems == []
+    assert warnings == ["md writes 'INV-2026-0042' with a typographic dash"]
+    exact: list[str] = []
+    assert rc.check_contains(["INV-2026-0042"], "INV-2026-0042", "md", exact) == []
+    assert exact == []
+    assert rc.check_contains(["INV-2026-0042"], "INV-2026-0043", "md", []) != []
+
+
+def test_the_summary_shows_extra_attempts_and_warnings():
+    summary = {
+        "started": "now",
+        "gaik_version": "x",
+        "gaik_from": "here",
+        "git_commit": "abc",
+        "git_dirty": False,
+        "judge": None,
+        "case_ids": ["s", "p"],
+        "providers": {
+            "azure": {
+                "model": "m",
+                "cases": {
+                    "s": {
+                        "status": "pass",
+                        "attempts": 2,
+                        "earlier_attempts": [
+                            {"status": "fail", "problems": ["fields: no field 'x'"]}
+                        ],
+                    },
+                    "p": {
+                        "status": "pass",
+                        "warnings": ["md writes 'A-1' with a typographic dash"],
+                    },
+                },
+            }
+        },
+    }
+    text = rc.render_summary(summary)
+    assert "| s | pass (attempt 2) |" in text
+    assert "| p | pass (warning) |" in text
+    assert "## Needed another attempt" in text and "attempt 1 fail: fields: no field 'x'" in text
+    assert "## Warnings" in text and "azure / p: md writes 'A-1'" in text
+
+
+def test_attempts_default_to_one():
+    assert rc.parse_args([]).attempts == 1
+    assert rc.parse_args(["--attempts", "2"]).attempts == 2
