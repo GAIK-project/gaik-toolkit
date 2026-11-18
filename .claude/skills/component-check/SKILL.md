@@ -34,9 +34,15 @@ end to end, the way the demo's pages chain them. Every input is synthetic (`fixt
      model: `CHECK_<PROVIDER>_VISION_MODEL`. The summary names the model each provider used.
      Check the provider's current model catalogue before naming one; do not copy an old example.
    - `--baseline <earlier run folder>` adds a section on cases that passed then and do not now,
-     and outputs that changed.
+     outputs that changed, and generated schemas whose names, types, enums or structure changed
+     (descriptions are ignored: their wording varies from run to run).
    - `--reuse-schemas <earlier run folder>` takes that run's schemas instead of generating new
-     ones, to test the extractors on a fixed schema (and to save calls).
+     ones, to test the extractors on a fixed schema (and to save calls). It cannot rebuild a
+     schema the generator classed as `nested_list`; run such a case without it.
+   - `--provider-timeout <s>` (default 900) stops waiting for a provider that has run that long
+     since it started; its unfinished cases are errors and the summary is still written.
+   - `--public` keeps only error types and status codes, no provider error text: for a run
+     whose results are published, such as the live-smoke workflow.
    - `--judge claude|codex|agy` (below).
 4. Read `<out>/summary.md` and report from it.
 
@@ -67,11 +73,17 @@ names:
 | `agy` | Antigravity `agy -p --mode plan --sandbox` | the Antigravity Google sign-in |
 
 The runner removes every API key, token and alternative endpoint from the judge's environment
-(`judge_env` in `run_checks.py`), so the CLI falls back to its own login and nothing is billed
-to an API key. A judge that is not signed in, or has hit its plan's usage limit, gives
-`judge error` with the CLI's message; the fixed checks still stand. `--judge-model` (or
-`CHECK_JUDGE_MODEL`) picks the CLI's model; Codex gets `gpt-6.2-sol` unless you name another. Give a judge only synthetic or otherwise shareable inputs: it sends them to
-its own provider under the subscription's terms.
+(`judge_env` in `run_checks.py`), so the CLI falls back to its own login. Before any component
+call it also asks the CLI how it is signed in (`claude auth status` must say `claude.ai`,
+`codex login status` must say ChatGPT) and stops when that is not a subscription, for example
+a Claude Code `apiKeyHelper` or a Codex API-key login. Antigravity has no status command and
+signs in with Google only. A judge that hits its plan's usage limit gives `judge error` with
+the CLI's message; the fixed checks still stand.
+
+`--judge-model` (or `CHECK_JUDGE_MODEL`) picks the CLI's model. Codex gets `gpt-6.2-sol` unless
+you name another; Claude Code and Antigravity use their own default. Give a judge only
+synthetic or otherwise shareable inputs: it sends them to its own provider under the
+subscription's terms.
 
 The judge is advice. A `judge fail` on a case the fixed checks pass is a finding only after
 you have read the output and agree; say which.
@@ -84,9 +96,11 @@ case: `checks.json` (problems, usage, the judge's answer), `result.json` (an ext
 or `requirements.json` and `json_schema.json` (a generated schema).
 
 - `fail` means the output broke a fixed check: quote the problems from the summary and the
-  value from `result.json`. A schema case that fails skips the cases built on it; rerun with
+  value from `result.json`. A schema case checks both the parsed requirements and the
+  generated model's JSON schema (`model: ...` problems). A schema case that fails skips the cases built on it; rerun with
   `--keep-going` to see them anyway.
-- `error` is an exception: its type and message (credentials redacted) are in `checks.json`.
+- `error` is an exception: its type and message (credentials redacted; no message with
+  `--public`) are in `checks.json`.
   A timeout, 429 or 5xx comes from the provider, not gaik: run that provider again with
   `--providers <one> --only <case>` before calling it a regression.
 - One provider failing a case the others pass points at the provider or model; every

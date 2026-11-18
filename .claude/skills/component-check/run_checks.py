@@ -56,6 +56,8 @@ JUDGE_DROP_EXACT = {
     "CLAUDE_CODE_USE_BEDROCK",
     "CLAUDE_CODE_USE_VERTEX",
     "CLAUDE_CODE_USE_FOUNDRY",
+    "CLAUDECODE",
+    "CLAUDE_CODE_ENTRYPOINT",
     "OPENAI_API_KEY",
     "OPENAI_BASE_URL",
     "CODEX_API_KEY",
@@ -283,19 +285,15 @@ def check_extraction(expect: dict, data: Any) -> list[str]:
         for index, (want, got) in enumerate(zip(wanted, records)):
             problems += compare_record(want, got, f"record[{index}]")
         return problems
-    # A parent record with a nested list of items.
-    if not records:
-        return ["no record returned"]
+    # One parent record with a nested list of items; flat rows are a failure.
+    if len(records) != 1:
+        return [f"expected 1 parent record, got {len(records)}"]
     record = records[0]
-    if len(records) > 1 and all(not isinstance(v, list) for v in record.values()):
-        # Rows came back flat, one per line item.
-        items, key = records, "(flat rows)"
-    else:
-        problems += compare_record(expect.get("parent", {}), record, "parent")
-        items, key = find_items(record, expect.get("items_key", ""))
-        if items is None:
-            return problems + [f"no list of items under {expect.get('items_key')!r}"]
-    if key not in (expect.get("items_key"), "(flat rows)"):
+    problems += compare_record(expect.get("parent", {}), record, "parent")
+    items, key = find_items(record, expect.get("items_key", ""))
+    if items is None:
+        return problems + [f"no list of items under {expect.get('items_key')!r}"]
+    if key != expect.get("items_key"):
         problems.append(f"items came under {key!r}, not {expect.get('items_key')!r}")
     wanted = expect.get("items", [])
     if len(items) != len(wanted):
@@ -375,6 +373,63 @@ def check_schema(expect: dict, observed: dict) -> list[str]:
     return problems
 
 
+def _resolve(root: dict, node: dict) -> dict:
+    """Follow a local ``$ref`` (and a single non-null ``anyOf`` branch) in a JSON schema."""
+    for _ in range(10):
+        if "$ref" in node:
+            name = node["$ref"].rsplit("/", 1)[-1]
+            node = root.get("$defs", {}).get(name, {})
+        elif "anyOf" in node:
+            branches = [b for b in node["anyOf"] if b.get("type") != "null"]
+            if len(branches) != 1:
+                return node
+            node = branches[0]
+        else:
+            return node
+    return node
+
+
+def _enum_values(root: dict, node: dict) -> list[str]:
+    """Every enum value a property's schema allows, wherever it is nested."""
+    found: list[str] = []
+    stack = [node]
+    while stack:
+        item = stack.pop()
+        if "$ref" in item:
+            item = _resolve(root, item)
+        found += [str(v) for v in item.get("enum", [])]
+        if "const" in item:
+            found.append(str(item["const"]))
+        for key in ("anyOf", "oneOf", "allOf"):
+            stack += item.get(key, [])
+    return found
+
+
+def check_model(expect: dict, json_schema: dict) -> list[str]:
+    """Problems with the generated model itself: its field names, enums and nested list."""
+    problems = []
+    properties = _resolve(json_schema, json_schema).get("properties", {})
+    for name in expect.get("fields", {}):
+        if name not in properties:
+            problems.append(f"model: no property {name!r} (got {', '.join(properties)})")
+    for name, values in expect.get("enums", {}).items():
+        if name in properties:
+            got = _enum_values(json_schema, properties[name])
+            if sorted(v.upper() for v in got) != sorted(v.upper() for v in values):
+                problems.append(f"model.{name}: allows {got}, expected {values}")
+    container = expect.get("child_container")
+    if container:
+        node = _resolve(json_schema, properties.get(container, {}))
+        if node.get("type") != "array":
+            problems.append(f"model: {container!r} is not a list")
+        else:
+            item = _resolve(json_schema, node.get("items", {}))
+            for name in expect.get("child_fields", {}):
+                if name not in item.get("properties", {}):
+                    problems.append(f"model.{container}: no property {name!r}")
+    return problems
+
+
 # ---------------------------------------------------------------------------
 # Running one provider
 # ---------------------------------------------------------------------------
@@ -392,13 +447,15 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False, default=str) + "\n", "utf-8")
 
 
-def _error(exc: BaseException, secrets: list[str]) -> dict:
-    message = redact(str(exc), secrets)
-    return {
-        "error_type": type(exc).__name__,
-        "status_code": getattr(exc, "status_code", None),
-        "message": message[:600],
-    }
+def _error(exc: BaseException, secrets: list[str], *, public: bool = False) -> dict:
+    """An exception as type, status and (unless ``public``) its redacted message.
+
+    ``--public`` (the CI run) keeps no message: a provider's error text can hold request
+    details that redaction does not catch, and CI publishes the run's summary.
+    """
+    error = {"error_type": type(exc).__name__, "status_code": getattr(exc, "status_code", None)}
+    error["message"] = "" if public else redact(str(exc), secrets)[:600]
+    return error
 
 
 def run_provider(
@@ -409,6 +466,8 @@ def run_provider(
     ``progress`` gets the provider's results as they come, so a run that stops
     waiting for a slow provider still reports the cases it finished.
     """
+    if progress is not None:
+        progress[provider] = {"_started": time.monotonic()}
     out_dir = args.out / provider
     environ = dict(os.environ)
     model = model_for(provider, args.model_overrides, environ)
@@ -439,7 +498,7 @@ def run_provider(
     }
     results: dict[str, dict] = {}
     if progress is not None:
-        progress[provider] = {**info, "cases": results}
+        progress[provider].update(info, cases=results)
     schemas: dict[str, dict] = {}
     reuse = args.reuse_schemas / provider if args.reuse_schemas else None
 
@@ -452,9 +511,13 @@ def run_provider(
                 output = _run_schema(case, config, reuse)
                 schemas[case["id"]] = output
                 entry["observed"] = output["observed"]
-                entry["problems"] = check_schema(case.get("expect", {}), output["observed"])
+                expect = case.get("expect", {})
+                entry["problems"] = check_schema(expect, output["observed"]) + check_model(
+                    expect, output["json_schema"]
+                )
                 _write_json(case_dir / "requirements.json", output["requirements_json"])
                 _write_json(case_dir / "json_schema.json", output["json_schema"])
+                _write_json(case_dir / "structure.json", output["structure"])
                 entry["usage"] = output.get("usage")
             else:
                 parent = schemas.get(case.get("schema_from", ""))
@@ -480,7 +543,7 @@ def run_provider(
             if case["component"] == "schema_generator" and entry["problems"]:
                 schemas[case["id"]]["failed"] = True
         except Exception as exc:
-            entry.update(status="error", **_error(exc, secrets))
+            entry.update(status="error", **_error(exc, secrets, public=args.public))
         entry["elapsed_s"] = round(time.monotonic() - started, 2)
 
         if args.judge and entry["status"] in ("pass", "fail"):
@@ -508,6 +571,17 @@ def _run_schema(case: dict, config: dict, reuse: Path | None) -> dict:
         if not saved.is_file():
             raise FileNotFoundError(f"--reuse-schemas has no {saved}")
         raw = json.loads(saved.read_text("utf-8"))
+        structure_file = saved.parent / "structure.json"
+        saved_structure = (
+            json.loads(structure_file.read_text("utf-8")) if structure_file.is_file() else {}
+        )
+        if saved_structure.get("structure_type") == "nested_list":
+            # The saved requirements are the item fields only; the list around them comes
+            # from the structure analysis, which this runner does not rebuild.
+            raise ValueError(
+                f"--reuse-schemas cannot rebuild the nested_list schema of {case['id']}; "
+                "run that case without it"
+            )
         if raw.get("structure_type") == "parent_with_nested_list":
             requirements = CompositeExtractionRequirements.model_validate(raw)
             # The builder generate_schema itself uses for a nested schema.
@@ -518,7 +592,7 @@ def _run_schema(case: dict, config: dict, reuse: Path | None) -> dict:
         else:
             requirements = ExtractionRequirements.model_validate(raw)
             schema = create_extraction_model(requirements)
-        structure = raw.get("structure_type", "flat")
+        structure = raw.get("structure_type") or saved_structure.get("structure_type", "flat")
         usage = None
     else:
         generator = SchemaGenerator(config)
@@ -533,6 +607,7 @@ def _run_schema(case: dict, config: dict, reuse: Path | None) -> dict:
         "requirements_json": requirements.model_dump(mode="json"),
         "json_schema": schema.model_json_schema(),
         "observed": describe_requirements(requirements, structure),
+        "structure": {"structure_type": structure},
         "usage": usage,
     }
 
@@ -578,6 +653,54 @@ def judge_env(environ: dict[str, str]) -> dict[str, str]:
         if name in JUDGE_KEEP
         or (name not in JUDGE_DROP_EXACT and not JUDGE_DROP_PATTERN.search(name))
     }
+
+
+def login_problem(kind: str, status_output: str) -> str | None:
+    """Why a judge CLI's login is not a subscription login, or None when it is.
+
+    ``status_output`` is what ``claude auth status`` or ``codex login status`` printed
+    with the judge's environment. Antigravity has no status command; it signs in with
+    Google only.
+    """
+    if kind == "claude":
+        status = _parse_json(status_output) or {}
+        if not status.get("loggedIn"):
+            return "claude is not signed in (run claude, then /login)"
+        if status.get("authMethod") != "claude.ai" or status.get("apiProvider") not in (
+            None,
+            "firstParty",
+        ):
+            method = status.get("authMethod")
+            return f"claude signs in with {method!r}, not a Claude subscription"
+        return None
+    if kind == "codex":
+        if "ChatGPT" not in status_output:
+            return "codex is not signed in with ChatGPT (run codex login)"
+        return None
+    return None
+
+
+def check_judge_login(kind: str) -> None:
+    """Stop before any component call when the judge would not run on a subscription."""
+    commands = {"claude": ["auth", "status"], "codex": ["login", "status"]}
+    if kind not in commands:
+        return
+    exe = shutil.which(kind)
+    try:
+        done = subprocess.run(
+            [exe, *commands[kind]],
+            env=judge_env(dict(os.environ)),
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            timeout=60,
+        )
+        output = (done.stdout or "") + (done.stderr or "")
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SystemExit(f"--judge {kind}: could not read its login ({type(exc).__name__})")
+    problem = login_problem(kind, output)
+    if problem:
+        raise SystemExit(f"--judge {kind}: {problem}; no judge call would be a subscription call")
 
 
 def judge_prompt(case: dict, entry: dict) -> str:
@@ -738,7 +861,31 @@ def diff_baseline(current: dict, baseline: dict) -> list[str]:
                 and _plain(old["output"]) != _plain(entry["output"])
             ):
                 notes.append(f"{provider} / {case_id}: output differs from the baseline")
+            if (
+                "observed" in old
+                and "observed" in entry
+                and _contract(old["observed"]) != _contract(entry["observed"])
+            ):
+                notes.append(f"{provider} / {case_id}: schema differs from the baseline")
     return notes
+
+
+def _contract(observed: dict) -> Any:
+    """A generated schema's names, types, enums, formats and structure, without descriptions."""
+
+    def strip(fields: dict) -> dict:
+        return {
+            name: {k: v for k, v in spec.items() if k != "description"}
+            for name, spec in fields.items()
+        }
+
+    return _plain(
+        {
+            "structure_type": observed.get("structure_type"),
+            "fields": strip(observed.get("fields", {})),
+            "children": {k: strip(v) for k, v in observed.get("children", {}).items()},
+        }
+    )
 
 
 def render_summary(summary: dict) -> str:
@@ -859,6 +1006,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Use the schemas an earlier run folder generated, per provider",
     )
     parser.add_argument(
+        "--public",
+        action="store_true",
+        help="Keep no provider error text in the outputs (for a run whose results are published)",
+    )
+    parser.add_argument(
         "--keep-going",
         action="store_true",
         help="Run extraction cases even when their schema case failed its checks",
@@ -879,8 +1031,30 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
+def check_cases(cases: list[dict]) -> list[dict]:
+    """The cases with schema cases first; stop on a duplicate id or a broken dependency."""
+    by_id: dict[str, dict] = {}
+    for case in cases:
+        if case.get("component") not in COMPONENTS:
+            raise SystemExit(f"case {case.get('id')!r}: component must be one of {COMPONENTS}")
+        if case["id"] in by_id:
+            raise SystemExit(f"case id {case['id']!r} appears twice")
+        by_id[case["id"]] = case
+    for case in cases:
+        if case["component"] == "schema_generator":
+            continue
+        parent = by_id.get(case.get("schema_from", ""))
+        if parent is None or parent["component"] != "schema_generator":
+            raise SystemExit(
+                f"case {case['id']!r}: schema_from {case.get('schema_from')!r} "
+                "is not a schema_generator case in this file"
+            )
+    schemas = [c for c in cases if c["component"] == "schema_generator"]
+    return schemas + [c for c in cases if c["component"] != "schema_generator"]
+
+
 def select_cases(args) -> list[dict]:
-    cases = json.loads(args.cases.read_text("utf-8"))["cases"]
+    cases = check_cases(json.loads(args.cases.read_text("utf-8"))["cases"])
     only = {c for c in args.only.split(",") if c}
     components = {c for c in args.component.split(",") if c}
     unknown = only - {c["id"] for c in cases}
@@ -915,6 +1089,8 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"Unknown provider(s) {unknown}; choose from {PROVIDERS}")
     if args.judge and shutil.which(args.judge) is None:
         raise SystemExit(f"--judge {args.judge}: the CLI is not on PATH")
+    if args.judge:
+        check_judge_login(args.judge)
 
     loaded = load_env_files(args.env_file, args.env_override)
     secrets = secret_values(dict(os.environ))
@@ -931,13 +1107,29 @@ def main(argv: list[str] | None = None) -> int:
     workers = max(1, args.parallel)
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
     futures = {pool.submit(run_provider, p, cases, args, secrets, progress): p for p in providers}
-    rounds = -(-len(providers) // workers)
-    done, stuck = concurrent.futures.wait(futures, timeout=args.provider_timeout * rounds)
-    for future in done:
-        results[futures[future]] = future.result()
+    pending, stuck = set(futures), set()
+    while pending:
+        done, pending = concurrent.futures.wait(
+            pending, timeout=5, return_when=concurrent.futures.FIRST_COMPLETED
+        )
+        for future in done:
+            results[futures[future]] = future.result()
+        now = time.monotonic()
+        for future in list(pending):
+            begun = progress.get(futures[future], {}).get("_started")
+            overdue = begun is not None and now - begun > args.provider_timeout
+            # A provider that never started: every worker is held by one that timed out.
+            blocked = begun is None and len(stuck) >= workers
+            if overdue or blocked:
+                pending.discard(future)
+                stuck.add(future)
     for future in stuck:
         provider = futures[future]
-        partial = progress.get(provider, {"provider": provider})
+        partial = {
+            k: v
+            for k, v in progress.get(provider, {"provider": provider}).items()
+            if not k.startswith("_")
+        }
         finished = dict(partial.get("cases", {}))
         message = f"the provider did not finish within {args.provider_timeout:.0f} s"
         for case in cases:

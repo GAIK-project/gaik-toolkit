@@ -248,3 +248,111 @@ def test_codex_judges_with_gpt_6_2_sol_unless_told_otherwise():
     assert rc.DEFAULT_JUDGE_MODELS["codex"] == "gpt-6.2-sol"
     assert rc.parse_args(["--judge", "codex"]).judge_model in (None, "")
     assert "claude" not in rc.DEFAULT_JUDGE_MODELS and "agy" not in rc.DEFAULT_JUDGE_MODELS
+
+
+def test_line_items_need_one_parent_record():
+    expect = {"parent": {"id": "A"}, "items_key": "line_items", "items": [{"q": 2}]}
+    flat_rows = [{"id": "A", "q": 2}, {"id": "A", "q": 3}]
+    assert rc.check_extraction(expect, flat_rows) == ["expected 1 parent record, got 2"]
+    two_parents = [{"id": "A", "line_items": [{"q": 2}]}, {"id": "B", "line_items": []}]
+    assert rc.check_extraction(expect, two_parents) == ["expected 1 parent record, got 2"]
+
+
+def _json_schema(currency_enum=("EUR", "USD"), lines_type="array"):
+    return {
+        "$defs": {"Line": {"properties": {"q": {"type": "integer"}}, "type": "object"}},
+        "properties": {
+            "total": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+            "currency": {
+                "anyOf": [{"enum": list(currency_enum), "type": "string"}, {"type": "null"}]
+            },
+            "line_items": {"type": lines_type, "items": {"$ref": "#/$defs/Line"}},
+        },
+        "type": "object",
+    }
+
+
+def test_the_generated_model_is_checked_as_well_as_its_requirements():
+    expect = {
+        "fields": {"total": ["decimal"], "currency": ["str"]},
+        "enums": {"currency": ["EUR", "USD"]},
+        "child_container": "line_items",
+        "child_fields": {"q": ["int"]},
+    }
+    assert rc.check_model(expect, _json_schema()) == []
+    problems = rc.check_model(
+        {**expect, "fields": {**expect["fields"], "date": ["date"]}},
+        _json_schema(currency_enum=("EUR",), lines_type="object"),
+    )
+    assert any("no property 'date'" in p for p in problems)
+    assert any("model.currency: allows ['EUR']" in p for p in problems)
+    assert any("'line_items' is not a list" in p for p in problems)
+
+
+def test_cases_are_checked_and_schema_cases_run_first():
+    schema = {"id": "s", "component": "schema_generator"}
+    extract = {"id": "e", "component": "extractor", "schema_from": "s"}
+    assert [c["id"] for c in rc.check_cases([extract, schema])] == ["s", "e"]
+    with pytest.raises(SystemExit, match="appears twice"):
+        rc.check_cases([schema, dict(schema)])
+    with pytest.raises(SystemExit, match="is not a schema_generator case"):
+        rc.check_cases([{"id": "e", "component": "extractor", "schema_from": "missing"}])
+    with pytest.raises(SystemExit, match="component must be one of"):
+        rc.check_cases([{"id": "x", "component": "parser"}])
+
+
+def test_the_baseline_compares_the_schema_but_not_its_wording():
+    def run(field_type, description):
+        observed = {
+            "structure_type": "flat",
+            "fields": {"total": {"type": field_type, "enum": None, "description": description}},
+            "children": {},
+        }
+        return {"providers": {"azure": {"cases": {"s": {"status": "pass", "observed": observed}}}}}
+
+    baseline = run("decimal", "The total.")
+    assert rc.diff_baseline(run("decimal", "Invoice total incl. VAT."), baseline) == []
+    assert rc.diff_baseline(run("float", "The total."), baseline) == [
+        "azure / s: schema differs from the baseline"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("kind", "output", "ok"),
+    [
+        (
+            "claude",
+            '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty"}',
+            True,
+        ),
+        (
+            "claude",
+            '{"loggedIn": true, "authMethod": "apiKeyHelper", "apiProvider": "firstParty"}',
+            False,
+        ),
+        (
+            "claude",
+            '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "bedrock"}',
+            False,
+        ),
+        ("claude", '{"loggedIn": false}', False),
+        ("claude", "not json", False),
+        ("codex", "Logged in using ChatGPT", True),
+        ("codex", "Logged in using an API key - sk-***", False),
+        ("agy", "", True),
+    ],
+)
+def test_a_judge_runs_only_on_a_subscription_login(kind, output, ok):
+    assert (rc.login_problem(kind, output) is None) is ok
+
+
+def test_a_public_run_keeps_no_provider_error_text():
+    error = rc._error(RuntimeError("upstream said: request body ..."), [], public=True)
+    assert error == {"error_type": "RuntimeError", "status_code": None, "message": ""}
+    local = rc._error(RuntimeError("upstream said: x"), [])
+    assert local["message"] == "upstream said: x"
+
+
+def test_the_judge_does_not_inherit_the_nesting_markers():
+    kept = rc.judge_env({"PATH": "/bin", "CLAUDECODE": "1", "CLAUDE_CODE_ENTRYPOINT": "cli"})
+    assert kept == {"PATH": "/bin"}
