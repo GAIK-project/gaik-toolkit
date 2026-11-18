@@ -2,17 +2,29 @@
 
 import asyncio
 
+import pytest
 from api.routers import pipeline
+from api.utils.result_owner import forget_owner, remember_owner
+from fastapi import HTTPException
 
 
-def _download(tmp_path, **kwargs):
+def _download(tmp_path, *, owner="user-a", user="user-a", **kwargs):
     pdf = tmp_path / "report.pdf"
     pdf.write_bytes(b"%PDF-1.4\n")
     pipeline.PDF_STORAGE["job-1234"] = pdf
+    remember_owner("job-1234", owner)
     try:
-        return asyncio.run(pipeline.download_pdf("job-1234", **kwargs))
+        return asyncio.run(pipeline.download_pdf("job-1234", user=user, **kwargs))
     finally:
         pipeline.PDF_STORAGE.pop("job-1234", None)
+        forget_owner("job-1234")
+
+
+def test_another_user_gets_not_found(tmp_path):
+    for user in ("user-b", ""):
+        with pytest.raises(HTTPException) as refused:
+            _download(tmp_path, user=user)
+        assert (refused.value.status_code, refused.value.detail) == (404, "PDF not found")
 
 
 def test_the_pdf_downloads_as_an_attachment_by_default(tmp_path):

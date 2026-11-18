@@ -35,6 +35,16 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   `persist-credentials: false`, and token permissions are granted per job. The
   `Workflow security` job (zizmor) fails on medium or higher findings.
 
+## Claude Agent SDK
+
+The Solution Wizard's interactive runner (`run_wizard_interactive.py`, with its tool guard
+`agent_tool_guard.py`) and the demo's `api/routers/solution_wizard.py` drive Claude Code
+through `claude-agent-sdk`. Before changing their options, hooks or permissions, read the
+current docs (index: https://code.claude.com/docs/llms.txt) and the installed SDK's
+`ClaudeAgentOptions`: defaults change between versions. For example, `setting_sources`
+left unset loads the user's, project and local settings, and `env` is merged over the
+parent's environment.
+
 ## who owns a change
 
 The person who asked for a change owns it, also when an agent wrote it. They read the
@@ -138,8 +148,16 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   (`lib/trial.ts`, counted in Upstash Redis, off without it). The first Solution
   Wizard's API, `/api/wizard`, also needs the per-user `wizard_access` grant from
   `/admin`, for reads too: its agent has shell tools in the API pod. A write to data
-  that every visitor shares needs an approved user (`writesSharedData`), and the API
-  serves no route that writes the shared video-search index.
+  that every visitor shares needs a signed-in user with the `/admin` session
+  (`writesSharedData`), and the API serves no route that writes the shared
+  video-search index. A video's playback and thumbnail links go to signed-in users
+  only (`handsOutStorageLink`, checked again in `api/routers/video_search.py`).
+  A generated result (PDF, subtitles, tabular session) belongs to the user whose run
+  made it: the proxy sends the signed-in user in `X-GAIK-User`, and the API serves the
+  result by id only to that user (`api/utils/result_owner.py`). A RAG collection belongs
+  to the user who indexed it the same way; the shared example collections serve everyone.
+  Each run, and each result download, leaves one `gaik.audit` log line with the user id,
+  the route template and the status, never content or file names (`api/utils/audit.py`).
 
 ## docs site (GitHub Pages)
 

@@ -68,15 +68,24 @@ def list_bucket_files() -> dict[str, set[str]]:
 
 
 def probe_media(video_id: str, kind: str) -> tuple[bool, str]:
+    """Ask for a media link without signing in.
+
+    The links go to signed-in users only, so the expected answer is 401; the
+    files themselves are checked in Allas above. A 401 does not show that the API
+    pod can sign a link with its own storage keys: play one video while signed in
+    to check that.
+    """
     path = f"/api/video-search/videos/{quote(video_id)}/{kind}"
     url = f"{BASE_URL}{path}"
     request = Request(url, headers={"User-Agent": "gaik-video-search-verify"})
 
     try:
         with urlopen(request, timeout=30) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        return True, payload.get("url", "")
+            response.read()
+        return False, "a link was handed out without signing in"
     except HTTPError as exc:
+        if exc.code == 401:
+            return True, "401, signed-in users only"
         return False, f"{exc.code} {exc.reason}"
     except URLError as exc:
         return False, str(exc.reason)

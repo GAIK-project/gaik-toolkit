@@ -230,3 +230,102 @@ def test_quoted_schema_must_match_exactly():
     with pytest.raises(UnsafeSQLError, match="Cross-schema"):
         validate_read_only('SELECT * FROM "Public".customers', schema_name="public")
     validate_read_only("SELECT * FROM PUBLIC.customers", schema_name="public")
+
+
+# Type casts are checked against the table list.
+
+_LISTED = ["orders", "Users"]
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT 'orders'::regclass",
+        "SELECT CAST('int' AS regtype)",
+        "SELECT TRY_CAST('lower' AS regproc)",
+        "SELECT 'lower(text)'::regprocedure",
+        "SELECT '+'::regoper",
+        "SELECT '+(int,int)'::regoperator",
+        "SELECT 'public'::regnamespace",
+        "SELECT 'postgres'::regrole",
+        "SELECT 'english'::regconfig",
+        "SELECT 'simple'::regdictionary",
+        "SELECT 'C'::regcollation",
+        "SELECT 1::oid",
+        "SELECT regclass 'orders'",
+        "SELECT id FROM orders WHERE 'orders'::regclass IS NOT NULL",
+    ],
+)
+def test_object_identifier_types_are_refused(sql):
+    with pytest.raises(UnsafeSQLError, match="type casts are checked against the table list"):
+        validate_read_only(sql, allowlist=_LISTED)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT CAST(NULL AS other_table)",
+        "SELECT NULL::other_table",
+        "SELECT TRY_CAST(NULL AS other_table)",
+        "SELECT ARRAY[]::other_table[]",
+        "SELECT NULL::users",  # the listed table is "Users"
+        "SELECT * FROM generate_series(1, 2) AS g(x other_table)",
+        "SELECT name::citext FROM orders",
+    ],
+)
+def test_cast_to_a_type_that_is_not_a_listed_table_is_refused(sql):
+    with pytest.raises(UnsafeSQLError, match="type casts are checked against the table list"):
+        validate_read_only(sql, allowlist=_LISTED)
+
+
+@pytest.mark.parametrize("sql", ["SELECT NULL::pg_catalog.orders", "SELECT NULL::other.orders"])
+def test_cast_to_a_type_in_another_schema_is_refused(sql):
+    with pytest.raises(UnsafeSQLError, match="Cross-schema type"):
+        validate_read_only(sql, allowlist=_LISTED)
+
+
+@pytest.mark.parametrize(
+    ("sql", "rendered"),
+    [
+        ("SELECT NULL::orders", 'CAST(NULL AS "public".orders)'),
+        ('SELECT CAST(NULL AS "Users")', 'CAST(NULL AS "public"."Users")'),
+        ("SELECT NULL::public.orders", 'CAST(NULL AS "public".orders)'),
+    ],
+)
+def test_cast_to_a_listed_table_is_pinned_to_the_schema(sql, rendered):
+    assert rendered in validate_read_only(sql, allowlist=_LISTED)
+
+
+def test_casts_to_built_in_types_still_work():
+    out = validate_read_only(
+        "SELECT id::int4, total::numeric(10, 2), name::varchar(20), name::text, "
+        'created::date, tags::text[], doc::jsonb, body::tsvector, flag::"char", '
+        "CAST(id AS bigint), '1 day'::interval FROM orders",
+        allowlist=_LISTED,
+    )
+    assert "tsvector" in out and '"char"' in out
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT version()",
+        "SELECT current_database()",
+        "SELECT current_user",
+        "SELECT session_user",
+        "SELECT current_role",
+        "SELECT current_schema",
+        "SELECT current_schema()",
+        "SELECT current_catalog",
+        "SELECT user FROM orders",
+        "SELECT id FROM orders WHERE current_user = 'x'",
+    ],
+)
+def test_session_and_server_details_are_refused(sql):
+    with pytest.raises(UnsafeSQLError, match="not allowed"):
+        validate_read_only(sql, allowlist=_LISTED)
+
+
+def test_quoted_user_column_is_a_column():
+    out = validate_read_only('SELECT "user", o.user FROM orders AS o', allowlist=_LISTED)
+    assert '"user"' in out

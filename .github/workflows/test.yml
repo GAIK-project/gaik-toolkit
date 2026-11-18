@@ -116,7 +116,7 @@ jobs:
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
     - name: Install package
-      run: uv pip install --system ".[all,dev,llm-all]"
+      run: uv pip install --system ".[all,dev,llm-all,wizard]"
 
     # The Word export tests (test_report_writer.py, test_report_synthesizer.py) skip without Pandoc.
     - name: Install Pandoc
@@ -143,7 +143,9 @@ jobs:
     # The Solution Wizard's tests are outside `testpaths` and share a file name with
     # unit_tests/ (test_source_tracing.py), so they run in a pytest session of their own.
     # ReportLab is what a generated PoC installs for its PDF report (scaffolder.py); no
-    # gaik extra brings it, and without it test_pdf_report.py skips as a whole.
+    # gaik extra brings it, and without it test_pdf_report.py skips as a whole. The wizard
+    # extra (claude-agent-sdk) above lets the interactive runner's tool guard and its SDK
+    # contract tests run here too.
     - name: Run Solution Wizard tests
       run: |
         uv pip install --system "reportlab>=4.0"
