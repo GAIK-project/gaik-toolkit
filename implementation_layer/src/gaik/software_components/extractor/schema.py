@@ -1560,18 +1560,27 @@ def sanitize_model_name(name: str, suffix: str = "") -> str:
 # through a 64-bit float and silently truncate past ~17 significant digits).
 # _clean_decimal_string then strips common currency/unit noise before Decimal
 # parsing runs, so a model's "12.40 EUR" still resolves to Decimal('12.40')
-# instead of crashing.
+# instead of crashing. It also reads the decimal comma, because a model copies
+# an amount as the document writes it: "150,00" on a Finnish invoice.
 # -----------------------------------------------------------------------------
 
 DECIMAL_JSON_SCHEMA = {"type": "string"}
 DECIMAL_JSON_SCHEMA_OR_NULL = {"anyOf": [{"type": "string"}, {"type": "null"}]}
 
 _CURRENCY_NOISE_RE = re.compile(r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]")
-# Exactly one signed amount: comma is accepted only as a thousands separator
-# in groups of exactly 3 digits, dot only as the decimal separator. European
-# comma-decimal formatting ("1.234,56") and multi-number/ambiguous strings
-# are deliberately NOT interpreted -- see _clean_decimal_string's docstring.
+# Exactly one signed amount in one of two notations. Dot decimal: comma only
+# as a thousands separator in groups of exactly 3 digits ("1,234.56").
+# Comma decimal: one comma before a required fraction, thousands optionally
+# grouped in 3s by one kind of separator -- space, no-break space, narrow
+# no-break space or dot ("18,90", "1 234,56", "1.234,56"). The dot notation is
+# tried first, so "1,234" keeps its reading 1234. Multi-number and malformed
+# strings are not interpreted -- see _clean_decimal_string's docstring.
 _SINGLE_AMOUNT_RE = re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
+_COMMA_DECIMAL_RE = re.compile(
+    r"^(?P<sign>[-+]?)(?P<int>\d{1,3}(?P<sep>[ \u00a0\u202f.])\d{3}(?:(?P=sep)\d{3})*|\d+)"
+    r",(?P<frac>\d+)$"
+)
+_GROUP_SEPARATORS_RE = re.compile(r"[ \u00a0\u202f.]")
 
 
 def _clean_decimal_string(v):
@@ -1582,12 +1591,17 @@ def _clean_decimal_string(v):
 
     - Known currency codes/symbols (EUR, USD, "$", "€", etc.) and surrounding
       whitespace are stripped.
-    - What remains must be exactly one well-formed amount: an optional sign,
-      digits optionally grouped in thousands of exactly 3 via ``,``, and an
-      optional ``.``-delimited fractional part. Anything else -- multiple
-      embedded numbers ("abc1def2"), space-grouped or comma-decimal
-      formatting ("1 234,56"), malformed grouping ("1,23.56"), or leftover
-      non-numeric text -- is rejected outright rather than guessed at.
+    - What remains must be exactly one well-formed amount, in one of two
+      notations. Dot decimal: an optional sign, digits optionally grouped in
+      thousands of exactly 3 via ``,``, and an optional ``.``-delimited
+      fractional part ("1,234.56"). Comma decimal: an optional sign, digits
+      optionally grouped in thousands of exactly 3 by one kind of separator
+      (space, no-break space, narrow no-break space or ``.``), a ``,`` and a
+      fractional part ("150,00", "1 234,56", "1.234,56"). The dot notation
+      is tried first, so "1,234" reads as 1234, as before. Anything else --
+      multiple embedded numbers ("abc1def2"), malformed grouping ("1,23.56",
+      "1 23,45"), mixed separators ("1 234.567,89"), or leftover non-numeric
+      text -- is rejected outright rather than guessed at.
     - Rejected or blank input resolves to ``None``, matching the fallback
       already used elsewhere for blank/unparseable numeric values -- not a
       crash, and not a fabricated number from a partial match.
@@ -1603,9 +1617,12 @@ def _clean_decimal_string(v):
     s = _CURRENCY_NOISE_RE.sub("", s).strip()
     if not s:
         return None
-    if not _SINGLE_AMOUNT_RE.match(s):
-        return None
-    return s.replace(",", "")
+    if _SINGLE_AMOUNT_RE.match(s):
+        return s.replace(",", "")
+    m = _COMMA_DECIMAL_RE.match(s)
+    if m:
+        return f"{m['sign']}{_GROUP_SEPARATORS_RE.sub('', m['int'])}.{m['frac']}"
+    return None
 
 
 DecimalField = Annotated[
@@ -1665,11 +1682,17 @@ _CURRENCY_NOISE_RE = _re.compile(
     r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]"
 )
 _SINGLE_AMOUNT_RE = _re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
+_COMMA_DECIMAL_RE = _re.compile(
+    r"^(?P<sign>[-+]?)(?P<int>\d{1,3}(?P<sep>[ \u00a0\u202f.])\d{3}(?:(?P=sep)\d{3})*|\d+)"
+    r",(?P<frac>\d+)$"
+)
+_GROUP_SEPARATORS_RE = _re.compile(r"[ \u00a0\u202f.]")
 
 
 def _clean_decimal_string(v):
-    """Strip currency/unit noise before Decimal parsing; reject (return None)
-    ambiguous or multi-number input rather than fabricating a value. See
+    """Strip currency/unit noise before Decimal parsing and read a dot or
+    comma decimal; reject (return None) ambiguous or multi-number input
+    rather than fabricating a value. See
     gaik.software_components.extractor.schema._clean_decimal_string for the
     full policy this mirrors."""
     if not isinstance(v, str):
@@ -1680,9 +1703,12 @@ def _clean_decimal_string(v):
     s = _CURRENCY_NOISE_RE.sub("", s).strip()
     if not s:
         return None
-    if not _SINGLE_AMOUNT_RE.match(s):
-        return None
-    return s.replace(",", "")
+    if _SINGLE_AMOUNT_RE.match(s):
+        return s.replace(",", "")
+    m = _COMMA_DECIMAL_RE.match(s)
+    if m:
+        return f"{m['sign']}{_GROUP_SEPARATORS_RE.sub('', m['int'])}.{m['frac']}"
+    return None
 
 
 DecimalField = Annotated[

@@ -289,6 +289,20 @@ class TestSchemaDesigner:
 
         _assert_decimal_safe(loaded_cls)
 
+    def test_reloaded_schema_reads_a_decimal_comma(self):
+        # The helper mirrors gaik's cleaner: "150,00" on a Finnish invoice is 150.00.
+        from solution_wizard.schema_designer import build_pydantic_model
+
+        src = build_pydantic_model(self._spec(), schema_name="Test")
+        ns: dict = {}
+        exec(compile(src, "<schema>", "exec"), ns)  # noqa: S102
+        model_cls = ns["Test"]
+
+        obj = model_cls(name="x", fee="150,00", price="1 234,56 EUR")
+        assert obj.fee == Decimal("150.00")
+        assert obj.price == Decimal("1234.56")
+        assert model_cls(name="x", fee="1", price="1 23,45").price is None
+
     def test_required_decimal_field_has_no_default(self):
         from solution_wizard.schema_designer import build_pydantic_model
 

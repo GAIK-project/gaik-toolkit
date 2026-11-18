@@ -79,11 +79,17 @@ _CURRENCY_NOISE_RE = _re.compile(
     r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]"
 )
 _SINGLE_AMOUNT_RE = _re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
+_COMMA_DECIMAL_RE = _re.compile(
+    r"^(?P<sign>[-+]?)(?P<int>\d{1,3}(?P<sep>[ \u00a0\u202f.])\d{3}(?:(?P=sep)\d{3})*|\d+)"
+    r",(?P<frac>\d+)$"
+)
+_GROUP_SEPARATORS_RE = _re.compile(r"[ \u00a0\u202f.]")
 
 
 def _clean_decimal_string(v):
-    """Strip currency/unit noise before Decimal parsing; reject (return None)
-    ambiguous or multi-number input rather than fabricating a value. See
+    """Strip currency/unit noise before Decimal parsing and read a dot or
+    comma decimal; reject (return None) ambiguous or multi-number input
+    rather than fabricating a value. See
     gaik.software_components.extractor.schema._clean_decimal_string for the
     full policy this mirrors."""
     if not isinstance(v, str):
@@ -94,9 +100,12 @@ def _clean_decimal_string(v):
     s = _CURRENCY_NOISE_RE.sub("", s).strip()
     if not s:
         return None
-    if not _SINGLE_AMOUNT_RE.match(s):
-        return None
-    return s.replace(",", "")
+    if _SINGLE_AMOUNT_RE.match(s):
+        return s.replace(",", "")
+    m = _COMMA_DECIMAL_RE.match(s)
+    if m:
+        return f"{m['sign']}{_GROUP_SEPARATORS_RE.sub('', m['int'])}.{m['frac']}"
+    return None
 
 
 DecimalField = Annotated[
