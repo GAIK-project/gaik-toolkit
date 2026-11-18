@@ -400,3 +400,10 @@ def test_azure_keeps_the_configured_deployment_name():
     )
 
     assert transcriber._resolve_transcription_model() == "whisper"
+
+
+def test_a_bad_enhancement_ratio_fails_when_the_transcriber_is_built():
+    for ratio in (0, 1.5, -0.1):
+        with pytest.raises(ValueError, match="enhancement_max_change_ratio"):
+            _transcriber(enhancement_max_change_ratio=ratio)
+    assert _transcriber(enhancement_max_change_ratio=None).enhancement_max_change_ratio is None

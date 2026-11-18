@@ -190,6 +190,10 @@ class Transcriber:
         limits: InputLimits | None = None,
     ) -> None:
         _audio_provider(api_config)
+        # Checked here as TranscriptEnhancer checks it, so a wrong value fails before a
+        # paid transcription rather than when the enhancer is built after it.
+        if enhancement_max_change_ratio is not None and not 0 < enhancement_max_change_ratio <= 1:
+            raise ValueError("enhancement_max_change_ratio must be between 0 and 1, or None")
         if transcription_model == "whisper_local" and local_api_base:
             check_endpoint(
                 local_api_base,
