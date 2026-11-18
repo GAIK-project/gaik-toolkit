@@ -43,6 +43,14 @@ _DEFAULT_SYSTEM_PROMPT_WITH_CITATIONS = (
     "as in [1] [Document: name, Page: X]; the citations shown to the reader are built "
     "from those references."
 )
+# The system message for citations over a string context: it has no chunks to number,
+# so the model writes each source as [document_name, page X] and the answer is
+# returned as written.
+_STRING_CONTEXT_SYSTEM_PROMPT_WITH_CITATIONS = (
+    _INSTRUCTIONS + " Include citations in the form [document_name, page X]. When a "
+    "context block starts with [Document: name, Page: X], take the document name and "
+    "the page from that line."
+)
 # The system message for a custom ``prompt=``: the caller's template goes in the
 # user message, with the chunk blocks where it has ``{context}``.
 _CUSTOM_PROMPT_SYSTEM = (
@@ -145,20 +153,22 @@ class AnswerGenerator:
         answer and listed in ``dropped_citations``. A bracketed number that is not a
         retrieved chunk's (``[7]`` with four chunks, ``[2019]``), a bracket in code
         or after a name (``arr[0]``), and a source written in any other form are
-        left as written and are not citations. A string context has no chunks, so
-        its answer has no citations and every ``[name, page X]`` in it is removed.
-        With ``citations=False`` the answer is returned as the model wrote it.
+        left as written and are not citations. A string context has no chunks: the
+        model is asked for ``[document_name, page X]`` citations, the answer is
+        returned as written and ``citations`` stays empty. With
+        ``citations=False`` the answer is returned as the model wrote it.
         """
         use_stream = self.stream if stream is None else stream
-        documents = context if self.citations and not isinstance(context, str) else []
-        resolver = CitationResolver(documents) if self.citations else None
+        string_context = isinstance(context, str)
+        resolve = self.citations and not string_context
+        resolver = CitationResolver(context) if resolve else None
 
         # One block per retrieved chunk, with this call's random id; the question
         # and the instructions stay outside the blocks.
         material = SourceMaterial()
-        context_text = self._format_context(context, material, references=self.citations)
+        context_text = self._format_context(context, material, references=resolve)
         prompt = self._build_prompt(query, context_text)
-        messages = self._build_messages(prompt)
+        messages = self._build_messages(prompt, string_context=string_context)
 
         if resolver is None:
             if use_stream:
@@ -214,17 +224,19 @@ class AnswerGenerator:
             )
         return _CONTEXT_AND_QUESTION.format(query=query, context=context_text)
 
-    def _system_prompt(self) -> str:
+    def _system_prompt(self, *, string_context: bool = False) -> str:
         """The system message: the instructions and the source-material sentence."""
         if self.prompt:
             base = _CUSTOM_PROMPT_SYSTEM
+        elif self.citations and string_context:
+            base = _STRING_CONTEXT_SYSTEM_PROMPT_WITH_CITATIONS
         elif self.citations:
             base = _DEFAULT_SYSTEM_PROMPT_WITH_CITATIONS
         else:
             base = _DEFAULT_SYSTEM_PROMPT
         return with_source_material_instruction(base)
 
-    def _build_messages(self, prompt: str) -> list[dict]:
+    def _build_messages(self, prompt: str, *, string_context: bool = False) -> list[dict]:
         """System message, then the kept Q/A pairs, then this turn's user message.
 
         The history holds each earlier question and answer only, never the chunks
@@ -237,7 +249,8 @@ class AnswerGenerator:
                 history_msgs.append({"role": "user", "content": question})
                 history_msgs.append({"role": "assistant", "content": answer})
             messages = history_msgs + messages
-        return [{"role": "system", "content": self._system_prompt()}, *messages]
+        system = self._system_prompt(string_context=string_context)
+        return [{"role": "system", "content": system}, *messages]
 
     def _stream_answer(
         self, messages: list[dict], query: str, *, resolver: CitationResolver | None = None

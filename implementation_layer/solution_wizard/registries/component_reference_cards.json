@@ -1026,7 +1026,7 @@
         "name": "citations",
         "type": "bool",
         "default": false,
-        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and each numbered reference becomes [document_name, page X] from that chunk's metadata. The citations list (generate_with_citations() -> CitedAnswer.citations) holds only retrieved chunks; a [name, page X] no chunk has is removed. A number that is not a chunk's reference, code, and sources in other forms are left as written.",
+        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and each numbered reference becomes [document_name, page X] from that chunk's metadata. The citations list (generate_with_citations() -> CitedAnswer.citations) holds only retrieved chunks; a [name, page X] no chunk has is removed. A number that is not a chunk's reference, code, and sources in other forms are left as written. A string context has no chunks: the model is asked for [document_name, page X] citations and the answer is returned as written, with an empty citations list.",
         "selection_relevant": true,
         "infer_from": "traceability / citation requirement"
       },

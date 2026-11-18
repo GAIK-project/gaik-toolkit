@@ -160,14 +160,53 @@ def test_generate_returns_the_answer_with_the_built_citations(monkeypatch):
     )
 
 
-def test_a_string_context_has_no_chunks_to_cite(monkeypatch):
-    generator = _generator(monkeypatch, "Total is 1 500 EUR [1] [invoice.pdf, page 1].")
+# The case of examples/software_components/RAG/answer_generator_example.py.
+STRING_CONTEXT = "Invoice total amount is $1,500."
+STRING_CONTEXT_REPLY = "The total amount is $1,500 [invoice.pdf, page 1]."
+# The system prompt gaik 0.11.0 sends with citations=True, before the source-material
+# sentence: a string context is still asked for [document_name, page X] citations.
+STRING_CONTEXT_PROMPT = (
+    "You are a helpful assistant that answers questions using only the provided context.\n"
+    "If the context does not contain the answer, say you do not have enough information.\n"
+    "Be concise and factual. Include citations in the form [document_name, page X]. "
+    "When a context block starts with [Document: name, Page: X], take the document "
+    "name and the page from that line."
+)
 
-    result = generator.generate_with_citations(QUESTION, "Invoice total is 1 500 EUR.")
 
-    assert result.answer == "Total is 1 500 EUR [1]."
+@pytest.mark.parametrize("stream", [False, True], ids=["whole", "streamed"])
+def test_a_string_context_keeps_the_citations_the_model_writes(monkeypatch, stream):
+    generator = _generator(monkeypatch, STRING_CONTEXT_REPLY, stream=stream)
+    sent = []
+    create = generator.client.chat.completions.create
+
+    def record(**kwargs):
+        sent.append(kwargs["messages"])
+        return create(**kwargs)
+
+    generator.client.chat.completions.create = record
+
+    result = generator.generate_with_citations("What is the total amount?", STRING_CONTEXT)
+    answer = result.answer if isinstance(result.answer, str) else "".join(result.answer)
+
+    assert answer == STRING_CONTEXT_REPLY
     assert result.citations == []
-    assert result.dropped_citations == ["[invoice.pdf, page 1]"]
+    assert result.dropped_citations == []
+    system = sent[0][0]["content"]
+    assert system.startswith(STRING_CONTEXT_PROMPT)
+    assert "[1]" not in system
+    assert generator.generate("What is the total amount?", STRING_CONTEXT, stream=False) == (
+        STRING_CONTEXT_REPLY
+    )
+
+
+def test_a_string_context_leaves_a_bracketed_number_as_written(monkeypatch):
+    generator = _generator(monkeypatch, "The total amount is $1,500 [1].")
+
+    result = generator.generate_with_citations("What is the total amount?", STRING_CONTEXT)
+
+    assert result.answer == "The total amount is $1,500 [1]."
+    assert result.citations == []
 
 
 def test_without_citations_the_answer_is_returned_as_written(monkeypatch):

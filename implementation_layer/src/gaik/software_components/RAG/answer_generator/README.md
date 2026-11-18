@@ -121,9 +121,10 @@ Text in other forms, such as `[fake.pdf]` or `(report.pdf, page 3)`, is left as
 written and is not listed anywhere. A bracket is never read inside a fenced code
 block or an inline code span, directly after a name, a digit, `)` or `]` (`arr[0]`,
 `matrix[1][2]`), or after `=` (`nums = [1, 2]`); a Markdown link stays as it is too.
-A string context has no chunks, so its answer has no citations and every
-`[name, page X]` in it is removed. With `citations=False` the answer is returned as
-the model wrote it.
+A string context has no chunks to number: the model is asked to cite as
+`[document_name, page X]`, as in gaik 0.11.0, the answer is returned as the model
+wrote it, and `citations` and `dropped_citations` stay empty. With `citations=False`
+the answer is returned as the model wrote it.
 
 ### Retrieved text as data
 
