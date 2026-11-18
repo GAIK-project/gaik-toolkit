@@ -74,5 +74,5 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("[report-writer-v2] failed to record usage:", e);
     }
-  });
+  }, userId);
 }

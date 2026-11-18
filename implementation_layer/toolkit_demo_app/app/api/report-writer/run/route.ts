@@ -114,5 +114,5 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("[report-writer] failed to record usage:", e);
     }
-  });
+  }, userId);
 }
