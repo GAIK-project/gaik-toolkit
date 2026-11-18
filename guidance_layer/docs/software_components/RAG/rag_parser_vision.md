@@ -43,26 +43,34 @@ ffmpeg -version
 
 ### Tesseract CLI (for OCR)
 
-If you enable OCR (`enable_ocr=True`) with `ocr_engine="tesseract_cli"`, install Tesseract:
+If you enable OCR (`enable_ocr=True`) with `ocr_engine="tesseract_cli"` (the default), install
+Tesseract. The parser passes Docling the languages of Docling's default Tesseract options (English,
+Spanish, French and German) that your Tesseract has traineddata for, so English alone works; add the
+others your documents use. With none of the four installed, Docling raises
+`OcrLanguageNotSupportedError`. `ocr_engine="rapidocr"` needs no system packages.
 
 **Windows:**
 ```powershell
 winget install UB-Mannheim.TesseractOCR
 ```
 
+The installer adds English only: pick more languages when you run it interactively, or copy their
+`.traineddata` files (`spa`, `fra`, `deu`) into its `tessdata` folder.
+
 **macOS:**
 ```bash
-brew install tesseract
+brew install tesseract  # tesseract-lang adds the other languages
 ```
 
 **Linux:**
 ```bash
-sudo apt-get install tesseract-ocr  # Ubuntu/Debian
+sudo apt-get install tesseract-ocr  # Ubuntu/Debian; tesseract-ocr-spa, -fra and -deu add those languages
 ```
 
 **Verify:**
 ```bash
 tesseract --version
+tesseract --list-langs
 ```
 
 If needed, set:
@@ -149,10 +157,10 @@ chunks = parser.convert_doc_to_chunks_with_vision(
 
 ## Version Notes
 
-- Docling version: 2.64.1
-- Docling core version: >=2.50.1,<3.0.0 (with chunking extra)
-- Docling IBM models: >=3.9.1,<4
-- Docling parse: >=4.7.0,<5.0.0
+- Docling version: 2.150.1
+- Docling core version: >=2.106.0,<3.0.0 (with chunking extra)
+- Docling IBM models: >=4.0.2,<5
+- Docling parse: >=7.22.2,<8.0.0
 - FFmpeg version: 8.0.1 (system dependency)
 
 ---

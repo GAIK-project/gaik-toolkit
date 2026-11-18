@@ -64,12 +64,6 @@ function InstallTerminal() {
 
   return (
     <div className="max-w-md overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-sm">
-      <div className="flex items-center gap-1.5 border-b border-zinc-800 bg-zinc-900 px-3.5 py-2.5">
-        <span aria-hidden className="size-2.5 rounded-full bg-zinc-700" />
-        <span aria-hidden className="size-2.5 rounded-full bg-zinc-700" />
-        <span aria-hidden className="size-2.5 rounded-full bg-zinc-700" />
-        <span className="ml-2 text-xs text-zinc-400">terminal</span>
-      </div>
       <div className="flex items-center gap-3 px-4 py-3.5 font-mono text-sm">
         <span aria-hidden className="text-teal-400 select-none">
           $
@@ -125,8 +119,7 @@ export function GetStarted({ hasWizardAccess, isAuthenticated }: WizardAccess) {
           </h2>
           <p className="text-muted-foreground max-w-xl">
             Every demo on this site runs on gaik, an open-source (MIT) Python
-            package. Install it, follow the docs and examples, or let the Wizard
-            design a proof of concept for your use case.
+            package.
           </p>
           <InstallTerminal />
         </div>
@@ -146,6 +139,7 @@ export function GetStarted({ hasWizardAccess, isAuthenticated }: WizardAccess) {
           <WizardEntry
             hasWizardAccess={hasWizardAccess}
             isAuthenticated={isAuthenticated}
+            tour="wizard"
             className={cn(rowClassName, "cursor-pointer")}
           >
             <RowContent
