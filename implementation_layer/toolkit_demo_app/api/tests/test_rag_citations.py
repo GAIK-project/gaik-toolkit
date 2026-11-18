@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 from api.routers import rag
+from api.utils.result_owner import remember_owner
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from langchain_core.documents import Document
@@ -28,6 +29,9 @@ def empty_store(monkeypatch) -> None:
     monkeypatch.setattr(rag, "RAG_INSTANCES", {})
     monkeypatch.setattr(rag, "_USAGE", {})
     monkeypatch.setattr(rag, "_collection_locks", {})
+    from api.utils import result_owner
+
+    monkeypatch.setattr(result_owner, "_owners", {})
 
 
 def _client() -> TestClient:
@@ -83,6 +87,7 @@ def _stream(reply: str) -> object:
 def test_sources_are_the_cited_chunks_and_never_an_invented_page() -> None:
     generator = _stream("A laptop on day one [1]. Ask HR [halden_handbook, page 9].")
     rag.RAG_INSTANCES["c1"] = _workflow(generator)
+    remember_owner("c1", "")  # owned by the test client, which names no user
 
     response = _client().post(
         "/rag/query/stream", data={"question": "Laptop?", "collection_id": "c1"}
@@ -100,6 +105,7 @@ def test_a_generator_without_a_citation_list_still_answers() -> None:
         return iter(["Holidays go via the lead ", "[halden_handbook, page 5]."])
 
     rag.RAG_INSTANCES["c2"] = _workflow(SimpleNamespace(generate=generate))
+    remember_owner("c2", "")  # owned by the test client, which names no user
 
     response = _client().post(
         "/rag/query/stream", data={"question": "Holidays?", "collection_id": "c2"}
