@@ -1,6 +1,7 @@
 """Shared configuration utilities for the demo API."""
 
 import os
+import re
 
 import fitz
 from fastapi import HTTPException, UploadFile
@@ -191,8 +192,9 @@ def get_model_options(config: dict, *, schema: bool = False) -> dict:
     """Use only sampling options supported by the selected model family."""
     model = str(config.get("model", "")).lower()
     if model.startswith("gpt-6"):
-        # gpt-6.1 models reject "none"; the earlier gpt-6 ones accept it.
-        if model.startswith("gpt-6.1"):
+        # gpt-6.1 and later point releases (gpt-6.2-sol) reject "none"; the first
+        # gpt-6 models accept it.
+        if re.match(r"gpt-6\.[1-9]", model):
             effort = "medium"
         else:
             effort = "low" if "astra" in model else "none"
