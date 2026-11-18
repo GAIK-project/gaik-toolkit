@@ -13,6 +13,8 @@ receivers:
     protocols:
       http:
         endpoint: 0.0.0.0:4320
+        # A request from outside the project is at most 4 MiB (the receiver's default is 20 MiB).
+        max_request_body_size: 4194304
         auth:
           authenticator: bearertokenauth/ingress
 

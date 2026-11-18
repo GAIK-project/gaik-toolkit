@@ -14,7 +14,9 @@ spec:
   port: {targetPort: otlp-ingress}
   tls:
     termination: edge
-    insecureEdgeTerminationPolicy: Redirect
+    # Plain HTTP is refused, not redirected: a producer set up with http:// would send its bearer
+    # token in clear before any redirect.
+    insecureEdgeTerminationPolicy: None
 ---
 # The OpenShift router may reach the token-checked receiver, and no other collector port.
 apiVersion: networking.k8s.io/v1
