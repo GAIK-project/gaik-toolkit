@@ -440,69 +440,111 @@ def _errors(blueprint: dict) -> dict[tuple, Any]:
     return {_issue_key(issue): issue for issue in result.errors}
 
 
-def _drawn_loops(blueprint: dict) -> list[frozenset[str]]:
-    """The loops of the flow the diagram draws, each as the set of its steps.
+@dataclass
+class _Flow:
+    """The flow the diagram draws, between steps (and manual steps).
 
-    The flow is each step's (and manual step's) ``depends_on`` and each business
-    decision's branches. A branch back to an earlier step is drawn as a normal
-    flow, which the generator's layout cannot rank (rule 8 of the validator
-    reads ``depends_on`` only); rework loops are exceptions (``loop_to:``),
-    drawn apart, and are not counted.
+    It is each step's ``depends_on`` and each business decision's branches. A
+    branch back to an earlier step is drawn as a normal flow, which the
+    generator's layout cannot rank (rule 8 of the validator reads
+    ``depends_on`` only); rework loops are exceptions (``loop_to:``), drawn
+    apart, and are not counted.
     """
-    workflow = blueprint.get("workflow") or {}
-    process = blueprint.get("business_process") or {}
-    items = [*(workflow.get("steps") or []), *(process.get("manual_steps") or [])]
-    nodes = [str(i.get("id")) for i in items if isinstance(i, dict)]
-    known = set(nodes)
-    successors: dict[str, set[str]] = {n: set() for n in nodes}
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        for dep in item.get("depends_on") or []:
-            if dep in known:
-                successors[dep].add(str(item.get("id")))
-    for decision in process.get("decision_points") or []:
-        if not isinstance(decision, dict) or decision.get("after") not in known:
-            continue
-        for branch in decision.get("branches") or []:
-            if isinstance(branch, dict) and branch.get("target") in known:
-                successors[decision["after"]].add(branch["target"])
 
-    def reach(start: str) -> set[str]:
-        seen: set[str] = set()
-        todo = list(successors[start])
-        while todo:
-            node = todo.pop()
-            if node not in seen:
-                seen.add(node)
-                todo.extend(successors[node])
-        return seen
+    #: Step ids, workflow steps first in their order, then the manual steps.
+    order: list[str]
+    names: dict[str, str]
+    successors: dict[str, set[str]]
+    #: (after, target) of every decision branch to a step.
+    branches: set[tuple[str, str]]
 
-    reached = {n: reach(n) for n in nodes}
-    loops: list[frozenset[str]] = []
-    for n in nodes:
-        if n not in reached[n] or any(n in loop for loop in loops):
-            continue
-        loops.append(frozenset({n} | {m for m in reached[n] if n in reached[m]}))
-    return loops
+    @classmethod
+    def of(cls, blueprint: dict) -> _Flow:
+        workflow = blueprint.get("workflow") or {}
+        process = blueprint.get("business_process") or {}
+        items = [
+            i
+            for i in [*(workflow.get("steps") or []), *(process.get("manual_steps") or [])]
+            if isinstance(i, dict)
+        ]
+        order = [str(i.get("id")) for i in items]
+        flow = cls(
+            order, {str(i.get("id")): _label(i) for i in items}, {n: set() for n in order}, set()
+        )
+        for item in items:
+            for dep in item.get("depends_on") or []:
+                if dep in flow.successors:
+                    flow.successors[dep].add(str(item.get("id")))
+        for decision in process.get("decision_points") or []:
+            after = decision.get("after") if isinstance(decision, dict) else None
+            if after not in flow.successors:
+                continue
+            for branch in decision.get("branches") or []:
+                target = branch.get("target") if isinstance(branch, dict) else None
+                if target in flow.successors:
+                    flow.successors[after].add(target)
+                    flow.branches.add((after, target))
+        return flow
+
+    def loops(self) -> list[frozenset[str]]:
+        """Each loop as the set of its steps (a strongly connected part)."""
+
+        def reach(start: str) -> set[str]:
+            seen: set[str] = set()
+            todo = list(self.successors[start])
+            while todo:
+                node = todo.pop()
+                if node not in seen:
+                    seen.add(node)
+                    todo.extend(self.successors[node])
+            return seen
+
+        reached = {n: reach(n) for n in self.order}
+        loops: list[frozenset[str]] = []
+        for n in self.order:
+            if n in reached[n] and not any(n in loop for loop in loops):
+                loops.append(frozenset({n} | {m for m in reached[n] if n in reached[m]}))
+        return loops
+
+    def leads_back(self, edge: tuple[str, str]) -> bool:
+        """Whether a branch goes to its own step or one before it."""
+        after, target = edge
+        return self.order.index(target) <= self.order.index(after)
 
 
 def _check_loops(draft: dict, blueprint: dict) -> None:
-    """Refuse a loop the operations make; loops already in the draft (an agent
-    may write a branch back) stay, and edits beside them are made."""
-    before = _drawn_loops(draft)
-    for loop in _drawn_loops(blueprint):
-        if any(loop <= old for old in before):
-            continue
-        steps = (blueprint.get("workflow") or {}).get("steps") or []
-        order = [str(s.get("id")) for s in steps if isinstance(s, dict)]
-        names = sorted(loop, key=lambda sid: order.index(sid) if sid in order else len(order))
-        raise OperationError(
-            "cycle",
-            "The edit would make a loop through steps "
-            + ", ".join(f'"{sid}"' for sid in names)
-            + ": a branch cannot lead back to an earlier step",
+    """Refuse a loop the operations make, decided by its edges.
+
+    A loop after the edit is the draft's own (an agent may write a branch
+    back, and edits beside it are made) when it overlaps a loop of the draft
+    and no branch in it is a new one that leads back. So a step added or moved
+    within the agent's loop, or a forward decision there, is made; a new
+    branch back, inside that loop or not, and a loop where the draft had none
+    (a move or a reorder that turns a branch backwards) are refused.
+    """
+    old, new = _Flow.of(draft), _Flow.of(blueprint)
+    before = old.loops()
+    for loop in new.loops():
+        back = sorted(
+            (
+                e
+                for e in new.branches - old.branches
+                if e[0] in loop and e[1] in loop and new.leads_back(e)
+            ),
+            key=lambda e: new.order.index(e[0]),
         )
+        if not back and any(loop & was for was in before):
+            continue
+        steps = ", ".join(f'"{new.names[sid]}"' for sid in sorted(loop, key=new.order.index))
+        if back:
+            after, target = back[0]
+            why = (
+                f'the decision after "{new.names[after]}" would lead back to '
+                f'"{new.names[target]}", and a branch cannot lead back to an earlier step'
+            )
+        else:
+            why = "the steps would follow each other in a circle"
+        raise OperationError("cycle", f"The edit would make a loop through steps {steps}: {why}")
 
 
 def _check(draft: dict, blueprint: dict) -> list[str]:

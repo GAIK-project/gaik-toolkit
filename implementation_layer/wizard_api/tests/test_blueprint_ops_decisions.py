@@ -202,7 +202,7 @@ def test_a_branch_back_to_an_earlier_step_is_refused_as_a_cycle() -> None:
         with pytest.raises(OperationError) as refused:
             apply_operations(_plain_draft(), ops(_add(branches=back)))
         assert refused.value.code == "cycle"
-        assert '"extract"' in refused.value.message
+        assert 'the decision after "Extract" would lead back' in refused.value.message
 
 
 def test_a_loop_through_another_decision_is_refused() -> None:
@@ -216,7 +216,7 @@ def test_a_loop_through_another_decision_is_refused() -> None:
     with pytest.raises(OperationError) as refused:
         apply_operations(first.blueprint, ops(_add(name="Loop", after="deliver", branches=back)))
     assert refused.value.code == "cycle"
-    assert '"review", "deliver"' in refused.value.message
+    assert 'loop through steps "Review", "Deliver"' in refused.value.message
 
 
 def _agent_loop_draft() -> dict:
@@ -257,12 +257,52 @@ def test_an_agents_decision_with_a_branch_back_can_be_renamed_and_its_branches_c
     with pytest.raises(OperationError) as refused:
         apply_operations(draft, ops(_add(name="Back", after="deliver", branches=back)))
     assert refused.value.code == "cycle"
-    assert '"upload", "extract", "review", "deliver"' in refused.value.message
+    assert '"Upload", "Extract", "Review", "Deliver"' in refused.value.message
+    assert 'the decision after "Deliver" would lead back to "Upload"' in refused.value.message
 
 
 def test_a_forward_decision_on_a_step_inside_an_existing_loop_is_made() -> None:
     result = apply_operations(_agent_loop_draft(), ops(_add(after="extract")))
     assert [d["id"] for d in _decisions(result.blueprint)] == ["redo", "confident_enough"]
+
+
+def test_a_step_added_or_moved_inside_an_agents_loop_is_made() -> None:
+    added = apply_operations(
+        _agent_loop_draft(),
+        ops({"op": "add_step", "name": "Check", "type": "user_task", "after": "extract"}),
+    ).blueprint
+    assert [s["id"] for s in added["workflow"]["steps"]] == [
+        "upload",
+        "extract",
+        "check",
+        "review",
+        "deliver",
+    ]
+    moved = apply_operations(added, ops({"op": "move_step", "step_id": "check", "after": "upload"}))
+    assert [s["id"] for s in moved.blueprint["workflow"]["steps"]][:3] == [
+        "upload",
+        "check",
+        "extract",
+    ]
+
+
+def test_a_new_branch_back_inside_an_agents_loop_is_refused() -> None:
+    draft = _agent_loop_draft()
+    back = [{"condition": "again", "target": "upload"}, {"condition": "ok", "target": "review"}]
+    with pytest.raises(OperationError) as refused:
+        apply_operations(draft, ops(_add(after="extract", branches=back)))
+    assert refused.value.code == "cycle"
+    assert 'the decision after "Extract" would lead back to "Upload"' in refused.value.message
+    # The agent's own back branch moved to another earlier step is a new one too.
+    moved = [
+        {"condition": "ok", "target": "deliver"},
+        {"condition": "again", "target": "extract"},
+    ]
+    with pytest.raises(OperationError) as refused:
+        apply_operations(
+            draft, ops({"op": "update_decision", "decision_id": "redo", "branches": moved})
+        )
+    assert refused.value.code == "cycle"
 
 
 def test_a_move_that_makes_a_loop_through_a_decision_is_refused() -> None:
@@ -278,7 +318,9 @@ def test_a_move_that_makes_a_loop_through_a_decision_is_refused() -> None:
     with pytest.raises(OperationError) as refused:
         apply_operations(made, ops({"op": "move_step", "step_id": "beta", "after": "deliver"}))
     assert refused.value.code == "cycle"
-    assert '"alpha", "beta"' in refused.value.message or '"beta", "alpha"' in refused.value.message
+    # No branch was added: the move closed the loop, and the message says so.
+    assert '"Beta", "Alpha"' in refused.value.message
+    assert "in a circle" in refused.value.message
 
 
 def test_a_second_decision_after_one_step_is_refused() -> None:
