@@ -160,8 +160,9 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   the route template and the status, never content or file names (`api/utils/audit.py`).
   The Postgres agent's model-written SQL runs on its own read-only role
   (`POSTGRES_AGENT_DATABASE_URL`, created with `api/scripts/postgres_agent_role.sql`);
-  the API refuses a role that can write, create, call a SECURITY DEFINER function, is a
-  member of another role or can read outside the demo schema, and falls back to
+  the API refuses a role that can write, create, replicate, call a SECURITY DEFINER
+  function or one that reads server files, is a member of another role or can read
+  outside the demo schema, and falls back to
   `DATABASE_URL` with a warning while the variable is unset.
 
 ## docs site (GitHub Pages)

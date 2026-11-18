@@ -80,17 +80,24 @@ def _agent_database_url() -> tuple[str | None, bool]:
 # read server files or run programs); the relations of any kind (tables, views,
 # materialized views, foreign tables) it can write, also through a column grant; the
 # relations outside the demo schema it can read, also through a column grant, and the
-# sequences it can use; and the SECURITY DEFINER functions it can call, which run with
-# their owner's rights.
+# sequences it can use; the SECURITY DEFINER functions it can call, which run with
+# their owner's rights; and the built-in functions that read, list or copy server files,
+# which PUBLIC cannot call unless someone grants them.
 _NOT_SYSTEM = (
     "n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg\\_%%'"
 )
+_SERVER_FILE_FUNCTIONS = (
+    "pg_read_file", "pg_read_binary_file", "pg_stat_file", "pg_ls_dir", "pg_ls_logdir",
+    "pg_ls_waldir", "pg_ls_tmpdir", "pg_ls_archive_statusdir", "pg_ls_logicalsnapdir",
+    "pg_ls_logicalmapdir", "pg_ls_replslotdir", "lo_import", "lo_export",
+)  # fmt: skip
 _ROLE_FACTS_SQL = f"""
 SELECT
     r.rolsuper,
     r.rolcreaterole,
     r.rolcreatedb,
     r.rolbypassrls,
+    r.rolreplication,
     has_database_privilege(current_database(), 'CREATE'),
     EXISTS (SELECT 1 FROM pg_namespace n
              WHERE {_NOT_SYSTEM} AND has_schema_privilege(n.oid, 'CREATE')),
@@ -109,6 +116,10 @@ SELECT
               OR (c.relkind = 'S' AND has_sequence_privilege(c.oid, 'USAGE, SELECT, UPDATE')))),
     (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
        WHERE {_NOT_SYSTEM} AND p.prosecdef AND has_function_privilege(p.oid, 'EXECUTE')),
+    (SELECT count(*) FROM pg_proc p
+       WHERE p.pronamespace = 'pg_catalog'::regnamespace
+         AND p.proname = ANY(%(server_file_functions)s)
+         AND has_function_privilege(p.oid, 'EXECUTE')),
     current_user <> session_user,
     EXISTS (SELECT 1 FROM pg_largeobject_metadata m, aclexplode(m.lomacl) a
              WHERE a.grantee IN (0, r.oid) AND a.privilege_type = 'SELECT')
@@ -122,6 +133,13 @@ WHERE r.rolname = session_user
 """
 
 
+_ROLE_FACTS_PARAMS = {
+    "schema": DEMO_SCHEMA,
+    "tables": DEMO_TABLES,
+    "server_file_functions": list(_SERVER_FILE_FUNCTIONS),
+}
+
+
 def _role_problems(facts: tuple | None) -> list[str]:
     """Why the agent's role is not read-only on the demo tables; empty when it is."""
     if facts is None:
@@ -131,12 +149,14 @@ def _role_problems(facts: tuple | None) -> list[str]:
         createrole,
         createdb,
         bypassrls,
+        replication,
         db_create,
         schema_create,
         memberships,
         writable,
         elsewhere,
         definer_functions,
+        server_file_functions,
         switched,
         large_objects,
         reaching_extensions,
@@ -147,6 +167,8 @@ def _role_problems(facts: tuple | None) -> list[str]:
         problems.append("it is a superuser")
     if createrole or createdb or bypassrls:
         problems.append("it can create roles or databases, or bypass row security")
+    if replication:
+        problems.append("it has the replication attribute")
     if db_create or schema_create:
         problems.append("it can create schemas or objects")
     if memberships:
@@ -159,6 +181,10 @@ def _role_problems(facts: tuple | None) -> list[str]:
         )
     if definer_functions:
         problems.append(f"it can call {definer_functions} SECURITY DEFINER function(s)")
+    if server_file_functions:
+        problems.append(
+            f"it can call {server_file_functions} function(s) that read or list server files"
+        )
     if switched:
         problems.append("the connection switches to another role than the one it logs in as")
     if large_objects:
@@ -187,9 +213,7 @@ def _check_agent_role(database_url: str) -> list[str]:
             import psycopg
 
             with psycopg.connect(database_url, connect_timeout=5) as conn:
-                facts = conn.execute(
-                    _ROLE_FACTS_SQL, {"schema": DEMO_SCHEMA, "tables": DEMO_TABLES}
-                ).fetchone()
+                facts = conn.execute(_ROLE_FACTS_SQL, _ROLE_FACTS_PARAMS).fetchone()
             _role_checked = _role_problems(facts)
             _role_checked_at = time.monotonic()
             if _role_checked:
@@ -221,8 +245,22 @@ def _llm_config() -> dict | None:
     return None
 
 
+_seed_lock = threading.Lock()
+
+
 def _seed_demo_schema(database_url: str) -> None:
-    """Create and populate the isolated demo schema (idempotent, seed-once)."""
+    """Create and populate the isolated demo schema (idempotent, seed-once).
+
+    Requests build the agent in worker threads, so the first two can arrive together:
+    the lock lets one seed while the other waits and then finds it done.
+    """
+    if _seeded:
+        return
+    with _seed_lock:
+        _seed_demo_schema_once(database_url)
+
+
+def _seed_demo_schema_once(database_url: str) -> None:
     global _seeded
     if _seeded:
         return

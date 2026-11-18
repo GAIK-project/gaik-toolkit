@@ -20,8 +20,9 @@
 -- them, and the check refuses a connection whose role differs from its login.
 --
 -- The API checks the role before the agent answers, and again every ten minutes, and
--- refuses one that can write, create objects, is a member of another role, can call a
--- SECURITY DEFINER function, can read a relation besides the demo tables or a large
+-- refuses one that can write, create objects, has the replication attribute, is a
+-- member of another role, can call a SECURITY DEFINER function or a function that reads
+-- or lists server files, can read a relation besides the demo tables or a large
 -- object, or when default privileges grant it future objects or an extension that
 -- reaches other hosts or files is installed. GET /postgres-agent/status reports
 -- own_read_only_role=true only when the last check passed.
@@ -42,7 +43,8 @@
 SELECT 'CREATE ROLE gaik_sql_agent LOGIN'
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'gaik_sql_agent') \gexec
 
-ALTER ROLE gaik_sql_agent WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+ALTER ROLE gaik_sql_agent WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS
+    NOREPLICATION;
 ALTER ROLE gaik_sql_agent SET default_transaction_read_only = on;
 ALTER ROLE gaik_sql_agent SET statement_timeout = '15s';
 
