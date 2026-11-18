@@ -231,8 +231,13 @@ def transcription_check(config, transcription_model, budget, work_dir) -> dict:
                     api_config=audio_config, output_dir=Path(work_dir) / name, **options
                 ).transcribe(TRANSCRIPTION_FIXTURE, **(call or {}))
             except RuntimeError as exc:
-                if str(exc).startswith("Live release request budget"):
-                    raise  # the budget stop keeps its own message
+                # The budget stop keeps its own message, also when the Transcriber
+                # wraps it as the failure of a chunk ("Segment N of M ...").
+                for stop in (exc, exc.__cause__):
+                    if isinstance(stop, RuntimeError) and str(stop).startswith(
+                        "Live release request budget"
+                    ):
+                        raise stop from None
                 # A chunk that fails raises, naming its time range.
                 raise AssertionError(f"A {name} transcription request failed") from exc
         requests = [request for client in clients for request in client.requests]

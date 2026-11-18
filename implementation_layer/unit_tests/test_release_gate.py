@@ -315,8 +315,8 @@ def test_transcription_check_fails_on_a_changed_fixture(monkeypatch, tmp_path):
 def test_transcription_requests_count_against_the_shared_budget(monkeypatch, tmp_path):
     received = _fake_audio_provider(monkeypatch, [_BOTH_SENTENCES, *_SENTENCES])
     # Two calls left: the single request and the first chunk; the budget refuses the
-    # second chunk before it reaches the provider.
-    with pytest.raises(AssertionError, match="request failed"):
+    # second chunk before it reaches the provider, and the check stops on the budget.
+    with pytest.raises(RuntimeError, match="Live release request budget exceeded"):
         _transcription_check(tmp_path, max_calls=2)
     assert len(received) == 2
 
