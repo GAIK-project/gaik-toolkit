@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { RadioItem as MenuRadioItem } from "@radix-ui/react-dropdown-menu";
 import {
   Check,
   ChevronDown,
@@ -52,13 +53,17 @@ import { apiFetch } from "@/lib/api-client";
 import {
   MODEL_SETTINGS_HEADER,
   encodeModelSettings,
+  isReasoningEffort,
   pageUsesModelSettings,
+  takesReasoningEffort,
   type ModelProvider,
   type ModelSettings,
 } from "@/lib/model-settings";
 import { setModelSettings, useModelSettings } from "@/lib/model-settings-store";
 import {
+  setReasoningEffort,
   setServerModel,
+  useReasoningEffort,
   useServerModel,
   useServerModels,
   type ServerModel,
@@ -622,6 +627,58 @@ function ModelRow({
   );
 }
 
+const AUTO = "auto";
+const EFFORT_CHOICES = [
+  { value: AUTO, label: "Auto", title: "The default for this model" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+
+/**
+ * The reasoning effort of a GPT-6 model, as one row of the model menu. Auto
+ * sends nothing, so each model keeps its own default. The segments are menu
+ * radio items: the arrow keys reach them like the models above, and a choice
+ * leaves the menu open to show what changed.
+ */
+function ReasoningRow() {
+  const effort = useReasoningEffort();
+  return (
+    <div className="px-2 py-1.5">
+      <div className="flex items-center justify-between gap-2.5">
+        <span id="model-menu-reasoning" className="text-sm">
+          Reasoning
+        </span>
+        <DropdownMenuRadioGroup
+          aria-labelledby="model-menu-reasoning"
+          className="bg-muted flex rounded-md p-0.5"
+          value={effort ?? AUTO}
+          onValueChange={(value) =>
+            setReasoningEffort(isReasoningEffort(value) ? value : null)
+          }
+        >
+          {EFFORT_CHOICES.map(({ value, label, title }) => (
+            <MenuRadioItem
+              key={value}
+              value={value}
+              title={title}
+              onSelect={(event) => event.preventDefault()}
+              // Hover and keyboard focus both set data-highlighted, as on the
+              // model rows: a fill on the other segments, a ring on the picked one.
+              className="text-muted-foreground ring-ring/50 data-[state=checked]:bg-background data-[state=checked]:text-foreground dark:data-[state=checked]:bg-input/60 data-[state=unchecked]:data-[highlighted]:bg-accent data-[state=unchecked]:data-[highlighted]:text-accent-foreground cursor-default rounded-[5px] px-1.5 py-1.5 text-xs font-medium outline-hidden transition-[color,background-color,box-shadow,scale] duration-150 select-none active:scale-[0.97] data-[state=checked]:shadow-xs data-[state=checked]:data-[highlighted]:ring-2 motion-reduce:transition-none"
+            >
+              {label}
+            </MenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </div>
+      <p className="text-muted-foreground pt-1.5 text-xs">
+        Higher is slower and costs more.
+      </p>
+    </div>
+  );
+}
+
 /**
  * The model menu in the nav. A signed-in user sees the model in use and can
  * switch among the server's models without a key; their own key stays an
@@ -635,6 +692,7 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
   const settings = useModelSettings();
   const pathname = usePathname();
   const active = useActiveModel(loggedIn);
+  const effort = useReasoningEffort();
 
   if (!loggedIn) return null;
   // While the list loads, hold the button's place instead of showing the
@@ -665,6 +723,12 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
   const aittaModels = catalog.models.filter((m) => m.provider === "aitta");
   const someLocked = catalog.models.some((m) => !m.allowed);
   const status = use.problem ?? use.summary;
+  // Only GPT-6 models take an effort: no row for Claude, Gemini or Aitta.
+  const takesEffort = takesReasoningEffort(active.provider, active.model);
+  const hint =
+    takesEffort && effort && use.runsHere
+      ? `${status} Reasoning: ${effort}.`
+      : status;
 
   return (
     <>
@@ -678,8 +742,8 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
               settings &&
                 "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15",
             )}
-            aria-label={`Model: ${label}. ${status}`}
-            title={status}
+            aria-label={`Model: ${label}. ${hint}`}
+            title={hint}
           >
             {settings ? (
               <KeyRound className="size-4 shrink-0" aria-hidden />
@@ -778,6 +842,12 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
             <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs">
               Locked models: ask an admin for access.
             </p>
+          )}
+          {takesEffort && (
+            <>
+              <DropdownMenuSeparator />
+              <ReasoningRow />
+            </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
