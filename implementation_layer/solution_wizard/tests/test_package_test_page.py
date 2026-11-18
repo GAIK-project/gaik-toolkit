@@ -1819,6 +1819,16 @@ def test_an_env_example_that_gives_a_key_a_value_is_not_in_the_source_zip(page):
     assert folder + ".env.example" not in files
     assert not any(b"not-a-real-key-7f3a" in content for content in files.values())
 
+    # Saved with a byte order mark, as Windows editors do, or in UTF-16: the key on
+    # the first line was missed (found by a second reader on #229, round 2).
+    for written in (
+        b"\xef\xbb\xbfAZURE_OPENAI_API_KEY=not-a-real-key-7f3a\n",
+        "AZURE_OPENAI_API_KEY=not-a-real-key-7f3a\n".encode("utf-16"),
+    ):
+        example.write_bytes(written)
+        _, files = _source(page)
+        assert folder + ".env.example" not in files, written[:4]
+
     placeholders = "AZURE_OPENAI_API_KEY=<your key>\nHF_TOKEN=\n# OPENAI_API_KEY=xxxx\n"
     example.write_text(template + placeholders + "MAX_TOKENS=4000\n", encoding="utf-8")
     _, files = _source(page)
@@ -1890,9 +1900,11 @@ def test_every_ipv6_address_takes_ipv4_as_well_and_turns_the_source_download_off
     if not _can_listen_on("::"):
         pytest.skip(":: cannot be listened on here")
     served = Page(_scaffold(tmp_path), host="::")
+    served.address = "127.0.0.1" if served.server.dual_stack else "::1"
     try:
-        # Reached on 127.0.0.1: the IPv4 addresses are in as well.
-        assert served.request("GET", "/")[0] == 200
+        if served.server.dual_stack:
+            # Reached on 127.0.0.1: the IPv4 addresses are in as well.
+            assert served.request("GET", "/")[0] == 200
         assert served.server.source_download is False
         assert served.request("GET", "/api/source")[0] == 403
     finally:
@@ -1935,3 +1947,20 @@ def test_no_read_of_the_files_waits_past_their_deadline(page, monkeypatch):
     assert handler.close_connection is True
     # The second wait was held to the 5 s left, and the timeout is put back after.
     assert handler.connection.timeouts == [30, 5, 30]
+
+
+@pytest.mark.parametrize(
+    ("host", "dual_stack", "shown"),
+    [
+        ("127.0.0.1", False, "127.0.0.1"),
+        ("0.0.0.0", False, "127.0.0.1"),
+        ("::", True, "127.0.0.1"),
+        # Listening on IPv6 alone, 127.0.0.1 does not answer (round 2 of #229).
+        ("::", False, "[::1]"),
+        ("::1", False, "[::1]"),
+        ("192.168.1.20", False, "192.168.1.20"),
+    ],
+)
+def test_the_address_printed_is_one_that_answers(page, host, dual_stack, shown):
+    server = types.SimpleNamespace(dual_stack=dual_stack)
+    assert page.app._shown_host(host, server) == shown

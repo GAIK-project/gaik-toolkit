@@ -1403,10 +1403,11 @@ def env_example_key_values(text: str) -> list[str]:
     shipped in both zips. A credential (``_is_credential_name``) may stand
     there empty or with a placeholder (``_is_placeholder``), also commented
     out; any other value is refused. Other variables (a model name, an API
-    version, an endpoint) keep their example values.
+    version, an endpoint) keep their example values. A byte order mark before
+    the first line (as Windows editors write one) is not part of its name.
     """
     found: list[str] = []
-    for line in text.splitlines():
+    for line in text.removeprefix("\ufeff").splitlines():
         match = _ENV_COMMENTED_ASSIGNMENT.match(line) or _ENV_ASSIGNMENT.match(line)
         if match is None:
             continue

@@ -370,10 +370,11 @@ def _env_example_key_values(text: str) -> list[str]:
 
     A credential may stand there empty or with a placeholder (``<your key>``,
     ``your-key-here``, ``xxxx``), also commented out; a model name, an API version
-    or an endpoint keeps its example value.
+    or an endpoint keeps its example value. A byte order mark before the first
+    line (as Windows editors write one) is not part of its name.
     """
     found: list[str] = []
-    for line in text.splitlines():
+    for line in text.removeprefix("\ufeff").splitlines():
         match = _ENV_COMMENTED_ASSIGNMENT.match(line) or _ENV_ASSIGNMENT.match(line)
         if match is None:
             continue
@@ -391,6 +392,15 @@ def _env_example_key_values(text: str) -> list[str]:
         if credential and not placeholder and name not in found:
             found.append(name)
     return found
+
+
+def _gives_a_key_a_value(data: bytes) -> bool:
+    """Whether ``.env.example``, as bytes, gives a key a value or cannot be read to tell."""
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return True  # not UTF-8 (UTF-16, say): left out rather than read wrong
+    return bool(_env_example_key_values(text))
 
 
 def _is_source(relative: PurePosixPath) -> bool:
@@ -943,9 +953,7 @@ class Solution:
                     continue
                 if len(data) > MAX_SOURCE_FILE_BYTES:
                     continue
-                if name == ".env.example" and _env_example_key_values(
-                    data.decode("utf-8", "replace")
-                ):
+                if name == ".env.example" and _gives_a_key_a_value(data):
                     continue
                 budget -= len(data)
                 if budget < 0:
@@ -1269,11 +1277,15 @@ class _IPv6Server(ThreadingHTTPServer):
 class _DualStackServer(_IPv6Server):
     """``--host ::``: every address of this computer, its IPv4 ones as well."""
 
+    #: Whether the IPv4 addresses are in as well; not where the system has no dual stack.
+    dual_stack = False
+
     def server_bind(self):
         try:
             self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            self.dual_stack = True
         except (AttributeError, OSError):
-            pass  # IPv6 alone where the system has no dual stack
+            pass  # IPv6 alone
         super().server_bind()
 
 
@@ -1282,6 +1294,16 @@ def _server_class(host: str) -> type[ThreadingHTTPServer]:
     if host == "::":
         return _DualStackServer
     return _IPv6Server if ":" in host else ThreadingHTTPServer
+
+
+def _shown_host(host: str, server: ThreadingHTTPServer) -> str:
+    """The address of this computer to open the page at, as a URL writes it."""
+    if host == "0.0.0.0":
+        return "127.0.0.1"
+    if host == "::":
+        # Listening on IPv6 alone, 127.0.0.1 would not answer.
+        return "127.0.0.1" if getattr(server, "dual_stack", False) else "[::1]"
+    return f"[{host}]" if ":" in host else host
 
 
 def create_server(
@@ -1348,9 +1370,7 @@ def main() -> None:
         print(f"Cannot listen on {args.host}:{args.port}: {exc}", file=sys.stderr)
         print("Try another port: python app.py --port 8080", file=sys.stderr)
         sys.exit(1)
-    shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
-    if ":" in shown_host:
-        shown_host = f"[{shown_host}]"
+    shown_host = _shown_host(args.host, server)
     print(f"Test page: http://{shown_host}:{server.server_address[1]}", flush=True)
     if args.host not in _LOOPBACK_NAMES:
         print(

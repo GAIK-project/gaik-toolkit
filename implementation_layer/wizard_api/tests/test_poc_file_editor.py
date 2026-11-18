@@ -294,6 +294,22 @@ def test_a_value_with_a_long_run_of_spaces_is_read_at_once() -> None:
     assert poc_service.env_example_key_values("HF_TOKEN=abc#def\n") == ["HF_TOKEN"]
 
 
+def test_a_key_after_a_byte_order_mark_is_not_saved(tmp_path) -> None:
+    """Saved with a byte order mark, as Windows editors do, the first line's key was
+    read as a name starting with that mark, which is no credential's."""
+    poc = _package(tmp_path)
+    read = poc_service.read_package_file(poc, ".env.example")
+
+    refused = _refusal(
+        lambda: poc_service.write_package_file(
+            poc, ".env.example", "\ufeffAZURE_API_KEY=typed-by-mistake\n", read["digest"]
+        )
+    )
+
+    assert (refused.status, refused.code) == (422, "key_value_not_stored")
+    assert refused.extra == {"variables": ["AZURE_API_KEY"]}
+
+
 def test_the_test_page_leaves_env_example_out_of_its_zip_by_this_rule() -> None:
     """The package's app.py keeps a .env.example that gives a key a value out of its
     source zip. It is standard library only, so it has its own copy of this rule."""
@@ -319,6 +335,8 @@ def test_the_test_page_leaves_env_example_out_of_its_zip_by_this_rule() -> None:
         "GOOGLE_SERVICE_ACCOUNT_JSON={}\n",
         "MAX_TOKENS=4000\nKEYWORDS=a,b\nAZURE_OPENAI_API_VERSION=2024-10-21\n",
         "openai_apikey=abc\nDOCLING_API_PASSWORD=p\nA_KEY=1\nA_KEY=2\n",
+        "\ufeffAZURE_OPENAI_API_KEY=abc123\n",
+        "\ufeff# AZURE_OPENAI_API_KEY=\nHF_TOKEN=abc\n",
         (TEMPLATES_DIR / "_common" / "env.example.tmpl").read_text(encoding="utf-8"),
     ]
 
