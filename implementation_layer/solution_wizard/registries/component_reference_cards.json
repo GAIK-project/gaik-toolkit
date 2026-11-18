@@ -1472,7 +1472,7 @@
         "name": "transcriber_ctor",
         "type": "dict",
         "default": null,
-        "effect": "Constructor kwargs forwarded to the internal Transcriber -- the general form of the enhanced_transcript option above. This is the only way to configure transcription inside the module; read the Transcriber reference card for its option names. NOTE the module drives the hosted Transcriber path, so whisper_local options (diarization, speaker_count) do not produce speaker labels here -- see the LIMITATION in the note.",
+        "effect": "Constructor kwargs forwarded to the internal Transcriber -- the general form of the enhanced_transcript option above. This is the only way to configure transcription inside the module; read the Transcriber reference card for its option names. Every name must be a Transcriber constructor parameter (an unknown one raises ValueError before the run starts), and api_config is refused here: pass the audio provider config to the module constructor as transcription_config (or the shared api_config). NOTE the module drives the hosted Transcriber path, so whisper_local options (diarization, speaker_count) do not produce speaker labels here -- see the LIMITATION in the note.",
         "selection_relevant": true,
         "infer_from": "any Transcriber option that would have been set on a standalone transcription step, e.g. {'enhanced_transcript': True, 'language': 'fi'}"
       },
@@ -1488,9 +1488,9 @@
         "name": "extractor_ctor",
         "type": "dict",
         "default": null,
-        "effect": "DataExtractor constructor kwargs. model and config select the shared schema-generation/extraction configuration; other kwargs (temperature, reasoning_effort) apply to DataExtractor only. Use extraction_config['reasoning_effort'] or ['model_family'] when both internal clients need the same model-family configuration.",
+        "effect": "DataExtractor constructor kwargs: model, temperature, reasoning_effort -- nothing else. model is the only key that also reaches the internal SchemaGenerator; temperature and reasoning_effort apply to DataExtractor only. The provider config is NOT set here: config, api_config and openai_config are refused with a ValueError before the run starts, as is any name DataExtractor does not take. Pass the provider config to the module constructor as extraction_config (or the shared api_config), and put reasoning_effort or model_family in extraction_config when both internal clients need the same model-family configuration.",
         "selection_relevant": true,
-        "infer_from": "Choose extraction_config for provider/model choices; pre-generate schema and requirements to avoid repeat schema generation."
+        "infer_from": "Choose the provider and model in the module's extraction_config, not here; use extractor_ctor only for a model override or DataExtractor sampling options. Pre-generate schema and requirements to avoid repeat schema generation."
       },
       {
         "name": "extract_options",
@@ -1563,25 +1563,25 @@
         "name": "parser_ctor",
         "type": "dict",
         "default": null,
-        "effect": "Constructor kwargs forwarded to the parser selected by parser_choice, e.g. parser_ctor={'enable_ocr': True} for docling or {'dpi': 300} for vision_parser. This is the only way to configure the internal parser -- read the chosen parser's own reference card for its option names.",
+        "effect": "Constructor kwargs forwarded to the parser selected by parser_choice, e.g. parser_ctor={'enable_ocr': True} for docling or {'use_context': True} for vision_parser. Every name must be a constructor parameter of the chosen parser (an unknown one raises ValueError before anything is parsed), and openai_config/config/api_config are refused: pass the vision provider config to the module constructor as parser_config (or the shared api_config). Read the chosen parser's own reference card for its option names.",
         "selection_relevant": true,
-        "infer_from": "any parser option that would have been set on a standalone parser step -- scanned inputs -> {'enable_ocr': True}; low-DPI scans with vision_parser -> {'dpi': 300}"
+        "infer_from": "any parser option that would have been set on a standalone parser step -- scanned inputs -> {'enable_ocr': True}; low-DPI scans with vision_parser -> parse_options={'dpi': 300}, not parser_ctor"
       },
       {
         "name": "parse_options",
         "type": "dict",
         "default": null,
-        "effect": "Call-time kwargs for the parser's parse method (as opposed to its constructor). Most parsers take no useful call-time options; prefer parser_ctor.",
+        "effect": "Call-time kwargs for the parser's parse method (as opposed to its constructor); the module sets the file path itself. For vision_parser this is convert_pdf: dpi, clean_output, first_pages. Most other parsers take no useful call-time options. A name the parse method does not take raises ValueError before anything is parsed.",
         "selection_relevant": false,
-        "infer_from": "leave null unless the chosen parser documents a call-time option"
+        "infer_from": "leave null unless the chosen parser documents a call-time option -- low-DPI scans with vision_parser -> {'dpi': 300}"
       },
       {
         "name": "extractor_ctor",
         "type": "dict",
         "default": null,
-        "effect": "DataExtractor constructor kwargs. model and config select the shared schema-generation/extraction configuration; other kwargs (temperature, reasoning_effort) apply to DataExtractor only. Use extraction_config['reasoning_effort'] or ['model_family'] when both internal clients need the same model-family configuration.",
+        "effect": "DataExtractor constructor kwargs: model, temperature, reasoning_effort -- nothing else. model is the only key that also reaches the internal SchemaGenerator; temperature and reasoning_effort apply to DataExtractor only. The provider config is NOT set here: config, api_config and openai_config are refused with a ValueError before the run starts, as is any name DataExtractor does not take. Pass the provider config to the module constructor as extraction_config (or the shared api_config), and put reasoning_effort or model_family in extraction_config when both internal clients need the same model-family configuration.",
         "selection_relevant": true,
-        "infer_from": "Choose extraction_config for provider/model choices; pre-generate schema and requirements to avoid repeat schema generation."
+        "infer_from": "Choose the provider and model in the module's extraction_config, not here; use extractor_ctor only for a model override or DataExtractor sampling options. Pre-generate schema and requirements to avoid repeat schema generation."
       },
       {
         "name": "extract_options",
