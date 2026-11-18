@@ -77,6 +77,8 @@ On a new stack, restart Grafana once after `grafana-setup` has created the *Secu
 (`oc rollout restart deployment/grafana`): Grafana looks the organisation up by name when it starts,
 and until then `aiops-admin` gets no *Security* membership.
 
+- **No local Grafana users for people.** Grafana does not link a local user to a GAIK sign-in with the
+  same address (insecure email lookup is off); that person's sign-in would fail. Add people in Keycloak.
 - **Grafana's local admin** (`admin`, `oc extract secret/aiops-grafana --keys=admin-password --to=-`)
   stays: `grafana-setup` signs in with it, and it is the way in when Keycloak is down.
 - **MLflow** cannot delete through the Route: `mlflow-auth` answers 403 to the `DELETE` method and to

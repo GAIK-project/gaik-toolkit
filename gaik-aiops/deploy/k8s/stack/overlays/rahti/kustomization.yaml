@@ -48,6 +48,10 @@ images:
 configMapGenerator:
   - name: mlflow-auth-nginx
     files: [nginx.conf=mlflow-auth-nginx.conf]
+  # The GAIK waiting-for-approval page of implementation_layer/deploy/openshift/signin-templates,
+  # with MLflow's Keycloak sign-out address filled in (a test keeps the two the same).
+  - name: mlflow-signin-templates
+    files: [error.html=mlflow-signin-error.html]
 
 patches:
   # The base's workloads; mlflow-auth.yaml and mlflow-signin.yaml set no seccomp profile to begin with.

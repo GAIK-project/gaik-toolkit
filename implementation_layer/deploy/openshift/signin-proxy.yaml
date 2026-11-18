@@ -36,6 +36,11 @@ items:
               args:
                 - --http-address=0.0.0.0:4180
                 - --reverse-proxy=true
+                # X-Forwarded-* are taken only from the cluster network (the
+                # Rahti router), and the callback address is fixed rather than
+                # built from those headers.
+                - --trusted-proxy-ip=10.128.0.0/14
+                - --redirect-url=https://NAME_PLACEHOLDER-web-PROJECT_PLACEHOLDER.2.rahtiapp.fi/oauth2/callback
                 - --provider=keycloak-oidc
                 - --oidc-issuer-url=https://gaik-keycloak-PROJECT_PLACEHOLDER.2.rahtiapp.fi/realms/gaik
                 - --code-challenge-method=S256

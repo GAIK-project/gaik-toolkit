@@ -88,14 +88,29 @@ async function signingKey(
   fetcher: typeof fetch,
   now: number,
 ): Promise<CryptoKey | null> {
-  if (!keyCache || keyCache.url !== url || now - keyCache.fetchedAt > JWKS_TTL_MS) {
-    keyCache = { url, keys: await fetchKeys(url, fetcher), fetchedAt: now, missAt: 0 };
+  const cached = keyCache?.url === url ? keyCache : null;
+  if (!cached || now - cached.fetchedAt > JWKS_TTL_MS) {
+    // A failed refresh keeps the keys already fetched: Keycloak restarting for a
+    // minute must not sign every user out while its key has not changed. The next
+    // attempt waits a minute, so an unreachable Keycloak is not asked on every
+    // request. Without keys at all nobody is signed in.
+    if (cached && now - cached.missAt < JWKS_MISS_REFETCH_MS) {
+      // A refresh failed a moment ago; use what we have.
+    } else {
+      try {
+        keyCache = { url, keys: await fetchKeys(url, fetcher), fetchedAt: now, missAt: 0 };
+      } catch (error) {
+        if (!cached) throw error;
+        keyCache = { ...cached, missAt: now };
+      }
+    }
   }
-  const known = keyCache.keys.get(kid);
+  const current = keyCache as KeyCache;
+  const known = current.keys.get(kid);
   if (known) return known;
   // Keycloak rotated its key: fetch once more, but not on every request that
   // names an unknown key id.
-  if (now - keyCache.missAt < JWKS_MISS_REFETCH_MS) return null;
+  if (now - current.missAt < JWKS_MISS_REFETCH_MS) return null;
   keyCache = { url, keys: await fetchKeys(url, fetcher), fetchedAt: now, missAt: now };
   return keyCache.keys.get(kid) ?? null;
 }

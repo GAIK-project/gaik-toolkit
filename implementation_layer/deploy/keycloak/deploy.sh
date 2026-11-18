@@ -40,13 +40,27 @@ ensure_secret() {  # <name> <key>=<value>...; created once, left alone afterward
 
 # kcadm inside the Keycloak pod, signed in as the bootstrap admin from the pod's
 # own environment, so no password passes through this script or its arguments.
+# kcadm reads a password from stdin when it has one, so the sign-in gets
+# /dev/null and the script after it keeps its stdin (a secret, a JSON body).
+# The master admin signs in with a password grant, so it must not get a second
+# factor; it is protected by its long random password and brute-force detection.
+KC_SIGNIN='cfg=/tmp/kcadm.config; k=/opt/keycloak/bin/kcadm.sh
+KC_CLI_PASSWORD="$KC_BOOTSTRAP_ADMIN_PASSWORD" "$k" config credentials --config "$cfg" --server http://localhost:8080 \
+    --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" </dev/null >/dev/null 2>&1 \
+    || { echo "kcadm sign-in failed (was the bootstrap admin password changed? see README)" >&2; exit 1; }'
+
 kcadm() {
-    oc exec -n "$PROJECT" "$KC" -- sh -c '
-        cfg=/tmp/kcadm.config
-        KC_CLI_PASSWORD="$KC_BOOTSTRAP_ADMIN_PASSWORD" /opt/keycloak/bin/kcadm.sh config credentials --config "$cfg" --server http://localhost:8080 \
-            --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" >/dev/null 2>&1 \
-            || { echo "kcadm sign-in failed (was the bootstrap admin password changed? see README)" >&2; exit 1; }
-        exec /opt/keycloak/bin/kcadm.sh "$@" --config "$cfg"' kcadm "$@"
+    oc exec -n "$PROJECT" "$KC" -- sh -c "$KC_SIGNIN"'
+        exec "$k" "$@" --config "$cfg"' kcadm "$@"
+}
+
+# A short script run in the pod after the same sign-in ($k is kcadm.sh, $cfg its
+# config). It gets this script's stdin and its arguments as $1...: a secret goes
+# on stdin, other values as arguments, never spliced into the script text.
+kcadm_script() {  # <script> [args...]
+    local script="$1"; shift
+    oc exec -i -n "$PROJECT" "$KC" -- sh -c "$KC_SIGNIN
+$script" kcadm "$@"
 }
 
 up() {
@@ -93,24 +107,36 @@ setup() {
     # The apps need only the e-mail address. Keycloak's default user profile asks
     # every user for a first and last name at sign-in; collecting them would be
     # personal data with no use here, so the names are made optional.
-    oc exec -n "$PROJECT" "$KC" -- sh -c '
-        cfg=/tmp/kcadm.config
-        KC_CLI_PASSWORD="$KC_BOOTSTRAP_ADMIN_PASSWORD" /opt/keycloak/bin/kcadm.sh config credentials --config "$cfg" --server http://localhost:8080 \
-            --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" >/dev/null 2>&1
-        /opt/keycloak/bin/kcadm.sh get users/profile --config "$cfg" -r '"$REALM"' > /tmp/profile.json' \
-        && oc exec -n "$PROJECT" "$KC" -- cat /tmp/profile.json \
-        | python3 -c '
+    kcadm get users/profile -r "$REALM" | python3 -c '
 import json, sys
 profile = json.load(sys.stdin)
 for attr in profile.get("attributes", []):
     if attr.get("name") in ("firstName", "lastName"):
         attr.pop("required", None)
-print(json.dumps(profile))' \
-        | oc exec -i -n "$PROJECT" "$KC" -- sh -c '
-            cfg=/tmp/kcadm.config; cat > /tmp/profile-optional.json
-            /opt/keycloak/bin/kcadm.sh update users/profile --config "$cfg" -r '"$REALM"' -f /tmp/profile-optional.json >/dev/null
-            rm -f /tmp/profile.json /tmp/profile-optional.json'
+print(json.dumps(profile))' | kcadm_script '
+        cat > /tmp/profile-optional.json
+        "$k" update users/profile --config "$cfg" -r "$1" -f /tmp/profile-optional.json >/dev/null
+        rm -f /tmp/profile-optional.json' "$REALM"
     echo "First and last name are optional."
+
+    # Sign-ins, failed sign-ins and second-factor changes, kept 30 days: who
+    # signed in when, for the audit trail (the apps behind the proxy see no
+    # sign-in of their own).
+    kcadm update "realms/$REALM" -s eventsEnabled=true -s eventsExpiration=2592000 \
+        -s 'enabledEventTypes=["LOGIN","LOGIN_ERROR","LOGOUT","UPDATE_PASSWORD","UPDATE_TOTP","REMOVE_TOTP","IDENTITY_PROVIDER_FIRST_LOGIN"]'
+    echo "Sign-in events are recorded (30 days)."
+
+    # A second factor for everyone: an authenticator app (TOTP). Every new
+    # account sets one up at its first sign-in; Keycloak's browser flow then asks
+    # for it on every sign-in. Existing accounts without one get the same step.
+    kcadm update authentication/required-actions/CONFIGURE_TOTP -r "$REALM" -s enabled=true -s defaultAction=true
+    require_totp_for_existing
+    echo "Every account signs in with a second factor."
+
+    # The master realm (the bootstrap admin) slows down guessing as well.
+    kcadm update realms/master -s bruteForceProtected=true -s failureFactor=5 -s waitIncrementSeconds=60 \
+        -s maxFailureWaitSeconds=900
+    echo "Brute-force detection is on in realm master."
 
     # Groups added after a realm was first imported (the import runs once).
     local g
@@ -166,6 +192,23 @@ print(json.dumps(profile))' \
     echo "Nightly clean-up of pending accounts older than 7 days is scheduled."
 }
 
+require_totp_for_existing() {
+    # Accounts that have no authenticator app and are not yet asked to set one up.
+    local id username actions types
+    kcadm get users -r "$REALM" -q max=10000 --fields id,username,requiredActions | python3 -c '
+import json, sys
+for u in json.load(sys.stdin):
+    if u["username"].startswith("service-account-"):
+        continue
+    if "CONFIGURE_TOTP" not in (u.get("requiredActions") or []):
+        print(u["id"], json.dumps((u.get("requiredActions") or []) + ["CONFIGURE_TOTP"]))' |
+    while read -r id actions; do
+        types=$(kcadm get "users/$id/credentials" -r "$REALM" --fields type --format csv --noquotes)
+        echo "$types" | grep -qx otp && continue
+        kcadm update "users/$id" -r "$REALM" -s "requiredActions=$actions"
+    done
+}
+
 prune_pending() {  # [days] [--dry-run]: the nightly clean-up, run now
     oc exec -i -n "$PROJECT" "$KC" -- sh -c 'cat > /tmp/prune-pending.sh' < "$SCRIPT_DIR/prune-pending.sh"
     oc exec -n "$PROJECT" "$KC" -- bash /tmp/prune-pending.sh "${1:-7}" ${2:+"$2"}
@@ -208,18 +251,36 @@ add_google() {
         echo "Identity provider google exists; change it in the admin console."
         return
     fi
-    # The secret goes to the pod on stdin, never as an argument.
-    printf '%s' "$GOOGLE_CLIENT_SECRET" | oc exec -i -n "$PROJECT" "$KC" -- sh -c '
-        cfg=/tmp/kcadm.config; secret=$(cat)
-        KC_CLI_PASSWORD="$KC_BOOTSTRAP_ADMIN_PASSWORD" /opt/keycloak/bin/kcadm.sh config credentials --config "$cfg" --server http://localhost:8080 \
-            --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" >/dev/null 2>&1
-        /opt/keycloak/bin/kcadm.sh create identity-provider/instances --config "$cfg" -r '"$REALM"' \
+    google_otp_flow
+    # The secret goes to the pod on stdin, the client id as an argument; neither
+    # is spliced into the script.
+    printf '%s' "$GOOGLE_CLIENT_SECRET" | kcadm_script '
+        secret=$(cat)
+        "$k" create identity-provider/instances --config "$cfg" -r "$1" \
             -s alias=google -s providerId=google -s enabled=true -s trustEmail=true \
-            -s firstBrokerLoginFlowAlias="first broker login" \
-            -s config.clientId='"$GOOGLE_CLIENT_ID"' -s config.clientSecret="$secret" \
-            -s config.syncMode=IMPORT -s config.defaultScope="openid email profile" >/dev/null'
+            -s firstBrokerLoginFlowAlias="first broker login" -s postBrokerLoginFlowAlias="gaik post broker otp" \
+            -s config.clientId="$2" -s config.clientSecret="$secret" \
+            -s config.syncMode=IMPORT -s config.defaultScope="openid email profile" >/dev/null' "$REALM" "$GOOGLE_CLIENT_ID"
     echo -e "${GREEN}Google sign-in added. Redirect URI for the Google client:${NC}"
     echo "  https://$KEYCLOAK_HOST/realms/$REALM/broker/google/endpoint"
+}
+
+google_otp_flow() {
+    # A sign-in through Google skips Keycloak's own browser flow, and with it the
+    # second factor. This flow runs after every Google sign-in and asks for the
+    # authenticator app (setting one up the first time).
+    local alias="gaik post broker otp"
+    if ! kcadm get authentication/flows -r "$REALM" --fields alias --format csv --noquotes | grep -qx "$alias"; then
+        kcadm create authentication/flows -r "$REALM" -s alias="$alias" -s providerId=basic-flow \
+            -s topLevel=true -s builtIn=false -s description="Second factor after an identity provider" >/dev/null
+        kcadm create "authentication/flows/gaik%20post%20broker%20otp/executions/execution" -r "$REALM" \
+            -s provider=auth-otp-form >/dev/null
+        local eid
+        eid=$(kcadm get "authentication/flows/gaik%20post%20broker%20otp/executions" -r "$REALM" --fields id --format csv --noquotes | head -1)
+        kcadm update "authentication/flows/gaik%20post%20broker%20otp/executions" -r "$REALM" \
+            -b "{\"id\":\"$eid\",\"requirement\":\"REQUIRED\"}" >/dev/null
+        echo "Flow '$alias' created."
+    fi
 }
 
 user_id() { kcadm get users -r "$REALM" -q email="$1" -q exact=true --fields id --format csv --noquotes | head -1; }
@@ -241,15 +302,14 @@ add_users() {  # <file>: one "email[,group]" per line (group defaults to wizard-
             echo "$email exists; skipped."
             continue
         fi
+        # A new password and an authenticator app at the first sign-in.
         kcadm create users -r "$REALM" -s username="$email" -s email="$email" -s emailVerified=true \
-            -s enabled=true -s 'requiredActions=["UPDATE_PASSWORD"]' >/dev/null
+            -s enabled=true -s 'requiredActions=["UPDATE_PASSWORD","CONFIGURE_TOTP"]' >/dev/null
         uid=$(user_id "$email")
         pw=$(random_secret | cut -c1-20)
-        printf '%s' "$pw" | oc exec -i -n "$PROJECT" "$KC" -- sh -c '
-            cfg=/tmp/kcadm.config; pw=$(cat)
-            KC_CLI_PASSWORD="$KC_BOOTSTRAP_ADMIN_PASSWORD" /opt/keycloak/bin/kcadm.sh config credentials --config "$cfg" --server http://localhost:8080 \
-                --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" >/dev/null 2>&1
-            /opt/keycloak/bin/kcadm.sh set-password --config "$cfg" -r '"$REALM"' --userid '"$uid"' --new-password "$pw" --temporary'
+        printf '%s' "$pw" | kcadm_script '
+            pw=$(cat)
+            "$k" set-password --config "$cfg" -r "$1" --userid "$2" --new-password "$pw" --temporary' "$REALM" "$uid"
         gid=$(group_id "$group")
         if [ -n "$gid" ]; then
             kcadm update "users/$uid/groups/$gid" -r "$REALM" -s realm="$REALM" -s userId="$uid" -s groupId="$gid" -n >/dev/null

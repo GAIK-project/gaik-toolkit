@@ -164,6 +164,35 @@ describe("verifyAccessToken", () => {
   });
 });
 
+describe("when Keycloak cannot be reached", () => {
+  it("keeps the keys it has and asks again at most once a minute", async () => {
+    const good = await jwksFetcher(pair.publicKey);
+    const token = await sign(pair.privateKey, claims({ exp: NOW_S + 3600 }));
+    let down = 0;
+    const failing = (async () => {
+      down++;
+      throw new Error("connection refused");
+    }) as unknown as typeof fetch;
+    expect(await verifyAccessToken(token, CONFIG, { fetcher: good, nowMs: NOW_MS })).not.toBeNull();
+    // Past the 10-minute refresh, Keycloak is down: the cached key still verifies.
+    const later = NOW_MS + 11 * 60 * 1000;
+    expect(await verifyAccessToken(token, CONFIG, { fetcher: failing, nowMs: later })).not.toBeNull();
+    expect(await verifyAccessToken(token, CONFIG, { fetcher: failing, nowMs: later + 1000 })).not.toBeNull();
+    expect(down).toBe(1);
+    // A minute on, it is asked again.
+    await verifyAccessToken(token, CONFIG, { fetcher: failing, nowMs: later + 61 * 1000 });
+    expect(down).toBe(2);
+  });
+
+  it("signs nobody in when it never had the keys", async () => {
+    const token = await sign(pair.privateKey, claims());
+    const failing = (async () => {
+      throw new Error("connection refused");
+    }) as unknown as typeof fetch;
+    expect(await verifyAccessToken(token, CONFIG, { fetcher: failing, nowMs: NOW_MS })).toBeNull();
+  });
+});
+
 describe("proxy auth settings", () => {
   it("is on only with WIZARD_AUTH_MODE=proxy", () => {
     expect(proxyAuthEnabled({ WIZARD_AUTH_MODE: "proxy" } as unknown as NodeJS.ProcessEnv)).toBe(true);

@@ -42,7 +42,7 @@ Groups: `pending` (waiting for approval), `wizard-user` (Solution Wizard),
 ```bash
 cd implementation_layer/deploy/keycloak
 PROJECT=gaik ./deploy.sh up       # Keycloak + database, realm gaik
-PROJECT=gaik ./deploy.sh setup    # groups in the tokens, approvers, nightly clean-up
+PROJECT=gaik ./deploy.sh setup    # groups, second factor, events, approvers, nightly clean-up
 ```
 
 Keycloak is then at `https://gaik-keycloak-<project>.2.rahtiapp.fi`. The master
@@ -64,6 +64,23 @@ PROJECT=gaik INSTANCE=kc ./deploy.sh signin-off   # back to the stack's own sign
 The client id is the stack's name (`wizard-v2`, `wizard-v2-s4`, ...): the web
 app checks that the token was issued to it. `deploy.sh manifests` keeps a stack's
 sign-in as it is.
+
+## Second factor and sign-in events
+
+Every account signs in with a password and an authenticator app (TOTP: Google
+Authenticator, Microsoft Authenticator, 1Password and the like). A new account
+sets the app up at its first sign-in; `setup` asks the same of existing accounts
+that have none. A sign-in through Google skips Keycloak's password form, so a
+flow after it (`gaik post broker otp`) asks for the app as well. Someone who
+loses their phone: an approver removes the app in the console (Users → the user →
+Credentials → delete OTP), and the next sign-in sets up a new one.
+
+The master admin has no second factor: the scripts sign in with it by password
+grant. It has a long random password, and brute-force detection is on in realm
+master.
+
+Sign-ins, failed sign-ins and second-factor changes are kept 30 days (Realm
+settings → Events → User events), admin changes 90 days.
 
 ## Accounts
 
@@ -185,5 +202,4 @@ Keycloak over its public address. Their clients and how the groups map are in
 
 - Serve the admin console on its own hostname (`KC_HOSTNAME_ADMIN`) before the
   realm holds real users.
-- Set `--trusted-proxy-ip` on the proxy to the Rahti router's addresses.
 - Decide who owns and updates Keycloak after the hand-over.

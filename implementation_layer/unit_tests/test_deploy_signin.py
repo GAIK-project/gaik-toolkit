@@ -132,7 +132,7 @@ def test_the_proxy_and_the_web_app_name_the_keycloak_that_issues_the_tokens(
     script = OPENSHIFT_DEPLOY.read_text()
     assert 'KEYCLOAK_HOST="gaik-keycloak-${PROJECT}.2.rahtiapp.fi"' in script
     assert kc_host == f"https://gaik-keycloak-{PROJECT}.2.rahtiapp.fi"
-    assert 'WIZARD_OIDC_CLIENT_ID="$NAME"' in script
+    assert '"WIZARD_OIDC_CLIENT_ID=$NAME"' in script
 
 
 def test_images_are_pinned() -> None:
@@ -370,3 +370,74 @@ def test_a_theme_change_reaches_browsers_within_the_hour() -> None:
     ][0]
     env = {e["name"]: e.get("value") for e in keycloak["env"]}
     assert env["KC_SPI_THEME__STATIC_MAX_AGE"] == "3600"
+
+
+def test_the_proxies_fix_their_callback_and_trust_forwarded_headers_from_the_cluster_only(
+    instance: str, name: str
+) -> None:
+    wizard = one(render("signin-proxy.yaml", instance), "Deployment", f"{name}-signin")
+    mlflow = one(aiops_docs("mlflow-signin.yaml"), "Deployment", "mlflow-signin")
+    expected = {
+        id(wizard): f"https://{name}-web-{PROJECT}.2.rahtiapp.fi/oauth2/callback",
+        id(mlflow): "https://mlflow-gaik-aiops.2.rahtiapp.fi/oauth2/callback",
+    }
+    for deployment in (wizard, mlflow):
+        args = args_of(deployment["spec"]["template"]["spec"]["containers"][0])
+        assert args["redirect-url"] == expected[id(deployment)]
+        assert args["trusted-proxy-ip"] == "10.128.0.0/14"
+    route = one(render("route-signin.yaml", instance), "Route", f"{name}-web")
+    assert "host" not in route["spec"]  # the host Rahti assigns is the one the callback names
+
+
+def test_mlflows_waiting_page_is_the_wizards_with_mlflows_sign_out() -> None:
+    shared = (DEPLOY_DIR / "openshift" / "signin-templates" / "error.html").read_text()
+    sign_out = (
+        f"{KEYCLOAK_PUBLIC}/realms/gaik/protocol/openid-connect/logout?client_id=aiops-mlflow"
+        "&amp;post_logout_redirect_uri=https%3A%2F%2Fmlflow-gaik-aiops.2.rahtiapp.fi%2F"
+    )
+    assert (AIOPS_RAHTI / "mlflow-signin-error.html").read_text() == shared.replace(
+        "SIGN_OUT_URL_PLACEHOLDER", sign_out
+    )
+    container = one(aiops_docs("mlflow-signin.yaml"), "Deployment", "mlflow-signin")["spec"][
+        "template"
+    ]["spec"]["containers"][0]
+    assert "--custom-templates-dir=/templates" in container["args"]
+    assert "mlflow-signin-templates" in (AIOPS_RAHTI / "kustomization.yaml").read_text()
+
+
+def test_a_sign_in_stacks_web_app_is_applied_with_its_sign_in_settings() -> None:
+    script = OPENSHIFT_DEPLOY.read_text()
+    # One rollout, never in dev-login mode behind the proxy, without the dev account list.
+    assert 'oc set env --local -f - "${env[@]}" -o yaml' in script
+    assert "WIZARD_DEV_USERS-" in script
+    code = [line for line in script.splitlines() if not line.lstrip().startswith("#")]
+    assert not any(
+        re.search(r"^\s*mapfile\b|[;&|]\s*mapfile\b|\bmapfile -t", line) for line in code
+    )
+
+
+def test_keycloak_asks_everyone_for_a_second_factor_and_records_sign_ins() -> None:
+    script = (KEYCLOAK_DIR / "deploy.sh").read_text()
+    assert (
+        "authentication/required-actions/CONFIGURE_TOTP" in script
+        and "defaultAction=true" in script
+    )
+    assert '"requiredActions=[\\"UPDATE_PASSWORD\\",\\"CONFIGURE_TOTP\\"]"' in script or (
+        '\'requiredActions=["UPDATE_PASSWORD","CONFIGURE_TOTP"]\'' in script
+    )
+    assert "require_totp_for_existing" in script
+    # A Google sign-in skips the browser flow; the post-broker flow asks for the second factor.
+    assert 'postBrokerLoginFlowAlias="gaik post broker otp"' in script and "auth-otp-form" in script
+    assert "eventsEnabled=true" in script and "eventsExpiration=2592000" in script
+    assert "realms/master -s bruteForceProtected=true" in script
+
+
+def test_the_keycloak_script_signs_in_once_and_keeps_the_scripts_stdin() -> None:
+    script = (KEYCLOAK_DIR / "deploy.sh").read_text()
+    assert script.count("KC_CLI_PASSWORD=") == 1
+    # kcadm reads a password from stdin when it has one; the sign-in must not eat
+    # the secret or JSON meant for the script after it.
+    signin = script.split("KC_SIGNIN='", 1)[1].split("'\n", 1)[0]
+    assert "</dev/null" in signin
+    # The Google client id is an argument, not spliced into the pod's script.
+    assert "'\"$GOOGLE_CLIENT_ID\"'" not in script

@@ -64,7 +64,9 @@ async function route(request: NextRequest): Promise<NextResponse> {
     }
     const url = request.nextUrl.clone();
     url.pathname = "/oauth2/start";
-    url.search = `?rd=${encodeURIComponent(path === "/login" ? "/" : path)}`;
+    // Back to the page asked for, its query included.
+    const back = path === "/login" ? "/" : `${path}${request.nextUrl.search}`;
+    url.search = `?rd=${encodeURIComponent(back)}`;
     return withTraceId(request, NextResponse.redirect(url));
   }
 

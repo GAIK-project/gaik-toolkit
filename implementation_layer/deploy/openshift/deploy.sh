@@ -220,9 +220,17 @@ deploy_manifests() {
     signin_enabled && signin=1
     for m in "${MANIFESTS[@]}"; do
         if [ "$m" = route.yaml ] && [ "$signin" = 1 ]; then m=route-signin.yaml; fi
+        if [ "$m" = deployment-web.yaml ] && [ "$signin" = 1 ]; then
+            # The web app's manifest with the sign-in settings already in it, so
+            # it rolls out once and never runs with the dev login behind the proxy.
+            local env=() line
+            while IFS= read -r line; do env+=("$line"); done < <(signin_env)  # no mapfile in macOS bash 3.2
+            render_manifest "$SCRIPT_DIR/$m" | oc set env --local -f - "${env[@]}" -o yaml \
+                | oc apply -n "$PROJECT" -f -
+            continue
+        fi
         apply_manifest "$m"
     done
-    if [ "$signin" = 1 ]; then set_signin_env; fi
     echo -e "${GREEN}Manifests applied. (Ensure ./deploy.sh secrets has run for this instance.)${NC}"
 }
 
@@ -315,20 +323,27 @@ signin_enabled() {
     oc get deployment "$SIGNIN_DEPLOYMENT" -n "$PROJECT" >/dev/null 2>&1
 }
 
-set_signin_env() {
+signin_env() {
     # The web app checks the forwarded token itself (lib/proxy-auth.ts). The
     # keys come from Keycloak's Service; the issuer is its public address.
     # The sign-in proxy is one more hop in X-Forwarded-For after the router.
     # Sign-out goes to the proxy's /oauth2/sign_out, which also ends the
-    # Keycloak session (--backend-logout-url in signin-proxy.yaml).
-    local issuer="https://$KEYCLOAK_HOST/realms/gaik"
-    oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" \
+    # Keycloak session (--backend-logout-url in signin-proxy.yaml). The dev
+    # account list has no use behind the proxy and is removed.
+    printf '%s\n' \
         WIZARD_AUTH_MODE=proxy \
-        WIZARD_OIDC_ISSUER="$issuer" \
-        WIZARD_OIDC_JWKS_URL="http://gaik-keycloak:8080/realms/gaik/protocol/openid-connect/certs" \
-        WIZARD_OIDC_CLIENT_ID="$NAME" \
+        "WIZARD_OIDC_ISSUER=https://$KEYCLOAK_HOST/realms/gaik" \
+        "WIZARD_OIDC_JWKS_URL=http://gaik-keycloak:8080/realms/gaik/protocol/openid-connect/certs" \
+        "WIZARD_OIDC_CLIENT_ID=$NAME" \
         WIZARD_OIDC_GROUP=wizard-user \
-        WIZARD_TRUSTED_PROXY_HOPS=2 >/dev/null
+        WIZARD_TRUSTED_PROXY_HOPS=2 \
+        WIZARD_DEV_USERS-
+}
+
+set_signin_env() {
+    local env=() line
+    while IFS= read -r line; do env+=("$line"); done < <(signin_env)  # no mapfile in macOS bash 3.2
+    oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" "${env[@]}" >/dev/null
 }
 
 deploy_signin() {

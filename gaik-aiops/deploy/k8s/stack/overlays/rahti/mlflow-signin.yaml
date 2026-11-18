@@ -35,6 +35,9 @@ spec:
           args:
             - --http-address=0.0.0.0:4180
             - --reverse-proxy=true
+            # X-Forwarded-* only from the cluster network (the Rahti router); a fixed callback address.
+            - --trusted-proxy-ip=10.128.0.0/14
+            - --redirect-url=https://mlflow-gaik-aiops.2.rahtiapp.fi/oauth2/callback
             - --provider=keycloak-oidc
             - --oidc-issuer-url=https://gaik-keycloak-gaik.2.rahtiapp.fi/realms/gaik
             - --code-challenge-method=S256
@@ -50,6 +53,8 @@ spec:
             - --cookie-refresh=5m
             - --upstream-timeout=5m
             - --silence-ping-logging=true
+            # The GAIK page for an account outside the AIOps groups, with a Keycloak sign-out.
+            - --custom-templates-dir=/templates
             - --backend-logout-url=https://gaik-keycloak-gaik.2.rahtiapp.fi/realms/gaik/protocol/openid-connect/logout?id_token_hint={id_token}
           env:
             - name: OAUTH2_PROXY_CLIENT_ID
@@ -59,6 +64,8 @@ spec:
             - name: OAUTH2_PROXY_COOKIE_SECRET
               valueFrom: {secretKeyRef: {name: aiops-mlflow-signin, key: cookie-secret}}
           ports: [{containerPort: 4180}]
+          volumeMounts:
+            - {name: templates, mountPath: /templates, readOnly: true}
           readinessProbe:
             httpGet: {path: /ready, port: 4180}
             periodSeconds: 10
@@ -73,3 +80,6 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: [ALL]}
+      volumes:
+        - name: templates
+          configMap: {name: mlflow-signin-templates}
