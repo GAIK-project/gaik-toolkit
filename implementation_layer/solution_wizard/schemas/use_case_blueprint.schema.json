@@ -51,6 +51,12 @@
           "default": false,
           "title": "Overwrite",
           "type": "boolean"
+        },
+        "label": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Label",
+          "type": "string"
         }
       },
       "required": [
@@ -803,6 +809,17 @@
             }
           ],
           "default": null
+        },
+        "description": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Description",
+          "type": "string"
+        },
+        "performed_by": {
+          "default": "",
+          "title": "Performed By",
+          "type": "string"
         }
       },
       "required": [

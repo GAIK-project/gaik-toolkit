@@ -16,6 +16,7 @@ from .blueprint import (
     external_services,
     sends_nothing,
 )
+from .bpmn_generator import DERIVED_PARTICIPANT_IDS
 from .registry import Registry, get_registry
 
 # Components whose job is to check an extracted result against its source (Rule 14).
@@ -496,6 +497,39 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     # has already refused a package or a variable name that is not plain; this
     # rule checks what the user and the governance flags said about each one.
     _check_external_services(blueprint, errors, warnings)
+
+    # ------------------------------------------------------------------
+    # Rule 16: a step's performed_by names a business_process participant, so
+    # the step's lane in the BPMN is the one the blueprint says. With no
+    # participants the generator derives the lanes; their ids are accepted then.
+    participants = blueprint.business_process.participants
+    if participants:
+        participant_ids = {p.id for p in participants}
+        for step in steps:
+            if step.performed_by and step.performed_by not in participant_ids:
+                errors.append(
+                    Issue(
+                        16,
+                        f"Step '{step.id}' has performed_by '{step.performed_by}', which is "
+                        "not a participant id in business_process.participants "
+                        f"({', '.join(sorted(participant_ids))}). Use one of them, add the "
+                        "participant, or leave performed_by empty.",
+                        step_id=step.id,
+                    )
+                )
+    else:
+        for step in steps:
+            if step.performed_by and step.performed_by not in DERIVED_PARTICIPANT_IDS:
+                errors.append(
+                    Issue(
+                        16,
+                        f"Step '{step.id}' has performed_by '{step.performed_by}', but "
+                        "business_process.participants is empty. Add the participant, use a "
+                        "derived lane id (system, reviewers, users), or leave performed_by "
+                        "empty.",
+                        step_id=step.id,
+                    )
+                )
 
     ok = len(errors) == 0
     return ValidationResult(ok=ok, errors=errors, warnings=warnings)

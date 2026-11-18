@@ -30,7 +30,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .blueprint import Blueprint
+from .blueprint import Blueprint, Participant
 
 # ---------------------------------------------------------------------------
 # Layout constants
@@ -145,6 +145,9 @@ _ARTIFACT_TYPE_LABELS: Dict[str, str] = {
 
 def _data_object_label(art_id: str, art: Any = None) -> str:
     """Human-readable data object name (official BPMN samples + modeling guide)."""
+    label = str(getattr(art, "label", "") or "").strip()
+    if label:
+        return label
     type_key = ""
     if art is not None:
         type_key = str(getattr(art, "type", "") or "").lower()
@@ -161,6 +164,62 @@ def _data_object_label(art_id: str, art: Any = None) -> str:
     if type_key:
         return _humanize_token(type_key)
     return _humanize_token(art_id) if art_id else "Data"
+
+
+# ---------------------------------------------------------------------------
+# Derived lanes
+# ---------------------------------------------------------------------------
+
+#: The lanes drawn when business_process.participants is empty, per node
+#: category: (participant id, lane id, lane priority, bpmn_mapping path).
+_DERIVED_LANES: dict[str, tuple[str, str, int, str]] = {
+    "user": ("users", "Lane_users", 0, "derived:business_spec.intended_users"),
+    "ai": ("system", "Lane_gaik_ai", 1, "derived:system"),
+    "review": ("reviewers", "Lane_reviewers", 2, "derived:business_spec.reviewers"),
+}
+#: The ids of the derived participants; a step's performed_by may name one when
+#: there are no participants.
+DERIVED_PARTICIPANT_IDS = frozenset(spec[0] for spec in _DERIVED_LANES.values())
+
+
+def _derived_participant(blueprint: Blueprint, category: str) -> Participant:
+    """The participant behind the derived lane of a node category."""
+    spec = blueprint.business_spec if isinstance(blueprint.business_spec, dict) else {}
+    if category == "ai":
+        # Official GAIK samples use "GenAI" for the software/AI lane.
+        return Participant(
+            id="system", name="GenAI", kind="system", default_lane_for=["automated_task"]
+        )
+    if category == "review":
+        reviewers = spec.get("reviewers") or []
+        name = (
+            " / ".join(r.replace("_", " ").title() for r in reviewers) if reviewers else "Reviewer"
+        )
+        return Participant(id="reviewers", name=name, default_lane_for=["human_review"])
+    users = spec.get("intended_users") or []
+    name = " / ".join(u.replace("_", " ").title() for u in users) if users else "User"
+    return Participant(id="users", name=name, default_lane_for=["user_task"])
+
+
+def derived_participants(blueprint: Blueprint) -> list[Participant]:
+    """The participants behind the lanes the generator derives when
+    ``business_process.participants`` is empty, in lane order.
+
+    Only the lanes the generator would draw are returned. Setting the result as
+    the participants draws the same lanes, with the same names, in the same order.
+    """
+    if not blueprint.workflow.steps:
+        return []
+    process = blueprint.business_process.model_copy(update={"participants": []})
+    builder = _BpmnBuilder(blueprint.model_copy(update={"business_process": process}))
+    builder.build()
+    category_of = {lane_id: category for category, (_, lane_id, _, _) in _DERIVED_LANES.items()}
+    ordered = sorted(builder.lanes.values(), key=lambda lane: (lane.priority, lane.id))
+    return [
+        _derived_participant(blueprint, category_of[lane.id])
+        for lane in ordered
+        if lane.id in category_of
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +257,7 @@ class _Node:
         self.name = name
         self.lane = lane  # lane id
         self.w, self.h = SIZE[size_key]
+        self.documentation = ""
         self.rank = 0
         self.x = 0
         self.y = 0
@@ -319,46 +379,26 @@ class _BpmnBuilder:
     def _lane_for_category(self, category: str) -> str:
         """Resolve a lane id for a node category, creating lanes lazily.
 
-        Categories: 'user', 'ai', 'review', 'manual'.
+        Categories: 'user', 'ai', 'review', 'manual'. Without a matching
+        participant the lane is the derived one (``_derived_participant``).
         """
-        spec = self.bp.business_spec if isinstance(self.bp.business_spec, dict) else {}
-
         if category == "ai":
             hit = self._participant_lane(lambda p: getattr(p, "kind", "") == "system")
-            if hit:
-                return self._ensure_lane(hit[0], hit[1], 1)
-            # Official GAIK samples use "GenAI" for the software/AI lane.
-            lid = self._ensure_lane("Lane_gaik_ai", "GenAI", 1)
-            if lid not in self.mapping:
-                self._map(lid, "lane", "derived:system")
-            return lid
-
-        if category == "review":
+        elif category == "review":
             hit = self._participant_lane(
                 lambda p: "human_review" in getattr(p, "default_lane_for", [])
             )
-            if hit:
-                return self._ensure_lane(hit[0], hit[1], 2)
-            reviewers = spec.get("reviewers") or []
-            name = (
-                " / ".join(r.replace("_", " ").title() for r in reviewers)
-                if reviewers
-                else "Reviewer"
+        else:  # user / manual default
+            category = "user"
+            hit = self._participant_lane(
+                lambda p: "user_task" in getattr(p, "default_lane_for", [])
             )
-            lid = self._ensure_lane("Lane_reviewers", name, 2)
-            if lid not in self.mapping:
-                self._map(lid, "lane", "derived:business_spec.reviewers")
-            return lid
-
-        # user / manual default
-        hit = self._participant_lane(lambda p: "user_task" in getattr(p, "default_lane_for", []))
+        _, lid, priority, source = _DERIVED_LANES[category]
         if hit:
-            return self._ensure_lane(hit[0], hit[1], 0)
-        users = spec.get("intended_users") or []
-        name = " / ".join(u.replace("_", " ").title() for u in users) if users else "User"
-        lid = self._ensure_lane("Lane_users", name, 0)
+            return self._ensure_lane(hit[0], hit[1], priority)
+        lid = self._ensure_lane(lid, _derived_participant(self.bp, category).name, priority)
         if lid not in self.mapping:
-            self._map(lid, "lane", "derived:business_spec.intended_users")
+            self._map(lid, "lane", source)
         return lid
 
     def _lane_for_participant(self, participant_id: str, fallback_category: str) -> str:
@@ -369,6 +409,12 @@ class _BpmnBuilder:
                 if lid not in self.mapping:
                     self._map(lid, "lane", f"business_process.participants[{i}]")
                 return self._ensure_lane(lid, p.name, priority)
+        if not self.bp.business_process.participants:
+            # Derived lanes: a derived participant id names its lane.
+            for category, (derived_id, _, _, _) in _DERIVED_LANES.items():
+                if derived_id == participant_id:
+                    return self._lane_for_category(category)
+        # An unknown id falls back to the category lane (validator rule 16 reports it).
         return self._lane_for_category(fallback_category)
 
     # -- step -> node -----------------------------------------------------
@@ -396,15 +442,20 @@ class _BpmnBuilder:
         for i, step in enumerate(steps):
             nid = self._step_node_id(step)
             if step.type == "user_task":
-                tag, size, lane = "bpmn:userTask", "task", self._lane_for_category("user")
+                tag, size, category = "bpmn:userTask", "task", "user"
             elif step.type == "human_review":
-                tag, size, lane = "bpmn:userTask", "task", self._lane_for_category("review")
+                tag, size, category = "bpmn:userTask", "task", "review"
             elif step.type == "decision":
-                tag, size, lane = "bpmn:exclusiveGateway", "gateway", self._lane_for_category("ai")
+                tag, size, category = "bpmn:exclusiveGateway", "gateway", "ai"
             else:  # automated_task
-                tag, size, lane = "bpmn:serviceTask", "task", self._lane_for_category("ai")
+                tag, size, category = "bpmn:serviceTask", "task", "ai"
+            if step.performed_by:
+                lane = self._lane_for_participant(step.performed_by, category)
+            else:
+                lane = self._lane_for_category(category)
             name = self._step_display_name(step)
             node = _Node(nid, tag, name, lane, size)
+            node.documentation = (step.description or "").strip()
             self.nodes[nid] = node
             self._map(nid, step.type, f"workflow.steps[{i}]")
 
@@ -1230,6 +1281,11 @@ class _BpmnBuilder:
 
     def _emit_node(self, L: List[str], node: _Node) -> None:
         inner: List[str] = []
+        if node.documentation:
+            # BPMN puts documentation first among an element's children.
+            inner.append(
+                f"      <bpmn:documentation>{_esc(node.documentation)}</bpmn:documentation>"
+            )
         for fid in node.incoming:
             inner.append(f"      <bpmn:incoming>{fid}</bpmn:incoming>")
         for fid in node.outgoing:
