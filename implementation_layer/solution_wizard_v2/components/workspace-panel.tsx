@@ -855,6 +855,10 @@ export function WorkspacePanel({
   // The tab's two views: "Workflow steps" (the plan and its form) and "Full
   // blueprint" (the whole draft, components/full-blueprint-view).
   const [blueprintView, setBlueprintView] = useState<"steps" | "full">("steps");
+  // The full view's editor holds text not saved: leaving the view (which
+  // drops the editor) asks first.
+  const [fullDirty, setFullDirty] = useState(false);
+  const [leaveAsk, setLeaveAsk] = useState(false);
   // The form holds a draft it cannot save (an unnamed step, JSON that does not
   // parse, a failed save, a newer version to choose over). Behind the read
   // view that draft was out of sight and the read view showed the old
@@ -3077,7 +3081,14 @@ export function WorkspacePanel({
     <button
       type="button"
       aria-pressed={blueprintView === key}
-      onClick={() => setBlueprintView(key)}
+      onClick={() => {
+        if (key === "steps" && blueprintView === "full" && fullDirty) {
+          setLeaveAsk(true);
+          return;
+        }
+        setLeaveAsk(false);
+        setBlueprintView(key);
+      }}
       className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${
         blueprintView === key ? "bg-surface text-text-strong shadow-xs" : "text-text-muted hover:text-text"
       }`}
@@ -3095,6 +3106,36 @@ export function WorkspacePanel({
     >
       {blueprintViewButton("steps", "listChecks", t.bpViewSteps)}
       {blueprintViewButton("full", "fileBraces", t.bpViewFull)}
+    </div>
+  );
+  const blueprintLeaveAsk = leaveAsk && blueprintView === "full" && (
+    <div
+      role="alertdialog"
+      aria-label={t.bpViewLeaveAsk}
+      className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-text"
+      data-testid="blueprint-view-leave"
+    >
+      <span className="min-w-0 flex-1 basis-56">{t.bpViewLeaveAsk}</span>
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => setLeaveAsk(false)}
+        data-testid="blueprint-view-leave-stay"
+      >
+        {t.bpViewLeaveStay}
+      </button>
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => {
+          setLeaveAsk(false);
+          setFullDirty(false);
+          setBlueprintView("steps");
+        }}
+        data-testid="blueprint-view-leave-discard"
+      >
+        {t.bpViewLeaveDiscard}
+      </button>
     </div>
   );
 
@@ -3208,11 +3249,13 @@ export function WorkspacePanel({
             {key === "json" && (
               <>
                 {blueprintViewSwitch}
+                {blueprintLeaveAsk}
                 {blueprintView === "full" && (
                   <FullBlueprintView
                     sessionId={sessionId}
                     version={activeVersion}
                     t={t}
+                    onDirtyChange={setFullDirty}
                     onSaved={({ blueprint: saved, version, bpmnChanged }) => {
                       if (saved) takeOwnBlueprint(saved);
                       takeOwnVersion(version);

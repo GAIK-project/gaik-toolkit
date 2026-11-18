@@ -7,8 +7,11 @@ import {
   parseDraftText,
   readFullBlueprint,
   readonlyRanges,
-  withServerSections,
+  downloadText,
+  mergeDrafts,
+  withoutAiMark,
 } from "@/lib/full-blueprint";
+import { AI_RECORD_MARK } from "@/lib/ai-marking";
 
 const READONLY = ["blueprint_version", "metadata", "visualizations", "package", "traceability", "change_log"];
 
@@ -67,15 +70,50 @@ describe("full blueprint", () => {
     expect(changedReadonlySection(draft, { ...draft, package: { name: "p" } }, READONLY)).toBe("package");
   });
 
-  it("takes the read-only sections from the server's draft for a save", () => {
+  it("merges the user's change into a draft nobody else changed", () => {
+    const mine = { ...draft, models: { extract: { model: "gpt-5-mini" } } };
+    expect(mergeDrafts(draft, draft, mine, READONLY)).toEqual({ ok: true, draft: mine });
+  });
+
+  it("keeps a section only the newer draft changed, and the user's change beside it", () => {
+    const newer = { ...draft, use_case: { id: "invoices", name: "Invoices", description: "by the agent" } };
+    const mine = { ...draft, models: { extract: { model: "gpt-5-mini" } } };
+    const merged = mergeDrafts(draft, newer, mine, READONLY);
+    expect(merged).toEqual({ ok: true, draft: { ...newer, models: { extract: { model: "gpt-5-mini" } } } });
+  });
+
+  it("takes a section only the newer draft added or removed", () => {
+    const { models: _m, ...newer } = { ...draft, prompts: { extract: "Read the invoice" } };
+    void _m;
+    const merged = mergeDrafts(draft, newer, draft, READONLY);
+    expect(merged.ok && merged.draft).toEqual(newer);
+  });
+
+  it("refuses a section both sides changed, and names each one", () => {
+    const newer = { ...draft, models: { extract: { model: "gpt-4.1" } }, use_case: { id: "x", name: "Agent's" } };
+    const mine = { ...draft, models: { extract: { model: "gpt-5-mini" } }, use_case: { id: "x", name: "Mine" } };
+    expect(mergeDrafts(draft, newer, mine, READONLY)).toEqual({ ok: false, conflicts: ["use_case", "models"] });
+    // The same change on both sides is no conflict.
+    expect(mergeDrafts(draft, newer, newer, READONLY)).toEqual({ ok: true, draft: newer });
+  });
+
+  it("takes the read-only sections from the newer draft, always", () => {
     const newer = { ...draft, change_log: [...draft.change_log, { version: "2", change: "agent" }] };
-    const { visualizations: _v, ...base } = { ...newer, visualizations: undefined };
-    void _v;
-    const edited = { ...draft, models: { extract: { model: "gpt-5-mini" } }, visualizations: { a: 1 } };
-    const sent = withServerSections(edited, base, READONLY);
-    expect(sent.change_log).toEqual(newer.change_log);
-    expect(sent.models).toEqual({ extract: { model: "gpt-5-mini" } });
-    expect("visualizations" in sent).toBe(false);
+    const mine = { ...draft, change_log: [], package: { name: "p" } };
+    const merged = mergeDrafts(draft, newer, mine, READONLY);
+    expect(merged.ok && merged.draft.change_log).toEqual(newer.change_log);
+    expect(merged.ok && "package" in merged.draft).toBe(false);
+  });
+
+  it("marks the download as AI output, and a save never sends the mark", () => {
+    const text = downloadText(draft);
+    const file = JSON.parse(text) as Record<string, unknown>;
+    expect(file).toEqual({ ...AI_RECORD_MARK, ...draft });
+    // The mark comes first, where a reader of the file sees it.
+    expect(Object.keys(file).slice(0, 2)).toEqual(Object.keys(AI_RECORD_MARK));
+    expect(withoutAiMark(file)).toEqual(draft);
+    // A draft that already carries the keys gets the mark's own values.
+    expect(JSON.parse(downloadText({ ...draft, ai_generated: false }))).toMatchObject(AI_RECORD_MARK);
   });
 
   it("names the download after the use case", () => {

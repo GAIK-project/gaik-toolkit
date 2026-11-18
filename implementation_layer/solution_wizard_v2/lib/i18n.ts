@@ -500,6 +500,12 @@ export type Dict = {
   /** After "keep editing" over a newer draft: what the next save does. */
   fullBpKeptEditing: string;
   fullBpAgentBusy: string;
+  /** "{sections}": the sections both the newer draft and the user's text changed, in plain words. */
+  fullBpConflict: string;
+  /** Leaving "Full blueprint" with text not saved in its editor: asked first. */
+  bpViewLeaveAsk: string;
+  bpViewLeaveStay: string;
+  bpViewLeaveDiscard: string;
   fullBpUnchanged: string;
   /** Over the server's warnings and what the wizard completes after a save. */
   fullBpAttention: string;
@@ -1391,8 +1397,12 @@ const fi: Dict = {
   fullBpChangedElsewhere: "Blueprint muuttui muualla, eikä muutostasi tallennettu. Tekstisi on yhä editorissa.",
   fullBpReload: "Lataa uudempi versio (hylkää muutokseni)",
   fullBpKeepEditing: "Jatka muokkausta",
-  fullBpKeptEditing: "Seuraava tallennus korvaa uudemman version tekstilläsi. Wizardin ylläpitämät osiot otetaan uudemmasta versiosta.",
+  fullBpKeptEditing: "Seuraava tallennus yhdistää muutoksesi uudempaan versioon. Jos wizard muutti samaa osiota, tallennus estetään.",
   fullBpAgentBusy: "Wizard kirjoittaa vastausta. Tallenna uudelleen, kun se on valmis; tekstisi on tallessa.",
+  fullBpConflict: "Ei tallennettu: myös wizard muutti näitä osioita: {sections}. Lataa uudempi versio ja tee muutoksesi siihen.",
+  bpViewLeaveAsk: "Koko blueprintin editorissa on tallentamattomia muutoksia.",
+  bpViewLeaveStay: "Palaa editoriin",
+  bpViewLeaveDiscard: "Hylkää muutokset",
   fullBpUnchanged: "Ei muutoksia tallennettavaksi.",
   fullBpAttention: "Wizard täydentää nämä seuraavassa vastauksessaan:",
   wsFormName: "Nimi",
@@ -2328,8 +2338,12 @@ const en: Dict = {
   fullBpChangedElsewhere: "The blueprint changed elsewhere, so your change was not saved. Your text is still in the editor.",
   fullBpReload: "Load the newer version (discard my changes)",
   fullBpKeepEditing: "Keep editing",
-  fullBpKeptEditing: "Your next save replaces the newer version with your text. The sections the wizard keeps are taken from the newer version.",
+  fullBpKeptEditing: "Your next save merges your changes into the newer version. If the wizard changed the same section, the save is refused.",
   fullBpAgentBusy: "The wizard is replying. Save again once it is done; your text is kept.",
+  fullBpConflict: "Not saved: the wizard also changed these sections: {sections}. Load the newer version and make your change there.",
+  bpViewLeaveAsk: "The full blueprint editor has changes that are not saved.",
+  bpViewLeaveStay: "Back to the editor",
+  bpViewLeaveDiscard: "Discard changes",
   fullBpUnchanged: "Nothing changed to save.",
   fullBpAttention: "The wizard completes these in its next reply:",
   wsFormName: "Name",

@@ -5,6 +5,7 @@
  * the checks made before a save is sent (the JSON parses, it is an object, no
  * read-only section changed). wizard_api checks the same again.
  */
+import { AI_RECORD_MARK } from "@/lib/ai-marking";
 
 export type Draft = Record<string, unknown>;
 
@@ -200,18 +201,54 @@ export function changedReadonlySection(loaded: Draft, edited: Draft, sections: r
   return null;
 }
 
+const hasKey = (draft: Draft, key: string) => Object.prototype.hasOwnProperty.call(draft, key);
+
+/** Whether `key` is the same in both drafts: absent in both, or present with the same value. */
+function sameSection(a: Draft, b: Draft, key: string): boolean {
+  return hasKey(a, key) === hasKey(b, key) && (!hasKey(a, key) || sameJson(a[key], b[key]));
+}
+
+export type Merged = { ok: true; draft: Draft } | { ok: false; conflicts: string[] };
+
 /**
- * The draft to save: the user's sections, and the read-only ones as the
- * server's draft has them now. They are the same as the text's unless the
- * user chose to keep editing over a newer draft, whose change log (only the
- * server writes it) has grown since the text was read.
+ * The draft to save, section by section (the top-level keys): `old` is the
+ * draft the editor's text was made from, `newer` the server's draft now (the
+ * same as `old` until a save was refused as changed elsewhere and the user
+ * kept editing), `mine` the parsed text. A section only one side changed
+ * takes that side; one both changed alike takes it; one both changed
+ * differently is a conflict, named in the answer, and nothing is saved. The
+ * read-only sections are always the newer draft's: only the server writes them.
  */
-export function withServerSections(edited: Draft, server: Draft, sections: readonly string[]): Draft {
-  const out: Draft = { ...edited };
-  for (const section of sections) {
-    if (Object.prototype.hasOwnProperty.call(server, section)) out[section] = server[section];
-    else delete out[section];
+export function mergeDrafts(old: Draft, newer: Draft, mine: Draft, readonly: readonly string[]): Merged {
+  const keys = [...new Set([...Object.keys(newer), ...Object.keys(mine), ...Object.keys(old)])];
+  const out: Draft = {};
+  const conflicts: string[] = [];
+  for (const key of keys) {
+    let from: Draft;
+    if (readonly.includes(key) || sameSection(mine, old, key)) from = newer;
+    else if (sameSection(newer, old, key) || sameSection(newer, mine, key)) from = mine;
+    else {
+      conflicts.push(key);
+      continue;
+    }
+    if (hasKey(from, key)) out[key] = from[key];
   }
+  return conflicts.length > 0 ? { ok: false, conflicts } : { ok: true, draft: out };
+}
+
+/**
+ * The draft as the downloaded file has it: marked as AI output first (EU AI
+ * Act art. 50(2)), with the mark the case exports carry (lib/ai-marking).
+ * `Blueprint` ignores the extra top-level keys; a save strips them anyway.
+ */
+export function downloadText(draft: Draft): string {
+  return JSON.stringify({ ...AI_RECORD_MARK, ...withoutAiMark(draft) }, null, 2);
+}
+
+/** The draft without the download's AI mark: a file pasted back into the editor is saved without it. */
+export function withoutAiMark(draft: Draft): Draft {
+  const out: Draft = { ...draft };
+  for (const key of Object.keys(AI_RECORD_MARK)) delete out[key];
   return out;
 }
 

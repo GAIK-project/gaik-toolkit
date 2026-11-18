@@ -111,6 +111,8 @@ test.describe("Full blueprint (stack)", () => {
     const downloaded = JSON.parse(await readFile((await file.path())!, "utf-8")) as ReturnType<typeof draftWithModel>;
     expect(downloaded.models.extract.model).toBe(MODEL);
     expect(downloaded.use_case.id).toBe("invoices");
+    // Marked as AI output, as the case exports are (lib/ai-marking).
+    expect(downloaded).toMatchObject({ ai_generated: true, ai_generator: "GAIK Solution Wizard" });
 
     const bpmnBefore = await (await page.request.get(`/api/sessions/${id}/bpmn`)).text();
     expect(bpmnBefore).toContain("Activity_extract");
@@ -151,7 +153,7 @@ test.describe("Full blueprint (stack)", () => {
     expect(await (await page.request.get(`/api/sessions/${id}/bpmn`)).text()).toBe(bpmnBefore);
   });
 
-  test("a save over a draft changed meanwhile is refused and keeps the text; Keep editing saves it on the newer draft", async ({
+  test("a save over a draft changed meanwhile is refused and keeps the text; Keep editing merges it into the newer draft", async ({
     page,
     request,
   }) => {
@@ -184,6 +186,81 @@ test.describe("Full blueprint (stack)", () => {
     await page.getByTestId("full-blueprint-save").click();
     expect((await saved).status()).toBe(200);
     await expect(status).toHaveAttribute("data-state", "saved");
-    expect((await readDraft(request, id)).models?.extract?.model).toBe("gpt-5-mini");
+    const merged = await readDraft(request, id);
+    expect(merged.models?.extract?.model).toBe("gpt-5-mini");
+    // What the agent changed meanwhile, in a section the text did not change, is kept.
+    expect(merged.use_case.description).toBe("Invoice handling, written by the agent");
+  });
+
+  test("a section both the text and a newer draft changed is refused by name; only the newer version is offered", async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(180_000);
+    const id = await sessionAtBpmn(page, request);
+    await writeDraft(request, id, draftWithModel());
+    await page.reload();
+    await openFullBlueprint(page);
+    await page.getByTestId("full-blueprint-advanced").click();
+    await replaceLine(page, `"model": "${MODEL}"`, '"model": "gpt-5-mini"');
+
+    // Leaving the view with the text not saved asks first; going back keeps the text.
+    await page.getByTestId("blueprint-view-steps").click();
+    await expect(page.getByTestId("blueprint-view-leave")).toContainText("tallentamattomia muutoksia");
+    await page.getByTestId("blueprint-view-leave-stay").click();
+    await expect(page.getByTestId("blueprint-view-leave")).toHaveCount(0);
+    await editorLine(page, '"model": "gpt-5-mini"');
+
+    // The agent changes the same model meanwhile.
+    const newer = draftWithModel();
+    newer.models.extract.model = "gpt-4.1";
+    await writeDraft(request, id, newer);
+
+    const refused = fullSave(page);
+    await page.getByTestId("full-blueprint-save").click();
+    expect((await refused).status()).toBe(409);
+    await page.getByTestId("full-blueprint-keep-editing").click();
+    const status = page.getByTestId("full-blueprint-status");
+    await expect(status).toHaveAttribute("data-state", "kept");
+
+    // Nothing is sent: the conflict is found before.
+    let puts = 0;
+    page.on("request", (r) => {
+      if (r.url().endsWith("/blueprint/full") && r.method() === "PUT") puts += 1;
+    });
+    await page.getByTestId("full-blueprint-save").click();
+    await expect(status).toHaveAttribute("data-state", "conflict");
+    await expect(status).toContainText("Mallit");
+    await expect(page.getByTestId("full-blueprint-save")).toBeDisabled();
+    await expect(page.getByTestId("full-blueprint-keep-editing")).toHaveCount(0);
+    expect(puts).toBe(0);
+    expect((await readDraft(request, id)).models?.extract?.model).toBe("gpt-4.1");
+
+    // Loading the newer version shows the agent's model; the text is gone, so leaving asks nothing.
+    await page.getByTestId("full-blueprint-reload").click();
+    await expect(page.getByTestId("full-blueprint-view")).toHaveAttribute("data-mode", "read");
+    const models = page.getByTestId("full-blueprint-section-models");
+    await models.locator("summary").click();
+    await expect(models.locator("pre")).toContainText('"gpt-4.1"');
+    await page.getByTestId("blueprint-view-steps").click();
+    await expect(page.getByTestId("blueprint-view-leave")).toHaveCount(0);
+    await expect(page.getByTestId("blueprint-view-steps")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("leaving the full blueprint with text not saved, and discarding it, drops the text", async ({ page, request }) => {
+    test.setTimeout(180_000);
+    const id = await sessionAtBpmn(page, request);
+    await writeDraft(request, id, draftWithModel());
+    await page.reload();
+    await openFullBlueprint(page);
+    await page.getByTestId("full-blueprint-advanced").click();
+    await replaceLine(page, `"model": "${MODEL}"`, '"model": "gpt-5-mini"');
+    await page.getByTestId("blueprint-view-steps").click();
+    await page.getByTestId("blueprint-view-leave-discard").click();
+    await expect(page.getByTestId("blueprint-view-steps")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("full-blueprint-view")).toHaveCount(0);
+    await page.getByTestId("blueprint-view-full").click();
+    await expect(page.getByTestId("full-blueprint-view")).toHaveAttribute("data-mode", "read");
+    expect((await readDraft(request, id)).models?.extract?.model).toBe(MODEL);
   });
 });

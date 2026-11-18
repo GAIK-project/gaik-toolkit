@@ -14,7 +14,9 @@ import {
   parseDraftText,
   readFullBlueprint,
   readonlyRanges,
-  withServerSections,
+  downloadText,
+  mergeDrafts,
+  withoutAiMark,
   type Draft,
   type FullBlueprint,
 } from "@/lib/full-blueprint";
@@ -40,6 +42,8 @@ type Status =
   | { kind: "unchanged" }
   | { kind: "changed" }
   | { kind: "kept" }
+  /** The newer draft and the text both changed these sections: only "load the newer version" is offered. */
+  | { kind: "conflict"; sections: string[] }
   | { kind: "error"; message: string };
 
 export type FullBlueprintSaved = {
@@ -80,12 +84,15 @@ export function FullBlueprintView({
   version,
   t,
   onSaved,
+  onDirtyChange,
 }: {
   sessionId: string;
   /** The workspace's active version: a new one is read again while the editor is closed. */
   version: number | null;
   t: Dict;
   onSaved: (saved: FullBlueprintSaved) => void;
+  /** Whether the advanced editor holds text not saved: the panel asks before leaving the view. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -95,6 +102,14 @@ export function FullBlueprintView({
   const [attention, setAttention] = useState<string[]>([]);
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const textRef = useRef("");
+  const [dirty, setDirty] = useState(false);
+  const onDirtyChangeRef = useRef(onDirtyChange);
+  useEffect(() => {
+    onDirtyChangeRef.current = onDirtyChange;
+  });
+  useEffect(() => {
+    onDirtyChangeRef.current?.(dirty);
+  }, [dirty]);
   // Whether the editor is open, for the reads that answer after it was opened.
   const editingRef = useRef(editing);
   useEffect(() => {
@@ -129,6 +144,7 @@ export function FullBlueprintView({
   function startEditing(full: FullBlueprint) {
     const text = draftText(full.draft);
     textRef.current = text;
+    setDirty(false);
     setBase(full);
     setStatus({ kind: "idle" });
     setAttention([]);
@@ -141,7 +157,7 @@ export function FullBlueprintView({
   }
 
   function download(full: FullBlueprint) {
-    const url = URL.createObjectURL(new Blob([draftText(full.draft)], { type: "application/json" }));
+    const url = URL.createObjectURL(new Blob([downloadText(full.draft)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = blueprintFileName(full.draft);
@@ -166,9 +182,18 @@ export function FullBlueprintView({
       });
       return;
     }
-    const locked = changedReadonlySection(editing.loaded, parsed.draft, base.readonlySections);
+    // A downloaded file pasted back carries the AI mark: it is not part of the blueprint.
+    const mine = withoutAiMark(parsed.draft);
+    const locked = changedReadonlySection(editing.loaded, mine, base.readonlySections);
     if (locked) {
       setStatus({ kind: "error", message: fillTemplate(t.wsJsonReadonlySection, { field: name(locked) }) });
+      return;
+    }
+    // On the draft as the server has it now: after "Keep editing" what the
+    // wizard changed meanwhile stays, unless the text changed the same section.
+    const merged = mergeDrafts(editing.loaded, base.draft, mine, base.readonlySections);
+    if (!merged.ok) {
+      setStatus({ kind: "conflict", sections: merged.conflicts });
       return;
     }
     setStatus({ kind: "saving" });
@@ -181,7 +206,7 @@ export function FullBlueprintView({
         body: JSON.stringify({
           base_version: base.version,
           base_digest: base.draftDigest,
-          draft: withServerSections(parsed.draft, base.draft, base.readonlySections),
+          draft: merged.draft,
         }),
       });
       body = (await res.json().catch(() => null)) as unknown;
@@ -205,6 +230,7 @@ export function FullBlueprintView({
       .filter((s): s is string => typeof s === "string" && s.trim() !== "");
     setEditing(null);
     editingRef.current = null;
+    setDirty(false);
     setAttention(notes);
     setStatus({ kind: savedVersion === base.version ? "unchanged" : "saved" });
     await reload();
@@ -239,6 +265,7 @@ export function FullBlueprintView({
   async function discardForNewer() {
     setEditing(null);
     editingRef.current = null;
+    setDirty(false);
     setStatus({ kind: "idle" });
     await reload();
   }
@@ -297,12 +324,14 @@ export function FullBlueprintView({
           ? t.fullBpUnchanged
           : status.kind === "changed"
             ? t.fullBpChangedElsewhere
+            : status.kind === "conflict"
+              ? fillTemplate(t.fullBpConflict, { sections: status.sections.map(name).join(", ") })
             : status.kind === "kept"
               ? t.fullBpKeptEditing
               : status.kind === "error"
                 ? status.message
                 : null;
-  const statusIsProblem = status.kind === "error" || status.kind === "changed";
+  const statusIsProblem = status.kind === "error" || status.kind === "changed" || status.kind === "conflict";
 
   return (
     <div className="flex flex-col gap-3 pb-2" data-testid="full-blueprint-view" data-mode={editing ? "edit" : "read"}>
@@ -316,7 +345,7 @@ export function FullBlueprintView({
         >
           {statusText}
         </p>
-        {status.kind === "changed" && editing && (
+        {(status.kind === "changed" || status.kind === "conflict") && editing && (
           <>
             <button
               type="button"
@@ -326,14 +355,16 @@ export function FullBlueprintView({
             >
               {t.fullBpReload}
             </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => void keepEditing()}
-              data-testid="full-blueprint-keep-editing"
-            >
-              {t.fullBpKeepEditing}
-            </button>
+            {status.kind === "changed" && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => void keepEditing()}
+                data-testid="full-blueprint-keep-editing"
+              >
+                {t.fullBpKeepEditing}
+              </button>
+            )}
           </>
         )}
         {editing ? (
@@ -343,7 +374,11 @@ export function FullBlueprintView({
               className="btn-ghost"
               onClick={() => {
                 setEditing(null);
+                editingRef.current = null;
+                setDirty(false);
                 setStatus({ kind: "idle" });
+                // A version written while the editor was open was not read: the view would show the old one.
+                if (version !== loadedVersion) void reload();
               }}
               data-testid="full-blueprint-cancel"
             >
@@ -353,7 +388,7 @@ export function FullBlueprintView({
               type="button"
               className="btn-brand"
               onClick={() => void save()}
-              disabled={status.kind === "saving" || status.kind === "changed"}
+              disabled={status.kind === "saving" || status.kind === "changed" || status.kind === "conflict"}
               data-testid="full-blueprint-save"
             >
               <Icon name="save" size={16} />
@@ -410,6 +445,7 @@ export function FullBlueprintView({
               label={t.fullBpEditorLabel}
               onChange={(text) => {
                 textRef.current = text;
+                setDirty(text !== editing.text);
               }}
               onSave={() => void save()}
             />
