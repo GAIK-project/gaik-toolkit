@@ -113,7 +113,10 @@ export function ReportResults({
                 <p key={stage}>
                   <span className="font-medium">{STAGE_LABELS[stage]}:</span>{" "}
                   {Object.entries(rw.usage[stage]!)
-                    .map(([key, value]) => `${key} ${value.toLocaleString()}`)
+                    .map(
+                      ([key, value]) =>
+                        `${key} ${value.toLocaleString("en-US")}`,
+                    )
                     .join(" · ") || "no token counts reported"}
                 </p>
               ))}

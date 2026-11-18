@@ -1114,7 +1114,7 @@ export default function KnowledgeSynthesisPage() {
                     {sections.length} sections
                   </Badge>
                   <Badge variant="outline" className="font-normal">
-                    {wordCount(markdown).toLocaleString()} words
+                    {wordCount(markdown).toLocaleString("en-US")} words
                   </Badge>
                   <Badge variant="outline" className="font-normal">
                     {cited.reduce((n, [, c]) => n + c, 0)} citations
@@ -1134,7 +1134,7 @@ export default function KnowledgeSynthesisPage() {
                   )}
                   <Badge variant="outline" className="font-normal">
                     {Object.entries(run.result.usage)
-                      .map(([k, v]) => `${k} ${v.toLocaleString()}`)
+                      .map(([k, v]) => `${k} ${v.toLocaleString("en-US")}`)
                       .join(" · ") || "no token counts reported"}
                   </Badge>
                 </div>

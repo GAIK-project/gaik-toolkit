@@ -540,7 +540,7 @@ export default function KnowledgeCuratorPage() {
                             {f.source_type} ·{" "}
                             {(
                               normalized[`normalized/${f.id}.md`]?.length ?? 0
-                            ).toLocaleString()}{" "}
+                            ).toLocaleString("en-US")}{" "}
                             chars
                           </span>
                           {f.source_class && (
@@ -881,7 +881,7 @@ export default function KnowledgeCuratorPage() {
                   <Badge variant="outline" className="font-normal">
                     {usage && Object.keys(usage).length > 0
                       ? Object.entries(usage)
-                          .map(([k, v]) => `${k} ${v.toLocaleString()}`)
+                          .map(([k, v]) => `${k} ${v.toLocaleString("en-US")}`)
                           .join(" · ")
                       : "no token counts reported"}
                   </Badge>

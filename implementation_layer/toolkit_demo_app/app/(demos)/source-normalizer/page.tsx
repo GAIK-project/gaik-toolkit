@@ -894,10 +894,10 @@ export default function SourceNormalizerPage() {
                     {mdPaths.length} {mdPaths.length === 1 ? "text" : "texts"}
                   </Badge>
                   <Badge variant="outline" className="font-normal">
-                    {totals.words.toLocaleString()} words
+                    {totals.words.toLocaleString("en-US")} words
                   </Badge>
                   <Badge variant="outline" className="font-normal">
-                    {totals.chars.toLocaleString()} characters
+                    {totals.chars.toLocaleString("en-US")} characters
                   </Badge>
                   {Object.entries(classCounts).map(([name, count]) => (
                     <Badge key={name} variant="outline" className="font-normal">
@@ -907,7 +907,7 @@ export default function SourceNormalizerPage() {
                   <Badge variant="outline" className="font-normal">
                     {usage && Object.keys(usage).length > 0
                       ? Object.entries(usage)
-                          .map(([k, v]) => `${k} ${v.toLocaleString()}`)
+                          .map(([k, v]) => `${k} ${v.toLocaleString("en-US")}`)
                           .join(" · ")
                       : "no model calls"}
                   </Badge>
@@ -981,7 +981,8 @@ export default function SourceNormalizerPage() {
                                 </>
                               )}
                               <span>
-                                {artifacts[path].length.toLocaleString()} chars
+                                {artifacts[path].length.toLocaleString("en-US")}{" "}
+                                chars
                               </span>
                               {entry?.source_class && (
                                 <Badge
@@ -1122,10 +1123,11 @@ export default function SourceNormalizerPage() {
                             <dd>{selectedKind?.text}</dd>
                             <dt className="text-muted-foreground">Size</dt>
                             <dd>
-                              {describeText(text).words.toLocaleString()} words
-                              · {describeText(text).lines.toLocaleString()}{" "}
+                              {describeText(text).words.toLocaleString("en-US")}{" "}
+                              words ·{" "}
+                              {describeText(text).lines.toLocaleString("en-US")}{" "}
                               lines ·{" "}
-                              {describeText(text).chars.toLocaleString()}{" "}
+                              {describeText(text).chars.toLocaleString("en-US")}{" "}
                               characters
                             </dd>
                             <dt className="text-muted-foreground">Saved as</dt>
