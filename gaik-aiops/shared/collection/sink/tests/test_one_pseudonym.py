@@ -15,6 +15,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+import yaml
 
 OTLP = "http://127.0.0.1:4318"
 MLFLOW = "http://127.0.0.1:5000"
@@ -133,19 +134,20 @@ def test_the_mlflow_routes_keep_the_base_traces_processors():
 def test_health_probe_spans_are_dropped_from_traces_only():
     # The wizard API's probe spans (GET /health and FastAPI's child spans) are dropped first in the
     # traces pipeline, after the memory limiter; logs and metrics keep their processors.
-    base = (COMPOSE / "otel-collector.yaml").read_text()
-    conditions = [
-        line.strip()
-        for line in base.split("  filter/health:\n")[1].split("  # Prometheus")[0].splitlines()
-        if line.strip().startswith("- ")
-    ]
+    config = yaml.safe_load((COMPOSE / "otel-collector.yaml").read_text())
     wizard = 'resource.attributes["service.name"] == "wizard-v2-api" and '
-    assert conditions == [
-        f'- {wizard}attributes["http.route"] == "/health"',
-        f'- {wizard}attributes["code.function.name"] == "wizard_api.main.health"',
-    ]
-    assert "processors: [memory_limiter, filter/health, transform/privacy, transform/session, batch]" in base
-    assert base.count("filter/health") == 2
+    assert config["processors"]["filter/health"] == {
+        "error_mode": "ignore",
+        "traces": {
+            "span": [
+                f'{wizard}attributes["http.route"] == "/health"',
+                f'{wizard}attributes["code.function.name"] == "wizard_api.main.health"',
+            ]
+        },
+    }
+    pipelines = config["service"]["pipelines"]
+    assert pipelines["traces"]["processors"][:2] == ["memory_limiter", "filter/health"]
+    assert "filter/health" not in pipelines["logs"]["processors"] + pipelines["metrics"]["processors"]
     # The files merged over the base config name no processors (lists are replaced), so the filter stays.
     rahti_ingress = COMPOSE.parent / "k8s" / "stack" / "overlays" / "rahti" / "otlp-ingress-collector.yaml"
     for overlay in (COMPOSE / "openbao" / "otel-collector.openbao.yaml", rahti_ingress):

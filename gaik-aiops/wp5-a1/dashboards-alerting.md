@@ -27,8 +27,8 @@ by the WP5 instrumentation side on top of the same Grafana and datasources.
 
 | Alert | Severity | Condition (placeholder thresholds) |
 |---|---|---|
-| HighErrorRatio | warning | More than 5 % of requests fail for 5 min |
-| HighLatencyP95 | warning | p95 latency above 2 s for 10 min |
+| HighErrorRatio | warning | More than 5 % of requests fail for 5 min, at 0.1 requests a second or more |
+| HighLatencyP95 | warning | p95 latency above 2 s for 10 min (the wizard API's streaming routes are left out) |
 | ErrorLogs | info | A service keeps logging errors for 5 min |
 | CollectorDown | critical | Collector not reachable (or never scraped) for 2 min |
 | EventDeliveryBacklog | warning | Records queue up because storage does not accept them, for 2 min |

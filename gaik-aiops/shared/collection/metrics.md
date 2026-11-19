@@ -30,7 +30,7 @@ carries `service_name` (and `deployment_environment_name` when set).
 |---|---|
 | `gaik:requests:rate5m` | Requests per second by service and operation |
 | `gaik:request_errors:ratio5m` | Share of failed requests by service |
-| `gaik:request_latency_ms:p50_5m`, `:p95_5m` | Request latency percentiles by service |
+| `gaik:request_latency_ms:p50_5m`, `:p95_5m` | Request latency percentiles by service, without the wizard API's streaming routes (chat turn and event streams), whose spans last the whole turn |
 | `gaik:log_records:rate5m` | Log records per second by service and event class |
 | `gaik:log_errors:rate5m` | Error log records per second by service |
 

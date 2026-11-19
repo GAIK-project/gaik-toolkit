@@ -17,6 +17,11 @@ tests:
         values: '0+100x20'
       - series: 'traces_span_metrics_calls_total{service_name="web", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}'
         values: '0+1x20'
+      # Half of a trickle of requests fails: below the minimum request rate, so no alert.
+      - series: 'traces_span_metrics_calls_total{service_name="quiet", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_OK"}'
+        values: '0+1x20'
+      - series: 'traces_span_metrics_calls_total{service_name="quiet", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}'
+        values: '0+1x20'
     alert_rule_test:
       - eval_time: 4m
         alertname: HighErrorRatio
@@ -47,6 +52,31 @@ tests:
           - exp_labels: {service_name: api, severity: warning}
             exp_annotations:
               summary: "api: p95 latency 2.425k ms"
+
+  - name: streaming routes do not count in the p95 latency
+    interval: 1m
+    input_series:
+      # One chat turn a minute, each longer than every bucket; the other requests are fast.
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="wizard-v2-api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="wizard-v2-api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="2500"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="wizard-v2-api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="+Inf"}'
+        values: '0+1x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="wizard-v2-api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/chat/stream", le="+Inf"}'
+        values: '0+1x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="wizard-v2-api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/runs/{run_id}/stream", le="+Inf"}'
+        values: '0+1x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="wizard-v2-api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="1000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="wizard-v2-api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="2500"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="wizard-v2-api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: HighLatencyP95
+        exp_alerts: []
 
   - name: collector down or missing
     interval: 1m
