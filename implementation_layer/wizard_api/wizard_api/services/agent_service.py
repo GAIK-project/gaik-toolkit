@@ -1407,17 +1407,25 @@ class Turn:
         self.stop_requested = False
         #: Ends the agent if the stop does not take effect; held so it is not collected.
         self.stop_watchdog: asyncio.Task | None = None
-        self._changed = asyncio.Condition()
+        # Set, and replaced by a fresh one, whenever a frame arrives or the turn
+        # ends. No lock: a reader whose page goes away is cancelled while it
+        # waits, and a condition variable could then be left held, which stopped
+        # the turn from publishing or finishing (19.11.2026). Everything here
+        # runs on one event loop, so nothing changes between a reader's check
+        # and its wait.
+        self._wake = asyncio.Event()
+
+    def _notify(self) -> None:
+        wake, self._wake = self._wake, asyncio.Event()
+        wake.set()
 
     async def publish(self, frame: str) -> None:
-        async with self._changed:
-            self.frames.append(frame)
-            self._changed.notify_all()
+        self.frames.append(frame)
+        self._notify()
 
     async def finish(self) -> None:
-        async with self._changed:
-            self.finished = True
-            self._changed.notify_all()
+        self.finished = True
+        self._notify()
 
     async def subscribe(self) -> AsyncGenerator[str, None]:
         """Every frame from the first one, then the new ones until the turn is through.
@@ -1429,19 +1437,16 @@ class Turn:
         """
         sent = 0
         while True:
-            async with self._changed:
+            if len(self.frames) <= sent and not self.finished:
+                wake = self._wake
                 try:
-                    await asyncio.wait_for(
-                        self._changed.wait_for(lambda: len(self.frames) > sent or self.finished),
-                        timeout=_HEARTBEAT_INTERVAL,
-                    )
+                    async with asyncio.timeout(_HEARTBEAT_INTERVAL):
+                        await wake.wait()
                 except TimeoutError:
-                    pass
-                batch = self.frames[sent:]
-                finished = self.finished
-            if not batch and not finished:
-                yield sse({"heartbeat": True})
-                continue
+                    yield sse({"heartbeat": True})
+                    continue
+            batch = self.frames[sent:]
+            finished = self.finished
             for frame in batch:
                 yield frame
             sent += len(batch)
