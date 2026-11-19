@@ -435,12 +435,30 @@ export function useReportWriter() {
       if (stages.includes("synthesize") || stages.includes("rebuild"))
         toast.success("Report ready");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(null);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortRef.current === controller) setRunning(null);
     }
+  }
+
+  /**
+   * Cancels the run in the browser. The workspace keeps the stages that
+   * finished. The Next.js route may still finish the stage on the server, and
+   * it then counts against the user's report quota. A stage's result is
+   * applied only when its stream ends, after the route has recorded the usage,
+   * so a stopped run never keeps a report that was not counted.
+   */
+  function stop() {
+    abortRef.current?.abort();
+    setRunning(null);
+    setProgress([]);
   }
 
   function saveArtifact(path: string, text: string) {
@@ -499,6 +517,7 @@ export function useReportWriter() {
     downloadAllZip,
     clearAll,
     run,
+    stop,
     saveArtifact,
   };
 }

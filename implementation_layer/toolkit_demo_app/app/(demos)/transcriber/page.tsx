@@ -7,7 +7,7 @@ import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { FeedbackButton } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
   CardContent,
@@ -185,7 +185,8 @@ export default function TranscriberPage() {
     }
 
     abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setIsLoading(true);
     clearResult();
@@ -218,7 +219,7 @@ export default function TranscriberPage() {
       const response = await apiFetch("/api/transcribe", {
         method: "POST",
         body: formData,
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -259,12 +260,23 @@ export default function TranscriberPage() {
           : "Transcription complete!",
       );
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
-      setIsLoading(false);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortControllerRef.current === controller) setIsLoading(false);
     }
+  }
+
+  /** Cancels the run in the browser; the page is ready again with its input. */
+  function stopRun(): void {
+    abortControllerRef.current?.abort();
+    setIsLoading(false);
   }
 
   return (
@@ -590,24 +602,17 @@ export default function TranscriberPage() {
                 }
               />
 
-              <Button
-                onClick={() => void handleSubmit()}
-                disabled={!file || busy}
+              <RunButton
+                running={isLoading}
+                onRun={() => void handleSubmit()}
+                onStop={stopRun}
+                icon={Sparkles}
+                disabled={!file || isLoadingExample}
                 className="mt-auto w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Transcribing…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Transcribe
-                  </>
-                )}
-              </Button>
+                Transcribe
+              </RunButton>
             </CardContent>
           </Card>
         </div>

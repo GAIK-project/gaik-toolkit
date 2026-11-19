@@ -1,5 +1,6 @@
 "use client";
 
+import { RunButton } from "@/components/demo/run-button";
 import { SectionGuide } from "@/components/demo/section-guide";
 import { RunBlockedButton, useRunAccess } from "@/components/run-access";
 import { Button } from "@/components/ui/button";
@@ -165,14 +166,15 @@ export function ExtractionExampleSection({
             {runBlocked ? (
               <RunBlockedButton />
             ) : (
-              <Button size="lg" onClick={process} disabled={busy}>
-                {busy ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Sparkles className="size-4" />
-                )}
-                {busy ? "Processing..." : "Process the example"}
-              </Button>
+              <RunButton
+                running={pipeline.isLoading}
+                onRun={process}
+                onStop={pipeline.stop}
+                icon={Sparkles}
+                disabled={busy}
+              >
+                Process the example
+              </RunButton>
             )}
             <button
               type="button"

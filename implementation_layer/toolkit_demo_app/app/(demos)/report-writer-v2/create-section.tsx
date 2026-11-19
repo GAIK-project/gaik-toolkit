@@ -498,7 +498,7 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
             progress={rw.progress}
             error={rw.error}
             onRun={rw.run}
-            onCancel={() => rw.abortRef.current?.abort()}
+            onStop={rw.stop}
             stacked
             runAllHint="Add at least one source file, and a file for every source listed, to run the stages."
           />

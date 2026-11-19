@@ -1,6 +1,7 @@
 "use client";
 
 import { MessageResponse } from "@/components/ai-elements/message";
+import { RunButton } from "@/components/demo/run-button";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
@@ -394,12 +395,23 @@ export default function SourceNormalizerPage() {
       if (!result) throw new Error("Normalize ended without a result.");
       toast.success("Sources normalized");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(false);
+      if (abortRef.current === controller) setRunning(false);
     }
+  }
+
+  /** Cancels the run in the browser; the files and options stay. */
+  function stopRun() {
+    abortRef.current?.abort();
+    setRunning(false);
+    setProgress([]);
   }
 
   /** Pass the (edited) texts to the Knowledge Curator page within this tab. */
@@ -799,29 +811,16 @@ export default function SourceNormalizerPage() {
               </div>
 
               <div className="mt-auto flex gap-2 pt-2">
-                <Button
-                  size="lg"
+                <RunButton
+                  running={running}
+                  onRun={normalize}
+                  onStop={stopRun}
+                  icon={Sparkles}
                   className="flex-1"
-                  onClick={normalize}
                   disabled={busy || rows.length === 0 || uploadTooLarge}
                 >
-                  {running ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  {running ? "Normalizing…" : "Normalize"}
-                </Button>
-                {running && (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => abortRef.current?.abort()}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                )}
+                  Normalize
+                </RunButton>
               </div>
             </CardContent>
           </Card>
