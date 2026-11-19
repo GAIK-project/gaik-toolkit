@@ -30,3 +30,5 @@ No text, no letters, no numbers, no logos, no borders around the cells, no drop 
 
 To add or replace one, generate it in the same style, save it as the next number and
 raise `AVATAR_COUNT` in `lib/account.ts`.
+The hash takes the count as its modulus, so raising it gives most users another
+avatar; `lib/account.test.ts` pins two assignments, so update those on purpose.

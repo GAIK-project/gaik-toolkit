@@ -2,13 +2,17 @@
 // which avatar is theirs and what they can run. Kept free of Supabase and Redis
 // imports, so the mapping can be tested on its own.
 
-/** Full access (approved), the daily trial, waiting, e-mail not confirmed, declined, or local dev. */
+/**
+ * Approved, the daily trial, waiting, e-mail not confirmed, declined, no access
+ * request at all (its insert at sign-up failed), or local development.
+ */
 export type AccountStatus =
   | "full"
   | "trial"
   | "pending"
   | "unconfirmed"
   | "rejected"
+  | "norequest"
   | "bypass";
 
 export interface Account {
@@ -21,7 +25,10 @@ export interface Account {
   trialRunsPerDay?: number;
 }
 
-/** public/avatars holds avatar-1.webp to avatar-8.webp (GPT Image 2.6, docs/avatars.md). */
+/**
+ * public/avatars holds avatar-1.webp to avatar-8.webp (GPT Image 2.6, docs/avatars.md).
+ * Raising the count gives most users another avatar.
+ */
 export const AVATAR_COUNT = 8;
 
 /** The same avatar for a user on every visit and device: a hash of the user id picks it. */
@@ -80,11 +87,13 @@ export function accountOf(
     ? "full"
     : access.requestStatus === "rejected"
       ? "rejected"
-      : access.isTrial
-        ? "trial"
-        : access.emailUnconfirmed
-          ? "unconfirmed"
-          : "pending";
+      : access.requestStatus === null
+        ? "norequest"
+        : access.isTrial
+          ? "trial"
+          : access.emailUnconfirmed
+            ? "unconfirmed"
+            : "pending";
   return {
     name,
     email,
@@ -98,7 +107,8 @@ export function accountOf(
 export function statusLine(account: Account): string {
   switch (account.status) {
     case "full":
-      return "Full access to the demos";
+      // Not "full access": the first wizard in the browser is a grant of its own.
+      return "Account approved";
     case "trial":
       return `Trial: ${account.trialRunsPerDay ?? 0} demo runs a day`;
     case "unconfirmed":
@@ -107,6 +117,8 @@ export function statusLine(account: Account): string {
       return "Waiting for approval";
     case "rejected":
       return "Your access request was declined";
+    case "norequest":
+      return "No access request on file";
     case "bypass":
       return "Sign-in is bypassed (BYPASS_AUTH)";
   }

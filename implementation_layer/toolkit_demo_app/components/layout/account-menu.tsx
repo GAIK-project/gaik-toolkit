@@ -10,9 +10,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { type Account, initials, statusLine } from "@/lib/account";
+import { GAIK_CONTACT_URL } from "@/lib/onboarding/mailto";
 import { setModelSettings } from "@/lib/model-settings-store";
 import { cn } from "@/lib/utils";
-import { CircleUser, LogOut } from "lucide-react";
+import { CircleUser, LogOut, Mail } from "lucide-react";
 import Link from "next/link";
 
 /** Clears this browser's model settings, signs out and follows the API's redirect. */
@@ -32,6 +33,7 @@ const STATUS_DOT: Record<Account["status"], string> = {
   pending: "bg-amber-500",
   unconfirmed: "bg-amber-500",
   rejected: "bg-destructive",
+  norequest: "bg-amber-500",
   bypass: "bg-muted-foreground",
 };
 
@@ -56,7 +58,8 @@ function AccountAvatar({
  * The signed-in user's avatar in the header. It opens who is signed in, what
  * they can run, and sign-out. A user on the trial or waiting for approval also
  * gets the access status page, which explains both; it says nothing true for
- * an unconfirmed e-mail address or a declined request, so they do not.
+ * an unconfirmed e-mail address or a declined request, so they do not. With a
+ * declined request or none at all, the way on is the GAIK team.
  *
  * The name and address stay out of analytics: PostHog's autocapture records a
  * clicked element's text and attributes, so the trigger has a generic label and
@@ -65,6 +68,8 @@ function AccountAvatar({
 export function AccountMenu({ account }: { account: Account }) {
   const notApproved =
     account.status === "trial" || account.status === "pending";
+  const askTeam =
+    account.status === "rejected" || account.status === "norequest";
   // With BYPASS_AUTH there is no session to end.
   const canSignOut = account.status !== "bypass";
 
@@ -98,13 +103,27 @@ export function AccountMenu({ account }: { account: Account }) {
           />
           {statusLine(account)}
         </p>
-        {notApproved || canSignOut ? <DropdownMenuSeparator /> : null}
+        {notApproved || askTeam || canSignOut ? (
+          <DropdownMenuSeparator />
+        ) : null}
         {notApproved ? (
           <DropdownMenuItem asChild>
             <Link href="/access-pending">
               <CircleUser className="size-4" />
               Access status
             </Link>
+          </DropdownMenuItem>
+        ) : null}
+        {askTeam ? (
+          <DropdownMenuItem asChild>
+            <a
+              href={GAIK_CONTACT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Mail className="size-4" />
+              Contact the GAIK team
+            </a>
           </DropdownMenuItem>
         ) : null}
         {canSignOut ? (
