@@ -45,7 +45,7 @@ def test_the_session_id_is_pseudonymised_before_it_names_the_mlflow_session():
             hashed = f'set({context}.attributes["{name}"], SHA256(Concat(["<key>", "session:"'
             assert any(hashed in s for s in statements), (context, name)
     # The copy to session.id runs after the privacy processor, so it copies the pseudonym.
-    assert "processors: [memory_limiter, transform/privacy, transform/session, batch]" in base
+    assert "processors: [memory_limiter, filter/health, transform/privacy, transform/session, batch]" in base
     # The overlay overrides transform/privacy only; the session rule lives in the base config.
     assert "transform/session" not in (COMPOSE / "openbao" / "otel-collector.openbao.yaml").read_text()
 
@@ -128,3 +128,13 @@ def test_the_mlflow_routes_keep_the_base_traces_processors():
     # naming receivers or processors there would drop transform/session (or a later rule).
     traces = _routes_module().routes({"wizard-v2-api": "1"})["service"]["pipelines"]["traces"]
     assert traces == {"exporters": ["spanmetrics", "routing/mlflow"]}
+
+
+def test_health_probe_spans_are_dropped_from_traces_only():
+    # Probe spans (GET /health) are dropped first in the traces pipeline, after the memory limiter;
+    # logs and metrics keep their processors. The overlays name no trace processors, so they inherit it.
+    base = (COMPOSE / "otel-collector.yaml").read_text()
+    assert 'attributes["http.route"] == "/health"' in base.split("filter/health:")[1].split("deltatocumulative")[0]
+    assert "processors: [memory_limiter, filter/health, transform/privacy, transform/session, batch]" in base
+    assert base.count("filter/health") == 2
+    assert "filter/health" not in (COMPOSE / "openbao" / "otel-collector.openbao.yaml").read_text()
