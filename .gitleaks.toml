@@ -22,4 +22,8 @@ paths = [
   # Unit tests with a placeholder key and a configuration arithmetic line.
   '''implementation_layer/unit_tests/test_report_skill\.py''',
   '''implementation_layer/unit_tests/test_parallel_transcriber_config\.py''',
+  # Upstream tests with invented values: a canary .env line the runner must not
+  # read, and a made-up key the error redaction must hide.
+  '''implementation_layer/solution_wizard/tests/test_interactive_runner\.py''',
+  '''implementation_layer/unit_tests/test_component_check_skill\.py''',
 ]
