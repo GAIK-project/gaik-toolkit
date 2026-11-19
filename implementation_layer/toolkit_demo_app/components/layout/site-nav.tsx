@@ -2,15 +2,6 @@
 
 import { ModelPicker } from "@/components/model-settings";
 
-import { GitHubIcon } from "@/components/github-icon";
-import {
-  Glimpse,
-  GlimpseContent,
-  GlimpseDescription,
-  GlimpseImage,
-  GlimpseTitle,
-  GlimpseTrigger,
-} from "@/components/kibo-ui/glimpse";
 import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +20,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 import {
   ACCESS,
   CAPTURE,
@@ -683,84 +673,6 @@ function NavLink({ href, label, icon: Icon, active, variant }: NavLinkProps) {
   );
 }
 
-interface GitHubLinkProps {
-  preview?: LinkPreview | null;
-  variant: "desktop" | "mobile";
-}
-
-function GitHubLink({ preview, variant }: GitHubLinkProps) {
-  const isDesktop = variant === "desktop";
-
-  const linkContent = (
-    <a
-      href={GITHUB_REPO_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={cn(
-        "flex items-center font-medium transition",
-        isDesktop
-          ? "gap-2 text-sm"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground gap-3 rounded-lg px-3 py-2.5 text-sm",
-      )}
-    >
-      <GitHubIcon className={isDesktop ? "h-4 w-4" : "h-5 w-5"} />
-      GitHub
-    </a>
-  );
-
-  if (!preview) {
-    return isDesktop ? (
-      <a
-        href={GITHUB_REPO_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all xl:inline-flex"
-        aria-label="GitHub"
-      >
-        <GitHubIcon className="h-4 w-4" />
-      </a>
-    ) : (
-      linkContent
-    );
-  }
-
-  return (
-    <Glimpse>
-      <GlimpseTrigger asChild>
-        {isDesktop ? (
-          <a
-            href={GITHUB_REPO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all xl:inline-flex"
-            aria-label="GitHub"
-          >
-            <GitHubIcon className="h-4 w-4" />
-          </a>
-        ) : (
-          linkContent
-        )}
-      </GlimpseTrigger>
-      <GlimpseContent className="w-80">
-        <a
-          href={GITHUB_REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-inherit no-underline"
-        >
-          {preview.image && (
-            <GlimpseImage src={preview.image} alt={preview.title || "GitHub"} />
-          )}
-          <GlimpseTitle>{preview.title || "GAIK Toolkit"}</GlimpseTitle>
-          <GlimpseDescription>
-            {preview.description || "AI-powered document processing toolkit"}
-          </GlimpseDescription>
-        </a>
-      </GlimpseContent>
-    </Glimpse>
-  );
-}
-
 const MobileMenuButton = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<typeof Button>
@@ -781,17 +693,11 @@ const MobileMenuButton = React.forwardRef<
 
 interface MobileNavProps {
   isActive: (href: string) => boolean;
-  githubPreview?: LinkPreview | null;
   isLoggedIn?: boolean;
   hasWizardAccess?: boolean;
 }
 
-function MobileNav({
-  isActive,
-  githubPreview,
-  isLoggedIn,
-  hasWizardAccess,
-}: MobileNavProps) {
+function MobileNav({ isActive, isLoggedIn, hasWizardAccess }: MobileNavProps) {
   const { openWizardAccess } = useOnboarding();
   const [mounted, setMounted] = useState(false);
   const itemContext: ItemContext = {
@@ -846,13 +752,10 @@ function MobileNav({
               )}
             </div>
           ))}
-          <hr className="border-border/60 my-3" />
-          <div className="px-2">
-            <GitHubLink preview={githubPreview} variant="mobile" />
-          </div>
-          {/* Signed in, the header's account menu has sign-out. */}
+          {/* Signed in, the header's account menu has sign-out. The GitHub
+              link is in the footer. */}
           {isLoggedIn ? null : (
-            <div className="px-2">
+            <div className="border-border/60 mt-3 border-t px-2 pt-3">
               <Link
                 href="/sign-in"
                 className="text-foreground hover:bg-muted flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
@@ -870,7 +773,6 @@ function MobileNav({
 
 export interface SiteNavProps {
   pathname: string;
-  githubPreview?: LinkPreview | null;
   isLoggedIn?: boolean;
   /** Who is signed in, for the account menu; null for a visitor. */
   account?: Account | null;
@@ -880,7 +782,6 @@ export interface SiteNavProps {
 
 export function SiteNav({
   pathname: initialPathname,
-  githubPreview,
   isLoggedIn,
   account,
   hasWizardAccess,
@@ -907,15 +808,6 @@ export function SiteNav({
       prev[group.label] === shift ? prev : { ...prev, [group.label]: shift },
     );
   }
-
-  // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
-  // a different element on SSR vs client. Only pass the preview after mount so that
-  // the server and client both render the plain <a> fallback on first render.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time SSR mount flag, not a cascade
-    setMounted(true);
-  }, []);
 
   function isActive(href: string): boolean {
     if (href === "/") return pathname === "/";
@@ -1029,10 +921,6 @@ export function SiteNav({
         {/* Right: Actions. min-w-fit keeps them from sliding under the nav. */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3 md:min-w-fit">
           <ModelPicker loggedIn={!!isLoggedIn} />
-          <GitHubLink
-            preview={mounted ? githubPreview : null}
-            variant="desktop"
-          />
           {account ? (
             <AccountMenu account={account} />
           ) : (
@@ -1043,7 +931,6 @@ export function SiteNav({
           )}
           <MobileNav
             isActive={isActive}
-            githubPreview={githubPreview}
             isLoggedIn={isLoggedIn}
             hasWizardAccess={hasWizardAccess}
           />
