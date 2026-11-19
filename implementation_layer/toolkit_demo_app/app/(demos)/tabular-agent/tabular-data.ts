@@ -179,3 +179,18 @@ export function toCsv(rows: Row[]): string {
 
 export const percent = (fraction: number): string =>
   `${Math.round(fraction * 100)}%`;
+
+/**
+ * A cell as text. A float from SQL arithmetic is shown at twelve significant
+ * digits, so 21.000000000000014 reads 21; the CSV download keeps the exact value.
+ */
+export function cellText(value: unknown): string {
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    !Number.isInteger(value)
+  ) {
+    return String(Number(value.toPrecision(12)));
+  }
+  return String(value);
+}

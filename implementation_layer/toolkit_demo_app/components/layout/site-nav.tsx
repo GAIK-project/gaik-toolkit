@@ -1,17 +1,7 @@
 "use client";
 
 import { ModelPicker } from "@/components/model-settings";
-import { setModelSettings } from "@/lib/model-settings-store";
 
-import { GitHubIcon } from "@/components/github-icon";
-import {
-  Glimpse,
-  GlimpseContent,
-  GlimpseDescription,
-  GlimpseImage,
-  GlimpseTitle,
-  GlimpseTrigger,
-} from "@/components/kibo-ui/glimpse";
 import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +20,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 import {
   ACCESS,
   CAPTURE,
@@ -63,7 +52,6 @@ import {
   House,
   Lightbulb,
   LogIn,
-  LogOut,
   LucideIcon,
   Menu,
   MessageSquare,
@@ -81,6 +69,8 @@ import {
   Wand2,
 } from "lucide-react";
 import Image from "next/image";
+import type { Account } from "@/lib/account";
+import { AccountMenu } from "./account-menu";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -105,38 +95,38 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    label: "Use Cases",
+    label: "Use cases",
     icon: Lightbulb,
     items: [
       {
-        label: "EU AI Act Screening",
+        label: "EU AI Act screening",
         href: "/ai-act-screening",
         icon: ShieldCheck,
       },
-      { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
-      { label: "Construction Diary", href: "/diary", icon: HardHat },
+      { label: "Incident reporting", href: "/incident-report", icon: ShieldAlert },
+      { label: "Construction diary", href: "/diary", icon: HardHat },
       {
-        label: "Video Transcription & Captioning",
+        label: "Video transcription and captioning",
         href: "/dental-transcription",
         icon: Mic,
       },
       {
-        label: "Semantic Video Search",
+        label: "Semantic video search",
         href: "/video-search",
         icon: Video,
       },
       {
-        label: "Purchase Order Processing",
+        label: "Purchase order processing",
         href: "/luvata-order",
         icon: FileBarChart,
       },
       {
-        label: "Construction Report Writing",
+        label: "Construction report writing",
         href: "/report-writer-v2?example=house_condition_assessment",
         icon: House,
       },
       {
-        label: "Helpdesk Chatbot",
+        label: "Helpdesk chatbot",
         href: "/helpdesk-chatbot",
         icon: Headset,
       },
@@ -149,11 +139,11 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Software Components",
+    label: "Software components",
     icon: Boxes,
     items: [
       {
-        label: "Schema Generator",
+        label: "Schema generator",
         href: "/schema-generator",
         icon: Braces,
         section: CAPTURE,
@@ -165,7 +155,7 @@ const navGroups: NavGroup[] = [
         section: CAPTURE,
       },
       {
-        label: "Vision Extractor",
+        label: "Vision extractor",
         href: "/vision-extractor",
         icon: ScanEye,
         section: CAPTURE,
@@ -184,49 +174,49 @@ const navGroups: NavGroup[] = [
         section: CAPTURE,
       },
       {
-        label: "Source Normalizer",
+        label: "Source normalizer",
         href: "/source-normalizer",
         icon: FileStack,
         section: CAPTURE,
       },
       {
-        label: "Web Scraper",
+        label: "Web scraper",
         href: "/web-scraper",
         icon: Globe,
         section: CAPTURE,
       },
       {
-        label: "Knowledge Curator",
+        label: "Knowledge curator",
         href: "/knowledge-curator",
         icon: LibraryBig,
         section: CAPTURE,
       },
       {
-        label: "PostgreSQL Agent",
+        label: "PostgreSQL agent",
         href: "/postgres-agent",
         icon: Database,
         section: ACCESS,
       },
       {
-        label: "Tabular Agent",
+        label: "Tabular agent",
         href: "/tabular-agent",
         icon: Table2,
         section: ACCESS,
       },
       {
-        label: "Text-to-Speech",
+        label: "Text-to-speech",
         href: "/text-to-speech",
         icon: Volume2,
         section: SYNTHESIS,
       },
       {
-        label: "LLM Judge",
+        label: "LLM judge",
         href: "/llm-judge",
         icon: Scale,
         section: SYNTHESIS,
       },
       {
-        label: "Knowledge Synthesizer",
+        label: "Knowledge synthesizer",
         href: "/knowledge-synthesis",
         icon: NotebookPen,
         section: SYNTHESIS,
@@ -234,30 +224,30 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Software Modules",
+    label: "Software modules",
     icon: Puzzle,
     items: [
       {
-        label: "Audio → Structured",
+        label: "Audio → structured",
         href: "/audio-structured",
         icon: AudioWaveform,
         section: CAPTURE,
       },
       {
-        label: "Document → Structured",
+        label: "Document → structured",
         href: "/document-structured",
         icon: FileOutput,
         section: CAPTURE,
       },
-      { label: "RAG Builder", href: "/rag", icon: Bot, section: ACCESS },
+      { label: "RAG builder", href: "/rag", icon: Bot, section: ACCESS },
       {
-        label: "Report Writer",
+        label: "Report writer",
         href: "/report-writer",
         icon: FileText,
         section: SYNTHESIS,
       },
       {
-        label: "Report Writer v2",
+        label: "Report writer v2",
         href: "/report-writer-v2",
         icon: FilePen,
         section: SYNTHESIS,
@@ -265,7 +255,7 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "No-code Assets",
+    label: "No-code assets",
     icon: FileCode,
     items: [
       {
@@ -274,12 +264,12 @@ const navGroups: NavGroup[] = [
         icon: MessageSquare,
       },
       {
-        label: "Agent Skills",
+        label: "Agent skills",
         href: "/skills",
         icon: Wand2,
       },
       {
-        label: "Desktop App",
+        label: "Desktop app",
         href: "/desktop-app",
         icon: MonitorDown,
       },
@@ -683,94 +673,6 @@ function NavLink({ href, label, icon: Icon, active, variant }: NavLinkProps) {
   );
 }
 
-interface GitHubLinkProps {
-  preview?: LinkPreview | null;
-  variant: "desktop" | "mobile";
-}
-
-function GitHubLink({ preview, variant }: GitHubLinkProps) {
-  const isDesktop = variant === "desktop";
-
-  const linkContent = (
-    <a
-      href={GITHUB_REPO_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={cn(
-        "flex items-center font-medium transition",
-        isDesktop
-          ? "gap-2 text-sm"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground gap-3 rounded-lg px-3 py-2.5 text-sm",
-      )}
-    >
-      <GitHubIcon className={isDesktop ? "h-4 w-4" : "h-5 w-5"} />
-      GitHub
-    </a>
-  );
-
-  if (!preview) {
-    return isDesktop ? (
-      <a
-        href={GITHUB_REPO_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all xl:inline-flex"
-        aria-label="GitHub"
-      >
-        <GitHubIcon className="h-4 w-4" />
-      </a>
-    ) : (
-      linkContent
-    );
-  }
-
-  return (
-    <Glimpse>
-      <GlimpseTrigger asChild>
-        {isDesktop ? (
-          <a
-            href={GITHUB_REPO_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all xl:inline-flex"
-            aria-label="GitHub"
-          >
-            <GitHubIcon className="h-4 w-4" />
-          </a>
-        ) : (
-          linkContent
-        )}
-      </GlimpseTrigger>
-      <GlimpseContent className="w-80">
-        <a
-          href={GITHUB_REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-inherit no-underline"
-        >
-          {preview.image && (
-            <GlimpseImage src={preview.image} alt={preview.title || "GitHub"} />
-          )}
-          <GlimpseTitle>{preview.title || "GAIK Toolkit"}</GlimpseTitle>
-          <GlimpseDescription>
-            {preview.description || "AI-powered document processing toolkit"}
-          </GlimpseDescription>
-        </a>
-      </GlimpseContent>
-    </Glimpse>
-  );
-}
-
-/** Handles sign-out via API and redirects */
-async function handleSignOut(): Promise<void> {
-  setModelSettings(null);
-  const res = await fetch("/api/auth/sign-out", { method: "POST" });
-  const data = await res.json();
-  if (data.redirectTo) {
-    window.location.href = data.redirectTo;
-  }
-}
-
 const MobileMenuButton = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<typeof Button>
@@ -791,17 +693,11 @@ const MobileMenuButton = React.forwardRef<
 
 interface MobileNavProps {
   isActive: (href: string) => boolean;
-  githubPreview?: LinkPreview | null;
   isLoggedIn?: boolean;
   hasWizardAccess?: boolean;
 }
 
-function MobileNav({
-  isActive,
-  githubPreview,
-  isLoggedIn,
-  hasWizardAccess,
-}: MobileNavProps) {
+function MobileNav({ isActive, isLoggedIn, hasWizardAccess }: MobileNavProps) {
   const { openWizardAccess } = useOnboarding();
   const [mounted, setMounted] = useState(false);
   const itemContext: ItemContext = {
@@ -828,6 +724,7 @@ function MobileNav({
       </SheetTrigger>
       <SheetContent
         side="right"
+        aria-describedby={undefined}
         className="flex w-[85vw] max-w-72 flex-col sm:w-72"
       >
         <SheetHeader className="shrink-0">
@@ -837,7 +734,7 @@ function MobileNav({
           {navGroups.map((group, index) => (
             <div key={group.label} className={index > 0 ? "mt-2" : ""}>
               {index > 0 && <hr className="border-border/60 mb-3" />}
-              <div className="text-primary/80 mb-2 flex items-center gap-2 px-3 py-1 text-xs font-semibold tracking-wider uppercase">
+              <div className="text-primary/80 mb-2 flex items-center gap-2 px-3 py-1 text-xs font-semibold">
                 <group.icon className="h-4 w-4" />
                 {group.label}
               </div>
@@ -856,23 +753,10 @@ function MobileNav({
               )}
             </div>
           ))}
-          <hr className="border-border/60 my-3" />
-          <div className="px-2">
-            <GitHubLink preview={githubPreview} variant="mobile" />
-          </div>
-          {isLoggedIn ? (
-            <div className="px-2">
-              <button
-                type="button"
-                className="text-muted-foreground hover:bg-muted hover:text-foreground flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
-                onClick={handleSignOut}
-              >
-                <LogOut className="h-5 w-5" />
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <div className="px-2">
+          {/* Signed in, the header's account menu has sign-out. The GitHub
+              link is in the footer. */}
+          {isLoggedIn ? null : (
+            <div className="border-border/60 mt-3 border-t px-2 pt-3">
               <Link
                 href="/sign-in"
                 className="text-foreground hover:bg-muted flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
@@ -890,16 +774,17 @@ function MobileNav({
 
 export interface SiteNavProps {
   pathname: string;
-  githubPreview?: LinkPreview | null;
   isLoggedIn?: boolean;
+  /** Who is signed in, for the account menu; null for a visitor. */
+  account?: Account | null;
   /** True when the visitor may open the beta items — server-read. */
   hasWizardAccess?: boolean;
 }
 
 export function SiteNav({
   pathname: initialPathname,
-  githubPreview,
   isLoggedIn,
+  account,
   hasWizardAccess,
 }: SiteNavProps) {
   // Use client pathname when available, fall back to server pathname for SSR
@@ -925,18 +810,10 @@ export function SiteNav({
     );
   }
 
-  // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
-  // a different element on SSR vs client. Only pass the preview after mount so that
-  // the server and client both render the plain <a> fallback on first render.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time SSR mount flag, not a cascade
-    setMounted(true);
-  }, []);
-
   function isActive(href: string): boolean {
-    if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(`${href}/`);
+    const [path] = href.split("?");
+    if (path === "/") return pathname === "/";
+    return pathname === path || pathname.startsWith(`${path}/`);
   }
 
   const itemContext: ItemContext = {
@@ -1000,13 +877,13 @@ export function SiteNav({
                         <group.icon className="mr-1.5 h-4 w-4 lg:mr-2" />
                         <span className="hidden lg:inline">{group.label}</span>
                         <span className="lg:hidden">
-                          {group.label === "Use Cases"
+                          {group.label === "Use cases"
                             ? "Cases"
-                            : group.label === "Software Components"
+                            : group.label === "Software components"
                               ? "Components"
-                              : group.label === "Software Modules"
+                              : group.label === "Software modules"
                                 ? "Modules"
-                                : group.label === "No-code Assets"
+                                : group.label === "No-code assets"
                                   ? "Assets"
                                   : group.label}
                         </span>
@@ -1046,21 +923,8 @@ export function SiteNav({
         {/* Right: Actions. min-w-fit keeps them from sliding under the nav. */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3 md:min-w-fit">
           <ModelPicker loggedIn={!!isLoggedIn} />
-          <GitHubLink
-            preview={mounted ? githubPreview : null}
-            variant="desktop"
-          />
-          {isLoggedIn ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground hidden gap-1.5 md:inline-flex"
-              onClick={handleSignOut}
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+          {account ? (
+            <AccountMenu account={account} />
           ) : (
             // Demos run only for a signed-in account, so say so where it shows.
             <Button asChild size="sm">
@@ -1069,7 +933,6 @@ export function SiteNav({
           )}
           <MobileNav
             isActive={isActive}
-            githubPreview={githubPreview}
             isLoggedIn={isLoggedIn}
             hasWizardAccess={hasWizardAccess}
           />

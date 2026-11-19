@@ -89,7 +89,7 @@ export function FinalReportCard({
           <CardDescription>
             {markdown === undefined
               ? "Run all to write the report."
-              : `${sectionCount} sections · ${words.toLocaleString()} words`}
+              : `${sectionCount} sections · ${words.toLocaleString("en-US")} words`}
           </CardDescription>
         </div>
         {status}

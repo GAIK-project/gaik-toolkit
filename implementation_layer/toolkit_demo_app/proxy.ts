@@ -13,7 +13,9 @@ import {
 } from "@/lib/api-access";
 import {
   MODEL_SETTINGS_HEADER,
+  REASONING_EFFORT_HEADER,
   SERVER_MODEL_HEADER,
+  isReasoningEffort,
   isServerModelId,
   encodeModelSettings,
   parseModelSettingsHeader,
@@ -52,7 +54,7 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|logos/|data/|downloads/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|logos/|avatars/|data/|downloads/).*)",
   ],
 };
 
@@ -286,6 +288,15 @@ async function route(request: NextRequest): Promise<NextResponse> {
       supportsServerModel(pathname, request.method)
     ) {
       headers.set(SERVER_MODEL_HEADER, serverModel);
+    }
+    // The reasoning effort picked with the model, on an own key as well. The
+    // API applies it to GPT-6 models only; any other value is dropped here.
+    const reasoningEffort = request.headers.get(REASONING_EFFORT_HEADER);
+    if (
+      isReasoningEffort(reasoningEffort) &&
+      supportsServerModel(pathname, request.method)
+    ) {
+      headers.set(REASONING_EFFORT_HEADER, reasoningEffort);
     }
     // Tell the API whether this user may run the team-only models, from the
     // session (lib/model-tier.ts): on every run, which may name a model, and on
