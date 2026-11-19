@@ -17,11 +17,9 @@ const rowClassName =
 function RowContent({
   icon: Icon,
   title,
-  description,
 }: {
   icon: LucideIcon | ComponentType<{ className?: string }>;
   title: string;
-  description: string;
 }) {
   return (
     <>
@@ -30,9 +28,6 @@ function RowContent({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-medium">{title}</span>
-        <span className="text-muted-foreground block text-sm">
-          {description}
-        </span>
       </span>
       <ArrowUpRight className="text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-colors" />
     </>
@@ -81,19 +76,16 @@ const links = [
     href: "https://gaik-project.github.io/gaik-toolkit/",
     icon: BookOpen,
     title: "Documentation",
-    description: "Guides, use cases and the component reference.",
   },
   {
     href: "https://pypi.org/project/gaik/",
     icon: Package,
     title: "PyPI package",
-    description: "Install only the extras you need.",
   },
   {
     href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples",
     icon: GitHubIcon,
     title: "Examples on GitHub",
-    description: "Runnable example scripts for the components and modules.",
   },
 ];
 
@@ -104,8 +96,8 @@ export function GetStarted() {
       id="get-started"
       className="from-primary/10 via-card to-card relative scroll-mt-24 overflow-hidden rounded-2xl border bg-gradient-to-br p-6 shadow-sm md:p-10"
     >
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
+        <div className="min-w-0 space-y-4">
           <h2 className="font-serif text-2xl font-semibold tracking-tight text-balance md:text-3xl">
             Build your own solution with GAIK
           </h2>

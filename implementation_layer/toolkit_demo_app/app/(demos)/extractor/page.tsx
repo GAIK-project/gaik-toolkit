@@ -342,8 +342,7 @@ export default function ExtractorPage() {
   async function handleGenerateSchema(): Promise<void> {
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
-    const next = await generateSchema();
-    if (next) toast.success("Schema generated");
+    await generateSchema();
   }
 
   /** The quotes of one extraction, located in the PDF or PDFs the text was read from. */
@@ -525,7 +524,6 @@ export default function ExtractorPage() {
         example: exampleId,
         results_count: data.results?.length || 0,
       });
-      toast.success("Data extracted");
     } catch (error) {
       if (
         controller.signal.aborted ||
@@ -548,7 +546,7 @@ export default function ExtractorPage() {
       <DemoPageHeader
         icon={Database}
         title="Extractor"
-        description="Finds and lists the details you ask for in any document. Nothing you enter is saved."
+        description="Extract the fields you choose from uploaded documents. Nothing you enter is saved."
         className="mb-6"
       />
 
@@ -964,7 +962,6 @@ export default function ExtractorPage() {
             <EmptyStateCard
               icon={FileText}
               title="No extraction yet"
-              description="Add a document and press Extract data."
               feedbackSlot={<FeedbackButton demoType="extractor" />}
             />
           )}
