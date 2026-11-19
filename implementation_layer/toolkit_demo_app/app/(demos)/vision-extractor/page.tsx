@@ -7,7 +7,6 @@ import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import type { SchemaField } from "@/components/demo/schema-fields-table";
 import { schemaTabs, SchemaTabsView } from "@/components/demo/schema-views";
-import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { TaskChangeNotice } from "@/components/demo/task-change-notice";
 import {
   appendVisionSettings,
@@ -19,6 +18,7 @@ import {
   useVisionModels,
 } from "@/components/demo/vision-settings";
 import { FeedbackButton } from "@/components/feedback";
+import { RunBlockedButton, useRunAccess } from "@/components/run-access";
 import {
   Accordion,
   AccordionContent,
@@ -34,14 +34,12 @@ import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { cn, formatFileSize } from "@/lib/utils";
 import { openFileInNewTab } from "@/components/demo/file-upload";
 import {
+  Check,
   ExternalLink,
   FileCode2,
-  ListChecks,
   Loader2,
   ScanEye,
-  ShieldCheck,
   Sparkles,
-  TextSearch,
   Upload,
   X,
 } from "lucide-react";
@@ -59,37 +57,12 @@ import {
   EXAMPLES,
   fileNameOf,
   MAX_FILE_MB,
+  MAX_FILES,
+  runHint,
   type VisionExample,
 } from "./vision-data";
 
 const ACCEPT_ATTR = ACCEPTED_EXTENSIONS.join(",");
-
-const GUIDE_STEPS: GuideStep[] = [
-  {
-    icon: Upload,
-    title: "Add the documents",
-    text: "Upload PDFs and images, one or several. Or use one of the ready-made documents.",
-  },
-  {
-    icon: ListChecks,
-    title: "Say what to extract",
-    text: "Describe the fields in words. The schema is generated for you to check.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Choose the model",
-    text: "Pick the model and options. Confidence scores per field are optional.",
-  },
-  {
-    icon: TextSearch,
-    title: "Check the sources",
-    text: "Each value shows the text it was read from, highlighted on its page.",
-  },
-];
-const GUIDE_NOTES = [
-  "One model call sees every file at once, so it can match values across documents, for example an invoice against its purchase order.",
-  "Nothing you enter is saved. A schema generated for your own task lives in this session only.",
-];
 
 const STRUCTURE_TEXT: Record<string, string> = {
   flat: "One record: one set of fields for all the documents.",
@@ -149,6 +122,37 @@ function pluralize(
 
 const normalizeTask = (value: string): string =>
   value.replace(/\r\n?/g, "\n").trim();
+
+/** The heading of one step of the form: its number, what to do, and whether it can be skipped. */
+function StepTitle({
+  n,
+  optional = false,
+  children,
+}: {
+  n: number;
+  optional?: boolean;
+  children: string;
+}) {
+  return (
+    <CardTitle className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+      <span
+        aria-hidden
+        className="bg-primary text-primary-foreground flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums"
+      >
+        {n}
+      </span>
+      <span>
+        <span className="sr-only">Step {n}: </span>
+        {children}
+      </span>
+      {optional && (
+        <span className="text-muted-foreground text-sm font-normal">
+          Optional
+        </span>
+      )}
+    </CardTitle>
+  );
+}
 
 interface FileListRowProps {
   file: File;
@@ -210,6 +214,9 @@ export default function VisionExtractorPage() {
   );
   const [isDragging, setIsDragging] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const schemaCardRef = useRef<HTMLDivElement | null>(null);
+  // Counts the schema previews, so each one brings the schema card into view.
+  const [previewCount, setPreviewCount] = useState(0);
 
   const busy = isLoading || isLoadingExample || isGeneratingSchema;
   const schemaCurrent =
@@ -228,6 +235,19 @@ export default function VisionExtractorPage() {
     ? !schemaCurrent
     : exampleTask !== null &&
       normalizeTask(userRequirements) !== normalizeTask(exampleTask);
+  // A run generates no schema: one was previewed for this text, or the text is an
+  // example's with a ready-made one.
+  const schemaReady = schemaCurrent || (!generatedSchema && readyMade);
+  const { blocked: runBlocked } = useRunAccess();
+  const loadedExample = EXAMPLES.find((e) => e.id === exampleId) ?? null;
+  const run = runHint({
+    loadingExample: isLoadingExample,
+    generatingSchema: isGeneratingSchema,
+    extracting: isLoading,
+    fileCount: files.length,
+    hasTask: userRequirements.trim().length > 0,
+    schemaReady,
+  });
 
   function handleRequirementsChange(value: string): void {
     setUserRequirements(value);
@@ -272,8 +292,22 @@ export default function VisionExtractorPage() {
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
     const next = await generateSchema();
-    if (next) toast.success("Schema generated");
+    if (next) {
+      toast.success("Schema generated");
+      setPreviewCount((count) => count + 1);
+    }
   }
+
+  useEffect(() => {
+    if (previewCount === 0) return;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    schemaCardRef.current?.scrollIntoView({
+      behavior: reduced ? "auto" : "smooth",
+      block: "nearest",
+    });
+  }, [previewCount]);
 
   useEffect(() => {
     return () => {
@@ -291,6 +325,10 @@ export default function VisionExtractorPage() {
         continue;
       }
       if (files.some((f) => f.name === file.name && f.size === file.size)) {
+        continue;
+      }
+      if (files.length + accepted.length >= MAX_FILES) {
+        errors.push(`${file.name}: at most ${MAX_FILES} files per extraction`);
         continue;
       }
       accepted.push(file);
@@ -431,70 +469,78 @@ export default function VisionExtractorPage() {
       />
 
       <div className="space-y-6">
-        <SectionGuide
-          heading="How to use the Vision Extractor"
-          steps={GUIDE_STEPS}
-          notes={GUIDE_NOTES}
-        />
-
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold">
-            Start from a ready-made document
-          </h2>
-          <div
-            role="radiogroup"
-            aria-label="Ready-made documents"
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-          >
-            {EXAMPLES.map((example) => (
-              <div
-                key={example.id}
-                className={cn(
-                  "flex flex-col gap-1.5 rounded-xl border-2 p-3 transition-all",
-                  exampleId === example.id
-                    ? "border-primary bg-primary/5"
-                    : "bg-card hover:border-primary/40",
-                )}
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={exampleId === example.id}
-                  disabled={busy}
-                  onClick={() => void pickExample(example)}
-                  className="flex flex-1 flex-col gap-1.5 text-left"
-                >
-                  <span className="font-semibold">{example.title}</span>
-                  <span className="text-muted-foreground text-sm">
-                    {example.summary}
-                  </span>
-                </button>
-                <div className="flex flex-wrap justify-center gap-1">
-                  {example.files.map((file) => (
-                    <ExamplePreviewDialog
-                      key={file.url}
-                      exampleUrl={file.url}
-                      exampleName={fileNameOf(file.url)}
-                      onUseExample={() => void pickExample(example)}
-                      disabled={busy}
-                      label={
-                        example.files.length === 1
-                          ? "View document"
-                          : `View ${file.label}`
-                      }
-                      buttonSize="xs"
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+        <section className="space-y-3" aria-labelledby="vx-examples">
+          <div className="space-y-1">
+            <h2 id="vx-examples" className="text-sm font-semibold">
+              Start with an example
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Using an example fills in steps 1 and 2 for you. For your own
+              documents, start at step 1.
+            </p>
           </div>
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {EXAMPLES.map((example) => {
+              const loaded = exampleId === example.id;
+              return (
+                <li
+                  key={example.id}
+                  className={cn(
+                    "flex flex-col gap-1.5 rounded-xl border-2 p-3 transition-colors",
+                    loaded ? "border-primary bg-primary/5" : "bg-card",
+                  )}
+                >
+                  <h3 className="font-semibold">{example.title}</h3>
+                  <p className="text-muted-foreground flex-1 text-sm">
+                    {example.summary}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      aria-pressed={loaded}
+                      aria-label={
+                        loaded
+                          ? `${example.title}: loaded in the form`
+                          : `Use the example ${example.title}`
+                      }
+                      disabled={busy}
+                      onClick={() => void pickExample(example)}
+                      className={cn(
+                        loaded &&
+                          "border-primary text-primary hover:text-primary",
+                      )}
+                    >
+                      {loaded && <Check aria-hidden />}
+                      {loaded ? "Loaded in the form" : "Use this example"}
+                    </Button>
+                    {example.files.map((file) => (
+                      <ExamplePreviewDialog
+                        key={file.url}
+                        exampleUrl={file.url}
+                        exampleName={fileNameOf(file.url)}
+                        onUseExample={() => void pickExample(example)}
+                        disabled={busy}
+                        label={
+                          example.files.length === 1
+                            ? "View document"
+                            : `View ${file.label}`
+                        }
+                        buttonSize="xs"
+                      />
+                    ))}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </section>
 
-        <div className="grid items-start gap-6 md:gap-8 lg:grid-cols-2">
-          <Card>
+        <div className="grid items-start gap-6 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
+          <Card className="lg:col-start-1 lg:row-start-1">
             <CardHeader>
-              <CardTitle>1. The documents</CardTitle>
+              <StepTitle n={1}>Add the documents</StepTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <label
@@ -526,11 +572,11 @@ export default function VisionExtractorPage() {
                   <p className="text-sm font-medium">
                     {isDragging
                       ? "Drop files here"
-                      : "Drag & drop or click to add files"}
+                      : "Drag and drop files, or click to choose"}
                   </p>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    PDF, PNG, JPG, GIF, WEBP, TIFF, BMP — up to {MAX_FILE_MB}MB
-                    each
+                    Up to {MAX_FILES} files of {MAX_FILE_MB} MB each: PDF, PNG,
+                    JPG, GIF, WEBP, TIFF or BMP
                   </p>
                 </div>
                 <input
@@ -557,9 +603,16 @@ export default function VisionExtractorPage() {
 
               {files.length > 0 && (
                 <div className="space-y-2">
-                  <Label className="text-xs">
-                    {pluralize(files.length, "file")} selected
-                  </Label>
+                  {loadedExample ? (
+                    <p className="text-primary flex items-start gap-1.5 text-xs font-medium">
+                      <Check className="mt-px size-3.5 shrink-0" aria-hidden />
+                      Loaded from the example “{loadedExample.title}”
+                    </p>
+                  ) : (
+                    <p className="text-xs font-medium">
+                      {pluralize(files.length, "file")} selected
+                    </p>
+                  )}
                   <div className="max-h-48 space-y-1.5 overflow-auto">
                     {files.map((file, index) => (
                       <FileListRow
@@ -572,16 +625,30 @@ export default function VisionExtractorPage() {
                   </div>
                 </div>
               )}
+
+              <p className="text-muted-foreground text-xs">
+                One model call sees every file at once, so it can match values
+                across documents, for example an invoice against its purchase
+                order. Nothing you enter is saved.
+              </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
             <CardHeader>
-              <CardTitle>2. What to extract</CardTitle>
+              <StepTitle n={2}>Say what to extract</StepTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor="requirements">Extraction requirements</Label>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <Label htmlFor="requirements">Extraction requirements</Label>
+                  {loadedExample && (
+                    <span className="text-primary flex items-center gap-1.5 text-xs font-medium">
+                      <Check className="size-3.5 shrink-0" aria-hidden />
+                      Filled in from the example
+                    </span>
+                  )}
+                </div>
                 <Textarea
                   id="requirements"
                   value={userRequirements}
@@ -589,24 +656,68 @@ export default function VisionExtractorPage() {
                   placeholder="e.g. Extract company name, total amount, date, and a list of line items (description, quantity, unit price) from this invoice."
                   disabled={busy}
                   rows={8}
+                  className="max-h-80"
                 />
-                {taskChanged ? (
+                {taskChanged && userRequirements.trim() ? (
                   <TaskChangeNotice />
                 ) : (
                   <p className="text-muted-foreground text-xs">
-                    {generatedSchema?.schema_source === "example" ||
-                    (!generatedSchema && readyMade) ||
-                    schemaCurrent
-                      ? "The schema is ready, so only the extraction runs."
-                      : "A schema is generated from this text at the first run. Name the fields and their types."}
+                    {schemaReady
+                      ? "A schema for this text is ready. If you edit the text, a new schema is generated when you extract."
+                      : "Name the fields and their types. A schema is generated from this text when you extract."}
                   </p>
                 )}
               </div>
 
+              {!runBlocked &&
+                !(
+                  schemaCurrent && generatedSchema?.schema_source === "example"
+                ) && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleGenerateSchema()}
+                      disabled={busy || !userRequirements.trim()}
+                    >
+                      {isGeneratingSchema && !isLoading ? (
+                        <Loader2 className="animate-spin" aria-hidden />
+                      ) : (
+                        <FileCode2 aria-hidden />
+                      )}
+                      {isGeneratingSchema && !isLoading
+                        ? "Generating the schema…"
+                        : schemaCurrent
+                          ? "Generate the schema again"
+                          : "Preview the schema"}
+                    </Button>
+                    <span className="text-muted-foreground text-xs">
+                      {schemaCurrent
+                        ? "Makes a new schema from the same text."
+                        : "Optional: check the fields before you extract."}
+                    </span>
+                  </div>
+                )}
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-start-1 lg:row-start-2">
+            <CardHeader>
+              <StepTitle n={3} optional>
+                Choose the model and options
+              </StepTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <TraceSourcesSwitch
+                checked={includeSources}
+                onCheckedChange={setIncludeSources}
+                disabled={busy}
+              />
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="settings" className="rounded-lg border">
                   <AccordionTrigger className="px-3 text-sm">
-                    Model and options
+                    Model, reasoning effort and other options
                   </AccordionTrigger>
                   <AccordionContent className="px-3">
                     <VisionSettingsFields
@@ -618,55 +729,6 @@ export default function VisionExtractorPage() {
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
-
-              <TraceSourcesSwitch
-                checked={includeSources}
-                onCheckedChange={setIncludeSources}
-                disabled={busy}
-              />
-
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void handleGenerateSchema()}
-                disabled={busy || !userRequirements.trim()}
-                className="w-full"
-              >
-                {isGeneratingSchema ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating schema…
-                  </>
-                ) : (
-                  <>
-                    <FileCode2 className="mr-2 h-4 w-4" />
-                    {generatedSchema
-                      ? "Generate the schema again"
-                      : "Generate schema"}
-                  </>
-                )}
-              </Button>
-
-              <Button
-                onClick={() => void handleSubmit()}
-                disabled={
-                  busy || files.length === 0 || !userRequirements.trim()
-                }
-                className="w-full"
-                size="lg"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isGeneratingSchema ? "Generating schema…" : "Extracting…"}
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Extract data
-                  </>
-                )}
-              </Button>
             </CardContent>
           </Card>
         </div>
@@ -675,7 +737,7 @@ export default function VisionExtractorPage() {
           !isLoading &&
           (!result ||
             generatedSchema.schema_id !== resultSchema?.schema_id) && (
-            <Card>
+            <Card ref={schemaCardRef} className="scroll-mt-24">
               <CardContent className="space-y-3 pt-6">
                 <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="text-base">
@@ -687,6 +749,12 @@ export default function VisionExtractorPage() {
                     </Badge>
                   )}
                 </div>
+                {!schemaCurrent && (
+                  <p className="text-muted-foreground text-sm">
+                    Made from an earlier version of the text in step 2. A new
+                    schema is generated when you extract.
+                  </p>
+                )}
                 <SchemaTabsView
                   tabs={schemaTabs(
                     generatedSchema,
@@ -696,6 +764,52 @@ export default function VisionExtractorPage() {
               </CardContent>
             </Card>
           )}
+
+        <Card>
+          <CardHeader>
+            <StepTitle n={4}>Extract</StepTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              {runBlocked ? (
+                <div className="shrink-0">
+                  <RunBlockedButton />
+                </div>
+              ) : (
+                <Button
+                  onClick={() => void handleSubmit()}
+                  disabled={!run.ready}
+                  size="lg"
+                  className="w-full sm:w-auto sm:min-w-44"
+                >
+                  {isLoading ? (
+                    <Loader2 className="animate-spin" aria-hidden />
+                  ) : (
+                    <Sparkles aria-hidden />
+                  )}
+                  {isLoading
+                    ? isGeneratingSchema
+                      ? "Generating schema…"
+                      : "Extracting…"
+                    : "Extract data"}
+                </Button>
+              )}
+              <p
+                role="status"
+                className={cn(
+                  "text-sm",
+                  run.ready || runBlocked
+                    ? "text-muted-foreground"
+                    : "text-foreground",
+                )}
+              >
+                {runBlocked
+                  ? "A run generates a schema from your text when there is none, then reads every file in one model call."
+                  : run.text}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="space-y-6" aria-live="polite">
           {isLoading && (
@@ -711,7 +825,6 @@ export default function VisionExtractorPage() {
           {result && !isLoading && (
             <ResultView
               results={[result.data]}
-              defaultTab={result.sources ? "sources" : "readable"}
               documentCount={result.documents_processed}
               seconds={result.duration_s}
               detail={result.model}

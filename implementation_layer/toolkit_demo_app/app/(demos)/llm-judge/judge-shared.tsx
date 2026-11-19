@@ -133,7 +133,10 @@ export function UsageBar({ usage }: { usage: Usage | null | undefined }) {
     });
   }
   if (usage.total_tokens != null)
-    items.push({ label: "Tokens", value: usage.total_tokens.toLocaleString() });
+    items.push({
+      label: "Tokens",
+      value: usage.total_tokens.toLocaleString("en-US"),
+    });
   if (usage.duration_s != null)
     items.push({ label: "Duration", value: `${usage.duration_s.toFixed(2)}s` });
   if (usage.cost_usd != null)

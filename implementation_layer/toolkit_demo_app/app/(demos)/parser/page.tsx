@@ -400,7 +400,7 @@ export default function ParserPage() {
                 >
                   {parserLabel(run.parser)}
                   <span className="text-muted-foreground ml-1.5 text-xs">
-                    {run.text.length.toLocaleString()} chars
+                    {run.text.length.toLocaleString("en-US")} chars
                   </span>
                 </button>
               ))}

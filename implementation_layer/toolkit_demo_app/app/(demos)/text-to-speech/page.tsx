@@ -361,9 +361,9 @@ export default function TextToSpeechPage() {
               <div>
                 <CardTitle>1. The text</CardTitle>
                 <CardDescription>
-                  Up to {MAX_CHARACTERS.toLocaleString()} characters. The server
-                  reads {MAX_PART_CHARACTERS.toLocaleString()} at a time, so a
-                  longer text goes in parts.
+                  Up to {MAX_CHARACTERS.toLocaleString("en-US")} characters. The
+                  server reads {MAX_PART_CHARACTERS.toLocaleString("en-US")} at
+                  a time, so a longer text goes in parts.
                 </CardDescription>
               </div>
               <Button
@@ -399,11 +399,11 @@ export default function TextToSpeechPage() {
                     tooLong && "border-destructive text-destructive",
                   )}
                 >
-                  {text.trim().length.toLocaleString()} /{" "}
-                  {MAX_CHARACTERS.toLocaleString()} characters
+                  {text.trim().length.toLocaleString("en-US")} /{" "}
+                  {MAX_CHARACTERS.toLocaleString("en-US")} characters
                 </Badge>
                 <Badge variant="outline" className="font-normal">
-                  {wordCount(text).toLocaleString()} words
+                  {wordCount(text).toLocaleString("en-US")} words
                 </Badge>
                 {text.trim() && !tooLong && (
                   <>
@@ -418,8 +418,8 @@ export default function TextToSpeechPage() {
               </div>
               {tooLong && (
                 <p className="text-destructive text-xs">
-                  The text is over {MAX_CHARACTERS.toLocaleString()} characters.
-                  Shorten it to generate speech.
+                  The text is over {MAX_CHARACTERS.toLocaleString("en-US")}{" "}
+                  characters. Shorten it to generate speech.
                 </p>
               )}
             </CardContent>
@@ -579,7 +579,7 @@ export default function TextToSpeechPage() {
                         {formatDuration(take.duration)}
                       </Badge>
                       <Badge variant="outline" className="font-normal">
-                        {take.characters.toLocaleString()} characters
+                        {take.characters.toLocaleString("en-US")} characters
                         {take.parts > 1 && `, ${take.parts} parts`}
                       </Badge>
                       <Badge

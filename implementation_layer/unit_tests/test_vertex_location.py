@@ -195,13 +195,13 @@ def test_a_default_location_gets_a_request_timeout(monkeypatch):
     assert seen[-1]["http_options"].timeout == 120_000
     # The fallback is the retry, so the EU is asked once, not with the SDK's retries.
     assert seen[-1]["http_options"].retry_options.attempts == 1
-    # A caller's own timeout stands, and a chosen location gets none added.
+    # A caller's own timeout stands, and a chosen location gets the default limit.
     _provider(timeout=30.0)
     assert seen[-1]["http_options"].timeout == 30_000
     _provider(max_retries=2)
     assert seen[-1]["http_options"].retry_options.attempts == 3
     _provider(location="europe-west4")
-    assert "http_options" not in seen[-1]
+    assert seen[-1]["http_options"].timeout == 600_000
 
 
 def test_a_fallback_named_in_the_config_decides(world):
@@ -247,9 +247,11 @@ def test_the_judge_asks_the_eu_once_within_a_time_limit(monkeypatch):
     assert [c["location"] for c in clients] == ["eu", "global"]
     assert clients[0]["http_options"].timeout == 120_000
     assert clients[0]["http_options"].retry_options.attempts == 1
-    # A location from the environment is used as given: no limit added, no fallback.
+    # A location from the environment is used as given, with the default limit and
+    # no fallback.
     clients.clear()
     monkeypatch.setenv("GOOGLE_VERTEXAI_LOCATION", "eu")
     with pytest.raises(genai_errors.ServerError):
         judge_module.LLMJudge._call_google(judge, [], "user", "system")
-    assert len(clients) == 1 and "http_options" not in clients[0]
+    assert len(clients) == 1 and clients[0]["http_options"].timeout == 600_000
+    assert clients[1:] == []

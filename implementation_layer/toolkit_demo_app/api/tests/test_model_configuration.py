@@ -64,6 +64,7 @@ def test_unconfigured_server_has_actionable_error():
         ("gpt-6-sol", "none"),
         ("gpt-6-astra", "low"),
         ("gpt-6.1-sol", "medium"),
+        ("gpt-6.2-sol", "medium"),
     ],
 )
 def test_gpt6_sampling_is_valid_for_chat_and_schema(model, effort):

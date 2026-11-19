@@ -119,6 +119,16 @@ def record_llm(usage: dict[str, Any]) -> None:
         trace.calls.append(data)
 
 
+def _route_template(scope) -> str | None:
+    """The matched route's full template (see utils/audit.py), or None when unmatched."""
+    try:
+        from utils.audit import route_template
+    except ImportError:
+        from api.utils.audit import route_template
+    template = route_template(scope)
+    return None if template == "unmatched" else template
+
+
 class OpsMiddleware:
     """Keep streaming intact; record only completed operations and server failures."""
 
@@ -151,7 +161,7 @@ class OpsMiddleware:
             _trace.reset(token)
             # Telemetry must not mask an exception or invalidate a successful response.
             with contextlib.suppress(Exception):
-                route = getattr(scope.get("route"), "path", None)
+                route = _route_template(scope)
                 if route and (
                     failed
                     or status >= 500

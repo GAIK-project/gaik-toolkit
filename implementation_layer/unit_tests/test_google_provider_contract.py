@@ -180,7 +180,15 @@ def test_google_retry_budget_works_without_explicit_timeout(monkeypatch):
     monkeypatch.setattr(google_provider.genai, "Client", lambda **kwargs: captured.update(kwargs))
     google_provider.GoogleProvider({"model": "gemini-test", "api_key": "test", "max_retries": 0})
     assert captured["http_options"].retry_options.attempts == 1
-    assert captured["http_options"].timeout is None
+    assert captured["http_options"].timeout == 600_000
+
+
+def test_google_requests_get_the_default_time_limit_and_retries(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(google_provider.genai, "Client", lambda **kwargs: captured.update(kwargs))
+    google_provider.GoogleProvider({"model": "gemini-test", "api_key": "test"})
+    assert captured["http_options"].timeout == 600_000
+    assert captured["http_options"].retry_options.attempts == 3
 
 
 @pytest.mark.parametrize("retries", [-1, 1.5])

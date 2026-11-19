@@ -73,6 +73,8 @@ reasoning. GPT-6 Astra does not support `reasoning_effort='none'`; Sol/Luna do.
 Custom Azure deployment names need `model_family` for family normalization.
 PostgresAgent/TabularAgent drop their `0.0` temperature default for GPT-6/GPT-5.6
 automatically; pass `temperature=None` only for other reasoning deployments that
-reject it (o-series, older gpt-5.x reasoning tiers). Follow SKILL.md Phase 6 and
+reject it (o-series, older gpt-5.x reasoning tiers). Keep SchemaGenerator's defaults:
+with no effort its requirements parses send GPT-6 Sol/Luna and GPT-5.6
+`reasoning_effort='none'`, so their `temperature=0` applies. Follow SKILL.md Phase 6 and
 the card's current options instead of the obsolete blanket restriction against every
 model newer than GPT-5.4.

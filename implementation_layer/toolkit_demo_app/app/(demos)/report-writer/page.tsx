@@ -48,6 +48,7 @@ import { ConfigActions } from "./components/config-actions";
 import {
   AUDIO_COMPRESS_COMMAND,
   isMediaFile,
+  REPORT_MAX_INPUT_FILES,
   REPORT_UPLOAD_MAX_BYTES,
   REPORT_UPLOAD_MAX_MB,
   totalFileBytes,
@@ -259,7 +260,13 @@ function MultiFileUpload({
   function addFiles(incoming: File[]) {
     const names = new Set(files.map((f) => f.name));
     const fresh = incoming.filter((f) => !names.has(f.name));
-    if (fresh.length) onChange([...files, ...fresh]);
+    const room = Math.max(REPORT_MAX_INPUT_FILES - files.length, 0);
+    if (fresh.length > room)
+      toast.error(
+        `At most ${REPORT_MAX_INPUT_FILES} input files per report: ${fresh.length - room} not added.`,
+      );
+    const kept = fresh.slice(0, room);
+    if (kept.length) onChange([...files, ...kept]);
   }
 
   return (
@@ -287,7 +294,8 @@ function MultiFileUpload({
         <Upload className="mx-auto h-7 w-7 text-muted-foreground mb-2" />
         <p className="text-sm font-medium">Drop files or click to browse</p>
         <p className="text-xs text-muted-foreground mt-1">
-          PDF · DOCX · Audio/Video · XLSX · Images · Text · CSV
+          PDF · DOCX · Audio/Video · XLSX · Images · Text · CSV · up to{" "}
+          {REPORT_MAX_INPUT_FILES} files
         </p>
         <input
           ref={inputRef}
@@ -468,6 +476,12 @@ export default function ReportWriterPage() {
     }
     if (sections.filter((s) => s.title.trim()).length === 0) {
       toast.error("Add at least one section");
+      return;
+    }
+    if (files.length + (additionalContext.trim() ? 1 : 0) > REPORT_MAX_INPUT_FILES) {
+      toast.error(
+        `At most ${REPORT_MAX_INPUT_FILES} input files per report, the additional context counting as one. Remove a file.`,
+      );
       return;
     }
     if (uploadTooLarge) {
@@ -881,7 +895,7 @@ export default function ReportWriterPage() {
               title="Generated Report"
               description={`${result.sections.length} section(s) · ${
                 result.usage?.total_tokens != null
-                  ? `${result.usage.total_tokens.toLocaleString()} tokens`
+                  ? `${result.usage.total_tokens.toLocaleString("en-US")} tokens`
                   : ""
               }`}
               feedbackSlot={<FeedbackButton demoType="report-writer" />}

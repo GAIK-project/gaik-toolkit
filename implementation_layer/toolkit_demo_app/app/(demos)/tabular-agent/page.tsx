@@ -135,7 +135,7 @@ function Profile({ tables }: { tables: TableInfo[] }) {
           className={cn(tables.length > 1 && "mt-3")}
         >
           <p className="text-muted-foreground mb-2 text-xs">
-            {table.name}: {table.row_count.toLocaleString()} rows,{" "}
+            {table.name}: {table.row_count.toLocaleString("en-US")} rows,{" "}
             {table.columns.length} columns
           </p>
           <div className="max-h-72 overflow-auto rounded-md border">

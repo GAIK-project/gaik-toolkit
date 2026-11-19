@@ -7,6 +7,11 @@ import re
 from collections import OrderedDict
 from typing import TYPE_CHECKING
 
+from gaik.software_components._tesseract import (
+    installed_tesseract_cli_languages,
+    installed_tesserocr_languages,
+    with_installed_languages,
+)
 from gaik.software_components.input_limits import InputLimits, docling_limits
 
 # Patch transformers export for AutoProcessor before docling imports.
@@ -324,10 +329,11 @@ def parse_pdf_to_chunks_with_metadata(pdf_path: str) -> list[Document]:
 
 def _build_ocr_options(ocr_engine: str):
     engine = (ocr_engine or "").lower()
+    # Tesseract gets only the default languages it has traineddata for (see _tesseract).
     if engine == "tesseract":
-        return TesseractOcrOptions()
+        return with_installed_languages(TesseractOcrOptions, installed_tesserocr_languages())
     if engine == "tesseract_cli":
-        return TesseractCliOcrOptions()
+        return with_installed_languages(TesseractCliOcrOptions, installed_tesseract_cli_languages())
     if engine == "easyocr":
         return EasyOcrOptions()
     if engine == "rapidocr":

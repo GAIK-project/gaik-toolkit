@@ -469,6 +469,13 @@ class LLMJudge:
         from google import genai
         from google.genai import types
 
+        from gaik.software_components.llm.base import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS
+
+        # The SDK waits without a limit unless it is given one.
+        limited = types.HttpOptions(
+            timeout=int(DEFAULT_TIMEOUT_SECONDS * 1000),
+            retry_options=types.HttpRetryOptions(attempts=DEFAULT_MAX_RETRIES + 1),
+        )
         if self.use_vertexai:
             # The EU multi-region unless a location is set (llm/config.py). A model
             # the EU does not serve is retried on the global endpoint below.
@@ -476,7 +483,7 @@ class LLMJudge:
             # The default location is asked once and for at most two minutes: the
             # SDK otherwise waits without a limit and would never reach the fallback.
             bounded = (
-                {}
+                {"http_options": limited}
                 if location
                 else {
                     "http_options": types.HttpOptions(
@@ -498,7 +505,7 @@ class LLMJudge:
                     "GOOGLE_APPLICATION_CREDENTIALS) and use_vertexai=True, "
                     "or set GOOGLE_GEMINI_API_KEY."
                 )
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=api_key, http_options=limited)
 
         parts: list[Any] = [user_prompt]
         for page in source_pages:
@@ -539,6 +546,7 @@ class LLMJudge:
                     vertexai=True,
                     project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
                     location="global",
+                    http_options=limited,
                 )
             )
         text = resp.text or ""

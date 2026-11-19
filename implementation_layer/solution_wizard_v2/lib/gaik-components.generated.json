@@ -190,7 +190,7 @@
       "outputs": [
         "structured_json"
       ],
-      "docs": "https://gaik-project.github.io/gaik-toolkit/toolkit/software-components/"
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/form_understander/README.md"
     },
     {
       "name": "JevClassifier",

@@ -22,7 +22,8 @@ output.
 
 ## What each demo calls today
 
-The server default is Azure OpenAI deployment `gpt-6-luna` (`AZURE_DEPLOYMENT`). A
+The server default is Azure OpenAI deployment `gpt-6-sol` (`DEMO_LLM_MODEL`; without it,
+`AZURE_DEPLOYMENT`). A
 signed-in user can switch the demos marked "own key works" below to another server model
 from the model menu; see the README for the list and who may use the team-only models.
 
@@ -159,6 +160,6 @@ the 0.9.1 release smoke run on gpt-oss 120B generated the schema in 17 seconds.
 
 ## Models listed in the UI today
 
-Server models: see the README. Own key, OpenAI/Azure: `gpt-6-luna` (default),
-`gpt-6-sol`, `gpt-6.1-sol`, `gpt-6-astra`, `gpt-5.6-terra`. Own key, Aitta:
+Server models: see the README. Own key, OpenAI/Azure: `gpt-6-sol` (default), `gpt-6-luna`,
+`gpt-6.2-sol`, `gpt-6.1-sol`, `gpt-6-astra`, `gpt-5.6-terra`. Own key, Aitta:
 `google/gemma-4-31b-it`, `openai/gpt-oss-120b` (text only), `Qwen/Qwen3.8-27B`.

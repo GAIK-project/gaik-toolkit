@@ -499,7 +499,8 @@ export default function SchemaGeneratorPage() {
                       </Badge>
                       {result.usage?.total_tokens != null && (
                         <Badge variant="outline">
-                          {result.usage.total_tokens.toLocaleString()} tokens
+                          {result.usage.total_tokens.toLocaleString("en-US")}{" "}
+                          tokens
                         </Badge>
                       )}
                       {outOfDate && (

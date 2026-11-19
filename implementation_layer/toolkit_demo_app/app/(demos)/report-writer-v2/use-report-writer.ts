@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/demo/use-confirm";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { processSSEStream } from "@/lib/sse";
 import {
@@ -131,6 +132,7 @@ export function useReportWriter() {
   const [progress, setProgress] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -223,12 +225,14 @@ export function useReportWriter() {
   }
 
   /** Reset the page to its state on load. */
-  function clearAll() {
+  async function clearAll() {
     if (
       Object.keys(artifacts).length > 0 &&
-      !window.confirm(
-        "Clearing the form also clears the current workspace. Continue?",
-      )
+      !(await confirm({
+        title: "Clear the form?",
+        description: "This also clears the current workspace.",
+        action: "Clear",
+      }))
     )
       return;
     setExampleId("");
@@ -248,9 +252,11 @@ export function useReportWriter() {
   async function loadExample(ex: ExampleInfo) {
     if (
       Object.keys(artifacts).length > 0 &&
-      !window.confirm(
-        "Loading an example clears the current workspace. Continue?",
-      )
+      !(await confirm({
+        title: "Load the example?",
+        description: "It clears the current workspace.",
+        action: "Load example",
+      }))
     )
       return;
     setLoadingExample(true);
@@ -409,9 +415,12 @@ export function useReportWriter() {
     if (
       stages.includes("synthesize") &&
       stale.editedSections &&
-      !window.confirm(
-        "Stage 3 rewrites every section and overwrites your section edits. Continue?",
-      )
+      !(await confirm({
+        title: "Run Stage 3 again?",
+        description:
+          "Stage 3 rewrites every section and overwrites your section edits.",
+        action: "Run Stage 3",
+      }))
     )
       return;
     abortRef.current?.abort();
@@ -482,6 +491,7 @@ export function useReportWriter() {
     progress,
     error,
     abortRef,
+    confirmDialog,
     // actions
     buildSpec,
     loadExample,
