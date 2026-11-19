@@ -381,3 +381,81 @@ def test_an_accepted_message_counts_as_activity(api) -> None:
     assert api.post(f"/wizard/message/{sid}", json={"text": "hi"}, headers=ALICE).is_success
 
     assert route.WIZARD_SESSIONS[sid]["last_active"] > time.time() - 60
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("", None), ("4.5", 4.5), ("0", None), ("-1", None), ("inf", None), ("lots", None)],
+)
+def test_the_agents_cost_limit_is_off_unless_set(monkeypatch, tmp_path, raw, expected) -> None:
+    monkeypatch.setattr(route, "WIZARD_DIR", tmp_path)
+    monkeypatch.setattr(route, "WORKSPACES_DIR", tmp_path / "workspaces")
+    for name in route.REQUIRED_FOUNDRY_VARS:
+        monkeypatch.setenv(name, "test")
+    monkeypatch.setenv("WIZARD_AGENT_MAX_BUDGET_USD", raw)
+
+    options = route._build_options(tmp_path / "workspaces" / "s1", route._cli_home("s1"))
+
+    assert options.max_budget_usd == expected
+
+
+def test_a_turn_stopped_at_the_cost_limit_says_so_and_ends_the_session() -> None:
+    class OverBudget:
+        async def receive_response(self):
+            yield route.ResultMessage(
+                subtype="error_max_budget_usd",
+                duration_ms=1,
+                duration_api_ms=1,
+                is_error=True,
+                num_turns=3,
+                session_id="cli",
+            )
+
+    session = {"client": OverBudget(), "last_active": 0.0}
+
+    async def run() -> str:
+        return "".join([chunk async for chunk in route._stream_turn(session)])
+
+    out = asyncio.run(run())
+
+    assert route.BUDGET_STOP in out
+    assert "Please continue" not in out
+    assert session["over_budget"] is True
+
+
+def test_a_session_over_its_cost_limit_takes_no_more_messages(api) -> None:
+    sid = _start(api, ALICE)
+    session = route.WIZARD_SESSIONS[sid]
+    (session["output_dir"] / "blueprint.json").write_text("{}", encoding="utf-8")
+    session["over_budget"] = True
+
+    refused = api.post(f"/wizard/message/{sid}", json={"text": "go on"}, headers=ALICE)
+
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == route.BUDGET_STOP
+    assert Client.started[0].queries == []
+    # The files made before the stop can still be downloaded.
+    assert api.get(f"/wizard/files/{sid}", headers=ALICE).status_code == 200
+
+
+@pytest.mark.parametrize("text", ["/clear", "  /compact now", "/solution-wizard"])
+def test_a_users_message_never_runs_a_cli_command(api, text) -> None:
+    sid = _start(api, ALICE)
+    api.post(f"/wizard/message/{sid}", json={"text": "hello"}, headers=ALICE)
+
+    response = api.post(f"/wizard/message/{sid}", json={"text": text}, headers=ALICE)
+
+    assert response.status_code == 200
+    sent = Client.started[0].queries[-1]
+    assert not sent.lstrip().startswith("/")
+    assert sent.removeprefix("​") == text  # the text itself is unchanged
+
+
+def test_the_bootstrap_still_starts_with_the_skills_command(api) -> None:
+    sid = _start(api, ALICE)
+
+    api.post(f"/wizard/message/{sid}", json={"text": "/clear"}, headers=ALICE)
+
+    first = Client.started[0].queries[0]
+    assert first.startswith("/solution-wizard")
+    assert first.endswith("​/clear")

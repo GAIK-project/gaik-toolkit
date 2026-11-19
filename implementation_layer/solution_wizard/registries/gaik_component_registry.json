@@ -2225,7 +2225,8 @@
     ],
     "uses_components": [],
     "required_parameters": [
-      "connection_string"
+      "connection_string",
+      "table_allowlist"
     ],
     "optional_parameters": [
       "config",
@@ -2233,7 +2234,6 @@
       "max_retries",
       "max_rows",
       "statement_timeout_ms",
-      "table_allowlist",
       "schema_name",
       "extra_instructions",
       "answer_language",
@@ -2258,13 +2258,14 @@
       "speed_vs_accuracy": "Agentic retry loop (max_retries) improves SQL accuracy at cost of latency",
       "cost_sensitivity": "low-medium -- one to three LLM calls per question",
       "degrades_on": [
-        "very_large_schemas_without_table_allowlist",
+        "very_large_table_allowlists",
         "highly_ambiguous_questions"
       ]
     },
     "known_limitations": [
       "Read-only SELECT queries only; no writes, DDL, or data import",
-      "Full schema placed in LLM prompt; very large databases need table_allowlist",
+      "Reads only the tables named in the required table_allowlist; a query touching any other table, view or system catalog is refused, and the agent cannot be constructed without the list",
+      "The schema of every table on table_allowlist is placed in the LLM prompt; keep the list to the tables the questions need",
       "Requires a live PostgreSQL connection at runtime",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
@@ -2279,12 +2280,18 @@
         "id": "ask_database",
         "component": "PostgresAgent",
         "inputs": [
-          "user_question",
-          "connection_string"
+          "user_question"
         ],
         "outputs": [
           "natural_language_answer"
-        ]
+        ],
+        "parameters": {
+          "connection_string": "env:DATABASE_URL",
+          "table_allowlist": [
+            "customers",
+            "orders"
+          ]
+        }
       }
     ],
     "source_path": "implementation_layer/src/gaik/software_components/postgres_agent/",
@@ -2428,7 +2435,7 @@
       ]
     },
     "known_limitations": [
-      "No README available -- sourced from module docstring and source inspection",
+      "Sourced from the component README and source inspection",
       "No example script available",
       "LLM-based labelling; ambiguous field IDs may need parent HTML snippet for context",
       "No extra pip install needed; bundled with base gaik install",
@@ -2454,7 +2461,7 @@
     "source_path": "implementation_layer/src/gaik/software_components/form_understander/",
     "import_path": "gaik.software_components.form_understander",
     "example_script_path": "",
-    "readme_path": "",
+    "readme_path": "implementation_layer/src/gaik/software_components/form_understander/README.md",
     "install_extra": ""
   },
   {

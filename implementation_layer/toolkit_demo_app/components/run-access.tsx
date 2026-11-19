@@ -7,11 +7,20 @@ import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { pageUsesModelSettings } from "@/lib/model-settings";
 import { useModelSettings } from "@/lib/model-settings-store";
+import {
+  runBlockedLabel,
+  runRefusal,
+  type RunRefusal,
+} from "@/lib/run-refusal";
 
 interface RunAccess {
   loggedIn: boolean;
   /** Approved, or pending on the daily trial allowance. */
   canRun: boolean;
+  /** May run on their own model key: approved, or pending and confirmed. */
+  ownKeyRuns: boolean;
+  /** Pending approval, and the e-mail address is not confirmed yet. */
+  emailUnconfirmed: boolean;
 }
 
 // Without a provider (state unknown) nothing is blocked: the proxy still refuses
@@ -35,18 +44,28 @@ export function RunAccessProvider({
 /**
  * Whether this visitor can run the demo now, and if not, why. Runs need an
  * approved account or the trial allowance; on a demo that takes the user's own
- * model key, a saved key is enough (lib/api-access.ts).
+ * model key, a saved key also opens it for a signed-in user waiting for
+ * approval whose e-mail address is confirmed (lib/api-access.ts). A saved key
+ * opens nothing for a visitor who is not signed in.
  */
 export function useRunAccess(): {
   blocked: boolean;
   loggedIn: boolean;
+  /** Why the run is held, when it is. */
+  reason: RunRefusal | null;
 } {
   const access = useContext(RunAccessContext);
   const settings = useModelSettings();
   const pathname = usePathname();
-  if (!access || access.canRun) return { blocked: false, loggedIn: true };
-  const ownKey = !!settings && pageUsesModelSettings(pathname);
-  return { blocked: !ownKey, loggedIn: access.loggedIn };
+  if (!access || access.canRun)
+    return { blocked: false, loggedIn: true, reason: null };
+  const ownKey =
+    access.ownKeyRuns && !!settings && pageUsesModelSettings(pathname);
+  return {
+    blocked: !ownKey,
+    loggedIn: access.loggedIn,
+    reason: ownKey ? null : runRefusal(access),
+  };
 }
 
 /**
@@ -58,12 +77,12 @@ export function RunBlockedButton({
 }: {
   size?: "default" | "sm" | "lg";
 }) {
-  const { loggedIn } = useRunAccess();
+  const { loggedIn, reason } = useRunAccess();
   return (
     <span className="flex flex-wrap items-center gap-3">
       <Button size={size} disabled>
         <Lock className="size-4" aria-hidden />
-        {loggedIn ? "Waiting for approval" : "Sign in to run"}
+        {runBlockedLabel(reason ?? (loggedIn ? "approval" : "sign-in"))}
       </Button>
       {!loggedIn && (
         <Link

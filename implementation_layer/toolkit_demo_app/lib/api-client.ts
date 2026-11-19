@@ -1,10 +1,16 @@
 import toast from "react-hot-toast";
 import { getModelSettings } from "./model-settings-store";
-import { getServerModel } from "./server-model-store";
+import {
+  getActiveServerModel,
+  getReasoningEffort,
+  getServerModel,
+} from "./server-model-store";
 import {
   MODEL_SETTINGS_HEADER,
+  REASONING_EFFORT_HEADER,
   SERVER_MODEL_HEADER,
   encodeModelSettings,
+  reasoningEffortFor,
   supportsModelSettings,
   supportsServerModel,
 } from "./model-settings";
@@ -61,6 +67,19 @@ export async function apiFetch(
     headers.set(SERVER_MODEL_HEADER, serverModel);
   } else if (!serverModelRoute) {
     headers.delete(SERVER_MODEL_HEADER);
+  }
+  // The reasoning effort picked in the model menu travels with the model, on
+  // an own key too. Auto sends nothing.
+  const effort = serverModelRoute
+    ? reasoningEffortFor(
+        getReasoningEffort(),
+        settings ?? getActiveServerModel(),
+      )
+    : null;
+  if (effort && !headers.has(REASONING_EFFORT_HEADER)) {
+    headers.set(REASONING_EFFORT_HEADER, effort);
+  } else if (!serverModelRoute) {
+    headers.delete(REASONING_EFFORT_HEADER);
   }
   const response = await fetch(url, {
     ...options,

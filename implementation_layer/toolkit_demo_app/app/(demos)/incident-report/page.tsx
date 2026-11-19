@@ -25,7 +25,7 @@ export default function IncidentReportPage() {
       <DemoPageHeader
         icon={AlertTriangle}
         iconClassName="h-8 w-8 text-amber-500"
-        title="Incident Reporting"
+        title="Incident reporting"
         description="Turn incident reports, logs, recordings and photos of paper forms into structured reports"
       >
         <div className="mt-2 flex justify-end">
@@ -34,19 +34,9 @@ export default function IncidentReportPage() {
       </DemoPageHeader>
 
       <UseCaseChooser
-        exampleDescription="Nothing to prepare. Pick a ready-made incident report and see what the demo does."
-        examplePoints={[
-          "Text reports, a log with two incidents, a Finnish report and a spoken one",
-          "See which details are read from each",
-          "Click a value to see where it comes from in the source",
-        ]}
+        exampleDescription="Try a shift log with two incidents, a Finnish report or a recording."
         createTitle="Test on your own data or examples"
-        createDescription="Try the extraction on your own reports, with the fields and language you need."
-        createPoints={[
-          "Type text, add a recording, or a photo or scan of a form",
-          "Choose fields, add your own, or write the prompt",
-          "Get one report for each incident, with a PDF you can download",
-        ]}
+        createDescription="Pick the fields and language for your reports, then download them as a PDF."
         ExampleSection={ExampleSection}
         CreateSection={CreateSection}
       />

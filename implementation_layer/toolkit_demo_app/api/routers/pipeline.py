@@ -89,7 +89,12 @@ except ImportError:
         _categorize_fallback_reason,
         _summarize_corrections,
     )
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+try:
+    from utils.result_owner import current_user, remember_owner, require_owner
+except ImportError:
+    from api.utils.result_owner import current_user, remember_owner, require_owner
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -318,6 +323,7 @@ async def audio_pipeline(
     compress_audio: bool = Form(True),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    user: str = Depends(current_user),
 ):
     """
     Run the complete audio pipeline: Transcribe -> Extract -> (PDF).
@@ -330,6 +336,7 @@ async def audio_pipeline(
     - **compress_audio**: Whether to compress audio before sending
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Initialize steps
     steps = [
@@ -501,6 +508,7 @@ async def document_pipeline(
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    user: str = Depends(current_user),
 ):
     """
     Run the complete document pipeline: Parse -> Extract -> (PDF).
@@ -512,6 +520,7 @@ async def document_pipeline(
     - **pdf_title**: Title for the generated PDF report
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Initialize steps
     steps = [
@@ -688,6 +697,7 @@ async def text_pipeline(
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    user: str = Depends(current_user),
 ):
     """
     Run the text extraction pipeline: Extract structured data from text.
@@ -698,6 +708,7 @@ async def text_pipeline(
     - **pdf_title**: Title for the generated PDF report
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Initialize steps
     steps = [
@@ -844,6 +855,7 @@ async def audio_pipeline_stream(
     custom_context: str = Form(""),
     fix_transcription_errors: bool = Form(False),
     prefer_local_first: bool = Form(True),
+    user: str = Depends(current_user),
 ):
     """
     Run the audio pipeline with SSE streaming progress updates.
@@ -852,6 +864,7 @@ async def audio_pipeline_stream(
     """
     enhanced = enhanced or fix_transcription_errors
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Validate file first
     if not file.filename:
@@ -1164,6 +1177,7 @@ async def text_pipeline_stream(
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
     schema_id: str | None = Form(None),
+    user: str = Depends(current_user),
 ):
     """
     Run the text extraction pipeline with SSE streaming progress updates.
@@ -1171,6 +1185,7 @@ async def text_pipeline_stream(
     Returns Server-Sent Events with progress updates and final result.
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         steps = [
@@ -1317,6 +1332,7 @@ async def document_pipeline_stream(
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
     schema_id: str | None = Form(None),
+    user: str = Depends(current_user),
 ):
     """
     Run the document pipeline with SSE streaming progress updates.
@@ -1324,6 +1340,7 @@ async def document_pipeline_stream(
     Returns Server-Sent Events with progress updates and final result.
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Validate file first
     if not file.filename:
@@ -1625,8 +1642,11 @@ async def generate_session_schema(user_requirements: str = Form(...)):
 
 
 @router.get("/pdf/{job_id}")
-async def download_pdf(job_id: str, inline: bool = False):
-    """Download a generated PDF by job ID, or show it in the page with ?inline=true."""
+async def download_pdf(job_id: str, inline: bool = False, user: str = Depends(current_user)):
+    """Download a generated PDF by job ID, or show it in the page with ?inline=true.
+
+    Only for the user whose run made it (api/utils/result_owner.py)."""
+    require_owner(job_id, user, "PDF not found")
     if job_id not in PDF_STORAGE:
         raise HTTPException(status_code=404, detail="PDF not found")
 

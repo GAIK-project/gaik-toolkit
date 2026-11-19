@@ -19,6 +19,7 @@ import {
   ACTION_STATUS,
   CONFIDENCE,
   type Citation,
+  conditionText,
   FINDING_QUESTIONS,
   FINDING_STATUS,
   formatDate,
@@ -111,7 +112,10 @@ function Cites({ list }: { list?: Citation[] }) {
 function TierLadder({ screening }: { screening: Screening }) {
   const { summary } = screening;
   const alt = new Map(
-    (summary.alternatives ?? []).map((a) => [a.risk_class, a.if]),
+    (summary.alternatives ?? []).map((a) => [
+      a.risk_class,
+      conditionText(a.if),
+    ]),
   );
   return (
     <ol className="space-y-2" aria-label="The four AI Act risk tiers">

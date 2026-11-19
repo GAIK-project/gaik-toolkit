@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 import { NextRequest, type NextResponse } from "next/server";
-import { SHARED_DATA_DENIAL } from "./lib/api-access";
+import {
+  EMAIL_UNCONFIRMED,
+  PENDING_DENIAL,
+  SHARED_DATA_DENIAL,
+} from "./lib/api-access";
+import { createAdminSessionValue } from "./lib/admin/session";
 
 // A demo run from a page left open past the access token's lifetime: the API
 // gate refreshes the session, and the browser must get the new cookies, or its
@@ -15,10 +20,15 @@ const KEYS = [
   "BYPASS_AUTH",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+  "UPSTASH_REDIS_REST_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
 ] as const;
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 const realFetch = globalThis.fetch;
 process.env.BYPASS_AUTH = "";
+// No trial store: a pending user's run that needs a trial run is refused.
+delete process.env.UPSTASH_REDIS_REST_URL;
+delete process.env.UPSTASH_REDIS_REST_TOKEN;
 const { default: proxy } = await import("./proxy");
 
 function jwt(sub: string, exp: number): string {
@@ -213,10 +223,17 @@ test("a page request keeps its cookies for the app", async () => {
 
 const fresh = () => Math.floor(Date.now() / 1000) + 3600;
 
+// A well-formed own-key header, which the proxy re-encodes and forwards.
+const OWN_KEY = JSON.stringify({
+  provider: "openai",
+  model: "test-model",
+  apiKey: "test-key",
+});
+
 function post(url: string, init: { cookie?: string; ownKey?: boolean } = {}) {
   const headers = new Headers();
   if (init.cookie) headers.set("cookie", init.cookie);
-  if (init.ownKey) headers.set("x-gaik-model-settings", "e30");
+  if (init.ownKey) headers.set("x-gaik-model-settings", OWN_KEY);
   return proxy(new NextRequest(url, { method: "POST", headers }));
 }
 
@@ -316,6 +333,47 @@ test("another route does not get the wizard's user header", async () => {
   expect(backendHeaders?.has("x-gaik-wizard-user")).toBe(false);
 });
 
+test("a signed-in user's request names the user, never the browser's claim", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const runResponse = await proxy(
+    new NextRequest(RUN, {
+      method: "POST",
+      headers: { cookie, "x-gaik-user": "someone-else" },
+    }),
+  );
+  expect(runResponse.status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-user")).toBe("u1");
+
+  const download = await proxy(
+    new NextRequest("https://demo.test/api/pipeline/pdf/abc", {
+      headers: { cookie, "x-gaik-user": "someone-else" },
+    }),
+  );
+  expect(download.status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-user")).toBe("u1");
+});
+
+test("a read that hands out no result names no user", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const read = await proxy(
+    new NextRequest("https://demo.test/api/tabular-agent/status", {
+      headers: { cookie },
+    }),
+  );
+  expect(read.status).toBe(200);
+  expect(backendHeaders?.has("x-gaik-user")).toBe(false);
+});
+
+test("a visitor who is not signed in names no user, whatever the browser sends", async () => {
+  const download = await proxy(
+    new NextRequest("https://demo.test/api/pipeline/pdf/abc", {
+      headers: { "x-gaik-user": "u1" },
+    }),
+  );
+  expect(download.status).toBe(200);
+  expect(backendHeaders?.has("x-gaik-user")).toBe(false);
+});
+
 test("a path the rules cannot judge is not forwarded", async () => {
   const cookie = sessionCookie("r1", fresh());
   for (const path of ["/api//wizard/start", "/api/x%2F..%2Fwizard/start"]) {
@@ -340,6 +398,78 @@ test("a visitor with their own model key is asked to sign in", async () => {
   expect(backendCalls).toBe(0);
 });
 
+const OWN_KEY_RUN = "https://demo.test/api/extract";
+
+test("a visitor whose refresh token is spent and who sends their own model key is asked to sign in", async () => {
+  // The first request spends the refresh token; the second cannot refresh the
+  // session, so it is anonymous.
+  await run(sessionCookie("r1", expired()));
+  backendCalls = 0;
+  const response = await post(OWN_KEY_RUN, {
+    cookie: sessionCookie("r1", expired()),
+    ownKey: true,
+  });
+  expect(response.status).toBe(401);
+  expect(backendCalls).toBe(0);
+});
+
+test("an approved user runs on their own model key, and the key reaches the API", async () => {
+  const response = await post(OWN_KEY_RUN, {
+    cookie: sessionCookie("r1", fresh()),
+    ownKey: true,
+  });
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(
+    JSON.parse(backendHeaders?.get("x-gaik-model-settings") ?? "null"),
+  ).toEqual(JSON.parse(OWN_KEY));
+});
+
+test("a pending user with a confirmed e-mail address runs on their own model key without a trial run", async () => {
+  // No trial store is configured in these tests, so a run that needed a trial
+  // run would be refused: the own-key run passes without one.
+  accessRow = { status: "pending", wizard_access: false };
+  user.email_confirmed_at = "2026-01-01T00:00:00Z";
+  try {
+    const cookie = sessionCookie("r1", fresh());
+    const trial = await post(OWN_KEY_RUN, { cookie });
+    expect(trial.status).toBe(403);
+    expect(backendCalls).toBe(0);
+    const ownKey = await post(OWN_KEY_RUN, { cookie, ownKey: true });
+    expect(ownKey.status).toBe(200);
+    expect(backendCalls).toBe(1);
+  } finally {
+    delete user.email_confirmed_at;
+  }
+});
+
+test("a pending user without a confirmed e-mail address is refused with their own model key", async () => {
+  accessRow = { status: "pending", wizard_access: false };
+  const response = await post(OWN_KEY_RUN, {
+    cookie: sessionCookie("r1", fresh()),
+    ownKey: true,
+  });
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ error: EMAIL_UNCONFIRMED.error });
+  expect(backendCalls).toBe(0);
+});
+
+test("a rejected user is refused with their own model key", async () => {
+  accessRow = { status: "rejected", wizard_access: false };
+  user.email_confirmed_at = "2026-01-01T00:00:00Z";
+  try {
+    const response = await post(OWN_KEY_RUN, {
+      cookie: sessionCookie("r1", fresh()),
+      ownKey: true,
+    });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: PENDING_DENIAL.error });
+    expect(backendCalls).toBe(0);
+  } finally {
+    delete user.email_confirmed_at;
+  }
+});
+
 test("the API learns the model tier from the session, never from the browser", async () => {
   const cookie = sessionCookie("r1", fresh());
   const send = () =>
@@ -359,6 +489,34 @@ test("the API learns the model tier from the session, never from the browser", a
   expect((await send()).status).toBe(200);
   expect(backendHeaders?.get("x-gaik-model-tier")).toBe("staff");
   expect(backendCalls).toBe(2);
+});
+
+test("the picked reasoning effort reaches the API only as low, medium or high", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  const forwarded = async (url: string, effort: string, ownKey = false) => {
+    const response = await proxy(
+      new NextRequest(url, {
+        method: "POST",
+        headers: {
+          cookie,
+          "x-gaik-reasoning-effort": effort,
+          ...(ownKey ? { "x-gaik-model-settings": OWN_KEY } : {}),
+        },
+      }),
+    );
+    expect(response.status).toBe(200);
+    return backendHeaders?.get("x-gaik-reasoning-effort") ?? null;
+  };
+
+  expect(await forwarded("https://demo.test/api/extract", "high")).toBe("high");
+  // With an own key as well.
+  expect(await forwarded(OWN_KEY_RUN, "low", true)).toBe("low");
+  for (const value of ["none", "max", "HIGH", "high, low"])
+    expect(await forwarded("https://demo.test/api/extract", value)).toBeNull();
+  // A route that takes no picked model gets no effort either.
+  expect(
+    await forwarded("https://demo.test/api/tabular-agent/ask", "high"),
+  ).toBeNull();
 });
 
 test("a path that only begins like the wizard API meets the normal gate", async () => {
@@ -399,7 +557,8 @@ test("the generic proxy does not pass on the report run header", async () => {
 });
 
 // A user waiting for approval runs demos on the trial, which never covers a
-// write to the video-search index that every visitor searches. Without Redis the
+// write to the video-search index that every visitor searches (nor does
+// approval: that takes the admin session, tested below). Without Redis the
 // trial is off here and this user's e-mail address is unconfirmed, so the
 // refusal is told apart by its reason; that it holds with trial runs left is in
 // lib/api-access.test.ts.
@@ -430,4 +589,129 @@ test("a pending user's DELETE /api/video-search/clear is refused", async () => {
     expect(await response.json()).toEqual({ error: SHARED_DATA_DENIAL.error });
   }
   expect(backendCalls).toBe(0);
+});
+
+test("an approved user's write to the shared video index needs the admin session", async () => {
+  const savedSecret = process.env.ADMIN_SESSION_SECRET;
+  process.env.ADMIN_SESSION_SECRET = "test-admin-key";
+  try {
+    const session = sessionCookie("r1", fresh());
+    const clear = (cookie: string) =>
+      proxy(
+        new NextRequest("https://demo.test/api/video-search/clear", {
+          method: "DELETE",
+          headers: { cookie },
+        }),
+      );
+    for (const cookie of [session, `${session}; admin_session=authenticated`]) {
+      const refused = await clear(cookie);
+      expect(refused.status).toBe(SHARED_DATA_DENIAL.status);
+      expect(await refused.json()).toEqual({ error: SHARED_DATA_DENIAL.error });
+    }
+    expect(backendCalls).toBe(0);
+
+    const admin = await clear(
+      `${session}; admin_session=${createAdminSessionValue()}`,
+    );
+    expect(admin.status).toBe(200);
+    expect(backendCalls).toBe(1);
+  } finally {
+    if (savedSecret === undefined) delete process.env.ADMIN_SESSION_SECRET;
+    else process.env.ADMIN_SESSION_SECRET = savedSecret;
+  }
+});
+
+test("a video's playback link is handed out to a signed-in user only", async () => {
+  for (const path of [
+    "/api/video-search/videos/v1/play",
+    "/api/video-search/videos/v1/thumbnail",
+    "/api/video-search/%76ideos/v1/play",
+  ]) {
+    const anonymous = await proxy(
+      new NextRequest(`https://demo.test${path}`, {
+        headers: { "x-gaik-signed-in": "1" },
+      }),
+    );
+    expect(anonymous.status).toBe(401);
+  }
+  expect(backendCalls).toBe(0);
+
+  accessRow = { status: "pending", wizard_access: false };
+  const signedIn = await proxy(
+    new NextRequest("https://demo.test/api/video-search/videos/v1/play", {
+      headers: { cookie: sessionCookie("r1", fresh()) },
+    }),
+  );
+  expect(signedIn.status).toBe(200);
+  expect(backendHeaders?.get("x-gaik-signed-in")).toBe("1");
+
+  // An open read does not carry the header, whatever the browser sends.
+  const list = await proxy(
+    new NextRequest("https://demo.test/api/video-search/videos", {
+      headers: { "x-gaik-signed-in": "1" },
+    }),
+  );
+  expect(list.status).toBe(200);
+  expect(backendHeaders?.has("x-gaik-signed-in")).toBe(false);
+  expect(backendCalls).toBe(2);
+});
+
+// Upload limits (lib/upload-limits.ts): /api/parse takes 22 MiB in all. A body
+// is refused by its declared length before any of it is read, and otherwise at
+// the first chunk past the limit; the backend sees neither.
+
+const MIB = 1024 * 1024;
+
+function upload(chunks: number, size: number, declared?: number) {
+  const seen = { pulled: 0 };
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        if (seen.pulled === chunks) return controller.close();
+        seen.pulled += 1;
+        controller.enqueue(new Uint8Array(size));
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const headers = new Headers({
+    cookie: sessionCookie("r1", fresh()),
+    "content-type": "multipart/form-data; boundary=x",
+  });
+  if (declared !== undefined) headers.set("content-length", String(declared));
+  const request = new NextRequest("https://demo.test/api/parse", {
+    method: "POST",
+    headers,
+    body,
+    duplex: "half",
+  } as ConstructorParameters<typeof NextRequest>[1]);
+  return { request, seen };
+}
+
+test("an upload that declares more than its route takes is refused before it is read", async () => {
+  const { request, seen } = upload(30, MIB, 30 * MIB);
+  const response = await proxy(request);
+  expect(response.status).toBe(413);
+  expect(await response.json()).toEqual({
+    error: "File too large. Maximum size is 20MB",
+    detail: "File too large. Maximum size is 20MB",
+  });
+  expect(seen.pulled).toBe(0);
+  expect(backendCalls).toBe(0);
+});
+
+test("an upload without a declared length is refused once it passes its route's limit", async () => {
+  const { request, seen } = upload(30, MIB);
+  const response = await proxy(request);
+  expect(response.status).toBe(413);
+  expect(seen.pulled).toBe(23);
+  expect(backendCalls).toBe(0);
+});
+
+test("an upload within its route's limit is forwarded whole", async () => {
+  const { request } = upload(3, MIB);
+  const response = await proxy(request);
+  expect(response.status).toBe(200);
+  expect(backendCalls).toBe(1);
+  expect(backendHeaders?.get("content-length")).toBe(String(3 * MIB));
 });

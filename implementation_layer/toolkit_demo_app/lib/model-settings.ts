@@ -175,3 +175,34 @@ export function isServerModelId(value: unknown): value is string {
     /^[a-z_]{2,30}:[A-Za-z0-9._/-]{1,120}$/.test(value)
   );
 }
+
+/** The reasoning effort picked in the model menu; left out for Auto. */
+export const REASONING_EFFORT_HEADER = "x-gaik-reasoning-effort";
+export const REASONING_EFFORTS = ["low", "medium", "high"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+export function isReasoningEffort(value: unknown): value is ReasoningEffort {
+  return REASONING_EFFORTS.includes(value as ReasoningEffort);
+}
+
+/** GPT-6 models on OpenAI or Azure take an effort; the API sends it to no other. */
+export function takesReasoningEffort(provider: string, model: string): boolean {
+  return (
+    (provider === "openai" || provider === "azure") &&
+    model.toLowerCase().startsWith("gpt-6")
+  );
+}
+
+/**
+ * The effort a request carries: the picked one when the model in use takes it.
+ * Null is Auto. While the model list has not loaded the model is unknown, and
+ * the pick is sent for the API to decide.
+ */
+export function reasoningEffortFor(
+  picked: ReasoningEffort | null,
+  model: { provider: string; model: string } | null,
+): ReasoningEffort | null {
+  if (!picked || !isReasoningEffort(picked)) return null;
+  if (model && !takesReasoningEffort(model.provider, model.model)) return null;
+  return picked;
+}

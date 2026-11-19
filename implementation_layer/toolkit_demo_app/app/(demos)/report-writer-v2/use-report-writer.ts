@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/demo/use-confirm";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { processSSEStream } from "@/lib/sse";
 import {
@@ -131,6 +132,7 @@ export function useReportWriter() {
   const [progress, setProgress] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -223,12 +225,14 @@ export function useReportWriter() {
   }
 
   /** Reset the page to its state on load. */
-  function clearAll() {
+  async function clearAll() {
     if (
       Object.keys(artifacts).length > 0 &&
-      !window.confirm(
-        "Clearing the form also clears the current workspace. Continue?",
-      )
+      !(await confirm({
+        title: "Clear the form?",
+        description: "This also clears the current workspace.",
+        action: "Clear",
+      }))
     )
       return;
     setExampleId("");
@@ -248,9 +252,11 @@ export function useReportWriter() {
   async function loadExample(ex: ExampleInfo) {
     if (
       Object.keys(artifacts).length > 0 &&
-      !window.confirm(
-        "Loading an example clears the current workspace. Continue?",
-      )
+      !(await confirm({
+        title: "Load the example?",
+        description: "It clears the current workspace.",
+        action: "Load example",
+      }))
     )
       return;
     setLoadingExample(true);
@@ -409,9 +415,12 @@ export function useReportWriter() {
     if (
       stages.includes("synthesize") &&
       stale.editedSections &&
-      !window.confirm(
-        "Stage 3 rewrites every section and overwrites your section edits. Continue?",
-      )
+      !(await confirm({
+        title: "Run Stage 3 again?",
+        description:
+          "Stage 3 rewrites every section and overwrites your section edits.",
+        action: "Run Stage 3",
+      }))
     )
       return;
     abortRef.current?.abort();
@@ -426,12 +435,30 @@ export function useReportWriter() {
       if (stages.includes("synthesize") || stages.includes("rebuild"))
         toast.success("Report ready");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(null);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortRef.current === controller) setRunning(null);
     }
+  }
+
+  /**
+   * Cancels the run in the browser. The workspace keeps the stages that
+   * finished. The Next.js route may still finish the stage on the server, and
+   * it then counts against the user's report quota. A stage's result is
+   * applied only when its stream ends, after the route has recorded the usage,
+   * so a stopped run never keeps a report that was not counted.
+   */
+  function stop() {
+    abortRef.current?.abort();
+    setRunning(null);
+    setProgress([]);
   }
 
   function saveArtifact(path: string, text: string) {
@@ -482,6 +509,7 @@ export function useReportWriter() {
     progress,
     error,
     abortRef,
+    confirmDialog,
     // actions
     buildSpec,
     loadExample,
@@ -489,6 +517,7 @@ export function useReportWriter() {
     downloadAllZip,
     clearAll,
     run,
+    stop,
     saveArtifact,
   };
 }

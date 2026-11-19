@@ -65,7 +65,7 @@ def test_a_failed_connection_names_no_connection_detail(monkeypatch, caplog, dsn
         raise error
 
     monkeypatch.setattr(agent_module.psycopg, "connect", fail)
-    agent = PostgresAgent(dsn)
+    agent = PostgresAgent(dsn, table_allowlist=["customers", "orders"])
 
     with caplog.at_level(logging.DEBUG, logger=agent_module.__name__):
         with pytest.raises(type(error)) as caught:
@@ -88,7 +88,9 @@ def test_redact_masks_every_password_form(dsn):
 
 
 def _agent_with_failing_query(error: Exception, prompts: list) -> PostgresAgent:
-    agent = PostgresAgent("postgresql://stub:stub@localhost:1/stub", max_retries=2)
+    agent = PostgresAgent(
+        "postgresql://stub:stub@localhost:1/stub", max_retries=2, table_allowlist=["t"]
+    )
     agent._schema = SchemaInfo(schema_name="public", tables=[TableInfo(name="t", columns=[])])
 
     def generate(**kwargs):
@@ -118,7 +120,8 @@ def test_a_rejected_query_reaches_result_answer_and_model_without_database_text(
     assert expected in answer.answer
     assert expected in prompts[1] and "SELECT CAST(name AS int) FROM t" in prompts[1]
     for text in (answer.query_result.error, answer.answer, *prompts):
-        assert "Jane" not in text and "555" not in text
+        # The whole number: a prompt's random source_material id can hold "555".
+        assert "Jane" not in text and "555-0100" not in text
 
 
 def test_a_canceled_query_reports_the_timeout_without_database_text():

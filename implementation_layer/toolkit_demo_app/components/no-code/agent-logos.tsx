@@ -5,26 +5,31 @@ import {
   CodexIcon,
   CopilotIcon,
   CursorIcon,
+  OpenAIIcon,
 } from "./provider-icons";
+
+/** A colour mark kept as a static file in public/icons (svgl). */
+function FileMark({ name }: { name: string }) {
+  return (
+    <Image
+      src={`/icons/${name}.svg`}
+      alt=""
+      width={16}
+      height={16}
+      unoptimized
+      className="size-4"
+    />
+  );
+}
 
 const agents = {
   claudeCode: { name: "Claude Code", icon: <ClaudeIcon className="size-4" /> },
   codex: { name: "Codex", icon: <CodexIcon className="size-4" /> },
-  gemini: {
-    name: "Gemini CLI",
-    icon: (
-      <Image
-        src="/icons/gemini.svg"
-        alt=""
-        width={16}
-        height={16}
-        unoptimized
-        className="size-4"
-      />
-    ),
-  },
+  gemini: { name: "Gemini CLI", icon: <FileMark name="gemini" /> },
   copilot: { name: "GitHub Copilot", icon: <CopilotIcon className="size-4" /> },
   cursor: { name: "Cursor", icon: <CursorIcon className="size-4" /> },
+  vscode: { name: "VS Code", icon: <FileMark name="vscode" /> },
+  chatgpt: { name: "ChatGPT", icon: <OpenAIIcon className="size-4" /> },
 };
 
 /**
