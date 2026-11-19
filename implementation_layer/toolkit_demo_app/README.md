@@ -79,6 +79,9 @@ text layer. It roughly triples the output tokens of an extraction.
     and another user's session answers 404.
   - At most `WIZARD_MAX_SESSIONS` (3) sessions run at once, one per user, each with at
     most `WIZARD_MAX_MESSAGES` (60) messages. A session idle for 30 minutes is ended.
+  - `WIZARD_AGENT_MAX_BUDGET_USD`, off unless set, stops a session's agent when the CLI's
+    estimated cost reaches it; the session then takes no more messages, and its files
+    stay to download.
   - Attachments (5 per message, 10 MB each) are checked for type, size and content
     before a parser or a model reads them, and reach the agent marked as data.
   - A session's workspace and download archives are removed when it ends or goes idle.
