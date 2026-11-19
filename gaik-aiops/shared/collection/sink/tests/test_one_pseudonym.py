@@ -15,6 +15,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+import yaml
 
 OTLP = "http://127.0.0.1:4318"
 MLFLOW = "http://127.0.0.1:5000"
@@ -130,41 +131,80 @@ def test_the_mlflow_routes_keep_the_base_traces_processors():
     assert traces == {"exporters": ["spanmetrics", "routing/mlflow"]}
 
 
-def test_health_probe_spans_are_left_out_on_the_way_to_mlflow_only():
-    module = _routes_module()
-    fragment = module.routes({"wizard-v2-api": "1", "gaik-poc": "2"})
+def _wizard_filter() -> tuple[dict, list[str]]:
+    """The routes fragment for two applications, and the wizard API's filter conditions in it."""
+    fragment = _routes_module().routes({"wizard-v2-api": "1", "gaik-poc": "2"})
+    [(name, mlflow_filter)] = fragment["processors"].items()
+    assert name == "filter/mlflow-wizard-v2-api" and mlflow_filter["error_mode"] == "ignore"
+    return fragment, mlflow_filter["traces"]["span"]
+
+
+def _dropped(condition: str) -> str:
+    return f"{condition} and status.code != STATUS_CODE_ERROR"
+
+
+def test_the_wizard_apis_filter_is_on_its_own_pipeline_to_mlflow_only():
+    fragment, _ = _wizard_filter()
     pipelines = fragment["service"]["pipelines"]
-    # The wizard API's probe spans (GET /health and FastAPI's child spans) are dropped in its own
-    # pipeline to MLflow, behind the router.
     assert pipelines["traces/mlflow-wizard-v2-api"] == {
         "receivers": ["routing/mlflow"],
         "processors": ["filter/mlflow-wizard-v2-api"],
         "exporters": ["otlphttp/mlflow-wizard-v2-api"],
     }
-    [(name, mlflow_filter)] = fragment["processors"].items()
-    assert name == "filter/mlflow-wizard-v2-api" and mlflow_filter["error_mode"] == "ignore"
-    conditions = mlflow_filter["traces"]["span"]
-    assert 'attributes["http.route"] == "/health"' in conditions
-    assert 'attributes["code.function.name"] == "wizard_api.main.health"' in conditions
-    # So are the page requests that belong to no session, by the server span's name and the endpoint
-    # function; the requests that carry a session (the chat turn, a PATCH of the session) are not named.
+    # Other applications and the Default experiment get every span.
+    assert "processors" not in pipelines["traces/mlflow-gaik-poc"]
+    assert "processors" not in pipelines["traces/mlflow-default"]
+    assert "processors" not in _routes_module().routes({"gaik-poc": "2"})
+
+
+def test_health_probe_spans_are_left_out_of_mlflow():
+    # The GET /health server span, and FastAPI's child spans under it by the endpoint function.
+    _, conditions = _wizard_filter()
+    assert _dropped('attributes["http.route"] == "/health"') in conditions
+    assert _dropped('attributes["code.function.name"] == "wizard_api.main.health"') in conditions
+
+
+def test_page_requests_without_a_session_are_left_out_of_mlflow():
+    _, conditions = _wizard_filter()
     for span_name, function in (
         ("GET /sessions", "sessions.list_sessions"),
         ("GET /sessions/{session_id}", "sessions.get_session"),
         ("POST /sessions", "sessions.create_session"),
         ("POST /owners/claim", "owners.claim_legacy_sessions"),
     ):
-        assert f'name == "{span_name}"' in conditions
-        assert f'attributes["code.function.name"] == "wizard_api.routers.{function}"' in conditions
-    assert len(conditions) == 10
+        assert _dropped(f'name == "{span_name}"') in conditions
+        assert _dropped(f'attributes["code.function.name"] == "wizard_api.routers.{function}"') in conditions
+    # The requests that carry a session (the chat turn, a PATCH of the session) are not named, and
+    # no condition goes by the route that the PATCH shares with opening a session.
     assert not [c for c in conditions if "chat" in c or "PATCH" in c or "update_session" in c]
-    # Other applications and the Default experiment get every span.
-    assert "processors" not in pipelines["traces/mlflow-gaik-poc"]
-    assert "processors" not in pipelines["traces/mlflow-default"]
-    assert "processors" not in module.routes({"gaik-poc": "2"})
-    # The span metrics branch off the traces pipeline, which names no filter in the base config or in
-    # the files merged over it, so Prometheus counts the probes.
-    assert pipelines["traces"] == {"exporters": ["spanmetrics", "routing/mlflow"]}
+    assert not [c for c in conditions if '"/sessions' in c]
+
+
+def test_a_failed_request_is_stored_in_mlflow_whatever_it_is():
+    _, conditions = _wizard_filter()
+    assert conditions and all(c.endswith(" and status.code != STATUS_CODE_ERROR") for c in conditions)
+
+
+def test_no_config_filters_spans_before_the_span_metrics():
+    # The span metrics branch off the traces pipeline. Its processors are the base config's, and no
+    # file merged over it (the collector replaces lists) names others, so Prometheus counts every span.
+    fragment, _ = _wizard_filter()
+    assert fragment["service"]["pipelines"]["traces"] == {"exporters": ["spanmetrics", "routing/mlflow"]}
+    base = yaml.safe_load((COMPOSE / "otel-collector.yaml").read_text())
+    assert base["service"]["pipelines"]["traces"] == {
+        "receivers": ["otlp"],
+        "processors": ["memory_limiter", "transform/privacy", "transform/session", "batch"],
+        "exporters": ["spanmetrics", "otlphttp/mlflow"],
+    }
     rahti_ingress = COMPOSE.parent / "k8s" / "stack" / "overlays" / "rahti" / "otlp-ingress-collector.yaml"
-    for config in (COMPOSE / "otel-collector.yaml", rahti_ingress):
-        assert "filter" not in config.read_text(), config.name
+    for overlay in (COMPOSE / "openbao" / "otel-collector.openbao.yaml", rahti_ingress):
+        traces = yaml.safe_load(overlay.read_text())["service"]["pipelines"].get("traces", {})
+        assert "processors" not in traces and "exporters" not in traces, overlay.name
+
+
+def test_a_filtered_application_that_is_not_listed_is_named():
+    # Without a pipeline of its own the application has no filter: setup_experiments.py warns about it.
+    module = _routes_module()
+    assert module.unfiltered(["wizard-v2-api", "gaik-poc"]) == []
+    assert module.unfiltered(["gaik-poc"]) == ["wizard-v2-api"]
+    assert module.unfiltered([]) == ["wizard-v2-api"]

@@ -42,7 +42,12 @@ Two kinds of `wizard-v2-api` spans are not stored in MLflow, where they would bu
 creating a session, claiming old ones), each with its child spans. The collector drops them in that
 application's pipeline to MLflow only (`NOT_IN_MLFLOW` in `deploy/compose/mlflow/setup_experiments.py`).
 The span metrics are taken before that, so Prometheus, the alerts and the dashboards count these
-requests as before. A request that carries a session, and any route not named there, is stored.
+requests as before. A request that carries a session, a request that failed (a span with an error
+status), and any route not named there are stored. Other requests without a session, such as rejoining
+a reply's stream or reading the package's files, are therefore still rows of their own in MLflow.
+
+The conditions are part of the MLflow image, whose script the collector's init container runs. A
+change to them reaches Rahti with a build (`oc start-build aiops-mlflow`), not with `oc apply`.
 
 MLflow runs at `http://127.0.0.1:5000`. Each application listed in `MLFLOW_EXPERIMENTS` (service names,
 default `wizard-v2-api,wizard-v2-web,gaik-poc,example-producer`) gets its own experiment, named after

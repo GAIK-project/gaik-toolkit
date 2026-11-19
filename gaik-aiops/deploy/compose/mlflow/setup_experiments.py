@@ -30,6 +30,12 @@ NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 # Spans MLflow does not store, by application: conditions for the collector's filter processor, read
 # for each span (a span that matches one is dropped). They apply only in that application's pipeline
 # to MLflow, so the span metrics, and the alerts and dashboards built on them, still see every span.
+# A span with an error status is always stored (KEEP_FAILED), so a failed request keeps its trace: the
+# server span and the spans that failed under it.
+#
+# The filter sees one span at a time, not the trace. A request is left out whole only while each of
+# its spans matches a condition, so a span added under one of these requests in the application needs
+# its condition here, or it is stored alone.
 NOT_IN_MLFLOW = {
     "wizard-v2-api": [
         # Kubernetes probes, every few seconds: the GET /health server span and FastAPI's child spans
@@ -50,6 +56,7 @@ NOT_IN_MLFLOW = {
         'attributes["code.function.name"] == "wizard_api.routers.owners.claim_legacy_sessions"',
     ],
 }
+KEEP_FAILED = " and status.code != STATUS_CODE_ERROR"
 
 
 def experiment_ids(client: MlflowClient, names: list[str]) -> dict[str, str]:
@@ -71,7 +78,8 @@ def routes(ids: dict[str, str]) -> dict:
         pipeline = {"receivers": ["routing/mlflow"], "exporters": [f"otlphttp/mlflow-{key}"]}
         if name in NOT_IN_MLFLOW:
             # The filter is defined and used in this fragment alone: the base config does not know it.
-            processors[f"filter/mlflow-{key}"] = {"error_mode": "ignore", "traces": {"span": NOT_IN_MLFLOW[name]}}
+            conditions = [condition + KEEP_FAILED for condition in NOT_IN_MLFLOW[name]]
+            processors[f"filter/mlflow-{key}"] = {"error_mode": "ignore", "traces": {"span": conditions}}
             pipeline["processors"] = [f"filter/mlflow-{key}"]
         pipelines[f"traces/mlflow-{key}"] = pipeline
         table.append({
@@ -93,6 +101,11 @@ def routes(ids: dict[str, str]) -> dict:
     return fragment
 
 
+def unfiltered(names: list[str]) -> list[str]:
+    """Applications with spans to leave out that get no pipeline of their own, so no filter either."""
+    return sorted(set(NOT_IN_MLFLOW) - set(names))
+
+
 def main() -> int:
     names = [n.strip() for n in os.environ.get("MLFLOW_EXPERIMENTS", "").split(",") if n.strip()]
     bad = [n for n in names if not NAME.match(n)]
@@ -105,6 +118,8 @@ def main() -> int:
         json.dump(routes(ids) if ids else {}, fh, indent=2)
     for name, experiment_id in ids.items():
         print(f"{name} -> experiment {experiment_id}")
+    for name in unfiltered(names):
+        print(f"warning: {name} is not in MLFLOW_EXPERIMENTS, so all its spans are stored, in Default", file=sys.stderr)
     return 0
 
 
