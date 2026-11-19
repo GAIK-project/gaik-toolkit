@@ -95,38 +95,38 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    label: "Use Cases",
+    label: "Use cases",
     icon: Lightbulb,
     items: [
       {
-        label: "EU AI Act Screening",
+        label: "EU AI Act screening",
         href: "/ai-act-screening",
         icon: ShieldCheck,
       },
-      { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
-      { label: "Construction Diary", href: "/diary", icon: HardHat },
+      { label: "Incident reporting", href: "/incident-report", icon: ShieldAlert },
+      { label: "Construction diary", href: "/diary", icon: HardHat },
       {
-        label: "Video Transcription & Captioning",
+        label: "Video transcription and captioning",
         href: "/dental-transcription",
         icon: Mic,
       },
       {
-        label: "Semantic Video Search",
+        label: "Semantic video search",
         href: "/video-search",
         icon: Video,
       },
       {
-        label: "Purchase Order Processing",
+        label: "Purchase order processing",
         href: "/luvata-order",
         icon: FileBarChart,
       },
       {
-        label: "Construction Report Writing",
+        label: "Construction report writing",
         href: "/report-writer-v2?example=house_condition_assessment",
         icon: House,
       },
       {
-        label: "Helpdesk Chatbot",
+        label: "Helpdesk chatbot",
         href: "/helpdesk-chatbot",
         icon: Headset,
       },
@@ -139,11 +139,11 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Software Components",
+    label: "Software components",
     icon: Boxes,
     items: [
       {
-        label: "Schema Generator",
+        label: "Schema generator",
         href: "/schema-generator",
         icon: Braces,
         section: CAPTURE,
@@ -155,7 +155,7 @@ const navGroups: NavGroup[] = [
         section: CAPTURE,
       },
       {
-        label: "Vision Extractor",
+        label: "Vision extractor",
         href: "/vision-extractor",
         icon: ScanEye,
         section: CAPTURE,
@@ -174,49 +174,49 @@ const navGroups: NavGroup[] = [
         section: CAPTURE,
       },
       {
-        label: "Source Normalizer",
+        label: "Source normalizer",
         href: "/source-normalizer",
         icon: FileStack,
         section: CAPTURE,
       },
       {
-        label: "Web Scraper",
+        label: "Web scraper",
         href: "/web-scraper",
         icon: Globe,
         section: CAPTURE,
       },
       {
-        label: "Knowledge Curator",
+        label: "Knowledge curator",
         href: "/knowledge-curator",
         icon: LibraryBig,
         section: CAPTURE,
       },
       {
-        label: "PostgreSQL Agent",
+        label: "PostgreSQL agent",
         href: "/postgres-agent",
         icon: Database,
         section: ACCESS,
       },
       {
-        label: "Tabular Agent",
+        label: "Tabular agent",
         href: "/tabular-agent",
         icon: Table2,
         section: ACCESS,
       },
       {
-        label: "Text-to-Speech",
+        label: "Text-to-speech",
         href: "/text-to-speech",
         icon: Volume2,
         section: SYNTHESIS,
       },
       {
-        label: "LLM Judge",
+        label: "LLM judge",
         href: "/llm-judge",
         icon: Scale,
         section: SYNTHESIS,
       },
       {
-        label: "Knowledge Synthesizer",
+        label: "Knowledge synthesizer",
         href: "/knowledge-synthesis",
         icon: NotebookPen,
         section: SYNTHESIS,
@@ -224,30 +224,30 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Software Modules",
+    label: "Software modules",
     icon: Puzzle,
     items: [
       {
-        label: "Audio → Structured",
+        label: "Audio → structured",
         href: "/audio-structured",
         icon: AudioWaveform,
         section: CAPTURE,
       },
       {
-        label: "Document → Structured",
+        label: "Document → structured",
         href: "/document-structured",
         icon: FileOutput,
         section: CAPTURE,
       },
-      { label: "RAG Builder", href: "/rag", icon: Bot, section: ACCESS },
+      { label: "RAG builder", href: "/rag", icon: Bot, section: ACCESS },
       {
-        label: "Report Writer",
+        label: "Report writer",
         href: "/report-writer",
         icon: FileText,
         section: SYNTHESIS,
       },
       {
-        label: "Report Writer v2",
+        label: "Report writer v2",
         href: "/report-writer-v2",
         icon: FilePen,
         section: SYNTHESIS,
@@ -255,7 +255,7 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: "No-code Assets",
+    label: "No-code assets",
     icon: FileCode,
     items: [
       {
@@ -264,12 +264,12 @@ const navGroups: NavGroup[] = [
         icon: MessageSquare,
       },
       {
-        label: "Agent Skills",
+        label: "Agent skills",
         href: "/skills",
         icon: Wand2,
       },
       {
-        label: "Desktop App",
+        label: "Desktop app",
         href: "/desktop-app",
         icon: MonitorDown,
       },
@@ -724,6 +724,7 @@ function MobileNav({ isActive, isLoggedIn, hasWizardAccess }: MobileNavProps) {
       </SheetTrigger>
       <SheetContent
         side="right"
+        aria-describedby={undefined}
         className="flex w-[85vw] max-w-72 flex-col sm:w-72"
       >
         <SheetHeader className="shrink-0">
@@ -733,7 +734,7 @@ function MobileNav({ isActive, isLoggedIn, hasWizardAccess }: MobileNavProps) {
           {navGroups.map((group, index) => (
             <div key={group.label} className={index > 0 ? "mt-2" : ""}>
               {index > 0 && <hr className="border-border/60 mb-3" />}
-              <div className="text-primary/80 mb-2 flex items-center gap-2 px-3 py-1 text-xs font-semibold tracking-wider uppercase">
+              <div className="text-primary/80 mb-2 flex items-center gap-2 px-3 py-1 text-xs font-semibold">
                 <group.icon className="h-4 w-4" />
                 {group.label}
               </div>
@@ -810,8 +811,9 @@ export function SiteNav({
   }
 
   function isActive(href: string): boolean {
-    if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(`${href}/`);
+    const [path] = href.split("?");
+    if (path === "/") return pathname === "/";
+    return pathname === path || pathname.startsWith(`${path}/`);
   }
 
   const itemContext: ItemContext = {
@@ -875,13 +877,13 @@ export function SiteNav({
                         <group.icon className="mr-1.5 h-4 w-4 lg:mr-2" />
                         <span className="hidden lg:inline">{group.label}</span>
                         <span className="lg:hidden">
-                          {group.label === "Use Cases"
+                          {group.label === "Use cases"
                             ? "Cases"
-                            : group.label === "Software Components"
+                            : group.label === "Software components"
                               ? "Components"
-                              : group.label === "Software Modules"
+                              : group.label === "Software modules"
                                 ? "Modules"
-                                : group.label === "No-code Assets"
+                                : group.label === "No-code assets"
                                   ? "Assets"
                                   : group.label}
                         </span>
