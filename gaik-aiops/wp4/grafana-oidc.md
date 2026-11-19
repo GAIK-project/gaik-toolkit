@@ -44,7 +44,9 @@ organisation, datasource and dashboards through the API and re-applies them ever
   network. In a real deployment both are the same public IdP URL.
 - Client secret is a local value in the overlay; in a real deployment use
   `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET__FILE` with a file rendered by the vault agent (`secrets/`).
-- The local `admin` account stays as break-glass access. Grafana refuses to link an IdP user whose login
+- The local `admin` account stays as break-glass access here, where the compose overlay keeps Grafana's
+  sign-in form on. On Rahti the form is off (`GF_AUTH_DISABLE_LOGIN_FORM`), so the local admin signs in
+  only through the API or after the form is switched back on; see the Rahti overlay's README.md. Grafana refuses to link an IdP user whose login
   equals an existing local account, so an IdP user named `admin` cannot take over the local admin; the
   test realm therefore uses `security-admin`.
 - Keycloak test users have fixed ids: the dev server is in memory, and new subjects after a restart would
