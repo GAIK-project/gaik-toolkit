@@ -339,6 +339,15 @@ def test_grafana_maps_the_aiops_groups_and_refuses_everyone_else() -> None:
     assert {"aiops-admin", "aiops-viewer"} <= {g["name"] for g in realm["groups"]}
 
 
+def test_grafanas_sign_in_page_offers_only_sign_in_with_gaik() -> None:
+    patch = aiops_docs("patch-grafana-oidc.yaml")[0]
+    env = {e["name"]: e for e in patch["spec"]["template"]["spec"]["containers"][0]["env"]}
+    assert env["GF_AUTH_DISABLE_LOGIN_FORM"]["value"] == "true"
+    # The local admin then has no sign-in page; the README says how to get in without Keycloak.
+    readme = (AIOPS_RAHTI / "README.md").read_text()
+    assert "GF_AUTH_DISABLE_LOGIN_FORM=false" in readme
+
+
 def test_cpu_limits_stay_within_rahtis_ratio() -> None:
     # Rahti's LimitRange refuses a container whose CPU limit is more than 8 times its request (the
     # Keycloak database's pod was refused at 10). The AIOps project asks for 5 at most.
