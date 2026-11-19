@@ -131,10 +131,24 @@ def test_the_mlflow_routes_keep_the_base_traces_processors():
 
 
 def test_health_probe_spans_are_dropped_from_traces_only():
-    # Probe spans (GET /health) are dropped first in the traces pipeline, after the memory limiter;
-    # logs and metrics keep their processors. The overlays name no trace processors, so they inherit it.
+    # The wizard API's probe spans (GET /health and FastAPI's child spans) are dropped first in the
+    # traces pipeline, after the memory limiter; logs and metrics keep their processors.
     base = (COMPOSE / "otel-collector.yaml").read_text()
-    assert 'attributes["http.route"] == "/health"' in base.split("filter/health:")[1].split("deltatocumulative")[0]
+    conditions = [
+        line.strip()
+        for line in base.split("  filter/health:\n")[1].split("  # Prometheus")[0].splitlines()
+        if line.strip().startswith("- ")
+    ]
+    wizard = 'resource.attributes["service.name"] == "wizard-v2-api" and '
+    assert conditions == [
+        f'- {wizard}attributes["http.route"] == "/health"',
+        f'- {wizard}attributes["code.function.name"] == "wizard_api.main.health"',
+    ]
     assert "processors: [memory_limiter, filter/health, transform/privacy, transform/session, batch]" in base
     assert base.count("filter/health") == 2
-    assert "filter/health" not in (COMPOSE / "openbao" / "otel-collector.openbao.yaml").read_text()
+    # The files merged over the base config name no processors (lists are replaced), so the filter stays.
+    rahti_ingress = COMPOSE.parent / "k8s" / "stack" / "overlays" / "rahti" / "otlp-ingress-collector.yaml"
+    for overlay in (COMPOSE / "openbao" / "otel-collector.openbao.yaml", rahti_ingress):
+        text = overlay.read_text()
+        assert "filter/health" not in text
+        assert "transform/session" not in text

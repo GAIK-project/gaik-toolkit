@@ -37,8 +37,9 @@ append-only guarantees, role permissions, purging, and the metrics derived from 
 Prometheus, and that a span reaches MLflow pseudonymised, address-masked and without prompt or response
 content (`tests/test_mlflow_stack.py`). They are skipped when the stack is not running.
 
-The collector drops health-probe spans (`http.route` = `/health`) from the traces pipeline before
-anything else is done with them (`filter/health`), so they reach neither MLflow nor the span metrics.
+The collector drops the spans of `wizard-v2-api`'s `/health` probes, the server span and its child
+spans, from the traces pipeline before anything else is done with them (`filter/health`), so they
+reach neither MLflow nor the span metrics. Other services' spans are not filtered.
 
 MLflow runs at `http://127.0.0.1:5000`. Each application listed in `MLFLOW_EXPERIMENTS` (service names,
 default `wizard-v2-api,wizard-v2-web,gaik-poc,example-producer`) gets its own experiment, named after
