@@ -1,8 +1,8 @@
 "use client";
 
+import { GitHubIcon } from "@/components/github-icon";
 import { Button } from "@/components/ui/button";
 import { chatApps, type Prompt } from "@/lib/no-code/catalog";
-import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { CopyAndOpen, CopyButton } from "./actions";
 import { AssetIcon } from "./asset-icon";
@@ -30,9 +30,9 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
           rel="noopener noreferrer"
           aria-label={`${prompt.title} on GitHub`}
           title="Sample data and guide on GitHub"
-          className="text-muted-foreground hover:text-foreground shrink-0 p-1"
+          className="-m-2 flex size-9 shrink-0 items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100"
         >
-          <ExternalLink className="size-4" />
+          <GitHubIcon className="size-4" />
         </a>
       </header>
 

@@ -1,23 +1,33 @@
+import { EuFlag } from "@/components/eu-flag";
 import {
   Braces,
   ClipboardList,
+  FileCheck,
   FilePen,
   HardHat,
   type LucideIcon,
+  Presentation,
   ReceiptText,
   ScanText,
   Search,
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
+import type { ComponentType } from "react";
 
 /** One glyph per asset id; a skill and its prompt share it. */
-const icons: Record<string, LucideIcon> = {
+const icons: Record<
+  string,
+  LucideIcon | ComponentType<{ className?: string }>
+> = {
   "incident-report-writing": ShieldAlert,
   "safety-observation-reporting": ShieldCheck,
   "construction-diary-creation": HardHat,
   "purchase-order-processing": ReceiptText,
   "report-writing": FilePen,
+  "brief-to-slides": Presentation,
+  "ai-act-use-case-screening": EuFlag,
+  "generate-structured-reports": FileCheck,
   "parsing-documents": ScanText,
   "extracting-structured-data": Braces,
   "searching-documents": Search,

@@ -33,6 +33,7 @@ from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 from .introspection import introspect_schema
 from .models import AnswerResult, GeneratedSQL, QueryResult, SchemaInfo
@@ -41,6 +42,26 @@ from .sql_safety import UnsafeSQLError, validate_read_only
 logger = logging.getLogger(__name__)
 
 _IDENTIFIER_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+_SYSTEM_SCHEMAS = frozenset({"information_schema", "pg_catalog", "pg_toast"})
+
+
+def _check_table_allowlist(table_allowlist: object) -> list[str]:
+    """Return the tables the agent may read, or raise when none are named."""
+    example = "for example table_allowlist=['customers', 'orders']"
+    if isinstance(table_allowlist, str):
+        raise ValueError(
+            f"table_allowlist must be a list of table names, not a string ({example})."
+        )
+    if not table_allowlist:
+        raise ValueError(
+            "PostgresAgent needs table_allowlist: the tables and views it may read, "
+            f"{example}. The agent reads no table that is not on the list."
+        )
+    names = list(table_allowlist)  # type: ignore[call-overload]
+    if not all(isinstance(name, str) and name.strip() for name in names):
+        raise ValueError(f"table_allowlist entries must be non-empty table names ({example}).")
+    return names
+
 
 # Caps on how much query output is fed to the LLM when synthesizing an answer.
 ANSWER_MAX_ROWS = 50
@@ -212,7 +233,10 @@ class PostgresAgent:
 
         from gaik.software_components.postgres_agent import PostgresAgent
 
-        with PostgresAgent("postgresql://user:pass@localhost:5432/db") as agent:
+        with PostgresAgent(
+            "postgresql://user:pass@localhost:5432/db",
+            table_allowlist=["customers", "orders"],
+        ) as agent:
             result = agent.ask("Which customer placed the most orders?")
             print(result.answer)
 
@@ -224,7 +248,19 @@ class PostgresAgent:
         max_retries: Attempts the agentic loop makes when SQL fails.
         max_rows: Hard cap on rows returned by :meth:`run_sql`.
         statement_timeout_ms: Per-statement timeout (0 disables it).
-        table_allowlist: When given, queries may only touch these tables.
+        table_allowlist: Required. The tables and views the agent may read, as
+            PostgreSQL stores their names (case-sensitive: ``"Users"`` is the
+            table created as ``"Users"``). Only these appear in the schema the
+            LLM sees, and a query that touches any other table, view or
+            system catalog is refused before it runs. Type casts are checked
+            against the list too: a cast to an ``oid`` or ``reg*`` type, or to
+            a type that is neither built in nor a listed table, is refused, as
+            are session and server details such as ``version()``. A listed
+            table's rows include those of its partitions and of tables that
+            inherit from it. A missing list raises
+            ``TypeError`` and an empty one ``ValueError`` at construction;
+            releases up to gaik 0.11.0 read every table in ``schema_name``
+            when no list was given.
         schema_name: The single schema the agent operates on.
         extra_instructions: Optional free-form text appended to the SQL-generation
             user prompt under "Additional context:". Use this for a domain glossary,
@@ -252,7 +288,7 @@ class PostgresAgent:
         max_retries: int = 3,
         max_rows: int = 100,
         statement_timeout_ms: int = 10_000,
-        table_allowlist: list[str] | None = None,
+        table_allowlist: list[str],
         schema_name: str = "public",
         extra_instructions: str | None = None,
         answer_language: str = "en",
@@ -265,6 +301,11 @@ class PostgresAgent:
                 f"Invalid schema_name '{schema_name}': "
                 "must contain only letters, digits, and underscores."
             )
+        if schema_name.lower() in _SYSTEM_SCHEMAS or schema_name.lower().startswith("pg_"):
+            raise ValueError(
+                f"schema_name '{schema_name}' is a PostgreSQL system schema; "
+                "the agent reads only tables in an application schema."
+            )
         self.connection_string = connection_string
         # An unquoted identifier, as in search_path and the validator: fold it once
         # so introspection looks for the schema PostgreSQL actually created.
@@ -272,7 +313,7 @@ class PostgresAgent:
         self.max_retries = max(1, max_retries)
         self.max_rows = max(1, max_rows)
         self.statement_timeout_ms = max(0, statement_timeout_ms)
-        self.table_allowlist = list(table_allowlist) if table_allowlist else None
+        self.table_allowlist = _check_table_allowlist(table_allowlist)
         self.extra_instructions = extra_instructions.strip() if extra_instructions else None
         self.answer_language = (answer_language or "en").strip().lower()
         self.temperature = temperature
@@ -395,13 +436,19 @@ class PostgresAgent:
             self._schema_has_samples = include_samples
         return self._schema
 
-    def generate_sql(self, question: str, *, error_context: str | None = None) -> GeneratedSQL:
+    def generate_sql(
+        self, question: str, *, error_context: str | None = None, advice: str | None = None
+    ) -> GeneratedSQL:
         """Generate a read-only SQL query for ``question`` (no execution).
 
         Args:
             question: The natural-language question.
             error_context: Feedback from a previous failed attempt, fed back to
-                the LLM so it can correct the query.
+                the LLM so it can correct the query. It can quote the data, so it
+                goes in a data block.
+            advice: The caller's own guidance for the retry, such as how to make a
+                timed-out query cheaper. It is an instruction, so it stays outside
+                the data blocks.
 
         Returns:
             A :class:`~gaik.software_components.postgres_agent.models.GeneratedSQL`.
@@ -412,19 +459,24 @@ class PostgresAgent:
         schema = schema.model_copy(
             update={"tables": [t.model_copy(update={"sample_rows": []}) for t in schema.tables]}
         )
+        # Table and column names come from the database, and a database error can quote its
+        # data: each goes in a data block. The question and the caller's extra
+        # instructions stay outside the blocks.
+        material = SourceMaterial()
         user_prompt = (
             f"Database schema (active schema: {self.schema_name}):\n"
-            f"{schema.to_prompt_text()}\n\n"
-            f"Question: {question}"
+            + material.wrap(schema.to_prompt_text(), label="database schema")
+            + f"\n\nQuestion: {question}"
         )
         if self.extra_instructions:
             user_prompt += f"\n\nAdditional context:\n{self.extra_instructions}"
         if error_context:
-            user_prompt += f"\n\nThe previous attempt failed -- fix it.\n{error_context}"
-        messages = [
-            {"role": "system", "content": _SQL_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ]
+            user_prompt += "\n\nThe previous attempt failed -- fix it.\n" + material.wrap(
+                error_context, label="previous attempt"
+            )
+        if advice:
+            user_prompt += f"\n\n{advice}"
+        messages = source_material_messages(_SQL_SYSTEM_PROMPT, user_prompt)
 
         if isinstance(client, ProviderClient):
             parsed = _with_retries(
@@ -495,11 +547,13 @@ class PostgresAgent:
         result = QueryResult(question=question)
         self.get_schema()
         error_context: str | None = None
+        advice: str | None = None
 
         for attempt in range(1, self.max_retries + 1):
             result.attempts = attempt
             try:
-                generated = self.generate_sql(question, error_context=error_context)
+                generated = self.generate_sql(question, error_context=error_context, advice=advice)
+                advice = None
                 result.sql = generated.sql
                 result.reasoning = generated.reasoning
                 rows = self.run_sql(generated.sql)
@@ -524,7 +578,9 @@ class PostgresAgent:
                     error_context = (
                         f"PostgreSQL canceled the query after "
                         f"{self.statement_timeout_ms} ms (statement_timeout). "
-                        f"Failed SQL:\n{result.sql}\n\n"
+                        f"Failed SQL:\n{result.sql}"
+                    )
+                    advice = (
                         "Rewrite the query to do less work: prefer EXISTS over "
                         "correlated subqueries, narrow the date range, drop "
                         "unused JOINs, push filters into derived tables, or "
@@ -592,16 +648,16 @@ class PostgresAgent:
         if self.answer_language != "en":
             language = _LANGUAGE_NAMES.get(self.answer_language, self.answer_language)
             system_prompt += f" Reply in {language}."
+        # The rows are the database's content: a value cannot add to the rules for the answer.
+        material = SourceMaterial()
         user_prompt = (
             f"Question: {question}\n\n"
-            f"SQL query used:\n{query_result.sql}\n\n"
-            f"Query result ({query_result.row_count} row(s)):\n"
-            f"{_format_rows_for_prompt(query_result.rows)}"
+            "SQL query used:\n"
+            + material.wrap(query_result.sql or "", label="SQL query used")
+            + f"\n\nQuery result ({query_result.row_count} row(s)):\n"
+            + material.wrap(_format_rows_for_prompt(query_result.rows), label="query result")
         )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = source_material_messages(system_prompt, user_prompt)
 
         if isinstance(client, ProviderClient):
             response = _with_retries(

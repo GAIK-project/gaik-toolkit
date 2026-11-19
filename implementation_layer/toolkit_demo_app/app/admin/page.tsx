@@ -408,11 +408,11 @@ function UsageRow({
         />
       </td>
       <td className="px-4 py-3 text-sm">
-        {request.report_tokens_used.toLocaleString()}
+        {request.report_tokens_used.toLocaleString("en-US")}
       </td>
       <td className="text-muted-foreground px-4 py-3 text-sm">
         {request.last_report_at
-          ? new Date(request.last_report_at).toLocaleString()
+          ? new Date(request.last_report_at).toLocaleString("en-US")
           : "-"}
       </td>
       <td className="px-4 py-3">
@@ -451,13 +451,15 @@ function WizardUseRow({
       <td className="px-4 py-3 text-sm">{request.email}</td>
       <td className="px-4 py-3 text-sm">{request.full_name}</td>
       <td className="px-4 py-3 text-sm tabular-nums">
-        {use ? use.sessions.toLocaleString() : "-"}
+        {use ? use.sessions.toLocaleString("en-US") : "-"}
       </td>
       <td className="px-4 py-3 text-sm tabular-nums">
-        {use ? use.messages.toLocaleString() : "-"}
+        {use ? use.messages.toLocaleString("en-US") : "-"}
       </td>
       <td className="text-muted-foreground px-4 py-3 text-sm">
-        {use?.lastAt ? new Date(use.lastAt).toLocaleString() : "Not used"}
+        {use?.lastAt
+          ? new Date(use.lastAt).toLocaleString("en-US")
+          : "Not used"}
       </td>
       <td className="px-4 py-3">
         <WizardAccessButton request={request} onUpdate={onUpdate} />
@@ -604,7 +606,7 @@ function Dashboard() {
           <StatCard
             icon={Coins}
             label="Tokens used"
-            value={stats.tokens.toLocaleString()}
+            value={stats.tokens.toLocaleString("en-US")}
           />
         </div>
 

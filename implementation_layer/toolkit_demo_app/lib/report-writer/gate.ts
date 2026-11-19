@@ -1,3 +1,4 @@
+import { USER_HEADER } from "@/lib/api-access";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { EMAIL_UNCONFIRMED, isEmailConfirmed } from "@/lib/api-access";
@@ -172,14 +173,17 @@ export async function forwardReportRun(
   body: FormData,
   staff: boolean,
   onEnd: (usage: ReportUsageInfo) => Promise<void>,
+  userId: string | null = null,
 ): Promise<Response> {
   let backendRes: Response;
   try {
     backendRes = await fetch(`${BACKEND_URL}${backendPath}`, {
       method: "POST",
-      // One headers object: the run token and, for the team, the model tier.
+      // One headers object: the run token, the user (for the API's audit line,
+      // api/utils/audit.py) and, for the team, the model tier.
       headers: {
         ...reportRunHeaders(),
+        ...(userId ? { [USER_HEADER]: userId } : {}),
         ...(staff ? { [MODEL_TIER_HEADER]: "staff" } : {}),
       },
       body,

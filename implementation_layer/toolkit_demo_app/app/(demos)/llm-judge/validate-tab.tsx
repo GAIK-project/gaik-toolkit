@@ -3,6 +3,7 @@
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
   CardContent,
@@ -69,7 +70,7 @@ export function ValidatePdfTab() {
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const { isLoading, result, setResult, run } =
+  const { isLoading, result, setResult, run, stop } =
     useJudgeSubmit<ValidationResult>();
 
   const judgedFile = judged?.file ?? null;
@@ -308,24 +309,16 @@ export function ValidatePdfTab() {
               </Select>
             </div>
 
-            <Button
-              onClick={handleSubmit}
+            <RunButton
+              running={isLoading}
+              onRun={handleSubmit}
+              onStop={stop}
+              icon={Gavel}
               disabled={isLoading || !file}
               className="w-full"
-              size="lg"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Validating…
-                </>
-              ) : (
-                <>
-                  <Gavel className="mr-2 h-4 w-4" />
-                  Validate against the PDF
-                </>
-              )}
-            </Button>
+              Validate against the PDF
+            </RunButton>
           </CardContent>
         </Card>
 

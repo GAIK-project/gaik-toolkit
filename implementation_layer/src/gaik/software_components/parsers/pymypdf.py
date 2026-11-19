@@ -9,6 +9,7 @@ import logging
 import os
 from typing import Any
 
+from .._ligatures import expand_ligatures
 from ..file_type import check_file_type
 from ..input_limits import InputLimits
 
@@ -108,7 +109,7 @@ class PyMuPDFParser:
                     page = doc[page_num]
                     if page_markers:
                         text_content += f"[Page {page_num + 1}]\n"
-                    text_content += str(page.get_text())
+                    text_content += expand_ligatures(str(page.get_text()))
                     text_content += "\n\n"  # Add page separator
             else:
                 # Structured extraction preserving layout
@@ -214,7 +215,9 @@ class PyMuPDFParser:
                             if span["text"].strip():
                                 # Add positioning info for structured extraction
                                 x, y = span["bbox"][0], span["bbox"][1]
-                                line_text.append(f"[x:{x:.0f},y:{y:.0f}] {span['text']}")
+                                line_text.append(
+                                    f"[x:{x:.0f},y:{y:.0f}] {expand_ligatures(span['text'])}"
+                                )
                         if line_text:
                             block_text.append(" ".join(line_text))
                     if block_text:

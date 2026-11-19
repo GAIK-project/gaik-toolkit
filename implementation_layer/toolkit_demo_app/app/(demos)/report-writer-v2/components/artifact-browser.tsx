@@ -193,6 +193,7 @@ export function ArtifactBrowser({
                     )}
                     <button
                       type="button"
+                      aria-label={`Download ${p}`}
                       title="Download"
                       onClick={() => download(p)}
                       className="text-muted-foreground hover:text-foreground"

@@ -3,6 +3,10 @@
 Every visitor searches the same index, so the API only reads it. The index is
 seeded with ``api/scripts/seed_dental_demo.py``, which writes to the database
 directly.
+
+A video's playback and thumbnail routes hand out signed storage links. The
+proxy (``proxy.ts``) forwards them for a signed-in user only and then sets
+``x-gaik-signed-in``; a request without it gets no link.
 """
 
 import logging
@@ -12,7 +16,7 @@ try:
     from utils import generate_presigned_url
 except ImportError:
     from api.utils import generate_presigned_url
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, Header, HTTPException
 from pydantic import BaseModel
 
 try:
@@ -32,6 +36,14 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 1536
 TABLE_NAME = "video_segments"
 FTS_LANGUAGE = "simple"
+
+# Set by the proxy, never by the browser, once it has found the user signed in.
+SIGNED_IN_HEADER = "x-gaik-signed-in"
+
+
+def _require_signed_in(signed_in: str | None) -> None:
+    if signed_in != "1":
+        raise HTTPException(status_code=401, detail="Sign in to use this feature.")
 
 
 def _get_store():
@@ -184,14 +196,22 @@ async def list_videos():
 
 
 @router.get("/videos/{video_id}/play")
-async def get_playback_url(video_id: str):
-    """Generate a presigned Allas S3 URL for video playback."""
+async def get_playback_url(
+    video_id: str,
+    signed_in: str | None = Header(None, alias=SIGNED_IN_HEADER),
+):
+    """Generate a presigned Allas S3 URL for video playback (signed-in users)."""
+    _require_signed_in(signed_in)
     return generate_presigned_url(video_id, "video.mp4", label="video")
 
 
 @router.get("/videos/{video_id}/thumbnail")
-async def get_thumbnail_url(video_id: str):
-    """Generate a presigned Allas S3 URL for video thumbnail."""
+async def get_thumbnail_url(
+    video_id: str,
+    signed_in: str | None = Header(None, alias=SIGNED_IN_HEADER),
+):
+    """Generate a presigned Allas S3 URL for video thumbnail (signed-in users)."""
+    _require_signed_in(signed_in)
     return generate_presigned_url(video_id, "thumbnail.jpg", label="thumbnail")
 
 

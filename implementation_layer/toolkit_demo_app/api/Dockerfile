@@ -15,10 +15,16 @@ WORKDIR /app
 
 # Install system dependencies
 # pandoc: Report Writer DOCX export (pypandoc shells out to the binary)
+# tesseract-ocr-spa/-fra/-deu: with eng, the languages of docling's default
+# Tesseract OCR options. gaik leaves out, with a warning, any that is missing, so
+# with all four routers/rag.py's VisionRagParser reads them all and logs nothing.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     tesseract-ocr \
     tesseract-ocr-fin \
+    tesseract-ocr-spa \
+    tesseract-ocr-fra \
+    tesseract-ocr-deu \
     pandoc \
     && rm -rf /var/lib/apt/lists/*
 

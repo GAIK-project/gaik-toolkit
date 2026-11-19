@@ -55,3 +55,26 @@ def test_the_index_cannot_be_cleared_or_written_over_http(client, store) -> None
     )
     assert response.status_code == 404
     assert store.limits == []
+
+
+@pytest.mark.parametrize("kind", ["play", "thumbnail"])
+def test_a_media_link_goes_only_to_a_request_the_proxy_marked_signed_in(
+    client, monkeypatch, kind
+) -> None:
+    issued: list[str] = []
+
+    def fake_link(video_id: str, filename: str, *, label: str) -> dict:
+        issued.append(filename)
+        return {"url": "https://storage.test/signed", "expires_in": 900}
+
+    monkeypatch.setattr(video_search, "generate_presigned_url", fake_link)
+    path = f"/video-search/videos/an-indexed-video/{kind}"
+
+    assert client.get(path).status_code == 401
+    assert client.get(path, headers={"x-gaik-signed-in": "0"}).status_code == 401
+    assert issued == []
+
+    response = client.get(path, headers={"x-gaik-signed-in": "1"})
+    assert response.status_code == 200
+    assert response.json()["url"] == "https://storage.test/signed"
+    assert len(issued) == 1

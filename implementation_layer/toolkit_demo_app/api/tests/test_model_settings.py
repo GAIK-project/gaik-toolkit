@@ -374,7 +374,8 @@ async def test_vision_extraction_uses_own_model_instead_of_server_allowlist(monk
 
     monkeypatch.setattr(component, "VisionExtractor", FakeExtractor)
     task, _, _ = vision_extractor._load_example_schema()
-    token = settings._settings.set(settings.parse_model_settings(header()))
+    # An own OpenAI key: the Vision Extractor refuses Aitta (test_vision_extractor_demo).
+    token = settings._settings.set(settings.parse_model_settings(header("openai")))
     try:
         result = await vision_extractor.extract_vision(
             files=[UploadFile(filename="sample.pdf", file=io.BytesIO(b"%PDF-test"))],
@@ -388,8 +389,9 @@ async def test_vision_extraction_uses_own_model_instead_of_server_allowlist(monk
             include_verification=False,
         )
         assert result.model == "test-model"
-        assert captured["api_config"]["provider"] == "aitta"
+        assert captured["api_config"]["provider"] == "openai"
         assert captured["model"] == "test-model"
-        assert captured["reasoning_effort"] is None
+        # The effort get_model_options picks for the own model, not the form's "high".
+        assert captured["reasoning_effort"] != "high"
     finally:
         settings._settings.reset(token)

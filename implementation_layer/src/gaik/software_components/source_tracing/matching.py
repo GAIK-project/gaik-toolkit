@@ -11,6 +11,7 @@ import re
 from decimal import Decimal
 from typing import Any
 
+from .._ligatures import expand_ligatures
 from .models import TracePolicy, ValueStatus, Verdict
 
 # Underscores split words too, so a code such as approved_with_remarks reads as words.
@@ -37,6 +38,7 @@ _DEFAULT_POLICY = TracePolicy()
 
 def tokens(text: str) -> list[str]:
     """Lowercased words with punctuation and spacing removed."""
+    text = expand_ligatures(text)
     return [token for token in _NON_WORD.sub(" ", text).lower().split() if token]
 
 

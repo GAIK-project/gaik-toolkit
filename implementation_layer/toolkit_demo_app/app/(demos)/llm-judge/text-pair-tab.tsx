@@ -2,7 +2,7 @@
 
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
   CardContent,
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { Loader2, Scale, Sparkles } from "lucide-react";
+import { Scale, Sparkles } from "lucide-react";
 import posthog from "posthog-js";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -114,7 +114,7 @@ export function TextPairTab() {
     expected: string;
     extracted: string;
   } | null>(null);
-  const { isLoading, result, setResult, run } =
+  const { isLoading, result, setResult, run, stop } =
     useJudgeSubmit<TextPairResult>();
 
   const example = PAIR_EXAMPLES.find((entry) => entry.id === exampleId) ?? null;
@@ -244,24 +244,16 @@ export function TextPairTab() {
                 number, &quot;date&quot; as a date.
               </p>
             </div>
-            <Button
-              onClick={handleSubmit}
+            <RunButton
+              running={isLoading}
+              onRun={handleSubmit}
+              onStop={stop}
+              icon={Sparkles}
               disabled={isLoading || !expected.trim() || !extracted.trim()}
               className="w-full"
-              size="lg"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Judging…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Judge equivalence
-                </>
-              )}
-            </Button>
+              Judge equivalence
+            </RunButton>
           </CardContent>
         </Card>
 

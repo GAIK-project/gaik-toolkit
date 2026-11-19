@@ -1,23 +1,15 @@
-"use client";
-
 /**
- * PageTransition – a lightweight fade-in wrapper that avoids the
- * Framer Motion SSR hydration mismatch present in React 19 / Next 16.
+ * PageTransition – a short entrance for a page's content, in CSS only.
  *
- * The root cause: `motion.div` with `initial={{ opacity:0 }}` writes
- * inline styles during SSR.  React 19 then throws a hydration warning
- * because the client-side initial state differs from the server HTML.
- * Adding `suppressHydrationWarning` silences the warning but does NOT
- * cause the animation to run, leaving the page invisible.
- *
- * Solution: render children immediately at opacity:1 until the component
- * mounts, then switch to a Framer Motion animation so the fade-in only
- * ever runs client-side and never conflicts with SSR.
+ * The animation starts with the first paint of the server HTML and never
+ * depends on JavaScript. An earlier version switched to a Framer Motion
+ * `initial={{ opacity: 0 }}` after hydration: the page was readable, went
+ * blank and faded back in, and stayed dim wherever animation frames do not
+ * advance (a background tab, an embedded preview).
  */
 
-import { motion } from "motion/react";
-import { type ReactNode, type CSSProperties } from "react";
-import { useHasMounted } from "@/hooks/use-has-mounted";
+import { type CSSProperties, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -30,27 +22,15 @@ export function PageTransition({
   className,
   style,
 }: PageTransitionProps) {
-  const mounted = useHasMounted();
-
-  if (!mounted) {
-    // Server render and first client render: visible, no animation.
-    // This keeps the SSR HTML and initial client render in sync.
-    return (
-      <div className={className} style={style}>
-        {children}
-      </div>
-    );
-  }
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-      className={className}
+    <div
+      className={cn(
+        "animate-in fade-in slide-in-from-bottom-3 duration-300 ease-out motion-reduce:animate-none",
+        className,
+      )}
       style={style}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 // What the Vision Extractor demo works with: the file types it accepts, and
 // ready-made documents with a matching extraction task.
+import { bodyLimitFor } from "@/lib/upload-limits";
 
 export const ACCEPTED_EXTENSIONS = [
   ".pdf",
@@ -12,6 +13,8 @@ export const ACCEPTED_EXTENSIONS = [
   ".bmp",
 ];
 export const MAX_FILE_MB = 20;
+/** Files one extraction request may carry (api/upload_limits.json). */
+export const MAX_FILES = bodyLimitFor("/extract-vision").maxFiles;
 
 export interface ExampleFile {
   url: string;
@@ -144,3 +147,46 @@ Amounts and quantities should be numeric: read a decimal comma as a decimal poin
 
 export const fileNameOf = (url: string): string =>
   url.split("/").pop() ?? "document";
+
+export interface RunState {
+  loadingExample: boolean;
+  /** A schema is being generated, for the preview or as the first part of a run. */
+  generatingSchema: boolean;
+  /** A run started with "Extract data" is under way. */
+  extracting: boolean;
+  fileCount: number;
+  hasTask: boolean;
+  /** The text has a schema already: a previewed one, or an example's ready-made one. */
+  schemaReady: boolean;
+}
+
+/**
+ * The line next to "Extract data": why the button is off, or what a run will do.
+ * The button is on only when `ready` is true.
+ */
+export function runHint(state: RunState): { ready: boolean; text: string } {
+  const off = (text: string) => ({ ready: false, text });
+  if (state.extracting)
+    return off(
+      state.generatingSchema
+        ? "Generating the schema from your text. The extraction starts when it is done."
+        : "The model is reading the documents. The result appears below.",
+    );
+  if (state.generatingSchema)
+    return off("Generating the schema. You can extract when it is done.");
+  if (state.loadingExample) return off("Loading the example.");
+  if (state.fileCount === 0 && !state.hasTask)
+    return off("Add a document in step 1 and say what to extract in step 2.");
+  if (state.fileCount === 0) return off("Add at least one document in step 1.");
+  if (!state.hasTask) return off("Say what to extract in step 2.");
+  const reads =
+    state.fileCount === 1
+      ? "one model call reads the file"
+      : `one model call reads all ${state.fileCount} files`;
+  return {
+    ready: true,
+    text: state.schemaReady
+      ? `Ready. The schema is in place, so ${reads}.`
+      : `Ready. A schema is generated from your text first, then ${reads}.`,
+  };
+}
