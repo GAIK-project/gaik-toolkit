@@ -201,16 +201,17 @@ PATCH_SESSION = ("PATCH /sessions/{session_id}", "/sessions/{session_id}", "wiza
 ERROR = 2  # OTLP STATUS_CODE_ERROR
 
 
-def _request_trace(name: str, route: str, function: str, status: int = 0) -> tuple[str, list[dict]]:
+def _request_trace(name: str, route: str, function: str, status: int = 0,
+                   child_status: int = 0) -> tuple[str, list[dict]]:
     """A server span and one FastAPI child span, as the wizard API's instrumentation sends them."""
     trace_id, root_id = secrets.token_hex(16), secrets.token_hex(8)
     now = time.time_ns()
-    common = {"traceId": trace_id, "startTimeUnixNano": str(now - 3_000_000), "endTimeUnixNano": str(now),
-              "status": {"code": status}}
+    common = {"traceId": trace_id, "startTimeUnixNano": str(now - 3_000_000), "endTimeUnixNano": str(now)}
     spans = [
-        {**common, "spanId": root_id, "name": name, "kind": 2, "attributes": [_attr("http.route", route)]},
+        {**common, "spanId": root_id, "name": name, "kind": 2, "status": {"code": status},
+         "attributes": [_attr("http.route", route)]},
         {**common, "spanId": secrets.token_hex(8), "parentSpanId": root_id, "name": "fastapi.endpoint", "kind": 1,
-         "attributes": [_attr("code.function.name", function)]},
+         "status": {"code": child_status}, "attributes": [_attr("code.function.name", function)]},
     ]
     return f"tr-{trace_id}", spans
 
@@ -250,7 +251,8 @@ def _stored_and_left_out(service: str, kept: tuple, *left_out: tuple) -> dict:
 @needs_prometheus
 def test_health_probes_stay_out_of_mlflow_and_in_the_span_metrics():
     counted_before = _requests_counted("wizard-v2-api", "GET /health")
-    kept = _stored_and_left_out("wizard-v2-api", PATCH_SESSION, HEALTH)
+    # A probe that fails is left out as well: an outage must not fill MLflow with probes.
+    kept = _stored_and_left_out("wizard-v2-api", PATCH_SESSION, HEALTH, (*HEALTH, ERROR, ERROR))
     assert _experiment_of(kept) == _experiment_id("wizard-v2-api")
     # Prometheus still counts the probe: the span metrics are taken before the filter.
     _wait_until_counted("wizard-v2-api", "GET /health", counted_before)
@@ -267,13 +269,17 @@ def test_the_filter_is_the_wizard_apis_alone():
 def test_page_requests_without_a_session_stay_out_of_mlflow_and_in_the_span_metrics():
     counted_before = _requests_counted("wizard-v2-api", "GET /sessions/{session_id}")
     # A PATCH of the session has the same route as opening it, and is stored with both its spans.
-    patched = _stored_and_left_out("wizard-v2-api", PATCH_SESSION, OPEN_SESSION, LIST_SESSIONS)
+    # A refused request (4xx) marks only the child span as an error: it is left out whole.
+    refused = (*OPEN_SESSION, 0, ERROR)
+    patched = _stored_and_left_out("wizard-v2-api", PATCH_SESSION, OPEN_SESSION, LIST_SESSIONS, refused)
     assert len(patched["spans"]) == 2
     _wait_until_counted("wizard-v2-api", "GET /sessions/{session_id}", counted_before)
 
 
-def test_a_failed_page_request_is_stored_in_mlflow():
-    # The same request that is left out when it succeeds: with an error status its trace is kept.
-    trace_id, spans = _request_trace(*OPEN_SESSION, status=ERROR)
+def test_a_failed_page_request_keeps_its_server_span_in_mlflow():
+    # The same request that is left out when it succeeds: failed by the API (5xx), its server span is
+    # stored, with the route and the error status; the child spans are not.
+    trace_id, spans = _request_trace(*OPEN_SESSION, status=ERROR, child_status=ERROR)
     _post_spans("wizard-v2-api", spans)
-    assert len(_find_trace(trace_id)["spans"]) == 2
+    [span] = _find_trace(trace_id)["spans"]
+    assert span["name"] == "GET /sessions/{session_id}"

@@ -30,33 +30,35 @@ NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 # Spans MLflow does not store, by application: conditions for the collector's filter processor, read
 # for each span (a span that matches one is dropped). They apply only in that application's pipeline
 # to MLflow, so the span metrics, and the alerts and dashboards built on them, still see every span.
-# A span with an error status is always stored (KEEP_FAILED), so a failed request keeps its trace: the
-# server span and the spans that failed under it.
 #
 # The filter sees one span at a time, not the trace. A request is left out whole only while each of
 # its spans matches a condition, so a span added under one of these requests in the application needs
 # its condition here, or it is stored alone.
+KEEP_FAILED = " and status.code != STATUS_CODE_ERROR"
 NOT_IN_MLFLOW = {
     "wizard-v2-api": [
         # Kubernetes probes, every few seconds: the GET /health server span and FastAPI's child spans
-        # under it, which carry only the endpoint function's name.
+        # under it, which carry only the endpoint function's name. A failing probe is left out too:
+        # an outage would otherwise fill MLflow with probes, and the error ratio already shows it.
         'attributes["http.route"] == "/health"',
         'attributes["code.function.name"] == "wizard_api.main.health"',
         # The web app's page requests, which belong to no session and would each be a row of their own
         # beside the conversation: listing, opening and creating a session, and claiming old ones. The
         # server spans are matched by name, because PATCH /sessions/{session_id} (kept: it carries the
         # session) has the same route as the GET. A route that is not listed here is always stored.
-        'name == "GET /sessions"',
-        'name == "GET /sessions/{session_id}"',
-        'name == "POST /sessions"',
-        'name == "POST /owners/claim"',
+        # A page request the API failed (5xx: the server span has an error status) keeps that span,
+        # with its route and status code. The child spans are left out whatever their status, so a
+        # refused request (4xx), where only a child span is marked, leaves no span without its parent.
+        'name == "GET /sessions"' + KEEP_FAILED,
+        'name == "GET /sessions/{session_id}"' + KEEP_FAILED,
+        'name == "POST /sessions"' + KEEP_FAILED,
+        'name == "POST /owners/claim"' + KEEP_FAILED,
         'attributes["code.function.name"] == "wizard_api.routers.sessions.list_sessions"',
         'attributes["code.function.name"] == "wizard_api.routers.sessions.get_session"',
         'attributes["code.function.name"] == "wizard_api.routers.sessions.create_session"',
         'attributes["code.function.name"] == "wizard_api.routers.owners.claim_legacy_sessions"',
     ],
 }
-KEEP_FAILED = " and status.code != STATUS_CODE_ERROR"
 
 
 def experiment_ids(client: MlflowClient, names: list[str]) -> dict[str, str]:
@@ -78,8 +80,7 @@ def routes(ids: dict[str, str]) -> dict:
         pipeline = {"receivers": ["routing/mlflow"], "exporters": [f"otlphttp/mlflow-{key}"]}
         if name in NOT_IN_MLFLOW:
             # The filter is defined and used in this fragment alone: the base config does not know it.
-            conditions = [condition + KEEP_FAILED for condition in NOT_IN_MLFLOW[name]]
-            processors[f"filter/mlflow-{key}"] = {"error_mode": "ignore", "traces": {"span": conditions}}
+            processors[f"filter/mlflow-{key}"] = {"error_mode": "ignore", "traces": {"span": NOT_IN_MLFLOW[name]}}
             pipeline["processors"] = [f"filter/mlflow-{key}"]
         pipelines[f"traces/mlflow-{key}"] = pipeline
         table.append({
