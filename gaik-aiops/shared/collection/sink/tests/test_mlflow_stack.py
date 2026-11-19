@@ -213,6 +213,13 @@ def _assert_not_in_mlflow(trace_id: str) -> None:
     assert missing.value.code == 404
 
 
+def _wait_until_counted(service: str, span_name: str, counted_before: float) -> None:
+    deadline = time.monotonic() + 30
+    while _requests_counted(service, span_name) <= counted_before:
+        assert time.monotonic() < deadline, f"{span_name} was not counted in the span metrics"
+        time.sleep(1)
+
+
 def test_health_probes_stay_out_of_mlflow_and_in_the_span_metrics():
     health = ("GET /health", "/health", "wizard_api.main.health")
     counted_before = _requests_counted("wizard-v2-api", "GET /health")
@@ -225,7 +232,20 @@ def test_health_probes_stay_out_of_mlflow_and_in_the_span_metrics():
     time.sleep(3)
     _assert_not_in_mlflow(probe)
     # Prometheus still counts the probe: the span metrics are taken before the filter.
-    deadline = time.monotonic() + 30
-    while _requests_counted("wizard-v2-api", "GET /health") <= counted_before:
-        assert time.monotonic() < deadline, "the probe was not counted in the span metrics"
-        time.sleep(1)
+    _wait_until_counted("wizard-v2-api", "GET /health", counted_before)
+
+
+def test_page_requests_without_a_session_stay_out_of_mlflow_and_in_the_span_metrics():
+    counted_before = _requests_counted("wizard-v2-api", "GET /sessions/{session_id}")
+    opened = _send_request_trace("wizard-v2-api", "GET /sessions/{session_id}", "/sessions/{session_id}",
+                                 "wizard_api.routers.sessions.get_session")
+    listed = _send_request_trace("wizard-v2-api", "GET /sessions", "/sessions",
+                                 "wizard_api.routers.sessions.list_sessions")
+    # A PATCH of the session has the same route as opening it, and is stored with both its spans.
+    patched = _find_trace(_send_request_trace("wizard-v2-api", "PATCH /sessions/{session_id}",
+                                              "/sessions/{session_id}", "wizard_api.routers.sessions.update_session"))
+    assert len(patched["spans"]) == 2
+    time.sleep(3)
+    _assert_not_in_mlflow(opened)
+    _assert_not_in_mlflow(listed)
+    _wait_until_counted("wizard-v2-api", "GET /sessions/{session_id}", counted_before)

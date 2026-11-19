@@ -36,6 +36,18 @@ NOT_IN_MLFLOW = {
         # under it, which carry only the endpoint function's name.
         'attributes["http.route"] == "/health"',
         'attributes["code.function.name"] == "wizard_api.main.health"',
+        # The web app's page requests, which belong to no session and would each be a row of their own
+        # beside the conversation: listing, opening and creating a session, and claiming old ones. The
+        # server spans are matched by name, because PATCH /sessions/{session_id} (kept: it carries the
+        # session) has the same route as the GET. A route that is not listed here is always stored.
+        'name == "GET /sessions"',
+        'name == "GET /sessions/{session_id}"',
+        'name == "POST /sessions"',
+        'name == "POST /owners/claim"',
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.list_sessions"',
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.get_session"',
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.create_session"',
+        'attributes["code.function.name"] == "wizard_api.routers.owners.claim_legacy_sessions"',
     ],
 }
 

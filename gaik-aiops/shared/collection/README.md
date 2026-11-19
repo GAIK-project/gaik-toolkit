@@ -37,10 +37,12 @@ append-only guarantees, role permissions, purging, and the metrics derived from 
 Prometheus, and that a span reaches MLflow pseudonymised, address-masked and without prompt or response
 content (`tests/test_mlflow_stack.py`). They are skipped when the stack is not running.
 
-The spans of `wizard-v2-api`'s `/health` probes (the server span and its child spans) are not stored in
-MLflow, where they would bury the sessions: the collector drops them in that application's pipeline to
-MLflow only (`NOT_IN_MLFLOW` in `deploy/compose/mlflow/setup_experiments.py`). The span metrics are
-taken before that, so Prometheus, the alerts and the dashboards count the probes as before.
+Two kinds of `wizard-v2-api` spans are not stored in MLflow, where they would bury the sessions: its
+`/health` probes, and the web app's page requests that belong to no session (listing, opening and
+creating a session, claiming old ones), each with its child spans. The collector drops them in that
+application's pipeline to MLflow only (`NOT_IN_MLFLOW` in `deploy/compose/mlflow/setup_experiments.py`).
+The span metrics are taken before that, so Prometheus, the alerts and the dashboards count these
+requests as before. A request that carries a session, and any route not named there, is stored.
 
 MLflow runs at `http://127.0.0.1:5000`. Each application listed in `MLFLOW_EXPERIMENTS` (service names,
 default `wizard-v2-api,wizard-v2-web,gaik-poc,example-producer`) gets its own experiment, named after

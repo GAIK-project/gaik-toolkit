@@ -146,6 +146,18 @@ def test_health_probe_spans_are_left_out_on_the_way_to_mlflow_only():
     conditions = mlflow_filter["traces"]["span"]
     assert 'attributes["http.route"] == "/health"' in conditions
     assert 'attributes["code.function.name"] == "wizard_api.main.health"' in conditions
+    # So are the page requests that belong to no session, by the server span's name and the endpoint
+    # function; the requests that carry a session (the chat turn, a PATCH of the session) are not named.
+    for span_name, function in (
+        ("GET /sessions", "sessions.list_sessions"),
+        ("GET /sessions/{session_id}", "sessions.get_session"),
+        ("POST /sessions", "sessions.create_session"),
+        ("POST /owners/claim", "owners.claim_legacy_sessions"),
+    ):
+        assert f'name == "{span_name}"' in conditions
+        assert f'attributes["code.function.name"] == "wizard_api.routers.{function}"' in conditions
+    assert len(conditions) == 10
+    assert not [c for c in conditions if "chat" in c or "PATCH" in c or "update_session" in c]
     # Other applications and the Default experiment get every span.
     assert "processors" not in pipelines["traces/mlflow-gaik-poc"]
     assert "processors" not in pipelines["traces/mlflow-default"]
