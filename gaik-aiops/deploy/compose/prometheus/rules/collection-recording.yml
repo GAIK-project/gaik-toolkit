@@ -14,11 +14,14 @@ groups:
           /
           sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER"}[5m]))
 
+      # Request latency of request-response routes. Routes that stream a reply or a run
+      # (a chat turn, a run's log) stay open for minutes by design, so they are left out;
+      # the wizard has its own turn-length metrics and alerts for them.
       - record: gaik:request_latency_ms:p50_5m
-        expr: histogram_quantile(0.50, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER"}[5m])))
+        expr: histogram_quantile(0.50, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER", span_name!~".*/(chat|chat/stream|stream)"}[5m])))
 
       - record: gaik:request_latency_ms:p95_5m
-        expr: histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER"}[5m])))
+        expr: histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER", span_name!~".*/(chat|chat/stream|stream)"}[5m])))
 
       - record: gaik:log_records:rate5m
         expr: sum by (service_name, gaik_event_class) (rate(gaik_log_records_total[5m]))
