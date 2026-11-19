@@ -436,3 +436,26 @@ def test_a_session_over_its_cost_limit_takes_no_more_messages(api) -> None:
     assert Client.started[0].queries == []
     # The files made before the stop can still be downloaded.
     assert api.get(f"/wizard/files/{sid}", headers=ALICE).status_code == 200
+
+
+@pytest.mark.parametrize("text", ["/clear", "  /compact now", "/solution-wizard"])
+def test_a_users_message_never_runs_a_cli_command(api, text) -> None:
+    sid = _start(api, ALICE)
+    api.post(f"/wizard/message/{sid}", json={"text": "hello"}, headers=ALICE)
+
+    response = api.post(f"/wizard/message/{sid}", json={"text": text}, headers=ALICE)
+
+    assert response.status_code == 200
+    sent = Client.started[0].queries[-1]
+    assert not sent.lstrip().startswith("/")
+    assert sent.removeprefix("​") == text  # the text itself is unchanged
+
+
+def test_the_bootstrap_still_starts_with_the_skills_command(api) -> None:
+    sid = _start(api, ALICE)
+
+    api.post(f"/wizard/message/{sid}", json={"text": "/clear"}, headers=ALICE)
+
+    first = Client.started[0].queries[0]
+    assert first.startswith("/solution-wizard")
+    assert first.endswith("​/clear")

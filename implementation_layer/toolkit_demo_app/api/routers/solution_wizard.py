@@ -157,6 +157,18 @@ def _max_messages() -> int:
     return _count_env("WIZARD_MAX_MESSAGES", 60)
 
 
+# The CLI reads a message that starts with "/" as one of its commands: /clear would
+# reset the conversation, and with it the cost limit's count. A user's text never
+# runs one: a zero-width space in front keeps it plain text for the CLI and
+# changes nothing the model reads. Only the server's own bootstrap starts with "/".
+_NOT_A_COMMAND = "​"
+
+
+def _as_user_text(text: str) -> str:
+    """The user's text as it goes to the agent: never one of the CLI's commands."""
+    return _NOT_A_COMMAND + text if text.lstrip().startswith("/") else text
+
+
 BUDGET_STOP = "This session reached its cost limit. Download its files, then start a new session."
 
 
@@ -809,7 +821,7 @@ async def send_message(
 
     async def gen() -> AsyncGenerator[str, None]:
         async with session["lock"]:
-            message_text = body.text
+            message_text = _as_user_text(body.text)
             # First message of the session carries the wizard instructions.
             # The user only ever sees their own text; this rides underneath it.
             bootstrap = session.pop("pending_bootstrap", None)
