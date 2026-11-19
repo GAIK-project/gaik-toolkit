@@ -15,7 +15,6 @@ from pathlib import Path
 
 import psycopg
 import pytest
-import yaml
 
 OTLP = "http://127.0.0.1:4318"
 MLFLOW = "http://127.0.0.1:5000"
@@ -46,7 +45,7 @@ def test_the_session_id_is_pseudonymised_before_it_names_the_mlflow_session():
             hashed = f'set({context}.attributes["{name}"], SHA256(Concat(["<key>", "session:"'
             assert any(hashed in s for s in statements), (context, name)
     # The copy to session.id runs after the privacy processor, so it copies the pseudonym.
-    assert "processors: [memory_limiter, filter/health, transform/privacy, transform/session, batch]" in base
+    assert "processors: [memory_limiter, transform/privacy, transform/session, batch]" in base
     # The overlay overrides transform/privacy only; the session rule lives in the base config.
     assert "transform/session" not in (COMPOSE / "openbao" / "otel-collector.openbao.yaml").read_text()
 
@@ -131,26 +130,29 @@ def test_the_mlflow_routes_keep_the_base_traces_processors():
     assert traces == {"exporters": ["spanmetrics", "routing/mlflow"]}
 
 
-def test_health_probe_spans_are_dropped_from_traces_only():
-    # The wizard API's probe spans (GET /health and FastAPI's child spans) are dropped first in the
-    # traces pipeline, after the memory limiter; logs and metrics keep their processors.
-    config = yaml.safe_load((COMPOSE / "otel-collector.yaml").read_text())
-    wizard = 'resource.attributes["service.name"] == "wizard-v2-api" and '
-    assert config["processors"]["filter/health"] == {
-        "error_mode": "ignore",
-        "traces": {
-            "span": [
-                f'{wizard}attributes["http.route"] == "/health"',
-                f'{wizard}attributes["code.function.name"] == "wizard_api.main.health"',
-            ]
-        },
+def test_health_probe_spans_are_left_out_on_the_way_to_mlflow_only():
+    module = _routes_module()
+    fragment = module.routes({"wizard-v2-api": "1", "gaik-poc": "2"})
+    pipelines = fragment["service"]["pipelines"]
+    # The wizard API's probe spans (GET /health and FastAPI's child spans) are dropped in its own
+    # pipeline to MLflow, behind the router.
+    assert pipelines["traces/mlflow-wizard-v2-api"] == {
+        "receivers": ["routing/mlflow"],
+        "processors": ["filter/mlflow-wizard-v2-api"],
+        "exporters": ["otlphttp/mlflow-wizard-v2-api"],
     }
-    pipelines = config["service"]["pipelines"]
-    assert pipelines["traces"]["processors"][:2] == ["memory_limiter", "filter/health"]
-    assert "filter/health" not in pipelines["logs"]["processors"] + pipelines["metrics"]["processors"]
-    # The files merged over the base config name no processors (lists are replaced), so the filter stays.
+    [(name, mlflow_filter)] = fragment["processors"].items()
+    assert name == "filter/mlflow-wizard-v2-api" and mlflow_filter["error_mode"] == "ignore"
+    conditions = mlflow_filter["traces"]["span"]
+    assert 'attributes["http.route"] == "/health"' in conditions
+    assert 'attributes["code.function.name"] == "wizard_api.main.health"' in conditions
+    # Other applications and the Default experiment get every span.
+    assert "processors" not in pipelines["traces/mlflow-gaik-poc"]
+    assert "processors" not in pipelines["traces/mlflow-default"]
+    assert "processors" not in module.routes({"gaik-poc": "2"})
+    # The span metrics branch off the traces pipeline, which names no filter in the base config or in
+    # the files merged over it, so Prometheus counts the probes.
+    assert pipelines["traces"] == {"exporters": ["spanmetrics", "routing/mlflow"]}
     rahti_ingress = COMPOSE.parent / "k8s" / "stack" / "overlays" / "rahti" / "otlp-ingress-collector.yaml"
-    for overlay in (COMPOSE / "openbao" / "otel-collector.openbao.yaml", rahti_ingress):
-        text = overlay.read_text()
-        assert "filter/health" not in text
-        assert "transform/session" not in text
+    for config in (COMPOSE / "otel-collector.yaml", rahti_ingress):
+        assert "filter" not in config.read_text(), config.name

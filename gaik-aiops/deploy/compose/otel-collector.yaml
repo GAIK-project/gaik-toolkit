@@ -17,16 +17,6 @@ processors:
     limit_percentage: 80
     spike_limit_percentage: 20
   batch: {}
-  # Traces only: drop the spans of wizard-v2-api's Kubernetes health probes, the GET /health server span
-  # and FastAPI's child spans under it (named by the endpoint function), which otherwise fill MLflow's
-  # trace list. Other services are untouched. The spans are dropped before spanmetrics too, so the
-  # probes no longer count in that service's request rate, error rate and latency.
-  filter/health:
-    error_mode: ignore
-    traces:
-      span:
-        - resource.attributes["service.name"] == "wizard-v2-api" and attributes["http.route"] == "/health"
-        - resource.attributes["service.name"] == "wizard-v2-api" and attributes["code.function.name"] == "wizard_api.main.health"
   # Prometheus accepts cumulative series only; producers may send delta.
   deltatocumulative: {}
   # Pseudonymise the user identity and mask client addresses (WP4 S4). One keyed hash here, before any
@@ -129,7 +119,7 @@ service:
       exporters: [otlphttp/sink, count]
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, filter/health, transform/privacy, transform/session, batch]
+      processors: [memory_limiter, transform/privacy, transform/session, batch]
       exporters: [spanmetrics, otlphttp/mlflow]
     metrics:
       receivers: [otlp, spanmetrics, count]

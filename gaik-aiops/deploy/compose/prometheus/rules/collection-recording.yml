@@ -14,14 +14,11 @@ groups:
           /
           sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER"}[5m]))
 
-      # Latency leaves out the wizard API's streaming routes (the chat turn and the two event streams):
-      # their server spans last as long as the turn or the run, tens of seconds in ordinary use, and
-      # would set the percentiles for the whole service. They stay in the request rate and error ratio.
       - record: gaik:request_latency_ms:p50_5m
-        expr: histogram_quantile(0.50, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER", span_name!~".+ /sessions/[^/]+/(chat|chat/stream|runs/[^/]+/stream)"}[5m])))
+        expr: histogram_quantile(0.50, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER"}[5m])))
 
       - record: gaik:request_latency_ms:p95_5m
-        expr: histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER", span_name!~".+ /sessions/[^/]+/(chat|chat/stream|runs/[^/]+/stream)"}[5m])))
+        expr: histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER"}[5m])))
 
       - record: gaik:log_records:rate5m
         expr: sum by (service_name, gaik_event_class) (rate(gaik_log_records_total[5m]))

@@ -6,6 +6,9 @@ MLFLOW_EXPERIMENTS (experiment name = OTel service.name), then writes a collecto
 routes each application's traces to its experiment. Traces from any other service go to the Default
 experiment (id 0) through the base config's otlphttp/mlflow exporter.
 
+An application's pipeline to MLflow can leave spans out (NOT_IN_MLFLOW). That happens after the span
+metrics are taken, so Prometheus and Grafana count those requests as before.
+
 The fragment is JSON, which the collector reads as YAML. Re-running is safe: existing experiments are
 reused.
 
@@ -24,6 +27,18 @@ from mlflow import MlflowClient
 
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 
+# Spans MLflow does not store, by application: conditions for the collector's filter processor, read
+# for each span (a span that matches one is dropped). They apply only in that application's pipeline
+# to MLflow, so the span metrics, and the alerts and dashboards built on them, still see every span.
+NOT_IN_MLFLOW = {
+    "wizard-v2-api": [
+        # Kubernetes probes, every few seconds: the GET /health server span and FastAPI's child spans
+        # under it, which carry only the endpoint function's name.
+        'attributes["http.route"] == "/health"',
+        'attributes["code.function.name"] == "wizard_api.main.health"',
+    ],
+}
+
 
 def experiment_ids(client: MlflowClient, names: list[str]) -> dict[str, str]:
     ids = {}
@@ -34,14 +49,19 @@ def experiment_ids(client: MlflowClient, names: list[str]) -> dict[str, str]:
 
 
 def routes(ids: dict[str, str]) -> dict:
-    exporters, pipelines, table = {}, {}, []
+    exporters, processors, pipelines, table = {}, {}, {}, []
     for name, experiment_id in ids.items():
         key = re.sub(r"[^A-Za-z0-9_-]", "_", name)
         exporters[f"otlphttp/mlflow-{key}"] = {
             "traces_endpoint": "http://mlflow:5000/v1/traces",
             "headers": {"x-mlflow-experiment-id": experiment_id},
         }
-        pipelines[f"traces/mlflow-{key}"] = {"receivers": ["routing/mlflow"], "exporters": [f"otlphttp/mlflow-{key}"]}
+        pipeline = {"receivers": ["routing/mlflow"], "exporters": [f"otlphttp/mlflow-{key}"]}
+        if name in NOT_IN_MLFLOW:
+            # The filter is defined and used in this fragment alone: the base config does not know it.
+            processors[f"filter/mlflow-{key}"] = {"error_mode": "ignore", "traces": {"span": NOT_IN_MLFLOW[name]}}
+            pipeline["processors"] = [f"filter/mlflow-{key}"]
+        pipelines[f"traces/mlflow-{key}"] = pipeline
         table.append({
             "statement": f'route() where attributes["service.name"] == "{name}"',
             "pipelines": [f"traces/mlflow-{key}"],
@@ -51,11 +71,14 @@ def routes(ids: dict[str, str]) -> dict:
     # replaces lists, so the traces pipeline keeps the base's receivers and processors (the
     # privacy rules and the session rule) and spans reach the router processed.
     pipelines["traces"] = {"exporters": ["spanmetrics", "routing/mlflow"]}
-    return {
+    fragment = {
         "connectors": {"routing/mlflow": {"default_pipelines": ["traces/mlflow-default"], "table": table}},
         "exporters": exporters,
         "service": {"pipelines": pipelines},
     }
+    if processors:
+        fragment["processors"] = processors
+    return fragment
 
 
 def main() -> int:

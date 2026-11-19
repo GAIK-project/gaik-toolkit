@@ -3,10 +3,8 @@
 groups:
   - name: gaik-service-alerts
     rules:
-      # Only above 0.1 requests a second (30 in the 5 minutes), so that one failed request in a quiet
-      # period is not more than 5 % of the traffic.
       - alert: HighErrorRatio
-        expr: gaik:request_errors:ratio5m > 0.05 and on (service_name) sum by (service_name) (gaik:requests:rate5m) > 0.1
+        expr: gaik:request_errors:ratio5m > 0.05
         for: 5m
         labels:
           severity: warning

@@ -16,6 +16,7 @@ import pytest
 
 COLLECTOR = "http://127.0.0.1:4318"
 MLFLOW = "http://127.0.0.1:5000"
+PROM = "http://127.0.0.1:9090"
 EXPERIMENT = os.environ.get("MLFLOW_TRACES_EXPERIMENT_ID", "0")
 
 
@@ -176,3 +177,55 @@ def test_a_producers_own_session_id_wins_and_is_pseudonymised_too():
 
 def test_a_trace_without_a_session_gets_none(stored_trace):
     assert _session_of(stored_trace) is None
+
+
+def _send_request_trace(service: str, name: str, route: str, function: str) -> str:
+    """Send a server span and one FastAPI child span, as the wizard API's instrumentation does."""
+    trace_id, root_id = secrets.token_hex(16), secrets.token_hex(8)
+    now = time.time_ns()
+    times = {"startTimeUnixNano": str(now - 3_000_000), "endTimeUnixNano": str(now)}
+    spans = [
+        {"traceId": trace_id, "spanId": root_id, "name": name, "kind": 2, **times,
+         "attributes": [_attr("http.route", route)]},
+        {"traceId": trace_id, "spanId": secrets.token_hex(8), "parentSpanId": root_id, "name": "fastapi.endpoint",
+         "kind": 1, **times, "attributes": [_attr("code.function.name", function)]},
+    ]
+    body = {"resourceSpans": [{
+        "resource": {"attributes": [_attr("service.name", service)]},
+        "scopeSpans": [{"scope": {"name": "test"}, "spans": spans}],
+    }]}
+    req = urllib.request.Request(f"{COLLECTOR}/v1/traces", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        assert resp.status == 200
+    return f"tr-{trace_id}"
+
+
+def _requests_counted(service: str, span_name: str) -> float:
+    expr = f'sum(traces_span_metrics_calls_total{{service_name="{service}", span_name="{span_name}"}})'
+    result = _get(f"{PROM}/api/v1/query?" + urllib.parse.urlencode({"query": expr}))["data"]["result"]
+    return float(result[0]["value"][1]) if result else 0.0
+
+
+def _assert_not_in_mlflow(trace_id: str) -> None:
+    with pytest.raises(urllib.error.HTTPError) as missing:
+        _get(f"{MLFLOW}/api/3.0/mlflow/traces/get?trace_id={trace_id}")
+    assert missing.value.code == 404
+
+
+def test_health_probes_stay_out_of_mlflow_and_in_the_span_metrics():
+    health = ("GET /health", "/health", "wizard_api.main.health")
+    counted_before = _requests_counted("wizard-v2-api", "GET /health")
+    probe = _send_request_trace("wizard-v2-api", *health)
+    # Sent after the probe through the same pipeline: once these are stored, the probe has passed too.
+    kept = _find_trace(_send_span("wizard-v2-api"))
+    assert _experiment_of(kept) == _experiment_id("wizard-v2-api")
+    # The same spans from another application are stored: the filter is the wizard API's alone.
+    _find_trace(_send_request_trace("example-producer", *health))
+    time.sleep(3)
+    _assert_not_in_mlflow(probe)
+    # Prometheus still counts the probe: the span metrics are taken before the filter.
+    deadline = time.monotonic() + 30
+    while _requests_counted("wizard-v2-api", "GET /health") <= counted_before:
+        assert time.monotonic() < deadline, "the probe was not counted in the span metrics"
+        time.sleep(1)
