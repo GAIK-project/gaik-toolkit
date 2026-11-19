@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiFetch, failureMessage } from "@/lib/api-client";
 import { parseSSEEvents } from "@/lib/sse";
@@ -316,6 +317,13 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
     setStep(-1);
   };
 
+  const stopRun = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setProcessing(false);
+    setStep(-1);
+  };
+
   const showSource = (file: string) => {
     setActiveFile(file);
     explorerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -398,7 +406,7 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
       toast.error("An error occurred");
       console.error(error);
     } finally {
-      setProcessing(false);
+      if (abortRef.current === controller) setProcessing(false);
     }
   };
 
@@ -465,7 +473,7 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
       toast.error(error instanceof Error ? error.message : "An error occurred");
       console.error(error);
     } finally {
-      setProcessing(false);
+      if (abortRef.current === controller) setProcessing(false);
     }
   };
 
@@ -665,27 +673,17 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
           {/* Process */}
           <div className="space-y-3 border-t pt-5">
             <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="button"
-                size="lg"
-                disabled={processing}
-                onClick={processExample}
+              <RunButton
+                running={processing}
+                onRun={processExample}
+                onStop={stopRun}
+                icon={Play}
                 className="h-11 rounded-xl px-6 font-semibold shadow-sm"
               >
-                {processing ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 size-4" />
-                    {hasResult
-                      ? "Process the example again"
-                      : "Process the example"}
-                  </>
-                )}
-              </Button>
+                {hasResult
+                  ? "Process the example again"
+                  : "Process the example"}
+              </RunButton>
               <button
                 type="button"
                 onClick={onCreate}

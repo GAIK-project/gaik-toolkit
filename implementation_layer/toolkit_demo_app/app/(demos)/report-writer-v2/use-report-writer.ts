@@ -439,8 +439,20 @@ export function useReportWriter() {
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(null);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortRef.current === controller) setRunning(null);
     }
+  }
+
+  /**
+   * Cancels the run in the browser. The workspace keeps the stages that
+   * finished. The Next.js route may still finish the stage on the server, and
+   * it then counts against the user's report quota.
+   */
+  function stop() {
+    abortRef.current?.abort();
+    setRunning(null);
+    setProgress([]);
   }
 
   function saveArtifact(path: string, text: string) {
@@ -499,6 +511,7 @@ export function useReportWriter() {
     downloadAllZip,
     clearAll,
     run,
+    stop,
     saveArtifact,
   };
 }

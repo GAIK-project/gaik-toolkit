@@ -72,7 +72,7 @@ export function ReportWriterExampleSection({
         progress={rw.progress}
         error={rw.error}
         onRun={rw.run}
-        onCancel={() => rw.abortRef.current?.abort()}
+        onStop={rw.stop}
         runAllHint="The example is loading."
       />
 

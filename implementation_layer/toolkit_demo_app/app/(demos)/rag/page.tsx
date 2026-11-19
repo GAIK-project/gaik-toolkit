@@ -2,6 +2,7 @@
 
 import { ComponentSource } from "@/components/demo/component-source";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { RunButton } from "@/components/demo/run-button";
 import { PageTransition } from "@/components/demo/page-transition";
 import {
   DocumentList,
@@ -221,6 +222,7 @@ interface UploadDialogContentProps {
   onFilesSelect: (files: File[]) => void;
   onFileRemove: (filename: string) => void;
   onIndex: () => void;
+  onStop: () => void;
 }
 
 function UploadDialogContent({
@@ -229,6 +231,7 @@ function UploadDialogContent({
   onFilesSelect,
   onFileRemove,
   onIndex,
+  onStop,
 }: UploadDialogContentProps) {
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>): void {
     const selected = Array.from(event.target.files || []).filter((file) =>
@@ -292,14 +295,17 @@ function UploadDialogContent({
           </div>
         )}
         {pendingFiles.length > 0 && (
-          <Button onClick={onIndex} disabled={isIndexing} className="w-full">
-            <Sparkles className="mr-2 h-4 w-4" />
-            {isIndexing ? (
-              <Shimmer className="text-inherit">{`Indexing ${pendingFiles.length} document(s)...`}</Shimmer>
-            ) : (
-              `Index ${pendingFiles.length} Document${pendingFiles.length !== 1 ? "s" : ""}`
-            )}
-          </Button>
+          <RunButton
+            running={isIndexing}
+            onRun={onIndex}
+            onStop={onStop}
+            icon={Sparkles}
+            spinner
+            size="default"
+            className="w-full"
+          >
+            {`Index ${pendingFiles.length} Document${pendingFiles.length !== 1 ? "s" : ""}`}
+          </RunButton>
         )}
       </div>
     </DialogContent>
@@ -350,7 +356,8 @@ export default function RAGPage() {
     "vision_plus" | "docling_rag" | "pymupdf"
   >("docling_rag");
 
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const indexAbortRef = useRef<AbortController | null>(null);
+  const queryAbortRef = useRef<AbortController | null>(null);
 
   // Load from localStorage on mount and verify collection exists
   useEffect(() => {
@@ -420,7 +427,8 @@ export default function RAGPage() {
 
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort();
+      indexAbortRef.current?.abort();
+      queryAbortRef.current?.abort();
     };
   }, []);
 
@@ -452,8 +460,9 @@ export default function RAGPage() {
   async function handleIndexDocuments(): Promise<void> {
     if (pendingFiles.length === 0 || isIndexing) return;
 
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    indexAbortRef.current?.abort();
+    const controller = new AbortController();
+    indexAbortRef.current = controller;
 
     setIsIndexing(true);
 
@@ -477,7 +486,7 @@ export default function RAGPage() {
       const response = await apiFetch("/api/rag/index", {
         method: "POST",
         body: formData,
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -544,8 +553,17 @@ export default function RAGPage() {
         ),
       );
     } finally {
-      setIsIndexing(false);
+      if (indexAbortRef.current === controller) setIsIndexing(false);
     }
+  }
+
+  /** Cancels indexing in the browser; the files stay pending to index again. */
+  function stopIndexing() {
+    indexAbortRef.current?.abort();
+    setIsIndexing(false);
+    setIndexedDocuments((current) =>
+      current.filter((d) => d.status !== "processing"),
+    );
   }
 
   async function handleLoadExample(): Promise<void> {
@@ -591,8 +609,9 @@ export default function RAGPage() {
   async function handleQuery(question: string): Promise<void> {
     if (!question.trim() || !collectionId || isQuerying) return;
 
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    queryAbortRef.current?.abort();
+    const controller = new AbortController();
+    queryAbortRef.current = controller;
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -623,7 +642,7 @@ export default function RAGPage() {
       const response = await apiFetch("/api/rag/query/stream", {
         method: "POST",
         body: formData,
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -688,10 +707,20 @@ export default function RAGPage() {
       if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(error instanceof Error ? error.message : "Query failed");
     } finally {
-      setIsQuerying(false);
-      setStreamingAnswer([]);
-      setStreamingSources([]);
+      if (queryAbortRef.current === controller) {
+        setIsQuerying(false);
+        setStreamingAnswer([]);
+        setStreamingSources([]);
+      }
     }
+  }
+
+  /** Cancels the answer in the browser; the question stays in the chat. */
+  function stopQuery() {
+    queryAbortRef.current?.abort();
+    setIsQuerying(false);
+    setStreamingAnswer([]);
+    setStreamingSources([]);
   }
 
   async function handleClearCollection(): Promise<void> {
@@ -807,6 +836,7 @@ export default function RAGPage() {
                   onFilesSelect={handleFilesSelect}
                   onFileRemove={handleFileRemove}
                   onIndex={handleIndexDocuments}
+                  onStop={stopIndexing}
                 />
               </Dialog>
             )}
@@ -999,6 +1029,7 @@ export default function RAGPage() {
                     onFilesSelect={handleFilesSelect}
                     onFileRemove={handleFileRemove}
                     onIndex={handleIndexDocuments}
+                    onStop={stopIndexing}
                   />
                 </Dialog>
               )}
@@ -1068,6 +1099,7 @@ export default function RAGPage() {
           <div />
           <PromptInputSubmit
             status={isQuerying ? "streaming" : "ready"}
+            onStop={stopQuery}
             disabled={!hasDocuments}
           />
         </PromptInputFooter>

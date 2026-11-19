@@ -3,6 +3,7 @@
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
+import { RunButton } from "@/components/demo/run-button";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { FeedbackButton } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
@@ -386,6 +387,17 @@ export default function ClassifierPage() {
     }
   }
 
+  /** Cancels the run in the browser; documents already sorted keep their result. */
+  function stopRun(): void {
+    abortControllerRef.current?.abort();
+    setEntries((previous) =>
+      previous.map((entry) =>
+        entry.status === "running" ? { ...entry, status: "waiting" } : entry,
+      ),
+    );
+    setIsRunning(false);
+  }
+
   async function handleSubmit(): Promise<void> {
     if (busy) return;
     if (entries.length === 0) {
@@ -417,7 +429,8 @@ export default function ClassifierPage() {
         await classifyOne(next, controller.signal);
     };
     await Promise.all(Array.from({ length: WORKERS }, worker));
-    setIsRunning(false);
+    // A run that a newer one replaced leaves the newer one's state alone.
+    if (abortControllerRef.current === controller) setIsRunning(false);
 
     if (!controller.signal.aborted)
       posthog.capture("document_classified", {
@@ -677,28 +690,21 @@ export default function ClassifierPage() {
                 <p className="text-muted-foreground text-xs">{parser.hint}</p>
               </div>
 
-              <Button
-                onClick={() => void handleSubmit()}
+              <RunButton
+                running={isRunning}
+                onRun={() => void handleSubmit()}
+                onStop={stopRun}
+                icon={Sparkles}
                 disabled={busy || entries.length === 0 || classes.length < 2}
                 className="w-full"
                 size="lg"
               >
-                {isRunning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sorting {finished} of {entries.length}…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    {entries.length === 1
-                      ? "Sort the document"
-                      : entries.length > 1
-                        ? `Sort ${entries.length} documents`
-                        : "Sort"}
-                  </>
-                )}
-              </Button>
+                {entries.length === 1
+                  ? "Sort the document"
+                  : entries.length > 1
+                    ? `Sort ${entries.length} documents`
+                    : "Sort"}
+              </RunButton>
             </CardContent>
           </Card>
         </div>
