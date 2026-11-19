@@ -339,15 +339,6 @@ export default function ExtractorPage() {
     }
   }
 
-  /** Cancels the run in the browser; the page is ready again with its input. */
-  function stopRun(): void {
-    abortControllerRef.current?.abort();
-    setIsLoading(false);
-    setIsParsing(false);
-    setIsGeneratingSchema(false);
-    setPhase(null);
-  }
-
   async function handleGenerateSchema(): Promise<void> {
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
@@ -744,10 +735,11 @@ export default function ExtractorPage() {
                     disabled={busy}
                     rows={8}
                   />
+                  {/* No Stop: the server caches the schema this run makes, and a stopped
+                      run finishing late could replace the schema of a retry. */}
                   <RunButton
                     running={isGeneratingSchema && !isLoading}
                     onRun={() => void handleGenerateSchema()}
-                    onStop={stopRun}
                     icon={ListChecks}
                     spinner
                     disabled={busy || !task.trim()}
@@ -854,10 +846,11 @@ export default function ExtractorPage() {
                 disabled={busy}
               />
 
+              {/* No Stop: the server caches the schema this run makes, and a stopped
+                  run finishing late could replace the schema of a retry. */}
               <RunButton
                 running={isLoading || isParsing}
                 onRun={() => void handleSubmit()}
-                onStop={stopRun}
                 icon={Sparkles}
                 disabled={
                   busy ||

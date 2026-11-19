@@ -583,13 +583,6 @@ export function CustomUseCase() {
     }
   };
 
-  const stopRun = () => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setGenerating(false);
-    setExtracting(false);
-  };
-
   const generateSchema = async () => {
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -1056,10 +1049,11 @@ export function CustomUseCase() {
               3. Generate schema and extract
             </h3>
             <div className="flex flex-wrap gap-2">
+              {/* No Stop: the server caches the schema this run makes, and a stopped
+                  run finishing late could replace the schema of a retry. */}
               <RunButton
                 running={generating}
                 onRun={generateSchema}
-                onStop={stopRun}
                 icon={FileCode2}
                 spinner
                 variant="secondary"
@@ -1068,10 +1062,11 @@ export function CustomUseCase() {
               >
                 {schemaReady ? "Regenerate schema" : "Generate schema"}
               </RunButton>
+              {/* No Stop: the server caches the schema this run makes, and a stopped
+                  run finishing late could replace the schema of a retry. */}
               <RunButton
                 running={extracting}
                 onRun={extract}
-                onStop={stopRun}
                 icon={Sparkles}
                 spinner
                 size="default"
