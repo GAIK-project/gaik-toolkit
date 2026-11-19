@@ -51,5 +51,6 @@ for s in aiops-grafana-signin aiops-mlflow-signin; do
 done
 
 echo
-echo "Grafana's local admin, for grafana-setup and break-glass access; read it in your own terminal:"
+echo "Grafana's local admin, for grafana-setup's API calls; read it in your own terminal:"
 echo "  oc extract secret/aiops-grafana --keys=admin-password --to=-          # Grafana user: admin"
+echo "The sign-in page has no form for it; README.md (Signing in) says how to get in when Keycloak is down."
