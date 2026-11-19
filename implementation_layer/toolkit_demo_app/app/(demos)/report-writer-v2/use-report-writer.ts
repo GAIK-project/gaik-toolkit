@@ -369,43 +369,10 @@ export function useReportWriter() {
     });
     if (!response.ok) throw await httpError(response);
 
+    const results: StageResult[] = [];
     const errors: string[] = [];
-    let next = ws;
-    let applied = false;
-    // A result is applied as it arrives, not when the stream ends: the server has
-    // counted the stage against the user's report quota by then, so a Stop after
-    // this point keeps the stage instead of dropping it.
-    const apply = (result: StageResult) => {
-      if (result.stage !== stage)
-        throw new Error(`Expected a ${stage} result, got "${result.stage}".`);
-      const artifactsNext = parseArtifacts(result.artifacts);
-      const builds = stage === "synthesize" || stage === "rebuild";
-      if (builds && settings.docx && typeof result.docx_b64 !== "string")
-        throw new Error(`The ${stage} result has no report.docx.`);
-      if (!result.usage || typeof result.usage !== "object")
-        throw new Error(`The ${stage} result has no usage.`);
-      setArtifacts(artifactsNext);
-      if (builds)
-        setDocx(
-          result.docx_b64 === null
-            ? null
-            : Uint8Array.from(atob(result.docx_b64), (c) => c.charCodeAt(0)),
-        );
-      else if (!("report/report.md" in artifactsNext)) setDocx(null); // the stage dropped the report
-      if (stage !== "rebuild")
-        setUsage((u) => ({ ...u, [stage]: result.usage }));
-      setStale((s) => staleAfterStage(s, stage));
-      next = artifactsNext;
-      applied = true;
-    };
     await processSSEStream<StageResult>(response, {
-      onResult: (data) => {
-        try {
-          apply(data);
-        } catch (e) {
-          errors.push(message(e));
-        }
-      },
+      onResult: (data) => results.push(data),
       onError: (msg) => errors.push(msg),
       onCustomEvent: (event) => {
         if (event.type === "progress")
@@ -414,8 +381,31 @@ export function useReportWriter() {
       },
     });
 
+    const result = results.at(-1);
+    let next = ws;
+    if (result) {
+      if (result.stage !== stage)
+        throw new Error(`Expected a ${stage} result, got "${result.stage}".`);
+      next = parseArtifacts(result.artifacts);
+      const builds = stage === "synthesize" || stage === "rebuild";
+      if (builds && settings.docx && typeof result.docx_b64 !== "string")
+        throw new Error(`The ${stage} result has no report.docx.`);
+      if (!result.usage || typeof result.usage !== "object")
+        throw new Error(`The ${stage} result has no usage.`);
+      setArtifacts(next);
+      if (builds)
+        setDocx(
+          result.docx_b64 === null
+            ? null
+            : Uint8Array.from(atob(result.docx_b64), (c) => c.charCodeAt(0)),
+        );
+      else if (!("report/report.md" in next)) setDocx(null); // the stage dropped the report
+      if (stage !== "rebuild")
+        setUsage((u) => ({ ...u, [stage]: result.usage }));
+      setStale((s) => staleAfterStage(s, stage));
+    }
     if (errors.length) throw new Error(errors.join("\n"));
-    if (!applied)
+    if (!result)
       throw new Error(`${STAGE_LABELS[stage]} ended without a result.`);
     return next;
   }
@@ -461,7 +451,9 @@ export function useReportWriter() {
   /**
    * Cancels the run in the browser. The workspace keeps the stages that
    * finished. The Next.js route may still finish the stage on the server, and
-   * it then counts against the user's report quota.
+   * it then counts against the user's report quota. A stage's result is
+   * applied only when its stream ends, after the route has recorded the usage,
+   * so a stopped run never keeps a report that was not counted.
    */
   function stop() {
     abortRef.current?.abort();

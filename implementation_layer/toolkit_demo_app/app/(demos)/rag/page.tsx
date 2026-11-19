@@ -605,7 +605,9 @@ export default function RAGPage() {
   }
 
   async function handleQuery(question: string): Promise<void> {
-    if (!question.trim() || !collectionId || isQuerying) return;
+    // Not while indexing: it can switch the collection, and the answer would
+    // appear under documents it was not drawn from.
+    if (!question.trim() || !collectionId || isQuerying || isIndexing) return;
 
     queryAbortRef.current?.abort();
     const controller = new AbortController();
@@ -980,7 +982,7 @@ export default function RAGPage() {
             <>
               {hasDocuments && isExample ? (
                 <ExampleStart
-                  disabled={isQuerying}
+                  disabled={isQuerying || isIndexing}
                   onAsk={handleQuery}
                   onAbout={() => setExampleOpen(true)}
                 />
@@ -1100,7 +1102,8 @@ export default function RAGPage() {
           <PromptInputSubmit
             status={isQuerying ? "streaming" : "ready"}
             onStop={stopQuery}
-            disabled={!hasDocuments}
+            // The documents are needed to ask, never to stop an answer.
+            disabled={!isQuerying && (!hasDocuments || isIndexing)}
           />
         </PromptInputFooter>
       </PromptInput>
