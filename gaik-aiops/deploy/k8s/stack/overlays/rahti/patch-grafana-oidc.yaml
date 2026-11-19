@@ -25,6 +25,10 @@ spec:
           env:
             - {name: GF_AUTH_GENERIC_OAUTH_ENABLED, value: "true"}
             - {name: GF_AUTH_GENERIC_OAUTH_NAME, value: GAIK}
+            # Only "Sign in with GAIK" on the sign-in page: GAIK accounts typed into
+            # Grafana's own form fail as "user not found". The setup Job still calls
+            # the API with the local admin's basic auth, which this does not turn off.
+            - {name: GF_AUTH_DISABLE_LOGIN_FORM, value: "true"}
             - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
               valueFrom: {secretKeyRef: {name: aiops-grafana-signin, key: client-id}}
             - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET

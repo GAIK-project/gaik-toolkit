@@ -52,7 +52,8 @@ builds take the `develop` branch (`spec.source.git.ref`). After `oc apply`, the 
 ## Signing in
 
 People sign in with their GAIK account at the Keycloak in the `gaik` project
-(`implementation_layer/deploy/keycloak/README.md`). Two groups there decide what they get:
+(`implementation_layer/deploy/keycloak/README.md`); Grafana's sign-in page shows only
+*Sign in with GAIK*, not its own username and password form. Two groups there decide what they get:
 
 | Keycloak group | Grafana | MLflow |
 |---|---|---|
