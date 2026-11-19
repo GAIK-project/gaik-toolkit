@@ -15,7 +15,10 @@ dependencies = [
     # Pinned exactly: the agent's tool guard is a PreToolUse hook, and the SDK
     # (with the CLI it bundles) decides how hooks are registered and called.
     # Upgrade only together with tests/test_agent_sdk_contract.py (see README).
-    "claude-agent-sdk==0.2.178",
+    # Keep it at or above the floor of the root pyproject's `wizard` extra and at
+    # the version the root uv.lock resolves, so one environment can hold both and
+    # solution_wizard's guard is tested on the same SDK as this one.
+    "claude-agent-sdk==0.2.185",
     "opentelemetry-api==1.45.2",
     "opentelemetry-sdk==1.45.2",
     "opentelemetry-exporter-otlp-proto-http==1.45.2",
