@@ -119,6 +119,10 @@ _DEFAULT_MODELS = (
     ("claude", "claude-opus-5-5", True),
     ("gemini", "gemini-3.8-flash", False),
     ("gemini", "gemini-4-argon", True),
+    # Read every test receipt right on 2026-11-19, but takes 25 s to 3 min a page.
+    # Gemini 4 Neon and Hydrogen answer too, but left line prices empty
+    # (docs/MODEL_REQUIREMENTS.md); DEMO_SERVER_MODELS can list them.
+    ("gemini", "gemini-4-carbon", True),
     # CSC Aitta: open models hosted in Finland. Of the models tested through
     # gaik on 2026-11-16 these two are worth offering: Gemma reads images, and
     # gpt-oss answers three times faster (docs/MODEL_REQUIREMENTS.md). Others
@@ -543,6 +547,12 @@ def provider_error_detail(exc: Exception, what: str = "The request") -> str:
         return detail
     if isinstance(exc, HTTPException):
         return str(exc.detail)
+    if getattr(exc, "status_code", None) == 413:
+        # CSC Aitta answers a large scanned page this way.
+        return (
+            "The model's service refused the request as too large. "
+            "Try a smaller file or fewer pages, or pick another model."
+        )
     if _settings.get() is not None:
         return (
             "Model request failed. Check your credentials, model or deployment, "
