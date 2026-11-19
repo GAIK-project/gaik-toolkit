@@ -9,7 +9,9 @@
 # mapping raises aiops-admin to Admin in Main Org. only: Security stays Viewer (tested 18.11.2026 on
 # 11.6.16). Grafana resolves the organisation name Security when it starts, so restart Grafana once
 # after grafana-setup has first created that organisation (README.md). The local admin stays for
-# grafana-setup and as break-glass access. The client and its Secret come from
+# grafana-setup's API calls. With the sign-in form off it cannot sign in through the page: when
+# Keycloak is down, use the API with basic auth or switch the form back on (README.md). The client and
+# its Secret come from
 #   SECRET_NAMESPACE=gaik-aiops PROJECT=gaik implementation_layer/deploy/keycloak/deploy.sh \
 #     add-client aiops-grafana https://grafana-gaik-aiops.2.rahtiapp.fi /login/generic_oauth
 # Keycloak is in another project, so Grafana reaches it over its public address, never the Service.
@@ -26,8 +28,9 @@ spec:
             - {name: GF_AUTH_GENERIC_OAUTH_ENABLED, value: "true"}
             - {name: GF_AUTH_GENERIC_OAUTH_NAME, value: GAIK}
             # Only "Sign in with GAIK" on the sign-in page: GAIK accounts typed into
-            # Grafana's own form fail as "user not found". The setup Job still calls
-            # the API with the local admin's basic auth, which this does not turn off.
+            # Grafana's own form fail as "user not found". This also stops the local
+            # admin signing in through the page; the setup Job's API calls with basic
+            # auth still work.
             - {name: GF_AUTH_DISABLE_LOGIN_FORM, value: "true"}
             - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
               valueFrom: {secretKeyRef: {name: aiops-grafana-signin, key: client-id}}

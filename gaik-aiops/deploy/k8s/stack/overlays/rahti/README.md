@@ -82,7 +82,11 @@ and until then `aiops-admin` gets no *Security* membership.
 - **No local Grafana users for people.** Grafana does not link a local user to a GAIK sign-in with the
   same address (insecure email lookup is off); that person's sign-in would fail. Add people in Keycloak.
 - **Grafana's local admin** (`admin`, `oc extract secret/aiops-grafana --keys=admin-password --to=-`)
-  stays: `grafana-setup` signs in with it, and it is the way in when Keycloak is down.
+  stays for `grafana-setup`'s API calls with basic auth. The sign-in page shows only *Sign in with
+  GAIK*, so the local admin cannot sign in there: when Keycloak is down, use the API with basic auth,
+  or switch the form back on with
+  `oc set env deploy/grafana -c grafana GF_AUTH_DISABLE_LOGIN_FORM=false` and set it back to `true`
+  when done.
 - **MLflow** cannot delete through the Route: `mlflow-auth` answers 403 to the `DELETE` method and to
   MLflow's `…/delete` and `…/delete-<what>` endpoints. MLflow's own pages need other write requests, so
   it cannot be made read-only. Delete as a project member instead, through
@@ -141,8 +145,9 @@ way in: `OTLP_ENDPOINT=https://otlp-gaik-aiops.2.rahtiapp.fi OTLP_TOKEN=... send
 starts, so changing `aiops-db` afterwards also needs `ALTER ROLE` in Postgres. A new pseudonym key
 gives every user a new pseudonym and cuts the link to earlier events; change it only on purpose.
 `aiops-grafana` sets the admin password only on Grafana's first start, but `grafana-setup` keeps
-signing in with it. To change it, change it in Grafana (your profile, *Change password*), then put the
-same value in the Secret and run `oc rollout restart deployment/grafana-setup`; otherwise
+signing in with it. To change it, switch the sign-in form back on (above), sign in as `admin`, change
+it in your profile (*Change password*) and switch the form off again, then put the same value in the
+Secret and run `oc rollout restart deployment/grafana-setup`; otherwise
 `grafana-setup` fails and stops maintaining the *Security* organisation. The sign-in Secrets
 `aiops-grafana-signin` and `aiops-mlflow-signin` follow their Keycloak clients: after regenerating a
 client's secret in Keycloak, put it in the Secret and restart the Deployment that reads it.

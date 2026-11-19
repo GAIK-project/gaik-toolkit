@@ -328,8 +328,6 @@ def test_grafana_maps_the_aiops_groups_and_refuses_everyone_else() -> None:
         "aiops-admin:1:Admin,aiops-admin:Security:Viewer,aiops-viewer:1:Viewer"
     )
     assert env["GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN"]["value"] == "false"
-    # The sign-in page offers only "Sign in with GAIK", not Grafana's own form.
-    assert env["GF_AUTH_DISABLE_LOGIN_FORM"]["value"] == "true"
     for key in ("CLIENT_ID", "CLIENT_SECRET"):
         ref = env[f"GF_AUTH_GENERIC_OAUTH_{key}"]["valueFrom"]["secretKeyRef"]
         assert ref["name"] == "aiops-grafana-signin"
@@ -339,6 +337,15 @@ def test_grafana_maps_the_aiops_groups_and_refuses_everyone_else() -> None:
         )
     realm = json.loads((KEYCLOAK_DIR / "realm-gaik.json").read_text())
     assert {"aiops-admin", "aiops-viewer"} <= {g["name"] for g in realm["groups"]}
+
+
+def test_grafanas_sign_in_page_offers_only_sign_in_with_gaik() -> None:
+    patch = aiops_docs("patch-grafana-oidc.yaml")[0]
+    env = {e["name"]: e for e in patch["spec"]["template"]["spec"]["containers"][0]["env"]}
+    assert env["GF_AUTH_DISABLE_LOGIN_FORM"]["value"] == "true"
+    # The local admin then has no sign-in page; the README says how to get in without Keycloak.
+    readme = (AIOPS_RAHTI / "README.md").read_text()
+    assert "GF_AUTH_DISABLE_LOGIN_FORM=false" in readme
 
 
 def test_cpu_limits_stay_within_rahtis_ratio() -> None:
