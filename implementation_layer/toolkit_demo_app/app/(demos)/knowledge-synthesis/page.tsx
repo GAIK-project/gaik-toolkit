@@ -430,7 +430,11 @@ export default function KnowledgeSynthesisPage() {
       if (!raw) throw new Error("Synthesize ended without a result.");
       toast.success("Report written");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {

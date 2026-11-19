@@ -354,19 +354,17 @@ export default function TabularAgentPage() {
         example: example?.id ?? null,
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       // A run that a newer one replaced leaves the newer one's state alone.
       if (askAbortRef.current === controller) setIsAsking(false);
     }
-  }
-
-  /** Cancels the question in the browser; the question stays in the box. */
-  function stopAsk(): void {
-    askAbortRef.current?.abort();
-    setIsAsking(false);
   }
 
   const accept = status?.allowed_extensions.join(",") ?? ".csv,.xlsx,.xls";
@@ -509,10 +507,11 @@ export default function TabularAgentPage() {
                   aria-label="Your question"
                   disabled={!upload || busy}
                 />
+                {/* No Stop: the server would go on with the question, and a new
+                    one on the same upload would share its database connection. */}
                 <RunButton
                   running={isAsking}
                   onRun={() => void handleAsk()}
-                  onStop={stopAsk}
                   icon={Sparkles}
                   disabled={!upload || isUploading || !question.trim()}
                   size="default"

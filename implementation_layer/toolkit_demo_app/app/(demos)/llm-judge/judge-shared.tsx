@@ -271,7 +271,11 @@ export function useJudgeSubmit<T>() {
     try {
       setResult(await executor(controller.signal));
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return;
       toast.error(e instanceof Error ? e.message : "An error occurred");
     } finally {

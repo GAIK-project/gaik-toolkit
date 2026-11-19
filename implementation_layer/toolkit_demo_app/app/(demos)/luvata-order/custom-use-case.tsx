@@ -631,7 +631,11 @@ export function CustomUseCase() {
         vision,
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       toast.error(
         error instanceof Error ? error.message : "Failed to generate schema",
       );
@@ -688,7 +692,11 @@ export function CustomUseCase() {
         bom_count: bomFiles.length,
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       toast.error(error instanceof Error ? error.message : "Extraction failed");
     } finally {
       if (abortRef.current === controller) setExtracting(false);

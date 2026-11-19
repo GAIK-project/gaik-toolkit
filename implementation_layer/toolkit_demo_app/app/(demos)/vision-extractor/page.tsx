@@ -277,7 +277,11 @@ export default function VisionExtractorPage() {
       setGeneratedSchema(data);
       return data;
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return null;
+      if (
+        abortControllerRef.current?.signal.aborted ||
+        (err instanceof Error && err.name === "AbortError")
+      )
+        return null;
       if (err instanceof RateLimitError) return null;
       toast.error(
         err instanceof Error ? err.message : "Failed to generate schema",
@@ -453,7 +457,11 @@ export default function VisionExtractorPage() {
         example: exampleId,
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {

@@ -279,7 +279,11 @@ export default function ExtractorPage() {
       const data = await response.json();
       return String(data.text_content ?? "");
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return null;
+      if (
+        controller?.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return null;
       if (error instanceof RateLimitError) return null;
       toast.error(
         error instanceof Error ? error.message : "Failed to parse file",
@@ -319,7 +323,11 @@ export default function ExtractorPage() {
       });
       return next;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return null;
+      if (
+        controller?.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return null;
       if (error instanceof RateLimitError) return null;
       toast.error(
         error instanceof Error ? error.message : "Failed to generate schema",
@@ -528,7 +536,11 @@ export default function ExtractorPage() {
       });
       toast.success("Data extracted");
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {

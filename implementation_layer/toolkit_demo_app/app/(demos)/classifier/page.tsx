@@ -374,7 +374,11 @@ export default function ClassifierPage() {
         result: { ...data, filename: entry.file.name },
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       update(entry.key, {
         status: "failed",
         error:

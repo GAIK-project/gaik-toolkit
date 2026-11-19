@@ -280,7 +280,11 @@ export default function SchemaGeneratorPage() {
       });
       toast.success("Schema generated");
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(
         error instanceof Error ? error.message : "Failed to generate schema",

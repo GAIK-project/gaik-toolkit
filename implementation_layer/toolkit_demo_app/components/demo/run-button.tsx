@@ -15,7 +15,9 @@ type ButtonProps = ComponentProps<typeof Button>;
  * is the run's only sign of progress, `spinner` keeps a spinner beside "Stop".
  * Stopping cancels the request in the browser and returns the page to ready
  * with its input kept; a step the server is already running may still finish
- * there.
+ * there. A run that must not be stopped, because the server would go on and a
+ * retry would clash with it (indexing into a collection, a query on a shared
+ * connection), passes no `onStop`: the button then stays disabled while it runs.
  */
 export function RunButton({
   running,
@@ -31,7 +33,8 @@ export function RunButton({
 }: {
   running: boolean;
   onRun: () => void;
-  onStop: () => void;
+  /** Leave out for a run that must not be stopped. */
+  onStop?: () => void;
   /** The icon beside the label when idle. */
   icon?: LucideIcon;
   /** The label when idle, such as "Extract data". */
@@ -44,6 +47,23 @@ export function RunButton({
   size?: ButtonProps["size"];
   variant?: ButtonProps["variant"];
 }) {
+  if (running && !onStop)
+    return (
+      <Button
+        type="button"
+        variant={variant}
+        size={size}
+        disabled
+        className={className}
+      >
+        {spinner ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+        ) : Icon ? (
+          <Icon className="size-4" aria-hidden />
+        ) : null}
+        {children}
+      </Button>
+    );
   if (running)
     return (
       <Button

@@ -402,7 +402,11 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
         }
       }
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       toast.error("An error occurred");
       console.error(error);
     } finally {
@@ -469,7 +473,11 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
           ?.scrollIntoView({ behavior: "smooth", block: "start" }),
       );
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
       console.error(error);
     } finally {

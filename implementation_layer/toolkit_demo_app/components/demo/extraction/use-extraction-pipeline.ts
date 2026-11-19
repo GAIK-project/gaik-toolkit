@@ -153,7 +153,11 @@ export function useExtractionPipeline(demo: {
       });
       if (streamError) throw streamError;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return; // The toast is already shown.
       toast.error(error instanceof Error ? error.message : "An error occurred");
       setSteps((previous) =>

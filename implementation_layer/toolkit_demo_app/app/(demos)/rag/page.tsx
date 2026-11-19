@@ -222,7 +222,6 @@ interface UploadDialogContentProps {
   onFilesSelect: (files: File[]) => void;
   onFileRemove: (filename: string) => void;
   onIndex: () => void;
-  onStop: () => void;
 }
 
 function UploadDialogContent({
@@ -231,7 +230,6 @@ function UploadDialogContent({
   onFilesSelect,
   onFileRemove,
   onIndex,
-  onStop,
 }: UploadDialogContentProps) {
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>): void {
     const selected = Array.from(event.target.files || []).filter((file) =>
@@ -295,10 +293,11 @@ function UploadDialogContent({
           </div>
         )}
         {pendingFiles.length > 0 && (
+          // No Stop: the server would still add the files to the collection,
+          // and indexing them again would add a second copy.
           <RunButton
             running={isIndexing}
             onRun={onIndex}
-            onStop={onStop}
             icon={Sparkles}
             spinner
             size="default"
@@ -461,6 +460,9 @@ export default function RAGPage() {
     if (pendingFiles.length === 0 || isIndexing) return;
 
     indexAbortRef.current?.abort();
+    // An answer still streaming from the collection this replaces must not
+    // appear under the new one.
+    queryAbortRef.current?.abort();
     const controller = new AbortController();
     indexAbortRef.current = controller;
 
@@ -535,7 +537,11 @@ export default function RAGPage() {
         });
       }
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return; // Toast already shown
 
       let errorMessage = "Failed to index documents";
@@ -557,18 +563,10 @@ export default function RAGPage() {
     }
   }
 
-  /** Cancels indexing in the browser; the files stay pending to index again. */
-  function stopIndexing() {
-    indexAbortRef.current?.abort();
-    setIsIndexing(false);
-    setIndexedDocuments((current) =>
-      current.filter((d) => d.status !== "processing"),
-    );
-  }
-
   async function handleLoadExample(): Promise<void> {
     if (isIndexing) return;
 
+    queryAbortRef.current?.abort(); // as when indexing: the collection changes
     setIsIndexing(true);
     try {
       const formData = new FormData();
@@ -703,7 +701,11 @@ export default function RAGPage() {
         }
       }
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(error instanceof Error ? error.message : "Query failed");
     } finally {
@@ -836,7 +838,6 @@ export default function RAGPage() {
                   onFilesSelect={handleFilesSelect}
                   onFileRemove={handleFileRemove}
                   onIndex={handleIndexDocuments}
-                  onStop={stopIndexing}
                 />
               </Dialog>
             )}
@@ -1029,7 +1030,6 @@ export default function RAGPage() {
                     onFilesSelect={handleFilesSelect}
                     onFileRemove={handleFileRemove}
                     onIndex={handleIndexDocuments}
-                    onStop={stopIndexing}
                   />
                 </Dialog>
               )}

@@ -258,7 +258,11 @@ export default function DocumentStructuredPage() {
       });
       if (streamError) throw streamError;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       setSteps((previous) =>
         previous.map((step) =>

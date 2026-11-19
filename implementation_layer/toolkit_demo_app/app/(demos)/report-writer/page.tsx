@@ -583,7 +583,11 @@ export default function ReportWriterPage() {
         },
       });
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (err instanceof Error && err.name === "AbortError")
+      )
+        return;
       if (err instanceof RateLimitError) return;
       toast.error(err instanceof Error ? err.message : "An error occurred");
       // A run that a newer one replaced leaves the newer one's state alone.

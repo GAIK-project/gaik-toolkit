@@ -239,7 +239,11 @@ export default function TextToSpeechPage() {
               example: exampleTitle,
             });
           } catch (error) {
-            if (error instanceof Error && error.name === "AbortError") return;
+            if (
+              controller.signal.aborted ||
+              (error instanceof Error && error.name === "AbortError")
+            )
+              return;
             if (error instanceof RateLimitError) return;
             failed += 1;
             toast.error(
