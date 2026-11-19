@@ -1,7 +1,6 @@
 "use client";
 
 import { GitHubIcon } from "@/components/github-icon";
-import { cn } from "@/lib/utils";
 import {
   ArrowUpRight,
   BookOpen,
@@ -9,10 +8,8 @@ import {
   Copy,
   type LucideIcon,
   Package,
-  Wand2,
 } from "lucide-react";
-import { type ComponentType, type ReactNode, useState } from "react";
-import { type WizardAccess, WizardEntry } from "./wizard-entry";
+import { type ComponentType, useState } from "react";
 
 const rowClassName =
   "group bg-background/70 hover:border-primary/40 flex w-full items-center gap-3.5 rounded-xl border px-4 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0";
@@ -21,12 +18,10 @@ function RowContent({
   icon: Icon,
   title,
   description,
-  badge,
 }: {
   icon: LucideIcon | ComponentType<{ className?: string }>;
   title: string;
   description: string;
-  badge?: ReactNode;
 }) {
   return (
     <>
@@ -34,10 +29,7 @@ function RowContent({
         <Icon className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2 font-medium">
-          {title}
-          {badge}
-        </span>
+        <span className="block font-medium">{title}</span>
         <span className="text-muted-foreground block text-sm">
           {description}
         </span>
@@ -105,8 +97,8 @@ const links = [
   },
 ];
 
-/** The closing call to action: install the package, read on, or try the Wizard. */
-export function GetStarted({ hasWizardAccess, isAuthenticated }: WizardAccess) {
+/** The closing call to action: install the package or read on. The Wizard is under the hero. */
+export function GetStarted() {
   return (
     <section
       id="get-started"
@@ -136,27 +128,6 @@ export function GetStarted({ hasWizardAccess, isAuthenticated }: WizardAccess) {
               <RowContent {...content} />
             </a>
           ))}
-          <WizardEntry
-            hasWizardAccess={hasWizardAccess}
-            isAuthenticated={isAuthenticated}
-            tour="wizard"
-            className={cn(rowClassName, "cursor-pointer")}
-          >
-            <RowContent
-              icon={Wand2}
-              title="Solution Configuration Wizard"
-              description={
-                hasWizardAccess
-                  ? "Describe a use case and get a validated proof of concept."
-                  : "Private beta: request access to design a proof of concept."
-              }
-              badge={
-                <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
-                  Beta
-                </span>
-              }
-            />
-          </WizardEntry>
         </div>
       </div>
     </section>

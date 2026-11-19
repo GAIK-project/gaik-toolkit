@@ -1,5 +1,4 @@
 // The demos the home page lists.
-import { EuFlag } from "@/components/eu-flag";
 import {
   ACCESS,
   CAPTURE,
@@ -95,14 +94,9 @@ export const featuredUseCases: Demo[] = [
   },
 ];
 
+// EU AI Act screening is no use case: it has its own place under the hero
+// (solution-tools.tsx).
 export const useCases: Demo[] = [
-  {
-    title: "EU AI Act Screening",
-    description:
-      "A preliminary AI Act risk class for your AI idea, pilot or product, and what you must do",
-    href: "/ai-act-screening",
-    icon: EuFlag,
-  },
   {
     title: "Helpdesk Chatbot",
     description:
