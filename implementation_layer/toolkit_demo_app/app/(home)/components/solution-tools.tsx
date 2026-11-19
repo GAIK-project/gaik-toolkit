@@ -1,16 +1,17 @@
 import { EuFlag } from "@/components/eu-flag";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Wand2 } from "lucide-react";
+import { ArrowRight, Lock, Wand2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 /**
  * The two tools that are not demos of a component: the Solution Configuration
  * Wizard (this page's one way on to it) and the EU AI Act screening. They sit
- * under the hero, so both are on the first screen.
+ * under the hero, so both are on the first screen. The screening runs a model, so
+ * like the demo cards it sends a visitor who cannot run it to sign in first.
  */
-export function SolutionTools() {
+export function SolutionTools({ canRunDemos }: { canRunDemos: boolean }) {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <section
@@ -80,14 +81,19 @@ export function SolutionTools() {
           </p>
         </div>
         <Link
-          href="/ai-act-screening"
+          href={canRunDemos ? "/ai-act-screening" : "/sign-in"}
+          title={canRunDemos ? undefined : "Sign in to open"}
           className={cn(
             buttonVariants({ variant: "outline", size: "lg" }),
             "mt-auto w-fit gap-2",
           )}
         >
           Screen a use case
-          <ArrowRight className="size-4" />
+          {canRunDemos ? (
+            <ArrowRight className="size-4" />
+          ) : (
+            <Lock className="size-4" />
+          )}
         </Link>
       </section>
     </div>

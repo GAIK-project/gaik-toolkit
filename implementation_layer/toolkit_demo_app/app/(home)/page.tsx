@@ -11,18 +11,16 @@ const DemoCards = dynamic(() =>
 
 export default async function HomePage() {
   const { user, isUnlocked, isTrial } = await getUserAccessStatus();
+  const canRunDemos = isUnlocked || isTrial;
 
   return (
     <div className="space-y-16">
       <div className="space-y-4">
         <Hero isAuthenticated={Boolean(user)} />
-        <SolutionTools />
+        <SolutionTools canRunDemos={canRunDemos} />
         <OwnDataCallout />
       </div>
-      <DemoCards
-        isUnlocked={isUnlocked || isTrial}
-        isAuthenticated={Boolean(user)}
-      />
+      <DemoCards isUnlocked={canRunDemos} isAuthenticated={Boolean(user)} />
       <GetStarted />
     </div>
   );

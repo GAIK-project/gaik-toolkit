@@ -2,7 +2,11 @@
 
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { buttonVariants } from "@/components/ui/button";
-import { buildAccessRequestMailto } from "@/lib/onboarding/mailto";
+import {
+  buildAccessRequestMailto,
+  GAIK_CONTACT_EMAIL,
+  GAIK_CONTACT_URL,
+} from "@/lib/onboarding/mailto";
 import { cn } from "@/lib/utils";
 import { ArrowRight, ArrowUpRight, BookOpen, Wand2 } from "lucide-react";
 import Image from "next/image";
@@ -276,6 +280,24 @@ export function SolutionWizardNotice({
           </div>
         </section>
       </div>
+
+      {/* The request links above open a mail app; this works without one. */}
+      <p className="text-muted-foreground text-sm">
+        Requests go to{" "}
+        <a href={`mailto:${GAIK_CONTACT_EMAIL}`} className={linkClassName}>
+          {GAIK_CONTACT_EMAIL}
+        </a>
+        , or write through the{" "}
+        <a
+          href={GAIK_CONTACT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClassName}
+        >
+          GAIK contact page
+        </a>
+        .
+      </p>
 
       <figure className="space-y-2">
         <Image
