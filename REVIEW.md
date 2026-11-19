@@ -31,6 +31,14 @@ the repository is laid out and checked.
   `lib/no-code/catalog.generated.json` and `public/downloads/skills/`, lockfiles and
   `evaluation_layer/**/runs/`.
 
+## Live model checks
+
+CI runs the offline tests on every pull request; the live suite (`-m llm`) runs nightly
+and at the release gate. Run live calls in a review only when the change alters what a
+model or agent call depends on: the LLM layer, a provider, a prompt or schema sent to a
+model, or the wizard's agent runner. Then run only that area's tests (`-k`), and say in
+the review what ran live and what did not.
+
 ## Severity, and what holds a merge
 
 Mark every finding with one of these:

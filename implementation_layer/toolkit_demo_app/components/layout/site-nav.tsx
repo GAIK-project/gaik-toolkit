@@ -58,7 +58,6 @@ import {
   NotebookPen,
   FileSearch,
   FileText,
-  GraduationCap,
   HardHat,
   Headset,
   House,
@@ -74,6 +73,7 @@ import {
   Scale,
   ScanEye,
   ShieldAlert,
+  ShieldCheck,
   Table2,
   Tags,
   Video,
@@ -108,6 +108,11 @@ const navGroups: NavGroup[] = [
     label: "Use Cases",
     icon: Lightbulb,
     items: [
+      {
+        label: "EU AI Act Screening",
+        href: "/ai-act-screening",
+        icon: ShieldCheck,
+      },
       { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
       { label: "Construction Diary", href: "/diary", icon: HardHat },
       {
@@ -140,24 +145,6 @@ const navGroups: NavGroup[] = [
         href: "/solution-wizard",
         icon: Wand2,
         beta: true,
-      },
-      {
-        label: "Customer onboarding and sales assistant",
-        href: "#",
-        icon: Headset,
-        comingSoon: true,
-      },
-      {
-        label: "Sales Proposal Generation",
-        href: "#",
-        icon: FileBarChart,
-        comingSoon: true,
-      },
-      {
-        label: "Learning plans & recommendations",
-        href: "#",
-        icon: GraduationCap,
-        comingSoon: true,
       },
     ],
   },
@@ -962,16 +949,27 @@ export function SiteNav({
     <header className="border-border/60 bg-card/95 sticky top-0 z-50 border-b shadow-sm backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 md:px-6 md:py-4">
         {/* Left: Logo */}
-        <div className="flex min-w-0 flex-1 items-center">
-          <Link href="/" className="shrink-0">
+        <div className="flex min-w-0 flex-1 items-center md:min-w-fit">
+          {/* The wordmark, so the header says GAIK; the monogram alone read
+              as an abstract shape. The file has a white background, which
+              multiply blends into the header. The label completes the site's
+              name on phones; from md the menu needs the room. */}
+          <Link
+            href="/"
+            aria-label="GAIK Toolkit home"
+            className="flex shrink-0 items-center gap-2"
+          >
             <Image
-              src="/logos/gaik-logo-letter-only.png"
-              alt="GAIK"
-              width={40}
-              height={40}
-              className="h-9 w-9 md:h-10 md:w-10"
+              src="/logos/only-gaik-text.png"
+              alt=""
+              width={74}
+              height={32}
+              className="h-7 w-auto mix-blend-multiply md:h-8"
               priority
             />
+            <span className="text-muted-foreground text-sm font-medium md:hidden">
+              Toolkit
+            </span>
           </Link>
         </div>
 

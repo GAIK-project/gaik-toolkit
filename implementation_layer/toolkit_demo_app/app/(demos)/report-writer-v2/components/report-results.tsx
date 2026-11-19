@@ -3,7 +3,7 @@
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { STAGES } from "@/lib/report-writer/workspace";
+import { reportOutOfDate, STAGES } from "@/lib/report-writer/workspace";
 import { FilePen } from "lucide-react";
 import { effectiveId } from "../../report-writer/components/section-editor";
 import { STAGE_LABELS, type useReportWriter } from "../use-report-writer";
@@ -71,7 +71,7 @@ export function ReportResults({
             artifacts={rw.artifacts}
             disabled={rw.busy}
             onSave={rw.saveArtifact}
-            outOfDate={rw.stale.report}
+            outOfDate={reportOutOfDate(rw.stale, rw.artifacts, rw.running)}
             onDropRequirement={(sectionId, item) =>
               rw.setSections(
                 rw.sections.map((section) =>
@@ -113,7 +113,10 @@ export function ReportResults({
                 <p key={stage}>
                   <span className="font-medium">{STAGE_LABELS[stage]}:</span>{" "}
                   {Object.entries(rw.usage[stage]!)
-                    .map(([key, value]) => `${key} ${value.toLocaleString()}`)
+                    .map(
+                      ([key, value]) =>
+                        `${key} ${value.toLocaleString("en-US")}`,
+                    )
                     .join(" · ") || "no token counts reported"}
                 </p>
               ))}

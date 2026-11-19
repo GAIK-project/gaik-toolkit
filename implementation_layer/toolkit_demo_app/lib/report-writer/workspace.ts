@@ -349,6 +349,26 @@ export function staleHint(s: Staleness, path: string): string | null {
   return s.assembled && assembled ? "Rebuild report" : null;
 }
 
+/**
+ * Whether to tell the user that the facts changed after the report was written.
+ *
+ * `report` alone does not say that: every Curate sets it, also the first one, when no
+ * section has been written yet. So there must be a written report to be out of date. And
+ * nothing is said while a stage runs: the report is then either being rewritten or about
+ * to be, and "Run Stage 3 again" would point at a button that is disabled.
+ */
+export function reportOutOfDate(
+  s: Staleness,
+  artifacts: Record<string, string>,
+  running: Stage | null,
+): boolean {
+  return (
+    s.report &&
+    running === null &&
+    Object.keys(artifacts).some((path) => path.startsWith("report/sections/"))
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Run request validation (the Next route)
 // ---------------------------------------------------------------------------

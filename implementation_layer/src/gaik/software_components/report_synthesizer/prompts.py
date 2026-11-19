@@ -27,7 +27,9 @@ heading is added automatically.
 - Follow the section instructions and cover every required item.
 - Missing data: for each item in the knowledge's "missing" list, and for each required \
 item the material does not cover, write the marker (missing: <item>) in the text, e.g. \
-(missing: latest sewer camera inspection). Never fill a gap with a guess.
+(missing: latest sewer camera inspection). Put the marker inside a sentence that names \
+the item, e.g. "The base floor condition is not documented (missing: base floor \
+condition).", not alone after a label. Never fill a gap with a guess.
 - Conflicts: for a conflict with status "unresolved", state both sides and mark it with \
 "Unresolved:". For a "resolved" conflict, follow the side its description gives.
 - Sources: cite and attribute sources as the report instructions say. Each fact unit \
@@ -170,8 +172,8 @@ claims it does not support.
 - Correct numbers, years, dates, names and attributions (which source says what) that \
 contradict the reference.
 - Each required item of the section that the reference does not cover must carry a \
-(missing: <item>) marker in the text. Add a marker that is absent, and never remove one \
-for an item the reference does not cover.
+(missing: <item>) marker in the text. Add a marker that is absent, inside a sentence that \
+names the item, and never remove one for an item the reference does not cover.
 {knowledge_checks}\
 {hierarchy_check}
 - The text must follow the section instructions below.

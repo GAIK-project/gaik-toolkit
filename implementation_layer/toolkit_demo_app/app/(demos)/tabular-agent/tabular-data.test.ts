@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import {
   EXAMPLES,
   barsOf,
+  cellText,
   columnsOf,
   percent,
   sortRows,
@@ -84,4 +85,11 @@ test("toCsv quotes cells and writes empty values as nothing", () => {
 
 test("percent", () => {
   expect(percent(0.346)).toBe("35%");
+});
+
+test("a float from SQL arithmetic shows without its rounding tail", () => {
+  expect(cellText(21.000000000000014)).toBe("21");
+  expect(cellText(5.65)).toBe("5.65");
+  expect(cellText(1480000)).toBe("1480000");
+  expect(cellText("Helsinki")).toBe("Helsinki");
 });

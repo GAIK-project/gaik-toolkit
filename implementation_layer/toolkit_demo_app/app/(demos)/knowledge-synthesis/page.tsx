@@ -5,6 +5,7 @@ import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
+import { useConfirm } from "@/components/demo/use-confirm";
 import { FeedbackButton } from "@/components/feedback";
 import {
   Accordion,
@@ -201,6 +202,7 @@ export default function KnowledgeSynthesisPage() {
   const [progress, setProgress] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -252,14 +254,20 @@ export default function KnowledgeSynthesisPage() {
     setError(null);
   }
 
-  function confirmReplace(what: string): boolean {
+  /** Asks before the report is cleared; with none there is nothing to ask. */
+  async function confirmReplace(title: string, action: string) {
     return (
-      !run || window.confirm(`${what} clears the current report. Continue?`)
+      !run ||
+      (await confirm({
+        title,
+        description: "It clears the current report.",
+        action,
+      }))
     );
   }
 
   async function loadZip(file: File) {
-    if (!confirmReplace("Loading a zip")) return;
+    if (!(await confirmReplace("Load the zip?", "Load zip"))) return;
     try {
       const loaded = readKnowledgeZip(new Uint8Array(await file.arrayBuffer()));
       resetResult();
@@ -275,7 +283,8 @@ export default function KnowledgeSynthesisPage() {
   }
 
   async function pickExample(example: SynthesisExample) {
-    if (busy || !confirmReplace("Loading an example")) return;
+    if (busy || !(await confirmReplace("Load the example?", "Load example")))
+      return;
     setLoadingExample(true);
     try {
       const response = await fetch(example.url);
@@ -314,8 +323,8 @@ export default function KnowledgeSynthesisPage() {
     if (!title.trim()) setTitle("Report");
   }
 
-  function clearAll() {
-    if (!confirmReplace("Clearing")) return;
+  async function clearAll() {
+    if (!(await confirmReplace("Clear the page?", "Clear"))) return;
     setKnowledge({});
     setOrigin("");
     setExampleId(null);
@@ -347,9 +356,11 @@ export default function KnowledgeSynthesisPage() {
     if (
       run &&
       Object.keys(texts).length > 0 &&
-      !window.confirm(
-        "Synthesizing again replaces the report, including your text edits. Continue?",
-      )
+      !(await confirm({
+        title: "Synthesize again?",
+        description: "It replaces the report, including your text edits.",
+        action: "Synthesize again",
+      }))
     )
       return;
     abortRef.current?.abort();
@@ -510,6 +521,7 @@ export default function KnowledgeSynthesisPage() {
 
   return (
     <PageTransition>
+      {confirmDialog}
       <DemoPageHeader
         icon={NotebookPen}
         title="Knowledge Synthesis"
@@ -971,10 +983,14 @@ export default function KnowledgeSynthesisPage() {
                           const deps =
                             inputs.find((s) => s.id === id)?.depends_on ?? [];
                           return (
+                            // A badge does not wrap or shrink by default. A derived
+                            // section names every section it is written from, and
+                            // on a phone that line is wider than the card: let it
+                            // wrap, the dependencies under the title.
                             <Badge
                               key={id}
                               variant="outline"
-                              className="gap-1 font-normal"
+                              className="max-w-full shrink flex-wrap justify-start gap-1 rounded-xl text-left font-normal wrap-anywhere whitespace-normal"
                             >
                               {titleOf(id)}
                               {deps.length > 0 && (
@@ -1114,7 +1130,7 @@ export default function KnowledgeSynthesisPage() {
                     {sections.length} sections
                   </Badge>
                   <Badge variant="outline" className="font-normal">
-                    {wordCount(markdown).toLocaleString()} words
+                    {wordCount(markdown).toLocaleString("en-US")} words
                   </Badge>
                   <Badge variant="outline" className="font-normal">
                     {cited.reduce((n, [, c]) => n + c, 0)} citations
@@ -1134,7 +1150,7 @@ export default function KnowledgeSynthesisPage() {
                   )}
                   <Badge variant="outline" className="font-normal">
                     {Object.entries(run.result.usage)
-                      .map(([k, v]) => `${k} ${v.toLocaleString()}`)
+                      .map(([k, v]) => `${k} ${v.toLocaleString("en-US")}`)
                       .join(" · ") || "no token counts reported"}
                   </Badge>
                 </div>

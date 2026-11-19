@@ -231,12 +231,15 @@ export function parseInline(text: string): Inline[] {
   return out;
 }
 
+// A table cell writes its line breaks as <br>: markup, not text.
+const BR_TAG = /<br\s*\/?>/gi;
+
 /** The text without markdown marks, for the plain view. */
 export function toPlainText(markdown: string): string {
   return parseBlocks(markdown)
     .map((block) => {
-      const plain = (text: string) =>
-        parseInline(text)
+      const plain = (text: string, lineBreak = " ") =>
+        parseInline(text.replace(BR_TAG, lineBreak))
           .map((part) => part.text)
           .join("");
       switch (block.type) {
@@ -244,7 +247,7 @@ export function toPlainText(markdown: string): string {
           return plain(block.text);
         case "paragraph":
         case "quote":
-          return plain(block.text);
+          return plain(block.text, "\n");
         case "code":
           return block.text;
         case "list":
@@ -256,7 +259,7 @@ export function toPlainText(markdown: string): string {
             .join("\n");
         case "table":
           return [block.header, ...block.rows]
-            .map((row) => row.map(plain).join("\t"))
+            .map((row) => row.map((cell) => plain(cell)).join("\t"))
             .join("\n");
         case "hr":
           return "";
