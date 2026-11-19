@@ -1,13 +1,10 @@
 import { type Account, accountOf } from "@/lib/account";
-import { getGithubPreviewSafe } from "@/lib/link-previews";
 import { getUserAccessStatus, getWizardAccess } from "@/lib/queries/access";
 import { getTrialLimits } from "@/lib/trial";
 import { headers } from "next/headers";
 import { SiteNav } from "./site-nav";
 
 export async function SiteNavServer() {
-  const githubPreview = await getGithubPreviewSafe();
-
   // Get pathname from proxy header for SSR active state
   const headersList = await headers();
   const pathname = headersList.get("x-current-path") || "/";
@@ -20,7 +17,8 @@ export async function SiteNavServer() {
     // BYPASS_AUTH (local development) runs everything without an account.
     const access = await getUserAccessStatus();
     isLoggedIn = !!access.user || access.bypassAuth;
-    account = accountOf(access, getTrialLimits().runsPerDay);  } catch {
+    account = accountOf(access, getTrialLimits().runsPerDay);
+  } catch {
     // ignore auth errors
   }
   const hasWizardAccess = await getWizardAccess();
@@ -28,7 +26,6 @@ export async function SiteNavServer() {
   return (
     <SiteNav
       pathname={pathname}
-      githubPreview={githubPreview}
       isLoggedIn={isLoggedIn}
       account={account}
       hasWizardAccess={hasWizardAccess}
