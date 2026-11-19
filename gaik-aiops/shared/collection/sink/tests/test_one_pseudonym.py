@@ -15,6 +15,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+import yaml
 
 OTLP = "http://127.0.0.1:4318"
 MLFLOW = "http://127.0.0.1:5000"
@@ -128,3 +129,83 @@ def test_the_mlflow_routes_keep_the_base_traces_processors():
     # naming receivers or processors there would drop transform/session (or a later rule).
     traces = _routes_module().routes({"wizard-v2-api": "1"})["service"]["pipelines"]["traces"]
     assert traces == {"exporters": ["spanmetrics", "routing/mlflow"]}
+
+
+def _wizard_filter() -> tuple[dict, list[str]]:
+    """The routes fragment for two applications, and the wizard API's filter conditions in it."""
+    fragment = _routes_module().routes({"wizard-v2-api": "1", "gaik-poc": "2"})
+    [(name, mlflow_filter)] = fragment["processors"].items()
+    assert name == "filter/mlflow-wizard-v2-api" and mlflow_filter["error_mode"] == "ignore"
+    return fragment, mlflow_filter["traces"]["span"]
+
+
+UNLESS_FAILED = " and status.code != STATUS_CODE_ERROR"
+
+
+def test_the_wizard_apis_filter_is_on_its_own_pipeline_to_mlflow_only():
+    fragment, _ = _wizard_filter()
+    pipelines = fragment["service"]["pipelines"]
+    assert pipelines["traces/mlflow-wizard-v2-api"] == {
+        "receivers": ["routing/mlflow"],
+        "processors": ["filter/mlflow-wizard-v2-api"],
+        "exporters": ["otlphttp/mlflow-wizard-v2-api"],
+    }
+    # Other applications and the Default experiment get every span.
+    assert "processors" not in pipelines["traces/mlflow-gaik-poc"]
+    assert "processors" not in pipelines["traces/mlflow-default"]
+    assert "processors" not in _routes_module().routes({"gaik-poc": "2"})
+
+
+def test_health_probe_spans_are_left_out_of_mlflow_also_when_the_probe_fails():
+    # The GET /health server span, and FastAPI's child spans under it by the endpoint function.
+    _, conditions = _wizard_filter()
+    assert 'attributes["http.route"] == "/health"' in conditions
+    assert 'attributes["code.function.name"] == "wizard_api.main.health"' in conditions
+
+
+PAGE_REQUESTS = (
+    ("GET /sessions", "sessions.list_sessions"),
+    ("GET /sessions/{session_id}", "sessions.get_session"),
+    ("POST /sessions", "sessions.create_session"),
+    ("POST /owners/claim", "owners.claim_legacy_sessions"),
+)
+
+
+def test_page_requests_without_a_session_are_left_out_of_mlflow():
+    _, conditions = _wizard_filter()
+    for span_name, function in PAGE_REQUESTS:
+        assert f'name == "{span_name}"{UNLESS_FAILED}' in conditions
+        assert f'attributes["code.function.name"] == "wizard_api.routers.{function}"' in conditions
+    # The requests that carry a session (the chat turn, a PATCH of the session) are not named, and
+    # no condition goes by the route that the PATCH shares with opening a session.
+    assert not [c for c in conditions if "chat" in c or "PATCH" in c or "update_session" in c]
+    assert not [c for c in conditions if '"/sessions' in c]
+
+
+def test_only_the_server_span_of_a_failed_page_request_is_kept():
+    # Kept: the server span with an error status (a 5xx). Its child spans go whatever their status,
+    # so a refused request, where only a child span is marked as an error, leaves nothing root-less.
+    _, conditions = _wizard_filter()
+    kept_when_failed = [c for c in conditions if "status.code" in c]
+    assert kept_when_failed == [f'name == "{span_name}"{UNLESS_FAILED}' for span_name, _ in PAGE_REQUESTS]
+
+
+def test_no_config_filters_spans_before_the_span_metrics():
+    # The span metrics branch off the traces pipeline. Its processors are the base config's, and no
+    # file merged over it (the collector replaces lists) names others, so Prometheus counts every span.
+    base = yaml.safe_load((COMPOSE / "otel-collector.yaml").read_text())
+    processors = base["service"]["pipelines"]["traces"]["processors"]
+    assert processors and not [name for name in processors if name.startswith("filter")]
+    rahti_ingress = COMPOSE.parent / "k8s" / "stack" / "overlays" / "rahti" / "otlp-ingress-collector.yaml"
+    for overlay in (COMPOSE / "openbao" / "otel-collector.openbao.yaml", rahti_ingress):
+        traces = yaml.safe_load(overlay.read_text())["service"]["pipelines"].get("traces", {})
+        assert "processors" not in traces and "exporters" not in traces, overlay.name
+    assert "processors" not in _wizard_filter()[0]["service"]["pipelines"]["traces"]
+
+
+def test_a_filtered_application_that_is_not_listed_is_named():
+    # Without a pipeline of its own the application has no filter: setup_experiments.py warns about it.
+    module = _routes_module()
+    assert module.unfiltered(["wizard-v2-api", "gaik-poc"]) == []
+    assert module.unfiltered(["gaik-poc"]) == ["wizard-v2-api"]
+    assert module.unfiltered([]) == ["wizard-v2-api"]
