@@ -1,5 +1,7 @@
+import { type Account, accountOf } from "@/lib/account";
 import { getGithubPreviewSafe } from "@/lib/link-previews";
 import { getUserAccessStatus, getWizardAccess } from "@/lib/queries/access";
+import { getTrialLimits } from "@/lib/trial";
 import { headers } from "next/headers";
 import { SiteNav } from "./site-nav";
 
@@ -13,11 +15,12 @@ export async function SiteNavServer() {
   // The /solution-wizard page is a notice open to everyone (getWizardAccess),
   // so the nav shows it as a link rather than a locked "Beta" tile.
   let isLoggedIn = false;
+  let account: Account | null = null;
   try {
     // BYPASS_AUTH (local development) runs everything without an account.
     const access = await getUserAccessStatus();
     isLoggedIn = !!access.user || access.bypassAuth;
-  } catch {
+    account = accountOf(access, getTrialLimits().runsPerDay);  } catch {
     // ignore auth errors
   }
   const hasWizardAccess = await getWizardAccess();
@@ -27,6 +30,7 @@ export async function SiteNavServer() {
       pathname={pathname}
       githubPreview={githubPreview}
       isLoggedIn={isLoggedIn}
+      account={account}
       hasWizardAccess={hasWizardAccess}
     />
   );

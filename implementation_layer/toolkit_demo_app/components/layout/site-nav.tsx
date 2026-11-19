@@ -1,7 +1,6 @@
 "use client";
 
 import { ModelPicker } from "@/components/model-settings";
-import { setModelSettings } from "@/lib/model-settings-store";
 
 import { GitHubIcon } from "@/components/github-icon";
 import {
@@ -63,7 +62,6 @@ import {
   House,
   Lightbulb,
   LogIn,
-  LogOut,
   LucideIcon,
   Menu,
   MessageSquare,
@@ -81,6 +79,8 @@ import {
   Wand2,
 } from "lucide-react";
 import Image from "next/image";
+import type { Account } from "@/lib/account";
+import { AccountMenu } from "./account-menu";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -761,16 +761,6 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
   );
 }
 
-/** Handles sign-out via API and redirects */
-async function handleSignOut(): Promise<void> {
-  setModelSettings(null);
-  const res = await fetch("/api/auth/sign-out", { method: "POST" });
-  const data = await res.json();
-  if (data.redirectTo) {
-    window.location.href = data.redirectTo;
-  }
-}
-
 const MobileMenuButton = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<typeof Button>
@@ -860,18 +850,8 @@ function MobileNav({
           <div className="px-2">
             <GitHubLink preview={githubPreview} variant="mobile" />
           </div>
-          {isLoggedIn ? (
-            <div className="px-2">
-              <button
-                type="button"
-                className="text-muted-foreground hover:bg-muted hover:text-foreground flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
-                onClick={handleSignOut}
-              >
-                <LogOut className="h-5 w-5" />
-                Sign out
-              </button>
-            </div>
-          ) : (
+          {/* Signed in, the header's account menu has sign-out. */}
+          {isLoggedIn ? null : (
             <div className="px-2">
               <Link
                 href="/sign-in"
@@ -892,6 +872,8 @@ export interface SiteNavProps {
   pathname: string;
   githubPreview?: LinkPreview | null;
   isLoggedIn?: boolean;
+  /** Who is signed in, for the account menu; null for a visitor. */
+  account?: Account | null;
   /** True when the visitor may open the beta items — server-read. */
   hasWizardAccess?: boolean;
 }
@@ -900,6 +882,7 @@ export function SiteNav({
   pathname: initialPathname,
   githubPreview,
   isLoggedIn,
+  account,
   hasWizardAccess,
 }: SiteNavProps) {
   // Use client pathname when available, fall back to server pathname for SSR
@@ -1050,17 +1033,8 @@ export function SiteNav({
             preview={mounted ? githubPreview : null}
             variant="desktop"
           />
-          {isLoggedIn ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground hidden gap-1.5 md:inline-flex"
-              onClick={handleSignOut}
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+          {account ? (
+            <AccountMenu account={account} />
           ) : (
             // Demos run only for a signed-in account, so say so where it shows.
             <Button asChild size="sm">
