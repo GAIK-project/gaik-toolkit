@@ -2,12 +2,13 @@
 // which avatar is theirs and what they can run. Kept free of Supabase and Redis
 // imports, so the mapping can be tested on its own.
 
-/** Full access (approved), the daily trial, waiting, e-mail not confirmed, or local dev. */
+/** Full access (approved), the daily trial, waiting, e-mail not confirmed, declined, or local dev. */
 export type AccountStatus =
   | "full"
   | "trial"
   | "pending"
   | "unconfirmed"
+  | "rejected"
   | "bypass";
 
 export interface Account {
@@ -50,6 +51,8 @@ export interface AccountSource {
   isUnlocked: boolean;
   isTrial: boolean;
   emailUnconfirmed: boolean;
+  /** Told apart from pending: a declined request sets none of the flags above. */
+  requestStatus?: "pending" | "approved" | "rejected" | null;
   bypassAuth: boolean;
 }
 
@@ -75,11 +78,13 @@ export function accountOf(
       : (email ?? "Your account");
   const status: AccountStatus = access.isUnlocked
     ? "full"
-    : access.isTrial
-      ? "trial"
-      : access.emailUnconfirmed
-        ? "unconfirmed"
-        : "pending";
+    : access.requestStatus === "rejected"
+      ? "rejected"
+      : access.isTrial
+        ? "trial"
+        : access.emailUnconfirmed
+          ? "unconfirmed"
+          : "pending";
   return {
     name,
     email,
@@ -100,6 +105,8 @@ export function statusLine(account: Account): string {
       return "Confirm your e-mail address to start";
     case "pending":
       return "Waiting for approval";
+    case "rejected":
+      return "Your access request was declined";
     case "bypass":
       return "Sign-in is bypassed (BYPASS_AUTH)";
   }

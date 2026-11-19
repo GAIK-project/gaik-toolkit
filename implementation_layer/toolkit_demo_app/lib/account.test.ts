@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import {
   accountOf,
   AVATAR_COUNT,
@@ -32,6 +34,16 @@ test("a user keeps the same avatar, and every avatar is one that exists", () => 
     seen.add(index);
   }
   expect(seen.size).toBe(AVATAR_COUNT);
+  for (let index = 1; index <= AVATAR_COUNT; index++) {
+    const file = join(
+      import.meta.dir,
+      "..",
+      "public",
+      "avatars",
+      `avatar-${index}.webp`,
+    );
+    expect(existsSync(file)).toBe(true);
+  }
 });
 
 test("initials come from the first and last name, or the e-mail address", () => {
@@ -55,6 +67,9 @@ test("the account says what the user can run", () => {
     "unconfirmed",
   );
   expect(accountOf(signedIn(), 30)?.status).toBe("pending");
+  const declined = accountOf(signedIn({ requestStatus: "rejected" }), 30)!;
+  expect(declined.status).toBe("rejected");
+  expect(statusLine(declined)).toBe("Your access request was declined");
 });
 
 test("the name falls back to the e-mail address", () => {

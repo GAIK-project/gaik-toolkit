@@ -31,6 +31,7 @@ const STATUS_DOT: Record<Account["status"], string> = {
   trial: "bg-primary",
   pending: "bg-amber-500",
   unconfirmed: "bg-amber-500",
+  rejected: "bg-destructive",
   bypass: "bg-muted-foreground",
 };
 
@@ -53,27 +54,29 @@ function AccountAvatar({
 
 /**
  * The signed-in user's avatar in the header. It opens who is signed in, what
- * they can run, and sign-out. Users who are not approved yet also get their
- * access status page, which explains the trial and the review.
+ * they can run, and sign-out. A user on the trial or waiting for approval also
+ * gets the access status page, which explains both; it says nothing true for
+ * an unconfirmed e-mail address or a declined request, so they do not.
+ *
+ * The name and address stay out of analytics: PostHog's autocapture records a
+ * clicked element's text and attributes, so the trigger has a generic label and
+ * both parts carry `ph-no-capture`.
  */
 export function AccountMenu({ account }: { account: Account }) {
   const notApproved =
-    account.status === "trial" ||
-    account.status === "pending" ||
-    account.status === "unconfirmed";
+    account.status === "trial" || account.status === "pending";
   // With BYPASS_AUTH there is no session to end.
   const canSignOut = account.status !== "bypass";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label={`Account: ${account.name}`}
-        title={account.name}
-        className="focus-visible:ring-ring/50 hover:ring-primary/30 data-[state=open]:ring-primary/40 rounded-full ring-2 ring-transparent transition-[box-shadow,scale] outline-none focus-visible:ring-[3px] active:scale-95"
+        aria-label="Account menu"
+        className="ph-no-capture focus-visible:ring-ring/50 hover:ring-primary/30 data-[state=open]:ring-primary/40 rounded-full ring-2 ring-transparent transition-[box-shadow,scale] outline-none focus-visible:ring-[3px] active:scale-95"
       >
         <AccountAvatar account={account} className="size-8" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72">
+      <DropdownMenuContent align="end" className="ph-no-capture w-72">
         <DropdownMenuLabel className="flex items-center gap-3 py-2 font-normal">
           <AccountAvatar account={account} className="size-10" />
           <span className="min-w-0">
