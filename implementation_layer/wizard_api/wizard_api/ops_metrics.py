@@ -354,9 +354,7 @@ def _sandbox_active() -> dict[str, float]:
 
     if not sandbox_runner.kubernetes_available() or not sandbox_runner.runner_image():
         return {}
-    runner = sandbox_runner.SandboxRunner()
-    active = [j for j in runner._jobs() if sandbox_runner._unfinished(j)]  # noqa: SLF001
-    return {"active": float(len(active))}
+    return {"active": float(sandbox_runner.SandboxRunner().active_jobs())}
 
 
 _sandbox = _Cached(_sandbox_active)

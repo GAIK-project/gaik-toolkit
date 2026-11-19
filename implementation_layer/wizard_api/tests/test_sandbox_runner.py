@@ -680,6 +680,27 @@ def test_finished_jobs_and_other_stacks_do_not_count(monkeypatch):
     assert len(batch.created) == 1
 
 
+def test_the_ops_gauge_counts_unfinished_jobs_with_the_clients_it_loads(monkeypatch):
+    # The gauge builds its own runner, as the API does: no clients are passed in,
+    # so the count must load them first instead of calling a client that is None.
+    from wizard_api import ops_metrics
+    from wizard_api.services import sandbox_runner
+
+    done = _active_job()
+    done.status = SimpleNamespace(succeeded=1, conditions=[])
+    batch = FakeBatch(existing=[_active_job("a@x.org"), _active_job("b@x.org"), done])
+
+    def load(runner):
+        runner._batch, runner._core = batch, FakeCore([])
+
+    monkeypatch.setenv("WIZARD_SANDBOX_NAMESPACE", "gaik-staging")
+    monkeypatch.setenv("WIZARD_POC_RUNNER_IMAGE", IMAGE)
+    monkeypatch.setattr(sandbox_runner, "_K8S_AVAILABLE", True)
+    monkeypatch.setattr(sandbox_runner.SandboxRunner, "_load_clients", load)
+
+    assert ops_metrics._sandbox_active() == {"active": 2.0}
+
+
 def _check_job(version, image=IMAGE, name="20261104100000-abc-chk", user=None, **status):
     from wizard_api.services.sandbox_runner import (
         CHECK_KIND,
