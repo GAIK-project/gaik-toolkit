@@ -818,9 +818,11 @@ export function ChatPanel({
         notDelivered(busyLabel);
         return false;
       }
-      const refusalCode =
-        res.status === 429 ? ((await res.json().catch(() => ({}))) as { error?: unknown }).error : undefined;
-      const refusal = chatRefusalLabel(res.status, refusalCode, errorLabels);
+      const refusalBody =
+        res.status === 429 || res.status === 402
+          ? ((await res.json().catch(() => ({}))) as { error?: unknown; scope?: unknown })
+          : {};
+      const refusal = chatRefusalLabel(res.status, refusalBody.error, errorLabels, refusalBody.scope);
       if (refusal) {
         setMessages((prev) =>
           prev.map((m) => (m.id === asstId ? { ...m, content: `⚠︎ ${refusal}` } : m)),

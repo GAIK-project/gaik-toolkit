@@ -55,6 +55,7 @@ from wizard_api.services import (
     artifact_sync,
     blueprint_service,
     session_service,
+    usage_caps,
 )
 from wizard_api.session_state import (
     GATE_KEYS,
@@ -228,6 +229,11 @@ def _agent_busy(exc: agent_service.AgentUserLimitError) -> HTTPException:
         str(exc),
         headers={"Retry-After": str(agent_service.AgentUserLimitError.retry_after_s)},
     )
+
+
+def _usage_cap(exc: usage_caps.UsageCapError) -> HTTPException:
+    """402 for a message a reached usage cap refuses; ``scope`` says which cap."""
+    return api_error(402, "usage_cap", str(exc), scope=exc.scope)
 
 
 def _chat_rate_limited(exc: agent_service.ChatRateLimitError) -> HTTPException:
@@ -733,6 +739,11 @@ def create_session(
         session_service.check_metadata_patch(payload.metadata)
     except session_service.ServerOwnedMetadataError as exc:
         raise api_error(422, "server_owned_metadata", str(exc), keys=exc.keys) from exc
+    try:
+        # Claimed before the session exists: a refused one leaves nothing behind.
+        usage_caps.claim_session(db, payload.user_id)
+    except usage_caps.SessionLimitError as exc:
+        raise api_error(429, "session_limit", str(exc)) from exc
     session = session_service.create_session(db, payload)
     ops_metrics.sessions_created.add(
         1, {"owner": session.user_id if is_owner_id(session.user_id) else "legacy"}
@@ -1253,6 +1264,13 @@ async def chat(
         agent_service.check_chat_rate(owner)
     except agent_service.ChatRateLimitError as exc:
         raise _chat_rate_limited(exc) from exc
+    try:
+        # A reached usage cap refuses the message before an agent is woken,
+        # and an agent started for it gets what the caps have left as its budget.
+        usage_caps.check_chat(db, session)
+        budget = usage_caps.remaining_budget(db, session)
+    except usage_caps.UsageCapError as exc:
+        raise _usage_cap(exc) from exc
 
     # Before the agent is asked for: a live agent whose interface language
     # changed is told so in a turn of its own, which must not run into the
@@ -1269,6 +1287,7 @@ async def chat(
             resume_id=_resume_id(metadata, session_id),
             transcript=metadata.get("messages"),
             user_id=owner,
+            budget_usd=budget,
         )
     except agent_service.AgentUserLimitError as exc:
         raise _agent_busy(exc) from exc
@@ -1398,6 +1417,7 @@ async def chat(
                         resume_id=None,
                         transcript=metadata.get("messages") or [],
                         user_id=owner,
+                        budget_usd=budget,
                     )
                 except agent_service.AgentUserLimitError as exc:
                     yield agent_service.sse(stream_error("agent_busy", str(exc)))
@@ -1513,8 +1533,28 @@ async def chat(
         turn_db.commit()
         return row
 
+    turn_cost: list[float] = []
+
+    def record_usage() -> list[str]:
+        """Add the turn's cost to the caps' totals, in a database session of its own.
+
+        Its own, so a turn that failed half-way through a write of its database
+        session still has its spend counted. Returns the caps to tell the user of.
+        """
+        if not turn_cost:
+            return []
+        usage = open_db()
+        try:
+            usage_db = next(usage)
+            # A session deleted meanwhile is None: its owner's spend still counts.
+            row = session_service.get_session(usage_db, session_id)
+            return usage_caps.record_cost(usage_db, owner, sum(turn_cost), session=row)
+        finally:
+            usage.close()
+
     async def run_turn() -> None:
         opened = open_db()
+        completed = False
         try:
             turn_db = next(opened)
             turn_session = await asyncio.to_thread(open_turn_session, turn_db)
@@ -1530,10 +1570,12 @@ async def chat(
                     agent_service._model(),
                     _turn_failed,
                     lambda frame: agent_service.frame_stopped(frame) is not None,
+                    turn_cost.append,
                 ):
                     # Each reader keeps its own connection alive (Turn.subscribe).
                     if not agent_service.is_heartbeat(frame):
                         await turn.publish(frame)
+            completed = True
         except TimeoutError:
             logger.error("chat turn of session %s ended at the time limit", session_id)
             # The agent's process is in an unknown state: the next message
@@ -1561,6 +1603,19 @@ async def chat(
                 )
             )
         finally:
+            try:
+                notices = await asyncio.to_thread(record_usage)
+            except Exception:  # noqa: BLE001 - the reply is whole; the cause is in the log
+                logger.error("usage of session %s could not be recorded", session_id, exc_info=True)
+                notices = []
+            if completed and notices:
+                # Said once per cap, after the reply, and kept with it for a reload.
+                text = "\n\n".join(usage_caps.notice(scope, lang) for scope in notices)
+                await turn.publish(agent_service.sse({"delta": f"\n\n{text}"}))
+                try:
+                    await asyncio.to_thread(_append_usage_notice, open_db, session_id, text)
+                except Exception:  # noqa: BLE001
+                    logger.warning("usage notice of session %s not stored", session_id)
             # Whatever closing the database session does, the turn is taken
             # away: one left registered would refuse every later message.
             try:
@@ -1577,6 +1632,17 @@ async def chat(
         media_type="text/event-stream",
         headers=agent_service.sse_headers(),
     )
+
+
+def _append_usage_notice(open_db, session_id: uuid.UUID, text: str) -> None:
+    opened = open_db()
+    try:
+        db = next(opened)
+        row = session_service.get_session(db, session_id)
+        if row is not None:
+            session_service.append_to_last_reply(db, row, text)
+    finally:
+        opened.close()
 
 
 @router.post("/{session_id}/agent/end")

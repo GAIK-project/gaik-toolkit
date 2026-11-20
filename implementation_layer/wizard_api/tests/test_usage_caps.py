@@ -1,0 +1,424 @@
+"""Spend caps per session, per user and per deployment month, and sessions per user.
+
+The cost of each chat turn is added to the session, the user and the month
+(services/usage_caps.py). A reached cap refuses the next message before an agent
+is woken (402 usage_cap), an agent starts with what the caps have left as its
+budget, and the chat says once when most of a cap is used. A user may create a
+set number of sessions, and deleting one does not give its place or its spend back.
+"""
+
+import asyncio
+import json
+import threading
+import time
+import uuid
+from datetime import UTC, datetime
+
+import pytest
+from conftest import requires_postgres
+from sqlalchemy.orm import sessionmaker
+from wizard_api import config
+from wizard_api.db import get_db
+from wizard_api.main import app
+from wizard_api.models import UsageTotal, WizardSession
+from wizard_api.ownership import USER_HEADER
+from wizard_api.services import agent_service, usage_caps
+from wizard_api.services.agent_service import sse
+
+NOV = datetime(2026, 11, 20, 12, tzinfo=UTC)
+DEC = datetime(2026, 12, 1, 0, 5, tzinfo=UTC)
+
+
+@pytest.fixture
+def caps(monkeypatch):
+    """Turn the caps on with round numbers: 5 per session, 10 per user, 100 a month."""
+
+    def set_caps(session="5", user="10", deployment="100", sessions="3", ratio=None):
+        monkeypatch.setenv("WIZARD_SESSION_MAX_COST_USD", session)
+        monkeypatch.setenv("WIZARD_USER_MAX_COST_USD", user)
+        monkeypatch.setenv("WIZARD_DEPLOYMENT_MAX_COST_USD", deployment)
+        monkeypatch.setenv("WIZARD_MAX_SESSIONS_PER_USER", sessions)
+        if ratio is not None:
+            monkeypatch.setenv("WIZARD_COST_WARN_RATIO", ratio)
+
+    set_caps()
+    return set_caps
+
+
+# --- settings ------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "name, default",
+    [
+        ("WIZARD_SESSION_MAX_COST_USD", 5.4),
+        ("WIZARD_USER_MAX_COST_USD", 10.8),
+        ("WIZARD_DEPLOYMENT_MAX_COST_USD", 2000.0),
+    ],
+)
+def test_a_cost_cap_is_on_by_default_and_zero_turns_it_off(monkeypatch, name, default) -> None:
+    read = {
+        "WIZARD_SESSION_MAX_COST_USD": config.session_max_cost_usd,
+        "WIZARD_USER_MAX_COST_USD": config.user_max_cost_usd,
+        "WIZARD_DEPLOYMENT_MAX_COST_USD": config.deployment_max_cost_usd,
+    }[name]
+    monkeypatch.delenv(name, raising=False)
+    assert read() == default
+    for typo in ("-1", "lots", "inf", "nan"):
+        monkeypatch.setenv(name, typo)
+        assert read() == default, typo  # a typo does not lift the cap
+    monkeypatch.setenv(name, " 7.5 ")
+    assert read() == 7.5
+    monkeypatch.setenv(name, "0")
+    assert read() is None
+
+
+def test_sessions_per_user_default_to_three_and_zero_is_no_limit(monkeypatch) -> None:
+    monkeypatch.delenv("WIZARD_MAX_SESSIONS_PER_USER", raising=False)
+    assert config.max_sessions_per_user() == 3
+    for typo in ("-2", "three"):
+        monkeypatch.setenv("WIZARD_MAX_SESSIONS_PER_USER", typo)
+        assert config.max_sessions_per_user() == 3
+    monkeypatch.setenv("WIZARD_MAX_SESSIONS_PER_USER", "5")
+    assert config.max_sessions_per_user() == 5
+    monkeypatch.setenv("WIZARD_MAX_SESSIONS_PER_USER", "0")
+    assert config.max_sessions_per_user() is None
+
+
+@pytest.mark.parametrize(
+    "raw, expected", [("", 0.8), ("0.9", 0.9), ("0", 0.8), ("1", 0.8), ("x", 0.8)]
+)
+def test_the_warning_share_stays_between_zero_and_one(monkeypatch, raw, expected) -> None:
+    monkeypatch.setenv("WIZARD_COST_WARN_RATIO", raw)
+    assert config.cost_warn_ratio() == expected
+
+
+def test_the_month_is_counted_in_utc() -> None:
+    assert usage_caps.month(NOV) == "2026-11"
+    assert usage_caps.month(DEC) == "2026-12"
+
+
+# --- the agent's budget --------------------------------------------------------------
+
+
+def test_the_agent_gets_the_smaller_of_its_own_limit_and_what_the_caps_left(monkeypatch) -> None:
+    monkeypatch.delenv("WIZARD_AGENT_MAX_BUDGET_USD", raising=False)
+    assert agent_service._agent_budget(None) is None
+    assert agent_service._agent_budget(2.5) == 2.5
+    assert agent_service._budget_is_cap(2.5)
+
+    monkeypatch.setenv("WIZARD_AGENT_MAX_BUDGET_USD", "4")
+    assert agent_service._agent_budget(None) == 4
+    assert agent_service._agent_budget(9) == 4
+    assert not agent_service._budget_is_cap(9)
+    assert agent_service._agent_budget(1.5) == 1.5
+    assert agent_service._budget_is_cap(1.5)
+
+
+def test_a_stop_at_a_cap_set_budget_says_the_usage_limit_is_reached() -> None:
+    parts: list[str] = []
+    frames = list(
+        agent_service._budget_stop({"locale": "fi", "budget_from_caps": True}, "Tein", parts)
+    )
+
+    assert agent_service.CAP_NOTICE["fi"] in parts[0]
+    assert "jatka" not in parts[0]  # the next message is refused, so no "continue"
+    assert json.loads(frames[-1][6:]) == {"done": True, "limit": "budget"}
+
+
+def test_a_stop_at_the_agents_own_limit_still_says_go_on() -> None:
+    parts: list[str] = []
+    list(agent_service._budget_stop({"locale": "en"}, "", parts))
+
+    assert parts == [agent_service.BUDGET_NOTICE["en"]]
+
+
+# --- the ledger ----------------------------------------------------------------------
+
+
+def _session(db, user="ann", cost=None) -> WizardSession:
+    metadata = {usage_caps.SESSION_COST_KEY: cost} if cost is not None else {}
+    row = WizardSession(user_id=user, output_dir="/tmp/x", session_metadata=metadata)
+    db.add(row)
+    db.commit()
+    return row
+
+
+def _total(db, scope, key) -> UsageTotal | None:
+    db.expire_all()
+    return db.get(UsageTotal, (scope, key))
+
+
+@requires_postgres
+def test_a_turns_cost_counts_for_the_session_the_user_and_the_month(db_session, caps) -> None:
+    row = _session(db_session)
+
+    usage_caps.record_cost(db_session, "ann", 1.25, session=row, now=NOV)
+    usage_caps.record_cost(db_session, "ann", 0.5, session=row, now=NOV)
+
+    db_session.refresh(row)
+    assert usage_caps.session_spent(row) == pytest.approx(1.75)
+    assert _total(db_session, "user", "ann").cost_usd == pytest.approx(1.75)
+    assert _total(db_session, "deployment", "2026-11").cost_usd == pytest.approx(1.75)
+    usage_caps.record_cost(db_session, "ann", 0.25, session=row, now=DEC)
+    assert _total(db_session, "deployment", "2026-12").cost_usd == pytest.approx(0.25)
+
+
+@requires_postgres
+def test_nothing_is_recorded_for_a_turn_without_cost(db_session, caps) -> None:
+    row = _session(db_session)
+
+    assert usage_caps.record_cost(db_session, "ann", 0.0, session=row) == []
+    assert _total(db_session, "user", "ann") is None
+
+
+@requires_postgres
+def test_a_session_deleted_mid_turn_still_counts_for_its_owner(db_session, caps) -> None:
+    usage_caps.record_cost(db_session, "ann", 2.0, session=None, now=NOV)
+
+    assert _total(db_session, "user", "ann").cost_usd == pytest.approx(2.0)
+    assert _total(db_session, "deployment", "2026-11").cost_usd == pytest.approx(2.0)
+
+
+@requires_postgres
+def test_each_cap_is_warned_of_once_when_its_share_is_used(db_session, caps) -> None:
+    caps(ratio="0.8")
+    row = _session(db_session)
+
+    assert usage_caps.record_cost(db_session, "ann", 3.9, session=row, now=NOV) == []
+    assert usage_caps.record_cost(db_session, "ann", 0.2, session=row, now=NOV) == ["session"]
+    assert usage_caps.record_cost(db_session, "ann", 0.2, session=row, now=NOV) == []
+    other = _session(db_session)
+    assert usage_caps.record_cost(db_session, "ann", 3.7, session=other, now=NOV) == ["user"]
+    assert usage_caps.record_cost(db_session, "ann", 0.1, session=other, now=NOV) == []
+
+
+@requires_postgres
+def test_a_cap_that_is_off_is_never_warned_of(db_session, caps) -> None:
+    caps(session="0", user="0")
+    row = _session(db_session)
+
+    assert usage_caps.record_cost(db_session, "ann", 50.0, session=row, now=NOV) == []
+
+
+@requires_postgres
+def test_a_reached_cap_refuses_and_the_month_is_named_first(db_session, caps) -> None:
+    row = _session(db_session, cost=5.0)
+    with pytest.raises(usage_caps.UsageCapError) as refused:
+        usage_caps.check_chat(db_session, row, now=NOV)
+    assert refused.value.scope == "session"
+
+    fresh = _session(db_session)
+    usage_caps.record_cost(db_session, "ann", 10.0, session=None, now=NOV)
+    with pytest.raises(usage_caps.UsageCapError) as refused:
+        usage_caps.check_chat(db_session, fresh, now=NOV)
+    assert refused.value.scope == "user"
+
+    usage_caps.record_cost(db_session, "bob", 90.0, session=None, now=NOV)
+    with pytest.raises(usage_caps.UsageCapError) as refused:
+        usage_caps.check_chat(db_session, fresh, now=NOV)
+    assert refused.value.scope == "deployment"
+    # A new month starts from zero for the deployment, not for the user.
+    with pytest.raises(usage_caps.UsageCapError) as refused:
+        usage_caps.check_chat(db_session, fresh, now=DEC)
+    assert refused.value.scope == "user"
+
+
+@requires_postgres
+def test_the_budget_is_the_smallest_amount_left(db_session, caps) -> None:
+    row = _session(db_session, cost=1.0)
+    assert usage_caps.remaining_budget(db_session, row, now=NOV) == pytest.approx(4.0)
+
+    usage_caps.record_cost(db_session, "ann", 7.5, session=None, now=NOV)
+    assert usage_caps.remaining_budget(db_session, row, now=NOV) == pytest.approx(2.5)
+
+    caps(session="0", user="0", deployment="0")
+    assert usage_caps.remaining_budget(db_session, row, now=NOV) is None
+
+
+@requires_postgres
+def test_sessions_are_counted_and_the_limit_holds_under_concurrency(db_engine, caps) -> None:
+    factory = sessionmaker(bind=db_engine)
+    outcomes: list[str] = []
+
+    def claim() -> None:
+        db = factory()
+        try:
+            usage_caps.claim_session(db, "crowd")
+            outcomes.append("ok")
+        except usage_caps.SessionLimitError:
+            outcomes.append("refused")
+        finally:
+            db.close()
+
+    threads = [threading.Thread(target=claim) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(outcomes) == ["ok"] * 3 + ["refused"] * 5
+    db = factory()
+    try:
+        assert db.get(UsageTotal, ("user", "crowd")).sessions_created == 3
+        db.query(UsageTotal).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+@requires_postgres
+def test_without_a_session_limit_every_session_is_still_counted(db_session, caps) -> None:
+    caps(sessions="0")
+    for _ in range(5):
+        usage_caps.claim_session(db_session, "many")
+
+    assert _total(db_session, "user", "many").sessions_created == 5
+
+
+# --- through the API -----------------------------------------------------------------
+
+
+@requires_postgres
+def test_the_fourth_session_is_refused_and_deleting_does_not_make_room(client, caps) -> None:
+    ids = [
+        client.post("/sessions", json={"user_id": "ann", "title": f"S{n}"}).json()["id"]
+        for n in range(3)
+    ]
+    refused = client.post("/sessions", json={"user_id": "ann", "title": "S4"})
+    assert refused.status_code == 429
+    assert refused.json()["detail"]["error"] == "session_limit"
+
+    assert client.delete(f"/sessions/{ids[0]}", headers={USER_HEADER: "ann"}).status_code == 204
+    assert client.post("/sessions", json={"user_id": "ann", "title": "S5"}).status_code == 429
+    # Another user has places of their own.
+    assert client.post("/sessions", json={"user_id": "bob", "title": "B1"}).status_code == 201
+
+
+@requires_postgres
+def test_a_caller_cannot_set_the_sessions_spend(client, caps) -> None:
+    sid = client.post("/sessions", json={"user_id": "ann", "title": "S"}).json()["id"]
+
+    for key in (usage_caps.SESSION_COST_KEY, usage_caps.SESSION_WARNED_KEY):
+        res = client.patch(f"/sessions/{sid}", json={"metadata": {key: 0}})
+        assert res.status_code == 422, key
+        res = client.post("/sessions", json={"user_id": "bob", "title": "S", "metadata": {key: 0}})
+        assert res.status_code == 422, key
+
+
+@pytest.fixture
+def turn_client(client, db_engine):
+    """A database session per request, as the chat's own turn opens one."""
+    factory = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
+
+    def own_session():
+        db = factory()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = own_session
+    return client
+
+
+def _frames(text: str) -> list[dict]:
+    return [
+        json.loads(line[len("data: ") :])
+        for line in text.split("\n\n")
+        if line.startswith("data: ") and "heartbeat" not in line
+    ]
+
+
+@requires_postgres
+def test_a_message_over_a_cap_is_refused_before_an_agent_is_woken(
+    turn_client, db_engine, caps, monkeypatch
+) -> None:
+    woken: list[str] = []
+
+    async def no_agent(*args, **kwargs):
+        woken.append("agent")
+        raise AssertionError("no agent may be started")
+
+    monkeypatch.setattr(agent_service, "get_or_create_session", no_agent)
+    sid = turn_client.post("/sessions", json={"user_id": "ann", "title": "S"}).json()["id"]
+    db = sessionmaker(bind=db_engine)()
+    try:
+        row = db.get(WizardSession, uuid.UUID(sid))
+        usage_caps.record_cost(db, "ann", 5.0, session=row)
+    finally:
+        db.close()
+
+    res = turn_client.post(f"/sessions/{sid}/chat", json={"message": "Jatka"})
+
+    assert res.status_code == 402
+    assert res.json()["detail"]["error"] == "usage_cap"
+    assert res.json()["detail"]["scope"] == "session"
+    assert woken == []
+
+
+def _result(cost: float):
+    sdk = pytest.importorskip("claude_agent_sdk")
+    return sdk.ResultMessage(
+        subtype="success",
+        duration_ms=1,
+        duration_api_ms=1,
+        is_error=False,
+        num_turns=1,
+        session_id="s",
+        total_cost_usd=cost,
+    )
+
+
+def _wait_for(condition, seconds: float = 5.0) -> None:
+    deadline = time.monotonic() + seconds
+    while not condition():
+        assert time.monotonic() < deadline, "timed out"
+        time.sleep(0.02)
+
+
+@requires_postgres
+def test_a_turn_is_counted_and_most_of_the_cap_is_said_once(turn_client, caps, monkeypatch) -> None:
+    caps(session="5", user="100", deployment="1000", ratio="0.8")
+    budgets: list = []
+    agent = {"lock": asyncio.Lock()}
+
+    async def fake_agent(session_id, output_dir, locale=None, **kwargs):
+        budgets.append(kwargs.get("budget_usd"))
+        return agent
+
+    async def stream(_agent, message, parts):
+        # What the SDK reports for the query: its running total for the client.
+        spent = agent.get("cost_total_usd", 0.0) + 2.1
+        agent["turn_results"] = [("turn", _result(spent))]
+        parts.append("Valmis.")
+        yield sse({"delta": "Valmis."})
+        yield sse({"done": True})
+
+    monkeypatch.setattr(agent_service, "get_or_create_session", fake_agent)
+    monkeypatch.setattr(agent_service, "stream_turn_for", stream)
+    sid = turn_client.post("/sessions", json={"user_id": "ann", "title": "S"}).json()["id"]
+
+    def send() -> list[dict]:
+        res = turn_client.post(f"/sessions/{sid}/chat", json={"message": "Hei", "locale": "fi"})
+        assert res.status_code == 200
+        _wait_for(lambda: not agent_service.is_busy(sid))
+        return _frames(res.text)
+
+    first = send()
+    second = send()
+    third = send()
+
+    assert budgets == [pytest.approx(5.0), pytest.approx(2.9), pytest.approx(0.8)]
+    notice = usage_caps.notice("session", "fi")
+    assert not any(notice in f.get("delta", "") for f in first)
+    assert any(notice in f.get("delta", "") for f in second)  # 4.2 of 5 used
+    assert not any(notice in f.get("delta", "") for f in third)
+    detail = turn_client.get(f"/sessions/{sid}").json()
+    replies = [m["content"] for m in detail["metadata"]["messages"] if m["role"] == "assistant"]
+    assert notice in replies[1]  # kept with the reply, for a reload
+    assert detail["metadata"][usage_caps.SESSION_COST_KEY] == pytest.approx(6.3)
+    # Now over the cap: the next message is refused.
+    refused = turn_client.post(f"/sessions/{sid}/chat", json={"message": "Hei"})
+    assert refused.status_code == 402
+    assert refused.json()["detail"]["scope"] == "session"

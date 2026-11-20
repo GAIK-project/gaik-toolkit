@@ -356,6 +356,7 @@ async def traced_turn(
     model: str,
     is_error: Callable[[str], bool],
     is_stopped: Callable[[str], bool] | None = None,
+    on_cost: Callable[[float], None] | None = None,
 ) -> AsyncIterator[str]:
     """Pass a chat turn's SSE ``frames`` through, inside one ``wizard.turn`` span.
 
@@ -367,7 +368,9 @@ async def traced_turn(
     before it ended (closed tab, dropped connection) is ``gaik.turn.aborted``;
     the query it cut short has no ``chat`` span, as its usage never arrived. A
     turn the user stopped (a frame ``is_stopped`` knows) is ``gaik.turn.stopped``
-    and counted with the outcome ``stopped``, not as a failure.
+    and counted with the outcome ``stopped``, not as a failure. ``on_cost`` is
+    given the turn's whole cost in USD, when the queries reported one, for the
+    usage caps (services/usage_caps.py).
     """
     from wizard_api import ops_metrics
 
@@ -404,10 +407,14 @@ async def traced_turn(
         if outcome != "aborted":
             ops_metrics.turn_duration.record(time.monotonic() - started, {"outcome": outcome})
         # Each client keeps its own running cost, so each is priced against its own.
+        spent = 0.0
         for agent, replaced in agents():
             for purpose, result in agent.pop("turn_results", None) or []:
                 cost = query_cost(agent, result)
                 record_turn_usage(turn, result, model, purpose, cost=cost, replaced=replaced)
+                spent += cost or 0.0
+        if on_cost is not None and spent > 0:
+            on_cost(spent)
         if failed:
             turn.set_status(Status(StatusCode.ERROR))
         turn.end()

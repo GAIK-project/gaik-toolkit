@@ -10,6 +10,7 @@ import { getIncomingTraceId } from "@/lib/request-context";
 import { dictionary, getI18n, LOCALES } from "@/lib/i18n";
 import { chatMessageTooLong } from "@/lib/chat-limits";
 import { requireOwnedSession } from "@/lib/session-access";
+import { WizardApiError } from "@/lib/wizard-api-client";
 import { sessionTitleFrom, titleExampleIn, type TitleSource } from "@/lib/session-title";
 
 /** The longest name a session can be given by hand. */
@@ -50,7 +51,9 @@ export async function removeSession(
   return { error: null, deleted: true };
 }
 
-export type StartResult = { id: string } | { error: "empty" | "too_long" | "failed" };
+export type StartResult =
+  | { id: string }
+  | { error: "empty" | "too_long" | "session_limit" | "failed" };
 
 /** What names a session in `locale`: the start view's examples. */
 function titleSource(locale: (typeof LOCALES)[number], fallback: string): TitleSource {
@@ -85,6 +88,11 @@ export async function startSessionFromMessage(message: string): Promise<StartRes
   try {
     id = (await createSession(user.email, title, { chatLed: true })).id;
   } catch (err) {
+    if (err instanceof WizardApiError && err.code === "session_limit") {
+      // The account has started as many sessions as it may: a refusal, not a failure.
+      audit("session.create", { actor: user.email, outcome: "denied", traceId });
+      return { error: "session_limit" };
+    }
     logger.error({ traceId, err }, "session.create failed");
     audit("session.create", { actor: user.email, outcome: "error", traceId });
     return { error: "failed" };

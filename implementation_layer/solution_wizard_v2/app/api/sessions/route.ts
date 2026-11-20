@@ -13,6 +13,7 @@ import { getI18n } from "@/lib/i18n";
 import { logger } from "@/lib/logger";
 import { getTraceId, setContextUserId } from "@/lib/request-context";
 import { withLogging } from "@/lib/with-logging";
+import { WizardApiError } from "@/lib/wizard-api-client";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,10 @@ export const POST = withLogging("session.create", async (req: NextRequest) => {
     });
     return Response.json({ id: session.id }, { status: 201 });
   } catch (err) {
+    if (err instanceof WizardApiError && err.code === "session_limit") {
+      audit("session.create", { actor: user.email, outcome: "denied" });
+      return Response.json({ error: "session_limit" }, { status: 429 });
+    }
     logger.error({ traceId: getTraceId(), err }, "session.create failed");
     audit("session.create", { actor: user.email, outcome: "error" });
     return Response.json({ error: "failed" }, { status: 502 });

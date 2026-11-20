@@ -87,6 +87,19 @@ export const POST = withLogging("chat.post", async (
           headers: retryAfter ? { ...json, "Retry-After": retryAfter } : json,
         });
       }
+      if (upstream.status === 402) {
+        // A usage cap is reached: whose it is (session, user, deployment) picks
+        // the chat's message. Only a known scope is passed on.
+        const upstreamBody = await upstream.json().catch(() => ({}));
+        const scope = upstreamBody?.detail?.scope;
+        return new Response(
+          JSON.stringify({
+            error: "usage_cap",
+            scope: scope === "user" || scope === "deployment" ? scope : "session",
+          }),
+          { status: 402, headers: json },
+        );
+      }
       if (upstream.status === 413 || upstream.status === 503) {
         // Too long, or no free agent slot: the chat says which, and the gate
         // wake-up waits for a slot as it does for a busy agent.

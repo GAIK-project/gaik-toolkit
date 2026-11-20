@@ -15,23 +15,33 @@ export type ChatErrorLabels = {
   agentBusy: string;
   rateLimited: string;
   turnLimit: string;
+  usageSession: string;
+  usageUser: string;
+  usageDeployment: string;
 };
 
 /**
  * The chat's own message for a refused chat request, or undefined for any other
  * answer. `error` is the code the chat route answers a 429 with: `agent_busy`
  * (WIZARD_MAX_LIVE_AGENTS_PER_USER) or `rate_limited`
- * (WIZARD_MAX_CHAT_TURNS_PER_MINUTE).
+ * (WIZARD_MAX_CHAT_TURNS_PER_MINUTE). A 402 is a reached usage cap, and `scope`
+ * says whose: `session`, `user` or `deployment` (the API's usage caps).
  */
 export function chatRefusalLabel(
   status: number,
   error: unknown,
   labels: ChatErrorLabels | undefined,
+  scope?: unknown,
 ): string | undefined {
   if (!labels) return undefined;
   if (status === 413) return labels.tooLong;
   if (status === 503) return labels.capacity;
   if (status === 429) return error === "rate_limited" ? labels.rateLimited : labels.agentBusy;
+  if (status === 402) {
+    if (scope === "user") return labels.usageUser;
+    if (scope === "deployment") return labels.usageDeployment;
+    return labels.usageSession;
+  }
   return undefined;
 }
 

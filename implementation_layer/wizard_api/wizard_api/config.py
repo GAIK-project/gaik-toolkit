@@ -169,6 +169,80 @@ def agent_max_budget_usd() -> float | None:
     return value if 0 < value < math.inf else None
 
 
+def _usd_cap_env(name: str, default: float) -> float | None:
+    """A spend cap in estimated USD. Unset is ``default``; ``0`` turns the cap off.
+
+    A negative, unreadable or infinite value is the default, so a typo does not
+    lift the cap.
+    """
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    if value == 0:
+        return None
+    return value if 0 < value < math.inf else default
+
+
+def session_max_cost_usd() -> float | None:
+    """Estimated USD one session may spend in all, across agent restarts; None is off.
+
+    Counted from the agent's own cost estimate after each chat message and kept
+    in the session (services/usage_caps.py). The default is about 5 euros.
+    """
+    return _usd_cap_env("WIZARD_SESSION_MAX_COST_USD", 5.4)
+
+
+def user_max_cost_usd() -> float | None:
+    """Estimated USD one user may spend across all their sessions; None is off.
+
+    Deleting a session does not give its spend back. The default is about 10 euros.
+    """
+    return _usd_cap_env("WIZARD_USER_MAX_COST_USD", 10.8)
+
+
+def deployment_max_cost_usd() -> float | None:
+    """Estimated USD the whole deployment may spend in one calendar month (UTC); None is off.
+
+    Below the model provider's own monthly cap, which stays the hard limit: this
+    one is the API's estimate, not the bill.
+    """
+    return _usd_cap_env("WIZARD_DEPLOYMENT_MAX_COST_USD", 2000.0)
+
+
+def max_sessions_per_user() -> int | None:
+    """Sessions one user may create in all; None (``0``) means no limit.
+
+    A deleted session still counts, so deleting does not make room. A negative or
+    unreadable value is the default, 3.
+    """
+    raw = os.getenv("WIZARD_MAX_SESSIONS_PER_USER", "").strip()
+    if not raw:
+        return 3
+    try:
+        value = int(raw)
+    except ValueError:
+        return 3
+    if value == 0:
+        return None
+    return value if value > 0 else 3
+
+
+def cost_warn_ratio() -> float:
+    """The share of a session's or user's cap after which the chat says so once.
+
+    Between 0 and 1, both left out; anything else is the default, 0.8.
+    """
+    try:
+        value = float(os.getenv("WIZARD_COST_WARN_RATIO", "").strip() or 0.8)
+    except ValueError:
+        return 0.8
+    return value if 0 < value < 1 else 0.8
+
+
 def agent_fallback_model() -> str | None:
     """The model the agent switches to when its own fails or is unavailable; None is off."""
     return os.getenv("WIZARD_AGENT_FALLBACK_MODEL", "").strip() or None

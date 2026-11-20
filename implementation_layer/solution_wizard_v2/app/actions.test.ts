@@ -39,6 +39,7 @@ vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn() } }));
 import { dictionary } from "@/lib/i18n";
 import { withStartLines } from "@/lib/chat-background";
 import { MAX_CHAT_MESSAGE_CHARS } from "@/lib/chat-limits";
+import { WizardApiError } from "@/lib/wizard-api-client";
 import { removeSession, renameSession, startSessionFromMessage } from "./actions";
 
 const fi = dictionary("fi");
@@ -128,6 +129,21 @@ describe("startSessionFromMessage", () => {
     expect(state.audit).toHaveBeenCalledWith(
       "session.create",
       expect.objectContaining({ outcome: "error" }),
+    );
+  });
+
+  it("says the account has no sessions left when the api refuses one more", async () => {
+    state.createSession.mockRejectedValueOnce(
+      new WizardApiError(
+        429,
+        "/sessions",
+        JSON.stringify({ detail: { error: "session_limit", message: "x" } }),
+      ),
+    );
+    expect(await startSessionFromMessage("Luokittele laskut")).toEqual({ error: "session_limit" });
+    expect(state.audit).toHaveBeenCalledWith(
+      "session.create",
+      expect.objectContaining({ outcome: "denied" }),
     );
   });
 

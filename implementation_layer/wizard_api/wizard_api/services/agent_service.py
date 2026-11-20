@@ -835,7 +835,8 @@ def _budget_stop(session: dict, reply: str, out_parts: list[str]):
         config.agent_max_budget_usd(),
     )
     session["budget_spent"] = True
-    notice = BUDGET_NOTICE.get(session.get("locale") or "en", BUDGET_NOTICE["en"])
+    notices = CAP_NOTICE if session.get("budget_from_caps") else BUDGET_NOTICE
+    notice = notices.get(session.get("locale") or "en", notices["en"])
     if _is_notice(reply):
         yield sse({"narration_end": True})  # shown while it streamed; not an answer
         reply = ""
@@ -956,6 +957,18 @@ def _wizard_tools(session_id: str):
     return create_sdk_mcp_server("wizard", tools=[reopen_gate, offer_language])
 
 
+def _agent_budget(budget_usd: float | None) -> float | None:
+    """The smaller of the agent's own limit and what the usage caps have left."""
+    limits = [b for b in (config.agent_max_budget_usd(), budget_usd) if b is not None]
+    return min(limits) if limits else None
+
+
+def _budget_is_cap(budget_usd: float | None) -> bool:
+    """Whether a usage cap, not WIZARD_AGENT_MAX_BUDGET_USD, sets the agent's budget."""
+    own = config.agent_max_budget_usd()
+    return budget_usd is not None and (own is None or budget_usd < own)
+
+
 def _build_options(
     wizard_dir: Path,
     output_dir: Path,
@@ -963,10 +976,13 @@ def _build_options(
     resume: str | None = None,
     session_id: str | None = None,
     guard: agent_tool_guard.ToolGuard,
+    budget_usd: float | None = None,
 ):
     """The agent's options. ``guard`` is the session's tool guard, which knows its
     owner and counts the metered calls of each turn. It has no default, so no
-    agent can be built with a guard that skips its owner's hourly limit."""
+    agent can be built with a guard that skips its owner's hourly limit.
+    ``budget_usd`` is what the usage caps have left (services/usage_caps.py); the
+    agent gets the smaller of it and WIZARD_AGENT_MAX_BUDGET_USD."""
     tools = ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
     extra = {}
     if session_id and create_sdk_mcp_server is not None:
@@ -975,7 +991,7 @@ def _build_options(
     if config.agent_bridge_socket():
         # The agent runs in its own container; the SDK starts the bridge's client.
         extra["cli_path"] = agent_cli()
-    budget = config.agent_max_budget_usd()
+    budget = _agent_budget(budget_usd)
     if budget is not None:
         # Counted by the CLI for this agent process from its start or resume.
         extra["max_budget_usd"] = budget
@@ -1151,6 +1167,13 @@ TURN_LIMIT_FRAME = {
 #: delta, not an error frame: the chat shows an error frame other than the turn
 #: limit as a failed reply, and this is no failure. The agent is ended after the
 #: turn, so the next message resumes it with a budget of its own (see _stream_turn).
+#: Said instead of BUDGET_NOTICE when a usage cap set the budget
+#: (services/usage_caps.py): the next message is refused, so no "continue".
+CAP_NOTICE = {
+    "fi": "⚠︎ Wizard pysähtyi, koska käyttöraja tuli täyteen. Tähänastinen työ on tallessa.",
+    "en": "⚠︎ The wizard stopped because the usage limit was reached. The work so far is kept.",
+}
+
 BUDGET_NOTICE = {
     "fi": (
         "⚠︎ Wizard pysähtyi, koska sen kustannusraja tuli täyteen. Tähänastinen työ on "
@@ -1204,6 +1227,7 @@ async def get_or_create_session(
     resume_id: str | None = None,
     transcript: list[dict] | None = None,
     user_id: str | None = None,
+    budget_usd: float | None = None,
 ) -> dict:
     """Return the live agent session for ``session_id``, spawning + bootstrapping
     a ClaudeSDKClient on first use. ``locale`` (fi/en) pins the agent's reply
@@ -1243,7 +1267,7 @@ async def get_or_create_session(
             _STARTING[session_id] = user_id
         try:
             return await _start_session(
-                session_id, output_dir, locale, resume_id, transcript, user_id
+                session_id, output_dir, locale, resume_id, transcript, user_id, budget_usd
             )
         finally:
             _STARTING.pop(session_id, None)
@@ -1256,8 +1280,12 @@ async def _start_session(
     resume_id: str | None,
     transcript: list[dict] | None,
     user_id: str | None,
+    budget_usd: float | None = None,
 ) -> dict:
-    """Spawn, connect and bootstrap the agent once room has been made for it."""
+    """Spawn, connect and bootstrap the agent once room has been made for it.
+
+    ``budget_usd`` is what the usage caps have left when it starts; the agent
+    keeps it for its life, and the next agent of the session gets a new one."""
     wizard_dir = resolve_wizard_dir()
     if wizard_dir is None or not (wizard_dir / "SKILL.md").is_file():
         raise AgentNotConfiguredError(
@@ -1290,7 +1318,12 @@ async def _start_session(
         try:
             client = ClaudeSDKClient(
                 options=_build_options(
-                    wizard_dir, out, resume=resume_id, session_id=session_id, guard=guard
+                    wizard_dir,
+                    out,
+                    resume=resume_id,
+                    session_id=session_id,
+                    guard=guard,
+                    budget_usd=budget_usd,
                 )
             )
             await client.connect()
@@ -1307,7 +1340,9 @@ async def _start_session(
             client = None
     if client is None:
         client = ClaudeSDKClient(
-            options=_build_options(wizard_dir, out, session_id=session_id, guard=guard)
+            options=_build_options(
+                wizard_dir, out, session_id=session_id, guard=guard, budget_usd=budget_usd
+            )
         )
         try:
             await client.connect()
@@ -1347,6 +1382,8 @@ async def _start_session(
         "user_id": user_id,
         # Its tool guard, told by stream_turn_for when a new message begins.
         "tool_guard": guard,
+        # Whether a usage cap set its budget: a stop there says the cap is full.
+        "budget_from_caps": _budget_is_cap(budget_usd),
         # (purpose, ResultMessage) of each query not yet on a span (telemetry).
         "turn_results": turn_results,
     }

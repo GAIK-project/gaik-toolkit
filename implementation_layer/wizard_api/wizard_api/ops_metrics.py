@@ -78,6 +78,14 @@ budget_stops = meter.create_counter(
     "wizard.agent.budget_stops",
     description="Chat turns the agent ended at its cost limit (WIZARD_AGENT_MAX_BUDGET_USD)",
 )
+usage_cost = meter.create_counter(
+    "wizard.usage.cost_usd",
+    description="Estimated USD the agent spent, added after each chat turn (usage caps)",
+)
+usage_warnings = meter.create_counter(
+    "wizard.usage.warnings",
+    description="Times a session, a user or the deployment passed the warning share of its cap",
+)
 tool_calls = meter.create_counter(
     "wizard.agent.tool_calls",
     description="Agent tool calls the tool guard decided, by kind, decision and reason code",
@@ -158,6 +166,8 @@ _PRIMED = {
             "unavailable",
             "input_unsafe",
             "scanner_unavailable",
+            "usage_cap",
+            "session_limit",
         )
     ],
     "uploads_scanned": [{"result": r} for r in ("clean", "refused", "unavailable")],
@@ -182,6 +192,8 @@ _PRIMED = {
     ],
     "ownership_denied": [{}],
     "budget_stops": [{}],
+    "usage_cost": [{}],
+    "usage_warnings": [{"scope": s} for s in ("session", "user", "deployment")],
     # Metered calls refused at a limit (agent_tool_guard.METERED_KINDS).
     "tool_calls": [
         {"kind": k, "decision": "denied", "reason": r}

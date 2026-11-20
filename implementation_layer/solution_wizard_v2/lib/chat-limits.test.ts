@@ -18,6 +18,9 @@ describe("chat refusal message", () => {
     agentBusy: "agent busy",
     rateLimited: "rate limited",
     turnLimit: "turn limit",
+    usageSession: "session cap",
+    usageUser: "user cap",
+    usageDeployment: "deployment cap",
   };
 
   it("says the user's own agents are busy for a 429 agent_busy", () => {
@@ -37,5 +40,12 @@ describe("chat refusal message", () => {
     expect(chatRefusalLabel(503, undefined, labels)).toBe("capacity");
     expect(chatRefusalLabel(200, undefined, labels)).toBeUndefined();
     expect(chatRefusalLabel(429, "agent_busy", undefined)).toBeUndefined();
+  });
+
+  it("names whose usage cap a 402 reached, the session's when the scope is unknown", () => {
+    expect(chatRefusalLabel(402, "usage_cap", labels, "session")).toBe("session cap");
+    expect(chatRefusalLabel(402, "usage_cap", labels, "user")).toBe("user cap");
+    expect(chatRefusalLabel(402, "usage_cap", labels, "deployment")).toBe("deployment cap");
+    expect(chatRefusalLabel(402, "usage_cap", labels, "something")).toBe("session cap");
   });
 });
