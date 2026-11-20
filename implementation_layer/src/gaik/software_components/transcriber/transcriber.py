@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import math
 import os
 import re
 import shutil
+import struct
+import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -15,6 +18,8 @@ from pathlib import Path
 
 from openai import AzureOpenAI
 from pydub import AudioSegment
+from pydub.audio_segment import fix_wav_headers
+from pydub.exceptions import CouldntDecodeError
 
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
@@ -23,7 +28,11 @@ from gaik.software_components.enhance_transcript import (
     DEFAULT_MAX_CHANGE_RATIO,
     TranscriptEnhancer,
 )
-from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.input_limits import (
+    InputLimits,
+    check_not_media_list,
+    media_input_args,
+)
 from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
@@ -47,6 +56,73 @@ REMOTE_MAX_DURATION_SECONDS = 1400
 
 # Default chunking threshold, with margin below the API ceiling.
 DEFAULT_MAX_DURATION_SECONDS = 1200
+
+
+# Decoding a long recording to WAV takes a while; this only stops one that hangs.
+DECODE_TIMEOUT_SECONDS = 30 * 60
+
+
+def _read_pcm_wav(path: Path) -> AudioSegment | None:
+    """Read a PCM WAV with pydub's own Python reader; ``None`` for any other file.
+
+    No ffmpeg runs, so a WAV's duration and chunks hold where ffmpeg is not
+    installed, as they did when pydub read a ``.wav`` itself.
+    """
+    with path.open("rb") as handle:
+        head = handle.read(12)
+        if head[:4] != b"RIFF" or head[8:12] != b"WAVE":
+            return None
+        handle.seek(0)
+        data = handle.read()
+    try:
+        return AudioSegment(data=data)
+    except (CouldntDecodeError, struct.error, ValueError):
+        return None  # not plain PCM; ffmpeg decodes it
+
+
+def _decode_audio(path: str | Path) -> AudioSegment:
+    """Decode the local file at ``path`` into a pydub segment.
+
+    A PCM WAV is read in Python (:func:`_read_pcm_wav`). Anything else goes
+    through ffmpeg, which runs here, not inside pydub, with the arguments every
+    other media call uses
+    (:func:`~gaik.software_components.input_limits.media_input_args`): the path
+    is absolute, so a name such as ``http:...`` or ``concat:...`` is a file, and only
+    the ``file`` protocol is allowed, so nothing the file's content names (a stream
+    address, another file in a manifest) is opened over the network. pydub then reads
+    the WAV ffmpeg wrote with its own Python code, without starting ffmpeg again.
+
+    Raises:
+        OSError: If ``path`` is not a file that can be opened, or ffmpeg is missing.
+        subprocess.CalledProcessError: If ffmpeg cannot decode the file.
+    """
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"No such file: {path.name}")
+    wav_segment = _read_pcm_wav(path)
+    if wav_segment is not None:
+        return wav_segment
+    decoded = subprocess.run(
+        [
+            AudioSegment.converter,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            *media_input_args(path),
+            "-vn",
+            "-f",
+            "wav",
+            "-",
+        ],
+        capture_output=True,
+        check=True,
+        timeout=DECODE_TIMEOUT_SECONDS,
+    ).stdout
+    wav = bytearray(decoded)
+    del decoded  # one copy of the decoded audio at a time
+    fix_wav_headers(wav)  # a WAV written to a pipe carries no final sizes
+    return AudioSegment.from_file(io.BytesIO(bytes(wav)), format="wav")
 
 
 def _audio_provider(api_config: dict) -> str:
@@ -261,7 +337,7 @@ class Transcriber:
         # we fall back to None rather than blocking transcription.
         audio_duration_s: float | None = None
         try:
-            audio_duration_s = round(len(AudioSegment.from_file(str(input_path))) / 1000.0, 3)
+            audio_duration_s = round(len(_decode_audio(input_path)) / 1000.0, 3)
         except Exception as exc:
             print(f"Could not read audio duration: {exc}")
         if audio_duration_s is not None:
@@ -430,9 +506,7 @@ class Transcriber:
         """
         if self._needs_chunking(input_path):
             print("Chunking input for transcription...")
-            audio = AudioSegment.from_file(
-                input_path
-            )  # works for audio, and many video containers via ffmpeg
+            audio = _decode_audio(input_path)  # audio, and many video containers via ffmpeg
             self.limits.check_media_seconds(len(audio) / 1000, input_path.name)
             return split_and_transcribe_with_context(
                 str(input_path),
@@ -455,7 +529,7 @@ class Transcriber:
             return True
 
         try:
-            duration_seconds = len(AudioSegment.from_file(file_path)) / 1000
+            duration_seconds = len(_decode_audio(file_path)) / 1000
         except Exception as exc:
             print(f"Could not read audio duration for chunking check: {exc}")
             return False
@@ -545,14 +619,19 @@ def split_and_transcribe_with_context(
     ``usage``, if given, gets the usage of every chunk request added to it.
     ``language``, a two-letter ISO-639-1 code, goes with every chunk request;
     ``None`` or ``"auto"`` sends none, so the provider detects the language.
+
+    Raises:
+        ValueError: If ``audio_path`` is a playlist or file list rather than a
+            recording (:func:`~gaik.software_components.input_limits.check_not_media_list`).
     """
 
     _audio_provider(api_config)
+    check_not_media_list(audio_path)
     if transcription_model is None:
         transcription_model = api_config.get("transcription_model", "whisper")
 
     if audio is None:
-        audio = AudioSegment.from_file(audio_path)
+        audio = _decode_audio(audio_path)
 
     duration_seconds = len(audio) / 1000
     file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)

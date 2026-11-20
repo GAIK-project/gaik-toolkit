@@ -210,7 +210,7 @@ export function ParsedPane({
           .filter(([label, value]) => value > 0 || label === "characters")
           .map(([label, value]) => (
             <Badge key={label} variant="outline" className="font-normal">
-              {value.toLocaleString()} {label}
+              {value.toLocaleString("en-US")} {label}
             </Badge>
           ))}
       </div>

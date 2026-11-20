@@ -253,7 +253,7 @@
     "call": "schema, requirements = _load_output_schema(schema_dir)\n    if schema is None:\n        schema = schema_gen.generate_schema(user_requirements=user_requirements)\n        requirements = schema_gen.item_requirements\n        schema_dir.mkdir(parents=True, exist_ok=True)\n        _save_output_schema(schema_gen, schema, requirements, schema_dir)",
     "returns": "Pydantic model class; .item_requirements = ExtractionRequirements or CompositeExtractionRequirements for parent-with-repeated-record schemas",
     "install_extra": "extract",
-    "note": "Use _load_output_schema() first -- the wizard pre-generates the schema; only call generate_schema() when _load_output_schema() returns None. Schema files are always named output_schema.* regardless of the class name.",
+    "note": "Use _load_output_schema() first -- the wizard pre-generates the schema; only call generate_schema() when _load_output_schema() returns None. Schema files are always named output_schema.* regardless of the class name. When the user changes the requirements after approving a schema, keep the approved requirements and structure before regenerating (the template's _load_output_schema drops them once the requirements hash changes): read output_schema_requirements.json, call generate_schema_with_usage(user_requirements, approved_requirements=<its requirements dict>, approved_structure=<the approved StructureAnalysis or its model_dump() dict when kept, else 'flat' or 'nested_list'>), and show result.diff (structure, fields added, removed, changed; wording apart; notes) for approval before saving. With 'nested_list' the diff notes that a renamed list container cannot be seen, so result.diff.is_empty stays false. A wrong approved_structure raises ValueError before any model call.",
     "options": [
       {
         "name": "temperature",
@@ -542,7 +542,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can have more than 500 pages: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "VisionParser": {
     "import": "from gaik.software_components.parsers import VisionParser",
@@ -624,7 +625,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can have more than 500 pages: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (convert_pdf: another known type than PDF; convert_image: content that is not a PNG, JPEG, GIF, WebP, TIFF or BMP image; an image under another image extension, or a file without a suffix, is sent with the image type its content has) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "PyMuPDFParser": {
     "import": "from gaik.software_components.parsers import PyMuPDFParser",
@@ -650,7 +652,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF (DOCX, XLSX, an image), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DocxParser": {
     "import": "from gaik.software_components.parsers import DocxParser",
@@ -676,7 +679,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "is_supported_file() returns True for both .docx and legacy binary .doc, but parse_document() calls python-docx's Document(), which cannot open the legacy .doc format at all -- a real .doc file raises PackageNotFoundError at parse time, not at the file-type check. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik."
+    "note": "is_supported_file() returns True for both .docx and legacy binary .doc, but parse_document() calls python-docx's Document(), which cannot open the legacy .doc format at all -- a real .doc file is refused with FileTypeMismatchError (a ValueError) before python-docx opens it. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DoclingParser": {
     "import": "from gaik.software_components.parsers import DoclingParser",
@@ -741,7 +744,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (.pdf, .docx, .pptx, .doc/.ppt, .txt) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DocumentClassifier": {
     "import": "from gaik.software_components.doc_classifier import DocumentClassifier",
@@ -1050,7 +1054,7 @@
         "name": "citations",
         "type": "bool",
         "default": false,
-        "effect": "Include source citations in the answer.",
+        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and each numbered reference becomes [document_name, page X] from that chunk's metadata. The citations list (generate_with_citations() -> CitedAnswer.citations) holds only retrieved chunks; a [name, page X] no chunk has is removed. A number that is not a chunk's reference, code, and sources in other forms are left as written. A string context has no chunks: the model is asked for [document_name, page X] citations and the answer is returned as written, with an empty citations list.",
         "selection_relevant": true,
         "infer_from": "traceability / citation requirement"
       },
@@ -1655,7 +1659,7 @@
     "import": "from gaik.software_modules.RAG_workflow import RAGWorkflow",
     "construct": "workflow = RAGWorkflow(parser_config=get_stage_config(config, 'parser'), embedding_config=get_stage_config(config, 'embedding'), answer_config=get_stage_config(config, 'answer'), persist=True, persist_path=str(output_dir / 'chroma_store'), citations=True, stream=False)",
     "call": "workflow.index_documents(document_paths)\n    rr = workflow.ask(user_query)\n    answer = rr.answer",
-    "returns": "RAGWorkflowResult(.answer, .documents)",
+    "returns": "RAGWorkflowResult(.answer, .documents, .citations, .dropped_citations)",
     "install_extra": "rag-workflow",
     "subsumes": [
       "Embedder",
@@ -1667,7 +1671,7 @@
         "name": "citations",
         "type": "bool",
         "default": true,
-        "effect": "Include source citations in the answer. ON by default -- unlike the standalone AnswerGenerator, where citations defaults to false.",
+        "effect": "Include source citations in the answer, numbered references resolved to the retrieved chunks; RAGWorkflowResult.citations holds only retrieved chunks, and a [name, page X] the retrieval did not return is removed. Sources written in other forms are left as written. ON by default -- unlike the standalone AnswerGenerator, where citations defaults to false.",
         "selection_relevant": true,
         "infer_from": "leave true unless the requirements explicitly say citations are undesired in the output"
       },
@@ -2684,7 +2688,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can embed more than 500 images: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DoclingApiClientParser": {
     "import": "from gaik.software_components.parsers import DoclingApiClientParser",
@@ -2727,7 +2732,8 @@
         "selection_relevant": false,
         "infer_from": "Leave unset; read api_base from DOCLING_API_BASE."
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (for the extensions it knows: .pdf, Office, image and text files) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "TabularAgent": {
     "import": "from gaik.software_components.tabular_agent import TabularAgent",
@@ -3086,7 +3092,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when sheets can have more than 1,000,000 rows: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser."
+    "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "VectorStore": {
     "import": "from gaik.software_components.RAG.vector_store import VectorStore",

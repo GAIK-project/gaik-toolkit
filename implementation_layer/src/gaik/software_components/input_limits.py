@@ -88,6 +88,61 @@ _IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", "
 # ffprobe reads only the container header; a minute is far more than it needs.
 PROBE_TIMEOUT_SECONDS = 60
 
+# How a text file starts when ffmpeg would follow the file names or addresses
+# written in it: an HLS playlist and an ffconcat list. A DASH manifest is XML
+# with an <MPD> element.
+_MEDIA_LIST_STARTS = (b"#EXTM3U", b"ffconcat version")
+# XML manifests ffmpeg follows (DASH, IMF), matched in any case within the first
+# 64 KiB, more than ffmpeg's own probe reads before it decides; and an SDP session
+# description, which names network streams.
+_MEDIA_LIST_HEAD_BYTES = 64 * 1024
+_MEDIA_LIST_XML = (b"<mpd", b"<compositionplaylist", b"<assetmap")
+# A line is everything up to its newline, a carriage return included, so each
+# line matches in one way only and the match takes linear time in the head.
+_SDP = re.compile(rb"\Av=0\r?\n(?:[^\n]*\n)*?m=", re.IGNORECASE)
+
+
+def media_input_args(path: str | Path) -> list[str]:
+    """ffmpeg or ffprobe arguments that open ``path`` as a local file and nothing else.
+
+    The path is made absolute, so a name such as ``http:...`` or ``concat:...``
+    is read as a file and not as a protocol, and only the ``file`` protocol is
+    allowed, whatever the installed ffmpeg allows by default.
+    """
+    return ["-protocol_whitelist", "file", "-i", str(Path(path).absolute())]
+
+
+def check_not_media_list(path: str | Path) -> None:
+    """Refuse a playlist, file list or manifest given in place of a recording.
+
+    ffmpeg reads such a file by opening the files it names, so a recording
+    slot would read other files than the one given. The check reads the start
+    of the file, so it holds whatever the file's extension and the installed
+    ffmpeg version.
+
+    Raises:
+        ValueError: If the file starts like an HLS playlist, an ffconcat list,
+            a DASH or IMF manifest or an SDP session description.
+    """
+    path = Path(path)
+    try:
+        with path.open("rb") as handle:
+            head = handle.read(_MEDIA_LIST_HEAD_BYTES)
+    except OSError:
+        return  # the caller reports a file it cannot read
+    head = head.removeprefix(b"\xef\xbb\xbf").lstrip()
+    lowered = head.lower()
+    is_list = (
+        head.startswith(_MEDIA_LIST_STARTS)
+        or (head.startswith(b"<") and any(tag in lowered for tag in _MEDIA_LIST_XML))
+        or _SDP.match(head) is not None
+    )
+    if is_list:
+        raise ValueError(
+            f"{path.name} is a playlist or file list, not a recording; give the "
+            "audio or video file itself."
+        )
+
 
 class InputLimitError(ValueError):
     """A file is over one of the :class:`InputLimits` and was not processed.
@@ -374,6 +429,9 @@ class InputLimits:
     ) -> float | None:
         """Refuse a recording over ``max_media_bytes`` or ``max_media_seconds``.
 
+        A playlist or file list in place of a recording is refused too
+        (:func:`check_not_media_list`), with a :class:`ValueError`.
+
         The duration is read with ffprobe. Returns it in seconds, or ``None``
         when ffprobe is missing or cannot read the file, or ``max_media_seconds``
         is off; the caller then checks the duration once it has decoded the
@@ -381,6 +439,7 @@ class InputLimits:
         """
         path = Path(path)
         self.check_media_size(path)
+        check_not_media_list(path)
         if self.max_media_seconds is None:
             return None
         seconds = probe_media_seconds(path, timeout=timeout)
@@ -504,7 +563,7 @@ def probe_media_seconds(
                 "format=duration",
                 "-of",
                 "json",
-                str(path),
+                *media_input_args(path),
             ],
             capture_output=True,
             text=True,

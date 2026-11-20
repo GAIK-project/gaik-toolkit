@@ -1,9 +1,11 @@
 "use client";
 
+import { RunButton } from "@/components/demo/run-button";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
+import { useConfirm } from "@/components/demo/use-confirm";
 import { FeedbackButton } from "@/components/feedback";
 import {
   Accordion,
@@ -73,7 +75,6 @@ import {
   Sparkles,
   Upload,
   Wand2,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -185,6 +186,7 @@ export default function KnowledgeCuratorPage() {
   const [draft, setDraft] = useState<string | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -239,15 +241,21 @@ export default function KnowledgeCuratorPage() {
     setError(null);
   }
 
-  function confirmReplace(what: string): boolean {
+  /** Asks before the curated knowledge is cleared; with none there is nothing to ask. */
+  async function confirmReplace(title: string, action: string) {
     return (
       knowledgePaths.length === 0 ||
-      window.confirm(`${what} clears the current knowledge. Continue?`)
+      (await confirm({
+        title,
+        description: "It clears the current knowledge.",
+        action,
+      }))
     );
   }
 
   async function pickExample(example: CuratorExample) {
-    if (busy || !confirmReplace("Loading an example")) return;
+    if (busy || !(await confirmReplace("Load the example?", "Load example")))
+      return;
     setLoadingExample(true);
     try {
       const response = await fetch(example.url);
@@ -267,8 +275,8 @@ export default function KnowledgeCuratorPage() {
     }
   }
 
-  function clearAll() {
-    if (!confirmReplace("Clearing")) return;
+  async function clearAll() {
+    if (!(await confirmReplace("Clear the page?", "Clear"))) return;
     setNormalized(null);
     setOrigin("");
     setExampleId(null);
@@ -279,7 +287,7 @@ export default function KnowledgeCuratorPage() {
   }
 
   async function loadZip(file: File) {
-    if (!confirmReplace("Loading a zip")) return;
+    if (!(await confirmReplace("Load the zip?", "Load zip"))) return;
     try {
       const loaded = readWorkspaceZip(new Uint8Array(await file.arrayBuffer()));
       resetResult();
@@ -309,9 +317,11 @@ export default function KnowledgeCuratorPage() {
     }
     if (
       knowledgePaths.length > 0 &&
-      !window.confirm(
-        "Curating again replaces the knowledge, including your edits. Continue?",
-      )
+      !(await confirm({
+        title: "Curate again?",
+        description: "It replaces the knowledge, including your edits.",
+        action: "Curate again",
+      }))
     )
       return;
     abortRef.current?.abort();
@@ -365,12 +375,23 @@ export default function KnowledgeCuratorPage() {
       if (!result) throw new Error("Curate ended without a result.");
       toast.success("Knowledge curated");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(false);
+      if (abortRef.current === controller) setRunning(false);
     }
+  }
+
+  /** Cancels the run in the browser; the sources and options stay. */
+  function stopRun() {
+    abortRef.current?.abort();
+    setRunning(false);
+    setProgress([]);
   }
 
   async function verifyQuotes() {
@@ -438,6 +459,7 @@ export default function KnowledgeCuratorPage() {
 
   return (
     <PageTransition>
+      {confirmDialog}
       <DemoPageHeader
         icon={LibraryBig}
         title="Knowledge Curator"
@@ -540,7 +562,7 @@ export default function KnowledgeCuratorPage() {
                             {f.source_type} ·{" "}
                             {(
                               normalized[`normalized/${f.id}.md`]?.length ?? 0
-                            ).toLocaleString()}{" "}
+                            ).toLocaleString("en-US")}{" "}
                             chars
                           </span>
                           {f.source_class && (
@@ -712,29 +734,16 @@ export default function KnowledgeCuratorPage() {
                 </AccordionItem>
               </Accordion>
               <CardContent className="flex gap-2 pt-0">
-                <Button
-                  size="lg"
+                <RunButton
+                  running={running}
+                  onRun={curate}
+                  onStop={stopRun}
+                  icon={Sparkles}
                   className="flex-1"
-                  onClick={curate}
                   disabled={busy || !normalized || problem !== null}
                 >
-                  {running ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  {running ? "Curating…" : "Curate"}
-                </Button>
-                {running && (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => abortRef.current?.abort()}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                )}
+                  Curate
+                </RunButton>
               </CardContent>
             </Card>
           </div>
@@ -881,7 +890,7 @@ export default function KnowledgeCuratorPage() {
                   <Badge variant="outline" className="font-normal">
                     {usage && Object.keys(usage).length > 0
                       ? Object.entries(usage)
-                          .map(([k, v]) => `${k} ${v.toLocaleString()}`)
+                          .map(([k, v]) => `${k} ${v.toLocaleString("en-US")}`)
                           .join(" · ")
                       : "no token counts reported"}
                   </Badge>

@@ -181,7 +181,7 @@ function ImageCard({ demo, isUnlocked }: { demo: Demo; isUnlocked: boolean }) {
         <div className="bg-muted relative h-40 shrink-0 overflow-hidden sm:h-auto sm:w-[42%]">
           <Image
             src={demo.image}
-            alt={`${demo.title} demo`}
+            alt=""
             fill
             sizes="(min-width: 1024px) 240px, (min-width: 640px) 40vw, 100vw"
             className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
@@ -205,13 +205,13 @@ function ImageCard({ demo, isUnlocked }: { demo: Demo; isUnlocked: boolean }) {
   );
 }
 
-function SectionHeading({ title, intro }: { title: string; intro: string }) {
+function SectionHeading({ title, intro }: { title: string; intro?: string }) {
   return (
     <div className="space-y-1 border-b pb-3">
       <h2 className="font-serif text-2xl font-semibold tracking-tight">
         {title}
       </h2>
-      <p className="text-muted-foreground text-sm">{intro}</p>
+      {intro && <p className="text-muted-foreground text-sm">{intro}</p>}
     </div>
   );
 }
@@ -231,9 +231,6 @@ function ProcessHeading({
     >
       <style.icon className={cn("size-4", style.accent)} />
       <h3 className={cn("font-semibold", style.accent)}>{style.name}</h3>
-      <span className="text-muted-foreground hidden md:inline">
-        {style.summary}
-      </span>
     </div>
   );
 }
@@ -301,8 +298,7 @@ function Sections({
         tour="use-cases"
       >
         <SectionHeading
-          title="Use Cases"
-          intro="End-to-end applications for real business tasks, built from the modules and components below."
+          title="Use cases"
         />
         <div className="grid gap-4 lg:grid-cols-2">
           {featuredUseCases.map((demo) => (
@@ -326,7 +322,7 @@ function Sections({
         className="scroll-mt-24 space-y-5"
       >
         <SectionHeading
-          title="Software Modules"
+          title="Software modules"
           intro="Ready-made pipelines that combine several components into one workflow."
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -345,7 +341,7 @@ function Sections({
         tour="components"
       >
         <SectionHeading
-          title="Software Components"
+          title="Software components"
           intro="Single building blocks, each usable on its own from the gaik Python package."
         />
         {PROCESSES.map(({ name }) => {
@@ -372,7 +368,7 @@ function Sections({
         className="scroll-mt-24 space-y-5"
       >
         <SectionHeading
-          title="No-code Assets"
+          title="No-code assets"
           intro="Use GAIK's extraction know-how without writing code."
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -4,6 +4,7 @@ import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { FileUpload } from "@/components/demo/file-upload";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
+import { RunButton } from "@/components/demo/run-button";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { FeedbackButton } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
@@ -135,7 +136,7 @@ function Profile({ tables }: { tables: TableInfo[] }) {
           className={cn(tables.length > 1 && "mt-3")}
         >
           <p className="text-muted-foreground mb-2 text-xs">
-            {table.name}: {table.row_count.toLocaleString()} rows,{" "}
+            {table.name}: {table.row_count.toLocaleString("en-US")} rows,{" "}
             {table.columns.length} columns
           </p>
           <div className="max-h-72 overflow-auto rounded-md border">
@@ -202,6 +203,11 @@ export default function TabularAgentPage() {
   const [example, setExample] = useState<TabularExample | null>(null);
   const uploadRequest = useRef(0);
   const counter = useRef(0);
+  const askAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => askAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     async function loadStatus(): Promise<void> {
@@ -307,6 +313,9 @@ export default function TabularAgentPage() {
       return;
     }
 
+    askAbortRef.current?.abort();
+    const controller = new AbortController();
+    askAbortRef.current = controller;
     setIsAsking(true);
     const started = performance.now();
 
@@ -318,6 +327,7 @@ export default function TabularAgentPage() {
           session_id: upload.session_id,
           question: finalQuestion,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -344,10 +354,16 @@ export default function TabularAgentPage() {
         example: example?.id ?? null,
       });
     } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
-      setIsAsking(false);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (askAbortRef.current === controller) setIsAsking(false);
     }
   }
 
@@ -491,17 +507,17 @@ export default function TabularAgentPage() {
                   aria-label="Your question"
                   disabled={!upload || busy}
                 />
-                <Button
-                  onClick={() => void handleAsk()}
-                  disabled={!upload || busy || !question.trim()}
+                {/* No Stop: the server would go on with the question, and a new
+                    one on the same upload would share its database connection. */}
+                <RunButton
+                  running={isAsking}
+                  onRun={() => void handleAsk()}
+                  icon={Sparkles}
+                  disabled={!upload || isUploading || !question.trim()}
+                  size="default"
                 >
-                  {isAsking ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  {isAsking ? "Asking…" : "Ask"}
-                </Button>
+                  Ask
+                </RunButton>
               </div>
 
               {upload && (

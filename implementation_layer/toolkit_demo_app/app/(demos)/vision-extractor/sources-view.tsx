@@ -36,7 +36,7 @@ export function TraceSourcesSwitch({
           <TraceExplainer />
         </span>
         <p className="text-muted-foreground text-xs">
-          Each value comes with its quote, highlighted in the PDF. Uses more
+          Each value comes with its quote, highlighted on its page. Uses more
           output tokens.
         </p>
       </div>
@@ -238,7 +238,7 @@ export function SourcesView({ result }: { result: SourcesResult }) {
           )}
           {counts.ok} verified
           {counts.unchecked > 0 &&
-            `, ${counts.unchecked} without a text layer to check against`}
+            `, ${counts.unchecked} read from images, so not checked against a text layer`}
         </p>
         <TraceExplainer label="How it works" />
       </div>

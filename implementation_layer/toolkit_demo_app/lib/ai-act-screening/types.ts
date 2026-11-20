@@ -195,3 +195,15 @@ export function isCurrentGap(a: ScreeningAction, screenedOn: string): boolean {
     (a.applies_from as string) <= screenedOn
   );
 }
+
+/**
+ * An alternative tier's condition, ready to follow "If ". The model sometimes
+ * writes the condition as a sentence of its own ("If the system ranks people.");
+ * without this the page printed "If If the system ranks people..".
+ */
+export function conditionText(condition: string): string {
+  return condition
+    .trim()
+    .replace(/^if\s+/i, "")
+    .replace(/[.\s]+$/, "");
+}

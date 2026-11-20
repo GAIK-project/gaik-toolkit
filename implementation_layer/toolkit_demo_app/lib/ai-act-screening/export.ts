@@ -8,6 +8,7 @@ import {
   ROUTE_LABEL,
   type Screening,
   TIERS,
+  conditionText,
   isCurrentGap,
 } from "./types";
 
@@ -45,7 +46,9 @@ export function screeningToMarkdown(s: Screening, name: string): string {
   } else {
     lines.push("**Risk tier:** Not yet determined.", "");
     for (const alt of summary.alternatives ?? [])
-      lines.push(`- If ${alt.if}: ${TIERS[alt.risk_class].label}`);
+      lines.push(
+        `- If ${conditionText(alt.if)}: ${TIERS[alt.risk_class].label}`,
+      );
     lines.push("");
   }
   lines.push(

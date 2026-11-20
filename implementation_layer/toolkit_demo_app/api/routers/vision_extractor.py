@@ -105,8 +105,21 @@ PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
     "claude": tuple(
         os.getenv("DEMO_CLAUDE_MODELS", "claude-sonnet-5-5,claude-haiku-5-5").split(",")
     ),
-    "google": tuple(os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.8-flash").split(",")),
+    # Gemini 4 Argon and Carbon are team-only (utils/model_settings.py). Of the
+    # Gemini 4 models, Neon and Hydrogen left line prices empty on test receipts
+    # (2026-11-19, docs/MODEL_REQUIREMENTS.md) and are not offered.
+    "google": tuple(
+        os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.8-flash,gemini-4-argon,gemini-4-carbon").split(
+            ","
+        )
+    ),
 }
+
+AITTA_REFUSAL = (
+    "The Vision Extractor does not run on CSC Aitta: its models took 5 to 15 minutes per "
+    "receipt here and refused scanned pages as too large. Pick a GPT, Claude or Gemini "
+    "model in the model menu."
+)
 
 
 EXAMPLE_SCHEMA_ID = "example"
@@ -521,6 +534,8 @@ async def extract_vision(
     model = model or _server_model()
     request_config = get_request_api_config()
     if request_config is not None:
+        if request_config.get("provider") == "aitta":
+            raise HTTPException(status_code=400, detail=AITTA_REFUSAL)
         require_vision(request_config)
         model = request_config["model"]
         lib_provider, use_azure, vertex_ai = "openai", request_config["provider"] == "azure", False

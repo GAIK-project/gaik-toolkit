@@ -26,7 +26,7 @@ export function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
             href="/luvata-order"
             className={cn(
               buttonVariants({ size: "lg" }),
-              "h-11 gap-2 px-5 shadow-sm",
+              "h-auto min-h-11 max-w-full gap-2 px-5 py-2 whitespace-normal shadow-sm",
             )}
           >
             Try purchase order processing

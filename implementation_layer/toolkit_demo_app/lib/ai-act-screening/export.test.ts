@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { screeningToMarkdown } from "./export";
-import { isCurrentGap, type Screening } from "./types";
+import { conditionText, isCurrentGap, type Screening } from "./types";
 
 const screening: Screening = {
   screened_on: "2026-11-16",
@@ -87,4 +87,16 @@ describe("screeningToMarkdown", () => {
   test("never leaks data codes", () => {
     expect(md).not.toMatch(/\bin_place\b|\bF5\b|risk_class/);
   });
+});
+
+test("an alternative's condition reads once after If", () => {
+  expect(conditionText("If an applicable prohibited practice applies.")).toBe(
+    "an applicable prohibited practice applies",
+  );
+  expect(conditionText("the system ranks job applicants")).toBe(
+    "the system ranks job applicants",
+  );
+  expect(conditionText("  if it profiles people .. ")).toBe(
+    "it profiles people",
+  );
 });

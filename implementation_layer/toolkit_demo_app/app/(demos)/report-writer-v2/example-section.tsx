@@ -1,7 +1,6 @@
 "use client";
 
-import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
-import { FileSearch, FileText, Play, ScrollText, Wand2 } from "lucide-react";
+import { Wand2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { ExampleOverview } from "./components/example-overview";
 import { ReportResults } from "./components/report-results";
@@ -9,32 +8,6 @@ import { StageStepper } from "./components/stage-stepper";
 import type { useReportWriter } from "./use-report-writer";
 
 type ReportWriter = ReturnType<typeof useReportWriter>;
-
-const GUIDE_STEPS: GuideStep[] = [
-  {
-    icon: FileSearch,
-    title: "Look at the sources",
-    text: "Play the three site recordings and open the customer documents. This is all the report is written from.",
-  },
-  {
-    icon: ScrollText,
-    title: "See the plan",
-    text: "The report has seven sections. Each one lists what it must cover, and the last ones are written from the others.",
-  },
-  {
-    icon: Play,
-    title: "Write the report",
-    text: "Press Run all three stages. Recordings are transcribed, facts are collected with quotes, and the sections are written and reviewed.",
-  },
-  {
-    icon: FileText,
-    title: "Check the evidence",
-    text: "Read the report, then open any section to see the quoted facts, their sources, the conflicts and what is missing. Download the Word file.",
-  },
-];
-const GUIDE_NOTES = [
-  "Running the example uses AI models and takes about two minutes.",
-];
 
 /** The ready-made construction report: look at its sources, run it, check the evidence. */
 export function ReportWriterExampleSection({
@@ -56,14 +29,11 @@ export function ReportWriterExampleSection({
 
   return (
     <div className="space-y-6">
-      <SectionGuide
-        heading="How to try the example"
-        steps={GUIDE_STEPS}
-        notes={GUIDE_NOTES}
-      />
-
       <ExampleOverview rw={rw} />
 
+      <p className="text-muted-foreground text-sm">
+        Running the example uses AI models and takes about two minutes.
+      </p>
       <StageStepper
         artifacts={rw.artifacts}
         stale={rw.stale}
@@ -72,7 +42,7 @@ export function ReportWriterExampleSection({
         progress={rw.progress}
         error={rw.error}
         onRun={rw.run}
-        onCancel={() => rw.abortRef.current?.abort()}
+        onStop={rw.stop}
         runAllHint="The example is loading."
       />
 

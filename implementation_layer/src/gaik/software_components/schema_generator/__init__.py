@@ -5,6 +5,18 @@ existing imports and persisted schemas keep working. This package provides a
 clearer import path without creating a second software component.
 """
 
-from gaik.software_components.extractor import SchemaGenerationResult, SchemaGenerator
+from gaik.software_components.extractor import (
+    FieldChange,
+    SchemaDiff,
+    SchemaGenerationResult,
+    SchemaGenerator,
+    compare_requirements,
+)
 
-__all__ = ["SchemaGenerator", "SchemaGenerationResult"]
+__all__ = [
+    "SchemaGenerator",
+    "SchemaGenerationResult",
+    "SchemaDiff",
+    "FieldChange",
+    "compare_requirements",
+]

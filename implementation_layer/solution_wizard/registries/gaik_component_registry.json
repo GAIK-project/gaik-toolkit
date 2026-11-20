@@ -2529,7 +2529,8 @@
       "convert_image (image input) returns a single markdown string, not a page list -- page provenance applies to PDF input only",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF or image before any page is rendered or sent: size (100 MiB), pages (500; with first_pages=N only those pages) and the pixels of each page at the chosen dpi or of the image file (89,478,485). Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF or image before any page is rendered or sent: size (100 MiB), pages (500; with first_pages=N only those pages) and the pixels of each page at the chosen dpi or of the image file (89,478,485). Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (convert_pdf: another known type than PDF; convert_image: content that is not a PNG, JPEG, GIF, WebP, TIFF or BMP image; an image under another image extension, or a file without a suffix, is sent with the image type its content has) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "page_attributed_parsing",
@@ -2617,7 +2618,8 @@
       "Requires a premium multimodal model from OpenAI/Azure, Anthropic, or Google (pip install gaik[multimodal-parser])",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF before it is sent: size (100 MiB), pages (500) and the pixels of each rendered page; a PDF whose pages cannot be counted is refused. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF before it is sent: size (100 MiB), pages (500) and the pixels of each rendered page; a PDF whose pages cannot be counted is refused. Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "complex_tables_spanning_pages",
@@ -2688,7 +2690,8 @@
       "Slow without a CUDA-enabled GPU -- OCR and formula enrichment dominate runtime on CPU",
       "ocr_engine choice affects language support and system dependencies ('tesseract_cli' requires a system Tesseract install)",
       "parse_document flattens the document into one text_content string -- no page-level provenance",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before Docling reads it: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before Docling reads it: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (.pdf, .docx, .pptx, .doc/.ppt, .txt) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "scanned_document_ocr",
@@ -2778,7 +2781,8 @@
       "Returns one flat parsed_markdown string -- no page-level provenance",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size before Docling runs, then the embedded images before the first vision call: at most 500 (max_images, one call each) of at most 89,478,485 pixels; Docling reads the pages locally, so no page limit by default. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size before Docling runs, then the embedded images before the first vision call: at most 500 (max_images, one call each) of at most 89,478,485 pixels; Docling reads the pages locally, so no page limit by default. Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "documents_with_meaningful_images",
@@ -2846,7 +2850,8 @@
       "Sends the document to an external service -- unsuitable when data must not leave the local environment",
       "Returns parsed_markdown (not text_content like the local DoclingParser) and flattens pages -- no page-level provenance",
       "Declared under the 'parser' extra because that is where requests is pinned; the client itself does not need docling installed locally",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before it is uploaded: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before it is uploaded: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (for the extensions it knows: .pdf, Office, image and text files) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "gpu_accelerated_docling_parsing",
@@ -2906,7 +2911,8 @@
       "No OCR -- cannot read scanned or image-only PDFs (use DoclingParser)",
       "Simple layouts only; tables and multi-column text degrade badly",
       "Default (use_markdown=True) concatenates pages into one text_content string with no page marker -- no page-level provenance. use_markdown=False inserts '=== PAGE N ===' markers (plus per-line [x:,y:] bounding-box tags) and IS a valid, free/local way to get file_name|page_number citations for text-layer PDFs -- see the reference card's call_page_citations pattern.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size (100 MiB) before it is opened; no page limit by default (InputLimits.local_parsing()), InputLimits(max_pages=N) adds one. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size (100 MiB) before it is opened; no page limit by default (InputLimits.local_parsing()), InputLimits(max_pages=N) adds one. Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF (DOCX, XLSX, an image), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "fast_local_text_extraction",
@@ -2963,10 +2969,11 @@
       ]
     },
     "known_limitations": [
-      "Word documents -- use a PDF parser for PDFs. Declares .doc support (is_supported_file() accepts it), but python-docx's Document() cannot open the legacy binary .doc format -- a real .doc file raises PackageNotFoundError at parse time. Treat only .docx as actually supported.",
+      "Word documents -- use a PDF parser for PDFs. Declares .doc support (is_supported_file() accepts it), but python-docx's Document() cannot open the legacy binary .doc format -- a real .doc file is refused with FileTypeMismatchError before python-docx opens it. Treat only .docx as actually supported.",
       "DOCX has no fixed page model, so page-level citations are not possible",
       "use_markdown=False emits paragraph-index and style markers rather than clean prose",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB) and unpacked size (10 x that) before it is read. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB) and unpacked size (10 x that) before it is read. Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "word_document_parsing",
@@ -3201,7 +3208,7 @@
     "known_limitations": [
       "RAGWorkflow already performs answer generation -- select this directly only for custom pipelines",
       "Streams by default (stream=True); set stream=False to receive a single string",
-      "Citation quality depends entirely on the retrieved context -- it formats citations, it does not verify sources",
+      "The model cites by reference number and numbered references are resolved to the retrieved chunks; the citations list holds only retrieved chunks and a [name, page X] no chunk has is removed. A number that is not a chunk's reference, and sources in other forms, are left as written in the answer. It cannot check that a cited chunk supports the sentence it is attached to",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
@@ -3638,7 +3645,8 @@
       "Formula cells show the result stored in the file; a workbook whose formulas have no stored results (written by a library and never opened in Excel) raises ValueError -- open and save it in Excel or LibreOffice first",
       "The first non-empty row is the header; empty rows are dropped and empty sheets omitted; a file with no non-empty rows raises ValueError",
       "Reads a spreadsheet as text. To ask questions over its data use TabularAgent; for mixed source files use SourceNormalizer, which calls this parser",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "spreadsheet_to_markdown",
