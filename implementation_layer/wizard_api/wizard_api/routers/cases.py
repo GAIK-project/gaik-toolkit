@@ -452,15 +452,25 @@ async def reuse_poc_input(
         safe_name = poc_service.safe_input_name(payload.filename)
     except poc_service.InputRejectedError as exc:
         raise api_error(422, "input_rejected", str(exc)) from exc
-    src = Path(poc_service.sample_input_dir(poc)) / safe_name
-    if not poc_service.regular_file(src, poc):
+    sample_dir = Path(poc_service.sample_input_dir(poc))
+    candidate = sample_dir / safe_name
+    # A regular file (not a symlink, not reached through one) ...
+    if not poc_service.regular_file(candidate, poc):
+        raise HTTPException(status_code=404, detail="no such PoC test file")
+    # ... that still resolves inside sample_input/; only the resolved path is read.
+    src = candidate.resolve()
+    if not src.is_relative_to(sample_dir.resolve()):
         raise HTTPException(status_code=404, detail="no such PoC test file")
     try:
-        if src.stat().st_size > poc_service.MAX_INPUT_BYTES:
-            raise poc_service.InputTooLargeError(
-                f"the file is larger than {poc_service.MAX_INPUT_BYTES // (1024 * 1024)} MB"
-            )
-        data = await asyncio.to_thread(src.read_bytes)
+        try:
+            if src.stat().st_size > poc_service.MAX_INPUT_BYTES:
+                raise poc_service.InputTooLargeError(
+                    f"the file is larger than {poc_service.MAX_INPUT_BYTES // (1024 * 1024)} MB"
+                )
+            data = await asyncio.to_thread(src.read_bytes)
+        except OSError as exc:
+            # Removed or replaced between the check and the read.
+            raise HTTPException(status_code=404, detail="no such PoC test file") from exc
         draft = _draft(session.output_dir)
         allowed = input_content.contract_kinds(draft)
         if payload.task:

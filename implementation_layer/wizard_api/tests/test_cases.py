@@ -2305,3 +2305,21 @@ def test_cases_model_lists_compatible_reusable_poc_inputs_and_from_poc_copies_ex
         json={"filename": "missing.wav", "task": "T_report"},
     )
     assert missing.status_code == 404
+
+
+@requires_postgres
+def test_from_poc_refuses_names_that_leave_the_input_directory(client, db_session):
+    sid = _session_with_package(client, db_session)
+    case = client.post(f"/sessions/{sid}/cases").json()
+    for name in ("../run_poc.py", "/etc/passwd", "..\\run_poc.py"):
+        res = client.post(
+            f"/sessions/{sid}/cases/{case['id']}/inputs/from-poc",
+            json={"filename": name, "task": "T_report"},
+        )
+        assert res.status_code == 422, (name, res.text)
+    # The plain name of a package file outside sample_input/ is not found there.
+    res = client.post(
+        f"/sessions/{sid}/cases/{case['id']}/inputs/from-poc",
+        json={"filename": "run_poc.py", "task": "T_report"},
+    )
+    assert res.status_code == 404
