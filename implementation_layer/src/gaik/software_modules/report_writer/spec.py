@@ -52,9 +52,9 @@ class RunSettings(BaseModel):
     """Sections curated in parallel."""
     review_attempts: int = Field(5, ge=1)
     """Most reviewer requests per section, the first one included."""
-    strict_review: bool = False
-    """Fail the synthesize stage when a reviewer edit cannot be applied, instead of
-    logging it in the review log."""
+    strict_review: bool = True
+    """Fail the synthesize stage when a reviewer edit cannot be applied (the default);
+    ``False`` logs it in the review log instead."""
     docx: bool = True
     """Also write ``report.docx``; needs ``pypandoc`` and the Pandoc binary."""
     citations: bool = True
@@ -74,7 +74,11 @@ class ReportSpec(BaseModel):
     language: str = "English"
     sections: list[SectionSpec]
     instructions: str = ""
-    """Rules for every section, such as the source hierarchy and style."""
+    """Rules for every section, such as how each kind of source is worded, and style."""
+    source_precedence: list[str] = []
+    """Source classes, highest first, e.g. ``["primary", "secondary"]``. A conflict between
+    sources is resolved in code only when exactly one of its units has the top class;
+    without it every conflict stays unresolved and the report gives both sides."""
     sources: dict[Literal["primary", "secondary"], list[Path]]
     sample_report: Path | None = None
     """A report whose structure and style the new report follows."""
@@ -86,6 +90,14 @@ class ReportSpec(BaseModel):
         check_sections(self.sections)
         if not any(self.sources.values()):
             raise ValueError("The spec lists no sources")
+        unknown = [c for c in self.source_precedence if c not in ("primary", "secondary")]
+        if unknown:
+            raise ValueError(
+                f"source_precedence names classes a spec cannot have: {unknown}; "
+                "use 'primary' and 'secondary'"
+            )
+        if len(set(self.source_precedence)) != len(self.source_precedence):
+            raise ValueError("source_precedence names a class more than once")
         return self
 
     @classmethod

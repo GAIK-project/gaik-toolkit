@@ -10,10 +10,12 @@ import {
   STAGES,
   type ModelKey,
   type ReportSpec,
+  type SourceClass,
   type Stage,
   type Staleness,
   parseArtifacts,
   parseSpec,
+  precedenceForSpec,
   settingsForSpec,
   type SpecSettings,
   staleAfterEdit,
@@ -113,6 +115,8 @@ export function useReportWriter() {
   const [language, setLanguage] = useState("English");
   const [sections, setSections] = useState<SectionRow[]>(DEFAULT_SECTIONS);
   const [instructions, setInstructions] = useState("");
+  /** Kept from a loaded spec and written back; the form has no control for it. */
+  const [sourcePrecedence, setSourcePrecedence] = useState<SourceClass[]>([]);
   const [models, setModels] = useState(NO_MODELS);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [sources, setSources] = useState<SourceRow[]>([]);
@@ -157,7 +161,8 @@ export function useReportWriter() {
 
   // -- Spec --
 
-  function buildSpec(): Omit<ReportSpec, "settings"> & {
+  function buildSpec(): Omit<ReportSpec, "settings" | "source_precedence"> & {
+    source_precedence?: SourceClass[];
     settings: SpecSettings;
   } {
     return {
@@ -174,6 +179,7 @@ export function useReportWriter() {
         depends_on: s.depends_on,
       })),
       instructions,
+      ...precedenceForSpec(sourcePrecedence),
       sources: {
         primary: sources
           .filter((r) => r.sourceClass === "primary")
@@ -197,6 +203,7 @@ export function useReportWriter() {
       spec.sections.map((s, i) => ({ key: `spec-${i}-${Date.now()}`, ...s })),
     );
     setInstructions(spec.instructions);
+    setSourcePrecedence(spec.source_precedence);
     setModels(spec.models);
     setSettings(spec.settings);
     setSources(
@@ -242,6 +249,7 @@ export function useReportWriter() {
     setLanguage("English");
     setSections(DEFAULT_SECTIONS);
     setInstructions("");
+    setSourcePrecedence([]);
     setModels(NO_MODELS);
     setSettings(DEFAULT_SETTINGS);
     setSources([]);

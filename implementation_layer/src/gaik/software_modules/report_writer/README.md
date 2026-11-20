@@ -88,7 +88,8 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
       "depends_on": ["building_services"]
     }
   ],
-  "instructions": "Site recordings are primary sources and outrank the documents.",
+  "instructions": "Narrate site recordings as observations; attribute document content.",
+  "source_precedence": ["primary", "secondary"],
   "sources": {
     "primary": ["inputs/rec3_building_services.mp3"],
     "secondary": ["inputs/renovation_report_1998.pdf", "inputs/maintenance_log.xlsx"]
@@ -105,7 +106,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
     "transcription_language": "auto",
     "curator_workers": 4,
     "review_attempts": 5,
-    "strict_review": false,
+    "strict_review": true,
     "docx": true,
     "citations": true,
     "curator": {"reasoning_effort": null, "temperature": null},
@@ -123,7 +124,8 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `sections` | The template, in report order: `id` (letters, digits, `_`, `-`), `title`, `instructions` |
 | `required_items` | Items a section must cover; each one no source covers becomes `(missing: <item>)` |
 | `depends_on` | Makes a section *derived*: it has no knowledge file and is written from the reviewed texts of these sections |
-| `instructions` | Rules for every section: source hierarchy, citation style, tone |
+| `instructions` | Rules for every section: how each kind of source is worded, citation style, tone |
+| `source_precedence` | Optional source classes, highest first, e.g. `["primary", "secondary"]`. A conflict is resolved in code only when exactly one of its units has the highest-ranked class and that unit is not of `low` confidence; without it every conflict is `Unresolved:` in the report (see the KnowledgeCurator README, Conflicts) |
 | `sources` | Files grouped by class, `primary` and/or `secondary`; file names must be unique |
 | `sample_report` | Optional report whose structure, length and tone the new report follows; never its facts |
 | `models` | Optional model or deployment name per step; `null` uses the model of the config |
@@ -131,7 +133,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `settings.transcription_language` | Language of the recordings, e.g. `en` or `fi`, or `auto` |
 | `settings.curator_workers` | Sections curated in parallel |
 | `settings.review_attempts` | Most reviewer requests per section, the first one included |
-| `settings.strict_review` | `true` fails `synthesize` when a reviewer edit cannot be applied, instead of logging it in `review_log.json` |
+| `settings.strict_review` | `true` (the default) fails `synthesize` when a reviewer edit cannot be applied; `false` logs it in `review_log.json` and returns the report |
 | `settings.docx` | `false` skips `report.docx` and deletes one of an earlier run |
 | `settings.citations` | `true` (default) cites the source file and place of each fact, as the report instructions say. `false` writes plain statements with no file names, pages or references, even if the instructions ask for citations; the writers and the reviewer both follow it, and so does the `single_call` baseline |
 | `settings.curator` / `writer` / `reviewer` | `reasoning_effort` and `temperature` for every call of that step; `null` leaves the option unset. Where a model does not take `temperature` with reasoning on, it is dropped; an invalid effort raises before the call |
@@ -173,7 +175,8 @@ stale `sample_report.md` when the spec has no sample report.
 Every stage reads only files, so a person can correct a stage and rerun from there:
 
 ```python
-# Correct a fact, delete a unit or resolve a conflict in workspace/knowledge/*.json,
+# Correct a fact, delete a unit or resolve a conflict in workspace/knowledge/*.json
+# (status "resolved" and the units to follow in preferred_unit_ids),
 # then write the report again. Normalize and curate are not rerun.
 report = writer.synthesize(spec, "workspace")
 

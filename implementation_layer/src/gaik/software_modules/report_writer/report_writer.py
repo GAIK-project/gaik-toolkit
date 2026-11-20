@@ -142,6 +142,7 @@ class ReportWriter:
             sources,
             spec.sections,
             instructions=spec.instructions,
+            source_precedence=spec.source_precedence,
             progress_callback=progress_callback,
         )
         _clear(workspace / "knowledge")

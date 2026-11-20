@@ -1,7 +1,7 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.6.26",
+    "version": "0.6.28",
     "marketplace": "GAIK-project/gaik-toolkit",
     "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
   },
@@ -306,7 +306,7 @@
         "scripts/template_to_spec.py"
       ],
       "zip": "/downloads/skills/generate-structured-reports.zip",
-      "zipBytes": 179582,
+      "zipBytes": 182947,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports",
       "guideUrl": null
     }

@@ -63,10 +63,10 @@ SECTIONS = [
     ),
 ]
 
-INSTRUCTIONS = """Source hierarchy
+# Which side of a conflict the report follows is decided in code from the source
+# classes (source_precedence below), not from these instructions.
+INSTRUCTIONS = """Sources
 - Site notes are primary sources. Customer documents are secondary sources.
-- When a clear observation contradicts a document, follow the observation.
-- When two documents disagree on the same topic, follow the newer one.
 
 Style
 - English, third person."""
@@ -86,7 +86,11 @@ def curate_example() -> None:
     sources = build_sources()
     curator = KnowledgeCurator(get_llm_config())
     knowledge = curator.curate(
-        sources, SECTIONS, instructions=INSTRUCTIONS, progress_callback=print
+        sources,
+        SECTIONS,
+        instructions=INSTRUCTIONS,
+        source_precedence=["primary", "secondary"],
+        progress_callback=print,
     )
 
     for section in knowledge.sections:

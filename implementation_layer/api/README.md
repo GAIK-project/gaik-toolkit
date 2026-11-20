@@ -14,7 +14,7 @@ Lightweight REST API built with FastAPI for audio transcription, document parsin
 | `/pipeline/incident-report` | POST | Incident report from audio / text / document → structured JSON + optional PDF |
 | `/pipeline/pdf/{job_id}` | GET | Download a previously generated PDF |
 | `/extract/form` | POST | Form values from free-form text (`DataExtractor`) |
-| `/form/understand` | POST | Form-field labels cleaned into readable names (`FormUnderstander`) |
+| `/form/understand` | POST | Form-field labels cleaned into readable names (`FormUnderstander.describe_labels`): `mapping` (id → label) and `labels`, each with the page's own label (`pageLabel`) and `changed` / `truncated`; show `pageLabel` beside `label` when either is true |
 
 All non-health endpoints require the `X-API-Key` header.
 

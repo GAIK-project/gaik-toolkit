@@ -63,13 +63,7 @@ class CuratedConflict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     topic: str = Field(description="The topic the sources disagree on.")
-    description: str = Field(
-        description="What each source says and, if resolved, which side the source "
-        "hierarchy follows and why."
-    )
-    status: Literal["resolved", "unresolved"] = Field(
-        description="'resolved' if the source hierarchy decides the conflict, else 'unresolved'."
-    )
+    description: str = Field(description="What each source says, without deciding between them.")
     unit_numbers: list[int] = Field(
         description="1-based positions in units of the units that disagree, both sides."
     )
@@ -155,8 +149,60 @@ def _as_cited(answer: CurationResponse, cited: _Cited) -> CurationResponse:
     return answer.model_copy(update={"units": units})
 
 
+# A number: a digit run, or groups of three digits with a thousands separator between
+# them ("1 200", "1,200", "1.200"). Any other separator splits numbers, so a date such
+# as 14.3.2026 is 14, 3 and 2026, and a decimal 1,5 is 1 and 5, however a source writes it.
+_NUMBER = re.compile(r"(?<![^\W_])(?:\d{1,3}(?:[.,\u00a0\u202f ]\d{3})+(?!\d)|\d+)")
+# A number glued to letters before it, such as the 2 in m2, CO2 or ISO9001, is part of a
+# unit or a name, not a figure of the fact: the lookbehind above leaves it out, and it
+# never starts inside a digit run, so it does not take the 001 of ISO9001 either.
+_SEPARATORS = re.compile(r"[.,\u00a0\u202f ]")
+# Every digit run, glued to letters or not: what a quote gives. "ISO9001" in a quote
+# supports "ISO 9001" in the summary.
+_DIGIT_RUN = re.compile(r"\d+")
+
+
+def _digits(number: str) -> str:
+    """A number's digits without separators or leading zeros: "1 200,50" -> "120050"."""
+    return _SEPARATORS.sub("", number).lstrip("0") or "0"
+
+
+def _given_numbers(text: str) -> set[str]:
+    """The digits of every number in ``text``, of each group of a grouped one, and of
+    every digit run glued to letters.
+
+    "4 120" may be one figure or two (a count and an area), so both readings count; the
+    9001 of "ISO9001" counts too, so a summary may write it "ISO 9001".
+    """
+    given = {_digits(run) for run in _DIGIT_RUN.findall(text)}
+    for n in _NUMBER.findall(text):
+        given.add(_digits(n))
+        given.update(_digits(part) for part in _SEPARATORS.split(n) if part)
+    return given
+
+
+def _unsupported_numbers(unit: CuratedUnit, source_text: str | None = None) -> list[str]:
+    """The numbers of the summary that neither the quote nor the time qualifier gives.
+
+    The quote check confirms only that the quote is in its source; this confirms that the
+    summary states no number of its own, such as an age computed from a year or a figure
+    copied from another part of the source. Numbers are compared by their digits, so
+    "1 200" in the quote supports "1200" in the summary and "03" supports "3"; a number
+    written in words is not checked.
+    """
+    given = _given_numbers(unit.quote)
+    # The time qualifier is the model's own text: its numbers count only where the
+    # cited source has them too.
+    qualifier = _given_numbers(unit.time_qualifier or "")
+    if source_text is not None:
+        qualifier &= _given_numbers(source_text)
+    given |= qualifier
+    return [n for n in _NUMBER.findall(unit.summary) if _digits(n) not in given]
+
+
 def _failing_units(answer: CurationResponse, cited: _Cited) -> list[tuple[int, str, str]]:
-    """``(position, reason, message)`` of every unit whose quote fails the check.
+    """``(position, reason, message)`` of every unit whose quote fails the check, or
+    whose summary states a number its quote does not give.
 
     The message names a source by the label the model saw it under.
     """
@@ -177,6 +223,15 @@ def _failing_units(answer: CurationResponse, cited: _Cited) -> list[tuple[int, s
                     "quote not found in source",
                     f'unit {n}: quote "{unit.quote}" not found in '
                     f'"{cited.label(unit.source.file)}"',
+                )
+            )
+        elif unsupported := _unsupported_numbers(unit, cited.texts[unit.source.file]):
+            failures.append(
+                (
+                    n,
+                    "summary states a number the quote does not",
+                    f"unit {n}: the summary states {unsupported}, which the quote "
+                    f'"{unit.quote}" does not give',
                 )
             )
     return failures
@@ -235,8 +290,58 @@ def _without_units(answer: CurationResponse, dropped: set[int]) -> CurationRespo
     )
 
 
+def _check_precedence(source_precedence: Sequence[str] | None) -> tuple[str, ...]:
+    """The precedence as a tuple; raise ``ValueError`` on a blank, a repeat or a bare string."""
+    if source_precedence is None:
+        return ()
+    if isinstance(source_precedence, str):
+        raise ValueError(
+            "source_precedence takes a list of source classes, highest first, "
+            "e.g. ['primary', 'secondary']"
+        )
+    ranked = tuple(source_precedence)
+    if any(not isinstance(c, str) or not c.strip() for c in ranked):
+        raise ValueError("source_precedence entries must be non-blank source class names")
+    repeated = sorted({c for c in ranked if ranked.count(c) > 1})
+    if repeated:
+        raise ValueError(f"source_precedence names a class more than once: {repeated}")
+    return ranked
+
+
+def _decide(
+    units: Sequence[FactUnit], source_precedence: tuple[str, ...]
+) -> tuple[Literal["resolved", "unresolved"], list[str], str | None]:
+    """``(status, preferred_unit_ids, resolved_by)`` of one conflict, decided in code.
+
+    Resolved only when every unit's source class is in ``source_precedence`` and exactly
+    one unit has the highest-ranked class among them: that unit is the side the report
+    follows. Two units of the top class may disagree with each other, so they leave the
+    conflict unresolved, as do units of one class only, a class the precedence does not
+    name, or no precedence at all: a person decides. So does a top unit of ``low``
+    confidence, a source that is itself unsure: the class does not make it right.
+    """
+    # Fewer than two distinct units (an empty unit_numbers list, or one unit named twice)
+    # is no disagreement to rank: a person decides.
+    if not source_precedence or len(units) < 2:
+        return "unresolved", [], None
+    rank = {c: i for i, c in enumerate(source_precedence)}
+    classes = [u.source_class for u in units]
+    if any(c not in rank for c in classes):
+        return "unresolved", [], None
+    top = min(classes, key=rank.__getitem__)
+    preferred = [u.id for u in units if u.source_class == top]
+    if len(preferred) != 1:
+        return "unresolved", [], None
+    if next(u for u in units if u.source_class == top).confidence == "low":
+        return "unresolved", [], None
+    return "resolved", preferred, top
+
+
 def _to_knowledge(
-    section: SectionSpec, answer: CurationResponse, sources: NormalizedSources
+    section: SectionSpec,
+    answer: CurationResponse,
+    sources: NormalizedSources,
+    source_precedence: tuple[str, ...] = (),
 ) -> SectionKnowledge:
     _check_conflicts(section, answer)
     ids = [f"{section.id}-{n:02d}" for n in range(1, len(answer.units) + 1)]
@@ -246,12 +351,16 @@ def _to_knowledge(
     ]
     conflicts = []
     for c in answer.conflicts:
+        involved = [units[n - 1] for n in dict.fromkeys(c.unit_numbers)]
+        status, preferred, resolved_by = _decide(involved, source_precedence)
         conflicts.append(
             Conflict(
                 topic=c.topic,
                 description=c.description,
-                status=c.status,
+                status=status,
                 unit_ids=[ids[n - 1] for n in c.unit_numbers],
+                preferred_unit_ids=preferred,
+                resolved_by=resolved_by,
             )
         )
     return SectionKnowledge(
@@ -295,6 +404,7 @@ class KnowledgeCurator:
         sections: Sequence[SectionSpec],
         *,
         instructions: str = "",
+        source_precedence: Sequence[str] | None = None,
         progress_callback: Callable[[str], None] | None = None,
     ) -> KnowledgeBase:
         """Curate every non-derived section, one LLM call per section, in parallel.
@@ -302,16 +412,24 @@ class KnowledgeCurator:
         Args:
             sources: The normalized sources.
             sections: The report sections; derived sections are skipped.
-            instructions: Report-level instructions: source hierarchy, scope and style.
+            instructions: Report-level instructions: scope, style and how the report
+                words each kind of source. They do not decide conflicts.
+            source_precedence: Source classes, highest first, e.g.
+                ``["primary", "secondary"]``. A conflict is resolved in code when one
+                unit of the conflict has the highest-ranked class among them; the report
+                then follows that side. Without it, or when the classes do not decide,
+                every conflict is unresolved and the report gives both sides.
             progress_callback: Called with a status line when a section starts and ends,
                 possibly from a worker thread. An exception it raises stops the run.
 
         Raises:
-            ValueError: If there are no sources or no section to curate, or, with
+            ValueError: If there are no sources or no section to curate,
+                ``source_precedence`` is a bare string or names a class twice, or, with
                 `drop_unverified=False`, a quote still fails the check or a conflict still
                 refers to a unit that does not exist after one retry.
         """
         check_sections(sections)
+        precedence = _check_precedence(source_precedence)
         if not sources.sources:
             raise ValueError("No sources to curate from")
         curated = [s for s in sections if not s.derived]
@@ -323,7 +441,13 @@ class KnowledgeCurator:
             cited = _Cited(sources)
             futures = [
                 pool.submit(
-                    self._curate_section, sources, cited, s, instructions, progress_callback
+                    self._curate_section,
+                    sources,
+                    cited,
+                    s,
+                    instructions,
+                    precedence,
+                    progress_callback,
                 )
                 for s in curated
             ]
@@ -342,6 +466,7 @@ class KnowledgeCurator:
         cited: _Cited,
         section: SectionSpec,
         instructions: str,
+        source_precedence: tuple[str, ...],
         progress_callback: Callable[[str], None] | None,
     ) -> tuple[SectionKnowledge, list[DroppedUnit]]:
         if progress_callback:
@@ -380,7 +505,7 @@ class KnowledgeCurator:
             if not self.drop_unverified:
                 if failing:
                     raise ValueError(
-                        f"Section {section.id!r}: quotes not found in their sources after one "
+                        f"Section {section.id!r}: units failed the quote check after one "
                         f"retry: {[message for _, _, message in failing]}"
                     )
                 _check_conflicts(section, answer)
@@ -410,7 +535,7 @@ class KnowledgeCurator:
                 for n, reason, _ in failing
             ]
             logger.warning(
-                "Section %r: dropped %d unit(s) whose quote failed the check after the retry: %s",
+                "Section %r: dropped %d unit(s) that failed the quote check after the retry: %s",
                 section.id,
                 len(dropped),
                 _log_summary(failing, []),
@@ -418,11 +543,11 @@ class KnowledgeCurator:
             if progress_callback:
                 progress_callback(
                     f"Dropped {len(dropped)} fact(s) of {section.title}: "
-                    "the quote is not in its source"
+                    "the quote is not in its source or does not give the summary's numbers"
                 )
         if failing or bad_conflicts:
             answer = _without_units(answer, {n for n, _, _ in failing})
-        knowledge = _to_knowledge(section, answer, sources)
+        knowledge = _to_knowledge(section, answer, sources, source_precedence)
         if progress_callback:
             progress_callback(
                 f"Curated {section.title}: {len(knowledge.units)} units, "

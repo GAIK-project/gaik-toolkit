@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import logging
 import re
@@ -25,6 +26,15 @@ except ImportError as exc:
         "PgVectorStore requires 'langchain-core'. "
         "Install extras with 'pip install gaik[pg-vector-store]'"
     ) from exc
+
+from gaik.software_components.RAG._chunk_ids import (
+    CHUNK_OWNER_KEY,
+    DOCUMENT_KEY,
+    chunk_ids,
+    delete_scope,
+    document_scopes,
+    with_document_id,
+)
 
 if TYPE_CHECKING:
     from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
@@ -319,6 +329,7 @@ class PgVectorStore:
             hnsw_iterative_scan = "relaxed_order"
         self.hnsw_iterative_scan = hnsw_iterative_scan
         self._conn: psycopg.Connection | None = None
+        self._has_chunk_key: bool | None = None
 
     @property
     def _vec(self) -> str:
@@ -443,6 +454,7 @@ class PgVectorStore:
                     content_lemmatized TEXT,
                     metadata JSONB DEFAULT '{{}}'::JSONB,
                     embedding {vec},
+                    chunk_key TEXT,
                     text_search tsvector GENERATED ALWAYS AS (
                         to_tsvector(
                             '{lang}',
@@ -460,6 +472,7 @@ class PgVectorStore:
                     content TEXT NOT NULL,
                     metadata JSONB DEFAULT '{{}}'::JSONB,
                     embedding {vec},
+                    chunk_key TEXT,
                     text_search tsvector GENERATED ALWAYS AS (
                         to_tsvector('{lang}', COALESCE(content, ''))
                     ) STORED,
@@ -467,7 +480,18 @@ class PgVectorStore:
                 )
             """)
 
+        # A table made by an older gaik has no chunk_key; its rows keep NULL,
+        # which the unique index allows any number of. ALTER TABLE locks the table
+        # against readers even when the column exists, so it runs only when the
+        # column is missing.
+        if not self._has_chunk_key_column(conn):
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS chunk_key TEXT")
+
         # 3. Indexes
+        conn.execute(f"""
+            CREATE UNIQUE INDEX IF NOT EXISTS {table}_chunk_key_idx
+            ON {table} (chunk_key)
+        """)
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS {table}_embedding_hnsw_idx
             ON {table} USING hnsw (embedding {self.vector_type}_cosine_ops)
@@ -512,6 +536,7 @@ class PgVectorStore:
         self._create_hybrid_weighted_function(conn)
 
         conn.commit()
+        self._has_chunk_key = True
         logger.info("PgVectorStore setup complete for table '%s'", table)
 
     def _create_match_function(self, conn: psycopg.Connection) -> None:
@@ -815,17 +840,43 @@ class PgVectorStore:
         self,
         documents: list[Document],
         embeddings: list[list[float]],
+        *,
+        replace: bool = False,
     ) -> list[int]:
         """Insert documents with their embeddings.
 
         The ``title`` field is taken from ``Document.metadata["title"]`` if present.
 
+        Each row gets a ``chunk_key`` from its document, its owner and its
+        text: the document is ``metadata["document_id"]``, else ``source``, else
+        ``document_name``. A ``document_id`` the caller set is stored as given;
+        without one it is set to the document. The document is also stored as
+        a string under ``gaik_document_key``, which ``replace`` and
+        :meth:`delete_document` match on. The owner is the store's ``owner``.
+        Adding a chunk that is already stored updates its row instead of
+        inserting a second one. A chunk whose metadata names no document gets no
+        ``chunk_key`` and is inserted each time, as before. A table made by an older gaik gets the
+        ``chunk_key`` column from ``setup()``; until then rows are inserted as
+        before, one per call.
+
         Args:
-            documents: List of langchain Documents to store.
+            documents: List of langchain Documents to store. A ``document_id``
+                in the metadata must be a string or an int; other types raise
+                ``ValueError``.
             embeddings: Corresponding embedding vectors (same length as documents).
+            replace: First delete every stored row of each document in
+                ``documents``, in the same transaction, so chunks the document
+                no longer has do not stay behind. Only rows with the same owner
+                as the ones added (or, without one, rows that name no owner) are
+                deleted, and only rows this release stored (with
+                ``gaik_document_key``). Two calls replacing the same document
+                of the same owner wait for each other (a transaction-scoped
+                advisory lock). Pass all of a document's chunks in one call. If
+                the add fails, the transaction is rolled back and the old rows
+                stay.
 
         Returns:
-            List of inserted row IDs.
+            List of row IDs, inserted or updated.
 
         Raises:
             ValueError: If documents and embeddings have different lengths.
@@ -837,52 +888,102 @@ class PgVectorStore:
             return []
         if self.owner is None:
             refuse_foreign_owner(documents)
+        else:
+            # The owner is stamped before the chunk keys are made: it is part of
+            # them, so two owners' identical chunks keep separate rows.
+            documents = [
+                Document(
+                    page_content=doc.page_content,
+                    metadata={**(doc.metadata or {}), OWNER_KEY: self.owner},
+                )
+                for doc in documents
+            ]
 
         conn = self._get_conn()
+        has_chunk_key = self._chunk_key_column(conn)
+        keyed = chunk_ids(documents)
+        metadatas = [
+            with_document_id(doc.metadata, key.document_id) for doc, key in zip(documents, keyed)
+        ]
         ids: list[int] = []
 
         with conn.cursor() as cur:
-            for doc, emb in zip(documents, embeddings):
-                title = doc.metadata.get("title", "") if doc.metadata else ""
-                metadata = dict(doc.metadata or {})
-                if self.owner is not None:
-                    metadata[OWNER_KEY] = self.owner
+            if replace:
+                scopes = document_scopes(keyed)
+                # Two calls replacing the same document wait for each other, so
+                # one does not delete while the other inserts and leave a mix of
+                # both versions. Locks are taken in a fixed order (no deadlock)
+                # and released at commit or rollback.
+                for lock in sorted({self._document_lock_key(*scope) for scope in scopes}):
+                    cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock,))
+                for doc_id, owner in scopes:
+                    cur.execute(*self._delete_document_sql(doc_id, owner))
+            for doc, emb, metadata, key in zip(documents, embeddings, metadatas, keyed):
+                chunk_key = key.chunk_id
+                title = metadata.get("title", "")
                 vec_str = _format_vector(emb)
-
+                columns = ["title", "content", "metadata", "embedding"]
+                values = ["%s", "%s", "%s::jsonb", f"%s::{self._vec}"]
+                params: list[Any] = [title, doc.page_content, json.dumps(metadata), vec_str]
                 if self.text_processor is not None:
-                    lemmatized = self.text_processor.to_tsvector_text(doc.page_content)
-                    cur.execute(
-                        f"""
-                        INSERT INTO {self.table_name}
-                            (title, content, content_lemmatized, metadata, embedding)
-                        VALUES (
-                            %s, %s, %s, %s::jsonb, %s::{self._vec}
-                        )
-                        RETURNING id
-                        """,
-                        (
-                            title,
-                            doc.page_content,
-                            lemmatized,
-                            json.dumps(metadata),
-                            vec_str,
-                        ),
+                    columns.insert(2, "content_lemmatized")
+                    values.insert(2, "%s")
+                    params.insert(2, self.text_processor.to_tsvector_text(doc.page_content))
+                upsert = ""
+                if has_chunk_key:
+                    columns.append("chunk_key")
+                    values.append("%s")
+                    params.append(chunk_key)
+                    updates = ", ".join(
+                        f"{column} = EXCLUDED.{column}"
+                        for column in columns
+                        if column != "chunk_key"
                     )
-                else:
-                    cur.execute(
-                        f"""
-                        INSERT INTO {self.table_name} (title, content, metadata, embedding)
-                        VALUES (%s, %s, %s::jsonb, %s::{self._vec})
-                        RETURNING id
-                        """,
-                        (title, doc.page_content, json.dumps(metadata), vec_str),
-                    )
+                    upsert = f"ON CONFLICT (chunk_key) DO UPDATE SET {updates}"
+                cur.execute(
+                    f"""
+                    INSERT INTO {self.table_name} ({", ".join(columns)})
+                    VALUES ({", ".join(values)})
+                    {upsert}
+                    RETURNING id
+                    """,
+                    tuple(params),
+                )
                 row = cur.fetchone()
                 ids.append(row["id"])
 
         conn.commit()
-        logger.info("Inserted %d documents into '%s'", len(ids), self.table_name)
+        logger.info("Stored %d documents in '%s'", len(ids), self.table_name)
         return ids
+
+    def _chunk_key_column(self, conn: psycopg.Connection) -> bool:
+        """Whether the table has the ``chunk_key`` column ``setup()`` adds."""
+        # Only a found column is remembered: setup() may add it later.
+        if not self._has_chunk_key:
+            found = self._has_chunk_key_column(conn)
+            # Warn once: a None (not checked yet) becomes False only here.
+            warn = self._has_chunk_key is None and not found
+            self._has_chunk_key = found
+            if warn:
+                logger.warning(
+                    "Table '%s' has no chunk_key column: adding a document again "
+                    "inserts its chunks again. Run setup() to add the column.",
+                    self.table_name,
+                )
+        return self._has_chunk_key
+
+    def _has_chunk_key_column(self, conn: psycopg.Connection) -> bool:
+        """Whether the table has a ``chunk_key`` column now (read from ``pg_attribute``)."""
+        row = conn.execute(
+            """
+            SELECT 1 FROM pg_attribute
+            WHERE attrelid = to_regclass(%s)
+              AND attname = 'chunk_key'
+              AND NOT attisdropped
+            """,
+            (self.table_name,),
+        ).fetchone()
+        return bool(row)
 
     @_rolls_back_on_error
     def count(self) -> int:
@@ -919,6 +1020,61 @@ class PgVectorStore:
         )
         conn.commit()
         return result.rowcount
+
+    @_rolls_back_on_error
+    def delete_document(self, document_id: str, *, owner: str | None = None) -> int:
+        """Delete every row of one document and one owner.
+
+        ``add()`` records each row's document in its metadata under
+        ``gaik_document_key`` (the chunk's own ``document_id``, else its
+        ``source``, else its ``document_name``, as a string). Rows added by a
+        gaik release before that have none and are never deleted here, even
+        with a ``document_id`` in their metadata: index them again into a new
+        table.
+
+        Args:
+            document_id: The document, compared exactly with the metadata's
+                ``gaik_document_key``. A string, or an int compared as its
+                string; other types raise ``ValueError``.
+            owner: Delete only the rows recorded for this owner (metadata
+                ``gaik_owner``). Without it, only rows that name no owner are
+                deleted, so a call without an owner never removes an owner's
+                rows. A store with its own ``owner`` uses that one.
+
+        Returns:
+            Number of rows deleted.
+        """
+        doc_id, owner = delete_scope(self, document_id, owner)
+        conn = self._get_conn()
+        conn.execute("SELECT pg_advisory_xact_lock(%s)", (self._document_lock_key(doc_id, owner),))
+        result = conn.execute(*self._delete_document_sql(doc_id, owner))
+        conn.commit()
+        return result.rowcount
+
+    def _document_lock_key(self, document_id: str, owner: str | None) -> int:
+        """The advisory lock key (a signed bigint) for one document of one owner here."""
+        payload = json.dumps([self.table_name, document_id, owner], ensure_ascii=False)
+        digest = hashlib.sha256(payload.encode("utf-8")).digest()
+        return int.from_bytes(digest[:8], "big", signed=True)
+
+    def _delete_document_sql(self, document_id: str, owner: str | None) -> tuple[str, tuple]:
+        """The DELETE for one document's rows of exactly one owner (or none).
+
+        Rows match on ``gaik_document_key``, which only this release's ``add()``
+        writes, so rows an older gaik stored are never deleted here, even with a
+        ``document_id`` in their metadata. The containment test lets the
+        metadata index find the rows; the ``->>`` comparisons then match the
+        document and owner exactly.
+        """
+        if owner is None:
+            owner_clause, owner_params = f"metadata->>'{CHUNK_OWNER_KEY}' IS NULL", ()
+        else:
+            owner_clause, owner_params = f"metadata->>'{CHUNK_OWNER_KEY}' = %s", (owner,)
+        sql = (
+            f"DELETE FROM {self.table_name} WHERE metadata @> %s::jsonb"
+            f" AND metadata->>'{DOCUMENT_KEY}' = %s AND {owner_clause}"
+        )
+        return sql, (json.dumps({DOCUMENT_KEY: document_id}), document_id, *owner_params)
 
     # ------------------------------------------------------------------
     # Search methods

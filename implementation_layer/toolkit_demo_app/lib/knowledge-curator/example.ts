@@ -54,4 +54,4 @@ export const EXAMPLE_SECTIONS: SectionInput[] = [
 ];
 
 export const EXAMPLE_INSTRUCTIONS =
-  "Site notes are primary sources. Documents from the customer are secondary. When they disagree, prefer the primary source. Write the summaries in English.";
+  "Site notes are primary sources. Documents from the customer are secondary. Write the summaries in English.";
