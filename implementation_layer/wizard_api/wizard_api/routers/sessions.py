@@ -1545,6 +1545,8 @@ async def chat(
         turn_db.commit()
         return row
 
+    # The id as the database holds it, for the log lines below.
+    stored_id = session.id
     turn_cost: list[float] = []
     # Set when the turn stored its reply, which a usage notice is then added to.
     stored: list[bool] = []
@@ -1630,7 +1632,7 @@ async def chat(
                     notices = await asyncio.to_thread(record_usage, completed and bool(stored))
                 except Exception:  # noqa: BLE001 - the reply is whole; the cause is in the log
                     logger.error(
-                        "usage of session %s could not be recorded", session_id, exc_info=True
+                        "usage of session %s could not be recorded", stored_id, exc_info=True
                     )
                     notices = []
                 if notices:
@@ -1640,7 +1642,7 @@ async def chat(
                     try:
                         await asyncio.to_thread(_append_usage_notice, open_db, session_id, text)
                     except Exception:  # noqa: BLE001
-                        logger.warning("usage notice of session %s not stored", session_id)
+                        logger.warning("usage notice of session %s not stored", stored_id)
             finally:
                 # Whatever happens above, the turn is taken away: one left
                 # registered would refuse every later message.
