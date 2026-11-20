@@ -141,7 +141,9 @@ def test_owned_audio_client_is_closed_on_failure(tmp_path, monkeypatch, capsys, 
     monkeypatch.setattr(module.time, "sleep", lambda _: None)
     config = {"provider": "openai", "api_key": "test-key"}
     if chunked:
-        module.split_and_transcribe_with_context(str(audio), config, audio=_Audio())
+        with pytest.raises(RuntimeError) as raised:
+            module.split_and_transcribe_with_context(str(audio), config, audio=_Audio())
+        assert "do-not-log-this-key" not in str(raised.value)
         assert "do-not-log-this-key" not in capsys.readouterr().out
     else:
         transcriber = module.Transcriber(config, output_dir=tmp_path)

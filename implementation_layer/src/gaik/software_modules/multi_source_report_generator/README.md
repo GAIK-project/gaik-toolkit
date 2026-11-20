@@ -308,7 +308,7 @@ result = generator.run(
     agentic=False,
     review_options=None,
     polish=False,
-    strict_review=False,
+    strict_review=True,
     curate_evidence=False,
     verbose=False,
     progress_callback=None,
@@ -345,7 +345,7 @@ for section in result.sections:
 | `agentic` | `False` | If `False`, writes the whole report in one LLM call. If `True`, uses per-section agentic drafting and review. |
 | `review_options` | `None` | Optional separate LLM options for the agentic reviewer. If `None`, reviewer reuses the writer client/config. |
 | `polish` | `False` | Agentic only. Runs a final style/proofreading pass after mandatory review repair. |
-| `strict_review` | `False` | Agentic only. If unresolved reviewer edits remain, raise before final report outputs are written. |
+| `strict_review` | `True` | Agentic only. If unresolved reviewer edits remain, raise before final report outputs are written; `False` returns them as revision warnings. |
 | `curate_evidence` | `False` | Agentic only. Creates one section-specific evidence brief before drafting each section. |
 | `verbose` | `False` | Agentic only. Prints workflow progress events. |
 | `progress_callback` | `None` | Agentic only. Callable receiving progress strings. Overrides default printing behavior. |
@@ -470,9 +470,9 @@ The reviewer:
 - applies corrections locally with exact and fuzzy matching
 - retries failed corrections up to the configured retry limit
 
-Unresolved reviewer edits become `section.revision_warnings` by default.
+With `strict_review=False`, unresolved reviewer edits become `section.revision_warnings` and the report is written.
 
-With `strict_review=True`, unresolved reviewer edits raise before final report files such as `report.md` and `sections/` are written. Intermediate curation artifacts may already exist if `curate_evidence=True`.
+By default (`strict_review=True`), unresolved reviewer edits raise before final report files such as `report.md` and `sections/` are written. Intermediate curation artifacts may already exist if `curate_evidence=True`.
 
 ### Agentic Curation
 

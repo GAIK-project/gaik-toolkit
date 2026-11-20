@@ -659,3 +659,8 @@ def test_the_docs_name_a_release_after_0_11_1_for_source_precedence():
         assert "source_precedence" in text
         assert "newer than 0.11.0" not in text and "on 0.11.0 leave" not in text
         assert "a release after 0.11.1" in text
+
+
+def test_run_settings_review_strictly_by_default():
+    assert RunSettings().strict_review is True
+    assert RunSettings(strict_review=False).strict_review is False

@@ -67,9 +67,11 @@ def transcribe_audio(
         # The Transcriber's default working folder is one in the current directory.
         work = tempfile.mkdtemp(prefix="gaik-transcribe-", dir=settings.work_dir)
         try:
-            result = Transcriber(config, output_dir=work, language=language or "auto").transcribe(
-                file, custom_context=prompt
-            )
+            # allow_partial: a lost part is counted in failed_segments below
+            # rather than failing the whole recording.
+            result = Transcriber(
+                config, output_dir=work, language=language or "auto", allow_partial=True
+            ).transcribe(file, custom_context=prompt)
         finally:
             shutil.rmtree(work, ignore_errors=True)
 
@@ -78,7 +80,7 @@ def transcribe_audio(
     text = _PART_HEADER.sub("", _FAILED_PART.sub("", raw))
     text = re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]+\n", "\n", text)).strip()
     if failed:
-        # The Transcriber writes a line instead of raising when one part fails.
+        # With allow_partial the Transcriber writes a line instead of raising.
         logger.warning("Transcription lost %d part(s) of a recording", failed)
     if not text:
         if failed:

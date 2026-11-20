@@ -278,16 +278,32 @@ def test_agentic_strict_review_raises_before_writing(tmp_path, patch_llm):
     assert not (out / "report.md").exists()
 
 
-def test_agentic_warnings_returned_by_default(tmp_path, patch_llm):
+def test_agentic_warnings_returned_without_strict_review(tmp_path, patch_llm):
     patch_llm(_FakeClient(review_mode="fail"))
     (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
 
     result = _gen().run(
         input_paths=[tmp_path / "src.txt"],
         sections=[{"title": "A", "instructions": "a"}],
-        agentic=True,  # strict_review defaults to False
+        agentic=True,
+        strict_review=False,
     )
     assert result.sections[0].revision_warnings  # unresolved edit -> warning
+
+
+def test_agentic_review_is_strict_by_default(tmp_path, patch_llm):
+    patch_llm(_FakeClient(review_mode="fail"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+    out = tmp_path / "out"
+
+    with pytest.raises(RuntimeError, match="unresolved reviewer edits remain"):
+        _gen().run(
+            input_paths=[tmp_path / "src.txt"],
+            sections=[{"title": "A", "instructions": "a"}],
+            output_dir=out,
+            agentic=True,
+        )
+    assert not (out / "report.md").exists()
 
 
 def test_agentic_polish_runs_after_review_and_adds_no_content(tmp_path, patch_llm):
@@ -578,3 +594,62 @@ def test_without_langgraph_the_agentic_run_says_how_to_install_it(tmp_path, patc
             output_dir=tmp_path / "out",
             agentic=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# diff_editor_run: failed edits keep their ids across retries
+# ---------------------------------------------------------------------------
+
+
+class _ScriptedEditor:
+    """Returns scripted CorrectionLists in order and records each request's text prompt."""
+
+    def __init__(self, *answers: CorrectionList):
+        self.answers = list(answers)
+        self.prompts: list[str] = []
+
+    def chat_parsed(self, messages, response_format, **kwargs):
+        assert response_format is CorrectionList
+        self.prompts.append(messages[-1]["content"])
+        return self.answers.pop(0)
+
+
+TEXT = "The bridge opened in 1999. It was painted blue and white near the centre."
+MISSING_YEAR = Correction(search="opened in 1990 exactly", replace="opened in 1998", reason="r")
+MISSING_PAINT = Correction(search="painted red and black", replace="painted grey", reason="p")
+
+
+def _run(editor: _ScriptedEditor):
+    from gaik.software_modules.multi_source_report_generator.agentic.reviewer import (
+        diff_editor_run,
+    )
+
+    return diff_editor_run(text=TEXT, instruction="Check.", client=editor, chat_kwargs={})
+
+
+def test_diff_editor_keeps_a_failed_edit_the_retry_leaves_out():
+    year = Correction(search="1999", replace="1998", reason="other words", answers="F1")
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR, MISSING_PAINT]),
+        CorrectionList(corrections=[year]),
+        CorrectionList(corrections=[]),
+    )
+    text, applied, warnings, _ = _run(editor)
+    assert "opened in 1998" in text
+    assert [a["replace"] for a in applied] == ["1998"]
+    assert len(warnings) == 1 and "painted red" in warnings[0]
+    assert "id: F1" in editor.prompts[1] and "id: F2" in editor.prompts[1]
+    assert "id: F2" in editor.prompts[2] and "id: F1" not in editor.prompts[2]
+
+
+def test_diff_editor_retry_naming_the_id_resolves_it_whatever_its_wording():
+    year = Correction(search="1999", replace="1998", reason="The source says so.", answers="F1")
+    centre = Correction(search="centre", replace="center", reason="Spelling.", answers="")
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR]),
+        CorrectionList(corrections=[year, centre]),
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace("1999", "1998").replace("centre", "center")
+    assert warnings == []
+    assert len(editor.prompts) == 2

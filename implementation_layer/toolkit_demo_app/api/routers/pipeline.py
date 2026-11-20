@@ -23,6 +23,7 @@ try:
         on_aitta,
         require_vision,
         load_schema,
+        safe_schema_key,
         save_schema,
         sse_event,
         validate_audio_file_size,
@@ -54,6 +55,7 @@ except ImportError:
         on_aitta,
         require_vision,
         load_schema,
+        safe_schema_key,
         save_schema,
         sse_event,
         validate_audio_file_size,
@@ -210,7 +212,7 @@ def _get_or_create_schema(
     if schema_key:
         loaded = load_schema(schema_key, user_requirements)
         if loaded is not None and not regenerate_schema:
-            logger.info("Loaded existing schema for key %s", schema_key)
+            logger.info("Loaded existing schema for key %s", safe_schema_key(schema_key))
             schema, requirements = loaded
             return schema, requirements, False
 
@@ -220,7 +222,7 @@ def _get_or_create_schema(
 
     if schema_key and loaded is None and not regenerate_schema:
         save_schema(schema, requirements, schema_key, user_requirements)
-        logger.info("Saved schema for key %s", schema_key)
+        logger.info("Saved schema for key %s", safe_schema_key(schema_key))
 
     return wrap_schema_with_numeric_normalizers(schema), requirements, True
 
