@@ -81,7 +81,15 @@ schema = generator.generate_schema(user_requirements: str)
 generator.extraction_model      # Generated Pydantic model
 generator.item_requirements     # Field specifications
 generator.structure_analysis    # Structure type analysis
+
+# Regenerate over an approved schema and see what changed before saving it
+result = generator.generate_schema_with_usage(
+    user_requirements, approved_requirements=approved, approved_structure="flat"
+)
+print(result.diff)              # SchemaDiff; also compare_requirements(approved, new)
 ```
+
+See the [schema generator README](../schema_generator/README.md#review-a-new-schema-against-the-approved-one).
 
 ### DataExtractor
 
@@ -194,6 +202,12 @@ extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
 Do not combine an active reasoning effort (`low`, `medium`, or `high`) with
 a custom temperature. Supported reasoning-effort values are model-specific;
 check the selected model's OpenAI documentation.
+
+With its defaults (`temperature=0.0`, no `reasoning_effort`), `SchemaGenerator`
+sends GPT-6 Sol/Luna and GPT-5.6 `reasoning_effort="none"` in its requirements
+parses, so their temperature applies; with reasoning and free sampling these
+models sometimes kept only the first field of a task. Its structure detection and
+`DataExtractor` send no effort unless you set one.
 
 ---
 

@@ -17,12 +17,14 @@ Main Interface:
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 import time
 import types
 from collections.abc import Callable
 from dataclasses import dataclass
+from dataclasses import field as _dc_field
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Union, get_args, get_origin
@@ -52,7 +54,7 @@ from gaik.observability import (
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
-from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.llm.parameters import _accepts_effort_none, normalize_chat_kwargs
 
 # -----------------------------------------------------------------------------
 # Setup
@@ -206,6 +208,49 @@ def _parse_with(
             **sampling,
         )
     )
+
+
+def _schema_effort(
+    *,
+    client,
+    model: str,
+    config: dict | None,
+    temperature: float | None,
+    reasoning_effort: str | None,
+) -> str | None:
+    """The reasoning effort a requirements parse sends.
+
+    GPT-6 and GPT-5.6 reason unless told not to, and while they reason the
+    compatibility layer drops ``temperature``. Reasoning with free sampling made the
+    requirements parse keep only the first field of a task, or of a child list, in
+    some calls, with no error (issue #94). So when the caller asks for a temperature
+    and sets no effort, in the call or in the config, a model known to accept
+    ``"none"`` (GPT-6 Sol/Luna, GPT-5.6 Sol/Luna/Terra) gets ``"none"`` and the
+    temperature (``0`` by default) applies. An effort the caller sets is sent as
+    given, and ``temperature=None`` leaves the model's own default. Other models,
+    including GPT-6 Astra, gpt-6-rosalind and gpt-6.x, which reject ``"none"``, get
+    no effort, as before. Structure detection does not use this; see
+    :func:`detect_structure_type`.
+    """
+    if reasoning_effort is not None or temperature is None:
+        return reasoning_effort
+    if isinstance(client, ProviderClient):
+        # An adapter builds the request from its own config, which may set the
+        # effort or the family of a deployment alias; decide on that config.
+        adapter_config = getattr(client, "_config", None)
+        settings = adapter_config if isinstance(adapter_config, dict) else config or {}
+        provider = client.provider
+    else:
+        settings = config or {}
+        provider = settings.get("provider")
+    if settings.get("reasoning_effort") is not None:
+        return None
+    accepted = _accepts_effort_none(model, settings)
+    if provider == "litellm":
+        # LiteLLM also checks "none" against the routed name and refuses an alias
+        # such as azure/gpt-6-luna-prod before the request: both must accept it.
+        accepted = accepted and _accepts_effort_none(model)
+    return "none" if accepted else None
 
 
 # -----------------------------------------------------------------------------
@@ -478,7 +523,8 @@ def detect_structure_type(
 
     ``temperature`` / ``reasoning_effort`` are passed straight to
     :func:`_parse_with`; see it for how the two interact on reasoning
-    deployments.
+    deployments. Unlike the requirements parses, this call gets no ``"none"`` by
+    default: without reasoning, GPT-6 Luna often ignored a list name the task gave.
 
     When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
     LLM call is appended to it. This is an internal hook used by
@@ -504,6 +550,9 @@ def detect_structure_type(
         ],
         response_format=StructureAnalysis,
         temperature=temperature,
+        # Not _schema_effort: at effort "none", gpt-6-luna named a list the task
+        # calls inventory_items "records" in 4 of 5 runs. Only the requirements
+        # parses dropped fields (#94).
         reasoning_effort=reasoning_effort,
         config=config,
     )
@@ -1064,9 +1113,10 @@ def parse_user_requirements(
     Parse extraction requirements from natural language using LLM with type detection rules.
     Works with any input format - numbered lists, bullets, prose, tables, etc.
 
-    ``temperature`` / ``reasoning_effort`` are passed straight to
-    :func:`_parse_with`; see it for how the two interact on reasoning
-    deployments.
+    ``temperature`` / ``reasoning_effort`` are passed to :func:`_parse_with`; see
+    it for how the two interact on reasoning deployments. Without an effort, a
+    model that accepts ``"none"`` gets it, so the temperature applies
+    (:func:`_schema_effort`).
 
     When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
     LLM call is appended to it. Internal hook for :class:`SchemaGenerator`;
@@ -1091,7 +1141,13 @@ def parse_user_requirements(
         ],
         response_format=ExtractionRequirements,
         temperature=temperature,
-        reasoning_effort=reasoning_effort,
+        reasoning_effort=_schema_effort(
+            client=client,
+            model=model,
+            config=config,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
+        ),
         config=config,
     )
     req = resp.choices[0].message.parsed
@@ -1560,18 +1616,32 @@ def sanitize_model_name(name: str, suffix: str = "") -> str:
 # through a 64-bit float and silently truncate past ~17 significant digits).
 # _clean_decimal_string then strips common currency/unit noise before Decimal
 # parsing runs, so a model's "12.40 EUR" still resolves to Decimal('12.40')
-# instead of crashing.
+# instead of crashing. It also reads the decimal comma, because a model copies
+# an amount as the document writes it: "150,00" on a Finnish invoice.
 # -----------------------------------------------------------------------------
 
 DECIMAL_JSON_SCHEMA = {"type": "string"}
 DECIMAL_JSON_SCHEMA_OR_NULL = {"anyOf": [{"type": "string"}, {"type": "null"}]}
 
 _CURRENCY_NOISE_RE = re.compile(r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]")
-# Exactly one signed amount: comma is accepted only as a thousands separator
-# in groups of exactly 3 digits, dot only as the decimal separator. European
-# comma-decimal formatting ("1.234,56") and multi-number/ambiguous strings
-# are deliberately NOT interpreted -- see _clean_decimal_string's docstring.
+# A currency marker between digits ("2€ 550,00") separates two amounts;
+# stripping it would join them into one ("2 550,00").
+_CURRENCY_BETWEEN_DIGITS_RE = re.compile(
+    r"(?i)\d\s*(?:\b(?:EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹])\s*\d"
+)
+# Exactly one signed amount in one of two notations. Dot decimal: comma only
+# as a thousands separator in groups of exactly 3 digits ("1,234.56").
+# Comma decimal: one comma before a required fraction, thousands optionally
+# grouped in 3s by one kind of separator -- space, no-break space, narrow
+# no-break space or dot ("18,90", "1 234,56", "1.234,56"). The dot notation is
+# tried first, so "1,234" keeps its reading 1234. Multi-number and malformed
+# strings are not interpreted -- see _clean_decimal_string's docstring.
 _SINGLE_AMOUNT_RE = re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
+_COMMA_DECIMAL_RE = re.compile(
+    r"^(?P<sign>[-+]?)(?P<int>\d{1,3}(?P<sep>[ \u00a0\u202f.])\d{3}(?:(?P=sep)\d{3})*|\d+)"
+    r",(?P<frac>\d+)$"
+)
+_GROUP_SEPARATORS_RE = re.compile(r"[ \u00a0\u202f.]")
 
 
 def _clean_decimal_string(v):
@@ -1581,13 +1651,19 @@ def _clean_decimal_string(v):
     number parsing:
 
     - Known currency codes/symbols (EUR, USD, "$", "€", etc.) and surrounding
-      whitespace are stripped.
-    - What remains must be exactly one well-formed amount: an optional sign,
-      digits optionally grouped in thousands of exactly 3 via ``,``, and an
-      optional ``.``-delimited fractional part. Anything else -- multiple
-      embedded numbers ("abc1def2"), space-grouped or comma-decimal
-      formatting ("1 234,56"), malformed grouping ("1,23.56"), or leftover
-      non-numeric text -- is rejected outright rather than guessed at.
+      whitespace are stripped. A currency marker between digits ("2€ 550,00")
+      separates two amounts, so that input is rejected instead.
+    - What remains must be exactly one well-formed amount, in one of two
+      notations. Dot decimal: an optional sign, digits optionally grouped in
+      thousands of exactly 3 via ``,``, and an optional ``.``-delimited
+      fractional part ("1,234.56"). Comma decimal: an optional sign, digits
+      optionally grouped in thousands of exactly 3 by one kind of separator
+      (space, no-break space, narrow no-break space or ``.``), a ``,`` and a
+      fractional part ("150,00", "1 234,56", "1.234,56"). The dot notation
+      is tried first, so "1,234" reads as 1234, as before. Anything else --
+      multiple embedded numbers ("abc1def2"), malformed grouping ("1,23.56",
+      "1 23,45"), mixed separators ("1 234.567,89"), or leftover non-numeric
+      text -- is rejected outright rather than guessed at.
     - Rejected or blank input resolves to ``None``, matching the fallback
       already used elsewhere for blank/unparseable numeric values -- not a
       crash, and not a fabricated number from a partial match.
@@ -1600,12 +1676,17 @@ def _clean_decimal_string(v):
     s = v.strip()
     if not s:
         return None
+    if _CURRENCY_BETWEEN_DIGITS_RE.search(s):
+        return None
     s = _CURRENCY_NOISE_RE.sub("", s).strip()
     if not s:
         return None
-    if not _SINGLE_AMOUNT_RE.match(s):
-        return None
-    return s.replace(",", "")
+    if _SINGLE_AMOUNT_RE.match(s):
+        return s.replace(",", "")
+    m = _COMMA_DECIMAL_RE.match(s)
+    if m:
+        return f"{m['sign']}{_GROUP_SEPARATORS_RE.sub('', m['int'])}.{m['frac']}"
+    return None
 
 
 DecimalField = Annotated[
@@ -1664,12 +1745,21 @@ from pydantic import BeforeValidator, WithJsonSchema
 _CURRENCY_NOISE_RE = _re.compile(
     r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]"
 )
+_CURRENCY_BETWEEN_DIGITS_RE = _re.compile(
+    r"(?i)\d\s*(?:\b(?:EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹])\s*\d"
+)
 _SINGLE_AMOUNT_RE = _re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
+_COMMA_DECIMAL_RE = _re.compile(
+    r"^(?P<sign>[-+]?)(?P<int>\d{1,3}(?P<sep>[ \u00a0\u202f.])\d{3}(?:(?P=sep)\d{3})*|\d+)"
+    r",(?P<frac>\d+)$"
+)
+_GROUP_SEPARATORS_RE = _re.compile(r"[ \u00a0\u202f.]")
 
 
 def _clean_decimal_string(v):
-    """Strip currency/unit noise before Decimal parsing; reject (return None)
-    ambiguous or multi-number input rather than fabricating a value. See
+    """Strip currency/unit noise before Decimal parsing and read a dot or
+    comma decimal; reject (return None) ambiguous or multi-number input
+    rather than fabricating a value. See
     gaik.software_components.extractor.schema._clean_decimal_string for the
     full policy this mirrors."""
     if not isinstance(v, str):
@@ -1677,12 +1767,17 @@ def _clean_decimal_string(v):
     s = v.strip()
     if not s:
         return None
+    if _CURRENCY_BETWEEN_DIGITS_RE.search(s):
+        return None
     s = _CURRENCY_NOISE_RE.sub("", s).strip()
     if not s:
         return None
-    if not _SINGLE_AMOUNT_RE.match(s):
-        return None
-    return s.replace(",", "")
+    if _SINGLE_AMOUNT_RE.match(s):
+        return s.replace(",", "")
+    m = _COMMA_DECIMAL_RE.match(s)
+    if m:
+        return f"{m['sign']}{_GROUP_SEPARATORS_RE.sub('', m['int'])}.{m['frac']}"
+    return None
 
 
 DecimalField = Annotated[
@@ -2242,6 +2337,317 @@ def normalize_composite_extracted_data(
 # -----------------------------------------------------------------------------
 
 
+# Compared per field. ``default`` is compared as the default the model actually gets
+# (see :func:`_normalize_explicit_default`), so a switched-off explicit default counts
+# and ``""`` versus ``None`` without one does not; descriptions are reported apart.
+_COMPARED_ATTRIBUTES = (
+    "field_type",
+    "required_in_output",
+    "nullable",
+    "enum",
+    "pattern",
+    "format",
+    "default",
+)
+
+_Requirements = Union["ExtractionRequirements", "CompositeExtractionRequirements"]
+
+
+@dataclass
+class FieldChange:
+    """One field (or container) present in both schemas whose specification differs."""
+
+    field_name: str
+    """The field, prefixed with its child collection in a nested schema (``items.sku``);
+    a container itself is named with a trailing ``[]`` (``items[]``), the schema as a
+    whole as ``(schema)``."""
+    changes: dict[str, tuple[object, object]]
+    """Attribute name -> ``(approved value, new value)``."""
+
+
+@dataclass
+class SchemaDiff:
+    """How a newly generated schema differs from the one a person approved.
+
+    The requirement text steers which fields a generated schema gets, so a field can
+    drop out or change between two runs. Show this diff to a person before the new
+    schema replaces the approved one.
+
+    ``is_empty`` is true only when nothing differs and nothing is unknown: no field or
+    container added, removed or changed, no structure change, no reworded description
+    (a description is part of what the extraction model reads, so "net" becoming
+    "gross" changes the result) and no note that the structure could not be compared.
+    ``changes_output`` is the narrower test: a field, container or structure change.
+    Reworded descriptions are listed apart in ``wording``, with both texts.
+    """
+
+    added: list[str]
+    removed: list[str]
+    changed: list[FieldChange]
+    structure: tuple[str, str] | None = None
+    """``(approved, new)`` structure (``flat``, ``nested_list in records``, ...) when it
+    changed; ``None`` when it is the same or the approved one was not given."""
+    wording: list[FieldChange] = _dc_field(default_factory=list)
+    notes: list[str] = _dc_field(default_factory=list)
+
+    @property
+    def changes_output(self) -> bool:
+        return bool(self.added or self.removed or self.changed or self.structure)
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.changes_output or self.wording or self.notes)
+
+    def __str__(self) -> str:
+        lines = []
+        if self.structure:
+            lines.append(f"! structure: {_shown(self.structure[0])} -> {_shown(self.structure[1])}")
+        lines += [f"+ {_shown(name)}" for name in self.added]
+        lines += [f"- {_shown(name)}" for name in self.removed]
+        for change in self.changed:
+            parts = ", ".join(
+                f"{attr}: {_shown(old)} -> {_shown(new)}"
+                for attr, (old, new) in change.changes.items()
+            )
+            lines.append(f"~ {_shown(change.field_name)} ({parts})")
+        for c in self.wording:
+            old, new = c.changes["description"]
+            lines.append(f"~ {_shown(c.field_name)} (description: {_shown(old)} -> {_shown(new)})")
+        if not lines:
+            lines.append(
+                "No changes to the approved schema."
+                if not self.notes
+                else "No field changes found, but the comparison is incomplete:"
+            )
+        lines += [f"  note: {n}" for n in self.notes]
+        return "\n".join(lines)
+
+
+_SHOWN_MAX = 200
+
+
+def _shown(value) -> str:
+    """``value`` for a person to read: quoted, control characters escaped, cut to 200.
+
+    Names and values can come from a saved or edited dict, so a newline or a terminal
+    code in them must not make up a line of the diff, and a huge value must not push
+    the other lines out of view.
+    """
+    text = repr(value)
+    return text if len(text) <= _SHOWN_MAX else text[: _SHOWN_MAX - 1] + "…"
+
+
+def _coerce_requirements(value, what: str):
+    """``value`` as requirements; a saved ``requirements`` dict is read as one.
+
+    The dict is copied first: validation would otherwise write into the caller's dict.
+    """
+    if isinstance(value, (ExtractionRequirements, CompositeExtractionRequirements)):
+        return value
+    if isinstance(value, dict):
+        value = copy.deepcopy(value)
+        if value.get("structure_type") == "parent_with_nested_list":
+            return CompositeExtractionRequirements.model_validate(value)
+        return ExtractionRequirements.model_validate(value)
+    raise TypeError(
+        f"{what} must be ExtractionRequirements, CompositeExtractionRequirements or their "
+        f"model_dump() dict, not {type(value).__name__}"
+    )
+
+
+_STRUCTURE_KINDS = ("flat", "nested_list", "parent_with_nested_list")
+
+
+def _coerce_structure(value, what: str = "structure") -> StructureAnalysis | str | None:
+    """``value`` as a structure: a :class:`StructureAnalysis`, its saved
+    ``model_dump()`` dict (read as one), or one of the structure kinds.
+
+    Raises ``ValueError`` for anything else, so a caller can check it before any
+    model call.
+    """
+    if value is None or isinstance(value, StructureAnalysis):
+        return value
+    if isinstance(value, dict):
+        try:
+            return StructureAnalysis.model_validate(copy.deepcopy(value))
+        except ValidationError as error:
+            raise ValueError(
+                f"{what} is not a saved StructureAnalysis: {error.error_count()} "
+                "field(s) missing or invalid"
+            ) from None
+    if isinstance(value, str) and value in _STRUCTURE_KINDS:
+        return value
+    shown = _shown(value) if isinstance(value, str) else type(value).__name__
+    raise ValueError(
+        f"{what} must be a StructureAnalysis, its model_dump() dict or one of "
+        f"{_STRUCTURE_KINDS}, not {shown}"
+    )
+
+
+def _structure_key(structure, requirements) -> tuple[str, str | None] | None:
+    """``(kind, container)`` of the output's shape, or None when it cannot be told.
+
+    The requirements decide where they can: parent-with-children requirements are that
+    shape, and plain requirements are never it, whatever an analysis says (a failed
+    parent-with-children parse falls back to flat ones). A string names only the kind.
+    ``structure`` has been through :func:`_coerce_structure`.
+    """
+    if isinstance(requirements, CompositeExtractionRequirements):
+        return ("parent_with_nested_list", None)
+    if structure is None:
+        return None
+    if isinstance(structure, StructureAnalysis):
+        kind, container = structure.structure_type, structure.parent_container_name
+    else:
+        kind, container = structure, None
+    if kind == "parent_with_nested_list":
+        kind = "flat"
+    if kind != "nested_list":
+        container = None
+    return kind, _sanitize_field_name(container) if container else None
+
+
+def _same_structure(a: tuple[str, str | None], b: tuple[str, str | None]) -> bool:
+    """Same kind, and the same container where both name one (a container named on
+    one side only gets a note in the diff instead)."""
+    return a[0] == b[0] and (a[1] is None or b[1] is None or a[1] == b[1])
+
+
+def _label(key: tuple[str, str | None]) -> str:
+    return f"{key[0]} in {key[1]}" if key[1] else key[0]
+
+
+def _fields_by_name(requirements) -> dict[str, FieldSpec]:
+    if isinstance(requirements, CompositeExtractionRequirements):
+        found = {f.field_name: f for f in requirements.parent_requirements.fields}
+        for child in requirements.children:
+            for f in child.requirements.fields:
+                found[f"{child.container_name}.{f.field_name}"] = f
+        return found
+    return {f.field_name: f for f in requirements.fields}
+
+
+def _containers(requirements) -> dict[str, str]:
+    if isinstance(requirements, CompositeExtractionRequirements):
+        return {f"{c.container_name}[]": c.container_description for c in requirements.children}
+    return {}
+
+
+def _effective(f: FieldSpec, attr: str):
+    if attr == "default":
+        honoured, value = _normalize_explicit_default(f)
+        return value if honoured else None
+    if attr == "enum" and f.enum is not None:
+        return sorted(f.enum)
+    return getattr(f, attr)
+
+
+def compare_requirements(
+    approved: _Requirements | dict,
+    new: _Requirements | dict,
+    *,
+    approved_structure: StructureAnalysis | str | None = None,
+    new_structure: StructureAnalysis | str | None = None,
+) -> SchemaDiff:
+    """The fields ``new`` adds, removes or changes compared with ``approved``.
+
+    Fields are matched by name (``container.field`` inside a parent-with-children
+    schema). A field whose type, output policy, allowed values, pattern, format or
+    effective default differs is listed in ``changed`` with each change; a field whose
+    description alone differs goes to ``wording``. A child container added or removed
+    is listed as ``name[]``, and a changed container description in ``changed``.
+
+    A flat schema and a nested-list one hold the same fields; only the structure tells
+    them apart. Pass ``approved_structure`` and ``new_structure`` (a
+    :class:`StructureAnalysis` or its ``model_dump()`` dict, or ``"flat"`` /
+    ``"nested_list"``) to compare it; a parent-with-children schema is recognised from
+    its requirements. A nested-list schema's list container (its name and description)
+    is compared only when both structures are a :class:`StructureAnalysis` or its
+    dict; a bare ``"nested_list"`` on either side adds a note instead. ``approved`` and
+    ``new`` may also be the ``model_dump()`` dicts of saved requirements.
+    """
+    approved = _coerce_requirements(approved, "approved")
+    new = _coerce_requirements(new, "new")
+    old_fields, new_fields = _fields_by_name(approved), _fields_by_name(new)
+    old_boxes, new_boxes = _containers(approved), _containers(new)
+    changed, wording = [], []
+    for name in old_fields.keys() & new_fields.keys():
+        old, cur = old_fields[name], new_fields[name]
+        diffs = {
+            attr: (_effective(old, attr), _effective(cur, attr))
+            for attr in _COMPARED_ATTRIBUTES
+            if _effective(old, attr) != _effective(cur, attr)
+        }
+        if diffs:
+            changed.append(FieldChange(field_name=name, changes=diffs))
+        if old.description != cur.description:
+            wording.append(
+                FieldChange(
+                    field_name=name, changes={"description": (old.description, cur.description)}
+                )
+            )
+    for box in old_boxes.keys() & new_boxes.keys():
+        if old_boxes[box] != new_boxes[box]:
+            changed.append(
+                FieldChange(
+                    field_name=box,
+                    changes={"container_description": (old_boxes[box], new_boxes[box])},
+                )
+            )
+    approved_structure = _coerce_structure(approved_structure, "approved_structure")
+    new_structure = _coerce_structure(new_structure, "new_structure")
+    old_key = _structure_key(approved_structure, approved)
+    new_key = _structure_key(new_structure, new)
+    notes = []
+    if old_key is None or new_key is None:
+        notes.append(
+            "the structure of one schema is not known, so a flat versus nested-list "
+            "change cannot be seen; pass approved_structure and new_structure"
+        )
+    elif old_key[0] == new_key[0] == "nested_list" and (old_key[1] is None or new_key[1] is None):
+        notes.append(
+            "the list container of one nested-list schema is not known, so a renamed "
+            "container cannot be seen; pass its StructureAnalysis (or the model_dump() "
+            'dict) instead of "nested_list"'
+        )
+    elif (
+        old_key == new_key
+        and old_key[0] == "nested_list"
+        and isinstance(approved_structure, StructureAnalysis)
+        and isinstance(new_structure, StructureAnalysis)
+        and approved_structure.parent_description != new_structure.parent_description
+    ):
+        # The extraction model reads the list container's description too.
+        changed.append(
+            FieldChange(
+                field_name=f"{old_key[1]}[]",
+                changes={
+                    "container_description": (
+                        approved_structure.parent_description,
+                        new_structure.parent_description,
+                    )
+                },
+            )
+        )
+    structure = (
+        (_label(old_key), _label(new_key))
+        if old_key and new_key and not _same_structure(old_key, new_key)
+        else None
+    )
+    return SchemaDiff(
+        added=sorted(
+            (new_fields.keys() - old_fields.keys()) | (new_boxes.keys() - old_boxes.keys())
+        ),
+        removed=sorted(
+            (old_fields.keys() - new_fields.keys()) | (old_boxes.keys() - new_boxes.keys())
+        ),
+        changed=sorted(changed, key=lambda c: c.field_name),
+        structure=structure,
+        wording=sorted(wording, key=lambda c: c.field_name),
+        notes=notes,
+    )
+
+
 @dataclass
 class SchemaGenerationResult:
     """Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`.
@@ -2259,6 +2665,8 @@ class SchemaGenerationResult:
             ``None`` when none of the responses carried a usage payload.
         duration_s: Wall-clock seconds the schema generation took.
         model: Resolved model identifier the calls used.
+        diff: With ``approved_requirements``, how the new schema differs from the
+            approved one; ``None`` without it.
     """
 
     schema: type[BaseModel]
@@ -2267,6 +2675,7 @@ class SchemaGenerationResult:
     usage: UsageRecord | None
     duration_s: float
     model: str
+    diff: SchemaDiff | None = None
 
 
 class SchemaGenerator:
@@ -2321,13 +2730,17 @@ class SchemaGenerator:
             temperature: Sampling temperature for every schema-generation call.
                 Defaults to ``0.0`` so the same requirements yield the same
                 schema. ``None`` omits the parameter from the request.
-            reasoning_effort: Reasoning effort for a gpt-5.x reasoning
-                deployment; not sent by default, since the non-reasoning models
-                reject it. The two settings are coupled — a reasoning
-                deployment accepts an explicit temperature only at effort
-                ``"none"``, so run it either as ``reasoning_effort="none"``
-                (determinism kept) or as an active effort with
-                ``temperature=None``. See :func:`_parse_with`.
+            reasoning_effort: Reasoning effort for a reasoning deployment. The
+                two settings are coupled: GPT-6 and GPT-5.6 accept a
+                temperature only at effort ``"none"``. When this is ``None``
+                (the default), ``config`` sets no effort and a temperature is
+                set, the requirements parses send GPT-6 Sol/Luna and GPT-5.6
+                Sol/Luna/Terra (by name or ``model_family``) ``"none"`` so the
+                temperature applies; reasoning with free sampling sometimes
+                dropped all but the first field. Structure detection and other
+                models get no effort, since the non-reasoning models reject it.
+                Pass an active effort, with ``temperature=None``, to make every
+                call reason. See :func:`_schema_effort`.
         """
         self.config = config
         self.model = model if model else self.config["model"]
@@ -2434,14 +2847,44 @@ class SchemaGenerator:
 
         return self.extraction_model
 
-    def generate_schema_with_usage(self, user_requirements: str) -> SchemaGenerationResult:
+    def generate_schema_with_usage(
+        self,
+        user_requirements: str,
+        *,
+        approved_requirements: ExtractionRequirements
+        | CompositeExtractionRequirements
+        | dict
+        | None = None,
+        approved_structure: StructureAnalysis | str | None = None,
+    ) -> SchemaGenerationResult:
         """
         Generate schema and report token usage + latency + cost.
 
         Same input as :meth:`generate_schema`; returns a
         :class:`SchemaGenerationResult` aggregating usage across the
         underlying LLM calls (structure detection + requirement parsing).
+
+        Args:
+            user_requirements: Natural language description of fields to extract.
+            approved_requirements: The requirements of the schema a person approved,
+                e.g. from a saved schema. The result's ``diff`` then lists the fields
+                the new schema adds, removes or changes, for a person to review
+                before the new schema replaces the approved one. A saved
+                ``requirements`` dict is accepted; anything else raises
+                ``TypeError`` before any model call.
+            approved_structure: The approved schema's structure (its
+                :class:`StructureAnalysis` or its saved ``model_dump()`` dict, or
+                ``"flat"`` / ``"nested_list"``), so a change between a flat and a
+                nested-list schema shows in ``diff``; with the analysis or its dict, a
+                renamed or reworded list container shows too. Anything else raises
+                ``ValueError`` before any model call.
         """
+        if approved_requirements is not None:
+            approved_requirements = _coerce_requirements(
+                approved_requirements, "approved_requirements"
+            )
+        # Checked before any model call, so a wrong value loses no paid generation.
+        approved_structure = _coerce_structure(approved_structure, "approved_structure")
         print("Generating schema from requirements...")
         schema, usage, duration_s = self._generate_schema_inner(user_requirements)
 
@@ -2457,6 +2900,16 @@ class SchemaGenerator:
             usage=usage,
             duration_s=duration_s,
             model=self.model,
+            diff=(
+                compare_requirements(
+                    approved_requirements,
+                    self.item_requirements,
+                    approved_structure=approved_structure,
+                    new_structure=self.structure_analysis,
+                )
+                if approved_requirements is not None
+                else None
+            ),
         )
 
     def get_schema_info(self) -> dict:

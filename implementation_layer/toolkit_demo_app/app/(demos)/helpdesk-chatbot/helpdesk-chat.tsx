@@ -405,12 +405,12 @@ export function HelpdeskChat({ example }: { example: HelpdeskExample }) {
                 readOnly={playing}
               />
             </PromptInputBody>
-            <PromptInputFooter className="justify-between">
-              <span className="text-muted-foreground px-2 text-xs">
-                {playing
-                  ? "Demo playback · no AI calls are made"
-                  : "AI can make mistakes. Check important details with the team."}
-              </span>
+            <PromptInputFooter className="justify-end">
+              {playing && (
+                <span className="text-muted-foreground mr-auto px-2 text-xs">
+                  Demo playback makes no AI calls.
+                </span>
+              )}
               <PromptInputSubmit
                 status={status}
                 onStop={stop}

@@ -76,10 +76,16 @@ describe("modelUse", () => {
 
   test("a text-only model is a problem only where images are sent", () => {
     expect(modelUse("/extractor", gptOss).problem).toBeNull();
-    expect(modelUse("/vision-extractor", gptOss).problem).toContain(
-      "sends pages as images",
-    );
     expect(modelUse("/parser", gptOss).problem).toContain("Text works here");
+  });
+
+  test("the Vision Extractor does not run on Aitta, not even with Gemma", () => {
+    for (const active of [gptOss, gemma])
+      expect(modelUse("/vision-extractor", active).problem).toContain(
+        "does not run on CSC Aitta",
+      );
+    expect(modelUse("/vision-extractor", luna).problem).toBeNull();
+    expect(modelUse("/parser", gemma).problem).toBeNull();
   });
 
   test("a demo that ignores the pick says so", () => {

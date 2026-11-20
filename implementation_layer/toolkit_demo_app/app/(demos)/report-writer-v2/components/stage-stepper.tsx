@@ -1,6 +1,7 @@
 "use client";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RunButton } from "@/components/demo/run-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,6 @@ import {
   Mic,
   PenLine,
   Sparkles,
-  X,
   type LucideIcon,
 } from "lucide-react";
 import { ProgressStream } from "../../report-writer/components/progress-stream";
@@ -66,7 +66,7 @@ export function StageStepper({
   progress,
   error,
   onRun,
-  onCancel,
+  onStop,
   runAllHint,
   stacked = false,
 }: {
@@ -77,7 +77,7 @@ export function StageStepper({
   progress: string[];
   error: string | null;
   onRun: (stages: Stage[]) => void;
-  onCancel: () => void;
+  onStop: () => void;
   /** Says what is missing, when Run all is not possible yet. */
   runAllHint?: string;
   /** One stage under the other, for a narrow column. */
@@ -101,24 +101,16 @@ export function StageStepper({
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-3">
         <CardTitle className="text-base">Write the report</CardTitle>
         <div className="flex gap-2">
-          <Button
+          <RunButton
+            running={busy}
+            onRun={() => onRun(["normalize", "curate", "synthesize"])}
+            onStop={onStop}
+            icon={Sparkles}
             size="lg"
-            onClick={() => onRun(["normalize", "curate", "synthesize"])}
-            disabled={busy || !ready.normalize}
+            disabled={!ready.normalize}
           >
-            {busy ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Sparkles className="size-4" />
-            )}
             Run all three stages
-          </Button>
-          {busy && (
-            <Button variant="outline" size="lg" onClick={onCancel}>
-              <X className="size-4" />
-              Cancel
-            </Button>
-          )}
+          </RunButton>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -9,6 +9,7 @@ import {
   knowledgeJsonError,
   parseArtifacts,
   parseSpec,
+  reportOutOfDate,
   settingsForSpec,
   staleAfterEdit,
   staleAfterStage,
@@ -208,6 +209,50 @@ describe("staleness", () => {
     expect(staleHint(rebuilt, "report/report.md")).toBeNull();
     const knowledgeEdited = staleAfterStage(staleAfterEdit(FRESH, "knowledge/a.json"), "rebuild");
     expect(staleHint(knowledgeEdited, "report/report.md")).toBe("Rerun Stage 3");
+  });
+
+  describe("the report is out of date", () => {
+    const NORMALIZED = { "normalized/01_a.md": "text" };
+    const CURATED = { ...NORMALIZED, "knowledge/a.json": "{}" };
+    const WRITTEN = {
+      ...CURATED,
+      "report/sections/01_a.md": "text",
+      "report/report.md": "# R",
+    };
+    const afterCurate = staleAfterStage(
+      staleAfterStage(FRESH, "normalize"),
+      "curate",
+    );
+    const afterRun = staleAfterStage(afterCurate, "synthesize");
+
+    test("not during a first run, when no report has been written", () => {
+      expect(afterCurate.report).toBe(true);
+      expect(reportOutOfDate(afterCurate, CURATED, "synthesize")).toBe(false);
+      // Stage 2 run on its own: there is still no report to be out of date.
+      expect(reportOutOfDate(afterCurate, CURATED, null)).toBe(false);
+    });
+
+    test("not after a full run", () => {
+      expect(reportOutOfDate(afterRun, WRITTEN, null)).toBe(false);
+    });
+
+    test("after a fact changes, until Stage 3 has run again", () => {
+      const edited = staleAfterEdit(afterRun, "knowledge/a.json");
+      expect(reportOutOfDate(edited, WRITTEN, null)).toBe(true);
+      expect(reportOutOfDate(edited, WRITTEN, "synthesize")).toBe(false);
+      const again = staleAfterStage(edited, "synthesize");
+      expect(reportOutOfDate(again, WRITTEN, null)).toBe(false);
+    });
+
+    test("after Stage 2 runs again under a written report", () => {
+      const recurated = staleAfterStage(afterRun, "curate");
+      expect(reportOutOfDate(recurated, WRITTEN, null)).toBe(true);
+    });
+
+    test("not after a section edit, which only needs a rebuild", () => {
+      const edited = staleAfterEdit(afterRun, "report/sections/01_a.md");
+      expect(reportOutOfDate(edited, WRITTEN, null)).toBe(false);
+    });
   });
 });
 

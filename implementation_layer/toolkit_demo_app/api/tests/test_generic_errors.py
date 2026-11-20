@@ -38,6 +38,17 @@ def test_a_server_model_error_returns_an_id_not_the_provider_text():
     assert RAW not in detail and "error id" in detail
 
 
+def test_a_too_large_request_says_so_without_the_provider_text():
+    class TooLargeError(Exception):
+        status_code = 413
+
+    detail = settings.provider_error_detail(TooLargeError(RAW))
+    assert RAW not in detail
+    assert detail.startswith("The model's service refused the request as too large.")
+    # A 413 the demo raises itself keeps its own detail.
+    assert settings.provider_error_detail(HTTPException(413, "File too big")) == "File too big"
+
+
 def test_a_panel_judge_error_returns_an_id_not_the_judge_text(monkeypatch):
     class Judge:
         def judge_text_pair(self, **_kwargs):

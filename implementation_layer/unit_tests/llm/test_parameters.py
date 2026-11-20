@@ -114,3 +114,42 @@ def test_shared_openai_client_sends_max_completion_tokens():
         client.raw.close()
     assert calls[0]["max_completion_tokens"] == 64
     assert "max_tokens" not in calls[0]
+
+
+@pytest.mark.parametrize(
+    ("model", "config", "expected"),
+    [
+        ("gpt-6-luna", None, True),
+        ("gpt-6-sol", None, True),
+        ("gpt-6-luna-2026-09-22", None, True),
+        ("azure/gpt-6-luna", None, True),
+        ("gpt-5.6-sol", None, True),
+        ("gpt-5.6-luna", None, True),
+        ("gpt-5.6-terra", None, True),
+        ("production", {"model_family": "gpt-6-luna"}, True),
+        ("gpt-6-astra", None, False),
+        ("gpt-6-rosalind", None, False),
+        ("gpt-6-cyber", None, False),
+        ("gpt-6.1-sol", None, False),
+        ("gpt-6.1-terra", None, False),
+        ("gpt-6-luna-prod", None, False),
+        ("production", {"model_family": "gpt-6-astra"}, False),
+        ("production", None, False),
+        ("gpt-5.4", None, False),
+        ("gpt-4o", None, False),
+        ("claude-sonnet-5-5", None, False),
+    ],
+)
+def test_accepts_effort_none_is_an_allowlist(model, config, expected):
+    # Only for an effort gaik picks itself: an unknown GPT-6 name gets no "none".
+    from gaik.software_components.llm.parameters import _accepts_effort_none
+
+    assert _accepts_effort_none(model, config) is expected
+
+
+@pytest.mark.parametrize("model", ["gpt-6-luna", "gpt-6-rosalind"])
+def test_explicit_none_is_still_validated_by_the_family_rule(model):
+    # A caller's own "none" is checked as before: only Astra and gpt-6.x reject it here.
+    assert normalize_chat_kwargs(model, {"reasoning_effort": "none"}) == {
+        "reasoning_effort": "none"
+    }

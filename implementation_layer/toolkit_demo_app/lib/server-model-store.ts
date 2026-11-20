@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
-import { isServerModelId } from "./model-settings";
+import {
+  isReasoningEffort,
+  isServerModelId,
+  type ReasoningEffort,
+} from "./model-settings";
 
 export interface ServerModel {
   id: string;
@@ -35,7 +39,9 @@ export interface ServerModels {
 
 // The choice is not a secret: keep it across reloads in this browser.
 const KEY = "gaik:server-model";
+const EFFORT_KEY = "gaik:reasoning-effort";
 let selected: string | null = null;
+let effort: ReasoningEffort | null = null;
 let loadedFromStorage = false;
 let catalog: ServerModels | null = null;
 let catalogRequest: Promise<void> | null = null;
@@ -57,6 +63,8 @@ function readStorage() {
   try {
     const stored = window.localStorage.getItem(KEY);
     if (isServerModelId(stored)) selected = stored;
+    const storedEffort = window.localStorage.getItem(EFFORT_KEY);
+    if (isReasoningEffort(storedEffort)) effort = storedEffort;
   } catch {
     // Storage blocked: the choice lasts until reload.
   }
@@ -85,6 +93,27 @@ export function setServerModel(id: string | null): void {
 
 export function useServerModel(): string | null {
   return useSyncExternalStore(subscribe, getServerModel, () => null);
+}
+
+/** The picked reasoning effort, or null for Auto: each model's own default. */
+export function getReasoningEffort(): ReasoningEffort | null {
+  readStorage();
+  return effort;
+}
+
+export function setReasoningEffort(value: ReasoningEffort | null): void {
+  effort = isReasoningEffort(value) ? value : null;
+  try {
+    if (effort) window.localStorage.setItem(EFFORT_KEY, effort);
+    else window.localStorage.removeItem(EFFORT_KEY);
+  } catch {
+    // Storage blocked: keep it in memory.
+  }
+  emit();
+}
+
+export function useReasoningEffort(): ReasoningEffort | null {
+  return useSyncExternalStore(subscribe, getReasoningEffort, () => null);
 }
 
 // The API can be restarting when the page loads (a deploy, a cold start). An
@@ -135,4 +164,10 @@ export function useActiveServerModel(): ServerModel | null {
   if (!catalog) return null;
   const id = picked ?? catalog.default;
   return catalog.models.find((model) => model.id === id) ?? null;
+}
+
+/** The same outside React, for a request. Null until the list has loaded. */
+export function getActiveServerModel(): ServerModel | null {
+  const id = getServerModel() ?? catalog?.default;
+  return catalog?.models.find((model) => model.id === id) ?? null;
 }

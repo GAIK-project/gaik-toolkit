@@ -85,6 +85,12 @@ import os
 import re
 from collections import OrderedDict
 
+from gaik.software_components._tesseract import (
+    installed_tesseract_cli_languages,
+    installed_tesserocr_languages,
+    with_installed_languages,
+)
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits
 
 # Try to import additional format options
@@ -219,10 +225,17 @@ class DoclingParser:
         """
         ocr_engine = ocr_engine.lower()
 
+        # Tesseract gets only the default languages it has traineddata for (see _tesseract).
         if ocr_engine == "tesseract_cli":
-            self.pipeline_options.ocr_options = TesseractCliOcrOptions(force_full_page_ocr=True)
+            self.pipeline_options.ocr_options = with_installed_languages(
+                TesseractCliOcrOptions,
+                installed_tesseract_cli_languages(),
+                force_full_page_ocr=True,
+            )
         elif ocr_engine == "tesseract":
-            self.pipeline_options.ocr_options = TesseractOcrOptions()
+            self.pipeline_options.ocr_options = with_installed_languages(
+                TesseractOcrOptions, installed_tesserocr_languages()
+            )
         elif ocr_engine == "easyocr":
             self.pipeline_options.ocr_options = EasyOcrOptions()
         elif ocr_engine == "rapidocr":
@@ -338,6 +351,8 @@ class DoclingParser:
 
         Raises:
             ValueError: If Docling is not available or file format is not supported
+            FileTypeMismatchError: If the content is not the type the file's
+                extension says (a ``ValueError``)
             InputLimitError: If the file is over ``max_file_bytes``, a PDF over
                 ``max_pages``, or a DOCX/XLSX/PPTX unpacks to over ten times the size limit
         """
@@ -389,6 +404,8 @@ class DoclingParser:
                 pass
 
         # Convert document using docling, within the input limits
+        self.limits.check_file_size(file_path)
+        check_file_type(file_path)
         self.limits.check_document(file_path)
         result = self.converter.convert(file_path, **docling_limits(self.limits))
         doc = result.document

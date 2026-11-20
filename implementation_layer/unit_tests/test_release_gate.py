@@ -240,9 +240,8 @@ def _fake_audio_provider(monkeypatch, replies):
 
     raw = SimpleNamespace(audio=SimpleNamespace(transcriptions=SimpleNamespace(create=create)))
     monkeypatch.setattr(transcriber_module, "_create_audio_client", lambda config: raw)
-    monkeypatch.setattr(
-        transcriber_module.AudioSegment, "from_file", lambda *args, **kwargs: _FakeAudioSegment()
-    )
+    # The Transcriber decodes through _decode_audio, which runs ffmpeg itself.
+    monkeypatch.setattr(transcriber_module, "_decode_audio", lambda path: _FakeAudioSegment())
     monkeypatch.setattr(transcriber_module.time, "sleep", lambda seconds: None)
     return received
 

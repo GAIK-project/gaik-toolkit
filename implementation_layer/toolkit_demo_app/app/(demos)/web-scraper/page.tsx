@@ -5,6 +5,7 @@ import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import { MarkdownView } from "@/components/demo/markdown-view";
 import { PageTransition } from "@/components/demo/page-transition";
+import { RunButton } from "@/components/demo/run-button";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,6 @@ import {
   ExternalLink,
   Globe,
   Loader2,
-  Square,
   Waypoints,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -384,8 +384,13 @@ export default function WebScraperPage() {
       dispatch({ type: "error", data: { message } });
       toast.error(message);
     } finally {
-      abortRef.current = null;
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  }
+
+  /** Aborts the crawl; the catch in handleRun returns the page to ready. */
+  function stopRun() {
+    abortRef.current?.abort();
   }
 
   async function copyMarkdown(text: string) {
@@ -577,25 +582,17 @@ export default function WebScraperPage() {
                 />
               </div>
 
-              {running ? (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => abortRef.current?.abort()}
-                >
-                  <Square className="size-4" />
-                  Stop
-                </Button>
-              ) : (
-                <Button
-                  className="w-full"
-                  onClick={() => void handleRun()}
-                  disabled={!urlAllowed}
-                >
-                  <Globe className="size-4" />
-                  {extracting ? "Crawl and extract" : "Crawl"}
-                </Button>
-              )}
+              <RunButton
+                running={running}
+                onRun={() => void handleRun()}
+                onStop={stopRun}
+                icon={Globe}
+                size="default"
+                className="w-full"
+                disabled={!urlAllowed}
+              >
+                {extracting ? "Crawl and extract" : "Crawl"}
+              </RunButton>
             </CardContent>
           </Card>
 

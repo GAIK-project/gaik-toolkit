@@ -228,7 +228,7 @@ def test_webp_image_keeps_media_type_without_platform_mapping(monkeypatch, tmp_p
     # Python < 3.13 has no built-in .webp mapping.
     monkeypatch.setattr(mimetypes, "guess_type", lambda *args, **kwargs: (None, None))
     path = tmp_path / "scan.webp"
-    path.write_bytes(b"synthetic-webp")
+    path.write_bytes(b"RIFF\x10\x00\x00\x00WEBPsynthetic")
     content = build_chat_document_content([path], "Read this image")
     assert content[-1]["image_url"]["url"].startswith("data:image/webp;base64,")
 
@@ -238,7 +238,7 @@ def test_vision_extractor_uses_shared_structured_output(monkeypatch, tmp_path, p
     from gaik.software_components import llm
 
     path = tmp_path / "input.png"
-    path.write_bytes(b"synthetic-image")
+    path.write_bytes(b"\x89PNG\r\n\x1a\nsynthetic")
     client = _SharedClient()
     configs = []
     monkeypatch.setattr(llm, "create_llm_client", lambda config: configs.append(config) or client)

@@ -31,6 +31,12 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   before pushing a front-end change.
 - Solution Wizard, after the same `uv sync --all-extras`:
   `uv run pytest implementation_layer/solution_wizard/tests -q`.
+- Components with real providers: the `component-check` skill
+  (`.claude/skills/component-check/`) runs the schema generator, extractor and vision
+  extractor on synthetic invoices with each provider whose keys it gets, and can have
+  Claude Code, Codex or Antigravity judge the outputs on their own subscription login.
+  Before a tag, `gh workflow run live-smoke.yml -f providers=azure` runs it with the
+  release smoke checks on a branch; it is not the release gate.
 - Workflows: actions are pinned to commit SHAs with a version comment, checkouts set
   `persist-credentials: false`, and token permissions are granted per job. The
   `Workflow security` job (zizmor) fails on medium or higher findings.
@@ -158,6 +164,12 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   to the user who indexed it the same way; the shared example collections serve everyone.
   Each run, and each result download, leaves one `gaik.audit` log line with the user id,
   the route template and the status, never content or file names (`api/utils/audit.py`).
+  The Postgres agent's model-written SQL runs on its own read-only role
+  (`POSTGRES_AGENT_DATABASE_URL`, created with `api/scripts/postgres_agent_role.sql`);
+  the API refuses a role that can write, create, replicate, call a SECURITY DEFINER
+  function or one that reads server files, is a member of another role or can read
+  outside the demo schema, and falls back to
+  `DATABASE_URL` with a warning while the variable is unset.
 
 ## docs site (GitHub Pages)
 
@@ -201,5 +213,9 @@ expected.
   on that complete workflow succeeding. Do not tag, upload to PyPI, or deploy the
   demo until the applicable certification passes. Keep credentials, raw provider
   errors, and personal documents out of reports; use the synthetic fixtures.
+- The same release job then runs the `component-check` skill on Azure (schema generator,
+  extractor and vision extractor on its synthetic invoices); a failed case blocks the
+  publish like the certification does. Run it, or `gh workflow run live-smoke.yml`, before
+  tagging so that the tag does not find a failure first.
 - Once a release is on PyPI, offer to take it into the Solution Wizard v2 fork with the
   `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`.

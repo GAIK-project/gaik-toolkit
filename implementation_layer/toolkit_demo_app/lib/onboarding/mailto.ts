@@ -26,8 +26,13 @@ const BODY = [
   "Thanks!",
 ].join("\n");
 
-/** `mailto:` href that opens a prefilled access-request email. */
-export function buildAccessRequestMailto(): string {
-  const query = `subject=${encodeURIComponent(SUBJECT)}&body=${encodeURIComponent(BODY)}`;
+/**
+ * `mailto:` href that opens a prefilled access-request email. `wizard` names the
+ * version asked for ("Wizard V2", "first wizard in the browser"), so the team
+ * knows which access to open: they are granted in different places.
+ */
+export function buildAccessRequestMailto(wizard?: string): string {
+  const subject = wizard ? `${SUBJECT} (${wizard})` : SUBJECT;
+  const query = `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(BODY)}`;
   return `mailto:${GAIK_CONTACT_EMAIL}?${query}`;
 }

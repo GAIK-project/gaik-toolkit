@@ -20,7 +20,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS
+from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS, media_input_args
 
 from .config import TranscriptionConfig
 from .models import ChunkSpec
@@ -83,7 +83,7 @@ def get_audio_duration(
             "format=duration",
             "-of",
             "csv=p=0",
-            file_path,
+            *media_input_args(file_path),
         ],
         capture_output=True,
         text=True,
@@ -113,8 +113,7 @@ def decoded_audio_seconds(
             "-nostdin",
             "-v",
             "error",
-            "-i",
-            str(file_path),
+            *media_input_args(file_path),
             "-map",
             "0:a:0",
             "-f",
@@ -151,7 +150,7 @@ def has_video_stream(file_path: str | Path) -> bool:
                 "stream=index",
                 "-of",
                 "csv=p=0",
-                str(file_path),
+                *media_input_args(file_path),
             ],
             capture_output=True,
             timeout=30,
@@ -178,7 +177,7 @@ def has_audio_stream(file_path: str | Path) -> bool:
                 "stream=index",
                 "-of",
                 "csv=p=0",
-                str(file_path),
+                *media_input_args(file_path),
             ],
             capture_output=True,
             timeout=30,
@@ -223,8 +222,7 @@ def extract_audio(
 
     cmd = [
         "ffmpeg",
-        "-i",
-        str(input_path),
+        *media_input_args(input_path),
         "-vn",
         "-acodec",
         "libmp3lame",
@@ -401,8 +399,7 @@ def split_into_chunks(
             "ffmpeg",
             "-ss",
             str(spec.actual_start),
-            "-i",
-            audio_file_path,
+            *media_input_args(audio_file_path),
             "-t",
             str(spec.duration),
         ]

@@ -2,7 +2,7 @@
 
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
   CardContent,
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { Gavel, Loader2, ScrollText } from "lucide-react";
+import { Gavel, ScrollText } from "lucide-react";
 import posthog from "posthog-js";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -115,7 +115,7 @@ export function HallucinationsTab() {
   const [extracted, setExtracted] = useState("");
   const [judged, setJudged] = useState<Judged | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const { isLoading, result, setResult, run } =
+  const { isLoading, result, setResult, run, stop } =
     useJudgeSubmit<HallucinationResult>();
 
   const example =
@@ -264,24 +264,16 @@ export function HallucinationsTab() {
                 skipped.
               </p>
             </div>
-            <Button
-              onClick={handleSubmit}
+            <RunButton
+              running={isLoading}
+              onRun={handleSubmit}
+              onStop={stop}
+              icon={Gavel}
               disabled={isLoading || !sourceText.trim() || !extracted.trim()}
               className="w-full"
-              size="lg"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Checking…
-                </>
-              ) : (
-                <>
-                  <Gavel className="mr-2 h-4 w-4" />
-                  Detect hallucinations
-                </>
-              )}
-            </Button>
+              Detect hallucinations
+            </RunButton>
           </CardContent>
         </Card>
 

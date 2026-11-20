@@ -75,9 +75,17 @@ export function useExtractionPipeline(demo: {
     setIsLoading(false);
   };
 
+  /** Cancels the run in the browser; the page is ready again with its input. */
+  const stop = () => {
+    abortRef.current?.abort();
+    setSteps([]);
+    setIsLoading(false);
+  };
+
   const run = async (input: ExtractionInput, config: ExtractionRunConfig) => {
     abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
     const started = performance.now();
     setIsLoading(true);
     setResult(null);
@@ -116,7 +124,7 @@ export function useExtractionPipeline(demo: {
       const response = await apiFetch(endpoint, {
         method: "POST",
         body: form,
-        signal: abortRef.current.signal,
+        signal: controller.signal,
       });
       if (!response.ok)
         throw new Error(
@@ -145,7 +153,11 @@ export function useExtractionPipeline(demo: {
       });
       if (streamError) throw streamError;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return; // The toast is already shown.
       toast.error(error instanceof Error ? error.message : "An error occurred");
       setSteps((previous) =>
@@ -156,9 +168,10 @@ export function useExtractionPipeline(demo: {
         ),
       );
     } finally {
-      setIsLoading(false);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortRef.current === controller) setIsLoading(false);
     }
   };
 
-  return { steps, result, isLoading, seconds, run, reset };
+  return { steps, result, isLoading, seconds, run, stop, reset };
 }

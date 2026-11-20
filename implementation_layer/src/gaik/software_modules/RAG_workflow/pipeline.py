@@ -9,14 +9,14 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.RAG._chunk_ids import check_document_id
-from gaik.software_components.RAG.answer_generator import AnswerGenerator
+from gaik.software_components.RAG.answer_generator import AnswerGenerator, Citation
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.retriever import Retriever
 from gaik.software_components.RAG.vector_store import VectorStore
@@ -46,8 +46,18 @@ class IndexResult:
 
 @dataclass
 class RAGWorkflowResult:
+    """The answer and the retrieved chunks.
+
+    With ``citations=True``, ``citations`` lists the retrieved chunks the answer cites
+    and ``dropped_citations`` the ``[name, page X]`` citations it wrote that match
+    none of them (removed from the answer). When the answer streams, both are filled
+    in once it has been read to the end.
+    """
+
     answer: str | Iterable[str]
     documents: list[Document]
+    citations: list[Citation] = field(default_factory=list)
+    dropped_citations: list[str] = field(default_factory=list)
 
 
 class RAGWorkflow:
@@ -287,8 +297,13 @@ class RAGWorkflow:
             filters=filters,
             include_scores=include_scores,
         )
-        answer = self.answer_generator.generate(query, documents, stream=stream)
-        return RAGWorkflowResult(answer=answer, documents=documents)
+        cited = self.answer_generator.generate_with_citations(query, documents, stream=stream)
+        return RAGWorkflowResult(
+            answer=cited.answer,
+            documents=documents,
+            citations=cited.citations,
+            dropped_citations=cited.dropped_citations,
+        )
 
 
 def _takes_replace(add) -> bool:
