@@ -16,6 +16,7 @@ from typing import Any
 
 from gaik.software_components.endpoints import check_endpoint, log_endpoint
 
+from .._log_names import error_text, file_tag
 from ..input_limits import InputLimits
 
 logger = logging.getLogger(__name__)
@@ -326,7 +327,7 @@ class JevClassifier:
             except Exception as e:
                 if path.is_file():
                     raise
-                logger.error("Skipping %s: %s", file.name, e)
+                logger.error("Skipping %s: %s", file_tag(file), error_text(e, file))
                 results[file.name] = {
                     "class": UNKNOWN,
                     "confidence": 0.0,

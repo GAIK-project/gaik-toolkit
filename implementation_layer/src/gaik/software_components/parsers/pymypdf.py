@@ -10,6 +10,7 @@ import os
 from typing import Any
 
 from .._ligatures import expand_ligatures
+from .._log_names import error_text, file_tag
 from ..file_type import check_file_type
 from ..input_limits import InputLimits
 
@@ -118,7 +119,7 @@ class PyMuPDFParser:
             return text_content.strip()
 
         except Exception as e:
-            logger.error(f"Error parsing PDF {file_path}: {e}")
+            logger.error("Error parsing PDF %s: %s", file_tag(file_path), error_text(e, file_path))
             raise
 
     def parse_document(
@@ -160,13 +161,13 @@ class PyMuPDFParser:
             )
 
         format_type = "markdown" if use_markdown else "structured"
-        logger.info(f"Parsing document: {file_name} (format: {format_type})")
+        logger.info("Parsing document: %s (format: %s)", file_tag(file_path), format_type)
 
         # Extract text
         text_content = self.parse_pdf(file_path, use_markdown, page_markers)
 
         if not text_content:
-            logger.warning(f"No text content extracted from {file_name}")
+            logger.warning("No text content extracted from %s", file_tag(file_path))
 
         return {
             "file_path": file_path,
@@ -268,6 +269,6 @@ def parse_pdf(file_path: str, use_markdown: bool = True, output_path: str = None
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result["text_content"])
-        logger.info(f"Parsed content saved to: {output_path}")
+        logger.info("Parsed content saved to %s", file_tag(output_path))
 
     return result

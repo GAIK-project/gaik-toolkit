@@ -34,6 +34,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from .._log_names import file_tag
 from ..input_limits import InputLimits, count_table_rows
 from .models import SheetLayout
 
@@ -262,7 +263,7 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
                 [_EURO_DECIMAL],
             ).fetchone()
         except Exception as exc:  # pragma: no cover - defensive
-            logger.debug("Decimal probe failed for %s.%s: %s", table_name, column, exc)
+            logger.debug("Decimal probe failed for column %s: %s", column, type(exc).__name__)
             continue
         if not total or matching != total:
             continue
@@ -273,11 +274,9 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
             )
             converted.append(column)
         except Exception as exc:
-            logger.debug("Could not retype %s.%s as DOUBLE: %s", table_name, column, exc)
+            logger.debug("Could not retype column %s as DOUBLE: %s", column, type(exc).__name__)
     if converted:
-        logger.info(
-            "Converted comma-decimal column(s) in '%s': %s", table_name, ", ".join(converted)
-        )
+        logger.info("Converted comma-decimal column(s): %s", ", ".join(converted))
     return converted
 
 
@@ -319,18 +318,19 @@ def _load_excel(
             grid = _read_grid(worksheet, limits, f"{path.name} / {sheet_name}")
             grid = _trim_grid(grid)
             if len(grid) < 2:
-                logger.info("Skipping empty sheet '%s' in %s", sheet_name, path.name)
+                logger.info("Skipping an empty sheet in %s", file_tag(path))
                 continue
 
             layout, messy = _resolve_layout(
                 grid,
                 sheet_label=f"{path.name} / {sheet_name}",
+                log_label=f"a sheet in {file_tag(path)}",
                 layout_inference=layout_inference,
                 infer_layout=infer_layout,
             )
             header, rows = _apply_layout(grid, layout, drop_outliers=messy)
             if not header or not rows:
-                logger.info("Sheet '%s' in %s has no data rows", sheet_name, path.name)
+                logger.info("A sheet in %s has no data rows", file_tag(path))
                 continue
 
             # One sheet keeps the caller's name; extra sheets get suffixed.
@@ -485,6 +485,7 @@ def _resolve_layout(
     sheet_label: str,
     layout_inference: str,
     infer_layout: LayoutInferrer | None,
+    log_label: str = "a sheet",
 ) -> tuple[SheetLayout, bool]:
     """Pick the layout for a sheet, asking the LLM only when it is worth it.
 
@@ -510,13 +511,16 @@ def _resolve_layout(
     try:
         inferred = infer_layout(sheet_label, render_grid(grid))
     except Exception as exc:
-        logger.warning("Layout inference failed for %s, using heuristic: %s", sheet_label, exc)
+        # The file and sheet names go to the model, not to the log.
+        logger.warning(
+            "Layout inference failed for %s, using heuristic: %s", log_label, type(exc).__name__
+        )
         return heuristic, messy
 
     if not _layout_is_sane(inferred, grid):
-        logger.warning("Layout inference returned an unusable result for %s", sheet_label)
+        logger.warning("Layout inference returned an unusable result for %s", log_label)
         return heuristic, messy
-    logger.info("Layout inferred for %s: %s", sheet_label, inferred.reasoning)
+    logger.info("Layout inferred for %s", log_label)
     return inferred, messy
 
 

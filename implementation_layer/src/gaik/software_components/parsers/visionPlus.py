@@ -21,6 +21,7 @@ try:
 except Exception:
     pass
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
 from gaik.software_components.parsers.vision import OpenAIConfig, VisionParser
@@ -116,7 +117,7 @@ class VisionPlusParser:
     def parse_document(self, file_path: str) -> dict[str, Any]:
         """Parse PDF and return markdown + metadata with image descriptions injected."""
         if self.verbose:
-            print(f"Processing PDF with vision enhancement: {file_path}")
+            print(f"Processing PDF with vision enhancement: {file_tag(file_path)}")
 
         self.limits.check_file_size(file_path)
         check_file_type(file_path, {"pdf"})

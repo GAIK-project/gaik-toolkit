@@ -29,6 +29,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.source_material import (
     SourceMaterial,
@@ -255,7 +256,7 @@ def _xlsx_to_markdown(path: Path) -> str:
         logger.warning(
             "Cannot parse %s: 'openpyxl' is not installed. Install gaik extras "
             "for spreadsheet support. Skipping spreadsheet content.",
-            path.name,
+            file_tag(path),
         )
         return f"_([.xlsx not parsed: openpyxl not installed] {path.name})_"
 
@@ -1307,7 +1308,7 @@ def save_report_config(
             logger.warning(
                 "%s is outside the config's folder; load_report_config needs a root that "
                 "holds both to read it back",
-                Path(p).name,
+                file_tag(p),
             )
         return rel
 

@@ -7,6 +7,7 @@ import re
 from collections import OrderedDict
 from typing import TYPE_CHECKING
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components._tesseract import (
     installed_tesseract_cli_languages,
     installed_tesserocr_languages,
@@ -218,7 +219,7 @@ class DoclingRagParser:
         structure (headings, sections, paragraphs) rather than by fixed size. Chunk
         boundaries are determined by the document's semantic structure.
         """
-        print(f"Processing document with metadata extraction: {pdf_path}")
+        print(f"Processing document with metadata extraction: {file_tag(pdf_path)}")
         print("Parsing document(s)...")
         result = self._convert(pdf_path)
         doc = result.document
@@ -307,7 +308,7 @@ class DoclingRagParser:
                 )
                 chunk_id += 1
 
-        print(f"Created {len(langchain_docs)} chunks with metadata from {document_name}")
+        print(f"Created {len(langchain_docs)} chunks with metadata")
         return langchain_docs
 
 

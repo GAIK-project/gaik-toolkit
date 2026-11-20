@@ -20,6 +20,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from gaik.software_components._log_names import error_text, file_tag
 from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS, media_input_args
 
 from .config import TranscriptionConfig
@@ -45,10 +46,12 @@ def _encoded_seconds(chunk_path: Path) -> float | None:
     try:
         return get_audio_duration(chunk_path, decode_timeout=FFPROBE_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
-        logger.warning("Reading the length of %s timed out", Path(chunk_path).name)
+        logger.warning("Reading the length of %s timed out", file_tag(chunk_path))
         return None
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
-        logger.warning("Could not read the length of %s: %s", Path(chunk_path).name, exc)
+        logger.warning(
+            "Could not read the length of %s: %s", file_tag(chunk_path), error_text(exc, chunk_path)
+        )
         return 0.0
 
 
@@ -118,7 +121,7 @@ def get_audio_duration(
     try:
         return float(result.stdout.strip())
     except ValueError:
-        logger.info("%s has no duration in its header; decoding it", Path(file_path).name)
+        logger.info("%s has no duration in its header; decoding it", file_tag(file_path))
         return decoded_audio_seconds(file_path, timeout=decode_timeout)
 
 
@@ -265,7 +268,7 @@ def extract_audio(
         str(output_path),
     ]
 
-    logger.info("Extracting audio: %s -> %s", input_path.name, output_path.name)
+    logger.info("Extracting audio: %s -> %s", file_tag(input_path), file_tag(output_path))
 
     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
     process = subprocess.Popen(
@@ -414,11 +417,10 @@ def split_into_chunks(
     output_dir = specs[0].chunk_path.parent
 
     logger.info(
-        "Splitting %d chunks (workers=%d, threads_per=%d, temp=%s)",
+        "Splitting %d chunks (workers=%d, threads_per=%d)",
         total_specs,
         max_workers,
         cfg.ffmpeg_threads_per_process,
-        output_dir,
     )
 
     def _encode_chunk(spec: ChunkSpec) -> dict:
@@ -493,10 +495,9 @@ def split_into_chunks(
 
             seconds = _encoded_seconds(chunk_path)
             logger.info(
-                "Chunk %d/%d: %s (%.1f s of %.1f s, %.1f MB)",
+                "Chunk %d/%d (%.1f s of %.1f s, %.1f MB)",
                 spec.index + 1,
                 total_specs,
-                chunk_path.name,
                 seconds if seconds is not None else float("nan"),
                 spec.duration,
                 chunk_path.stat().st_size / (1024 * 1024),
