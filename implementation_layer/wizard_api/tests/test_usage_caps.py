@@ -205,35 +205,57 @@ def test_a_cap_that_is_off_is_never_warned_of(db_session, caps) -> None:
 def test_a_reached_cap_refuses_and_the_month_is_named_first(db_session, caps) -> None:
     row = _session(db_session, cost=5.0)
     with pytest.raises(usage_caps.UsageCapError) as refused:
-        usage_caps.check_chat(db_session, row, now=NOV)
+        usage_caps.chat_budget(db_session, row, now=NOV)
     assert refused.value.scope == "session"
 
     fresh = _session(db_session)
     usage_caps.record_cost(db_session, "ann", 10.0, session=None, now=NOV)
     with pytest.raises(usage_caps.UsageCapError) as refused:
-        usage_caps.check_chat(db_session, fresh, now=NOV)
+        usage_caps.chat_budget(db_session, fresh, now=NOV)
     assert refused.value.scope == "user"
 
     usage_caps.record_cost(db_session, "bob", 90.0, session=None, now=NOV)
     with pytest.raises(usage_caps.UsageCapError) as refused:
-        usage_caps.check_chat(db_session, fresh, now=NOV)
+        usage_caps.chat_budget(db_session, fresh, now=NOV)
     assert refused.value.scope == "deployment"
     # A new month starts from zero for the deployment, not for the user.
     with pytest.raises(usage_caps.UsageCapError) as refused:
-        usage_caps.check_chat(db_session, fresh, now=DEC)
+        usage_caps.chat_budget(db_session, fresh, now=DEC)
     assert refused.value.scope == "user"
 
 
 @requires_postgres
 def test_the_budget_is_the_smallest_amount_left(db_session, caps) -> None:
     row = _session(db_session, cost=1.0)
-    assert usage_caps.remaining_budget(db_session, row, now=NOV) == pytest.approx(4.0)
+    assert usage_caps.chat_budget(db_session, row, now=NOV) == pytest.approx(4.0)
 
     usage_caps.record_cost(db_session, "ann", 7.5, session=None, now=NOV)
-    assert usage_caps.remaining_budget(db_session, row, now=NOV) == pytest.approx(2.5)
+    assert usage_caps.chat_budget(db_session, row, now=NOV) == pytest.approx(2.5)
 
     caps(session="0", user="0", deployment="0")
-    assert usage_caps.remaining_budget(db_session, row, now=NOV) is None
+    assert usage_caps.chat_budget(db_session, row, now=NOV) is None
+
+
+def test_a_live_agent_with_more_budget_than_the_caps_leave_is_ended(monkeypatch) -> None:
+    ended: list[str] = []
+
+    async def end(session_id):
+        ended.append(session_id)
+        return True
+
+    monkeypatch.setattr(agent_service, "end_session", end)
+    monkeypatch.setattr(agent_service, "AGENT_SESSIONS", {})
+    sid = "a"
+    agent = {"lock": asyncio.Lock(), "budget_usd": 10.0, "cost_total_usd": 2.0}
+    agent_service.AGENT_SESSIONS[sid] = agent
+
+    assert asyncio.run(agent_service.fit_budget(sid, 8.0)) is False  # it has 8 left
+    assert asyncio.run(agent_service.fit_budget(sid, None)) is False
+    assert asyncio.run(agent_service.fit_budget(sid, 3.0)) is True
+    assert ended == [sid]
+    # One without a budget of its own is ended when a cap now sets one.
+    agent_service.AGENT_SESSIONS[sid] = {"lock": asyncio.Lock(), "budget_usd": None}
+    assert asyncio.run(agent_service.fit_budget(sid, 3.0)) is True
 
 
 @requires_postgres
@@ -293,6 +315,27 @@ def test_the_fourth_session_is_refused_and_deleting_does_not_make_room(client, c
     assert client.post("/sessions", json={"user_id": "ann", "title": "S5"}).status_code == 429
     # Another user has places of their own.
     assert client.post("/sessions", json={"user_id": "bob", "title": "B1"}).status_code == 201
+
+
+@requires_postgres
+def test_a_session_that_could_not_be_created_gives_its_place_back(
+    client, caps, monkeypatch
+) -> None:
+    from wizard_api.services import session_service
+
+    def broken(db, payload):
+        raise RuntimeError("database gone")
+
+    monkeypatch.setattr(session_service, "create_session", broken)
+    with pytest.raises(RuntimeError):
+        client.post("/sessions", json={"user_id": "ann", "title": "S"})
+    monkeypatch.undo()
+    caps()
+
+    for n in range(3):
+        assert (
+            client.post("/sessions", json={"user_id": "ann", "title": f"S{n}"}).status_code == 201
+        )
 
 
 @requires_postgres

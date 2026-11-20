@@ -744,7 +744,11 @@ def create_session(
         usage_caps.claim_session(db, payload.user_id)
     except usage_caps.SessionLimitError as exc:
         raise api_error(429, "session_limit", str(exc)) from exc
-    session = session_service.create_session(db, payload)
+    try:
+        session = session_service.create_session(db, payload)
+    except Exception:
+        usage_caps.release_session(db, payload.user_id)
+        raise
     ops_metrics.sessions_created.add(
         1, {"owner": session.user_id if is_owner_id(session.user_id) else "legacy"}
     )
@@ -1267,10 +1271,12 @@ async def chat(
     try:
         # A reached usage cap refuses the message before an agent is woken,
         # and an agent started for it gets what the caps have left as its budget.
-        usage_caps.check_chat(db, session)
-        budget = usage_caps.remaining_budget(db, session)
+        budget = usage_caps.chat_budget(db, session)
     except usage_caps.UsageCapError as exc:
         raise _usage_cap(exc) from exc
+    # A live agent started when the caps left more keeps that budget: it is
+    # ended, and resumed below with what they leave now.
+    await agent_service.fit_budget(str(session_id), budget)
 
     # Before the agent is asked for: a live agent whose interface language
     # changed is told so in a turn of its own, which must not run into the
@@ -1479,6 +1485,7 @@ async def chat(
                 "during a tool call" if stopped.get("tool") else "while writing",
             )
         if assistant_text:
+            stored.append(True)
             # Persist off the event loop (sync SQLAlchemy commit).
             await asyncio.to_thread(
                 session_service.append_messages,
@@ -1534,6 +1541,8 @@ async def chat(
         return row
 
     turn_cost: list[float] = []
+    # Set when the turn stored its reply, which a usage notice is then added to.
+    stored: list[bool] = []
 
     def record_usage() -> list[str]:
         """Add the turn's cost to the caps' totals, in a database session of its own.
@@ -1613,7 +1622,8 @@ async def chat(
                 text = "\n\n".join(usage_caps.notice(scope, lang) for scope in notices)
                 await turn.publish(agent_service.sse({"delta": f"\n\n{text}"}))
                 try:
-                    await asyncio.to_thread(_append_usage_notice, open_db, session_id, text)
+                    if stored:
+                        await asyncio.to_thread(_append_usage_notice, open_db, session_id, text)
                 except Exception:  # noqa: BLE001
                     logger.warning("usage notice of session %s not stored", session_id)
             # Whatever closing the database session does, the turn is taken

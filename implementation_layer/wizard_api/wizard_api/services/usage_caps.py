@@ -121,24 +121,18 @@ def _caps(db: Session, session: WizardSession, now: datetime | None = None) -> l
     return caps
 
 
-def check_chat(db: Session, session: WizardSession, now: datetime | None = None) -> None:
-    """Raise UsageCapError when a cap this session's message would spend under is reached.
+def chat_budget(db: Session, session: WizardSession, now: datetime | None = None) -> float | None:
+    """What the caps leave for this session's next message; None when no cap is on.
 
-    The deployment's cap is checked first: when it is reached, nobody's message
-    goes through, and the user is told so rather than that their own cap is full.
+    Raises UsageCapError when a cap is reached. The deployment's cap is checked
+    first: when it is reached, nobody's message goes through, and the user is
+    told so rather than that their own cap is full.
     """
     caps = sorted(_caps(db, session, now), key=lambda c: c.scope != DEPLOYMENT)
     for cap in caps:
         if cap.left <= 0:
             raise UsageCapError(cap.scope)
-
-
-def remaining_budget(
-    db: Session, session: WizardSession, now: datetime | None = None
-) -> float | None:
-    """The smallest amount any cap has left for this session; None when no cap is on."""
-    lefts = [cap.left for cap in _caps(db, session, now)]
-    return max(min(lefts), 0.0) if lefts else None
+    return min(cap.left for cap in caps) if caps else None
 
 
 def claim_session(db: Session, user_id: str) -> None:
@@ -167,6 +161,21 @@ def claim_session(db: Session, user_id: str) -> None:
         raise SessionLimitError(
             f"You have started the {limit} sessions your account may have. Continue in one of them."
         )
+
+
+def release_session(db: Session, user_id: str) -> None:
+    """Give back a place claimed for a session that could then not be created."""
+    db.rollback()
+    db.execute(
+        update(UsageTotal)
+        .where(
+            UsageTotal.scope == USER,
+            UsageTotal.key == user_id,
+            UsageTotal.sessions_created > 0,
+        )
+        .values(sessions_created=UsageTotal.sessions_created - 1)
+    )
+    db.commit()
 
 
 def _add(db: Session, scope: str, key: str, cost: float) -> float:

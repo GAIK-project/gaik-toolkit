@@ -320,7 +320,9 @@ not the provider's bill, which keeps its own cap as the hard limit.
   `{"error": "usage_cap", "scope": "session" | "user" | "deployment"}`. The agent
   is started with the smallest amount any cap has left as its `max_budget_usd`
   (or `WIZARD_AGENT_MAX_BUDGET_USD`, if smaller), so a long reply stops at the
-  cap; the chat then says the usage limit is reached, without "continue".
+  cap; the chat then says the usage limit is reached, without "continue". An idle
+  live agent started when the caps left more (the user spent in another session
+  since) is ended first and resumed with the smaller budget.
 - A new session past `WIZARD_MAX_SESSIONS_PER_USER` is refused with `429`
   `session_limit`, claimed in one statement so two at once cannot both get the last place.
 - Once a session or a user has used the warning share of its cap, a line is added

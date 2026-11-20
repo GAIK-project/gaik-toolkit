@@ -1384,6 +1384,8 @@ async def _start_session(
         "tool_guard": guard,
         # Whether a usage cap set its budget: a stop there says the cap is full.
         "budget_from_caps": _budget_is_cap(budget_usd),
+        # The budget it was started with; the CLI counts its spend against it.
+        "budget_usd": _agent_budget(budget_usd),
         # (purpose, ResultMessage) of each query not yet on a span (telemetry).
         "turn_results": turn_results,
     }
@@ -1688,6 +1690,25 @@ async def _discard_session(session: dict) -> None:
             await end_session(session_id)
             return
     await _disconnect_quietly(session["client"])
+
+
+async def fit_budget(session_id: str, budget_usd: float | None) -> bool:
+    """End the idle live agent of ``session_id`` when the caps now leave less than it may spend.
+
+    An agent keeps the budget it was started with, counted by its CLI from its
+    start. Spend in the owner's other sessions since then is not taken off it,
+    so when what the caps have left is less than what this agent still has, it
+    is ended, and the next message resumes it with the smaller budget. True when
+    one was ended. A busy agent is left alone: the message is refused anyway.
+    """
+    agent = AGENT_SESSIONS.get(session_id)
+    if agent is None or budget_usd is None or is_busy(session_id):
+        return False
+    started_with = agent.get("budget_usd")
+    left = None if started_with is None else started_with - agent.get("cost_total_usd", 0.0)
+    if left is not None and left <= budget_usd + 0.01:
+        return False
+    return await end_session(session_id)
 
 
 async def end_session(session_id: str) -> bool:
