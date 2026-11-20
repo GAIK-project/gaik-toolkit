@@ -526,7 +526,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can have more than 500 pages: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "VisionParser": {
     "import": "from gaik.software_components.parsers import VisionParser",
@@ -608,7 +609,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can have more than 500 pages: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (convert_pdf: another known type than PDF; convert_image: content that is not a PNG, JPEG, GIF, WebP, TIFF or BMP image; an image under another image extension, or a file without a suffix, is sent with the image type its content has) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "PyMuPDFParser": {
     "import": "from gaik.software_components.parsers import PyMuPDFParser",
@@ -634,7 +636,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF (DOCX, XLSX, an image), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DocxParser": {
     "import": "from gaik.software_components.parsers import DocxParser",
@@ -660,7 +663,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "is_supported_file() returns True for both .docx and legacy binary .doc, but parse_document() calls python-docx's Document(), which cannot open the legacy .doc format at all -- a real .doc file raises PackageNotFoundError at parse time, not at the file-type check. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik."
+    "note": "is_supported_file() returns True for both .docx and legacy binary .doc, but parse_document() calls python-docx's Document(), which cannot open the legacy .doc format at all -- a real .doc file is refused with FileTypeMismatchError (a ValueError) before python-docx opens it. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DoclingParser": {
     "import": "from gaik.software_components.parsers import DoclingParser",
@@ -725,7 +728,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (.pdf, .docx, .pptx, .doc/.ppt, .txt) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DocumentClassifier": {
     "import": "from gaik.software_components.doc_classifier import DocumentClassifier",
@@ -2668,7 +2672,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can embed more than 500 images: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DoclingApiClientParser": {
     "import": "from gaik.software_components.parsers import DoclingApiClientParser",
@@ -2711,7 +2716,8 @@
         "selection_relevant": false,
         "infer_from": "Leave unset; read api_base from DOCLING_API_BASE."
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (for the extensions it knows: .pdf, Office, image and text files) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "TabularAgent": {
     "import": "from gaik.software_components.tabular_agent import TabularAgent",
@@ -3070,7 +3076,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when sheets can have more than 1,000,000 rows: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser."
+    "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "VectorStore": {
     "import": "from gaik.software_components.RAG.vector_store import VectorStore",

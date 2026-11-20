@@ -10,6 +10,7 @@ import os
 from typing import Any
 
 from .._ligatures import expand_ligatures
+from ..file_type import check_file_type
 from ..input_limits import InputLimits
 
 try:
@@ -76,6 +77,8 @@ class PyMuPDFParser:
             FileNotFoundError: If file does not exist
             ValueError: If page_markers is used with structured text, or the
                 file's content is not a PDF
+            FileTypeMismatchError: If the content is another known type, or not
+                the type the file's extension says (a ``ValueError``)
             InputLimitError: If the file is over ``max_file_bytes`` or ``max_pages``
             Exception: If PDF parsing fails
         """  # noqa: E501
@@ -84,6 +87,7 @@ class PyMuPDFParser:
         if page_markers and not use_markdown:
             raise ValueError("page_markers needs use_markdown=True")
         self.limits.check_file_size(file_path)
+        check_file_type(file_path, {"pdf"})
 
         try:
             doc = fitz.open(file_path)
