@@ -284,7 +284,8 @@
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "Select an available embedding model/deployment separately from the chat model. Anthropic/Foundry has no native embeddings API; Aitta, compatible endpoints and LiteLLM require an explicit embedding model. Rebuild the index after changing provider, model or vector dimensions.",
       "The default parser='vision' parses PDFs with VisionRagParser (Docling layout + a vision model for images; the rag-workflow extra pulls docling and torch). parser='text' (gaik>=0.8.10, extra rag-workflow-text) reads the text layer without them, but the wizard's RAG template and install_extra use the vision default: choose RAGWorkflow only when image-aware parsing (scans, figures, diagrams) is required, and for text-layer PDFs compose a text parser such as PyMuPDFParser with Embedder, Retriever and AnswerGenerator.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. Change a limit with limits=InputLimits(...).",
+      "Each indexed file is one document identified by its document_ids entry or else its path as given with forward slashes (Path(path).as_posix(), not resolved: a relative and an absolute spelling of one file are two documents, and one relative path from two working directories is one; filenames are display names only); indexing the same id again replaces its chunks (gaik after 0.11.0; a persisted collection from an older gaik needs a new collection_name)"
     ],
     "best_for": [
       "document_qa",
@@ -973,7 +974,8 @@
     },
     "known_limitations": [
       "Requires PostgreSQL with pgvector extension (`pip install gaik[pg-vector-store]`)",
-      "Database must be set up separately before use"
+      "Database must be set up separately before use",
+      "Re-indexing replaces a document's rows (add(..., replace=True), delete_document) only for rows added by gaik after 0.11.0 to a table setup() has run on; older rows stay searchable but are not found: re-index into a new table_name"
     ],
     "best_for": [
       "semantic_search",
@@ -3710,7 +3712,8 @@
       "Default is an in-memory store: the index is lost when the process ends; persist=True keeps it in a local Chroma folder (needs chromadb, installed with gaik[vector-store])",
       "In-memory search compares the query with every stored embedding, so it suits small and medium collections",
       "Metadata filtering is basic",
-      "A single process: not a shared or production index -- use PgVectorStore for that"
+      "A single process: not a shared or production index -- use PgVectorStore for that",
+      "Re-indexing replaces a document's chunks only when each chunk names its document (metadata document_id, source or document_name) and, for a persisted collection, the collection was built by gaik after 0.11.0; otherwise re-index into a new collection_name"
     ],
     "best_for": [
       "proof_of_concept_retrieval",
