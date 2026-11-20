@@ -65,6 +65,9 @@ describe("supabase sign-in settings", () => {
     expect(supabaseSignUpUrl(env({ GAIK_DEMO_URL: "https://demo.example.test/" }))).toBe(
       "https://demo.example.test/sign-up",
     );
+    expect(supabaseSignUpUrl(env({ GAIK_DEMO_URL: "https://host.example.test/demo" }))).toBe(
+      "https://host.example.test/demo/sign-up",
+    );
     expect(supabaseSignUpUrl(env({ WIZARD_SUPABASE_SIGNUP_URL: "https://x.example.test/join" }))).toBe(
       "https://x.example.test/join",
     );

@@ -56,7 +56,8 @@ export function supabaseSignUpUrl(env: NodeJS.ProcessEnv = process.env): string 
     }
   }
   const demo = gaikDemoUrl(env.GAIK_DEMO_URL);
-  return demo ? new URL("sign-up", demo).href : null;
+  // Under the demo's own path: "https://host/demo" gives ".../demo/sign-up".
+  return demo ? new URL("sign-up", demo.endsWith("/") ? demo : `${demo}/`).href : null;
 }
 
 /** Whether access is taken from the demo's access_requests table (WIZARD_SUPABASE_ACCESS). */
