@@ -67,19 +67,6 @@ export function isAllowedEmail(
 /** The part of a Supabase user the sign-in check reads. */
 export type AuthUser = { email?: string | null; email_confirmed_at?: string | null };
 
-/**
- * A Supabase user may use the instance only with a listed address that has
- * been confirmed. A sign-up can name any address; until Supabase has
- * confirmed it, it is only a claim, and a listed address claimed by someone
- * else must not let them in.
- */
-export function isAllowedUser(
-  user: AuthUser | null | undefined,
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  return !!user?.email_confirmed_at && isAllowedEmail(user.email, env);
-}
-
 export function isDevUserEmail(email: string): boolean {
   return Object.prototype.hasOwnProperty.call(DEV_USERS, email);
 }

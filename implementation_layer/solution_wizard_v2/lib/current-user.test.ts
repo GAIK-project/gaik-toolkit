@@ -6,8 +6,19 @@ vi.mock("next/headers", () => ({
 }));
 
 const supabaseAuthMock = vi.hoisted(() => ({ getUser: vi.fn() }));
+const accessRow = vi.hoisted(() => ({ value: null as unknown }));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: supabaseAuthMock }),
+  createClient: async () => ({
+    auth: supabaseAuthMock,
+    from: () => {
+      const query = {
+        select: () => query,
+        eq: () => query,
+        maybeSingle: async () => ({ data: accessRow.value, error: null }),
+      };
+      return query;
+    },
+  }),
 }));
 
 afterEach(() => {
@@ -102,6 +113,32 @@ describe("getCurrentUser — Supabase mode", () => {
   it("returns null when Supabase has no signed-in user", async () => {
     vi.stubEnv("NEXT_PUBLIC_DEV_AUTH", "");
     supabaseAuthMock.getUser.mockResolvedValue({ data: { user: null } });
+    const { getCurrentUser } = await importFresh();
+    expect(await getCurrentUser()).toBeNull();
+  });
+});
+
+
+describe("getCurrentUser — Supabase sign-in on a dev-login image", () => {
+  const user = { id: "u1", email: "ada@gaik.local", email_confirmed_at: "2026-11-20T10:00:00Z" };
+
+  it("ignores a dev cookie and takes access from the demo's row", async () => {
+    vi.stubEnv("NEXT_PUBLIC_DEV_AUTH", "true");
+    vi.stubEnv("WIZARD_AUTH_MODE", "supabase");
+    vi.stubEnv("WIZARD_SUPABASE_ACCESS", "access_requests");
+    cookiesMock.get.mockReturnValue(await signedCookie("dev@gaik.local"));
+    supabaseAuthMock.getUser.mockResolvedValue({ data: { user } });
+    accessRow.value = { status: "approved" };
+    const { getCurrentUser } = await importFresh();
+    expect(await getCurrentUser()).toEqual({ email: "ada@gaik.local" });
+  });
+
+  it("returns null while the demo has not approved the account", async () => {
+    vi.stubEnv("NEXT_PUBLIC_DEV_AUTH", "true");
+    vi.stubEnv("WIZARD_AUTH_MODE", "supabase");
+    vi.stubEnv("WIZARD_SUPABASE_ACCESS", "access_requests");
+    supabaseAuthMock.getUser.mockResolvedValue({ data: { user } });
+    accessRow.value = { status: "pending", wizard_access: false };
     const { getCurrentUser } = await importFresh();
     expect(await getCurrentUser()).toBeNull();
   });

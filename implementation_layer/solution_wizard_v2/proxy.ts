@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
-import { DEV_AUTH, DEV_COOKIE } from "@/lib/auth";
+import { DEV_COOKIE } from "@/lib/auth";
+import { devAuthActive } from "@/lib/supabase-auth";
 import { verifyDevSession } from "@/lib/dev-session";
 import { ACCESS_TOKEN_HEADER, proxyAuthEnabled, verifyAccessToken } from "@/lib/proxy-auth";
 import { TRACE_HEADER } from "@/lib/trace-header";
@@ -71,7 +72,7 @@ async function route(request: NextRequest): Promise<NextResponse> {
   }
 
   // Dev mode: signed cookie check (lib/dev-session), no Supabase.
-  if (DEV_AUTH) {
+  if (devAuthActive()) {
     const email = await verifyDevSession(request.cookies.get(DEV_COOKIE)?.value);
     const hasSession = email !== null;
     const path = request.nextUrl.pathname;

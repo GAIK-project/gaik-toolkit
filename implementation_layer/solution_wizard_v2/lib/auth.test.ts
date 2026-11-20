@@ -4,7 +4,6 @@ import {
   allowedEmails,
   devUsers,
   isAllowedEmail,
-  isAllowedUser,
   isDevUserEmail,
   parseDevUsers,
   validateDevCredentials,
@@ -74,13 +73,4 @@ describe("Supabase accounts must be listed", () => {
     expect(isAllowedEmail(undefined, listed)).toBe(false);
   });
 
-  it("lets in a listed account only once its address is confirmed", () => {
-    const listed = env({ WIZARD_ALLOWED_EMAILS: "ada@example.com" });
-    const confirmed = "2026-11-01T10:00:00Z";
-    expect(isAllowedUser({ email: "ada@example.com", email_confirmed_at: confirmed }, listed)).toBe(true);
-    expect(isAllowedUser({ email: "ada@example.com", email_confirmed_at: null }, listed)).toBe(false);
-    expect(isAllowedUser({ email: "ada@example.com" }, listed)).toBe(false);
-    expect(isAllowedUser({ email: "eve@example.com", email_confirmed_at: confirmed }, listed)).toBe(false);
-    expect(isAllowedUser(null, listed)).toBe(false);
-  });
 });

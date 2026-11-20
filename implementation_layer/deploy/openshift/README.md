@@ -215,6 +215,42 @@ the web app's `WIZARD_AUTH_MODE=proxy` and `WIZARD_OIDC_*`; `signin-off` undoes
 it. The web app does not take the proxy's word for who the user is: it checks the
 forwarded access token itself (`lib/proxy-auth.ts`).
 
+## Sign-in through the GAIK demo's Supabase
+
+A stack whose users make their accounts in the GAIK demo signs them in through
+the demo's Supabase project instead (`solution_wizard_v2/README.md`,
+"Supabase-kirjautuminen"). The mode is chosen at run time, so the stack's usual
+web image serves it. To move a stack from the Keycloak sign-in to it:
+
+1. Put the project's URL and **public** key in a Secret of the stack's own (the
+   demo's secret key never goes to the wizard):
+
+   ```bash
+   oc create secret generic "$NAME-supabase" -n "$PROJECT" \
+     --from-literal=WIZARD_SUPABASE_URL='<project URL>' \
+     --from-literal=WIZARD_SUPABASE_KEY='<public key>'
+   ```
+
+2. In the demo's Supabase project, add `https://$WEB_HOST/` to the redirect
+   URLs, and check that *Confirm email* is on and the `access_requests` rules
+   are applied (`toolkit_demo_app/docs/AUTH_FLOW.md`).
+3. Take the Keycloak proxy away: `PROJECT=<project> INSTANCE=<name> ./deploy.sh signin-off`.
+   The Route leads to the web app again and its `WIZARD_OIDC_*` settings go.
+4. Set the mode and read the Secret:
+
+   ```bash
+   oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" --from="secret/$NAME-supabase"
+   oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" \
+     WIZARD_AUTH_MODE=supabase WIZARD_SUPABASE_ACCESS=access_requests WIZARD_DEV_USERS-
+   ```
+
+5. Check: an approved demo account gets in, one still waiting is told so, and
+   the sign-in page links to the demo's sign-up.
+
+Back to Keycloak: `oc set env "deployment/$WEB_DEPLOYMENT" WIZARD_AUTH_MODE-` and
+`./deploy.sh signin`. The sessions are kept either way; they belong to the
+e-mail address.
+
 ## Environment variables
 
 **wizard-v2-api** (runtime):
@@ -244,11 +280,16 @@ package the api image installs) to generate the extraction schema.
 
 **wizard-v2-web**: `WIZARD_API_URL` (runtime, → `http://wizard-v2-api:8100`),
 `WIZARD_AGENT_CHAT=true` (live agent, not mock), `WIZARD_API_TOKEN` and
-`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (runtime secrets). `NEXT_PUBLIC_SUPABASE_URL`
-/ `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_DEV_AUTH` are **build-time**
-args (baked into the bundle). With Supabase auth, set `WIZARD_ALLOWED_EMAILS`
-(runtime, comma-separated): only the listed accounts get in, and nobody without
-it, since anyone can create an account in the Supabase project with its public key.
+`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (runtime secrets). `NEXT_PUBLIC_DEV_AUTH`
+is a **build-time** arg. Supabase sign-in through the GAIK demo's project is
+chosen at run time: `WIZARD_AUTH_MODE=supabase`, `WIZARD_SUPABASE_URL` and
+`WIZARD_SUPABASE_KEY` (the public key only), and who gets in: a confirmed address
+listed in `WIZARD_ALLOWED_EMAILS`, or, with `WIZARD_SUPABASE_ACCESS=access_requests`,
+one whose row in the demo's `access_requests` is approved
+(solution_wizard_v2/README.md, "Supabase-kirjautuminen"). Without either nobody
+gets in, since anyone can create an account in the project with its public key.
+The older build-time pair `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+is still read when the run-time one is unset.
 `GAIK_DEMO_URL` (runtime, optional) is where the sign-in page and the account
 menu link back to the GAIK demos; it defaults to `https://gaik-demo.2.rahtiapp.fi`,
 and an empty value hides the link.
@@ -258,9 +299,12 @@ and an empty value hides the link.
 Go through this before rolling out a release that contains #43, and when a new
 stack or a new Supabase project is set up.
 
-Since #43 the web app lets a Supabase user in only when their address is listed
-in `WIZARD_ALLOWED_EMAILS` **and** Supabase has confirmed that address. An unset
-or empty `WIZARD_ALLOWED_EMAILS` means nobody gets in.
+The web app lets a Supabase user in only when Supabase has confirmed their
+address **and** it is listed in `WIZARD_ALLOWED_EMAILS` or, with
+`WIZARD_SUPABASE_ACCESS=access_requests`, the demo has approved their row. With
+neither, nobody gets in. With `access_requests` the demo's own approval is the
+gate, so its sign-up may stay open (for an event, only while it runs); the steps
+below on sign-up apply to the list.
 
 1. **Set `WIZARD_ALLOWED_EMAILS` on the live web Deployment first.** It is in no
    manifest. Set it with `oc set env` before the rollout, so the new pods start

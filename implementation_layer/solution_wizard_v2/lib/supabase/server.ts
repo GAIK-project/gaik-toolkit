@@ -1,16 +1,17 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { supabaseSettings } from "@/lib/supabase-auth";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 export async function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
+  const settings = supabaseSettings();
+  if (!settings) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY. For local UI set NEXT_PUBLIC_DEV_AUTH=true in .env.local (see .env.example).",
+      "Missing WIZARD_SUPABASE_URL / WIZARD_SUPABASE_KEY. For local UI set NEXT_PUBLIC_DEV_AUTH=true in .env.local (see .env.example).",
     );
   }
+  const { url, key } = settings;
 
   const cookieStore = await cookies();
 

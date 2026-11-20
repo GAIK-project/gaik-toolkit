@@ -2,10 +2,11 @@
 //
 // Gathering (steps 1-3) has no UI affordance to advance — the agent moves the
 // session on. E2E specs running against the mock store therefore cannot click
-// their way to a later phase, so they say where they want to be instead. Same DEV_AUTH gate as reset-mocks.
+// their way to a later phase, so they say where they want to be instead. Same dev-login gate as reset-mocks.
 
 import { NextRequest } from "next/server";
-import { DEV_AUTH } from "@/lib/auth";
+import { proxyAuthEnabled } from "@/lib/proxy-auth";
+import { devAuthActive } from "@/lib/supabase-auth";
 import { wizardApiEnabled } from "@/lib/wizard-api-client";
 import { rejectGate, setSessionStep } from "@/lib/mock-sessions";
 import { withLogging } from "@/lib/with-logging";
@@ -15,7 +16,8 @@ export const dynamic = "force-dynamic";
 export const POST = withLogging("dev.set-step", async (req: NextRequest) => {
   // These routes need no sign-in, so they exist only for the in-memory mock
   // store that E2E runs use; a stack with a real wizard_api has none of them.
-  if (!DEV_AUTH || wizardApiEnabled()) {
+  // Only where the dev login is the one in use, not behind another sign-in.
+  if (!devAuthActive() || proxyAuthEnabled() || wizardApiEnabled()) {
     return new Response("Forbidden", { status: 403 });
   }
   const body = (await req.json().catch(() => null)) as {

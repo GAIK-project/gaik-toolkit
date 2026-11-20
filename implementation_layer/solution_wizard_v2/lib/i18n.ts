@@ -16,7 +16,7 @@ export const DATE_LOCALE: Record<Locale, string> = {
   en: "en-GB",
 };
 
-export const LOGIN_ERROR_CODES = ["credentials", "unavailable", "signup"] as const;
+export const LOGIN_ERROR_CODES = ["credentials", "unavailable", "signup", "pending"] as const;
 export type LoginErrorCode = (typeof LOGIN_ERROR_CODES)[number];
 export const LOGIN_MESSAGE_CODES = ["signed-up"] as const;
 export type LoginMessageCode = (typeof LOGIN_MESSAGE_CODES)[number];
@@ -284,6 +284,8 @@ export type Dict = {
   helpLink: string;
   /** The link back to the GAIK toolkit's demos, on the sign-in page and in the account menu. */
   gaikDemosLink: string;
+  /** Sign-in page, Supabase sign-in: where to make an account. */
+  signUpInDemo: string;
   pocInputReminder: string;
   exportSessionOpen: string;
   searchSessions: string;
@@ -1104,6 +1106,7 @@ const fi: Dict = {
   privacyLink: "Tietosuojaseloste",
   helpLink: "Ohje",
   gaikDemosLink: "GAIK-demot",
+  signUpInDemo: "Ei tunnusta? Luo se GAIK-demossa",
   pocInputReminder:
     "Käytä synteettistä tai anonymisoitua aineistoa. Älä lataa henkilötietoja, ellei se ole tarpeen.",
   exportSessionOpen: "Lataa session tiedot ZIP-tiedostona",
@@ -1745,6 +1748,8 @@ const fi: Dict = {
     credentials: "Väärä tunnus tai salasana.",
     unavailable: "Kirjautuminen ei ole nyt käytettävissä.",
     signup: "Rekisteröinti epäonnistui.",
+    pending:
+      "Tunnuksellasi ei vielä ole pääsyä wizardiin. Vahvista sähköpostiosoitteesi ja odota, että GAIK-demon ylläpito hyväksyy tunnuksen.",
   },
   loginMessages: {
     "signed-up":
@@ -1975,6 +1980,7 @@ const en: Dict = {
   privacyLink: "Privacy notice",
   helpLink: "Help",
   gaikDemosLink: "GAIK demos",
+  signUpInDemo: "No account? Make one in the GAIK demo",
   pocInputReminder:
     "Use synthetic or anonymised material. Do not upload personal data unless it is needed.",
   exportSessionOpen: "Download the session's data as a ZIP file",
@@ -2614,6 +2620,8 @@ const en: Dict = {
     credentials: "Wrong email or password.",
     unavailable: "Signing in is not available right now.",
     signup: "Sign-up failed.",
+    pending:
+      "Your account does not have access to the wizard yet. Confirm your email address and wait for the GAIK demo's administrators to approve the account.",
   },
   loginMessages: {
     "signed-up":
