@@ -820,7 +820,11 @@ async def _stream_turn(
 
 
 def _budget_stop(session: dict, reply: str, out_parts: list[str]):
-    """The frames that end a turn the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD.
+    """The frames that end a turn the agent stopped at its budget.
+
+    The budget is WIZARD_AGENT_MAX_BUDGET_USD, or what the usage caps left when
+    the agent started (``budget_from_caps``); the log, the count and the chat's
+    line say which.
 
     The CLI counts the budget for the whole agent process, across messages, so
     the agent would stop again at once on the next message: it is ended after
@@ -829,13 +833,21 @@ def _budget_stop(session: dict, reply: str, out_parts: list[str]):
     """
     from wizard_api import ops_metrics
 
-    ops_metrics.budget_stops.add(1)
-    logger.warning(
-        "agent stopped at its cost limit of %s USD; it is ended and the next message resumes it",
-        config.agent_max_budget_usd(),
-    )
+    from_caps = bool(session.get("budget_from_caps"))
+    ops_metrics.budget_stops.add(1, {"limit": "usage_cap" if from_caps else "agent"})
+    if from_caps:
+        logger.warning(
+            "agent stopped at the %.2f USD the usage caps left it; the next message is refused",
+            session.get("budget_usd") or 0.0,
+        )
+    else:
+        logger.warning(
+            "agent stopped at its cost limit of %s USD; "
+            "it is ended and the next message resumes it",
+            config.agent_max_budget_usd(),
+        )
     session["budget_spent"] = True
-    notices = CAP_NOTICE if session.get("budget_from_caps") else BUDGET_NOTICE
+    notices = CAP_NOTICE if from_caps else BUDGET_NOTICE
     notice = notices.get(session.get("locale") or "en", notices["en"])
     if _is_notice(reply):
         yield sse({"narration_end": True})  # shown while it streamed; not an answer
@@ -1163,10 +1175,6 @@ TURN_LIMIT_FRAME = {
 }
 
 
-#: Said in the chat when the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD. A text
-#: delta, not an error frame: the chat shows an error frame other than the turn
-#: limit as a failed reply, and this is no failure. The agent is ended after the
-#: turn, so the next message resumes it with a budget of its own (see _stream_turn).
 #: Said instead of BUDGET_NOTICE when a usage cap set the budget
 #: (services/usage_caps.py): the next message is refused, so no "continue".
 CAP_NOTICE = {
@@ -1174,6 +1182,10 @@ CAP_NOTICE = {
     "en": "⚠︎ The wizard stopped because the usage limit was reached. The work so far is kept.",
 }
 
+#: Said in the chat when the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD. A text
+#: delta, not an error frame: the chat shows an error frame other than the turn
+#: limit as a failed reply, and this is no failure. The agent is ended after the
+#: turn, so the next message resumes it with a budget of its own (see _stream_turn).
 BUDGET_NOTICE = {
     "fi": (
         "⚠︎ Wizard pysähtyi, koska sen kustannusraja tuli täyteen. Tähänastinen työ on "
@@ -1692,21 +1704,33 @@ async def _discard_session(session: dict) -> None:
     await _disconnect_quietly(session["client"])
 
 
+#: How far past what the caps leave a live agent may still spend before
+#: ``fit_budget`` ends it, in USD: about one reply. Below it a small overrun is
+#: allowed rather than restarting the agent each time its owner switches sessions.
+FIT_BUDGET_MARGIN_USD = 1.0
+
+
 async def fit_budget(session_id: str, budget_usd: float | None) -> bool:
-    """End the idle live agent of ``session_id`` when the caps now leave less than it may spend.
+    """End the idle live agent of ``session_id`` when the caps leave much less than it may spend.
 
     An agent keeps the budget it was started with, counted by its CLI from its
     start. Spend in the owner's other sessions since then is not taken off it,
-    so when what the caps have left is less than what this agent still has, it
-    is ended, and the next message resumes it with the smaller budget. True when
-    one was ended. A busy agent is left alone: the message is refused anyway.
+    so when what this agent still has is more than ``FIT_BUDGET_MARGIN_USD``
+    over what the caps leave, it is ended, and the message resumes it with the
+    smaller budget. Then the user's cap is passed by at most that margin, and an
+    agent is not restarted every time its owner switches sessions. True when one
+    was ended. A busy agent is left alone (the message is refused anyway), and
+    so is one handed to a request in the last ``_JUST_USED_SECONDS``, which may
+    still be setting up its turn.
     """
     agent = AGENT_SESSIONS.get(session_id)
     if agent is None or budget_usd is None or is_busy(session_id):
         return False
+    if agent.get("last_active", 0.0) > time.time() - _JUST_USED_SECONDS:
+        return False
     started_with = agent.get("budget_usd")
     left = None if started_with is None else started_with - agent.get("cost_total_usd", 0.0)
-    if left is not None and left <= budget_usd + 0.01:
+    if left is not None and left <= budget_usd + FIT_BUDGET_MARGIN_USD:
         return False
     return await end_session(session_id)
 

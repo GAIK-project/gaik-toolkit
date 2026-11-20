@@ -76,7 +76,8 @@ uploads_scanned = meter.create_counter(
 )
 budget_stops = meter.create_counter(
     "wizard.agent.budget_stops",
-    description="Chat turns the agent ended at its cost limit (WIZARD_AGENT_MAX_BUDGET_USD)",
+    description="Chat turns the agent ended at its budget, by limit: agent "
+    "(WIZARD_AGENT_MAX_BUDGET_USD) or usage_cap (what the usage caps left)",
 )
 usage_cost = meter.create_counter(
     "wizard.usage.cost_usd",
@@ -191,7 +192,7 @@ _PRIMED = {
         for t in ("approved", "rejected", "pending")
     ],
     "ownership_denied": [{}],
-    "budget_stops": [{}],
+    "budget_stops": [{"limit": limit} for limit in ("agent", "usage_cap")],
     "usage_cost": [{}],
     "usage_warnings": [{"scope": s} for s in ("session", "user", "deployment")],
     # Metered calls refused at a limit (agent_tool_guard.METERED_KINDS).

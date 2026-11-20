@@ -320,13 +320,17 @@ not the provider's bill, which keeps its own cap as the hard limit.
   `{"error": "usage_cap", "scope": "session" | "user" | "deployment"}`. The agent
   is started with the smallest amount any cap has left as its `max_budget_usd`
   (or `WIZARD_AGENT_MAX_BUDGET_USD`, if smaller), so a long reply stops at the
-  cap; the chat then says the usage limit is reached, without "continue". An idle
-  live agent started when the caps left more (the user spent in another session
-  since) is ended first and resumed with the smaller budget.
+  cap; the chat then says the usage limit is reached, without "continue", and
+  `wizard.agent.budget_stops` counts it with `limit=usage_cap`. An idle live agent
+  started when the caps left more (the user spent in another session since) is
+  ended first and resumed with the smaller budget, once it could pass them by more
+  than about 1 USD (`FIT_BUDGET_MARGIN_USD`), so switching sessions does not
+  restart it each time.
 - A new session past `WIZARD_MAX_SESSIONS_PER_USER` is refused with `429`
   `session_limit`, claimed in one statement so two at once cannot both get the last place.
 - Once a session or a user has used the warning share of its cap, a line is added
-  to that reply, once, in the session's language. The deployment's is logged as a
+  to that reply, once, in the session's language; a turn that did not complete
+  leaves it for the next one. The deployment's is logged as a
   warning. `wizard.usage.cost_usd` and `wizard.usage.warnings` count both.
 - Not counted: the model calls of PoC test runs in the sandbox and of
   `generate_schema.py`, which the run and metered-call limits bound, and a reply

@@ -205,14 +205,17 @@ def record_cost(
     *,
     session: WizardSession | None = None,
     now: datetime | None = None,
+    warn: bool = True,
 ) -> list[str]:
     """Add one turn's ``cost`` everywhere it counts; return the scopes to tell the user of.
 
     ``session`` is None for a session deleted while its turn ran: the user's and
     the deployment's spend still grow. A scope is returned once, the first time
     its spend reaches ``WIZARD_COST_WARN_RATIO`` of its cap. The deployment's is
-    logged instead, for whoever runs it. Nothing is done for a cost that is not
-    positive.
+    logged instead, for whoever runs it. With ``warn`` false (a turn that did
+    not complete, so nothing could be said) the spend is counted and no warning
+    is marked as given, so the next turn gives it. Nothing is done for a cost
+    that is not positive.
     """
     from wizard_api import ops_metrics
     from wizard_api.services import session_service
@@ -228,14 +231,19 @@ def record_cost(
         total = session_spent(session) + cost
         metadata[SESSION_COST_KEY] = round(total, 6)
         cap = config.session_max_cost_usd()
-        if cap is not None and total >= ratio * cap and not metadata.get(SESSION_WARNED_KEY):
+        if (
+            warn
+            and cap is not None
+            and total >= ratio * cap
+            and not metadata.get(SESSION_WARNED_KEY)
+        ):
             metadata[SESSION_WARNED_KEY] = True
             notices.append("session")
         session.session_metadata = metadata
 
     user_total = _add(db, USER, user_id, cost)
     cap = config.user_max_cost_usd()
-    if cap is not None and user_total >= ratio * cap and _warn_once(db, USER, user_id):
+    if warn and cap is not None and user_total >= ratio * cap and _warn_once(db, USER, user_id):
         notices.append(USER)
 
     period = month(now)

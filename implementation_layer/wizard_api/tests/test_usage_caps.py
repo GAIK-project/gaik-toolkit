@@ -126,6 +126,28 @@ def test_a_stop_at_a_cap_set_budget_says_the_usage_limit_is_reached() -> None:
     assert json.loads(frames[-1][6:]) == {"done": True, "limit": "budget"}
 
 
+def test_a_cap_stop_is_logged_and_counted_as_the_caps(monkeypatch, caplog) -> None:
+    from wizard_api import ops_metrics
+
+    counted: list = []
+
+    class _Counter:
+        def add(self, amount, attributes=None):
+            counted.append(attributes)
+
+    monkeypatch.setattr(ops_metrics, "budget_stops", _Counter())
+    caplog.set_level("WARNING", logger="wizard_api.services.agent_service")
+    list(
+        agent_service._budget_stop(
+            {"locale": "en", "budget_from_caps": True, "budget_usd": 2.5}, "", []
+        )
+    )
+
+    assert counted == [{"limit": "usage_cap"}]
+    assert "2.50 USD the usage caps left" in caplog.text
+    assert "None" not in caplog.text
+
+
 def test_a_stop_at_the_agents_own_limit_still_says_go_on() -> None:
     parts: list[str] = []
     list(agent_service._budget_stop({"locale": "en"}, "", parts))
@@ -194,6 +216,17 @@ def test_each_cap_is_warned_of_once_when_its_share_is_used(db_session, caps) -> 
 
 
 @requires_postgres
+def test_a_turn_that_did_not_complete_leaves_the_warning_for_the_next(db_session, caps) -> None:
+    caps(ratio="0.8")
+    row = _session(db_session)
+
+    assert usage_caps.record_cost(db_session, "ann", 4.5, session=row, now=NOV, warn=False) == []
+    db_session.refresh(row)
+    assert usage_caps.session_spent(row) == pytest.approx(4.5)  # still counted
+    assert usage_caps.record_cost(db_session, "ann", 0.1, session=row, now=NOV) == ["session"]
+
+
+@requires_postgres
 def test_a_cap_that_is_off_is_never_warned_of(db_session, caps) -> None:
     caps(session="0", user="0")
     row = _session(db_session)
@@ -246,16 +279,38 @@ def test_a_live_agent_with_more_budget_than_the_caps_leave_is_ended(monkeypatch)
     monkeypatch.setattr(agent_service, "end_session", end)
     monkeypatch.setattr(agent_service, "AGENT_SESSIONS", {})
     sid = "a"
-    agent = {"lock": asyncio.Lock(), "budget_usd": 10.0, "cost_total_usd": 2.0}
+    idle = time.time() - 600
+    agent = {"lock": asyncio.Lock(), "budget_usd": 10.0, "cost_total_usd": 2.0, "last_active": idle}
     agent_service.AGENT_SESSIONS[sid] = agent
 
     assert asyncio.run(agent_service.fit_budget(sid, 8.0)) is False  # it has 8 left
     assert asyncio.run(agent_service.fit_budget(sid, None)) is False
+    # Within the margin a small overrun is allowed, so switching sessions
+    # does not restart the agent each time.
+    assert asyncio.run(agent_service.fit_budget(sid, 7.5)) is False
     assert asyncio.run(agent_service.fit_budget(sid, 3.0)) is True
     assert ended == [sid]
     # One without a budget of its own is ended when a cap now sets one.
-    agent_service.AGENT_SESSIONS[sid] = {"lock": asyncio.Lock(), "budget_usd": None}
+    agent_service.AGENT_SESSIONS[sid] = {
+        "lock": asyncio.Lock(),
+        "budget_usd": None,
+        "last_active": idle,
+    }
     assert asyncio.run(agent_service.fit_budget(sid, 3.0)) is True
+
+
+def test_an_agent_just_handed_to_a_request_is_not_ended(monkeypatch) -> None:
+    async def end(session_id):
+        raise AssertionError("an agent being set up for a turn must not be ended")
+
+    monkeypatch.setattr(agent_service, "end_session", end)
+    monkeypatch.setattr(
+        agent_service,
+        "AGENT_SESSIONS",
+        {"a": {"lock": asyncio.Lock(), "budget_usd": 10.0, "last_active": time.time()}},
+    )
+
+    assert asyncio.run(agent_service.fit_budget("a", 1.0)) is False
 
 
 @requires_postgres

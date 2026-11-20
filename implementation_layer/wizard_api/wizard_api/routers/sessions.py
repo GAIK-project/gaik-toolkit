@@ -1544,7 +1544,7 @@ async def chat(
     # Set when the turn stored its reply, which a usage notice is then added to.
     stored: list[bool] = []
 
-    def record_usage() -> list[str]:
+    def record_usage(warn: bool) -> list[str]:
         """Add the turn's cost to the caps' totals, in a database session of its own.
 
         Its own, so a turn that failed half-way through a write of its database
@@ -1557,7 +1557,7 @@ async def chat(
             usage_db = next(usage)
             # A session deleted meanwhile is None: its owner's spend still counts.
             row = session_service.get_session(usage_db, session_id)
-            return usage_caps.record_cost(usage_db, owner, sum(turn_cost), session=row)
+            return usage_caps.record_cost(usage_db, owner, sum(turn_cost), session=row, warn=warn)
         finally:
             usage.close()
 
@@ -1613,11 +1613,13 @@ async def chat(
             )
         finally:
             try:
-                notices = await asyncio.to_thread(record_usage)
+                # A turn that did not complete cannot say the notice: it is
+                # left for the next one.
+                notices = await asyncio.to_thread(record_usage, completed)
             except Exception:  # noqa: BLE001 - the reply is whole; the cause is in the log
                 logger.error("usage of session %s could not be recorded", session_id, exc_info=True)
                 notices = []
-            if completed and notices:
+            if notices:
                 # Said once per cap, after the reply, and kept with it for a reload.
                 text = "\n\n".join(usage_caps.notice(scope, lang) for scope in notices)
                 await turn.publish(agent_service.sse({"delta": f"\n\n{text}"}))
