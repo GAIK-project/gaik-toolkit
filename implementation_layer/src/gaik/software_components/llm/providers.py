@@ -6,6 +6,8 @@ import logging
 import os
 from enum import Enum
 
+from gaik.software_components.env_file import load_env_file
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,6 +36,7 @@ def resolve_provider(
     LLM_PROVIDER env > default ``azure``. An explicit legacy config keeps its
     selected backend even when a different default is set in the environment.
     """
+    load_env_file()
     if provider:
         return _validate(provider)
     if config and "provider" in config:

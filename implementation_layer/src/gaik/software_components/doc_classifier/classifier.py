@@ -25,7 +25,6 @@ from ..parsers.docx_parser import DocxParser
 from ..parsers.pymypdf import PyMuPDFParser
 from ..parsers.vision import VisionParser
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # System prompt for classification

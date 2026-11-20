@@ -95,6 +95,10 @@ The Google SDK adapter supports the direct Gemini API and Vertex AI. Vertex acce
 
 LiteLLM is opt-in: `get_llm_config("litellm", model="azure/gpt-6-luna", api_key=key, base_url=endpoint, api_version=version)`. It uses the same component interface and passes credentials per request. `LITELLM_API_KEY`, `LITELLM_BASE_URL`, `LITELLM_API_VERSION`, and `LITELLM_EMBEDDING_MODEL` are optional environment defaults. Select a provider-prefixed embedding model separately when needed.
 
+### Environment variables and `.env`
+
+The configuration helpers (`get_llm_config`, `get_openai_config` and the parsers' own) read keys and endpoints from environment variables, and also take them from a `.env` file. Importing gaik reads no file: the file is loaded once, the first time a helper runs, and never overrides a variable that is already set. Importing gaik also leaves your application's logging as it is. To pass every setting explicitly and have gaik ignore any `.env` file, set `GAIK_NO_DOTENV=1`. Where the file is looked up: from the directory gaik is installed in and every directory above it; in a notebook, `python -c`, a debugger or a coverage run, from the working directory at that first call and every directory above it. A `.env` found there can set provider keys and endpoints, so set `GAIK_NO_DOTENV=1` in a service, and in a notebook do not change into a folder you do not trust before the first configuration call. The endpoint checks, the JEV classifier and the web scraper read only the environment they are given and never load a `.env` file themselves.
+
 ### Timeouts and retries
 
 When a config sets no `timeout` or `max_retries`, every provider stops a request that gets no answer after 600 seconds and retries a failed one twice, the OpenAI and Anthropic SDKs' own defaults. Gemini, Vertex AI and LiteLLM use the same values instead of waiting without a limit or far longer. A Vertex AI request in the default EU location is asked once for at most 120 seconds before the global endpoint takes over. Pass `timeout` and `max_retries` in the config to choose other values.

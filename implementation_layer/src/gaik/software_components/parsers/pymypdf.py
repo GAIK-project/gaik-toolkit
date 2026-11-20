@@ -24,7 +24,6 @@ except ImportError as exc:
         "Install extras with 'pip install gaik[parser]'"
     ) from exc
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

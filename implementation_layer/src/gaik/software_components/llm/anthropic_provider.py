@@ -16,6 +16,7 @@ import anthropic
 from pydantic import BaseModel
 
 from gaik.software_components.endpoints import ANTHROPIC_URL, foundry_host, host_of, log_endpoint
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm.base import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_TIMEOUT_SECONDS,
@@ -154,6 +155,7 @@ class AnthropicProvider:
 
     @staticmethod
     def _build_client(config: dict):
+        load_env_file()
         options = {
             key: config[key]
             for key in ("timeout", "max_retries", "http_client")

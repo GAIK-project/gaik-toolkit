@@ -9,6 +9,7 @@ import os
 import time
 from typing import Any, Literal
 
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm import create_llm_client, get_llm_config, resolve_provider
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.source_material import SourceMaterial
@@ -466,6 +467,7 @@ class LLMJudge:
         user_prompt: str,
         system_prompt: str,
     ) -> tuple[str, int, int]:
+        load_env_file()
         from google import genai
         from google.genai import types
 

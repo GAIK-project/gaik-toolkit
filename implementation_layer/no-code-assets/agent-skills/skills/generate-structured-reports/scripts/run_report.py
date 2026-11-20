@@ -245,10 +245,25 @@ def install_provider_extra(provider: str, module: str, extra: str) -> None:
     )
 
 
+def load_env_file() -> None:
+    """Load the ``.env`` file the way gaik does, before this script reads the environment.
+
+    A gaik newer than 0.11.0 reads ``.env`` on its first configuration call, not on
+    import, so ``LLM_PROVIDER`` read here would miss it; an older gaik loaded it on
+    import already.
+    """
+    try:
+        from gaik.software_components.env_file import load_env_file as load
+    except ImportError:
+        return
+    load()
+
+
 def load_config(provider: str | None) -> dict:
     """The runtime LLM config. Credentials come from the environment, never from the spec."""
     from gaik.software_components.llm import get_llm_config
 
+    load_env_file()
     name = provider or os.environ.get("LLM_PROVIDER", "").strip() or DEFAULT_PROVIDER
     try:
         config = get_llm_config(name)
@@ -1303,6 +1318,7 @@ SECTION_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
 def provider_name(provider: str | None) -> str:
     """The provider a proposal is for. Only its name is used: no config, no credentials."""
+    load_env_file()
     return (provider or os.environ.get("LLM_PROVIDER", "").strip() or DEFAULT_PROVIDER).lower()
 
 

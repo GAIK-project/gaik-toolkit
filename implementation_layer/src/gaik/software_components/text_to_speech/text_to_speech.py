@@ -10,6 +10,7 @@ import requests
 
 from gaik.software_components.config import create_openai_client, get_openai_config
 from gaik.software_components.endpoints import check_endpoint, log_endpoint
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -161,6 +162,7 @@ class TextToSpeech:
         )
 
     def _resolve_default_model(self) -> str:
+        load_env_file()
         if self.api_config.get("use_azure", False):
             return os.getenv("AZURE_TTS_MODEL", DEFAULT_MODEL)
         return os.getenv("OPENAI_TTS_MODEL", DEFAULT_MODEL)
@@ -195,6 +197,7 @@ class TextToSpeech:
         return response.content
 
     def _azure_tts_endpoint(self) -> str | None:
+        load_env_file()
         return self.api_config.get("tts_endpoint") or os.getenv("TTS_ENDPOINT")
 
     def _azure_tts_target(self) -> tuple[str, str]:
@@ -204,6 +207,7 @@ class TextToSpeech:
         goes with ``AZURE_API_KEY``, as before, so a speech resource with its own key keeps
         working. Either falls back to the other key when its own is missing.
         """
+        load_env_file()
         tts_endpoint = self._azure_tts_endpoint()
         if self.api_config.get("tts_endpoint"):
             api_key = self.api_config.get("api_key") or os.getenv("AZURE_API_KEY")

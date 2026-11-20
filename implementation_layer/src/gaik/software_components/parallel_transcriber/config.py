@@ -11,6 +11,8 @@ import os
 from dataclasses import dataclass
 from typing import Literal
 
+from gaik.software_components.env_file import load_env_file
+
 from .models import TranscriptionModel
 
 
@@ -106,6 +108,7 @@ class TranscriptionConfig:
         - ``WHISPER_PROMPT``
         - ``TRANSCRIPTION_MODEL``
         """
+        load_env_file()
 
         def _int(name: str, *alt_names: str, default: int | None = None) -> int | None:
             for n in (name, *alt_names):

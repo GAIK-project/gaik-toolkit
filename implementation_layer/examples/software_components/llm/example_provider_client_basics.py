@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from pydantic import BaseModel, ConfigDict, Field  # noqa: E402
 
+from gaik.software_components.env_file import load_env_file  # noqa: E402
 from gaik.software_components.llm import create_llm_client, get_llm_config  # noqa: E402
 
 
@@ -35,6 +36,9 @@ class CountryFact(BaseModel):
 
 
 def available_providers() -> list[str]:
+    # The keys are read here before any gaik config helper runs, so load the .env
+    # file those helpers use (the repository's, found from the gaik package) first.
+    load_env_file()
     candidates: list[str] = []
     if os.getenv("AZURE_API_KEY") and os.getenv("AZURE_ENDPOINT"):
         candidates.append("azure")

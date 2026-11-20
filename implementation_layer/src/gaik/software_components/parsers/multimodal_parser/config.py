@@ -10,7 +10,6 @@ import os
 
 import anthropic
 import google.auth.transport.requests
-from dotenv import load_dotenv
 from google.oauth2 import service_account
 from openai import AzureOpenAI, OpenAI
 
@@ -21,12 +20,12 @@ from gaik.software_components.endpoints import (
     host_of,
     log_endpoint,
 )
-
-load_dotenv()
+from gaik.software_components.env_file import load_env_file
 
 
 def require_env(name: str) -> str:
     """Return a required environment variable or fail with a clear message."""
+    load_env_file()
     value = os.getenv(name)
     if not value:
         raise ValueError(f"{name} not found in .env")
@@ -35,6 +34,7 @@ def require_env(name: str) -> str:
 
 def get_openai_config(use_azure: bool = True) -> dict:
     """Get OpenAI configuration based on whether to use Azure or standard OpenAI."""
+    load_env_file()
     if use_azure:
         azure_endpoint = require_env("AZURE_ENDPOINT")
         return {
@@ -56,6 +56,9 @@ def get_openai_config(use_azure: bool = True) -> dict:
 
 def create_openai_client(config: dict):
     """Create an OpenAI or Azure OpenAI client based on configuration."""
+    # Without a base_url the endpoint check and the SDK read OPENAI_BASE_URL from the
+    # environment, so a value kept in .env must be loaded first.
+    load_env_file()
     if config.get("use_azure", False):
         check_openai_endpoint(config, "azure")
         return AzureOpenAI(
@@ -69,6 +72,7 @@ def create_openai_client(config: dict):
 
 def get_claude_config(use_azure: bool = True) -> dict:
     """Get Anthropic configuration based on whether to use Azure Foundry or direct API."""
+    load_env_file()
     if use_azure:
         return {
             "use_azure": True,
@@ -88,6 +92,7 @@ def get_claude_config(use_azure: bool = True) -> dict:
 
 def create_claude_client(config: dict):
     """Create an Anthropic Foundry or direct Anthropic client based on configuration."""
+    load_env_file()
     if config.get("use_azure", False):
         log_endpoint("anthropic_foundry", foundry_host(config["resource"]))
         return anthropic.AnthropicFoundry(
@@ -100,6 +105,7 @@ def create_claude_client(config: dict):
 
 def get_google_config(vertex_ai: bool = True) -> dict:
     """Get Google configuration based on whether to use Vertex AI or direct Gemini API."""
+    load_env_file()
     model = os.getenv("GOOGLE_MODEL", "gemini-3-flash-preview")
     if vertex_ai:
         return {
