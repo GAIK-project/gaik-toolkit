@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  accessCacheMs,
   accessRequestsEnabled,
+  forgetAccessReads,
   devAuthActive,
   hasWizardAccess,
   rowGrantsAccess,
@@ -27,6 +29,8 @@ const access = (c: unknown, user: Parameters<typeof hasWizardAccess>[1], e: Node
 
 const confirmed = { id: "u1", email: "ada@example.test", email_confirmed_at: "2026-11-20T10:00:00Z" };
 const byRows = env({ WIZARD_SUPABASE_ACCESS: "access_requests" });
+
+beforeEach(() => forgetAccessReads());
 
 describe("supabase sign-in settings", () => {
   it("is on only with WIZARD_AUTH_MODE=supabase", () => {
@@ -129,5 +133,48 @@ describe("who may use the wizard", () => {
       },
     };
     expect(await access(broken as never, confirmed, byRows)).toBe(false);
+  });
+});
+
+
+describe("an approval is taken as read for a while", () => {
+  const T0 = 1_700_000_000_000;
+
+  it("asks the demo once, then again after the time", async () => {
+    const c = client({ status: "approved" });
+    expect(await hasWizardAccess(c as never, confirmed, byRows, T0)).toBe(true);
+    expect(await hasWizardAccess(c as never, confirmed, byRows, T0 + 59_000)).toBe(true);
+    expect(c.from).toHaveBeenCalledTimes(1);
+    expect(await hasWizardAccess(c as never, confirmed, byRows, T0 + 61_000)).toBe(true);
+    expect(c.from).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps no refusal, so an approval is seen at once", async () => {
+    const waiting = client({ status: "pending" });
+    expect(await hasWizardAccess(waiting as never, confirmed, byRows, T0)).toBe(false);
+    const approved = client({ status: "approved" });
+    expect(await hasWizardAccess(approved as never, confirmed, byRows, T0 + 1_000)).toBe(true);
+    expect(approved.from).toHaveBeenCalledTimes(1);
+  });
+
+  it("still needs a confirmed address, and keeps nothing with the time set to 0", async () => {
+    const c = client({ status: "approved" });
+    await hasWizardAccess(c as never, confirmed, byRows, T0);
+    expect(
+      await hasWizardAccess(c as never, { ...confirmed, email_confirmed_at: null }, byRows, T0),
+    ).toBe(false);
+    forgetAccessReads();
+    const off = env({ WIZARD_SUPABASE_ACCESS: "access_requests", WIZARD_SUPABASE_ACCESS_CACHE_S: "0" });
+    await hasWizardAccess(c as never, confirmed, off, T0);
+    await hasWizardAccess(c as never, confirmed, off, T0);
+    expect(c.from).toHaveBeenCalledTimes(3);
+  });
+
+  it("reads the time from the environment within bounds", () => {
+    expect(accessCacheMs(env({}))).toBe(60_000);
+    expect(accessCacheMs(env({ WIZARD_SUPABASE_ACCESS_CACHE_S: "30" }))).toBe(30_000);
+    expect(accessCacheMs(env({ WIZARD_SUPABASE_ACCESS_CACHE_S: "99999" }))).toBe(3_600_000);
+    expect(accessCacheMs(env({ WIZARD_SUPABASE_ACCESS_CACHE_S: "-1" }))).toBe(60_000);
+    expect(accessCacheMs(env({ WIZARD_SUPABASE_ACCESS_CACHE_S: "soon" }))).toBe(60_000);
   });
 });

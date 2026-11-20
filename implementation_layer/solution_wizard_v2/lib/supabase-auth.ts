@@ -102,18 +102,54 @@ export async function hasWizardAccess(
   supabase: Pick<SupabaseClient, "from">,
   user: SupabaseUser | null | undefined,
   env: NodeJS.ProcessEnv = process.env,
+  now: number = Date.now(),
 ): Promise<boolean> {
   if (!user?.email_confirmed_at || !user.email) return false;
   if (isAllowedEmail(user.email, env)) return true;
   if (!accessRequestsEnabled(env) || !user.id) return false;
+  if ((granted.get(user.id) ?? 0) > now) return true;
   try {
     const { data, error } = await supabase
       .from("access_requests")
       .select("status, wizard_access")
       .eq("user_id", user.id)
       .maybeSingle();
-    return !error && rowGrantsAccess(data as AccessRow | null);
+    const allowed = !error && rowGrantsAccess(data as AccessRow | null);
+    if (allowed) remember(user.id, now, accessCacheMs(env));
+    return allowed;
   } catch {
     return false;
   }
+}
+
+/**
+ * How long an approval is taken as read, in ms: WIZARD_SUPABASE_ACCESS_CACHE_S
+ * (default 60, 0 is off). A page and its polling ask for the row on every
+ * request, the proxy and the page once each; without this, a full room asks
+ * the demo's project many times a second. Only an approval is kept: a waiting
+ * account sees its approval at once, and a withdrawn one ends within the time.
+ */
+export function accessCacheMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.WIZARD_SUPABASE_ACCESS_CACHE_S?.trim();
+  if (!raw) return 60_000;
+  const seconds = Number(raw);
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 3600) * 1000 : 60_000;
+}
+
+/** User id -> when the approval read for them stops counting (ms since the epoch). */
+const granted = new Map<string, number>();
+const MAX_REMEMBERED = 5000;
+
+function remember(userId: string, now: number, ttl: number): void {
+  if (ttl <= 0) return;
+  if (granted.size >= MAX_REMEMBERED) {
+    for (const [id, until] of granted) if (until <= now) granted.delete(id);
+    if (granted.size >= MAX_REMEMBERED) granted.clear();
+  }
+  granted.set(userId, now + ttl);
+}
+
+/** For tests: forget every approval read so far. */
+export function forgetAccessReads(): void {
+  granted.clear();
 }

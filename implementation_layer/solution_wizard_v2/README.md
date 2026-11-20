@@ -62,6 +62,7 @@ kirjautumissivulle ilmoituksen kanssa, ja API-kutsu ilman pääsyä saa `401`.
 | `WIZARD_SUPABASE_URL`, `WIZARD_SUPABASE_KEY` | projektin osoite ja julkinen (anon/publishable) avain, luetaan ajon aikana; ei koskaan secret- tai service role -avainta |
 | `WIZARD_SUPABASE_ACCESS` | `access_requests`: pääsy demon taulusta |
 | `WIZARD_SUPABASE_SIGNUP_URL` | rekisteröitymislinkki; tyhjä piilottaa sen |
+| `WIZARD_SUPABASE_ACCESS_CACHE_S` | kuinka kauan hyväksyntä pidetään luettuna, oletus `60`, `0` pois; hylkäystä ei muisteta, joten hyväksyntä näkyy heti ja peruttu hyväksyntä lakkaa viimeistään tämän ajan jälkeen |
 | `WIZARD_ALLOWED_EMAILS` | lisäksi päästettävät osoitteet, pilkuin eroteltuna |
 
 Demon Supabase-projektin redirect-listalle lisätään wizardin osoite, ja
