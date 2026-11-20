@@ -7,14 +7,15 @@ table, not the provider's bill). After every chat turn that cost is added to
 - the user's row in ``usage_totals``, which a deleted session does not reduce;
 - the deployment's row for the month (``usage_totals``, key ``YYYY-MM`` in UTC).
 
-Before an agent is woken for a message, a cap that is already reached refuses
-it (``check_chat``), and the agent is started with the smallest amount any cap
-has left as its own budget (``remaining_budget``), so one long reply cannot run
-far past a cap. Once a session or a user has used ``WIZARD_COST_WARN_RATIO`` of
-its cap, the chat says so, once (``record_cost``).
+Before an agent is woken for a message, a cap that is already reached, or
+leaves less than ``MIN_TURN_BUDGET_USD``, refuses it, and the agent is started
+with the smallest amount any cap has left as its own budget (``chat_budget``),
+so one long reply cannot run far past a cap. Once a session or a user has used
+``WIZARD_COST_WARN_RATIO`` of its cap, the chat says so, once (``record_cost``).
 
 Sessions per user are claimed before a session is created (``claim_session``):
-one atomic statement that refuses past ``WIZARD_MAX_SESSIONS_PER_USER``.
+one atomic statement that refuses past ``WIZARD_MAX_SESSIONS_PER_USER``. A
+removed session gives its place back (``release_session``), not its spend.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -68,6 +69,11 @@ NOTICES = {
 }
 
 
+#: Below this much left, in USD, a message is refused as if the cap were reached:
+#: a new agent's setup alone costs more, and the reply would stop at once.
+MIN_TURN_BUDGET_USD = 0.1
+
+
 class UsageCapError(RuntimeError):
     """A cap is reached. ``scope`` is ``session``, ``user`` or ``deployment``."""
 
@@ -77,7 +83,7 @@ class UsageCapError(RuntimeError):
 
 
 class SessionLimitError(RuntimeError):
-    """The user has created as many sessions as they may."""
+    """The user has as many sessions as they may."""
 
 
 def month(now: datetime | None = None) -> str:
@@ -121,68 +127,84 @@ def _caps(db: Session, session: WizardSession, now: datetime | None = None) -> l
     return caps
 
 
-def chat_budget(db: Session, session: WizardSession, now: datetime | None = None) -> float | None:
+def chat_budget(
+    db: Session, session: WizardSession, now: datetime | None = None, *, sharing: int = 0
+) -> float | None:
     """What the caps leave for this session's next message; None when no cap is on.
 
-    Raises UsageCapError when a cap is reached. The deployment's cap is checked
-    first: when it is reached, nobody's message goes through, and the user is
-    told so rather than that their own cap is full.
+    Raises UsageCapError when a cap is reached or leaves less than
+    ``MIN_TURN_BUDGET_USD``. The deployment's cap is checked first: when it is
+    reached, nobody's message goes through, and the user is told so rather than
+    that their own cap is full. ``sharing`` is how many of the user's other
+    sessions have a reply running: what the user's cap leaves is split with
+    them, so replies at once cannot each spend all of it.
     """
     caps = sorted(_caps(db, session, now), key=lambda c: c.scope != DEPLOYMENT)
     for cap in caps:
-        if cap.left <= 0:
+        if cap.left < MIN_TURN_BUDGET_USD:
             raise UsageCapError(cap.scope)
-    return min(cap.left for cap in caps) if caps else None
+    if not caps:
+        return None
+    shares = [cap.left / (1 + sharing) if cap.scope == USER else cap.left for cap in caps]
+    return max(MIN_TURN_BUDGET_USD, min(shares))
 
 
 def claim_session(db: Session, user_id: str) -> None:
     """Count a new session for ``user_id``, or raise SessionLimitError at the limit.
 
     One statement, so two sessions created at the same moment cannot both take
-    the last place. Committed at once: a session the caller then fails to create
-    still counts, which errs on the side of the limit.
+    the last place. Committed at once; a session the caller then fails to
+    create, or that is removed later, gives its place back (``release_session``).
     """
     limit = config.max_sessions_per_user()
-    statement = insert(UsageTotal).values(scope=USER, key=user_id, sessions_created=1)
+    statement = insert(UsageTotal).values(scope=USER, key=user_id, sessions_held=1)
     if limit is None:
         statement = statement.on_conflict_do_update(
             index_elements=[UsageTotal.scope, UsageTotal.key],
-            set_={"sessions_created": UsageTotal.sessions_created + 1},
+            set_={"sessions_held": UsageTotal.sessions_held + 1, "updated_at": func.now()},
         )
     else:
         statement = statement.on_conflict_do_update(
             index_elements=[UsageTotal.scope, UsageTotal.key],
-            set_={"sessions_created": UsageTotal.sessions_created + 1},
-            where=UsageTotal.sessions_created < limit,
+            set_={"sessions_held": UsageTotal.sessions_held + 1, "updated_at": func.now()},
+            where=UsageTotal.sessions_held < limit,
         )
-    claimed = db.execute(statement.returning(UsageTotal.sessions_created)).scalar_one_or_none()
+    claimed = db.execute(statement.returning(UsageTotal.sessions_held)).scalar_one_or_none()
     db.commit()
     if claimed is None:
         raise SessionLimitError(
-            f"You have started the {limit} sessions your account may have. Continue in one of them."
+            f"Your account has the {limit} sessions it may have. "
+            "Continue in one of them, or remove one you no longer need."
         )
 
 
-def release_session(db: Session, user_id: str) -> None:
-    """Give back a place claimed for a session that could then not be created."""
-    db.rollback()
+def release_session(db: Session, user_id: str, *, commit: bool = True) -> None:
+    """Give back the place of a session that could not be created, or was removed.
+
+    With ``commit`` (a create that failed) the caller's failed work is rolled
+    back first; without it (a removal) the place goes back in the caller's
+    transaction, with the session itself.
+    """
+    if commit:
+        db.rollback()
     db.execute(
         update(UsageTotal)
         .where(
             UsageTotal.scope == USER,
             UsageTotal.key == user_id,
-            UsageTotal.sessions_created > 0,
+            UsageTotal.sessions_held > 0,
         )
-        .values(sessions_created=UsageTotal.sessions_created - 1)
+        .values(sessions_held=UsageTotal.sessions_held - 1, updated_at=func.now())
     )
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def _add(db: Session, scope: str, key: str, cost: float) -> float:
     statement = insert(UsageTotal).values(scope=scope, key=key, cost_usd=cost)
     statement = statement.on_conflict_do_update(
         index_elements=[UsageTotal.scope, UsageTotal.key],
-        set_={"cost_usd": UsageTotal.cost_usd + cost},
+        set_={"cost_usd": UsageTotal.cost_usd + cost, "updated_at": func.now()},
     )
     return float(db.execute(statement.returning(UsageTotal.cost_usd)).scalar_one())
 

@@ -1092,7 +1092,7 @@ const fi: Dict = {
   languageLabel: "Kieli",
   startFailed: "Session aloitus ei onnistunut. Yritä uudelleen.",
   sessionLimit:
-    "Olet aloittanut jo niin monta sessiota kuin tunnuksesi sallii. Jatka jossakin niistä.",
+    "Tunnuksellasi on jo niin monta sessiota kuin se sallii. Jatka jossakin niistä tai poista sessio, jota et enää tarvitse.",
   sessionNotFound: "Sessiota ei löytynyt.",
   done: "Valmis",
   step: "Vaihe",
@@ -1923,7 +1923,7 @@ const en: Dict = {
   languageLabel: "Language",
   startFailed: "The session could not be started. Try again.",
   sessionLimit:
-    "You have started as many sessions as your account allows. Continue in one of them.",
+    "Your account has as many sessions as it allows. Continue in one of them, or remove one you no longer need.",
   sessionNotFound: "Session not found.",
   done: "Done",
   step: "Step",

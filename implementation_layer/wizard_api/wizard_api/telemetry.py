@@ -28,6 +28,7 @@ from opentelemetry.trace import Span, Status, StatusCode
 SERVICE_NAME = "wizard-v2-api"
 
 tracer = trace.get_tracer("wizard_api")
+logger = logging.getLogger(__name__)
 
 _provider: Any = None
 
@@ -278,6 +279,25 @@ def query_cost(agent: dict, result: Any) -> float | None:
     return total - before if total >= before else total
 
 
+#: What a query that ended with no result (a timeout, a crashed or killed
+#: agent) is charged for the usage caps, in USD, when its agent's own budget
+#: does not leave less: its real cost never arrives. About one long reply.
+UNREPORTED_QUERY_COST_USD = 1.0
+
+
+def unreported_query_cost(agent: dict) -> float:
+    """The estimate charged for ``agent``'s query that ended with no result."""
+    from wizard_api import ops_metrics
+
+    estimate = UNREPORTED_QUERY_COST_USD
+    budget = agent.get("budget_usd")
+    if budget is not None:
+        estimate = max(0.0, min(estimate, budget - agent.get("cost_total_usd", 0.0)))
+    logger.warning("a query ended with no result; %.2f USD is counted for it", estimate)
+    ops_metrics.usage_unreported.add(1)
+    return estimate
+
+
 def _response_model(result: Any) -> str | None:
     """The model that did most of the query's work, from the SDK's per-model usage."""
     per_model = getattr(result, "model_usage", None) or {}
@@ -413,6 +433,8 @@ async def traced_turn(
                 cost = query_cost(agent, result)
                 record_turn_usage(turn, result, model, purpose, cost=cost, replaced=replaced)
                 spent += cost or 0.0
+            if agent.pop("query_unfinished", False):
+                spent += unreported_query_cost(agent)
         if on_cost is not None and spent > 0:
             on_cost(spent)
         if failed:

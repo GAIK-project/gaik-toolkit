@@ -83,6 +83,10 @@ usage_cost = meter.create_counter(
     "wizard.usage.cost_usd",
     description="Estimated USD the agent spent, added after each chat turn (usage caps)",
 )
+usage_unreported = meter.create_counter(
+    "wizard.usage.unreported_queries",
+    description="Agent queries that ended with no result, charged an estimate (usage caps)",
+)
 usage_warnings = meter.create_counter(
     "wizard.usage.warnings",
     description="Times a session, a user or the deployment passed the warning share of its cap",
@@ -194,6 +198,7 @@ _PRIMED = {
     "ownership_denied": [{}],
     "budget_stops": [{"limit": limit} for limit in ("agent", "usage_cap")],
     "usage_cost": [{}],
+    "usage_unreported": [{}],
     "usage_warnings": [{"scope": s} for s in ("session", "user", "deployment")],
     # Metered calls refused at a limit (agent_tool_guard.METERED_KINDS).
     "tool_calls": [

@@ -686,6 +686,9 @@ async def _stream_turn(
     current: list[str] = []  # text of the assistant message being streamed
     shown = ""  # text of the last closed message that is still on the user's screen
     finished = False  # the agent's ResultMessage was seen
+    # Until the ResultMessage comes, this query's cost is not known: a turn that
+    # ends without one is charged an estimate (telemetry.traced_turn).
+    session["query_unfinished"] = True
     tool: str | None = None  # the kind of tool call that is running, if one is
 
     def stopped() -> list[str]:
@@ -753,6 +756,7 @@ async def _stream_turn(
                 _note_system_message(message)
             elif isinstance(message, ResultMessage):
                 finished = True
+                session["query_unfinished"] = False
                 # Tokens and cost of this query, for the turn's span (telemetry).
                 session.setdefault("turn_results", []).append(("turn", message))
                 if getattr(message, "session_id", None):
@@ -1251,6 +1255,7 @@ async def get_or_create_session(
     existing = AGENT_SESSIONS.get(session_id)
     if existing is not None:
         existing["last_active"] = time.time()  # keeps _make_room from ending it
+        existing["handed_at"] = existing["last_active"]  # and fit_budget
         # The session is already live, so the locale cannot be pinned by
         # bootstrapping again — send the change as its own instruction instead.
         repin = relanguage_prompt(existing.get("locale"), locale)
@@ -1270,7 +1275,7 @@ async def get_or_create_session(
     async with _START_LOCKS.setdefault(session_id, asyncio.Lock()):
         existing = AGENT_SESSIONS.get(session_id)
         if existing is not None:
-            existing["last_active"] = time.time()
+            existing["last_active"] = existing["handed_at"] = time.time()
             return existing
         if user_id:
             await _make_room_for_user(user_id)
@@ -1381,6 +1386,8 @@ async def _start_session(
         "output_dir": out,
         "lock": asyncio.Lock(),
         "last_active": time.time(),
+        # When a request was last given it, which fit_budget leaves alone a while.
+        "handed_at": time.time(),
         # What the bootstrap pinned, so a later turn can tell a switch from a
         # repeat and only re-instruct on a real change.
         "locale": _normalise_locale(locale),
@@ -1417,6 +1424,21 @@ def reply_language(session_id: str) -> str:
 def is_live(session_id: str) -> bool:
     """Whether an agent process is being held for this session."""
     return session_id in AGENT_SESSIONS or session_id in _STARTING
+
+
+def running_turns_of(user_id: str | None, *, besides: str | None = None) -> int:
+    """How many of ``user_id``'s sessions other than ``besides`` have a turn running.
+
+    The usage caps share what the user's cap has left between them
+    (usage_caps.chat_budget), so two replies at once cannot each spend all of it.
+    """
+    if not user_id:
+        return 0
+    return sum(
+        1
+        for sid in list(TURNS)
+        if sid != besides and (AGENT_SESSIONS.get(sid) or {}).get("user_id") == user_id
+    )
 
 
 def is_busy(session_id: str) -> bool:
@@ -1721,12 +1743,13 @@ async def fit_budget(session_id: str, budget_usd: float | None) -> bool:
     agent is not restarted every time its owner switches sessions. True when one
     was ended. A busy agent is left alone (the message is refused anyway), and
     so is one handed to a request in the last ``_JUST_USED_SECONDS``, which may
-    still be setting up its turn.
+    still be setting up its turn. A turn that merely ended a moment ago does not
+    count as handed out.
     """
     agent = AGENT_SESSIONS.get(session_id)
     if agent is None or budget_usd is None or is_busy(session_id):
         return False
-    if agent.get("last_active", 0.0) > time.time() - _JUST_USED_SECONDS:
+    if agent.get("handed_at", 0.0) > time.time() - _JUST_USED_SECONDS:
         return False
     started_with = agent.get("budget_usd")
     left = None if started_with is None else started_with - agent.get("cost_total_usd", 0.0)

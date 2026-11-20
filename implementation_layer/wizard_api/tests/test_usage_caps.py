@@ -4,7 +4,7 @@ The cost of each chat turn is added to the session, the user and the month
 (services/usage_caps.py). A reached cap refuses the next message before an agent
 is woken (402 usage_cap), an agent starts with what the caps have left as its
 budget, and the chat says once when most of a cap is used. A user may create a
-set number of sessions, and deleting one does not give its place or its spend back.
+set number of sessions; removing one gives its place back, not its spend.
 """
 
 import asyncio
@@ -269,6 +269,27 @@ def test_the_budget_is_the_smallest_amount_left(db_session, caps) -> None:
     assert usage_caps.chat_budget(db_session, row, now=NOV) is None
 
 
+@requires_postgres
+def test_replies_at_once_share_what_the_users_cap_leaves(db_session, caps) -> None:
+    caps(session="0", user="10", deployment="100")
+    row = _session(db_session)
+    usage_caps.record_cost(db_session, "ann", 4.0, session=None, now=NOV)
+
+    assert usage_caps.chat_budget(db_session, row, now=NOV) == pytest.approx(6.0)
+    assert usage_caps.chat_budget(db_session, row, now=NOV, sharing=1) == pytest.approx(3.0)
+    # The deployment's cap is not split: other users' replies are not counted.
+    caps(session="0", user="0", deployment="100")
+    assert usage_caps.chat_budget(db_session, row, now=NOV, sharing=1) == pytest.approx(96.0)
+
+
+@requires_postgres
+def test_too_little_left_for_a_reply_is_refused_as_a_reached_cap(db_session, caps) -> None:
+    row = _session(db_session, cost=5.0 - usage_caps.MIN_TURN_BUDGET_USD / 2)
+    with pytest.raises(usage_caps.UsageCapError) as refused:
+        usage_caps.chat_budget(db_session, row, now=NOV)
+    assert refused.value.scope == "session"
+
+
 def test_a_live_agent_with_more_budget_than_the_caps_leave_is_ended(monkeypatch) -> None:
     ended: list[str] = []
 
@@ -307,10 +328,44 @@ def test_an_agent_just_handed_to_a_request_is_not_ended(monkeypatch) -> None:
     monkeypatch.setattr(
         agent_service,
         "AGENT_SESSIONS",
-        {"a": {"lock": asyncio.Lock(), "budget_usd": 10.0, "last_active": time.time()}},
+        {"a": {"lock": asyncio.Lock(), "budget_usd": 10.0, "handed_at": time.time()}},
     )
 
     assert asyncio.run(agent_service.fit_budget("a", 1.0)) is False
+
+
+def test_an_agent_whose_turn_just_ended_is_still_fitted(monkeypatch) -> None:
+    ended: list[str] = []
+
+    async def end(session_id):
+        ended.append(session_id)
+        return True
+
+    monkeypatch.setattr(agent_service, "end_session", end)
+    agent = {
+        "lock": asyncio.Lock(),
+        "budget_usd": 10.0,
+        "last_active": time.time(),  # its last turn ended a moment ago
+        "handed_at": time.time() - 120,
+    }
+    monkeypatch.setattr(agent_service, "AGENT_SESSIONS", {"a": agent})
+
+    assert asyncio.run(agent_service.fit_budget("a", 1.0)) is True
+    assert ended == ["a"]
+
+
+def test_replies_running_in_the_users_other_sessions_are_counted(monkeypatch) -> None:
+    monkeypatch.setattr(
+        agent_service,
+        "AGENT_SESSIONS",
+        {"a": {"user_id": "ann"}, "b": {"user_id": "ann"}, "c": {"user_id": "bob"}},
+    )
+    monkeypatch.setattr(agent_service, "TURNS", {"a": object(), "b": object(), "c": object()})
+
+    assert agent_service.running_turns_of("ann", besides="a") == 1
+    assert agent_service.running_turns_of("ann") == 2
+    assert agent_service.running_turns_of("bob", besides="a") == 1
+    assert agent_service.running_turns_of(None) == 0
 
 
 @requires_postgres
@@ -337,7 +392,7 @@ def test_sessions_are_counted_and_the_limit_holds_under_concurrency(db_engine, c
     assert sorted(outcomes) == ["ok"] * 3 + ["refused"] * 5
     db = factory()
     try:
-        assert db.get(UsageTotal, ("user", "crowd")).sessions_created == 3
+        assert db.get(UsageTotal, ("user", "crowd")).sessions_held == 3
         db.query(UsageTotal).delete()
         db.commit()
     finally:
@@ -350,14 +405,16 @@ def test_without_a_session_limit_every_session_is_still_counted(db_session, caps
     for _ in range(5):
         usage_caps.claim_session(db_session, "many")
 
-    assert _total(db_session, "user", "many").sessions_created == 5
+    assert _total(db_session, "user", "many").sessions_held == 5
 
 
 # --- through the API -----------------------------------------------------------------
 
 
 @requires_postgres
-def test_the_fourth_session_is_refused_and_deleting_does_not_make_room(client, caps) -> None:
+def test_the_fourth_session_is_refused_and_removing_one_makes_room_but_keeps_its_spend(
+    client, db_engine, caps
+) -> None:
     ids = [
         client.post("/sessions", json={"user_id": "ann", "title": f"S{n}"}).json()["id"]
         for n in range(3)
@@ -365,9 +422,21 @@ def test_the_fourth_session_is_refused_and_deleting_does_not_make_room(client, c
     refused = client.post("/sessions", json={"user_id": "ann", "title": "S4"})
     assert refused.status_code == 429
     assert refused.json()["detail"]["error"] == "session_limit"
+    db = sessionmaker(bind=db_engine)()
+    try:
+        usage_caps.record_cost(db, "ann", 4.0, session=db.get(WizardSession, uuid.UUID(ids[0])))
+    finally:
+        db.close()
 
     assert client.delete(f"/sessions/{ids[0]}", headers={USER_HEADER: "ann"}).status_code == 204
-    assert client.post("/sessions", json={"user_id": "ann", "title": "S5"}).status_code == 429
+    assert client.post("/sessions", json={"user_id": "ann", "title": "S5"}).status_code == 201
+    assert client.post("/sessions", json={"user_id": "ann", "title": "S6"}).status_code == 429
+    db = sessionmaker(bind=db_engine)()
+    try:
+        assert _total(db, "user", "ann").cost_usd == pytest.approx(4.0)  # spend stays
+        assert _total(db, "user", "ann").sessions_held == 3
+    finally:
+        db.close()
     # Another user has places of their own.
     assert client.post("/sessions", json={"user_id": "bob", "title": "B1"}).status_code == 201
 
@@ -520,3 +589,77 @@ def test_a_turn_is_counted_and_most_of_the_cap_is_said_once(turn_client, caps, m
     refused = turn_client.post(f"/sessions/{sid}/chat", json={"message": "Hei"})
     assert refused.status_code == 402
     assert refused.json()["detail"]["scope"] == "session"
+
+
+@requires_postgres
+def test_a_turn_that_ends_in_an_error_leaves_the_notice_for_the_next(
+    turn_client, caps, monkeypatch
+) -> None:
+    caps(session="5", user="100", deployment="1000", ratio="0.8")
+    agent = {"lock": asyncio.Lock()}
+    fail = [True]
+
+    async def fake_agent(session_id, output_dir, locale=None, **kwargs):
+        return agent
+
+    async def stream(_agent, message, parts):
+        spent = agent.get("cost_total_usd", 0.0) + 2.1
+        agent["turn_results"] = [("turn", _result(spent))]
+        if fail[0]:
+            yield sse({"error": True, "message": "broken"})
+            return
+        parts.append("Valmis.")
+        yield sse({"delta": "Valmis."})
+        yield sse({"done": True})
+
+    monkeypatch.setattr(agent_service, "get_or_create_session", fake_agent)
+    monkeypatch.setattr(agent_service, "stream_turn_for", stream)
+    sid = turn_client.post("/sessions", json={"user_id": "ann", "title": "S"}).json()["id"]
+
+    def send() -> list[dict]:
+        res = turn_client.post(f"/sessions/{sid}/chat", json={"message": "Hei", "locale": "fi"})
+        assert res.status_code == 200
+        _wait_for(lambda: not agent_service.is_busy(sid))
+        return _frames(res.text)
+
+    notice = usage_caps.notice("session", "fi")
+    send()
+    failed = send()  # 4.2 of 5 used, but the reader stops at the error frame
+    assert not any(notice in f.get("delta", "") for f in failed)
+    fail[0] = False
+    caps(session="10", user="100", deployment="1000", ratio="0.4")
+    given = send()  # 6.3 of 10: the notice not yet given comes now
+    assert any(notice.replace("80", "40") in f.get("delta", "") for f in given)
+
+
+def test_a_query_that_ended_with_no_result_is_charged_an_estimate() -> None:
+    from wizard_api import telemetry
+
+    async def frames():
+        yield sse({"error": True, "message": "the agent's stream ended without a result"})
+
+    roomy = {"budget_usd": 5.0, "cost_total_usd": 1.0, "query_unfinished": True}
+    tight = {"budget_usd": 1.3, "cost_total_usd": 1.0, "query_unfinished": True}
+    done = {"budget_usd": 5.0, "query_unfinished": False}
+    charged: list[float] = []
+
+    async def run(agent) -> None:
+        async for _ in telemetry.traced_turn(
+            frames(),
+            {},
+            lambda: [(agent, False)],
+            "m",
+            lambda f: "error" in f,
+            None,
+            charged.append,
+        ):
+            pass
+
+    for agent in (roomy, tight, done):
+        asyncio.run(run(agent))
+
+    assert charged == [
+        pytest.approx(telemetry.UNREPORTED_QUERY_COST_USD),
+        pytest.approx(0.3),  # no more than the agent's own budget left
+    ]
+    assert "query_unfinished" not in roomy

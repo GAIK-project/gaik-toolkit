@@ -1271,7 +1271,12 @@ async def chat(
     try:
         # A reached usage cap refuses the message before an agent is woken,
         # and an agent started for it gets what the caps have left as its budget.
-        budget = usage_caps.chat_budget(db, session)
+        budget = await asyncio.to_thread(
+            usage_caps.chat_budget,
+            db,
+            session,
+            sharing=agent_service.running_turns_of(owner, besides=str(session_id)),
+        )
     except usage_caps.UsageCapError as exc:
         raise _usage_cap(exc) from exc
     # A live agent started when the caps left more keeps that budget: it is
@@ -1613,28 +1618,32 @@ async def chat(
             )
         finally:
             try:
-                # A turn that did not complete cannot say the notice: it is
-                # left for the next one.
-                notices = await asyncio.to_thread(record_usage, completed)
-            except Exception:  # noqa: BLE001 - the reply is whole; the cause is in the log
-                logger.error("usage of session %s could not be recorded", session_id, exc_info=True)
-                notices = []
-            if notices:
-                # Said once per cap, after the reply, and kept with it for a reload.
-                text = "\n\n".join(usage_caps.notice(scope, lang) for scope in notices)
-                await turn.publish(agent_service.sse({"delta": f"\n\n{text}"}))
+                # Closed first: a write that failed half-way may still hold the
+                # session row's lock, which recording the spend waits for.
                 try:
-                    if stored:
-                        await asyncio.to_thread(_append_usage_notice, open_db, session_id, text)
+                    opened.close()
                 except Exception:  # noqa: BLE001
-                    logger.warning("usage notice of session %s not stored", session_id)
-            # Whatever closing the database session does, the turn is taken
-            # away: one left registered would refuse every later message.
-            try:
-                opened.close()
-            except Exception:  # noqa: BLE001
-                logger.warning("the turn's database session did not close", exc_info=True)
+                    logger.warning("the turn's database session did not close", exc_info=True)
+                try:
+                    # Only a turn whose reply was stored can carry the notice: any
+                    # other leaves it for the next one.
+                    notices = await asyncio.to_thread(record_usage, completed and bool(stored))
+                except Exception:  # noqa: BLE001 - the reply is whole; the cause is in the log
+                    logger.error(
+                        "usage of session %s could not be recorded", session_id, exc_info=True
+                    )
+                    notices = []
+                if notices:
+                    # Said once per cap, after the reply, and kept with it for a reload.
+                    text = "\n\n".join(usage_caps.notice(scope, lang) for scope in notices)
+                    await turn.publish(agent_service.sse({"delta": f"\n\n{text}"}))
+                    try:
+                        await asyncio.to_thread(_append_usage_notice, open_db, session_id, text)
+                    except Exception:  # noqa: BLE001
+                        logger.warning("usage notice of session %s not stored", session_id)
             finally:
+                # Whatever happens above, the turn is taken away: one left
+                # registered would refuse every later message.
                 await agent_service.end_turn(str(session_id), turn)
 
     # Kept on the turn: a task nothing refers to can be collected mid-run.
