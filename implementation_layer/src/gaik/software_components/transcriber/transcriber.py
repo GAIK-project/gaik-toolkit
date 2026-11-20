@@ -24,7 +24,10 @@ from pydub.exceptions import CouldntDecodeError
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.endpoints import check_endpoint
-from gaik.software_components.enhance_transcript import TranscriptEnhancer
+from gaik.software_components.enhance_transcript import (
+    DEFAULT_MAX_CHANGE_RATIO,
+    TranscriptEnhancer,
+)
 from gaik.software_components.input_limits import (
     InputLimits,
     check_not_media_list,
@@ -191,6 +194,9 @@ class TranscriptionResult:
     # Usage of the transcription requests (not of transcript enhancement): token counts,
     # or ``audio_seconds`` for duration-billed models; empty for local Whisper.
     usage: dict[str, int] = field(default_factory=dict)
+    # Enhancement passes refused because they changed digits or too much of the text
+    # (TranscriptEnhancer.refused_passes, as dicts); the raw transcript was kept for them.
+    enhancement_refused_passes: list[dict] | None = None
 
     def save(
         self,
@@ -248,6 +254,7 @@ class Transcriber:
         default_prompt: str | None = None,
         transcription_model: str | None = None,
         enhanced_transcript_instructions: str | None = None,
+        enhancement_max_change_ratio: float | None = DEFAULT_MAX_CHANGE_RATIO,
         language: str = "auto",
         diarization: bool = False,
         speaker_count: int | None = None,
@@ -259,6 +266,10 @@ class Transcriber:
         limits: InputLimits | None = None,
     ) -> None:
         _audio_provider(api_config)
+        # Checked here as TranscriptEnhancer checks it, so a wrong value fails before a
+        # paid transcription rather than when the enhancer is built after it.
+        if enhancement_max_change_ratio is not None and not 0 < enhancement_max_change_ratio <= 1:
+            raise ValueError("enhancement_max_change_ratio must be between 0 and 1, or None")
         if transcription_model == "whisper_local" and local_api_base:
             check_endpoint(
                 local_api_base,
@@ -276,6 +287,7 @@ class Transcriber:
         self.default_prompt = default_prompt
         self.transcription_model = transcription_model
         self.enhanced_transcript_instructions = enhanced_transcript_instructions
+        self.enhancement_max_change_ratio = enhancement_max_change_ratio
         self.language = language
         self.diarization = diarization
         self.speaker_count = speaker_count
@@ -355,14 +367,19 @@ class Transcriber:
                 )
 
             enhanced_text: str | None = None
+            refused_passes: list[dict] | None = None
             if self.enhanced_transcript_enabled:
                 print("Fixing transcription errors with TranscriptEnhancer...")
-                enhancer = TranscriptEnhancer(api_config=self.api_config)
+                enhancer = TranscriptEnhancer(
+                    api_config=self.api_config,
+                    max_change_ratio=self.enhancement_max_change_ratio,
+                )
                 enhanced_result = enhancer.enhance_text(
                     raw_transcript,
                     additional_instructions=self.enhanced_transcript_instructions,
                 )
                 enhanced_text = enhanced_result.enhanced_text
+                refused_passes = [r.model_dump() for r in enhanced_result.refused_passes]
             else:
                 print("Transcript error fixing disabled; returning raw text only.")
         duration_s = round(elapsed(), 3)
@@ -372,6 +389,7 @@ class Transcriber:
         return TranscriptionResult(
             raw_transcript=raw_transcript,
             enhanced_transcript=enhanced_text,
+            enhancement_refused_passes=refused_passes,
             job_id=job_id,
             segments=segments,
             srt_content=srt_content,
