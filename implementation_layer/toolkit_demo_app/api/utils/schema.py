@@ -372,12 +372,17 @@ def load_saved_requirements(
     return data["model_name"], requirements
 
 
-def schema_paths(schema_key: str) -> tuple[Path, Path]:
-    """Return (schema_module_path, requirements_json_path) for *schema_key*."""
-    safe_key = (
+def safe_schema_key(schema_key: str) -> str:
+    """*schema_key* as the file names and the log use it: letters, digits, ``_`` and ``-``."""
+    return (
         "".join(c if c.isalnum() or c in {"_", "-"} else "_" for c in schema_key).strip("_")
         or "schema"
     )
+
+
+def schema_paths(schema_key: str) -> tuple[Path, Path]:
+    """Return (schema_module_path, requirements_json_path) for *schema_key*."""
+    safe_key = safe_schema_key(schema_key)
     return (
         SCHEMA_DIR / f"{safe_key}_schema.py",
         SCHEMA_DIR / f"{safe_key}_requirements.json",
