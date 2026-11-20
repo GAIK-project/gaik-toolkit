@@ -23,6 +23,12 @@ export function devAuthActive(env: NodeJS.ProcessEnv = process.env): boolean {
   return DEV_AUTH && !supabaseAuthEnabled(env);
 }
 
+// Written out in full so Next.js puts the build's values in: it replaces only a
+// literal process.env.NEXT_PUBLIC_*, and the image's runner stage does not carry
+// them as environment variables.
+const BUILT_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const BUILT_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 /**
  * The Supabase project's address and public key. `WIZARD_SUPABASE_URL` and
  * `WIZARD_SUPABASE_KEY` are read at run time; the build-time `NEXT_PUBLIC_*`
@@ -33,8 +39,12 @@ export function devAuthActive(env: NodeJS.ProcessEnv = process.env): boolean {
 export function supabaseSettings(
   env: NodeJS.ProcessEnv = process.env,
 ): { url: string; key: string } | null {
-  const url = env.WIZARD_SUPABASE_URL?.trim() || env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = env.WIZARD_SUPABASE_KEY?.trim() || env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const url =
+    env.WIZARD_SUPABASE_URL?.trim() || env.NEXT_PUBLIC_SUPABASE_URL?.trim() || BUILT_URL?.trim();
+  const key =
+    env.WIZARD_SUPABASE_KEY?.trim() ||
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    BUILT_KEY?.trim();
   return url && key ? { url, key } : null;
 }
 
