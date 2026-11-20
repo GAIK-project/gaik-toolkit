@@ -193,8 +193,8 @@ def _task_contract_kinds(
     if not outputs:
         return base_kinds
     if all(_is_audio_output(o) for o in outputs):
-        narrowed = base_kinds & _AUDIO_KINDS
-        return narrowed or _AUDIO_KINDS
+        # Never wider than the session's contract: an empty set refuses the file (415).
+        return base_kinds & _AUDIO_KINDS
     other_human_audio = any(
         n.get("id") != task_id
         and n.get("kind") in ("userTask", "manualTask")
