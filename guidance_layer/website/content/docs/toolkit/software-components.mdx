@@ -907,7 +907,7 @@ flowchart LR
 
 ### Knowledge Curator
 
-The Knowledge Curator collects the evidence for a fixed set of topics from normalized sources. For each topic, called a section, an LLM extracts fact units: a short summary paired with the exact words of the source, the file it came from and a locator such as a page or a sheet row. It also lists the required items that no source covers and the conflicts between sources. The source hierarchy in the instructions decides whether a conflict is resolved or unresolved. Every quote is checked against its source. It is the second stage of the Report-Writer module. On its own it suits any task that needs traceable evidence for fixed questions, such as audits and due diligence.
+The Knowledge Curator collects the evidence for a fixed set of topics from normalized sources. For each topic, called a section, an LLM extracts fact units: a short summary paired with the exact words of the source, the file it came from and a locator such as a page or a sheet row. It also lists the required items that no source covers and the conflicts between sources. Whether a conflict is resolved is decided in code from `source_precedence`, the source classes ranked highest first; without it, or when the sides share a class or the preferred source is itself unsure, the conflict stays unresolved for a person to settle. Every quote is checked against its source. It is the second stage of the Report-Writer module. On its own it suits any task that needs traceable evidence for fixed questions, such as audits and due diligence.
 
 <Mermaid chart={`
 flowchart TD

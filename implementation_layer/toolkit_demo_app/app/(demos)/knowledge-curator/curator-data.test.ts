@@ -134,3 +134,11 @@ describe("the examples", () => {
     }
   });
 });
+
+test("the examples rank primary sources first, as their instructions describe", () => {
+  for (const example of EXAMPLES) {
+    expect(example.source_precedence).toEqual(["primary", "secondary"]);
+    // The text no longer decides conflicts: the precedence does.
+    expect(example.instructions).not.toContain("prefer the primary");
+  }
+});

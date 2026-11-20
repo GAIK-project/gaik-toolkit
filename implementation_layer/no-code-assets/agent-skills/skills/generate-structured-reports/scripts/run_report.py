@@ -225,7 +225,10 @@ def install_provider_extra(provider: str, module: str, extra: str) -> None:
     commands = [[sys.executable, "-m", "pip", "install", requirement]]
     if shutil.which("uv"):
         commands.append(["uv", "pip", "install", "--python", sys.executable, requirement])
-    print(f"The {provider} provider needs the {module} package; installing {requirement}", file=sys.stderr)
+    print(
+        f"The {provider} provider needs the {module} package; installing {requirement}",
+        file=sys.stderr,
+    )
     for command in commands:
         code = subprocess.call(command, stdout=sys.stderr, stderr=sys.stderr)
         if code == 0:
@@ -359,10 +362,34 @@ def section_problems(spec) -> tuple[list[str], list[str]]:
                 )
     if not spec.instructions.strip():
         warnings.append(
-            "The report instructions are empty: state the source hierarchy, or that there is none, "
-            "so conflicts are not decided by the curator's own examples"
+            "The report instructions are empty: state the scope and how each kind of source is "
+            "worded; which class outranks which goes in source_precedence"
         )
     return errors, warnings
+
+
+def _resolved(conflict, section) -> dict:
+    """A resolved conflict with the side the report follows and the side it drops.
+
+    The code picks the side from the source each unit cites, so the person checks the
+    quotes of both sides at the evidence checkpoint.
+    """
+    units = {u.id: u for u in section.units}
+
+    def side(ids):
+        return [
+            {"id": i, "source": units[i].source.file, "quote": units[i].quote}
+            for i in ids
+            if i in units
+        ]
+
+    kept = set(getattr(conflict, "preferred_unit_ids", []) or [])
+    return {
+        "topic": conflict.topic,
+        "resolved_by": getattr(conflict, "resolved_by", None),
+        "follows": side([i for i in conflict.unit_ids if i in kept]),
+        "drops": side([i for i in conflict.unit_ids if i not in kept]),
+    }
 
 
 def pandoc_problem() -> str | None:
@@ -565,15 +592,16 @@ def stage_inputs(spec, stage: str) -> dict:
             ),
         }
     if stage == "curate":
-        return {
-            "spec": sha256_json(
-                {
-                    "sections": dump["sections"],
-                    "instructions": dump["instructions"],
-                    "options": dump["settings"]["curator"],
-                }
-            )
+        curate = {
+            "sections": dump["sections"],
+            "instructions": dump["instructions"],
+            "options": dump["settings"]["curator"],
         }
+        # The precedence decides the conflicts. Hashed only when set, so a run curated
+        # before the key existed stays current while the spec leaves it out.
+        if dump.get("source_precedence"):
+            curate["source_precedence"] = dump["source_precedence"]
+        return {"spec": sha256_json(curate)}
     settings = dump["settings"]
     return {
         "spec": sha256_json(
@@ -771,7 +799,7 @@ def knowledge_problems(ws: Path) -> tuple[list[str], dict]:
             "units": len(s.units),
             "missing": s.missing,
             "unresolved_conflicts": [c.topic for c in s.conflicts if c.status == "unresolved"],
-            "resolved_conflicts": [c.topic for c in s.conflicts if c.status == "resolved"],
+            "resolved_conflicts": [_resolved(c, s) for c in s.conflicts if c.status == "resolved"],
         }
         for s in knowledge.sections
     }
@@ -910,7 +938,9 @@ def cmd_curate(args) -> dict:
                     for c in s.conflicts
                     if c.status == "unresolved"
                 ],
-                "resolved_conflicts": [c.topic for c in s.conflicts if c.status == "resolved"],
+                "resolved_conflicts": [
+                    _resolved(c, s) for c in s.conflicts if c.status == "resolved"
+                ],
             }
             for s in knowledge.sections
         },
@@ -1266,7 +1296,7 @@ DEFAULT_TRANSCRIPTION = {"openai": "gpt-4o-transcribe", "azure": "gpt-4o-transcr
 MODEL_STEPS = ("vision", "transcription", "curator", "writer", "reviewer")
 SPEC_KEYS = (
     "title", "description", "language", "sections", "instructions", "sources",
-    "sample_report", "models", "settings",
+    "source_precedence", "sample_report", "models", "settings",
 )  # fmt: skip
 SECTION_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -1399,7 +1429,9 @@ def proposal_problems(raw: dict) -> tuple[list[str], list[str]]:
             if dep == s.get("id"):
                 errors.append(f"sections[{n}] ({s.get('title')!r}) cannot depend on itself")
             elif dep not in ids:
-                errors.append(f"sections[{n}] ({s.get('title')!r}) depends on {dep!r}, not a section")
+                errors.append(
+                    f"sections[{n}] ({s.get('title')!r}) depends on {dep!r}, not a section"
+                )
     names = [Path(p).name for paths in (raw.get("sources") or {}).values() for p in paths or []]
     sample = raw.get("sample_report")
     if sample and Path(sample).name in names:
@@ -1410,7 +1442,10 @@ def proposal_problems(raw: dict) -> tuple[list[str], list[str]]:
     if all(isinstance(s, dict) and s.get("id") == "draft" for s in sections):
         return errors, warnings  # step 2: the instructions are written with the sections
     settings = raw.get("settings") or {}
-    if settings.get("citations") is False and "cite each fact" in str(raw.get("instructions", "")).lower():
+    if (
+        settings.get("citations") is False
+        and "cite each fact" in str(raw.get("instructions", "")).lower()
+    ):
         warnings.append(
             "Citations are off but the instructions still ask to cite each fact; remove that sentence"
         )
@@ -1433,13 +1468,13 @@ def changed_stages(old: dict, new: dict, ws: Path) -> list[str]:
             value: Any = d
             for part in key.split("."):
                 value = value.get(part) if isinstance(value, dict) else None
-            out[key] = value
+            out[key] = value or None if key == "source_precedence" else value
         return sha256_json(out)
 
     normalize = (
         "sources", "models.vision", "models.transcription", "settings.transcription_language",
     )  # fmt: skip
-    curate = ("sections", "instructions", "models.curator", "settings.curator")
+    curate = ("sections", "instructions", "source_precedence", "models.curator", "settings.curator")
     synthesize = (
         "title", "language", "sections", "instructions", "sample_report", "models.writer",
         "models.reviewer", "settings.review_attempts", "settings.strict_review",
@@ -1470,6 +1505,20 @@ def review_lines(spec: dict, provider: str) -> list[str]:
     for cls in ("primary", "secondary"):
         files = spec["sources"].get(cls) or []
         lines.append(f"  sources.{cls}: {', '.join(files) if files else '(none)'}")
+    precedence = spec.get("source_precedence") or []
+    if not isinstance(precedence, list):
+        # A wrong shape has its own schema error; the list shows the value as it is.
+        shown = show(precedence)
+    else:
+        shown = " > ".join(c if isinstance(c, str) else show(c) for c in precedence)
+    lines.append(
+        "  source_precedence: "
+        + (
+            shown + " (decides conflicts between these classes)"
+            if precedence
+            else "(none: every conflict is left for the user to settle)"
+        )
+    )
     lines.append(f"  sample_report: {spec.get('sample_report') or '(none)'}")
     lines.append("SECTIONS")
     titles = {s.get("id"): s.get("title") for s in spec["sections"] if isinstance(s, dict)}
@@ -1553,7 +1602,9 @@ def cmd_apply_spec(args) -> dict:
     try:
         new = json.loads(proposal_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise HelperError(EXIT_INPUT, "proposal", f"{proposal_path.name}: not valid JSON ({exc})") from exc
+        raise HelperError(
+            EXIT_INPUT, "proposal", f"{proposal_path.name}: not valid JSON ({exc})"
+        ) from exc
     provider = provider_name(args.provider)
     old = read_json(path, {}) if path.is_file() else {}
     errors, warnings = proposal_problems(new)

@@ -2207,7 +2207,7 @@
   "ReportWriter": {
     "import": "from gaik.software_modules.report_writer import ReportWriter, ReportSpec, SectionSpec, RunSettings, ModelSettings",
     "construct": "writer = ReportWriter(config=get_stage_config(config, 'answer'))",
-    "call": "settings = RunSettings(transcription_language=language, strict_review=True, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = [entry.model_dump(mode='json') for entry in report.review_log]  # Pydantic models: json.dumps takes their model_dump(mode='json'), or use report.save(dir)",
+    "call": "settings = RunSettings(transcription_language=language, strict_review=True, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        source_precedence=source_precedence,  # e.g. ['primary', 'secondary'], or [] for a person to settle conflicts; needs the gaik release that ships source_precedence (a release after 0.11.1); 0.11.1 and earlier refuse the key, so leave this line out there\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = [entry.model_dump(mode='json') for entry in report.review_log]  # Pydantic models: json.dumps takes their model_dump(mode='json'), or use report.save(dir)",
     "call_from_spec_file": "spec = ReportSpec.load(spec_path)  # since gaik 0.10.0 (SourcePathError is exported from report_writer): source paths and the sample report are relative to the spec file's folder and must stay inside it; an absolute path, or one leading out through '..' or a symbolic link, raises SourcePathError before any file is read. ReportSpec.load(spec_path, root=parent_folder) accepts paths inside a wider root (and absolute ones inside it). spec.save(path) writes them back relative",
     "call_resume": "report = writer.synthesize(spec, workspace, progress_callback=print)  # after editing workspace/knowledge/*.json; normalize and curate are not rerun",
     "call_rebuild": "report = writer.rebuild(spec, workspace)  # after editing workspace/report/sections/*.md (keep the '## <title>' first line); no LLM call",
@@ -2231,7 +2231,8 @@
       "sections": "Template in report order: SectionSpec(id, title, instructions, required_items, depends_on). id is letters, digits, '_' or '-'. Maps 1:1 from target_output_spec.fields.",
       "required_items": "Per section: items it must cover; each one no source covers becomes '(missing: <item>)' in the report.",
       "depends_on": "Per section: makes it DERIVED -- no knowledge file, written only from the reviewed texts of these sections (never from the sources). Cycles and unknown ids raise.",
-      "instructions": "Report-wide rules sent to curator, writer and reviewer: source hierarchy (which class outranks which), citation/attribution style, tone, missing-data policy.",
+      "instructions": "Report-wide rules sent to curator, writer and reviewer: how each kind of source is worded, citation/attribution style, tone, missing-data policy. They do not decide conflicts.",
+      "source_precedence": "Optional ['primary', 'secondary'] or ['secondary', 'primary']: which class outranks which; needs the gaik release that ships source_precedence (a release after 0.11.1); 0.11.1 and earlier refuse the key. Conflicts are resolved in code from it, unless the higher-ranked fact is of low confidence; without it every conflict is 'Unresolved:' in the report for a person to settle.",
       "sources": "{'primary': [...], 'secondary': [...]} -- at least one non-empty list; file names must be unique across both.",
       "sample_report": "Optional report (any SourceNormalizer type) whose structure, length and tone the new report follows; never its facts. Never sent to the reviewer."
     },
@@ -2393,18 +2394,26 @@
   "KnowledgeCurator": {
     "import": "from gaik.software_components.knowledge_curator import KnowledgeCurator, SectionSpec, KnowledgeBase",
     "construct": "curator = KnowledgeCurator(config=get_stage_config(config, 'extraction'), max_workers=4)",
-    "call": "section_specs = [SectionSpec(**s) for s in sections]\n    knowledge = curator.curate(sources, section_specs, instructions=report_instructions, progress_callback=print)\n    knowledge.save(output_dir / 'knowledge')",
+    "call": "section_specs = [SectionSpec(**s) for s in sections]\n    knowledge = curator.curate(sources, section_specs, instructions=report_instructions, source_precedence=source_precedence, progress_callback=print)  # source_precedence needs the gaik release that ships it (a release after 0.11.1); 0.11.1 and earlier refuse it, so leave it out there\n    knowledge.save(output_dir / 'knowledge')",
     "call_verify": "bad_units = knowledge.verify_quotes(sources)  # after hand-editing knowledge files reloaded with KnowledgeBase.load(dir); [] means every quote is verbatim in its source",
-    "returns": "KnowledgeBase(.sections [SectionKnowledge(.section_id, .units [FactUnit(.id, .topic, .time_qualifier, .summary, .quote, .source(.file, .locator), .source_class, .confidence)], .missing, .conflicts [Conflict(.topic, .description, .status, .unit_ids)])], .usage, .dropped [DroppedUnit(.section_id, .topic, .summary, .quote, .file, .reason)]); .get(section_id), .save(dir) -> <section_id>.json per section, KnowledgeBase.load(dir), .verify_quotes(sources)",
+    "returns": "KnowledgeBase(.sections [SectionKnowledge(.section_id, .units [FactUnit(.id, .topic, .time_qualifier, .summary, .quote, .source(.file, .locator), .source_class, .confidence)], .missing, .conflicts [Conflict(.topic, .description, .status, .unit_ids, .preferred_unit_ids, .resolved_by)])], .usage, .dropped [DroppedUnit(.section_id, .topic, .summary, .quote, .file, .reason)]); .get(section_id), .save(dir) -> <section_id>.json per section, KnowledgeBase.load(dir), .verify_quotes(sources)",
     "install_extra": "knowledge-curator",
     "options": [
       {
         "name": "instructions",
         "type": "str",
         "default": "",
-        "effect": "curate() argument: report-level rules -- source hierarchy, scope and style. The curator uses the hierarchy to mark each conflict resolved or unresolved.",
+        "effect": "curate() argument: report-level rules -- scope, style and how each kind of source is worded. They do not decide conflicts; source_precedence does.",
         "selection_relevant": true,
-        "infer_from": "requirements name a source hierarchy (e.g. site observations outrank older documents) or scope rules -> state them here"
+        "infer_from": "requirements name scope or wording rules -> state them here; put which source class outranks which in source_precedence"
+      },
+      {
+        "name": "source_precedence",
+        "type": "list[str] | None",
+        "default": null,
+        "effect": "curate() argument: source classes, highest first, e.g. ['primary', 'secondary']. A conflict is resolved in code only when exactly one of its units has the highest-ranked class and that unit is not of low confidence (Conflict.preferred_unit_ids, .resolved_by); the writer follows those units. Without it, for units of one class, or when the top unit's source is itself unsure, every conflict is unresolved and the report gives both sides. The model no longer marks a conflict resolved, but the code decides from the sources the model's units cite; have a person check resolved conflicts at the evidence checkpoint.",
+        "selection_relevant": true,
+        "infer_from": "requirements say one kind of source outranks another (e.g. site observations over customer documents) -> list the classes in that order; otherwise leave None so a person settles each conflict"
       },
       {
         "name": "model",
@@ -2536,9 +2545,9 @@
         "name": "instructions",
         "type": "str",
         "default": "",
-        "effect": "synthesize() argument: report-wide rules (source hierarchy, missing data, citation style) sent to every writer and to every review. Pass the same instructions as to KnowledgeCurator.curate().",
+        "effect": "synthesize() argument: report-wide rules (how each kind of source is worded, missing data, citation style) sent to every writer and to every review. Conflicts follow KnowledgeCurator's source_precedence, not these rules. Pass the same instructions as to KnowledgeCurator.curate().",
         "selection_relevant": true,
-        "infer_from": "requirements mention a source hierarchy, citation/attribution style, or a report-wide tone rule"
+        "infer_from": "requirements mention how sources are worded, citation/attribution style, or a report-wide tone rule; a source priority goes to source_precedence"
       },
       {
         "name": "config",

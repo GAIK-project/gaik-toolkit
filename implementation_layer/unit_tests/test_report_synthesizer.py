@@ -459,3 +459,11 @@ def test_citations_off_change_the_writer_and_the_reviewer_prompts(fakes):
         assert "citation format" not in call["instructions"]
         assert "(missing: <item>) marker" in call["instructions"]
         assert "REPORT_RULES" in call["instructions"]
+
+
+@pytest.mark.parametrize("citations", [True, False])
+def test_the_writer_follows_the_code_chosen_side_of_a_resolved_conflict(citations):
+    prompt = writer_system_prompt(citations)
+
+    assert "follow the units listed in its preferred_unit_ids" in prompt
+    assert "follow the side its description gives" not in prompt

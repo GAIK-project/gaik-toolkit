@@ -31,7 +31,8 @@ item the material does not cover, write the marker (missing: <item>) in the text
 the item, e.g. "The base floor condition is not documented (missing: base floor \
 condition).", not alone after a label. Never fill a gap with a guess.
 - Conflicts: for a conflict with status "unresolved", state both sides and mark it with \
-"Unresolved:". For a "resolved" conflict, follow the side its description gives.
+"Unresolved:". For a "resolved" conflict, follow the units listed in its \
+preferred_unit_ids; the description only says what each source says.
 - Sources: cite and attribute sources as the report instructions say. Each fact unit \
 gives source.file, source.locator, source_class and time_qualifier for this. If the \
 report instructions say nothing about citations, cite the file and locator in \
@@ -164,7 +165,8 @@ def build_review_checks(section: SectionSpec, instructions: str, citations: bool
         if section.derived
         else '- Every item in the knowledge\'s "missing" list must carry a (missing: <item>) '
         'marker. A conflict with status "unresolved" must give both sides and be marked '
-        '"Unresolved:".\n'
+        '"Unresolved:". A conflict with status "resolved" must state the side of the units '
+        "in its preferred_unit_ids, not the other side.\n"
     )
     return f"""\
 - Every factual claim must be supported by the reference material. Correct or remove \
