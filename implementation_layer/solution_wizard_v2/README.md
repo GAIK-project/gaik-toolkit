@@ -50,8 +50,8 @@ oletuksena demon `/sign-up`).
 
 Sisään pääsee vain vahvistettu sähköpostiosoite, joka on joko
 `WIZARD_ALLOWED_EMAILS`-listassa tai, kun `WIZARD_SUPABASE_ACCESS=access_requests`,
-jonka oma rivi demon `access_requests`-taulussa on hyväksytty (`status = approved`)
-tai jolle on annettu `wizard_access`. Rivi luetaan käyttäjän omalla istunnolla,
+jonka oma rivi demon `access_requests`-taulussa on hyväksytty (`status = approved`).
+Demon `wizard_access` ei yksinään päästä sisään. Rivi luetaan käyttäjän omalla istunnolla,
 joten taulun säännöt (RLS) ratkaisevat, mitä näkyy; puuttuva tai lukematon rivi ei
 päästä ketään sisään. Hyväksyntää odottava tunnus kirjataan ulos ja ohjataan
 kirjautumissivulle ilmoituksen kanssa, ja API-kutsu ilman pääsyä saa `401`.

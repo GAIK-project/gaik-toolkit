@@ -82,11 +82,13 @@ describe("supabase sign-in settings", () => {
 });
 
 describe("who may use the wizard", () => {
-  it("a row lets its user in when approved or granted the wizard", () => {
+  it("a row lets its user in only once the demo has approved it", () => {
     expect(rowGrantsAccess({ status: "approved" })).toBe(true);
-    expect(rowGrantsAccess({ status: "pending", wizard_access: true })).toBe(true);
+    expect(rowGrantsAccess({ status: "approved", wizard_access: true })).toBe(true);
+    // The demo's first-wizard grant opens nothing without approval.
+    expect(rowGrantsAccess({ status: "pending", wizard_access: true })).toBe(false);
+    expect(rowGrantsAccess({ status: "rejected", wizard_access: true })).toBe(false);
     expect(rowGrantsAccess({ status: "pending", wizard_access: false })).toBe(false);
-    expect(rowGrantsAccess({ status: "rejected" })).toBe(false);
     expect(rowGrantsAccess(null)).toBe(false);
   });
 

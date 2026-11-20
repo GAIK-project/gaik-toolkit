@@ -249,7 +249,7 @@ is a **build-time** arg. Supabase sign-in through the GAIK demo's project is
 chosen at run time: `WIZARD_AUTH_MODE=supabase`, `WIZARD_SUPABASE_URL` and
 `WIZARD_SUPABASE_KEY` (the public key only), and who gets in: a confirmed address
 listed in `WIZARD_ALLOWED_EMAILS`, or, with `WIZARD_SUPABASE_ACCESS=access_requests`,
-one whose row in the demo's `access_requests` is approved or has `wizard_access`
+one whose row in the demo's `access_requests` is approved
 (solution_wizard_v2/README.md, "Supabase-kirjautuminen"). Without either nobody
 gets in, since anyone can create an account in the project with its public key.
 The older build-time pair `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`

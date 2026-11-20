@@ -68,9 +68,13 @@ export function accessRequestsEnabled(env: NodeJS.ProcessEnv = process.env): boo
 /** The part of a demo access_requests row the wizard reads. */
 export type AccessRow = { status?: string | null; wizard_access?: boolean | null };
 
-/** A row lets its user in when the demo approved it or granted the wizard to it. */
+/**
+ * A row lets its user in only when the demo has approved it. ``wizard_access``
+ * is the demo's grant for its first wizard, given on top of approval; on its own
+ * (a pending or rejected row) it opens nothing, as in the demo.
+ */
 export function rowGrantsAccess(row: AccessRow | null | undefined): boolean {
-  return row?.status === "approved" || row?.wizard_access === true;
+  return row?.status === "approved";
 }
 
 /** A signed-in Supabase user, with the id their access_requests row is keyed by. */
@@ -80,7 +84,7 @@ export type SupabaseUser = AuthUser & { id?: string };
  * Whether a signed-in Supabase user may use the wizard. The address must be
  * confirmed: until Supabase has confirmed it, it is only a claim. Then either
  * it is in WIZARD_ALLOWED_EMAILS, or, with WIZARD_SUPABASE_ACCESS=access_requests,
- * the user's own row in the demo's table grants it. The row is read with the
+ * the user's own row in the demo's table is approved. The row is read with the
  * user's own session, so the table's rules decide what can be read; a missing
  * row, or one that cannot be read, lets nobody in.
  */
