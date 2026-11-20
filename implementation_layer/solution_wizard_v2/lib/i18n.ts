@@ -92,6 +92,10 @@ export type Dict = {
   /** Beside the approval under the wizard's reply: points at the decision bar. */
   gateShowMe: string;
   gateShowMeName: string;
+  /** Compact dismissible Gate 2 action panel beside the structure (#251). */
+  gatePanelDismiss: string;
+  gatePanelShow: string;
+  gatePanelWaiting: string;
   /** The fields in the decision bar for what Gate 1 still lacks. */
   gate1Answer: {
     notKnown: string;
@@ -418,6 +422,8 @@ export type Dict = {
   languageLabel: string;
   /** The first message could not start a session; it stays in the field. */
   startFailed: string;
+  /** The account has started as many sessions as it may (429 session_limit). */
+  sessionLimit: string;
   sessionNotFound: string;
   done: string;
   step: string;
@@ -588,6 +594,27 @@ export type Dict = {
     noDefault: string;
     rule: string;
   };
+  /** Plain-language extraction rules proposal in the workspace (#251). */
+  extractionProposal: {
+    heading: string;
+    headingTicket: string;
+    example: string;
+    missing: string;
+    leftEmpty: string;
+    defaultValue: string;
+    noDefault: string;
+    approve: string;
+    approving: string;
+    approveMessage: string;
+    requestChanges: string;
+    chip: string;
+    requestPrefix: string;
+    technicalDetails: string;
+    technicalFieldId: string;
+    technicalPrompt: string;
+    technicalSchema: string;
+    sendFailed: string;
+  };
   pocRun: string;
   pocRunHint: string;
   pocRunning: string;
@@ -612,10 +639,27 @@ export type Dict = {
   pocIdle: string;
   /** The run step, while the first test run is about to start by itself. */
   pocAutoRun: string;
+  /** The run step while the package check runs with chosen files ({files}). */
+  pocAutoRunCheckingWithFiles: string;
+  /** The run step immediately after upload while the auto-run is queued ({files}). */
+  pocAutoRunQueued: string;
   /** The run step, when the package is ready but has no test material. */
   pocAutoRunNeedsInput: string;
-  /** The same, where only the wizard's example is there to run on. */
+  /** The same, where only the wizard's example is there to run on ({files}). */
   pocAutoRunNeedsOwnInput: string;
+  /** Plain-language progress stages shown near the PoC result during a run (#252). */
+  pocProgress: {
+    queued: string;
+    starting: string;
+    transcribing: string;
+    enhancing: string;
+    parsing: string;
+    extracting: string;
+    validating: string;
+    finalizing: string;
+    working: string;
+    logSummary: string;
+  };
   /** The run in view read other test material than what is listed now. */
   pocResultInputsChanged: string;
   /** The run step, while a run the tab started waits for room in the sandbox. */
@@ -689,6 +733,8 @@ export type Dict = {
   pocInputsTitle: string;
   pocInputsEmpty: string;
   pocInputUpload: string;
+  /** Primary upload label when the package still needs its first test file (#252). */
+  pocInputUploadTest: string;
   pocInputUploading: string;
   pocInputRemove: string;
   pocInputExample: string;
@@ -871,6 +917,9 @@ export type Dict = {
   showChat: string;
   /** Accessible name of the handle that resizes the chat. */
   chatResize: string;
+  /** Widen/narrow the docked chat on demand at wide desktop widths (#251). */
+  chatWiden: string;
+  chatNarrow: string;
   /** "Vaihe {n}/{total}": the step, where the timeline is not shown. */
   phaseOf: string;
   /** One line under each workspace tab name: what the tab shows. */
@@ -955,6 +1004,10 @@ export type Dict = {
     agentBusy: string;
     rateLimited: string;
     turnLimit: string;
+    /** A usage cap is reached (402 usage_cap): this session's, the account's or the month's. */
+    usageSession: string;
+    usageUser: string;
+    usageDeployment: string;
   };
 
   phases: string[];
@@ -986,7 +1039,7 @@ const fi: Dict = {
     "Wizard päivittää dokumentaation ja kertoo chatissa, mitä paketissa on.",
     "Lataa käyttöönottopaketti {poc}-välilehdeltä ja tarkista sen dokumentaatio.",
   ],
-  nowGate3Run: "Testi onnistui. Tarkista tulos {poc}-välilehdellä ja valitse sitten alareunasta {approve} tai {request}.",
+  nowGate3Run: "Testi onnistui. Tarkista tulos {poc}-välilehdellä ja valitse sitten {approve} tai {request}.",
   nowGate3Changed: "PoC-paketti muuttui onnistuneen testiajon jälkeen. Aja testi uudelleen {poc}-välilehdellä, niin testiajon voi hyväksyä.",
   nowDone: "Kaikki gatet on hyväksytty. Lataa käyttöönottopaketti tai kokeile ratkaisua omilla tapauksillasi.",
   nowDoneNoRun: "Kaikki gatet on hyväksytty. Aja vielä testi {poc}-välilehdellä, niin käyttöönottopaketin voi ladata.",
@@ -1049,6 +1102,9 @@ const fi: Dict = {
   gateStaleResult: "Tulos on aiemmasta paketista. Hyväksy, kun nykyisen paketin ajo on onnistunut.",
   gateShowMe: "Näytä sivulla",
   gateShowMeName: "Näytä hyväksyntä sivulla",
+  gatePanelDismiss: "Piilota hyväksyntäpaneeli",
+  gatePanelShow: "Näytä toiminnot",
+  gatePanelWaiting: "{topic} odottaa hyväksyntää",
   gate1Answer: {
     notKnown: "Ei tiedossa",
     notKnownItem: "Ei tiedossa: {item}",
@@ -1313,6 +1369,8 @@ const fi: Dict = {
   accountLabel: "Käyttäjä",
   languageLabel: "Kieli",
   startFailed: "Session aloitus ei onnistunut. Yritä uudelleen.",
+  sessionLimit:
+    "Tunnuksellasi on jo niin monta sessiota kuin se sallii. Jatka jossakin niistä tai poista sessio, jota et enää tarvitse.",
   sessionNotFound: "Sessiota ei löytynyt.",
   done: "Valmis",
   step: "Vaihe",
@@ -1439,7 +1497,7 @@ const fi: Dict = {
   planHiddenSettingsMany: "{n} teknistä asetusta piilotettu",
   planEmptySteps: "Ei vielä vaiheita. Lisää ne Muokkaa-painikkeella tai pyydä wizardia chatissa.",
   planSchema: {
-    title: "Tulosskeema",
+    title: "Poimittavat tiedot",
     countOne: "1 kenttä",
     countMany: "{n} kenttää",
     required: "Pakollinen",
@@ -1481,6 +1539,26 @@ const fi: Dict = {
     noDefault: "Ei oletusta",
     rule: "Poimintasääntö",
   },
+  extractionProposal: {
+    heading: "Mitä tietoja poimitaan?",
+    headingTicket: "Mitä tietoja tikettiin poimitaan?",
+    example: "Esimerkki",
+    missing: "Jos tietoa ei mainita",
+    leftEmpty: "Jätetään tyhjäksi",
+    defaultValue: "Oletusarvo: {value}",
+    noDefault: "Jätetään tyhjäksi",
+    approve: "Hyväksy poimintaohje",
+    approving: "Luodaan kenttämääritelmiä…",
+    approveMessage: "Hyväksyn poimintaohjeen. Luo kenttämääritelmät tämän pohjalta.",
+    requestChanges: "Pyydä muutoksia",
+    chip: "Poimintaohje",
+    requestPrefix: "Haluan muuttaa poimintaohjetta:",
+    technicalDetails: "Tekniset määritelmät",
+    technicalFieldId: "Kentän tunniste",
+    technicalPrompt: "Poimintaohje (Markdown)",
+    technicalSchema: "Kenttämääritelmät (Python)",
+    sendFailed: "Hyväksyntä ei lähtenyt wizardille. Yritä uudelleen.",
+  },
   pocRun: "Generoi PoC-paketti",
   pocRunHint: "Kokoaa blueprintistä ajettavan paketin: koodin, asetukset ja ohjeet.",
   pocRunning: "Generoidaan…",
@@ -1502,8 +1580,22 @@ const fi: Dict = {
   pocLogNoBackend: "PoC-pakettia ei voi generoida: wizard_api ei ole käytettävissä.",
   pocIdle: "Ei ajettu vielä. Testiajo kestää yleensä noin minuutin.",
   pocAutoRun: "Testiajo käynnistyy itsestään, kun paketti on tarkistettu. Se kestää yleensä noin minuutin.",
-  pocAutoRunNeedsInput: "Lisää testiaineisto, niin testiajo käynnistyy itsestään.",
-  pocAutoRunNeedsOwnInput: "Lisää oma testiaineisto, niin testiajo käynnistyy itsestään, tai aja testi wizardin esimerkillä.",
+  pocAutoRunCheckingWithFiles: "Pakettia tarkistetaan. Testiajo tiedostolla {files} käynnistyy automaattisesti tarkistuksen jälkeen.",
+  pocAutoRunQueued: "Testiajo jonossa tiedostolla {files}…",
+  pocAutoRunNeedsInput: "Lisää testitiedosto, niin ensimmäinen testiajo käynnistyy automaattisesti.",
+  pocAutoRunNeedsOwnInput: "Valmis esimerkkitiedosto: {files}. Ajo ei käynnisty sillä itsestään — lisää oma testitiedosto automaattista ajoa varten tai paina Aja testi.",
+  pocProgress: {
+    queued: "Odottaa testiajopaikkaa…",
+    starting: "Käynnistetään testiajoa…",
+    transcribing: "Litteroidaan äänitiedostoa tekstiksi…",
+    enhancing: "Siistitään ja tarkennetaan litterointia…",
+    parsing: "Luetaan testiaineistoa…",
+    extracting: "Poimitaan tietoja aineistosta…",
+    validating: "Tarkistetaan tuloksia lähdeaineistoa vasten…",
+    finalizing: "Kootaan tulosta…",
+    working: "Käsitellään testiaineistoa…",
+    logSummary: "Tekninen loki",
+  },
   pocResultInputsChanged: "Testiaineisto on muuttunut tämän ajon jälkeen.",
   pocAutoRunHeld: "Testiajo käynnistyy, kun wizard on päivittänyt paketin. Voit myös ajaa sen nyt.",
   pocAutoRunBusy: "Sandbox on varattu. Testiajo käynnistyy itsestään, kun tilaa vapautuu.",
@@ -1564,6 +1656,7 @@ const fi: Dict = {
   pocInputsTitle: "Testiaineisto",
   pocInputsEmpty: "Ei tiedostoja. Lisää esimerkkitiedosto, jota ratkaisu käsittelee.",
   pocInputUpload: "Lisää tiedosto",
+  pocInputUploadTest: "Lisää testitiedosto",
   pocInputUploading: "Lisätään…",
   pocInputRemove: "Poista",
   pocInputExample: "Wizardin esimerkki",
@@ -1738,6 +1831,8 @@ const fi: Dict = {
   },
   showChat: "Näytä keskustelu",
   chatResize: "Muuta keskustelun leveyttä",
+  chatWiden: "Levennä keskustelu",
+  chatNarrow: "Kavenna keskustelu",
   phaseOf: "Vaihe {n}/{total}",
   wsTabHints: {
     flow: "Ratkaisun prosessi kaaviona",
@@ -1874,6 +1969,10 @@ const fi: Dict = {
     rateLimited: "Lähetät viestejä nopeammin kuin wizard sallii. Odota hetki ja lähetä uudelleen.",
     turnLimit:
       "Wizard pysähtyi, koska yhden viestin askelraja tuli täyteen. Kirjoita esim. ”jatka”, niin se jatkaa.",
+    usageSession:
+      "Tämän session käyttöraja on täynnä. Työ on tallessa: voit yhä lukea sen ja ladata paketin. Jatka uudessa sessiossa.",
+    usageUser: "Tunnuksesi käyttöraja on täynnä. Pyydä uusi tunnus ylläpitäjältä.",
+    usageDeployment: "Wizardin tämän kuun käyttöraja on täynnä. Ota yhteys ylläpitäjään.",
   },
 
   phases: [
@@ -1929,7 +2028,7 @@ const en: Dict = {
     "The wizard updates the documentation and tells you in the chat what the package holds.",
     "Download the deployment package from the {poc} tab and check its documentation.",
   ],
-  nowGate3Run: "The test succeeded. Check the result on the {poc} tab, then choose {approve} or {request} at the bottom.",
+  nowGate3Run: "The test succeeded. Check the result on the {poc} tab, then choose {approve} or {request}.",
   nowGate3Changed: "The PoC package changed after the test that succeeded. Run the test again on the {poc} tab, and the test run can be approved.",
   nowDone: "Every gate is approved. Download the deployment package, or try the solution on your own cases.",
   nowDoneNoRun: "Every gate is approved. Run a test on the {poc} tab, and the deployment package can be downloaded.",
@@ -1992,6 +2091,9 @@ const en: Dict = {
   gateStaleResult: "The result is of an earlier package. Approve once a run of the current package has succeeded.",
   gateShowMe: "Show on the page",
   gateShowMeName: "Show me the approval on the page",
+  gatePanelDismiss: "Hide approval panel",
+  gatePanelShow: "Show actions",
+  gatePanelWaiting: "{topic} awaiting approval",
   gate1Answer: {
     notKnown: "Not known",
     notKnownItem: "Not known: {item}",
@@ -2256,6 +2358,8 @@ const en: Dict = {
   accountLabel: "Account",
   languageLabel: "Language",
   startFailed: "The session could not be started. Try again.",
+  sessionLimit:
+    "Your account has as many sessions as it allows. Continue in one of them, or remove one you no longer need.",
   sessionNotFound: "Session not found.",
   done: "Done",
   step: "Step",
@@ -2381,7 +2485,7 @@ const en: Dict = {
   planHiddenSettingsMany: "{n} technical settings hidden",
   planEmptySteps: "No steps yet. Add them with Edit, or ask the wizard in the chat.",
   planSchema: {
-    title: "Output schema",
+    title: "Fields to extract",
     countOne: "1 field",
     countMany: "{n} fields",
     required: "Required",
@@ -2423,6 +2527,26 @@ const en: Dict = {
     noDefault: "No default",
     rule: "Extraction rule",
   },
+  extractionProposal: {
+    heading: "What information is extracted?",
+    headingTicket: "What information is extracted into the ticket?",
+    example: "Example",
+    missing: "If not mentioned",
+    leftEmpty: "Left empty",
+    defaultValue: "Default: {value}",
+    noDefault: "Left empty",
+    approve: "Approve extraction rules",
+    approving: "Creating field definitions…",
+    approveMessage: "I approve the extraction rules. Create the field definitions from this.",
+    requestChanges: "Request changes",
+    chip: "Extraction rules",
+    requestPrefix: "I want to change the extraction rules:",
+    technicalDetails: "Technical definitions",
+    technicalFieldId: "Field identifier",
+    technicalPrompt: "Extraction prompt (Markdown)",
+    technicalSchema: "Field definitions (Python)",
+    sendFailed: "The approval did not reach the wizard. Try again.",
+  },
   pocRun: "Generate PoC package",
   pocRunHint: "Builds a runnable package from the blueprint: code, settings and instructions.",
   pocRunning: "Generating…",
@@ -2444,8 +2568,22 @@ const en: Dict = {
   pocLogNoBackend: "The PoC package cannot be generated: wizard_api is unavailable.",
   pocIdle: "Not run yet. A test run usually takes about a minute.",
   pocAutoRun: "The test run starts by itself once the package has been checked. It usually takes about a minute.",
-  pocAutoRunNeedsInput: "Add test material, and the test run starts by itself.",
-  pocAutoRunNeedsOwnInput: "Add your own test material and the test run starts by itself, or run the test on the wizard's example.",
+  pocAutoRunCheckingWithFiles: "Checking the package. The test run with {files} starts automatically once the check finishes.",
+  pocAutoRunQueued: "Test run queued with {files}…",
+  pocAutoRunNeedsInput: "Add a test file, and the first test run starts automatically.",
+  pocAutoRunNeedsOwnInput: "Ready sample file: {files}. The run does not start automatically on it — add your own test file to run automatically, or press Run the test.",
+  pocProgress: {
+    queued: "Waiting for a test slot…",
+    starting: "Starting the test run…",
+    transcribing: "Transcribing the audio file…",
+    enhancing: "Cleaning up and refining the transcript…",
+    parsing: "Reading the test material…",
+    extracting: "Extracting information from the material…",
+    validating: "Checking the results against the source…",
+    finalizing: "Putting the result together…",
+    working: "Processing the test material…",
+    logSummary: "Technical log",
+  },
   pocResultInputsChanged: "The test material has changed since this run.",
   pocAutoRunHeld: "The test run starts once the wizard has updated the package. You can also run it now.",
   pocAutoRunBusy: "The sandbox is busy. The test run starts by itself once there is room.",
@@ -2506,6 +2644,7 @@ const en: Dict = {
   pocInputsTitle: "Test data",
   pocInputsEmpty: "No files. Add a sample file the solution processes.",
   pocInputUpload: "Add file",
+  pocInputUploadTest: "Add test file",
   pocInputUploading: "Adding…",
   pocInputRemove: "Remove",
   pocInputExample: "Wizard's example",
@@ -2679,6 +2818,8 @@ const en: Dict = {
   },
   showChat: "Show chat",
   chatResize: "Resize the chat",
+  chatWiden: "Widen chat",
+  chatNarrow: "Narrow chat",
   phaseOf: "Step {n}/{total}",
   wsTabHints: {
     flow: "The solution's process as a diagram",
@@ -2815,6 +2956,10 @@ const en: Dict = {
     rateLimited: "You are sending messages faster than the wizard allows. Wait a moment and resend.",
     turnLimit:
       "The wizard stopped after the most steps one message may take. Send “continue” to let it go on.",
+    usageSession:
+      "This session has reached its usage limit. Its work is kept: you can still read it and download the package. Continue in a new session.",
+    usageUser: "Your account has reached its usage limit. Ask the administrator for a new account.",
+    usageDeployment: "The wizard has reached its usage limit for this month. Contact the administrator.",
   },
 
   phases: [

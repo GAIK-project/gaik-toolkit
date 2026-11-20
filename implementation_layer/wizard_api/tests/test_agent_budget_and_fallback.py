@@ -253,4 +253,4 @@ def test_a_switch_to_the_fallback_model_is_logged(monkeypatch, caplog) -> None:
 
 
 def test_the_budget_stops_start_at_zero_for_alerting() -> None:
-    assert ops_metrics._PRIMED["budget_stops"] == [{}]
+    assert ops_metrics._PRIMED["budget_stops"] == [{"limit": "agent"}, {"limit": "usage_cap"}]

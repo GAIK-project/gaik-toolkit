@@ -116,6 +116,55 @@ def test_a_quiet_turn_keeps_each_reader_alive(monkeypatch):
     assert agent_service.is_heartbeat(asyncio.run(scenario()))
 
 
+def test_readers_cancelled_as_a_frame_comes_do_not_stop_the_turn():
+    """Pages that went away mid-reply leave their readers waiting; the server
+    cancels them through an anyio cancel scope, which cancels again at every
+    await until the reader is out. When that met a frame's wake-up, a reader
+    could leave the turn's lock held: the reply was written but the turn never
+    published again or finished, and its stream stayed open (s4, 19.11.2026,
+    68 readers at once)."""
+    import anyio
+
+    async def trial(readers: int, steps_before_cancel: int) -> list[str]:
+        turn = Turn("Hei")
+        scopes: list = []
+        kept: list[str] = []
+
+        async def read(into: list[str] | None) -> None:
+            with anyio.CancelScope() as scope:
+                if into is None:
+                    scopes.append(scope)
+                async for frame in turn.subscribe():
+                    if into is not None:
+                        into.append(frame)
+
+        staying = asyncio.create_task(read(kept))
+        leaving = [asyncio.create_task(read(None)) for _ in range(readers)]
+        await asyncio.sleep(0.01)
+        publishing = asyncio.create_task(turn.publish(sse({"n": 1})))
+        for _ in range(steps_before_cancel):
+            await asyncio.sleep(0)
+        for scope in scopes:
+            scope.cancel()
+        await asyncio.wait_for(publishing, timeout=2)
+        await asyncio.wait_for(turn.publish(sse({"n": 2})), timeout=2)
+        await asyncio.wait_for(turn.finish(), timeout=2)
+        await asyncio.wait_for(asyncio.gather(*leaving, return_exceptions=True), timeout=2)
+        await asyncio.wait_for(staying, timeout=2)
+        late: list[str] = []
+        await asyncio.wait_for(read(late), timeout=2)
+        assert late == kept
+        return kept
+
+    async def scenario() -> None:
+        for readers in (1, 10, 68):
+            for steps in range(6):
+                kept = await trial(readers, steps)
+                assert [json.loads(f[6:]) for f in kept] == [{"n": 1}, {"n": 2}], (readers, steps)
+
+    asyncio.run(scenario())
+
+
 def _fake_agent(monkeypatch, stream) -> None:
     async def fake_get_or_create_session(session_id, output_dir, locale=None, **kwargs):
         return {"lock": asyncio.Lock()}

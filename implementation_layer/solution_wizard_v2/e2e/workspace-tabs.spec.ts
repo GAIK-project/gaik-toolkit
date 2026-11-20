@@ -146,24 +146,29 @@ test.describe("Workspace tabs", () => {
     await expect(page.getByTestId("plan-step-0").locator("details")).toHaveCount(0);
   });
 
-  test("Blueprint lists the output fields the wizard agreed behind Tulosskeema, read-only until Muokkaa kenttiä", async ({ page }) => {
+  test("Blueprint lists the output fields the wizard agreed behind Poimittavat tiedot, read-only until Muokkaa kenttiä", async ({ page }) => {
     await loginAsDev(page);
     await page.goto("/sessions/ses_laskut?tab=json");
 
     const schema = page.getByTestId("plan-schema");
     const toggle = page.getByTestId("plan-schema-toggle");
-    await expect(toggle).toHaveText("Tulosskeema6 kenttää");
+    await expect(toggle).toHaveText("Poimittavat tiedot6 kenttää");
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     const fields = page.getByTestId("plan-schema-fields").getByRole("listitem");
     await expect(fields.first()).toBeHidden();
     await toggle.click();
 
-    // Name, type and the required mark; a description and the allowed values where there are any.
+    // Readable field names and rules; technical identifiers stay behind the disclosure (#251).
     await expect(fields).toHaveCount(6);
-    await expect(fields.nth(0)).toHaveText("supplier_nameTekstiPakollinenThe supplier as written on the invoice.");
-    await expect(fields.nth(2)).toHaveText("invoice_datePäivämääräPakollinen");
-    await expect(fields.nth(4)).toHaveText("cost_centerValintaArvot: Sales, Production, Administration");
+    await expect(fields.nth(0)).toHaveText("Supplier nameTekstiPakollinenThe supplier as written on the invoice.");
+    await expect(fields.nth(2)).toHaveText("Invoice datePäivämääräPakollinen");
+    await expect(fields.nth(4)).toHaveText("Cost centerValintaArvot: Sales, Production, Administration");
     await expect(schema.getByRole("textbox")).toHaveCount(0);
+
+    const technical = page.getByTestId("plan-schema-technical");
+    await expect(technical).not.toHaveAttribute("open", "");
+    await technical.locator("summary").click();
+    await expect(technical).toContainText("supplier_name");
 
     // "Muokkaa kenttiä" turns the rows into a form: a name, a type and the
     // required mark for each field. Nothing is sent while nothing has changed,
@@ -181,12 +186,39 @@ test.describe("Workspace tabs", () => {
     await form.getByRole("button", { name: "Peruuta" }).click();
     await expect(form).toHaveCount(0);
     await expect(edit).toBeFocused();
-    await expect(fields.nth(0)).toContainText("supplier_name");
+    await expect(fields.nth(0)).toContainText("Supplier name");
 
     // A session with no agreed fields has no entry.
     await page.goto("/sessions/ses_ui_basics");
     await expect(page.getByTestId("solution-plan-view")).toBeVisible();
     await expect(page.getByTestId("plan-schema")).toHaveCount(0);
+  });
+
+  test("Gate 2 compact panel can be dismissed and restored, and desktop chat can widen on demand (#251)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loginAsDev(page);
+    await page.goto("/sessions/ses_gate2_pending?tab=json");
+
+    // Gate 2 review bar sits compactly above the reviewed structure and can be dismissed/restored.
+    const gate2 = page.getByTestId("gate2-actions");
+    await expect(gate2).toBeVisible();
+    await page.getByTestId("gate-panel-dismiss").click();
+    await expect(gate2).toHaveCount(0);
+    await expect(page.getByTestId("gate2-actions-collapsed")).toBeVisible();
+    await page.getByTestId("gate-panel-restore").click();
+    await expect(gate2).toBeVisible();
+
+    // Desktop chat pane can be widened and narrowed again via header toggle.
+    const dock = page.getByTestId("chat-dock");
+    const toggle = page.getByTestId("chat-width-toggle");
+    await expect(toggle).toBeVisible();
+    const initialWidth = (await dock.boundingBox())!.width;
+    await toggle.click();
+    await expect.poll(async () => (await dock.boundingBox())!.width).toBeGreaterThan(initialWidth + 80);
+    await toggle.click();
+    await expect.poll(async () => (await dock.boundingBox())!.width).toBeLessThanOrEqual(initialWidth + 5);
   });
 
   test("Muokkaa opens the form and Valmis returns to the read view", async ({ page }) => {

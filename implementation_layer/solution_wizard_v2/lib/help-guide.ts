@@ -37,7 +37,7 @@ export function helpGuide(locale: Locale): HelpGuide {
         {
           heading: "The tabs beside the chat",
           items: [
-            "Blueprint: the solution step by step and the output fields (Output schema).",
+            "Blueprint: the solution step by step and Fields to extract.",
             "Workflow: the workflow diagram, from the diagram step on.",
             "PoC: the generated package and its test runs, from Gate 2 on.",
           ],
@@ -84,7 +84,7 @@ export function helpGuide(locale: Locale): HelpGuide {
       {
         heading: "Chatin vieressä olevat välilehdet",
         items: [
-          "Blueprint: ratkaisu vaihe vaiheelta ja poimittavat kentät (Tulosskeema).",
+          "Blueprint: ratkaisu vaihe vaiheelta ja Poimittavat tiedot.",
           "Työnkulku: työnkulkukaavio kaaviovaiheesta alkaen.",
           "PoC: generoitu paketti ja sen testiajot Gate 2:n jälkeen.",
         ],

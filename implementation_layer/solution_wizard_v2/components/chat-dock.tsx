@@ -34,6 +34,9 @@ const WIDTH_KEY = "gaik-wizard.chat-width";
 const DEFAULT_WIDTH = 400;
 /** While the chat is the focus (requirements gathering) it starts wider. */
 const WIDE_WIDTH = 480;
+/** Comfortable reading width when the user widens the chat on demand (#251). */
+const EXPANDED_WIDTH = 640;
+const EXPANDED_THRESHOLD = 560;
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
 /** The workspace keeps at least this much when the chat is dragged wider. */
@@ -62,6 +65,8 @@ export function ChatDock({
   hideChatLabel,
   showChatLabel,
   resizeLabel,
+  widenChatLabel,
+  narrowChatLabel,
   defaultOpen = true,
   wide = false,
   lead = false,
@@ -93,6 +98,9 @@ export function ChatDock({
   showChatLabel: string;
   /** Accessible name of the drag handle between the workspace and the chat. */
   resizeLabel: string;
+  /** Desktop header toggle to widen/narrow the docked chat on demand (#251). */
+  widenChatLabel?: string;
+  narrowChatLabel?: string;
   /** false on BPMN+ workspace steps so the canvas gets the viewport (GAIK review). */
   defaultOpen?: boolean;
   /** wider panel while the chat is the focus (gathering / Q&A). */
@@ -509,6 +517,14 @@ export function ChatDock({
     }
   }
 
+  const chatExpanded = width >= EXPANDED_THRESHOLD;
+  function toggleExpand() {
+    const target = chatExpanded ? (wide ? WIDE_WIDTH : DEFAULT_WIDTH) : EXPANDED_WIDTH;
+    const w = clamp(target);
+    setWidth(w);
+    saveWidth(w);
+  }
+
   return (
     <>
       {/* One element for both layouts, so the conversation keeps its state
@@ -583,6 +599,10 @@ export function ChatDock({
             questionLabels={questionLabels}
             activityLabels={activityLabels}
             hideChatLabel={hideChatLabel}
+            widenChatLabel={widenChatLabel}
+            narrowChatLabel={narrowChatLabel}
+            chatExpanded={chatExpanded}
+            onToggleExpand={widenChatLabel && narrowChatLabel ? toggleExpand : undefined}
             onCollapse={() => {
               focusRailOnClose.current = true;
               setOpen(false);

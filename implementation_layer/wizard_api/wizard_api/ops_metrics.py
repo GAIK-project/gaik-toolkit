@@ -76,7 +76,20 @@ uploads_scanned = meter.create_counter(
 )
 budget_stops = meter.create_counter(
     "wizard.agent.budget_stops",
-    description="Chat turns the agent ended at its cost limit (WIZARD_AGENT_MAX_BUDGET_USD)",
+    description="Chat turns the agent ended at its budget, by limit: agent "
+    "(WIZARD_AGENT_MAX_BUDGET_USD) or usage_cap (what the usage caps left)",
+)
+usage_cost = meter.create_counter(
+    "wizard.usage.cost_usd",
+    description="Estimated USD the agent spent, added after each chat turn (usage caps)",
+)
+usage_unreported = meter.create_counter(
+    "wizard.usage.unreported_queries",
+    description="Agent queries that ended with no result, charged an estimate (usage caps)",
+)
+usage_warnings = meter.create_counter(
+    "wizard.usage.warnings",
+    description="Times a session, a user or the deployment passed the warning share of its cap",
 )
 tool_calls = meter.create_counter(
     "wizard.agent.tool_calls",
@@ -158,6 +171,8 @@ _PRIMED = {
             "unavailable",
             "input_unsafe",
             "scanner_unavailable",
+            "usage_cap",
+            "session_limit",
         )
     ],
     "uploads_scanned": [{"result": r} for r in ("clean", "refused", "unavailable")],
@@ -181,7 +196,10 @@ _PRIMED = {
         for t in ("approved", "rejected", "pending")
     ],
     "ownership_denied": [{}],
-    "budget_stops": [{}],
+    "budget_stops": [{"limit": limit} for limit in ("agent", "usage_cap")],
+    "usage_cost": [{}],
+    "usage_unreported": [{}],
+    "usage_warnings": [{"scope": s} for s in ("session", "user", "deployment")],
     # Metered calls refused at a limit (agent_tool_guard.METERED_KINDS).
     "tool_calls": [
         {"kind": k, "decision": "denied", "reason": r}
@@ -354,9 +372,7 @@ def _sandbox_active() -> dict[str, float]:
 
     if not sandbox_runner.kubernetes_available() or not sandbox_runner.runner_image():
         return {}
-    runner = sandbox_runner.SandboxRunner()
-    active = [j for j in runner._jobs() if sandbox_runner._unfinished(j)]  # noqa: SLF001
-    return {"active": float(len(active))}
+    return {"active": float(sandbox_runner.SandboxRunner().active_jobs())}
 
 
 _sandbox = _Cached(_sandbox_active)
@@ -453,6 +469,35 @@ def _db_size() -> Iterable[tuple[float | None, dict]]:
     yield _sessions.get().get("db_bytes"), {}
 
 
+def _usage_stats() -> dict[str, float]:
+    from wizard_api.db import SessionLocal
+    from wizard_api.services import usage_caps
+
+    with SessionLocal() as db:
+        return usage_caps.usage_stats(db)
+
+
+_usage = _Cached(_usage_stats)
+
+
+def _usage_caps() -> Iterable[tuple[float | None, dict]]:
+    from wizard_api import config
+
+    yield config.session_max_cost_usd(), {"scope": "session"}
+    yield config.user_max_cost_usd(), {"scope": "user"}
+    yield config.deployment_max_cost_usd(), {"scope": "deployment"}
+
+
+def _deployment_spent() -> Iterable[tuple[float | None, dict]]:
+    yield _usage.get().get("deployment_spent"), {}
+
+
+def _users_by_cap() -> Iterable[tuple[float | None, dict]]:
+    stats = _usage.get()
+    for state in ("near", "reached"):
+        yield stats.get(f"users_{state}"), {"state": state}
+
+
 def _shared_runner_key() -> Iterable[tuple[float | None, dict]]:
     secret = os.getenv("WIZARD_POC_RUNNER_SECRET", "").strip() or SHARED_RUNNER_SECRET
     yield (1.0 if secret == SHARED_RUNNER_SECRET else 0.0), {}
@@ -517,6 +562,21 @@ _GAUGES = [
     ("wizard.sessions", "Sessions by state: total, active, overdue", _session_counts),
     ("wizard.sessions.mismatch", "Session rows and folders without each other", _session_mismatch),
     ("wizard.db.size", "Size of the wizard database, bytes", _db_size),
+    (
+        "wizard.usage.cap_usd",
+        "The usage caps in USD, by scope; a cap that is off is absent",
+        _usage_caps,
+    ),
+    (
+        "wizard.usage.deployment_spent_usd",
+        "Estimated USD the deployment spent this month",
+        _deployment_spent,
+    ),
+    (
+        "wizard.usage.users",
+        "Users past the warning share (near) or at their cap (reached)",
+        _users_by_cap,
+    ),
     (
         "wizard.config.shared_runner_key",
         "1 while sandbox runs use the shared model key Secret",

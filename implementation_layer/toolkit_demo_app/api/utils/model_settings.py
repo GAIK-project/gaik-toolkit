@@ -89,10 +89,17 @@ _server_model: ContextVar[ServerModel | None] = ContextVar("demo_server_model", 
 # routes that check a named model (utils/model_allow_list.py).
 _staff: ContextVar[bool] = ContextVar("demo_model_staff", default=False)
 
+# The reasoning effort picked in the model menu. Absent means Auto: each model
+# keeps the effort get_model_options chooses for it (utils/config.py).
+EFFORT_HEADER = b"x-gaik-reasoning-effort"
+_EFFORTS = (b"low", b"medium", b"high")
+_reasoning_effort: ContextVar[str | None] = ContextVar("demo_reasoning_effort", default=None)
+
 _LABELS = {
     "gpt-6-luna": "GPT-6 Luna",
     "gpt-6-sol": "GPT-6 Sol",
     "gpt-6.1-sol": "GPT-6.1 Sol",
+    "gpt-6.2-sol": "GPT-6.2 Sol",
     "gpt-6-astra": "GPT-6 Astra",
     "google/gemma-4-31b-it": "Gemma 4 31B",
     "Qwen/Qwen3.8-27B": "Qwen 3.8 27B",
@@ -105,9 +112,10 @@ _DEFAULT_MODELS = (
     ("gpt", "gpt-6-luna", False),
     ("gpt", "gpt-6-sol", False),
     ("gpt", "gpt-6.1-sol", True),
+    ("gpt", "gpt-6.2-sol", True),
     ("gpt", "gpt-6-astra", True),
     ("claude", "claude-haiku-5-5", False),
-    ("claude", "claude-sonnet-5-5", True),
+    ("claude", "claude-sonnet-5-5", False),
     ("claude", "claude-opus-5-5", True),
     ("gemini", "gemini-3.8-flash", False),
     ("gemini", "gemini-4-argon", True),
@@ -268,6 +276,22 @@ def request_is_staff() -> bool:
 
 def request_server_model() -> ServerModel | None:
     return _server_model.get()
+
+
+def parse_reasoning_effort(values: list[bytes]) -> str | None:
+    """The effort one header names: low, medium or high. Anything else is Auto.
+
+    "none" is not offered: only some models accept it, and Auto already sends it
+    to those. A wrong or repeated header falls back to Auto and refuses nothing.
+    """
+    if len(values) != 1 or values[0] not in _EFFORTS:
+        return None
+    return values[0].decode("ascii")
+
+
+def request_reasoning_effort() -> str | None:
+    """The effort the user picked for this request, or None for Auto."""
+    return _reasoning_effort.get()
 
 
 def request_model_settings() -> RequestModelSettings | None:
@@ -563,9 +587,18 @@ class ModelSettingsMiddleware:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
         staff_token = _staff.set(is_staff(scope))
+        # Read on the routes that take a picked model, with an own key as well as
+        # with a server model.
+        effort = None
+        if supports_server_model(scope["path"], scope["method"]):
+            effort = parse_reasoning_effort(
+                [v for k, v in scope.get("headers", []) if k.lower() == EFFORT_HEADER]
+            )
+        effort_token = _reasoning_effort.set(effort)
         try:
             return await self._call(scope, receive, send)
         finally:
+            _reasoning_effort.reset(effort_token)
             _staff.reset(staff_token)
 
     async def _call(self, scope, receive, send):

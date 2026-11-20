@@ -85,6 +85,11 @@ import os
 import re
 from collections import OrderedDict
 
+from gaik.software_components._tesseract import (
+    installed_tesseract_cli_languages,
+    installed_tesserocr_languages,
+    with_installed_languages,
+)
 from gaik.software_components.input_limits import InputLimits, docling_limits
 
 # Try to import additional format options
@@ -219,10 +224,17 @@ class DoclingParser:
         """
         ocr_engine = ocr_engine.lower()
 
+        # Tesseract gets only the default languages it has traineddata for (see _tesseract).
         if ocr_engine == "tesseract_cli":
-            self.pipeline_options.ocr_options = TesseractCliOcrOptions(force_full_page_ocr=True)
+            self.pipeline_options.ocr_options = with_installed_languages(
+                TesseractCliOcrOptions,
+                installed_tesseract_cli_languages(),
+                force_full_page_ocr=True,
+            )
         elif ocr_engine == "tesseract":
-            self.pipeline_options.ocr_options = TesseractOcrOptions()
+            self.pipeline_options.ocr_options = with_installed_languages(
+                TesseractOcrOptions, installed_tesserocr_languages()
+            )
         elif ocr_engine == "easyocr":
             self.pipeline_options.ocr_options = EasyOcrOptions()
         elif ocr_engine == "rapidocr":

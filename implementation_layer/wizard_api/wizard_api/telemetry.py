@@ -28,6 +28,7 @@ from opentelemetry.trace import Span, Status, StatusCode
 SERVICE_NAME = "wizard-v2-api"
 
 tracer = trace.get_tracer("wizard_api")
+logger = logging.getLogger(__name__)
 
 _provider: Any = None
 
@@ -229,6 +230,14 @@ def record_refusal(span: Span, attribute: str, exc: HTTPException) -> None:
         span.set_status(Status(StatusCode.ERROR, reason))
 
 
+def name_session(session_id: Any) -> None:
+    """Put the session's id on the request's span, so the collector files the
+    request under that session (MLflow groups traces by it). The id is
+    pseudonymised in the collector like every ``gaik.session.id``. Without a
+    recording span this does nothing."""
+    trace.get_current_span().set_attribute("gaik.session.id", str(session_id))
+
+
 def sandbox_start_span(kind: str):
     """Wrap a run-starting endpoint in a ``wizard.sandbox.start`` span.
 
@@ -276,6 +285,25 @@ def query_cost(agent: dict, result: Any) -> float | None:
     before = agent.get("cost_total_usd", 0.0)
     agent["cost_total_usd"] = total
     return total - before if total >= before else total
+
+
+#: What a query that ended with no result (a timeout, a crashed or killed
+#: agent) is charged for the usage caps, in USD, when its agent's own budget
+#: does not leave less: its real cost never arrives. About one long reply.
+UNREPORTED_QUERY_COST_USD = 1.0
+
+
+def unreported_query_cost(agent: dict) -> float:
+    """The estimate charged for ``agent``'s query that ended with no result."""
+    from wizard_api import ops_metrics
+
+    estimate = UNREPORTED_QUERY_COST_USD
+    budget = agent.get("budget_usd")
+    if budget is not None:
+        estimate = max(0.0, min(estimate, budget - agent.get("cost_total_usd", 0.0)))
+    logger.warning("a query ended with no result; %.2f USD is counted for it", estimate)
+    ops_metrics.usage_unreported.add(1)
+    return estimate
 
 
 def _response_model(result: Any) -> str | None:
@@ -356,6 +384,7 @@ async def traced_turn(
     model: str,
     is_error: Callable[[str], bool],
     is_stopped: Callable[[str], bool] | None = None,
+    on_cost: Callable[[float], None] | None = None,
 ) -> AsyncIterator[str]:
     """Pass a chat turn's SSE ``frames`` through, inside one ``wizard.turn`` span.
 
@@ -367,7 +396,9 @@ async def traced_turn(
     before it ended (closed tab, dropped connection) is ``gaik.turn.aborted``;
     the query it cut short has no ``chat`` span, as its usage never arrived. A
     turn the user stopped (a frame ``is_stopped`` knows) is ``gaik.turn.stopped``
-    and counted with the outcome ``stopped``, not as a failure.
+    and counted with the outcome ``stopped``, not as a failure. ``on_cost`` is
+    given the turn's whole cost in USD, when the queries reported one, for the
+    usage caps (services/usage_caps.py).
     """
     from wizard_api import ops_metrics
 
@@ -404,10 +435,16 @@ async def traced_turn(
         if outcome != "aborted":
             ops_metrics.turn_duration.record(time.monotonic() - started, {"outcome": outcome})
         # Each client keeps its own running cost, so each is priced against its own.
+        spent = 0.0
         for agent, replaced in agents():
             for purpose, result in agent.pop("turn_results", None) or []:
                 cost = query_cost(agent, result)
                 record_turn_usage(turn, result, model, purpose, cost=cost, replaced=replaced)
+                spent += cost or 0.0
+            if agent.pop("query_unfinished", False):
+                spent += unreported_query_cost(agent)
+        if on_cost is not None and spent > 0:
+            on_cost(spent)
         if failed:
             turn.set_status(Status(StatusCode.ERROR))
         turn.end()

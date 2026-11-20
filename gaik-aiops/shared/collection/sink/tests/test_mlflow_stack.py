@@ -16,6 +16,7 @@ import pytest
 
 COLLECTOR = "http://127.0.0.1:4318"
 MLFLOW = "http://127.0.0.1:5000"
+PROM = "http://127.0.0.1:9090"
 EXPERIMENT = os.environ.get("MLFLOW_TRACES_EXPERIMENT_ID", "0")
 
 
@@ -64,15 +65,20 @@ def _send_span(service: str, *extra: dict) -> str:
             *extra,
         ],
     }
+    _post_spans(service, [span])
+    return f"tr-{trace_id}"
+
+
+def _post_spans(service: str, spans: list[dict]) -> None:
+    """Send the spans in one request: they reach MLflow, or are left out, together."""
     body = {"resourceSpans": [{
         "resource": {"attributes": [_attr("service.name", service)]},
-        "scopeSpans": [{"scope": {"name": "test"}, "spans": [span]}],
+        "scopeSpans": [{"scope": {"name": "test"}, "spans": spans}],
     }]}
     req = urllib.request.Request(f"{COLLECTOR}/v1/traces", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=5) as resp:
         assert resp.status == 200
-    return f"tr-{trace_id}"
 
 
 def _find_trace(trace_id: str, timeout: float = 30.0) -> dict:
@@ -176,3 +182,117 @@ def test_a_producers_own_session_id_wins_and_is_pseudonymised_too():
 
 def test_a_trace_without_a_session_gets_none(stored_trace):
     assert _session_of(stored_trace) is None
+
+
+def _prometheus_up() -> bool:
+    try:
+        urllib.request.urlopen(f"{PROM}/-/ready", timeout=3)
+    except Exception:  # noqa: BLE001
+        return False
+    return True
+
+
+needs_prometheus = pytest.mark.skipif(not _prometheus_up(), reason="Prometheus not running")
+
+HEALTH = ("GET /health", "/health", "wizard_api.main.health")
+OPEN_SESSION = ("GET /sessions/{session_id}", "/sessions/{session_id}", "wizard_api.routers.sessions.get_session")
+LIST_SESSIONS = ("GET /sessions", "/sessions", "wizard_api.routers.sessions.list_sessions")
+PATCH_SESSION = ("PATCH /sessions/{session_id}", "/sessions/{session_id}", "wizard_api.routers.sessions.update_session")
+POC_FILES = ("GET /sessions/{session_id}/poc/files", "/sessions/{session_id}/poc/files",
+             "wizard_api.routers.sessions.list_poc_files")
+REJOIN_STREAM = ("GET /sessions/{session_id}/chat/stream", "/sessions/{session_id}/chat/stream",
+                 "wizard_api.routers.sessions.chat_stream")
+POC_UPLOAD = ("POST /sessions/{session_id}/poc/input", "/sessions/{session_id}/poc/input",
+              "wizard_api.routers.sessions.upload_poc_input")
+ERROR = 2  # OTLP STATUS_CODE_ERROR
+
+
+def _request_trace(name: str, route: str, function: str, status: int = 0,
+                   child_status: int = 0) -> tuple[str, list[dict]]:
+    """A server span and one FastAPI child span, as the wizard API's instrumentation sends them."""
+    trace_id, root_id = secrets.token_hex(16), secrets.token_hex(8)
+    now = time.time_ns()
+    common = {"traceId": trace_id, "startTimeUnixNano": str(now - 3_000_000), "endTimeUnixNano": str(now)}
+    spans = [
+        {**common, "spanId": root_id, "name": name, "kind": 2, "status": {"code": status},
+         "attributes": [_attr("http.route", route)]},
+        {**common, "spanId": secrets.token_hex(8), "parentSpanId": root_id, "name": "fastapi.endpoint", "kind": 1,
+         "status": {"code": child_status}, "attributes": [_attr("code.function.name", function)]},
+    ]
+    return f"tr-{trace_id}", spans
+
+
+def _requests_counted(service: str, span_name: str) -> float:
+    expr = f'sum(traces_span_metrics_calls_total{{service_name="{service}", span_name="{span_name}"}})'
+    result = _get(f"{PROM}/api/v1/query?" + urllib.parse.urlencode({"query": expr}))["data"]["result"]
+    return float(result[0]["value"][1]) if result else 0.0
+
+
+def _wait_until_counted(service: str, span_name: str, counted_before: float) -> None:
+    deadline = time.monotonic() + 30
+    while _requests_counted(service, span_name) <= counted_before:
+        assert time.monotonic() < deadline, f"{span_name} was not counted in the span metrics"
+        time.sleep(1)
+
+
+def _stored_and_left_out(service: str, kept: tuple, *left_out: tuple) -> dict:
+    """Send the requests in one OTLP request, the kept one last; return it once MLflow has it.
+
+    One request is one export to MLflow, so when the kept trace is stored the others were handled in
+    the same call: none of them may be there, now or a little later.
+    """
+    sent = [_request_trace(*request) for request in left_out]
+    kept_id, kept_spans = _request_trace(*kept)
+    _post_spans(service, [span for _, spans in sent for span in spans] + kept_spans)
+    stored = _find_trace(kept_id)
+    for _ in range(3):
+        for trace_id, _spans in sent:
+            with pytest.raises(urllib.error.HTTPError) as missing:
+                _get(f"{MLFLOW}/api/3.0/mlflow/traces/get?trace_id={trace_id}")
+            assert missing.value.code == 404
+        time.sleep(1)
+    return stored
+
+
+@needs_prometheus
+def test_health_probes_stay_out_of_mlflow_and_in_the_span_metrics():
+    counted_before = _requests_counted("wizard-v2-api", "GET /health")
+    # A probe that fails is left out as well: an outage must not fill MLflow with probes.
+    kept = _stored_and_left_out("wizard-v2-api", PATCH_SESSION, HEALTH, (*HEALTH, ERROR, ERROR))
+    assert _experiment_of(kept) == _experiment_id("wizard-v2-api")
+    # Prometheus still counts the probe: the span metrics are taken before the filter.
+    _wait_until_counted("wizard-v2-api", "GET /health", counted_before)
+
+
+def test_the_filter_is_the_wizard_apis_alone():
+    # The probe's spans from another application are stored, both of them.
+    trace_id, spans = _request_trace(*HEALTH)
+    _post_spans("example-producer", spans)
+    assert len(_find_trace(trace_id)["spans"]) == 2
+
+
+@needs_prometheus
+def test_page_requests_without_a_session_stay_out_of_mlflow_and_in_the_span_metrics():
+    counted_before = _requests_counted("wizard-v2-api", "GET /sessions/{session_id}")
+    # A PATCH of the session has the same route as opening it, and is stored with both its spans.
+    # A refused request (4xx) marks only the child span as an error: it is left out whole.
+    refused = (*OPEN_SESSION, 0, ERROR)
+    patched = _stored_and_left_out("wizard-v2-api", PATCH_SESSION, OPEN_SESSION, LIST_SESSIONS, refused)
+    assert len(patched["spans"]) == 2
+    _wait_until_counted("wizard-v2-api", "GET /sessions/{session_id}", counted_before)
+
+
+def test_what_the_page_reads_in_the_background_stays_out_of_mlflow_and_what_the_user_does_is_stored():
+    # The PoC tab lists the package's files every few seconds and a reply's stream is rejoined; an
+    # upload to the same tab is something the user did, and is stored with both its spans.
+    uploaded = _stored_and_left_out("wizard-v2-api", POC_UPLOAD, POC_FILES, REJOIN_STREAM)
+    assert len(uploaded["spans"]) == 2
+
+
+def test_a_failed_page_request_keeps_its_server_span_in_mlflow():
+    # The same request that is left out when it succeeds: failed by the API (5xx), its server span is
+    # stored, with the route and the error status; the child spans are not.
+    trace_id, spans = _request_trace(*OPEN_SESSION, status=ERROR, child_status=ERROR)
+    _post_spans("wizard-v2-api", spans)
+    [span] = _find_trace(trace_id)["spans"]
+    assert span["name"] == "GET /sessions/{session_id}"

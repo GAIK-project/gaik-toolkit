@@ -80,6 +80,11 @@ services:
       WIZARD_TEST_HOOKS: "1"
       # No agent writes artifacts in this stack, so gates could never be approved.
       WIZARD_GATE_READINESS: "off"
+      # The specs create many sessions as one user and run no real agent.
+      WIZARD_MAX_SESSIONS_PER_USER: "0"
+      WIZARD_SESSION_MAX_COST_USD: "0"
+      WIZARD_USER_MAX_COST_USD: "0"
+      WIZARD_DEPLOYMENT_MAX_COST_USD: "0"
     restart: unless-stopped
     command: sh -c "alembic upgrade head && uvicorn wizard_api.main:app --host 0.0.0.0 --port 8100"
     depends_on:

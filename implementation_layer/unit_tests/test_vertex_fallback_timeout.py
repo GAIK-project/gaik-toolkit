@@ -59,14 +59,15 @@ def _by_location(seen):
     return {kwargs["location"]: kwargs for kwargs in seen}
 
 
-def test_the_fallback_client_gets_no_implicit_timeout(clients):
+def test_the_fallback_client_gets_the_default_time_limit(clients):
     config = get_llm_config("vertex", project_id="project", model="gemini-test")
     provider = google_provider.GoogleProvider(config)
     assert provider.chat(USER).text == "from global"
     by_location = _by_location(clients)
     assert by_location["eu"]["http_options"].timeout == 120_000
-    # The global endpoint keeps the SDK's default: a long request can finish there.
-    assert "http_options" not in by_location["global"]
+    # The global endpoint gets the default limit, longer than the EU's.
+    assert by_location["global"]["http_options"].timeout == 600_000
+    assert by_location["global"]["http_options"].retry_options.attempts == 3
 
 
 def test_a_callers_timeout_applies_to_both_clients(clients):
@@ -90,7 +91,7 @@ def test_a_location_set_on_the_returned_dict_does_not_fall_back(clients, how):
     assert provider.chat(USER).text == "from europe-west4"
     assert [kwargs["location"] for kwargs in clients] == ["europe-west4"]
     assert provider._fallback_location is None
-    assert "http_options" not in clients[0]
+    assert clients[0]["http_options"].timeout == 600_000
 
 
 def test_a_regional_fallback_named_with_the_location_stays(clients):

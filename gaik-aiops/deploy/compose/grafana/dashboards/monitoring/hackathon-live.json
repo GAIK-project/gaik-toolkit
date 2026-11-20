@@ -337,7 +337,9 @@
     "h": 10
    },
    "fieldConfig": {
-    "defaults": {},
+    "defaults": {
+     "decimals": 0
+    },
     "overrides": []
    },
    "targets": [
@@ -421,7 +423,9 @@
     "h": 10
    },
    "fieldConfig": {
-    "defaults": {},
+    "defaults": {
+     "decimals": 0
+    },
     "overrides": []
    },
    "targets": [
@@ -431,7 +435,7 @@
       "type": "prometheus",
       "uid": "prometheus"
      },
-     "expr": "sort_desc(sum by (component) (increase(wizard_components_selected_total{service_name=\"wizard-v2-api\"}[$__range])))",
+     "expr": "sort_desc(clamp_min(sum by (component) ((wizard_components_selected_total{service_name=\"wizard-v2-api\"} - wizard_components_selected_total{service_name=\"wizard-v2-api\"} offset $__range) or wizard_components_selected_total{service_name=\"wizard-v2-api\"}), 0))",
      "legendFormat": "{{component}}"
     }
    ],
@@ -619,7 +623,53 @@
       }
      }
     },
-    "overrides": []
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "succeeded"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "green"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "failed"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "red"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "timeout"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "orange"
+        }
+       }
+      ]
+     }
+    ]
    },
    "targets": [
     {
@@ -635,19 +685,160 @@
    "id": 13
   },
   {
-   "type": "text",
-   "title": "Cost",
+   "type": "gauge",
+   "title": "Spend this month of the cap",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "description": "The deployment's estimated spend this calendar month (UTC) against WIZARD_DEPLOYMENT_MAX_COST_USD. At the cap every message is refused (402 usage_cap). Estimated by the agent SDK; the provider's bill is the real figure.",
    "gridPos": {
     "x": 16,
     "y": 24,
-    "w": 8,
+    "w": 4,
     "h": 8
    },
-   "options": {
-    "mode": "markdown",
-    "content": "Token and cost metrics are defined by the WP5 instrumentation side. This panel shows them once that metric is agreed."
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "max": 1,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.8
+       },
+       {
+        "color": "red",
+        "value": 0.95
+       }
+      ]
+     }
+    },
+    "overrides": []
    },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_usage_deployment_spent_usd{service_name=\"wizard-v2-api\"}) / max(wizard_usage_cap_usd{service_name=\"wizard-v2-api\",scope=\"deployment\"})"
+    }
+   ],
    "id": 14
+  },
+  {
+   "type": "stat",
+   "title": "Users near or at their cap",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "description": "Users past WIZARD_COST_WARN_RATIO of WIZARD_USER_MAX_COST_USD (near), and users whose messages are now refused (at cap). Also: spend this month in USD.",
+   "gridPos": {
+    "x": 20,
+    "y": 24,
+    "w": 4,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "decimals": 0,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "USD this month"
+      },
+      "properties": [
+       {
+        "id": "decimals",
+        "value": 0
+       },
+       {
+        "id": "unit",
+        "value": "currencyUSD"
+       },
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "text"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "textMode": "value_and_name",
+    "orientation": "horizontal",
+    "colorMode": "value"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_usage_users{service_name=\"wizard-v2-api\",state=\"near\"})",
+     "legendFormat": "near"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_usage_users{service_name=\"wizard-v2-api\",state=\"reached\"})",
+     "legendFormat": "at cap"
+    },
+    {
+     "refId": "C",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_usage_deployment_spent_usd{service_name=\"wizard-v2-api\"})",
+     "legendFormat": "USD this month"
+    }
+   ],
+   "id": 18
   },
   {
    "type": "gauge",

@@ -55,6 +55,7 @@ from wizard_api.services import (
     blueprint_ops,
     blueprint_service,
     session_service,
+    usage_caps,
 )
 from wizard_api.services import blueprint_edit_service as edits
 from wizard_api.session_state import (
@@ -540,6 +541,11 @@ def _agent_busy(exc: agent_service.AgentUserLimitError) -> HTTPException:
         str(exc),
         headers={"Retry-After": str(agent_service.AgentUserLimitError.retry_after_s)},
     )
+
+
+def _usage_cap(exc: usage_caps.UsageCapError) -> HTTPException:
+    """402 for a message a reached usage cap refuses; ``scope`` says which cap."""
+    return api_error(402, "usage_cap", str(exc), scope=exc.scope)
 
 
 def _chat_rate_limited(exc: agent_service.ChatRateLimitError) -> HTTPException:
@@ -1040,7 +1046,16 @@ def create_session(
         session_service.check_metadata_patch(payload.metadata)
     except session_service.ServerOwnedMetadataError as exc:
         raise api_error(422, "server_owned_metadata", str(exc), keys=exc.keys) from exc
-    session = session_service.create_session(db, payload)
+    try:
+        # Claimed before the session exists: a refused one leaves nothing behind.
+        usage_caps.claim_session(db, payload.user_id)
+    except usage_caps.SessionLimitError as exc:
+        raise api_error(429, "session_limit", str(exc)) from exc
+    try:
+        session = session_service.create_session(db, payload)
+    except Exception:
+        usage_caps.release_session(db, payload.user_id)
+        raise
     ops_metrics.sessions_created.add(
         1, {"owner": session.user_id if is_owner_id(session.user_id) else "legacy"}
     )
@@ -1479,38 +1494,63 @@ async def chat(
         agent_service.check_chat_rate(owner)
     except agent_service.ChatRateLimitError as exc:
         raise _chat_rate_limited(exc) from exc
-
-    # Before the agent is asked for: a live agent whose interface language
-    # changed is told so in a turn of its own, which must not run into the
-    # reply still on its way.
-    if agent_service.running_turn(str(session_id)) is not None:
-        raise HTTPException(status_code=409, detail="The wizard is still responding.")
-
-    metadata = dict(session.session_metadata)
     try:
-        agent = await agent_service.get_or_create_session(
-            str(session_id),
-            session.output_dir,
-            payload.locale,
-            resume_id=_resume_id(metadata, session_id),
-            transcript=metadata.get("messages"),
-            user_id=owner,
-        )
-    except agent_service.AgentUserLimitError as exc:
-        raise _agent_busy(exc) from exc
-    except agent_service.AgentCapacityError as exc:
-        raise api_error(503, "agent_capacity", str(exc)) from exc
-    except agent_service.AgentNotConfiguredError as exc:
-        raise internal_error(
-            503, "agent_unavailable", "The wizard is not available right now.", exc
+        # A reached usage cap refuses the message before an agent is woken,
+        # and an agent started for it gets what the caps have left as its budget,
+        # held against the user's cap until the reply is charged.
+        caps = await asyncio.to_thread(usage_caps.caps_left, db, session)
+        reservation = usage_caps.reserve(owner, caps)
+    except usage_caps.UsageCapError as exc:
+        raise _usage_cap(exc) from exc
+    except usage_caps.UsageReservedError as exc:
+        raise api_error(
+            429,
+            "agent_busy",
+            str(exc),
+            headers={"Retry-After": str(agent_service.AgentUserLimitError.retry_after_s)},
         ) from exc
+    budget = reservation.budget
+    try:
+        # A live agent started when the caps left more keeps that budget: it is
+        # ended, and resumed below with what they leave now.
+        await agent_service.fit_budget(str(session_id), budget)
 
-    if agent["lock"].locked() or agent_service.running_turn(str(session_id)) is not None:
-        raise HTTPException(status_code=409, detail="The wizard is still responding.")
-    agent_service.record_chat_turn(owner)
-    # Registered before the next await, so a second message that arrives while
-    # this one is being prepared is refused instead of starting beside it.
-    turn = agent_service.begin_turn(str(session_id), payload.message)
+        # Before the agent is asked for: a live agent whose interface language
+        # changed is told so in a turn of its own, which must not run into the
+        # reply still on its way.
+        if agent_service.running_turn(str(session_id)) is not None:
+            raise HTTPException(status_code=409, detail="The wizard is still responding.")
+
+        metadata = dict(session.session_metadata)
+        try:
+            agent = await agent_service.get_or_create_session(
+                str(session_id),
+                session.output_dir,
+                payload.locale,
+                resume_id=_resume_id(metadata, session_id),
+                transcript=metadata.get("messages"),
+                user_id=owner,
+                budget_usd=budget,
+            )
+        except agent_service.AgentUserLimitError as exc:
+            raise _agent_busy(exc) from exc
+        except agent_service.AgentCapacityError as exc:
+            raise api_error(503, "agent_capacity", str(exc)) from exc
+        except agent_service.AgentNotConfiguredError as exc:
+            raise internal_error(
+                503, "agent_unavailable", "The wizard is not available right now.", exc
+            ) from exc
+
+        if agent["lock"].locked() or agent_service.running_turn(str(session_id)) is not None:
+            raise HTTPException(status_code=409, detail="The wizard is still responding.")
+        agent_service.record_chat_turn(owner)
+        # Registered before the next await, so a second message that arrives while
+        # this one is being prepared is refused instead of starting beside it.
+        turn = agent_service.begin_turn(str(session_id), payload.message)
+    except BaseException:
+        # Refused before its turn began: the budget goes back.
+        reservation.release()
+        raise
 
     try:
         # A save in the PoC tab's editor that began before the turn was
@@ -1591,6 +1631,7 @@ async def chat(
         # pool. Before the turn's task exists, which opens a session of its own.
         await asyncio.to_thread(db.commit)
     except BaseException:
+        reservation.release()
         await agent_service.end_turn(str(session_id), turn)
         raise
 
@@ -1634,6 +1675,7 @@ async def chat(
                         resume_id=None,
                         transcript=metadata.get("messages") or [],
                         user_id=owner,
+                        budget_usd=budget,
                     )
                 except agent_service.AgentUserLimitError as exc:
                     yield agent_service.sse(stream_error("agent_busy", str(exc)))
@@ -1695,6 +1737,7 @@ async def chat(
                 "during a tool call" if stopped.get("tool") else "while writing",
             )
         if assistant_text:
+            stored.append(True)
             # Persist off the event loop (sync SQLAlchemy commit).
             await asyncio.to_thread(
                 session_service.append_messages,
@@ -1757,8 +1800,32 @@ async def chat(
         turn_db.commit()
         return row
 
+    # The id as the database holds it, for the log lines below.
+    stored_id = session.id
+    turn_cost: list[float] = []
+    # Set when the turn stored its reply, which a usage notice is then added to.
+    stored: list[bool] = []
+
+    def record_usage(warn: bool) -> list[str]:
+        """Add the turn's cost to the caps' totals, in a database session of its own.
+
+        Its own, so a turn that failed half-way through a write of its database
+        session still has its spend counted. Returns the caps to tell the user of.
+        """
+        if not turn_cost:
+            return []
+        usage = open_db()
+        try:
+            usage_db = next(usage)
+            # A session deleted meanwhile is None: its owner's spend still counts.
+            row = session_service.get_session(usage_db, session_id)
+            return usage_caps.record_cost(usage_db, owner, sum(turn_cost), session=row, warn=warn)
+        finally:
+            usage.close()
+
     async def run_turn() -> None:
         opened = open_db()
+        completed = False
         try:
             turn_db = next(opened)
             turn_session = await asyncio.to_thread(open_turn_session, turn_db)
@@ -1774,10 +1841,12 @@ async def chat(
                     agent_service._model(),
                     _turn_failed,
                     lambda frame: agent_service.frame_stopped(frame) is not None,
+                    turn_cost.append,
                 ):
                     # Each reader keeps its own connection alive (Turn.subscribe).
                     if not agent_service.is_heartbeat(frame):
                         await turn.publish(frame)
+            completed = True
         except TimeoutError:
             logger.error("chat turn of session %s ended at the time limit", session_id)
             # The agent's process is in an unknown state: the next message
@@ -1805,13 +1874,35 @@ async def chat(
                 )
             )
         finally:
-            # Whatever closing the database session does, the turn is taken
-            # away: one left registered would refuse every later message.
             try:
-                opened.close()
-            except Exception:  # noqa: BLE001
-                logger.warning("the turn's database session did not close", exc_info=True)
+                # Closed first: a write that failed half-way may still hold the
+                # session row's lock, which recording the spend waits for.
+                try:
+                    opened.close()
+                except Exception:  # noqa: BLE001
+                    logger.warning("the turn's database session did not close", exc_info=True)
+                try:
+                    # Only a turn whose reply was stored can carry the notice: any
+                    # other leaves it for the next one.
+                    notices = await asyncio.to_thread(record_usage, completed and bool(stored))
+                except Exception:  # noqa: BLE001 - the reply is whole; the cause is in the log
+                    logger.error(
+                        "usage of session %s could not be recorded", stored_id, exc_info=True
+                    )
+                    notices = []
+                if notices:
+                    # Said once per cap, after the reply, and kept with it for a reload.
+                    text = "\n\n".join(usage_caps.notice(scope, lang) for scope in notices)
+                    await turn.publish(agent_service.sse({"delta": f"\n\n{text}"}))
+                    try:
+                        await asyncio.to_thread(_append_usage_notice, open_db, session_id, text)
+                    except Exception:  # noqa: BLE001
+                        logger.warning("usage notice of session %s not stored", stored_id)
             finally:
+                # The reply is charged by now: its budget stops being held.
+                reservation.release()
+                # Whatever happens above, the turn is taken away: one left
+                # registered would refuse every later message.
                 await agent_service.end_turn(str(session_id), turn)
 
     # Kept on the turn: a task nothing refers to can be collected mid-run.
@@ -1821,6 +1912,17 @@ async def chat(
         media_type="text/event-stream",
         headers=agent_service.sse_headers(),
     )
+
+
+def _append_usage_notice(open_db, session_id: uuid.UUID, text: str) -> None:
+    opened = open_db()
+    try:
+        db = next(opened)
+        row = session_service.get_session(db, session_id)
+        if row is not None:
+            session_service.append_to_last_reply(db, row, text)
+    finally:
+        opened.close()
 
 
 @router.post("/{session_id}/agent/end")

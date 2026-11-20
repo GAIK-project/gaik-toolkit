@@ -924,13 +924,6 @@ export default function ExtractorPage() {
               documentCount={combinedCount ?? result.document_count}
               seconds={seconds}
               labels={resultNames.length > 1 ? resultNames : undefined}
-              defaultTab={
-                result.results.length > 1
-                  ? "table"
-                  : result.sources
-                    ? "sources"
-                    : "readable"
-              }
               extraTabs={[
                 ...(result.document_sources || result.sources
                   ? [

@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -36,6 +37,7 @@ import {
   restoreStep,
 } from "@/lib/blueprint-draft";
 import type { BlueprintUpdate } from "@/lib/blueprint-update";
+import { hasBpmnDraft, subscribeBpmnDrafts } from "@/lib/bpmn-session-drafts";
 import { askInChat } from "@/lib/chat-events";
 import { fillTemplate } from "@/lib/chat-template";
 import type { Dict } from "@/lib/i18n";
@@ -541,6 +543,15 @@ export function WorkflowFlowView({
     queue.current = queue.current.then(run).catch(() => {});
   }
 
+  // A kept BPMN draft is still an unsaved edit of the same blueprint: "Lopeta
+  // muokkaus" waits for it instead of locking only for the BPMN tab to unlock
+  // again when opened (#234).
+  const bpmnDraftPending = useSyncExternalStore(
+    subscribeBpmnDrafts,
+    () => hasBpmnDraft(sessionId),
+    () => false,
+  );
+
   // -- a step's menu ---------------------------------------------------------------
 
   const menuRef = useRef<HTMLDivElement>(null);
@@ -934,10 +945,11 @@ export function WorkflowFlowView({
           help={t.flowEditHelp}
           // "Kumoa" after a removal is an edit too: it goes with the lock.
           onLock={() => {
+            if (bpmnDraftPending) return;
             setStatus({ kind: "idle" });
             onLock();
           }}
-          lockWaits={status.kind === "saving"}
+          lockWaits={status.kind === "saving" || bpmnDraftPending}
           testId="simple-flow"
           t={t}
         />

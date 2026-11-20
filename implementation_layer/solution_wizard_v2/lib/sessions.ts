@@ -133,6 +133,13 @@ function detailToWizardSession(detail: ApiSessionDetail): WizardSession {
           validationRules: detail.target_output_spec.validation_rules ?? [],
         }
       : null,
+    extractionProposal: detail.extraction_proposal
+      ? {
+          promptMarkdown: detail.extraction_proposal.prompt_markdown ?? "",
+          schemaGenerated: Boolean(detail.extraction_proposal.schema_generated),
+          schemaCode: detail.extraction_proposal.schema_code ?? "",
+        }
+      : null,
     assumptions: (detail.assumptions ?? []).map((a) => ({
       id: a.id,
       text: a.text,

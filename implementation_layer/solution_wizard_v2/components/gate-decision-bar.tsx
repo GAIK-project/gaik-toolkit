@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { approve } from "@/app/(app)/sessions/[id]/actions";
 import { askInChat, CHAT_REPLYING_EVENT, GATE_BAR_ATTRIBUTE, GATE_POINT_EVENT } from "@/lib/chat-events";
+import { fillTemplate } from "@/lib/chat-template";
 import { gateReference } from "@/lib/gate-guide";
 import { gate3Waits, packageReadFor, resultStaleFor, subscribeResultStale } from "@/lib/poc-result-state";
 import { PendingSubmitButton } from "./pending-submit-button";
@@ -28,6 +29,10 @@ export type GateDecisionLabels = {
   rejected: string;
   /** Said above the buttons at Gate 3 while the test result is an earlier package's. */
   staleResult: string;
+  /** Compact dismissible action panel controls (#251). */
+  dismissPanel?: string;
+  showPanel?: string;
+  waitingPanel?: string;
 };
 
 /**
@@ -57,6 +62,8 @@ export function GateDecisionBar({
   missing,
   hadNotice = false,
   packageChanged = false,
+  placement = "bottom",
+  dismissible = false,
   labels,
 }: {
   sessionId: string;
@@ -73,10 +80,15 @@ export function GateDecisionBar({
   hadNotice?: boolean;
   /** As the page read it: the package has changed since the test run that passed. */
   packageChanged?: boolean;
+  /** "top" places the compact panel right beside/above the structure being reviewed (#251). */
+  placement?: "bottom" | "top";
+  /** Allows collapsing the panel out of the way while keeping actions reachable (#251). */
+  dismissible?: boolean;
   labels: GateDecisionLabels;
 }) {
   const noteId = useId();
   const staleId = useId();
+  const [dismissed, setDismissed] = useState(false);
   const resultStale = useSyncExternalStore(
     subscribeResultStale,
     () => resultStaleFor(sessionId),
@@ -111,14 +123,17 @@ export function GateDecisionBar({
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const onPoint = () => {
-      const root = rootRef.current;
-      if (!root) return;
-      const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      root.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
-      root.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus({ preventScroll: true });
-      setPointed(true);
-      clearTimeout(timer);
-      timer = setTimeout(() => setPointed(false), POINTED_MS);
+      setDismissed(false);
+      requestAnimationFrame(() => {
+        const root = rootRef.current;
+        if (!root) return;
+        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        root.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
+        root.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus({ preventScroll: true });
+        setPointed(true);
+        clearTimeout(timer);
+        timer = setTimeout(() => setPointed(false), POINTED_MS);
+      });
     };
     window.addEventListener(GATE_POINT_EVENT, onPoint);
     return () => {
@@ -127,12 +142,38 @@ export function GateDecisionBar({
     };
   }, []);
 
+  const edge = placement === "top" ? "border-b border-border bg-surface-muted/40 py-2" : "border-t border-border bg-surface py-3";
+  const topic = labels.topics[gate - 1] ?? "";
+
+  if (dismissible && dismissed) {
+    return (
+      <div
+        ref={rootRef}
+        {...{ [GATE_BAR_ATTRIBUTE]: "" }}
+        data-testid={`gate${gate}-actions-collapsed`}
+        className={`relative z-10 flex shrink-0 items-center justify-between gap-2 px-4 sm:px-6 ${edge}`}
+      >
+        <span className="truncate text-xs font-medium text-text-secondary">
+          {labels.waitingPanel ? fillTemplate(labels.waitingPanel, { topic }) : topic}
+        </span>
+        <button
+          type="button"
+          onClick={() => setDismissed(false)}
+          data-testid="gate-panel-restore"
+          className="btn-inline shrink-0 text-xs font-medium text-brand-text"
+        >
+          {labels.showPanel ?? labels.approveShort}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={rootRef}
       {...{ [GATE_BAR_ATTRIBUTE]: "" }}
       data-testid={`gate${gate}-actions`}
-      className="@container relative z-10 shrink-0 border-t border-border bg-surface px-4 py-3 sm:px-6"
+      className={`@container relative z-10 shrink-0 px-4 sm:px-6 ${edge}`}
     >
       {missing}
       {rejected && (
@@ -211,6 +252,18 @@ export function GateDecisionBar({
             className="btn-brand w-full whitespace-nowrap font-semibold"
           />
         </form>
+        {dismissible && labels.dismissPanel && (
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            aria-label={labels.dismissPanel}
+            title={labels.dismissPanel}
+            data-testid="gate-panel-dismiss"
+            className="icon-btn h-8 w-8 shrink-0 @5xl:order-4"
+          >
+            <Icon name="x" size={15} />
+          </button>
+        )}
         {/* On a phone the line under the phase title says what to do; the
             note stays the approve button's description. */}
         <p

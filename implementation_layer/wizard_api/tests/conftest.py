@@ -15,7 +15,7 @@ from wizard_api import config
 from wizard_api.config import get_database_url
 from wizard_api.db import get_db
 from wizard_api.main import app
-from wizard_api.models import Base, BlueprintVersion, WizardSession
+from wizard_api.models import Base, BlueprintVersion, UsageTotal, WizardSession
 
 requires_postgres = pytest.mark.skipif(not postgres_available(), reason="Postgres not available")
 
@@ -31,6 +31,20 @@ def _service_token_comes_from_this_test_only():
     config.forget_consumed_secret("WIZARD_API_TOKEN")
     yield
     config.forget_consumed_secret("WIZARD_API_TOKEN")
+
+
+@pytest.fixture(autouse=True)
+def _usage_caps_off_unless_a_test_sets_them(monkeypatch):
+    """The usage caps are on by default (config); most tests create many sessions
+    for one user and are about something else. tests/test_usage_caps.py sets them."""
+    for name in (
+        "WIZARD_SESSION_MAX_COST_USD",
+        "WIZARD_USER_MAX_COST_USD",
+        "WIZARD_DEPLOYMENT_MAX_COST_USD",
+        "WIZARD_MAX_SESSIONS_PER_USER",
+    ):
+        monkeypatch.setenv(name, "0")
+    monkeypatch.delenv("WIZARD_COST_WARN_RATIO", raising=False)
 
 
 @pytest.fixture
@@ -50,6 +64,7 @@ def db_session(db_engine):
     finally:
         session.query(BlueprintVersion).delete()
         session.query(WizardSession).delete()
+        session.query(UsageTotal).delete()
         session.commit()
         session.close()
 

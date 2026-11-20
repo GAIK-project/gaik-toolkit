@@ -174,6 +174,33 @@ describe("POST /sessions/[id]/chat", () => {
     expect(resolveChatReply).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["session", "session"],
+    ["user", "user"],
+    ["deployment", "deployment"],
+    ["<b>other</b>", "session"],
+  ])("passes a 402 usage cap of scope %s on as %s", async (upstreamScope, scope) => {
+    vi.mocked(wizardAgentChatEnabled).mockReturnValue(true);
+    vi.mocked(openAgentChatStream).mockResolvedValue(
+      new Response(
+        JSON.stringify({ detail: { error: "usage_cap", message: "x", scope: upstreamScope } }),
+        { status: 402 },
+      ),
+    );
+    const res = await post();
+    expect(res.status).toBe(402);
+    expect(await res.json()).toEqual({ error: "usage_cap", scope });
+    expect(resolveChatReply).not.toHaveBeenCalled();
+  });
+
+  it("passes a 402 whose body is not JSON on as the session's cap", async () => {
+    vi.mocked(wizardAgentChatEnabled).mockReturnValue(true);
+    vi.mocked(openAgentChatStream).mockResolvedValue(new Response("Payment Required", { status: 402 }));
+    const res = await post();
+    expect(res.status).toBe(402);
+    expect(await res.json()).toEqual({ error: "usage_cap", scope: "session" });
+  });
+
   it("answers 409 while the agent is still responding", async () => {
     vi.mocked(wizardAgentChatEnabled).mockReturnValue(true);
     vi.mocked(openAgentChatStream).mockResolvedValue(

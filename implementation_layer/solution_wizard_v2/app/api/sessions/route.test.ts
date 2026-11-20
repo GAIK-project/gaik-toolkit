@@ -17,6 +17,7 @@ vi.mock("@/lib/i18n", async (importOriginal) => {
 
 import { POST } from "@/app/api/sessions/route";
 import { dictionary } from "@/lib/i18n";
+import { WizardApiError } from "@/lib/wizard-api-client";
 
 function post(body: unknown) {
   const req = new NextRequest("http://localhost/api/sessions", {
@@ -76,6 +77,23 @@ describe("POST /api/sessions", () => {
     expect(state.createSession).not.toHaveBeenCalled();
     // The longest name that is allowed.
     expect((await post({ title: "a".repeat(255) })).status).toBe(201);
+  });
+
+  it("answers 429 session_limit when the account has all the sessions it may have", async () => {
+    state.createSession.mockRejectedValue(
+      new WizardApiError(
+        429,
+        "/sessions",
+        JSON.stringify({ detail: { error: "session_limit", message: "x" } }),
+      ),
+    );
+    const res = await post({ title: "Laskujen luokittelu" });
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "session_limit" });
+    expect(state.audit).toHaveBeenCalledWith(
+      "session.create",
+      expect.objectContaining({ actor: "alice@example.test", outcome: "denied" }),
+    );
   });
 
   it("answers 502 when the session could not be created, without the cause", async () => {

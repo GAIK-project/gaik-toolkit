@@ -101,15 +101,22 @@ function fakeCase(number: number, status: string): FakeCase {
   };
 }
 
-type Fake = { cases: FakeCase[]; removed: string[] };
+type Fake = { cases: FakeCase[]; removed: string[]; created: number; reused: string[] };
 
 /** Answers the cases API from `cases` (oldest first), as wizard_api would. */
-async function fakeCases(page: Page, cases: FakeCase[], model: object = MODEL): Promise<Fake> {
-  const fake: Fake = { cases, removed: [] };
+async function fakeCases(
+  page: Page,
+  cases: FakeCase[],
+  model: object = MODEL,
+  options: { rejectUpload?: boolean } = {},
+): Promise<Fake> {
+  const fake: Fake = { cases, removed: [], created: 0, reused: [] };
   await page.route(`**${CASES}**`, async (route) => {
     const request = route.request();
     const method = request.method();
     const path = new URL(request.url()).pathname.split(CASES)[1].replace(/^\//, "");
+    const refuse = (status: number, error: string, message: string) =>
+      route.fulfill({ status, json: { detail: { error, message, trace_id: "trace-e2e" } } });
     if (method === "GET" && path === "model") return route.fulfill({ json: model });
     if (method === "GET" && path === "") {
       const listed = [...fake.cases]
@@ -117,10 +124,15 @@ async function fakeCases(page: Page, cases: FakeCase[], model: object = MODEL): 
         .map(({ id, number, created_at, status, round }) => ({ id, number, created_at, status, round }));
       return route.fulfill({ json: { cases: listed } });
     }
-    const [id, action] = path.split("/");
+    if (method === "POST" && path === "") {
+      fake.created += 1;
+      const nextNum = fake.cases.reduce((m, c) => Math.max(m, c.number), 0) + 1;
+      const created = fakeCase(nextNum, "draft");
+      fake.cases.push(created);
+      return route.fulfill({ status: 201, json: created });
+    }
+    const [id, action, sub] = path.split("/");
     const found = fake.cases.find((c) => c.id === id);
-    const refuse = (status: number, error: string, message: string) =>
-      route.fulfill({ status, json: { detail: { error, message, trace_id: "trace-e2e" } } });
     if (!found) return refuse(404, "not_found", "case not found");
     if (method === "GET" && !action) return route.fulfill({ json: found });
     if (method === "DELETE" && !action) {
@@ -130,6 +142,21 @@ async function fakeCases(page: Page, cases: FakeCase[], model: object = MODEL): 
       fake.cases = fake.cases.filter((c) => c !== found);
       fake.removed.push(found.id);
       return route.fulfill({ status: 204 });
+    }
+    if (method === "POST" && action === "inputs" && !sub) {
+      if (options.rejectUpload) {
+        return refuse(415, "input_type_not_accepted", "unsupported file type");
+      }
+      const list = found.inputs as { name: string; bytes: number; task?: string | null }[];
+      list.push({ name: "field_recording.wav", bytes: 4096, task: "T_report" });
+      return route.fulfill({ status: 201, json: { name: "field_recording.wav", bytes: 4096, task: "T_report" } });
+    }
+    if (method === "POST" && action === "inputs" && sub === "from-poc") {
+      const body = request.postDataJSON() as { filename: string; task?: string | null };
+      fake.reused.push(body.filename);
+      const list = found.inputs as { name: string; bytes: number; task?: string | null }[];
+      list.push({ name: body.filename, bytes: 8192, task: body.task ?? "T_report" });
+      return route.fulfill({ status: 201, json: { name: body.filename, bytes: 8192, task: body.task ?? "T_report" } });
     }
     if (method === "POST" && action === "review") {
       const body = request.postDataJSON() as { action: string; role: string; comment: string; return_to: string | null };
@@ -576,5 +603,109 @@ test.describe("cases view: a finished case's result", () => {
     await page.getByTestId("case-row").filter({ hasText: "Tapaus 1" }).click();
     await expect(page.getByRole("heading", { name: "Tapaus 1" })).toBeVisible();
     await expect(grounding).toHaveText("Lähdetarkistus läpi");
+  });
+});
+
+test.describe("cases view: direct input on first arrival (#253)", () => {
+  test.beforeEach(async ({ request }) => {
+    await resetMockSessions(request);
+  });
+
+  test("a failed case list shows a loading error instead of the first-case form", async ({ page }) => {
+    await fakeCases(page, [fakeCase(1, "draft")]);
+    await page.route(`**${CASES}`, (route) => route.fulfill({ status: 503 }));
+    await loginAsDev(page);
+    await page.goto(`/sessions/${SESSION}/cases`);
+
+    await expect(problem(page)).toContainText("HTTP 503");
+    await expect(page.getByTestId("case-drop")).toHaveCount(0);
+  });
+
+  test("a single case remains selectable when its details fail to load", async ({ page }) => {
+    const existing = fakeCase(1, "draft");
+    await fakeCases(page, [existing]);
+    let failDetails = true;
+    await page.route(`**${CASES}/${existing.id}`, (route) =>
+      failDetails ? route.abort() : route.fallback(),
+    );
+    await openCases(page);
+
+    await expect(problem(page)).toBeVisible();
+    failDetails = false;
+    await page.getByTestId("case-row").click();
+    await expect(page.getByRole("heading", { name: "Tapaus 1" })).toBeVisible();
+    await expect(problem(page)).toHaveCount(0);
+  });
+
+  test("arriving with zero cases shows the input drop zone immediately without creating blank cases on reload", async ({
+    page,
+  }) => {
+    const fake = await fakeCases(page, [], {
+      ...MODEL,
+      reusable_poc_inputs: [{ name: "sample_call.wav", bytes: 8192, uploaded: true }],
+    });
+    await openCases(page);
+
+    await expect(page.getByTestId("case-drop")).toBeVisible();
+    await expect(page.getByTestId("case-upload")).toBeVisible();
+    await expect(page.getByTestId("case-record")).toBeVisible();
+    await expect(page.getByTestId("case-reuse-poc-btn")).toContainText("sample_call.wav");
+    await expect(page.getByTestId("case-new")).toBeDisabled();
+    expect(fake.created).toBe(0);
+
+    // Reloading without adding input leaves zero cases behind.
+    await page.reload();
+    await expect(page.getByTestId("case-drop")).toBeVisible();
+    expect(fake.created).toBe(0);
+    expect(fake.cases).toHaveLength(0);
+  });
+
+  test("reusing a compatible PoC test file explicitly creates Case 1 and enables submit", async ({ page }) => {
+    const fake = await fakeCases(page, [], {
+      ...MODEL,
+      reusable_poc_inputs: [{ name: "sample_call.wav", bytes: 8192, uploaded: true }],
+    });
+    await openCases(page);
+
+    await expect(page.getByTestId("case-submit")).toBeDisabled();
+    await page.getByTestId("case-reuse-poc-btn").click();
+
+    await expect(page.getByTestId("case-inputs")).toContainText("sample_call.wav");
+    await expect(page.getByTestId("case-submit")).toBeEnabled();
+    await expect(page.getByTestId("case-new")).toBeEnabled();
+    expect(fake.created).toBe(1);
+    expect(fake.reused).toEqual(["sample_call.wav"]);
+  });
+
+  test("a refused first upload deletes the empty case so no blank duplicate remains", async ({ page }) => {
+    const fake = await fakeCases(page, [], MODEL, { rejectUpload: true });
+    await openCases(page);
+
+    await page.getByTestId("case-file").setInputFiles({
+      name: "bad.exe",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("MZ"),
+    });
+
+    await expect(page.getByTestId("case-upload-problem")).toContainText("bad.exe");
+    expect(fake.created).toBe(1);
+    expect(fake.removed).toHaveLength(1);
+    expect(fake.cases).toHaveLength(0);
+  });
+
+  test("an unconfirmed first upload leaves its case available for retry", async ({ page }) => {
+    const fake = await fakeCases(page, [], MODEL);
+    await page.route(`**${CASES}/${caseId(1)}`, (route) => route.abort(), { times: 1 });
+    await page.route(`**${CASES}/${caseId(1)}/inputs`, (route) => route.abort(), { times: 1 });
+    await openCases(page);
+
+    const file = { name: "field_recording.wav", mimeType: "audio/wav", buffer: Buffer.from("RIFF....WAVE") };
+    await page.getByTestId("case-file").setInputFiles(file);
+    await expect(page.getByTestId("case-upload-problem")).toBeVisible();
+    expect(fake.removed).toHaveLength(0);
+
+    await page.getByTestId("case-file").setInputFiles(file);
+    await expect(page.getByTestId("case-inputs")).toContainText(file.name);
+    expect(fake.created).toBe(1);
   });
 });

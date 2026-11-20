@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { RadioItem as MenuRadioItem } from "@radix-ui/react-dropdown-menu";
 import {
   Check,
   ChevronDown,
@@ -52,13 +53,17 @@ import { apiFetch } from "@/lib/api-client";
 import {
   MODEL_SETTINGS_HEADER,
   encodeModelSettings,
+  isReasoningEffort,
   pageUsesModelSettings,
+  takesReasoningEffort,
   type ModelProvider,
   type ModelSettings,
 } from "@/lib/model-settings";
 import { setModelSettings, useModelSettings } from "@/lib/model-settings-store";
 import {
+  setReasoningEffort,
   setServerModel,
+  useReasoningEffort,
   useServerModel,
   useServerModels,
   type ServerModel,
@@ -71,6 +76,12 @@ import {
   type ActiveModel,
 } from "@/lib/model-use";
 import { useRunAccess } from "@/components/run-access";
+import {
+  accessNoticeText,
+  heldOwnKeyUse,
+  runRefusal as refusalFor,
+  type RunRefusal,
+} from "@/lib/run-refusal";
 
 const LABELS = { openai: "OpenAI", azure: "Azure OpenAI", aitta: "CSC Aitta" };
 const CUSTOM = "__custom__";
@@ -79,9 +90,10 @@ const OPEN_EVENT = "gaik:open-model-settings";
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 type Preset = { id: string; label: string; note?: string; Icon?: IconType };
 const GPT_PRESETS: Preset[] = [
-  { id: "gpt-6-luna", label: "GPT-6 Luna", note: "default", Icon: Openai },
-  { id: "gpt-6-sol", label: "GPT-6 Sol", Icon: Openai },
-  { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", note: "newest", Icon: Openai },
+  { id: "gpt-6-sol", label: "GPT-6 Sol", note: "default", Icon: Openai },
+  { id: "gpt-6-luna", label: "GPT-6 Luna", Icon: Openai },
+  { id: "gpt-6.2-sol", label: "GPT-6.2 Sol", note: "newest", Icon: Openai },
+  { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", Icon: Openai },
   { id: "gpt-6-astra", label: "GPT-6 Astra", Icon: Openai },
   { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", Icon: Openai },
 ];
@@ -615,6 +627,58 @@ function ModelRow({
   );
 }
 
+const AUTO = "auto";
+const EFFORT_CHOICES = [
+  { value: AUTO, label: "Auto", title: "The default for this model" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+];
+
+/**
+ * The reasoning effort of a GPT-6 model, as one row of the model menu. Auto
+ * sends nothing, so each model keeps its own default. The segments are menu
+ * radio items: the arrow keys reach them like the models above, and a choice
+ * leaves the menu open to show what changed.
+ */
+function ReasoningRow() {
+  const effort = useReasoningEffort();
+  return (
+    <div className="px-2 py-1.5">
+      <div className="flex items-center justify-between gap-2.5">
+        <span id="model-menu-reasoning" className="text-sm">
+          Reasoning
+        </span>
+        <DropdownMenuRadioGroup
+          aria-labelledby="model-menu-reasoning"
+          className="bg-muted flex rounded-md p-0.5"
+          value={effort ?? AUTO}
+          onValueChange={(value) =>
+            setReasoningEffort(isReasoningEffort(value) ? value : null)
+          }
+        >
+          {EFFORT_CHOICES.map(({ value, label, title }) => (
+            <MenuRadioItem
+              key={value}
+              value={value}
+              title={title}
+              onSelect={(event) => event.preventDefault()}
+              // Hover and keyboard focus both set data-highlighted, as on the
+              // model rows: a fill on the other segments, a ring on the picked one.
+              className="text-muted-foreground ring-ring/50 data-[state=checked]:bg-background data-[state=checked]:text-foreground dark:data-[state=checked]:bg-input/60 data-[state=unchecked]:data-[highlighted]:bg-accent data-[state=unchecked]:data-[highlighted]:text-accent-foreground cursor-default rounded-[5px] px-1.5 py-1.5 text-xs font-medium outline-hidden transition-[color,background-color,box-shadow,scale] duration-150 select-none active:scale-[0.97] data-[state=checked]:shadow-xs data-[state=checked]:data-[highlighted]:ring-2 motion-reduce:transition-none"
+            >
+              {label}
+            </MenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </div>
+      <p className="text-muted-foreground pt-1.5 text-xs">
+        Higher is slower and costs more.
+      </p>
+    </div>
+  );
+}
+
 /**
  * The model menu in the nav. A signed-in user sees the model in use and can
  * switch among the server's models without a key; their own key stays an
@@ -628,6 +692,7 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
   const settings = useModelSettings();
   const pathname = usePathname();
   const active = useActiveModel(loggedIn);
+  const effort = useReasoningEffort();
 
   if (!loggedIn) return null;
   // While the list loads, hold the button's place instead of showing the
@@ -658,6 +723,12 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
   const aittaModels = catalog.models.filter((m) => m.provider === "aitta");
   const someLocked = catalog.models.some((m) => !m.allowed);
   const status = use.problem ?? use.summary;
+  // Only GPT-6 models take an effort: no row for Claude, Gemini or Aitta.
+  const takesEffort = takesReasoningEffort(active.provider, active.model);
+  const hint =
+    takesEffort && effort && use.runsHere
+      ? `${status} Reasoning: ${effort}.`
+      : status;
 
   return (
     <>
@@ -671,8 +742,8 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
               settings &&
                 "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15",
             )}
-            aria-label={`Model: ${label}. ${status}`}
-            title={status}
+            aria-label={`Model: ${label}. ${hint}`}
+            title={hint}
           >
             {settings ? (
               <KeyRound className="size-4 shrink-0" aria-hidden />
@@ -772,6 +843,12 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
               Locked models: ask an admin for access.
             </p>
           )}
+          {takesEffort && (
+            <>
+              <DropdownMenuSeparator />
+              <ReasoningRow />
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={() => window.dispatchEvent(new Event(OPEN_EVENT))}
@@ -794,11 +871,16 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
  */
 export function ModelSettingsNotice({
   loggedIn = true,
-}: { loggedIn?: boolean } = {}) {
+  runRefusal = null,
+}: {
+  loggedIn?: boolean;
+  /** Set when the proxy refuses this account's own-key runs, and why. */
+  runRefusal?: RunRefusal | null;
+} = {}) {
   const pathname = usePathname();
   const active = useActiveModel(loggedIn);
   if (!active || (!active.own && active.isDefault)) return null;
-  const use = modelUse(pathname, active);
+  const use = heldOwnKeyUse(modelUse(pathname, active), active.own, runRefusal);
   const aitta = active.provider === "aitta" && use.runsHere;
   return (
     <div
@@ -864,25 +946,32 @@ export function ModelSettingsNotice({
 }
 
 /**
- * Tells visitors who cannot run a demo yet how to: sign in, and once signed in,
- * use their own key. A pending user on the trial allowance is told the daily
- * limit instead.
+ * Tells visitors who cannot run a demo yet how to: sign in, confirm the e-mail
+ * address, and once runs are open to the account, use their own key. A pending
+ * user on the trial allowance is told the daily limit instead.
  */
 export function AccessNotice({
   loggedIn,
   unlocked,
+  ownKeyRuns = false,
+  emailUnconfirmed = false,
   trialRunsPerDay = null,
 }: {
   loggedIn: boolean;
   unlocked: boolean;
+  /** Signed in, and approved or pending with a confirmed e-mail address. */
+  ownKeyRuns?: boolean;
+  /** Pending approval, and the e-mail address is not confirmed yet. */
+  emailUnconfirmed?: boolean;
   /** Set when the user is pending approval and on the trial allowance. */
   trialRunsPerDay?: number | null;
 }) {
   const settings = useModelSettings();
   const pathname = usePathname();
   if (unlocked) return null;
-  // An own key runs a demo for a signed-in user (lib/api-access.ts).
-  const ownKeyWorks = loggedIn && pageUsesModelSettings(pathname);
+  // An own key runs a demo for a signed-in user who is approved, or pending
+  // with a confirmed e-mail address (lib/api-access.ts).
+  const ownKeyWorks = loggedIn && ownKeyRuns && pageUsesModelSettings(pathname);
   if (ownKeyWorks && settings) return null;
   if (trialRunsPerDay)
     return (
@@ -903,9 +992,7 @@ export function AccessNotice({
     >
       <p>
         <strong>View only.</strong>{" "}
-        {loggedIn
-          ? "Your access is pending approval, so running demos is off for now."
-          : "Sign in to run this demo."}
+        {accessNoticeText(refusalFor({ loggedIn, emailUnconfirmed }))}
         {ownKeyWorks ? " You can also run it with your own model key." : ""}
       </p>
       <div className="flex gap-2">

@@ -15,6 +15,10 @@ regexes = [
   # the word "keycloak" reads as a key name to the
   # generic rule. The credentials come from a Secret (deploy/keycloak).
   '''^5432/keycloak$''',
+  # Invented values in upstream tests: a canary .env line the interactive
+  # runner must not read, and a made-up key the error redaction must hide.
+  '''^CANARY-ENV-0451$''',
+  '''^abcdefgh12345$''',
 ]
 paths = [
   # A manifest of test fixtures: file names and their sha256 digests.

@@ -24,6 +24,7 @@ import {
   isTable,
   parseInput,
   problemCount,
+  reusablePocInputsForTask,
   rowProblems,
   shapeProcess,
   show,
@@ -164,13 +165,20 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
   // the list, oldest first.
   const numberOf = useMemo(() => new Map(cases.map((c, i) => [c.id, c.number ?? cases.length - i])), [cases]);
 
-  const loadCases = useCallback(async () => {
-    const res = await fetch(base, { cache: "no-store" });
-    if (!res.ok) return [];
-    const listed = ((await res.json()) as { cases: ListedCase[] }).cases;
-    setCases(listed);
-    return listed;
-  }, [base]);
+  const loadCases = useCallback(async (onError = setError) => {
+    try {
+      const res = await fetch(base, { cache: "no-store" });
+      if (res.ok) {
+        const listed = ((await res.json()) as { cases: ListedCase[] }).cases;
+        setCases(listed);
+        return listed;
+      }
+      onError(await detailOf(res));
+    } catch {
+      onError(s.networkError);
+    }
+    return null;
+  }, [base, detailOf, s.networkError]);
 
   // Only the latest case asked for is shown: a slower answer to an earlier
   // request must not replace the case the user opened since. Returns whether
@@ -182,31 +190,39 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
   const loadCase = useCallback(
     async (id: string): Promise<boolean> => {
       const request = ++caseRequest.current;
-      const res = await fetch(`${base}/${id}`, { cache: "no-store" });
-      if (request !== caseRequest.current) return false;
-      if (!res.ok) {
-        setError(await detailOf(res));
-        return false;
+      try {
+        const res = await fetch(`${base}/${id}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = (await res.json()) as Case;
+          if (request !== caseRequest.current) return false;
+          setCurrent(data);
+          return true;
+        }
+        const message = await detailOf(res);
+        if (request === caseRequest.current) setError(message);
+      } catch {
+        if (request === caseRequest.current) setError(s.networkError);
       }
-      const data = (await res.json()) as Case;
-      if (request !== caseRequest.current) return false;
-      setCurrent(data);
-      return true;
+      return false;
     },
-    [base, detailOf],
+    [base, detailOf, s.networkError],
   );
 
   useEffect(() => {
     (async () => {
       const res = await fetch(`${base}/model`, { cache: "no-store" });
       if (!res.ok) return setModelError(await detailOf(res));
-      setModel((await res.json()) as CaseModel);
-      const listed = await loadCases();
+      const loaded = (await res.json()) as CaseModel;
+      acceptedRef.current = loaded.accepted_inputs ?? NO_ACCEPTED;
+      const listed = await loadCases(setModelError);
+      if (!listed) return;
       // Open the newest case, as a click on it would: the page said "No cases
       // yet" beside a list that had them. Not when the user has opened one.
       if (listed[0] && !userPicked.current) await loadCase(listed[0].id);
-    })();
-  }, [base, loadCases, loadCase, detailOf]);
+      setModelError(null);
+      setModel(loaded);
+    })().catch(() => setModelError(s.networkError));
+  }, [base, loadCases, loadCase, detailOf, s.networkError]);
 
   // A running case settles on the server when its run has finished; ask until it has.
   useEffect(() => {
@@ -265,12 +281,99 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
     }
   }
 
+  // On first arrival with 0 cases and a runnable input step, show the first
+  // case's input view directly without creating an empty server-side case (#253).
+  const directFirstCase =
+    !current && cases.length === 0 && Boolean(model?.package_ready) && Boolean(shaped?.inputTasks[0]);
+
   // The open case has nothing in it yet: another "New case" would only add a
   // second empty one. Fourteen empty cases came from one burst of clicks, since
   // the button was free again between the request and the list's reload.
   const openCaseEmpty =
-    current?.status === "draft" && current.inputs.length === 0 && !(current.steps_done ?? []).length;
+    (current?.status === "draft" && current.inputs.length === 0 && !(current.steps_done ?? []).length) ||
+    directFirstCase;
   const [creating, setCreating] = useState(false);
+  const firstInputLock = useRef(false);
+  // If case creation succeeded before a transient network error interrupted the
+  // first attachment, remember that case ID so a retry reuses it instead of
+  // creating a duplicate blank case (#253).
+  const pendingFirstCaseId = useRef<string | null>(null);
+  const [carryNote, setCarryNote] = useState<{ caseId: string; taskId: string; note: string } | null>(null);
+  const [carryProblem, setCarryProblem] = useState<{ caseId: string; problem: string } | null>(null);
+
+  async function createFirstCaseForInput(
+    attach: (caseBase: string) => Promise<{ okCount: number; problem: string | null }>,
+    draftNote?: { taskId: string; note: string },
+  ): Promise<string | null> {
+    if (firstInputLock.current) return null;
+    firstInputLock.current = true;
+    userPicked.current = true;
+    setCreating(true);
+    setError(null);
+    let caseId = pendingFirstCaseId.current;
+    try {
+      if (!caseId) {
+        const res = await fetch(base, { method: "POST" });
+        if (!res.ok) return await detailOf(res);
+        const created = (await res.json()) as Case;
+        caseId = created.id;
+        pendingFirstCaseId.current = caseId;
+      }
+      const caseBase = `${base}/${caseId}`;
+      const { okCount, problem } = await attach(caseBase);
+      if (okCount === 0) {
+        // Every upload was refused: remove the empty case only if the server
+        // confirms it still has no inputs, so no blank duplicate remains.
+        const check = await fetch(caseBase, { cache: "no-store" }).catch(() => null);
+        if (check?.status === 404) pendingFirstCaseId.current = null;
+        const serverCase = check?.ok ? ((await check.json().catch(() => null)) as Case | null) : null;
+        if (!serverCase) return problem ?? s.networkError;
+        if (serverCase.inputs.length === 0) {
+          const del = await fetch(caseBase, { method: "DELETE" }).catch(() => null);
+          if (del && (del.ok || del.status === 404)) {
+            pendingFirstCaseId.current = null;
+          }
+          await loadCases();
+          return problem;
+        }
+      }
+      pendingFirstCaseId.current = null;
+      setCarryNote(draftNote?.note ? { caseId, ...draftNote } : null);
+      setCarryProblem(problem ? { caseId, problem } : null);
+      prevStatus.current = null;
+      await loadCase(caseId);
+      await loadCases();
+      return null;
+    } catch {
+      // Reconcile if the case was created before the attachment lost connection:
+      // if it already received a file, open it; if empty, remove it only if confirmed.
+      if (caseId) {
+        const caseBase = `${base}/${caseId}`;
+        const check = await fetch(caseBase, { cache: "no-store" }).catch(() => null);
+        if (check?.status === 404) pendingFirstCaseId.current = null;
+        if (check?.ok) {
+          const serverCase = (await check.json().catch(() => null)) as Case | null;
+          if (!serverCase) return s.networkError;
+          if (serverCase.inputs.length > 0) {
+            pendingFirstCaseId.current = null;
+            prevStatus.current = null;
+            await loadCase(caseId);
+            await loadCases();
+            return s.networkError;
+          }
+          const del = await fetch(caseBase, { method: "DELETE" }).catch(() => null);
+          if (del && (del.ok || del.status === 404)) {
+            pendingFirstCaseId.current = null;
+          }
+          await loadCases();
+        }
+      }
+      return s.networkError;
+    } finally {
+      setCreating(false);
+      firstInputLock.current = false;
+    }
+  }
 
   async function newCase() {
     if (creating || openCaseEmpty) return;
@@ -291,6 +394,7 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
   function openCase(id: string) {
     userPicked.current = true;
     prevStatus.current = null;
+    setError(null);
     void loadCase(id);
   }
 
@@ -335,7 +439,7 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
         caseRequest.current += 1;
         prevStatus.current = null;
         setCurrent(null);
-        if (listed[0]) await loadCase(listed[0].id);
+        if (listed?.[0]) await loadCase(listed[0].id);
       }
       (listHeading.current ?? pageTitle.current)?.focus();
     } finally {
@@ -544,9 +648,9 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
         {removedNote}
       </p>
 
-      {/* One case needs no list: the list is for choosing between cases. */}
+      {/* One open case needs no list. A case that failed to open stays selectable. */}
       <div className={`grid items-start gap-4 ${cases.length > 1 ? "lg:grid-cols-[288px_minmax(0,1fr)]" : ""}`}>
-        {cases.length > 1 && (
+        {(cases.length > 1 || (!current && cases.length > 0)) && (
           <aside className="rounded-lg border border-border bg-surface p-2 lg:sticky lg:top-4" data-testid="case-list">
             <h3 ref={listHeading} tabIndex={-1} className="px-2 pb-1.5 pt-1 text-sm font-semibold text-text focus:outline-none">
               {s.cases}
@@ -585,8 +689,48 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
             act={act}
             problemOf={detailOf}
             changeInChat={changeInChat}
+            initialNote={carryNote?.caseId === current.id ? carryNote : undefined}
+            initialUploadProblem={carryProblem?.caseId === current.id ? carryProblem.problem : undefined}
             reload={async () => {
+              setCarryProblem(null);
               await loadCase(current.id);
+            }}
+          />
+        ) : directFirstCase ? (
+          <CaseView
+            key="first-draft"
+            caseData={{
+              id: "",
+              created_at: "",
+              status: "draft",
+              round: 1,
+              note: "",
+              comment: "",
+              run_id: null,
+              run_message: null,
+              inputs: [],
+              steps_done: [],
+              input_tasks: {},
+              notes: {},
+              result: null,
+              record: null,
+              events: [],
+            }}
+            number={1}
+            model={model}
+            shaped={shaped}
+            roleName={roleName}
+            base={base}
+            accepted={accepted}
+            s={s}
+            dateLocale={dateLocale}
+            busy={busy || creating}
+            act={act}
+            problemOf={detailOf}
+            changeInChat={changeInChat}
+            onFirstInput={createFirstCaseForInput}
+            reload={async () => {
+              await loadCases();
             }}
           />
         ) : (
@@ -598,6 +742,11 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
     </div>
   );
 }
+
+type FirstInputAttach = (
+  attach: (caseBase: string) => Promise<{ okCount: number; problem: string | null }>,
+  draftNote?: { taskId: string; note: string },
+) => Promise<string | null>;
 
 type ViewProps = {
   caseData: Case;
@@ -617,6 +766,11 @@ type ViewProps = {
   problemOf: (res: Response) => Promise<string>;
   /** Back to the wizard's chat, to change the solution; with a failed run's message or the reviewer's comment. */
   changeInChat: (ask?: ChatAsk) => void;
+  /** Present on first-arrival direct input (0 cases): creates the first case only once an input is added (#253). */
+  onFirstInput?: FirstInputAttach;
+  /** Carried over when the virtual first case becomes a saved case on upload. */
+  initialNote?: { taskId: string; note: string };
+  initialUploadProblem?: string;
   reload: () => Promise<void>;
 };
 
@@ -778,7 +932,8 @@ function CaseView(p: ViewProps) {
 
 function InputView(p: ViewProps & { task: ProcessNode }) {
   const { caseData: c, s, base } = p;
-  const [note, setNote] = useState(c.notes?.[p.task.id] ?? "");
+  const carriedNote = p.initialNote?.taskId === p.task.id ? p.initialNote.note : "";
+  const [note, setNote] = useState(c.notes?.[p.task.id] ?? carriedNote);
   const first = p.shaped.inputTasks[0];
   // A file belongs to the step that uploaded it; untagged files to the first step.
   const mine = c.inputs.filter((f) => (f.task ?? first?.id) === p.task.id);
@@ -792,6 +947,7 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
   // Who returned it: the role the decision was posted under.
   const returnedBy = returnedHere ? c.events.findLast((e) => e.action === "return")?.role?.trim() : undefined;
   const [uploading, setUploading] = useState(false);
+  const [reusing, setReusing] = useState<string | null>(null);
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
   const [recordedFrom, setRecordedFrom] = useState(0);
   const [micProblem, setMicProblem] = useState<string | null>(null);
@@ -803,31 +959,83 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
     p.task.outputs.some(isAudioInput) &&
     (p.accepted.length === 0 || p.accepted.some((a) => a.extensions.includes(".wav")));
   const acceptedTypes = acceptedPhrase(p.accepted, s.or);
+  const reusablePocInputs = reusablePocInputsForTask(
+    p.model.reusable_poc_inputs,
+    p.task,
+    p.shaped.inputTasks,
+    c.inputs,
+  );
 
   // A refused file is said here, under the buttons that added it: the page's
   // own error line is above the list, out of sight of the person at this box.
-  const [uploadProblem, setUploadProblem] = useState<string | null>(null);
+  const [uploadProblem, setUploadProblem] = useState<string | null>(p.initialUploadProblem ?? null);
+
+  async function uploadToCase(targetBase: string, files: File[]): Promise<{ okCount: number; problem: string | null }> {
+    let okCount = 0;
+    let problem: string | null = null;
+    for (const f of files) {
+      const form = new FormData();
+      form.append("file", f, f.name);
+      form.append("task", p.task.id);
+      const res = await fetch(`${targetBase}/inputs`, { method: "POST", body: form });
+      if (res.ok) {
+        okCount += 1;
+      } else {
+        const line = `${f.name}: ${await p.problemOf(res)}`;
+        problem = problem ? `${problem}\n${line}` : line;
+      }
+    }
+    return { okCount, problem };
+  }
 
   async function upload(files: File[]) {
     setUploading(true);
     setUploadProblem(null);
     try {
-      for (const f of files) {
-        const form = new FormData();
-        form.append("file", f, f.name);
-        form.append("task", p.task.id);
-        const res = await fetch(`${base}/inputs`, { method: "POST", body: form });
-        if (!res.ok) {
-          const problem = `${f.name}: ${await p.problemOf(res)}`;
-          setUploadProblem((earlier) => (earlier ? `${earlier}\n${problem}` : problem));
-        }
+      if (p.onFirstInput) {
+        const problem = await p.onFirstInput(
+          (caseBase) => uploadToCase(caseBase, files),
+          note ? { taskId: p.task.id, note } : undefined,
+        );
+        if (problem) setUploadProblem(problem);
+        return;
       }
+      const { problem } = await uploadToCase(base, files);
+      if (problem) setUploadProblem(problem);
     } catch {
       // The request got no answer (no network): the buttons stayed disabled
       // under "Ladataan…" until the page was reloaded.
       setUploadProblem(s.networkError);
     } finally {
       setUploading(false);
+    }
+    await p.reload();
+  }
+
+  async function reusePocFile(filename: string) {
+    setReusing(filename);
+    setUploadProblem(null);
+    const attach = async (targetBase: string): Promise<{ okCount: number; problem: string | null }> => {
+      const res = await fetch(`${targetBase}/inputs/from-poc`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename, task: p.task.id }),
+      });
+      if (res.ok) return { okCount: 1, problem: null };
+      return { okCount: 0, problem: `${filename}: ${await p.problemOf(res)}` };
+    };
+    try {
+      if (p.onFirstInput) {
+        const problem = await p.onFirstInput(attach, note ? { taskId: p.task.id, note } : undefined);
+        if (problem) setUploadProblem(problem);
+        return;
+      }
+      const { problem } = await attach(base);
+      if (problem) setUploadProblem(problem);
+    } catch {
+      setUploadProblem(s.networkError);
+    } finally {
+      setReusing(null);
     }
     await p.reload();
   }
@@ -864,7 +1072,7 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
   }
 
   const [dragging, setDragging] = useState(false);
-  const [noteOpen, setNoteOpen] = useState(Boolean(c.notes?.[p.task.id]));
+  const [noteOpen, setNoteOpen] = useState(Boolean(c.notes?.[p.task.id] || carriedNote));
   const wanted = p.task.outputs.filter(Boolean);
   // Who reads a note: the next person in the input steps, or the reviewer. A
   // "message to the approver" named nobody, and was offered to a person who
@@ -872,7 +1080,7 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
   const nextTask = last ? p.shaped.reviewTask : p.shaped.inputTasks[p.shaped.inputTasks.indexOf(p.task) + 1];
   // By name: two lanes can carry one role's name.
   const reader = nextTask && p.roleName(nextTask.lane) !== p.roleName(p.task.lane) ? p.roleName(nextTask.lane) : null;
-  const blocked = uploading || !!recorder;
+  const blocked = uploading || !!reusing || !!recorder;
 
   return (
     <div className="flex flex-col gap-4" data-testid="case-input">
@@ -1005,7 +1213,7 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
                   <span className="tabular-nums">{clock((now - recordedFrom) / 1000)}</span>
                 </button>
               ) : (
-                <button type="button" className="btn-secondary" onClick={record} disabled={uploading} data-testid="case-record">
+                <button type="button" className="btn-secondary" onClick={record} disabled={uploading || !!reusing} data-testid="case-record">
                   <Icon name="mic" size={16} />
                   {s.record}
                 </button>
@@ -1026,6 +1234,51 @@ function InputView(p: ViewProps & { task: ProcessNode }) {
             </div>
           </div>
         </div>
+        {reusablePocInputs.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm" data-testid="case-reuse-poc">
+            {reusablePocInputs.length === 1 ? (
+              <button
+                type="button"
+                className="btn-secondary h-auto max-w-full flex-wrap justify-start gap-x-1.5 gap-y-0.5 py-1.5 text-left text-xs whitespace-normal"
+                disabled={blocked}
+                onClick={() => void reusePocFile(reusablePocInputs[0].name)}
+                data-testid="case-reuse-poc-btn"
+              >
+                {reusing === reusablePocInputs[0].name ? (
+                  <Icon name="loaderCircle" size={14} className="shrink-0 animate-spin" />
+                ) : (
+                  <FileIcon name={reusablePocInputs[0].name} size={14} />
+                )}
+                <span>
+                  {reusing === reusablePocInputs[0].name ? s.reusingPocFile : s.reusePocFile}
+                </span>
+                <span className="break-all font-mono text-text-muted">{reusablePocInputs[0].name}</span>
+              </button>
+            ) : (
+              <>
+                <span className="text-xs text-text-muted">{s.reusePocFiles}</span>
+                {reusablePocInputs.map((file) => (
+                  <button
+                    key={file.name}
+                    type="button"
+                    className="btn-secondary max-w-full py-1 text-xs"
+                    disabled={blocked}
+                    onClick={() => void reusePocFile(file.name)}
+                    data-testid="case-reuse-poc-btn"
+                  >
+                    {reusing === file.name ? (
+                      <Icon name="loaderCircle" size={14} className="shrink-0 animate-spin" />
+                    ) : (
+                      <FileIcon name={file.name} size={14} />
+                    )}
+                    <span className="truncate font-mono">{file.name}</span>
+                    <span className="shrink-0 tabular-nums text-text-muted">{formatSize(file.bytes)}</span>
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
         {micProblem && (
           <p className="mt-2 text-sm text-danger-text" role="alert" data-testid="case-mic-problem">{micProblem}</p>
         )}

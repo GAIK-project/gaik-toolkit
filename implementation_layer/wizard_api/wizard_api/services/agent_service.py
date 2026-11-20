@@ -335,6 +335,18 @@ IMPORTANT INSTRUCTIONS FOR THIS WEB SESSION:
   "Fields: a default invoice field list with line items." Never narrate the
   conversation in it: no "User skipped the field list question", no "The user
   did not answer".
+- EXTRACTION RULES ARE REVIEWED IN THE WORKSPACE, NOT AS RAW CODE IN CHAT.
+  In Phase 4, after writing poc/prompts/extraction_requirements.md, give a
+  concise plain-language summary (readable field names, examples, and clear
+  wording such as "left empty if not mentioned" / "jätetään tyhjäksi, jos
+  tietoa ei mainita" — never "null" or "skeema" for a non-technical user).
+  Tell the user they can review the proposal in the workspace and use the
+  "Approve extraction rules" / "Request changes" button (in Finnish
+  "Hyväksy poimintaohje" / "Pyydä muutoksia") instead of typing "hyvä".
+  After generating poc/schemas/output_schema.py, do NOT paste Python class
+  definitions into the chat for a non-technical user: summarise the agreed
+  fields in plain language and note that the technical definitions are in the
+  workspace details.
 - GATES ARE APPROVED WITH THE APPROVE BUTTON, NOT IN THE CHAT. The UI has an
   Approve button for each gate: Gate 1 (Requirements) after the specification,
   Gate 2 (Solution design) after the blueprint and BPMN, Gate 3 (Test run)
@@ -691,6 +703,9 @@ async def _stream_turn(
     current: list[str] = []  # text of the assistant message being streamed
     shown = ""  # text of the last closed message that is still on the user's screen
     finished = False  # the agent's ResultMessage was seen
+    # Until the ResultMessage comes, this query's cost is not known: a turn that
+    # ends without one is charged an estimate (telemetry.traced_turn).
+    session["query_unfinished"] = True
     tool: str | None = None  # the kind of tool call that is running, if one is
 
     def stopped() -> list[str]:
@@ -758,6 +773,7 @@ async def _stream_turn(
                 _note_system_message(message)
             elif isinstance(message, ResultMessage):
                 finished = True
+                session["query_unfinished"] = False
                 # Tokens and cost of this query, for the turn's span (telemetry).
                 session.setdefault("turn_results", []).append(("turn", message))
                 if getattr(message, "session_id", None):
@@ -825,7 +841,11 @@ async def _stream_turn(
 
 
 def _budget_stop(session: dict, reply: str, out_parts: list[str]):
-    """The frames that end a turn the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD.
+    """The frames that end a turn the agent stopped at its budget.
+
+    The budget is WIZARD_AGENT_MAX_BUDGET_USD, or what the usage caps left when
+    the agent started (``budget_from_caps``); the log, the count and the chat's
+    line say which.
 
     The CLI counts the budget for the whole agent process, across messages, so
     the agent would stop again at once on the next message: it is ended after
@@ -834,13 +854,22 @@ def _budget_stop(session: dict, reply: str, out_parts: list[str]):
     """
     from wizard_api import ops_metrics
 
-    ops_metrics.budget_stops.add(1)
-    logger.warning(
-        "agent stopped at its cost limit of %s USD; it is ended and the next message resumes it",
-        config.agent_max_budget_usd(),
-    )
+    from_caps = bool(session.get("budget_from_caps"))
+    ops_metrics.budget_stops.add(1, {"limit": "usage_cap" if from_caps else "agent"})
+    if from_caps:
+        logger.warning(
+            "agent stopped at the %.2f USD the usage caps left it; the next message is refused",
+            session.get("budget_usd") or 0.0,
+        )
+    else:
+        logger.warning(
+            "agent stopped at its cost limit of %s USD; "
+            "it is ended and the next message resumes it",
+            config.agent_max_budget_usd(),
+        )
     session["budget_spent"] = True
-    notice = BUDGET_NOTICE.get(session.get("locale") or "en", BUDGET_NOTICE["en"])
+    notices = CAP_NOTICE if from_caps else BUDGET_NOTICE
+    notice = notices.get(session.get("locale") or "en", notices["en"])
     if _is_notice(reply):
         yield sse({"narration_end": True})  # shown while it streamed; not an answer
         reply = ""
@@ -961,6 +990,18 @@ def _wizard_tools(session_id: str):
     return create_sdk_mcp_server("wizard", tools=[reopen_gate, offer_language])
 
 
+def _agent_budget(budget_usd: float | None) -> float | None:
+    """The smaller of the agent's own limit and what the usage caps have left."""
+    limits = [b for b in (config.agent_max_budget_usd(), budget_usd) if b is not None]
+    return min(limits) if limits else None
+
+
+def _budget_is_cap(budget_usd: float | None) -> bool:
+    """Whether a usage cap, not WIZARD_AGENT_MAX_BUDGET_USD, sets the agent's budget."""
+    own = config.agent_max_budget_usd()
+    return budget_usd is not None and (own is None or budget_usd < own)
+
+
 def _build_options(
     wizard_dir: Path,
     output_dir: Path,
@@ -968,10 +1009,13 @@ def _build_options(
     resume: str | None = None,
     session_id: str | None = None,
     guard: agent_tool_guard.ToolGuard,
+    budget_usd: float | None = None,
 ):
     """The agent's options. ``guard`` is the session's tool guard, which knows its
     owner and counts the metered calls of each turn. It has no default, so no
-    agent can be built with a guard that skips its owner's hourly limit."""
+    agent can be built with a guard that skips its owner's hourly limit.
+    ``budget_usd`` is what the usage caps have left (services/usage_caps.py); the
+    agent gets the smaller of it and WIZARD_AGENT_MAX_BUDGET_USD."""
     tools = ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
     extra = {}
     if session_id and create_sdk_mcp_server is not None:
@@ -980,7 +1024,7 @@ def _build_options(
     if config.agent_bridge_socket():
         # The agent runs in its own container; the SDK starts the bridge's client.
         extra["cli_path"] = agent_cli()
-    budget = config.agent_max_budget_usd()
+    budget = _agent_budget(budget_usd)
     if budget is not None:
         # Counted by the CLI for this agent process from its start or resume.
         extra["max_budget_usd"] = budget
@@ -1152,6 +1196,13 @@ TURN_LIMIT_FRAME = {
 }
 
 
+#: Said instead of BUDGET_NOTICE when a usage cap set the budget
+#: (services/usage_caps.py): the next message is refused, so no "continue".
+CAP_NOTICE = {
+    "fi": "⚠︎ Wizard pysähtyi, koska käyttöraja tuli täyteen. Tähänastinen työ on tallessa.",
+    "en": "⚠︎ The wizard stopped because the usage limit was reached. The work so far is kept.",
+}
+
 #: Said in the chat when the agent stopped at WIZARD_AGENT_MAX_BUDGET_USD. A text
 #: delta, not an error frame: the chat shows an error frame other than the turn
 #: limit as a failed reply, and this is no failure. The agent is ended after the
@@ -1209,6 +1260,7 @@ async def get_or_create_session(
     resume_id: str | None = None,
     transcript: list[dict] | None = None,
     user_id: str | None = None,
+    budget_usd: float | None = None,
 ) -> dict:
     """Return the live agent session for ``session_id``, spawning + bootstrapping
     a ClaudeSDKClient on first use. ``locale`` (fi/en) pins the agent's reply
@@ -1220,6 +1272,7 @@ async def get_or_create_session(
     existing = AGENT_SESSIONS.get(session_id)
     if existing is not None:
         existing["last_active"] = time.time()  # keeps _make_room from ending it
+        existing["handed_at"] = existing["last_active"]  # and fit_budget
         # The session is already live, so the locale cannot be pinned by
         # bootstrapping again — send the change as its own instruction instead.
         repin = relanguage_prompt(existing.get("locale"), locale)
@@ -1239,7 +1292,7 @@ async def get_or_create_session(
     async with _START_LOCKS.setdefault(session_id, asyncio.Lock()):
         existing = AGENT_SESSIONS.get(session_id)
         if existing is not None:
-            existing["last_active"] = time.time()
+            existing["last_active"] = existing["handed_at"] = time.time()
             return existing
         if user_id:
             await _make_room_for_user(user_id)
@@ -1248,7 +1301,7 @@ async def get_or_create_session(
             _STARTING[session_id] = user_id
         try:
             return await _start_session(
-                session_id, output_dir, locale, resume_id, transcript, user_id
+                session_id, output_dir, locale, resume_id, transcript, user_id, budget_usd
             )
         finally:
             _STARTING.pop(session_id, None)
@@ -1261,8 +1314,12 @@ async def _start_session(
     resume_id: str | None,
     transcript: list[dict] | None,
     user_id: str | None,
+    budget_usd: float | None = None,
 ) -> dict:
-    """Spawn, connect and bootstrap the agent once room has been made for it."""
+    """Spawn, connect and bootstrap the agent once room has been made for it.
+
+    ``budget_usd`` is what the usage caps have left when it starts; the agent
+    keeps it for its life, and the next agent of the session gets a new one."""
     wizard_dir = resolve_wizard_dir()
     if wizard_dir is None or not (wizard_dir / "SKILL.md").is_file():
         raise AgentNotConfiguredError(
@@ -1295,7 +1352,12 @@ async def _start_session(
         try:
             client = ClaudeSDKClient(
                 options=_build_options(
-                    wizard_dir, out, resume=resume_id, session_id=session_id, guard=guard
+                    wizard_dir,
+                    out,
+                    resume=resume_id,
+                    session_id=session_id,
+                    guard=guard,
+                    budget_usd=budget_usd,
                 )
             )
             await client.connect()
@@ -1312,7 +1374,9 @@ async def _start_session(
             client = None
     if client is None:
         client = ClaudeSDKClient(
-            options=_build_options(wizard_dir, out, session_id=session_id, guard=guard)
+            options=_build_options(
+                wizard_dir, out, session_id=session_id, guard=guard, budget_usd=budget_usd
+            )
         )
         try:
             await client.connect()
@@ -1339,6 +1403,8 @@ async def _start_session(
         "output_dir": out,
         "lock": asyncio.Lock(),
         "last_active": time.time(),
+        # When a request was last given it, which fit_budget leaves alone a while.
+        "handed_at": time.time(),
         # What the bootstrap pinned, so a later turn can tell a switch from a
         # repeat and only re-instruct on a real change.
         "locale": _normalise_locale(locale),
@@ -1352,6 +1418,10 @@ async def _start_session(
         "user_id": user_id,
         # Its tool guard, told by stream_turn_for when a new message begins.
         "tool_guard": guard,
+        # Whether a usage cap set its budget: a stop there says the cap is full.
+        "budget_from_caps": _budget_is_cap(budget_usd),
+        # The budget it was started with; the CLI counts its spend against it.
+        "budget_usd": _agent_budget(budget_usd),
         # (purpose, ResultMessage) of each query not yet on a span (telemetry).
         "turn_results": turn_results,
     }
@@ -1412,17 +1482,25 @@ class Turn:
         self.stop_requested = False
         #: Ends the agent if the stop does not take effect; held so it is not collected.
         self.stop_watchdog: asyncio.Task | None = None
-        self._changed = asyncio.Condition()
+        # Set, and replaced by a fresh one, whenever a frame arrives or the turn
+        # ends. No lock: a reader whose page goes away is cancelled while it
+        # waits, and a condition variable could then be left held, which stopped
+        # the turn from publishing or finishing (19.11.2026). Everything here
+        # runs on one event loop, so nothing changes between a reader's check
+        # and its wait.
+        self._wake = asyncio.Event()
+
+    def _notify(self) -> None:
+        wake, self._wake = self._wake, asyncio.Event()
+        wake.set()
 
     async def publish(self, frame: str) -> None:
-        async with self._changed:
-            self.frames.append(frame)
-            self._changed.notify_all()
+        self.frames.append(frame)
+        self._notify()
 
     async def finish(self) -> None:
-        async with self._changed:
-            self.finished = True
-            self._changed.notify_all()
+        self.finished = True
+        self._notify()
 
     async def subscribe(self) -> AsyncGenerator[str, None]:
         """Every frame from the first one, then the new ones until the turn is through.
@@ -1434,19 +1512,16 @@ class Turn:
         """
         sent = 0
         while True:
-            async with self._changed:
+            if len(self.frames) <= sent and not self.finished:
+                wake = self._wake
                 try:
-                    await asyncio.wait_for(
-                        self._changed.wait_for(lambda: len(self.frames) > sent or self.finished),
-                        timeout=_HEARTBEAT_INTERVAL,
-                    )
+                    async with asyncio.timeout(_HEARTBEAT_INTERVAL):
+                        await wake.wait()
                 except TimeoutError:
-                    pass
-                batch = self.frames[sent:]
-                finished = self.finished
-            if not batch and not finished:
-                yield sse({"heartbeat": True})
-                continue
+                    yield sse({"heartbeat": True})
+                    continue
+            batch = self.frames[sent:]
+            finished = self.finished
             for frame in batch:
                 yield frame
             sent += len(batch)
@@ -1651,6 +1726,38 @@ async def _discard_session(session: dict) -> None:
             await end_session(session_id)
             return
     await _disconnect_quietly(session["client"])
+
+
+#: How far past what the caps leave a live agent may still spend before
+#: ``fit_budget`` ends it, in USD: about one reply. Below it a small overrun is
+#: allowed rather than restarting the agent each time its owner switches sessions.
+FIT_BUDGET_MARGIN_USD = 1.0
+
+
+async def fit_budget(session_id: str, budget_usd: float | None) -> bool:
+    """End the idle live agent of ``session_id`` when the caps leave much less than it may spend.
+
+    An agent keeps the budget it was started with, counted by its CLI from its
+    start. Spend in the owner's other sessions since then is not taken off it,
+    so when what this agent still has is more than ``FIT_BUDGET_MARGIN_USD``
+    over what the caps leave, it is ended, and the message resumes it with the
+    smaller budget. Then the user's cap is passed by at most that margin, and an
+    agent is not restarted every time its owner switches sessions. True when one
+    was ended. A busy agent is left alone (the message is refused anyway), and
+    so is one handed to a request in the last ``_JUST_USED_SECONDS``, which may
+    still be setting up its turn. A turn that merely ended a moment ago does not
+    count as handed out.
+    """
+    agent = AGENT_SESSIONS.get(session_id)
+    if agent is None or budget_usd is None or is_busy(session_id):
+        return False
+    if agent.get("handed_at", 0.0) > time.time() - _JUST_USED_SECONDS:
+        return False
+    started_with = agent.get("budget_usd")
+    left = None if started_with is None else started_with - agent.get("cost_total_usd", 0.0)
+    if left is not None and left <= budget_usd + FIT_BUDGET_MARGIN_USD:
+        return False
+    return await end_session(session_id)
 
 
 async def end_session(session_id: str) -> bool:

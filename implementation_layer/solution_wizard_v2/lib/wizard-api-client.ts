@@ -260,6 +260,11 @@ export type ApiSessionDetail = {
     missing_value_policy: string;
     validation_rules: string[];
   } | null;
+  extraction_proposal?: {
+    prompt_markdown: string;
+    schema_generated: boolean;
+    schema_code?: string;
+  } | null;
   assumptions?: Array<{
     id: string;
     text: string;

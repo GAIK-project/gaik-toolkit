@@ -649,6 +649,12 @@ class SandboxRunner:
                 if getattr(exc, "status", None) != 404:
                     logger.warning("could not delete a superseded preflight %s: %s", name, exc)
 
+    def active_jobs(self) -> int:
+        """How many of this stack's Jobs are unfinished, preflights included."""
+        self._require_config()
+        self._load_clients()
+        return sum(1 for j in self._jobs() if _unfinished(j))
+
     def _jobs(self, **labels: str) -> list[Any]:
         selector = ",".join(
             f"{k}={v}"

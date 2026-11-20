@@ -185,6 +185,9 @@ export default async function SessionPage({
         requestPrefix: t.gateRequestPrefix,
         rejected: t.gateRejected,
         staleResult: t.gateStaleResult,
+        dismissPanel: t.gatePanelDismiss,
+        showPanel: t.gatePanelShow,
+        waitingPanel: t.gatePanelWaiting,
       }
     : null;
   // Gate 1 is approvable once the wizard has the core business framing.
@@ -339,6 +342,25 @@ export default async function SessionPage({
               pushed it to the bottom of the page. */}
           {reopenedNotice}
 
+          {/* Gate 2 reviews the solution structure (steps and diagram): offer
+              its compact, dismissible action panel right above the structure
+              instead of burying it in a bottom footer (#251). */}
+          {decisionStep && decisionLabels && decisionGate === 2 && (
+            <GateDecisionBar
+              key={decisionStep}
+              sessionId={session.id}
+              gate={decisionGate}
+              gateStep={decisionStep}
+              rejected={session.gateStatus[decisionStep] === "rejected"}
+              blocked={missing.length > 0}
+              hadNotice={Boolean(noticeText)}
+              packageChanged={packageChanged}
+              placement="top"
+              dismissible
+              labels={decisionLabels}
+            />
+          )}
+
           <div className="scroll-thin relative flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6">
             {isSpec ? (
               // The fields first; the review Gate 1 decides on under them, when
@@ -378,6 +400,7 @@ export default async function SessionPage({
                 // As far on as the wizard's files reach within the stage, so
                 // the Workflow tab is there once the diagram is.
                 wizardStep={workspaceStep(session)}
+                gate1Approved={session.gateStatus[GATE_STEPS[0]] === "approved"}
                 gate2Approved={session.gateStatus[GATE_STEPS[1]] === "approved"}
                 blueprint={session.blueprint}
                 blueprintVersion={session.activeVersion}
@@ -389,6 +412,8 @@ export default async function SessionPage({
                 wizardReplying={Boolean(session.pendingTurn)}
                 reopenedAt={reopened ? (reopened.at ?? `gate-${reopened.gate}`) : null}
                 outputFields={fieldSpecsFromTargetOutput(session.targetOutputSpec)}
+                targetOutputSpec={session.targetOutputSpec ?? null}
+                extractionProposal={session.extractionProposal ?? null}
                 initialTab={parseTabParam(tab)}
                 t={t}
               />
@@ -407,7 +432,7 @@ export default async function SessionPage({
               {noticeAction}
             </p>
           )}
-          {decisionStep && decisionLabels && (
+          {decisionStep && decisionLabels && decisionGate !== 2 && (
             <GateDecisionBar
               // A new gate gets a new bar.
               key={decisionStep}
@@ -469,6 +494,8 @@ export default async function SessionPage({
           hideChatLabel={t.hideChat}
           showChatLabel={t.showChat}
           resizeLabel={t.chatResize}
+          widenChatLabel={t.chatWiden}
+          narrowChatLabel={t.chatNarrow}
           questionLabels={t.chatQuestions}
           pendingTurn={session.pendingTurn ?? null}
           defaultOpen={!shouldCollapseChatByDefault(session.step, gateBlocking)}

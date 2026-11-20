@@ -23,9 +23,12 @@ import {
 } from "@/lib/blueprint-update";
 import { NO_POC_PACKAGE, pocPackageState, samePocPackage } from "@/lib/poc-package-state";
 import type { FieldSpec } from "@/components/field-schema-editor";
+import type { ExtractionProposal } from "@/lib/extraction-proposal";
+import type { TargetOutputSpec } from "@/lib/target-output-spec";
 import type { PocPackageState } from "@/lib/poc-package-state";
 import { pocPollDelay } from "@/lib/poc-package-poll";
-import { runLogLineFilter } from "@/lib/poc-run-log";
+import { classifyLogLine, runLogLineFilter, runProgressStage } from "@/lib/poc-run-log";
+import { pocActionEmphasis } from "@/lib/poc-run-guidance";
 import {
   NO_PREFLIGHT,
   packageStatus,
@@ -55,6 +58,7 @@ import {
   publishResultStale,
   publishRunWarnings,
   resultIsStale,
+  runNeedsReview,
   runWarnings,
   type RunWarning,
 } from "@/lib/poc-result-state";
@@ -267,11 +271,12 @@ function LogBox({ lines }: { lines: string[] }) {
       className="scroll-thin max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md bg-term-bg p-3 font-mono text-xs leading-5 text-term-text"
     >
       {lines.map((log, i) => {
-        const lower = log.toLowerCase();
-        const isErr = lower.includes("error") || lower.includes("fail") || lower.includes("✗");
-        const isOk = lower.includes("success") || lower.includes("✓") || lower.includes(" ok");
+        const tone = classifyLogLine(log);
         return (
-          <div key={i} className={isErr ? "text-term-err" : isOk ? "text-term-ok" : "text-term-muted"}>
+          <div
+            key={i}
+            className={tone === "error" ? "text-term-err" : tone === "ok" ? "text-term-ok" : "text-term-muted"}
+          >
             {log}
           </div>
         );
@@ -782,6 +787,7 @@ export function WorkspacePanel({
   sessionId,
   sessionTitle,
   wizardStep,
+  gate1Approved = false,
   gate2Approved = false,
   blueprint: initialBlueprint,
   blueprintVersion = null,
@@ -792,12 +798,16 @@ export function WorkspacePanel({
   wizardReplying: replyingAtLoad = false,
   reopenedAt = null,
   outputFields = NO_FIELDS,
+  targetOutputSpec = null,
+  extractionProposal = null,
   initialTab,
   t,
 }: {
   sessionId: string;
   sessionTitle: string;
   wizardStep: number;
+  /** Gate 1 is approved, so Phase 4 extraction rules can be reviewed in the workspace (#251). */
+  gate1Approved?: boolean;
   /** Gate 2 is approved, so the PoC can be generated and run. */
   gate2Approved?: boolean;
   blueprint: Blueprint;
@@ -821,6 +831,8 @@ export function WorkspacePanel({
   latestRunInputs?: string[] | null;
   /** The output fields the wizard agreed (target_output_spec), read-only on the Blueprint tab. */
   outputFields?: FieldSpec[];
+  targetOutputSpec?: TargetOutputSpec | null;
+  extractionProposal?: ExtractionProposal | null;
   /** The tab to open on (?tab=), e.g. "poc" when coming back from the case view. */
   initialTab?: Tab;
   t: Dict;
@@ -1016,6 +1028,8 @@ export function WorkspacePanel({
   const [runOutput, setRunOutput] = useState<PocRunOutput | null>(null);
   /** The run the tab follows now; an earlier run's output arriving late is dropped. */
   const activeRunRef = useRef<string | null>(null);
+  /** Synchronous lock so an upload-triggered auto-run and a manual press never start two runs (#252). */
+  const runInFlightRef = useRef(false);
   // The deployment package as its zip names its files (poc/...).
   const [pocFiles, setPocFiles] = useState<string[]>([]);
   const [pocWorkOnly, setPocWorkOnly] = useState<string[]>([]);
@@ -1567,6 +1581,8 @@ export function WorkspacePanel({
   /** Start a sandbox run and follow it (#94). Nothing here simulates: a run
    * that did not happen cannot report that it did. */
   async function runInSandbox(byItself = false) {
+    if (runInFlightRef.current) return;
+    runInFlightRef.current = true;
     ranVersionRef.current = pocVersion;
     if (!byItself) autoRunRetries.current = 0;
     if (autoRunTimer.current !== null) window.clearTimeout(autoRunTimer.current);
@@ -1589,48 +1605,52 @@ export function WorkspacePanel({
     // "could not be started" for a run that had started (#228).
     let started = false;
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/runs`, { method: "POST" });
-      const body = await response.json().catch(() => ({}));
-      // The inputs the api recorded for the run: the list may not have been
-      // read here when it was started.
-      if (response.ok && Array.isArray(body?.inputs)) {
-        setRunInputs(body.inputs.filter((name: unknown): name is string => typeof name === "string"));
-      }
-      if (!response.ok) {
-        // A run nobody pressed for does not end in a red "sandbox is busy":
-        // the step says it is waiting, and the run is asked for again.
-        if (byItself && isSandboxBusy(response.status, body) && autoRunRetries.current < 5) {
-          autoRunRetries.current += 1;
-          setRunPhase("idle");
-          setRunStartedAt(null);
-          setAutoRunWaiting(true);
-          autoRunTimer.current = window.setTimeout(
-            () => setAutoRunRetry((n) => n + 1),
-            retryAfterMs(response.headers.get("Retry-After")),
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}/runs`, { method: "POST" });
+        const body = await response.json().catch(() => ({}));
+        // The inputs the api recorded for the run: the list may not have been
+        // read here when it was started.
+        if (response.ok && Array.isArray(body?.inputs)) {
+          setRunInputs(body.inputs.filter((name: unknown): name is string => typeof name === "string"));
+        }
+        if (!response.ok) {
+          // A run nobody pressed for does not end in a red "sandbox is busy":
+          // the step says it is waiting, and the run is asked for again.
+          if (byItself && isSandboxBusy(response.status, body) && autoRunRetries.current < 5) {
+            autoRunRetries.current += 1;
+            setRunPhase("idle");
+            setRunStartedAt(null);
+            setAutoRunWaiting(true);
+            autoRunTimer.current = window.setTimeout(
+              () => setAutoRunRetry((n) => n + 1),
+              retryAfterMs(response.headers.get("Retry-After")),
+            );
+            return;
+          }
+          setRunPhase("error");
+          // 429: the run limits of the shared project quota, not a problem with the package.
+          setRunMessage(
+            body?.detail?.error === "sandbox_busy"
+              ? t.pocRunBusy
+              : (body?.detail?.message ?? body?.message ?? t.pocRunError),
           );
           return;
         }
+        runId = body.run_id;
+        activeRunRef.current = runId;
+        started = true;
+        setRunStarted(true);
+      } catch {
         setRunPhase("error");
-        // 429: the run limits of the shared project quota, not a problem with the package.
-        setRunMessage(
-          body?.detail?.error === "sandbox_busy"
-            ? t.pocRunBusy
-            : (body?.detail?.message ?? body?.message ?? t.pocRunError),
-        );
+        setRunMessage(t.pocRunError);
         return;
       }
-      runId = body.run_id;
-      activeRunRef.current = runId;
-      started = true;
-      setRunStarted(true);
-    } catch {
-      setRunPhase("error");
-      setRunMessage(t.pocRunError);
-      return;
-    }
 
-    setRunPhase("running");
-    await followRun(runId, started);
+      setRunPhase("running");
+      await followRun(runId, started);
+    } finally {
+      runInFlightRef.current = false;
+    }
   }
 
   /** Follow a run's log stream to its end: from the start, or after a reload. */
@@ -1888,10 +1908,23 @@ export function WorkspacePanel({
     publishResultStale(sessionId, resultStale, digestsRead);
   }, [sessionId, resultStale, digestsRead]);
   useEffect(() => () => publishResultStale(sessionId, false), [sessionId]);
-  const hasRunWarnings = runWarningList.length > 0;
+  const hasRunWarnings = runNeedsReview(runWarningList, runOutput?.validation);
   // The run in view succeeded and said what to check: the last step and the
   // finished solution's banner (drawn by the page) do not call it a success.
   const shownRunHasWarnings = hasRunWarnings && runPhase === "succeeded";
+  const emphasis = pocActionEmphasis({
+    pocGenerated,
+    pocReady,
+    checkFailed,
+    runPhase,
+    autoRunDecision: autoRun,
+    autoRunNeedsInput,
+    autoRunComing,
+    autoRunWaiting,
+    inputBusy,
+    pocInputs,
+    ownInputs,
+  });
   useEffect(() => {
     publishRunWarnings(sessionId, shownRunHasWarnings);
   }, [sessionId, shownRunHasWarnings]);
@@ -2264,13 +2297,16 @@ export function WorkspacePanel({
       }
       actions={
         pocGenerated && (
-          <label className={`btn-secondary ${inputBusy ? "opacity-60" : "cursor-pointer"}`}>
+          <label
+            className={`${emphasis.uploadPrimary ? "btn-brand font-semibold" : "btn-secondary"} ${inputBusy ? "opacity-60" : "cursor-pointer"}`}
+            data-testid="poc-input-upload-label"
+          >
             <Icon
               name={inputBusy ? "loaderCircle" : "upload"}
               size={16}
               className={inputBusy ? "animate-spin" : ""}
             />
-            {inputBusy ? t.pocInputUploading : t.pocInputUpload}
+            {inputBusy ? t.pocInputUploading : emphasis.uploadPrimary ? t.pocInputUploadTest : t.pocInputUpload}
             <input
               ref={fileInputRef}
               type="file"
@@ -2336,7 +2372,8 @@ export function WorkspacePanel({
     <StepCard
       n={3}
       title={t.pocStepRun}
-      done={runPhase === "succeeded"}
+      done={runPhase === "succeeded" && !hasRunWarnings}
+      attention={runPhase === "succeeded" && hasRunWarnings}
       muted={!pocGenerated}
       status={
         runPhase === "idle" ? (
@@ -2345,11 +2382,21 @@ export function WorkspacePanel({
               <span data-testid="poc-auto-run">{t.pocAutoRunBusy}</span>
             ) : autoRunHeld ? (
               <span data-testid="poc-auto-run">{t.pocAutoRunHeld}</span>
+            ) : emphasis.runQueued && emphasis.ownNames.length > 0 ? (
+              <span data-testid="poc-auto-run">
+                {t.pocAutoRunQueued.replace("{files}", emphasis.ownNames.join(", "))}
+              </span>
             ) : autoRunComing ? (
-              <span data-testid="poc-auto-run">{t.pocAutoRun}</span>
+              <span data-testid="poc-auto-run">
+                {emphasis.ownNames.length > 0
+                  ? t.pocAutoRunCheckingWithFiles.replace("{files}", emphasis.ownNames.join(", "))
+                  : t.pocAutoRun}
+              </span>
             ) : autoRunNeedsInput ? (
               <span data-testid="poc-auto-run">
-                {pocInputs.length > 0 ? t.pocAutoRunNeedsOwnInput : t.pocAutoRunNeedsInput}
+                {emphasis.sampleNames.length > 0
+                  ? t.pocAutoRunNeedsOwnInput.replace("{files}", emphasis.sampleNames.join(", "))
+                  : t.pocAutoRunNeedsInput}
               </span>
             ) : (
               t.pocIdle
@@ -2393,19 +2440,21 @@ export function WorkspacePanel({
         <button
           type="button"
           onClick={() => void runInSandbox()}
-          disabled={!pocGenerated || !pocReady || runActive}
+          disabled={!pocGenerated || !pocReady || runActive || emphasis.runQueued || inputBusy}
           title={!pocGenerated || !pocReady ? t.pocRunSandboxHint : undefined}
-          className={
-            pocGenerated && pocReady && !checkFailed && runPhase !== "succeeded" ? "btn-brand" : "btn-secondary"
-          }
+          className={emphasis.runPrimary ? "btn-brand font-semibold" : "btn-secondary"}
           data-testid="poc-run-sandbox"
         >
           <Icon
-            name={runActive ? "loaderCircle" : runPhase === "idle" ? "play" : "rotateCcw"}
+            name={runActive || emphasis.runQueued ? "loaderCircle" : runPhase === "idle" ? "play" : "rotateCcw"}
             size={16}
-            className={runActive ? "animate-spin" : ""}
+            className={runActive || emphasis.runQueued ? "animate-spin" : ""}
           />
-          {runActive ? t.pocRunning2 : runPhase === "idle" ? t.pocRunSandbox : t.pocRunAgain}
+          {runActive || emphasis.runQueued
+            ? t.pocRunning2
+            : runPhase === "idle"
+              ? t.pocRunSandbox
+              : t.pocRunAgain}
         </button>
       }
     />
@@ -2536,6 +2585,26 @@ export function WorkspacePanel({
         >
           {t.pocResultEmpty}
         </p>
+      )}
+
+      {/* Plain-language progress while the run is active; raw technical logs
+          stay tucked behind the disclosure below (#252). Keep role="status" on
+          the stage label only so a ticking clock is not re-announced every second. */}
+      {runActive && (
+        <div
+          className="flex flex-col gap-1 border-t border-border px-4 py-5"
+          data-testid="poc-run-progress"
+        >
+          <p role="status" className="flex items-center gap-2 text-sm font-medium text-text">
+            <Icon name="loaderCircle" size={16} className="animate-spin text-brand" />
+            <span>{t.pocProgress[runProgressStage(runPhase, runLogs)]}</span>
+          </p>
+          {runInputs.length > 0 && (
+            <p className="pl-6 text-xs text-text-muted">
+              {t.pocResultFrom.replace("{files}", runInputs.join(", "))}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Why the run ended the way it did: the reason the api read from the
@@ -2773,16 +2842,17 @@ export function WorkspacePanel({
         </p>
       )}
 
-      {/* The log: live while the run goes, folded once it is over. Nothing is
-          drawn before the first line arrives. */}
+      {/* Technical log: stays behind a disclosure while the run is going and
+          after it succeeds, so plain-language progress leads; opens
+          automatically only when the run fails (#252). */}
       {runPhase !== "idle" && runLogs.length > 0 && (
         <details
           className="border-t border-border px-4 py-2.5"
           data-testid="poc-run-log"
-          open={runActive || runPhase === "error" || runPhase === "failed" || runPhase === "timeout"}
+          open={runPhase === "error" || runPhase === "failed" || runPhase === "timeout"}
         >
           <summary className="cursor-pointer text-xs font-medium text-text-secondary">
-            {t.pocResultLog} · {t.pocLogLines.replace("{n}", String(runLogs.length))}
+            {t.pocProgress.logSummary} · {t.pocLogLines.replace("{n}", String(runLogs.length))}
           </summary>
           <div className="mt-2">
             <LogBox lines={runLogs} />
@@ -3274,7 +3344,16 @@ export function WorkspacePanel({
                   />
                 )}
                 {blueprintView === "steps" && !blueprintEditing && (
-                  <SolutionPlanView blueprint={blueprint} outputFields={outputFields} t={t} note={readBar} />
+                  <SolutionPlanView
+                    blueprint={blueprint}
+                    outputFields={outputFields}
+                    targetOutputSpec={targetOutputSpec}
+                    extractionProposal={extractionProposal}
+                    wizardStep={wizardStep}
+                    gate1Approved={gate1Approved}
+                    t={t}
+                    note={readBar}
+                  />
                 )}
                 {editorMounted && (
                   // Kept mounted under the other view: a draft the form has not saved stays.

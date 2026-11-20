@@ -67,6 +67,10 @@ except ImportError:
     from api.utils.file_content import content_mismatch
     from api.utils.model_settings import provider_error_detail
     from api.utils.upload_check import upload_problem
+try:
+    from utils.log_names import error_kind, file_tag
+except ImportError:
+    from api.utils.log_names import error_kind, file_tag
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -224,7 +228,7 @@ def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
     if text:
         logger.info(
             "Parsed wizard attachment %s via PyMuPDF (%d chars)",
-            original_name,
+            file_tag(original_name),
             len(text),
         )
         return text
@@ -234,7 +238,7 @@ def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
     if not api_base or not password:
         logger.warning(
             "PyMuPDF extracted no text from wizard attachment %s and Docling API is not configured",
-            original_name,
+            file_tag(original_name),
         )
         return ""
 
@@ -249,18 +253,18 @@ def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
         if markdown:
             logger.info(
                 "Parsed wizard attachment %s via Docling API fallback (%d chars)",
-                original_name,
+                file_tag(original_name),
                 len(markdown),
             )
             return markdown
         logger.warning(
-            "Docling API returned empty markdown for wizard attachment %s", original_name
+            "Docling API returned empty markdown for wizard attachment %s", file_tag(original_name)
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "Docling API fallback failed for wizard attachment %s: %s",
-            original_name,
-            exc,
+            file_tag(original_name),
+            error_kind(exc),
         )
     return ""
 

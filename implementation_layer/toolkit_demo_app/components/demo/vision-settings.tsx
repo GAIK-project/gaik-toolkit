@@ -328,17 +328,20 @@ export function UsageStats({ usage }: { usage: VisionUsage }) {
   if (usage.total_tokens != null) {
     stats.push({
       label: "Tokens",
-      value: usage.total_tokens.toLocaleString(),
+      value: usage.total_tokens.toLocaleString("en-US"),
       bold: true,
     });
   }
   if (usage.input_tokens != null) {
-    stats.push({ label: "Input", value: usage.input_tokens.toLocaleString() });
+    stats.push({
+      label: "Input",
+      value: usage.input_tokens.toLocaleString("en-US"),
+    });
   }
   if (usage.output_tokens != null) {
     stats.push({
       label: "Output",
-      value: usage.output_tokens.toLocaleString(),
+      value: usage.output_tokens.toLocaleString("en-US"),
     });
   }
   if (usage.cost_usd != null) {

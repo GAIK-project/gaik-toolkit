@@ -49,7 +49,7 @@ def unvalidated(monkeypatch):
 
 
 def test_runs_a_query_in_the_schema(schema):
-    with PostgresAgent(PG_URL, schema_name=schema) as agent:
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders"]) as agent:
         rows = agent.run_sql("SELECT count(*) AS n, sum(amount) AS total FROM orders")
     assert rows == [{"n": 2, "total": 30}]
 
@@ -64,7 +64,7 @@ def test_cte_and_join_still_run_after_schema_qualification(schema):
 
 
 def test_query_runs_in_a_read_only_transaction(schema, unvalidated):
-    with PostgresAgent(PG_URL, schema_name=schema) as agent:
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders"]) as agent:
         rows = agent.run_sql("SELECT current_setting('transaction_read_only') AS read_only")
         assert rows == [{"read_only": "on"}]
         with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
@@ -72,7 +72,7 @@ def test_query_runs_in_a_read_only_transaction(schema, unvalidated):
 
 
 def test_transaction_is_read_only_whatever_the_session_default(schema, unvalidated):
-    with PostgresAgent(PG_URL, schema_name=schema) as agent:
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders"]) as agent:
         agent._get_conn().execute("SET default_transaction_read_only = off")
         rows = agent.run_sql("SELECT current_setting('transaction_read_only') AS read_only")
         assert rows == [{"read_only": "on"}]
@@ -81,7 +81,9 @@ def test_transaction_is_read_only_whatever_the_session_default(schema, unvalidat
 
 
 def test_session_settings_changed_by_a_query_do_not_outlive_it(schema, unvalidated):
-    with PostgresAgent(PG_URL, schema_name=schema, statement_timeout_ms=4321) as agent:
+    with PostgresAgent(
+        PG_URL, schema_name=schema, table_allowlist=["orders"], statement_timeout_ms=4321
+    ) as agent:
         agent.run_sql(
             "SELECT set_config('statement_timeout', '0', false), "
             "set_config('default_transaction_read_only', 'off', false), "
@@ -96,7 +98,7 @@ def test_session_settings_changed_by_a_query_do_not_outlive_it(schema, unvalidat
 
 
 def test_connection_is_usable_after_a_failed_query(schema):
-    with PostgresAgent(PG_URL, schema_name=schema) as agent:
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders"]) as agent:
         with pytest.raises(psycopg.errors.UndefinedColumn):
             agent.run_sql("SELECT no_such_column FROM orders")
         assert agent.run_sql("SELECT id FROM orders ORDER BY id") == [{"id": 1}, {"id": 2}]
@@ -104,7 +106,8 @@ def test_connection_is_usable_after_a_failed_query(schema):
 
 def test_unqualified_system_relation_does_not_resolve(schema):
     """Without the schema pin this would read pg_catalog through the search path."""
-    with PostgresAgent(PG_URL, schema_name=schema) as agent:
+    # pg_user is on the list here, so only the schema pin keeps it from the catalog.
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders", "pg_user"]) as agent:
         with pytest.raises(psycopg.errors.UndefinedTable):
             agent.run_sql("SELECT * FROM pg_user")
 
@@ -124,3 +127,32 @@ def test_cte_named_after_a_table_outside_the_allowlist_is_rejected(schema):
     with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders"]) as agent:
         with pytest.raises(UnsafeSQLError):
             agent.run_sql("WITH users AS (SELECT * FROM users) SELECT * FROM users")
+
+
+def test_casts_to_built_in_types_and_listed_tables_run(schema):
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders", "Users"]) as agent:
+        rows = agent.run_sql(
+            "SELECT id::text AS id, amount::numeric(10, 2) AS amount, "
+            "'a b'::tsvector::text AS words, 'x'::\"char\"::text AS letter, "
+            "(CAST(ROW(id, amount) AS orders)).amount AS row_amount, "
+            'CAST(NULL AS "Users") IS NULL AS no_user '
+            "FROM orders ORDER BY id LIMIT 1"
+        )
+    assert rows == [
+        {
+            "id": "1",
+            "amount": 10,
+            "words": "'a' 'b'",
+            "letter": "x",
+            "row_amount": 10,
+            "no_user": True,
+        }
+    ]
+
+
+def test_cast_to_a_table_off_the_list_is_refused(schema):
+    with PostgresAgent(PG_URL, schema_name=schema, table_allowlist=["orders"]) as agent:
+        with pytest.raises(UnsafeSQLError, match="type casts are checked against the table list"):
+            agent.run_sql("SELECT CAST(NULL AS users)")
+        with pytest.raises(UnsafeSQLError, match="type casts are checked against the table list"):
+            agent.run_sql("SELECT 'users'::regclass")

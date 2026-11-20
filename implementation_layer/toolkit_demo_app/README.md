@@ -109,15 +109,23 @@ and commit the result; a unit test fails while the generated files are stale.
 The **model menu** in the nav shows which model runs the current demo. Signed-in users
 can switch among the server's own models without a key. `GET /api/model-settings/server`
 lists them, and the API checks the `x-gaik-server-model` header against that list.
-By default these are GPT-6 Luna (the server default), GPT-6 Sol, Claude Haiku 5.5 and
-Gemini 3.8 Flash for everyone, and GPT-6.1 Sol, GPT-6 Astra, Claude Sonnet 5.5, Claude
-Opus 5.5 and Gemini 4 Argon for the GAIK team only: the admin, the `DEMO_USER_NAME`
+By default these are GPT-6 Sol (the server default, set with `DEMO_LLM_MODEL`), GPT-6 Luna,
+Claude Haiku 5.5, Claude Sonnet 5.5 and Gemini 3.8 Flash for everyone, and GPT-6.2 Sol, GPT-6.1 Sol,
+GPT-6 Astra, Claude Opus 5.5 and Gemini 4 Argon for the GAIK team only: the admin, the `DEMO_USER_NAME`
 account, `haaga-helia.fi` addresses and anyone in `MODEL_STAFF_EMAILS`. The proxy
 decides this from the session and tells the API in `x-gaik-model-tier`; a browser cannot
 set it. A provider without credentials on the server is left out, and
 `DEMO_SERVER_MODELS=provider:model[:staff],…` replaces the list. With Claude or Gemini
 picked, the audio demos still transcribe on the server (local Whisper, else
 `gpt-4o-transcribe`) and the picked model extracts. Results name both models.
+
+With a GPT-6 model in use, on the server's key or the user's own, the menu also has a
+**Reasoning** row: Auto, Low, Medium or High. Auto sends nothing, and each model keeps the
+effort the API chooses for it. Another choice travels in `x-gaik-reasoning-effort` on the
+routes that take a picked model; the API accepts `low`, `medium` and `high`, treats
+anything else as Auto, and applies it to GPT-6 models only. The Report Writer and
+Knowledge Curator steps keep their own effort settings, and so does the Vision Extractor
+while it runs on its own model choice.
 
 A route that takes a model name in the request runs only the models it offers, and a
 team-only model only for the team, decided from the session as above. Which models are
@@ -165,7 +173,7 @@ or CSC Aitta account. Enter the model/deployment and key; Azure also needs its p
 resource endpoint. **Test connection** makes one small chat request. **Use this key**
 activates it for this browser tab until refresh, navigation away or sign-out. **Clear
 own model** returns to the server models. A run on an own key needs a signed-in account,
-approved or pending; it spends no trial run.
+approved, or pending with a confirmed e-mail address; it spends no trial run.
 
 Own settings apply to Extractor, Schema Generator, Classifier, LLM-based Parser modes,
 Vision Extractor, PostgreSQL Agent questions and single LLM Judge tasks.
@@ -181,7 +189,7 @@ OpenAI and Aitta endpoints are fixed. Azure accepts public HTTPS resource hosts 
 `openai.azure.com` or `services.ai.azure.com`; private endpoints and redirects are rejected.
 
 Server defaults accept `DEMO_LLM_PROVIDER` and `DEMO_LLM_MODEL`; otherwise the toolkit's
-provider environment model is preserved. The default OpenAI/Azure model is `gpt-6-luna`.
+provider environment model is preserved. The library default for OpenAI/Azure is `gpt-6-luna`; the demo server runs `gpt-6-sol` through `DEMO_LLM_MODEL`.
 Azure model values are deployment names. `gpt-6-sol`, `gpt-6-astra`, and the `gpt-5.6`
 family can be selected where available. Vision Extractor's server-side menu can be set
 with comma-separated `DEMO_OPENAI_MODELS`, `DEMO_CLAUDE_MODELS`, and `DEMO_GOOGLE_MODELS`.

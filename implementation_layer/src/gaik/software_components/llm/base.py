@@ -11,6 +11,14 @@ from pydantic import BaseModel
 
 ChatMessage = dict[str, Any]
 
+# When a config sets no ``timeout`` or ``max_retries``, a model request that gets
+# no answer stops after DEFAULT_TIMEOUT_SECONDS, and a failed one is retried
+# DEFAULT_MAX_RETRIES times. These are the OpenAI and Anthropic SDKs' own
+# defaults; the Google SDK would otherwise wait without a limit and LiteLLM far
+# longer, so every provider now stops at the same point.
+DEFAULT_TIMEOUT_SECONDS = 600.0
+DEFAULT_MAX_RETRIES = 2
+
 
 @dataclass
 class ChatResponse:

@@ -30,22 +30,25 @@ export function OwnDataCallout() {
 
   return (
     <section
-      aria-label="Proof of concept"
-      className="bg-muted/40 flex flex-col gap-4 rounded-xl border p-5 md:flex-row md:items-center md:justify-between"
+      aria-labelledby="poc-offer"
+      className="bg-muted/40 flex flex-col gap-4 rounded-xl border px-6 py-5 md:flex-row md:items-center md:justify-between md:px-10"
     >
       <div className="space-y-1">
-        <h2 className="font-serif text-xl font-semibold text-balance">
-          Try it with your own data
+        <h2
+          id="poc-offer"
+          className="font-serif text-xl font-semibold text-balance"
+        >
+          Free proof of concept for companies in Finland
         </h2>
         <p className="text-muted-foreground max-w-xl text-sm">
-          Every demo accepts your own documents and recordings. Companies in
-          Finland can get <strong>free proof-of-concept development</strong>{" "}
-          from GAIK&apos;s team.
+          Every demo accepts your own documents and recordings. GAIK&apos;s team
+          can build a proof of concept with you, free of charge.
         </p>
       </div>
       <DropdownMenu>
+        {/* Outline: the hero's button stays the one primary action up here. */}
         <DropdownMenuTrigger asChild>
-          <Button className="shrink-0 gap-2">
+          <Button variant="outline" className="shrink-0 gap-2">
             <Mail className="size-4" />
             Contact GAIK
             <ChevronDown className="size-4 opacity-70" />

@@ -299,6 +299,63 @@ and a default would stop ordinary long sessions at whatever point their spend
 reached it. Set it as a ceiling for a runaway agent, a few times what a whole
 session costs (the `gaik.cost.usd` of the `wizard.turn` spans shows that).
 
+**Usage caps.** Spend is capped per session, per user and per deployment month,
+and the number of sessions per user, so one participant cannot use up what
+others share (`services/usage_caps.py`). They are on by default; set one to `0`
+to turn it off. A negative or unreadable value gives the default, not off.
+Amounts are estimated USD, from the same CLI estimate as above,
+not the provider's bill, which keeps its own cap as the hard limit.
+
+| Variable | Default | What it limits |
+|---|---|---|
+| `WIZARD_SESSION_MAX_COST_USD` | `5.4` (about 5 €) | what one session may spend in all, across agent restarts |
+| `WIZARD_USER_MAX_COST_USD` | `10.8` (about 10 €) | what one user may spend across all their sessions |
+| `WIZARD_DEPLOYMENT_MAX_COST_USD` | `2000` | what the deployment may spend in one calendar month (UTC) |
+| `WIZARD_MAX_SESSIONS_PER_USER` | `3` | sessions one user may have at a time |
+| `WIZARD_COST_WARN_RATIO` | `0.8` | share of a session's or user's cap after which the chat says so, once; kept between 0 and 1, so `0` gives the default |
+
+- After each chat turn its cost is added to the session (`metadata.usage_cost_usd`,
+  which only the server writes), to the user's and to the month's row of
+  `usage_totals`. Removing a session gives back its place, not its spend. The
+  user's spend never resets; the month's starts again each calendar month. To
+  start a user or the deployment again (between two events, say), delete their
+  rows from `usage_totals`, by `scope` and `key`.
+- Counting starts when revision 003 is applied: spend before it is not known,
+  and the sessions users already have count against their limit.
+- Before an agent is woken, a reached cap, or one that leaves less than
+  `MIN_TURN_BUDGET_USD` (0.1), refuses the message with `402` and
+  `{"error": "usage_cap", "scope": "session" | "user" | "deployment"}`. The agent
+  is started with the smallest amount any cap has left as its `max_budget_usd`.
+  That budget is held against the user's cap until the reply is charged, so
+  replies in several sessions at once cannot each spend what is left; a message
+  that finds the rest held by the user's running replies gets `429 agent_busy`
+  (or `WIZARD_AGENT_MAX_BUDGET_USD`, if smaller), so a long reply stops at the
+  cap; the chat then says the usage limit is reached, without "continue", and
+  `wizard.agent.budget_stops` counts it with `limit=usage_cap`. An idle live agent
+  started when the caps left more (the user spent in another session since) is
+  ended first and resumed with the smaller budget, once it could pass them by more
+  than about 1 USD (`FIT_BUDGET_MARGIN_USD`), so switching sessions does not
+  restart it each time.
+- A new session past `WIZARD_MAX_SESSIONS_PER_USER` is refused with `429`
+  `session_limit`, claimed in one statement so two at once cannot both get the last place.
+- Once a session or a user has used the warning share of its cap, a line is added
+  to that reply, once, in the session's language; a turn that did not complete
+  leaves it for the next one. The deployment's is logged as a
+  warning. `wizard.usage.cost_usd` and `wizard.usage.warnings` count both.
+- A query whose cost never arrives (the turn timed out, or the agent crashed or
+  was ended mid-reply) is charged an estimate of 1 USD, or what its agent's
+  budget had left if less (`telemetry.UNREPORTED_QUERY_COST_USD`), and counted
+  in `wizard.usage.unreported_queries`.
+- Gauges for the dashboards: `wizard.usage.cap_usd` (by `scope`),
+  `wizard.usage.deployment_spent_usd` (this month) and `wizard.usage.users`
+  (`state` near: past the warning share and below the cap; reached: at it).
+  The "Hackathon live" Grafana view shows the month's
+  spend of its cap and the users near or at theirs.
+- Not counted: the model calls of PoC test runs in the sandbox and of
+  `generate_schema.py`, which the run and metered-call limits bound.
+- The values are read when a message or a session comes in, so a changed variable
+  applies once the process has it (a restart, on Kubernetes and Azure).
+
 **Fallback model.** With `WIZARD_AGENT_FALLBACK_MODEL` set to a model other than
 the agent's own (see Model below), the SDK's `fallback_model` lets the CLI
 switch to it when the agent's model is not found, not permitted, overloaded or

@@ -28,7 +28,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from wizard_api.models import WizardSession
-from wizard_api.schemas.blueprint import BlueprintContent, TargetOutputSpec
+from wizard_api.schemas.blueprint import BlueprintContent, ExtractionProposal, TargetOutputSpec
 from wizard_api.services import blueprint_service
 
 #: Draft blueprint the agent writes at Phase 3, right before Gate 1.
@@ -142,8 +142,11 @@ def _with_ai_steps(metadata: dict[str, Any], ai: frozenset[str]) -> dict[str, An
 
 #: The agent's package and the files it writes there as the phases go by.
 POC_DIR = "poc"
-SCHEMA_FILES = ("schemas/output_schema_requirements.json", "schemas/output_schema.py")
+EXTRACTION_PROMPT_FILE = "prompts/extraction_requirements.md"
+OUTPUT_SCHEMA_PY_FILE = "schemas/output_schema.py"
+SCHEMA_FILES = ("schemas/output_schema_requirements.json", OUTPUT_SCHEMA_PY_FILE)
 PACKAGE_ENTRYPOINT = "run_poc.py"
+_MAX_PROPOSAL_TEXT_BYTES = 64 * 1024
 
 #: UI step that each artifact shows the agent has reached: the artifact closes
 #: a phase, so the session moves to the phase that follows it (#169). Gate steps
@@ -215,6 +218,70 @@ def read_draft_blueprint(output_dir: str) -> dict[str, Any] | None:
     except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def _poc_file_mtime(poc: str, relative: str) -> int | None:
+    # poc_service also imports this module for the package's blueprint.
+    from wizard_api.services import poc_service
+
+    path = os.path.join(poc, relative)
+    if not poc_service.regular_file(path, poc):
+        return None
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return None
+
+
+def _read_poc_text(poc: str, relative: str) -> str:
+    """Read bounded UTF-8 text from a PoC file checked by ``_poc_file_mtime``."""
+    path = os.path.join(poc, relative)
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
+        with os.fdopen(fd, "rb") as fh:
+            data = fh.read(_MAX_PROPOSAL_TEXT_BYTES + 1)
+    except OSError:
+        return ""
+    if len(data) > _MAX_PROPOSAL_TEXT_BYTES:
+        return ""
+    return data.decode("utf-8", errors="replace").strip()
+
+
+def read_extraction_proposal(output_dir: str) -> ExtractionProposal | None:
+    """The Phase 4 extraction rules and whether their schema has been generated (#251).
+
+    Returns ``None`` when neither ``extraction_requirements.md`` nor any schema
+    file has been written yet.
+    """
+    if not output_dir:
+        return None
+    poc = artifact_path(output_dir, POC_DIR)
+    if os.path.islink(poc):
+        return None
+    prompt_mtime = _poc_file_mtime(poc, EXTRACTION_PROMPT_FILE)
+    prompt_markdown = (
+        _read_poc_text(poc, EXTRACTION_PROMPT_FILE) if prompt_mtime is not None else ""
+    )
+    schema_files = []
+    for name in SCHEMA_FILES:
+        mtime = _poc_file_mtime(poc, name)
+        if mtime is not None and (
+            not prompt_markdown or prompt_mtime is None or mtime >= prompt_mtime
+        ):
+            schema_files.append(name)
+    schema_generated = bool(schema_files)
+    if not prompt_markdown and not schema_generated:
+        return None
+    return ExtractionProposal(
+        prompt_markdown=prompt_markdown,
+        schema_generated=schema_generated,
+        schema_code=(
+            _read_poc_text(poc, OUTPUT_SCHEMA_PY_FILE)
+            if OUTPUT_SCHEMA_PY_FILE in schema_files
+            else ""
+        ),
+    )
 
 
 def has_draft_blueprint(output_dir: str) -> bool:
