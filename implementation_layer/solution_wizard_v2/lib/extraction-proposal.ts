@@ -176,7 +176,7 @@ export function extractExample(text: string): { cleaned: string; example?: strin
 /** Replaces raw `null` / `leave_empty` wording in field descriptions with plain words. */
 export function cleanTechnicalWording(text: string, leftEmpty: string): string {
   return text
-    .replace(/\b(?:palauta|aseta|käytä|return|set to|use)\s+`?null`?\b/gi, leftEmpty.toLowerCase())
+    .replace(/\b(?:palauta|aseta|käytä|return|set to|use)\s+(?:`null`|null\b)/gi, leftEmpty.toLowerCase())
     .replace(/`null`/g, `"${leftEmpty.toLowerCase()}"`)
     .replace(/\bleave_empty\b/gi, leftEmpty.toLowerCase())
     .trim();
