@@ -53,7 +53,7 @@ def _transcribe(tmp_path: Path, language: str, duration_ms: int) -> list[dict]:
     requests: list[dict] = []
     with (
         patch(f"{_MODULE}.create_openai_client") as factory,
-        patch(f"{_MODULE}.AudioSegment.from_file", return_value=_Audio(duration_ms)),
+        patch(f"{_MODULE}._decode_audio", return_value=_Audio(duration_ms)),
         patch(f"{_MODULE}.time.sleep"),
     ):
         factory.return_value.audio.transcriptions.create.side_effect = _fake_client(requests)
@@ -61,11 +61,15 @@ def _transcribe(tmp_path: Path, language: str, duration_ms: int) -> list[dict]:
     return requests
 
 
+# One request for a short file; 150 s in chunks of at most 60 s is three requests.
+_REQUESTS = {10_000: 1, 150_000: 3}
+
+
 @pytest.mark.parametrize("duration_ms", [10_000, 150_000], ids=["single", "chunked"])
 def test_language_reaches_every_cloud_request(tmp_path: Path, duration_ms: int):
     requests = _transcribe(tmp_path, "fi", duration_ms)
 
-    assert requests
+    assert len(requests) == _REQUESTS[duration_ms]
     assert [request.get("language") for request in requests] == ["fi"] * len(requests)
 
 
@@ -73,7 +77,7 @@ def test_language_reaches_every_cloud_request(tmp_path: Path, duration_ms: int):
 def test_auto_sends_no_language(tmp_path: Path, duration_ms: int):
     requests = _transcribe(tmp_path, "auto", duration_ms)
 
-    assert requests
+    assert len(requests) == _REQUESTS[duration_ms]
     assert all("language" not in request for request in requests)
 
 
