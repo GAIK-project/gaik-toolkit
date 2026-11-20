@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from gaik.software_components._log_names import file_tag
+from gaik.software_components._log_names import error_text, file_tag
 from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
@@ -212,7 +212,7 @@ class DocumentClassifier:
         except InputLimitError:
             raise
         except Exception as e:
-            logger.error("Error classifying %s: %s", file_tag(file_path), type(e).__name__)
+            logger.error("Error classifying %s: %s", file_tag(file_path), error_text(e, file_path))
             raise ValueError(f"Failed to classify {file_path}: {str(e)}")
 
     def _classify_directory(
@@ -255,7 +255,7 @@ class DocumentClassifier:
                 result = self._classify_single_file(str(file_path), classes, parser_override)
                 results[file_path.name] = result
             except Exception as e:
-                logger.error("Skipping %s: %s", file_tag(file_path), type(e).__name__)
+                logger.error("Skipping %s: %s", file_tag(file_path), error_text(e, file_path))
                 results[file_path.name] = {
                     "class": "unknown",
                     "confidence": 0.0,

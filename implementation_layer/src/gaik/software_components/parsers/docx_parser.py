@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Any
 
-from .._log_names import file_tag
+from .._log_names import error_text, file_tag
 from ..file_type import check_file_type
 from ..input_limits import InputLimits
 
@@ -127,7 +127,7 @@ class DocxParser:
             return text_content.strip()
 
         except Exception as e:
-            logger.error("Error parsing DOCX %s: %s", file_tag(file_path), type(e).__name__)
+            logger.error("Error parsing DOCX %s: %s", file_tag(file_path), error_text(e, file_path))
             raise
 
     def parse_document(self, file_path: str, use_markdown: bool = True) -> dict[str, Any]:

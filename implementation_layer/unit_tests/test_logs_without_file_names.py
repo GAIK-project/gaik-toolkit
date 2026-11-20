@@ -109,3 +109,41 @@ def test_an_empty_sheet_is_logged_without_the_workbook_name(tmp_path, caplog):
     finally:
         con.close()
     _assert_no_name_in_logs(caplog, path)
+
+
+def test_error_text_keeps_the_cause_and_tags_the_path(tmp_path):
+    from gaik.software_components._log_names import error_text, file_tag
+
+    path = tmp_path / "Matti Virtanen" / "Matti_Virtanen_report.pdf"
+    exc = ValueError(f"cannot open '{path}': broken xref table")
+    text = error_text(exc, path)
+    assert text.startswith("ValueError: cannot open")
+    assert "broken xref table" in text
+    assert file_tag(path) in text
+    assert "Matti" not in text and "Virtanen" not in text and str(tmp_path) not in text
+
+
+def test_error_text_tags_a_bare_file_name_in_the_message(tmp_path):
+    from gaik.software_components._log_names import error_text
+
+    path = tmp_path / "Matti_Virtanen_report.docx"
+    text = error_text(KeyError("Matti_Virtanen_report.docx"), path)
+    assert "Matti" not in text and text.startswith("KeyError:")
+
+
+def test_a_set_salt_gives_the_same_tag_in_another_process(tmp_path):
+    import subprocess
+    import sys
+
+    code = (
+        "from gaik.software_components._log_names import file_tag;"
+        "print(file_tag('/data/Matti_Virtanen_report.pdf'))"
+    )
+    env = {**__import__("os").environ, "GAIK_LOG_TAG_SALT": "deployment-salt"}
+    runs = {
+        subprocess.run(
+            [sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True
+        ).stdout
+        for _ in range(2)
+    }
+    assert len(runs) == 1 and next(iter(runs)).startswith("file ")

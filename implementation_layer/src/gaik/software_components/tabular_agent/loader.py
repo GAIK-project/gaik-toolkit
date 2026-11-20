@@ -263,7 +263,7 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
                 [_EURO_DECIMAL],
             ).fetchone()
         except Exception as exc:  # pragma: no cover - defensive
-            logger.debug("Decimal probe failed for a column: %s", type(exc).__name__)
+            logger.debug("Decimal probe failed for column %s: %s", column, type(exc).__name__)
             continue
         if not total or matching != total:
             continue
@@ -274,9 +274,9 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
             )
             converted.append(column)
         except Exception as exc:
-            logger.debug("Could not retype a column as DOUBLE: %s", type(exc).__name__)
+            logger.debug("Could not retype column %s as DOUBLE: %s", column, type(exc).__name__)
     if converted:
-        logger.info("Converted %d comma-decimal column(s)", len(converted))
+        logger.info("Converted comma-decimal column(s): %s", ", ".join(converted))
     return converted
 
 
