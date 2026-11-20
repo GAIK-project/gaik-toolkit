@@ -22,8 +22,12 @@ function cites(list: { ref: string; instrument?: string }[] = []): string {
     .join(", ");
 }
 
+// A table cell: a backslash first, so the one put before "|" is not taken back.
 function cell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\s*\n\s*/g, " ");
 }
 
 /** The screening as a readable Markdown report, from the validated data only. */
