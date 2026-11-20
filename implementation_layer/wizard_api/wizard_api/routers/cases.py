@@ -452,15 +452,13 @@ async def reuse_poc_input(
         safe_name = poc_service.safe_input_name(payload.filename)
     except poc_service.InputRejectedError as exc:
         raise api_error(422, "input_rejected", str(exc)) from exc
-    sample_dir = Path(poc_service.sample_input_dir(poc))
-    candidate = sample_dir / safe_name
-    # A regular file (not a symlink, not reached through one) ...
-    if not poc_service.regular_file(candidate, poc):
+    # Contained in sample_input/ where the path is made (for a reader and for the
+    # code scanner), and a regular file there: not a symlink, not reached through one.
+    sample_root = os.path.normpath(poc_service.sample_input_dir(poc))
+    path = os.path.normpath(os.path.join(sample_root, safe_name))
+    if not path.startswith(sample_root + os.sep) or not poc_service.regular_file(path, poc):
         raise HTTPException(status_code=404, detail="no such PoC test file")
-    # ... that still resolves inside sample_input/; only the resolved path is read.
-    src = candidate.resolve()
-    if not src.is_relative_to(sample_dir.resolve()):
-        raise HTTPException(status_code=404, detail="no such PoC test file")
+    src = Path(path)
     try:
         try:
             if src.stat().st_size > poc_service.MAX_INPUT_BYTES:
