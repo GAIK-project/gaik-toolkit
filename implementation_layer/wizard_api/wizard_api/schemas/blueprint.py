@@ -67,6 +67,15 @@ class AssumptionItem(BaseModel):
     impact: str = ""
 
 
+class ExtractionProposal(BaseModel):
+    """The extraction rules written before schema generation (Phase 4) and
+    whether the field definitions have been generated from them (#251)."""
+
+    prompt_markdown: str = ""
+    schema_generated: bool = False
+    schema_code: str = ""
+
+
 class PendingTurn(BaseModel):
     """A chat turn in progress: what the user sent and when."""
 
@@ -92,6 +101,7 @@ class SessionDetailResponse(BaseModel):
     blueprint: BlueprintContent
     business_context: BusinessContext | None = None
     target_output_spec: TargetOutputSpec | None = None
+    extraction_proposal: ExtractionProposal | None = None
     assumptions: list[AssumptionItem] = Field(default_factory=list)
     messages: list[dict]
     #: The message the wizard is answering right now, if any. It is not in

@@ -289,6 +289,10 @@ export function ChatPanel({
   errorLabels,
   questionLabels,
   hideChatLabel,
+  widenChatLabel,
+  narrowChatLabel,
+  chatExpanded = false,
+  onToggleExpand,
   onCollapse,
   focusSignal = 0,
   reference = null,
@@ -328,6 +332,11 @@ export function ChatPanel({
   questionLabels?: ChatQuestionLabels;
   /** Label of the button in the header that collapses the chat to its rail. */
   hideChatLabel: string;
+  /** Desktop header toggle to widen/narrow the docked chat (#251). */
+  widenChatLabel?: string;
+  narrowChatLabel?: string;
+  chatExpanded?: boolean;
+  onToggleExpand?: () => void;
   onCollapse: () => void;
   /** Bumped by the dock to move focus into the message field. */
   focusSignal?: number;
@@ -1109,19 +1118,34 @@ export function ChatPanel({
               {aiNotice}
             </p>
           </div>
-          <button
-            type="button"
-            data-testid="chat-dock-toggle"
-            onClick={onCollapse}
-            aria-expanded
-            aria-controls={id}
-            aria-label={hideChatLabel}
-            title={hideChatLabel}
-            className="icon-btn"
-          >
-            <Icon name="panelRightClose" size={18} className="max-md:hidden" />
-            <Icon name="chevronDown" size={18} className="md:hidden" />
-          </button>
+          <div className="flex shrink-0 items-center gap-0.5">
+            {onToggleExpand && widenChatLabel && narrowChatLabel && (
+              <button
+                type="button"
+                data-testid="chat-width-toggle"
+                onClick={onToggleExpand}
+                aria-pressed={chatExpanded}
+                aria-label={chatExpanded ? narrowChatLabel : widenChatLabel}
+                title={chatExpanded ? narrowChatLabel : widenChatLabel}
+                className="icon-btn hidden xl:inline-flex"
+              >
+                <Icon name={chatExpanded ? "minimize2" : "maximize2"} size={16} />
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="chat-dock-toggle"
+              onClick={onCollapse}
+              aria-expanded
+              aria-controls={id}
+              aria-label={hideChatLabel}
+              title={hideChatLabel}
+              className="icon-btn"
+            >
+              <Icon name="panelRightClose" size={18} className="max-md:hidden" />
+              <Icon name="chevronDown" size={18} className="md:hidden" />
+            </button>
+          </div>
         </div>
       )}
 

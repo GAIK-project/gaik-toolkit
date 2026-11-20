@@ -2247,3 +2247,100 @@ def test_a_case_input_named_like_a_package_document_is_refused_before_the_run(
     assert started == []
     assert client.get(f"/sessions/{sid}/cases/{case['id']}").json()["status"] == "draft"
     assert zipped.status_code == 409
+
+
+@requires_postgres
+def test_cases_model_lists_compatible_reusable_poc_inputs_and_from_poc_copies_explicitly(
+    client, db_session
+):
+    sid = _session_with_package(client, db_session)
+    out = session_service.get_session(db_session, uuid.UUID(sid)).output_dir
+    sample_dir = Path(out) / "poc" / "sample_input"
+    # Replace the dummy placeholder with a valid WAV and add an incompatible JSON file.
+    buf = io.BytesIO()
+    import wave
+
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(8000)
+        w.writeframes(b"\x00\x00" * 40)
+    wav_bytes = buf.getvalue()
+    (sample_dir / "developer.wav").write_bytes(wav_bytes)
+    (sample_dir / "placeholder.json").write_text('{"note": "not audio"}', encoding="utf-8")
+
+    # Restrict contract to audio so placeholder.json is excluded from reusable suggestions.
+    draft_path = Path(out) / artifact_sync.DRAFT_BLUEPRINT_FILE
+    draft = json.loads(draft_path.read_text(encoding="utf-8"))
+    draft.setdefault("technical_spec", {})["input_types"] = ["audio"]
+    draft_path.write_text(json.dumps(draft), encoding="utf-8")
+
+    model = client.get(f"/sessions/{sid}/cases/model")
+    assert model.status_code == 200
+    reusable = model.json()["reusable_poc_inputs"]
+    assert [item["name"] for item in reusable] == ["developer.wav"]
+
+    case = client.post(f"/sessions/{sid}/cases").json()
+    reused = client.post(
+        f"/sessions/{sid}/cases/{case['id']}/inputs/from-poc",
+        json={"filename": "developer.wav", "task": "T_report"},
+    )
+    assert reused.status_code == 201, reused.text
+    assert reused.json()["name"] == "developer.wav"
+    assert reused.json()["bytes"] == len(wav_bytes)
+
+    # Incompatible -> 415, duplicate -> 409, missing -> 404.
+    incompatible = client.post(
+        f"/sessions/{sid}/cases/{case['id']}/inputs/from-poc",
+        json={"filename": "placeholder.json", "task": "T_report"},
+    )
+    assert incompatible.status_code == 415
+    duplicate = client.post(
+        f"/sessions/{sid}/cases/{case['id']}/inputs/from-poc",
+        json={"filename": "developer.wav", "task": "T_report"},
+    )
+    assert duplicate.status_code == 409
+    missing = client.post(
+        f"/sessions/{sid}/cases/{case['id']}/inputs/from-poc",
+        json={"filename": "missing.wav", "task": "T_report"},
+    )
+    assert missing.status_code == 404
+
+
+@requires_postgres
+def test_from_poc_rejects_a_step_with_no_types_in_the_session_contract(
+    client, db_session, monkeypatch
+):
+    sid = _session_with_package(client, db_session)
+    _diagram(monkeypatch, BPMN)
+    out = Path(session_service.get_session(db_session, uuid.UUID(sid)).output_dir)
+    (out / artifact_sync.DRAFT_BLUEPRINT_FILE).write_text(
+        json.dumps({"technical_spec": {"input_types": ["txt"]}}), encoding="utf-8"
+    )
+    (out / "poc" / "sample_input" / "report.txt").write_text("Fault report", encoding="utf-8")
+    case = client.post(f"/sessions/{sid}/cases").json()
+    url = f"/sessions/{sid}/cases/{case['id']}"
+
+    result = client.post(f"{url}/inputs/from-poc", json={"filename": "report.txt", "task": "T_rec"})
+
+    assert result.status_code == 415, result.text
+    assert result.json()["detail"]["error"] == "input_type_not_accepted"
+    assert client.get(url).json()["inputs"] == []
+
+
+@requires_postgres
+def test_from_poc_refuses_names_that_leave_the_input_directory(client, db_session):
+    sid = _session_with_package(client, db_session)
+    case = client.post(f"/sessions/{sid}/cases").json()
+    for name in ("../run_poc.py", "/etc/passwd", "..\\run_poc.py"):
+        res = client.post(
+            f"/sessions/{sid}/cases/{case['id']}/inputs/from-poc",
+            json={"filename": name, "task": "T_report"},
+        )
+        assert res.status_code == 422, (name, res.text)
+    # The plain name of a package file outside sample_input/ is not found there.
+    res = client.post(
+        f"/sessions/{sid}/cases/{case['id']}/inputs/from-poc",
+        json={"filename": "run_poc.py", "task": "T_report"},
+    )
+    assert res.status_code == 404

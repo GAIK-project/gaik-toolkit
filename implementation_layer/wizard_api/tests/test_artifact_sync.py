@@ -458,3 +458,58 @@ def test_a_session_file_is_readable_by_the_api_user_only(tmp_path) -> None:
         fh.write("{}")
 
     assert (tmp_path / "probe.json").stat().st_mode & 0o077 == 0
+
+
+def test_read_extraction_proposal_reads_prompt_and_generated_schema(tmp_path) -> None:
+    assert artifact_sync.read_extraction_proposal(str(tmp_path)) is None
+
+    poc = tmp_path / "poc"
+    (poc / "prompts").mkdir(parents=True)
+    prompt = poc / "prompts" / "extraction_requirements.md"
+    prompt.write_text("# Poimintaohje\n\n- Kohde (location): halli tai laite\n", encoding="utf-8")
+
+    proposal = artifact_sync.read_extraction_proposal(str(tmp_path))
+    assert proposal is not None
+    assert "Kohde (location)" in proposal.prompt_markdown
+    assert proposal.schema_generated is False
+    assert proposal.schema_code == ""
+
+    (poc / "schemas").mkdir(parents=True)
+    schema_py = poc / "schemas" / "output_schema.py"
+    schema_py.write_text("class Ticket:\n    location: str\n", encoding="utf-8")
+    generated = artifact_sync.read_extraction_proposal(str(tmp_path))
+    assert generated is not None
+    assert generated.schema_generated is True
+    assert "class Ticket" in (generated.schema_code or "")
+
+    prompt.write_text("# Updated extraction rules", encoding="utf-8")
+    updated = schema_py.stat().st_mtime_ns + 1_000_000_000
+    os.utime(prompt, ns=(updated, updated))
+    revised = artifact_sync.read_extraction_proposal(str(tmp_path))
+    assert revised is not None
+    assert revised.prompt_markdown == "# Updated extraction rules"
+    assert revised.schema_generated is False
+    assert revised.schema_code == ""
+
+    os.utime(schema_py, ns=(updated, updated))
+    regenerated = artifact_sync.read_extraction_proposal(str(tmp_path))
+    assert regenerated is not None
+    assert regenerated.schema_generated is True
+    assert "class Ticket" in regenerated.schema_code
+
+
+def test_read_extraction_proposal_ignores_symlinks_outside_poc(tmp_path) -> None:
+    outside = tmp_path / "secret.txt"
+    outside.write_text("do not read", encoding="utf-8")
+    prompts_dir = tmp_path / "session" / "poc" / "prompts"
+    prompts_dir.mkdir(parents=True)
+    link = prompts_dir / "extraction_requirements.md"
+    schemas_dir = prompts_dir.parent / "schemas"
+    schemas_dir.mkdir()
+    try:
+        os.symlink(outside, link)
+        os.symlink(outside, schemas_dir / "output_schema.py")
+    except OSError:
+        pytest.skip("symlinks unavailable in this environment")
+
+    assert artifact_sync.read_extraction_proposal(str(tmp_path / "session")) is None

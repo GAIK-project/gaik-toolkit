@@ -38,6 +38,8 @@ export type CaseModel = {
   package_problems: string[];
   /** The file types an input upload accepts (absent from an older api). */
   accepted_inputs?: { kind?: string; label: string; extensions: string[] }[];
+  /** Compatible PoC test files the user can explicitly reuse when trying the solution (#253). */
+  reusable_poc_inputs?: { name: string; bytes: number; uploaded?: boolean }[];
 };
 
 export type CaseStatus =
@@ -360,6 +362,39 @@ export const isAudioInput = (name: string | null) => {
   const words = (name ?? "").replace(/(\p{Ll})(\p{Lu})/gu, "$1 $2");
   return /(?<!\p{L})(?:audio|voice|recording|ääni|puhe(?!lin|lu|en))/iu.test(words);
 };
+
+const AUDIO_FILE_EXT = /\.(wav|mp3|m4a|ogg|webm)$/i;
+
+/**
+ * Filters compatible PoC test files for the active case input step (#253):
+ * - Excludes filenames already attached anywhere in the case (case storage rejects duplicates case-wide).
+ * - When the step explicitly asks for audio only, offers audio files only.
+ * - When the step asks for non-audio material in a multi-step flow where another step takes audio,
+ *   excludes audio files so a PDF and a recording stay matched to their respective steps.
+ */
+export function reusablePocInputsForTask(
+  reusable: CaseModel["reusable_poc_inputs"],
+  task: ProcessNode,
+  inputTasks: ProcessNode[],
+  caseInputs: Case["inputs"],
+): NonNullable<CaseModel["reusable_poc_inputs"]> {
+  if (!reusable?.length) return [];
+  const existing = new Set(caseInputs.map((f) => f.name.toLowerCase()));
+  const outputs = task.outputs.filter((o): o is string => Boolean(o));
+  const audioOnlyStep = outputs.length > 0 && outputs.every((o) => isAudioInput(o));
+  const nonAudioStepWithAudioSibling =
+    outputs.length > 0 &&
+    !outputs.some((o) => isAudioInput(o)) &&
+    inputTasks.some((other) => other.id !== task.id && other.outputs.some((o) => isAudioInput(o)));
+
+  return reusable.filter((file) => {
+    if (existing.has(file.name.toLowerCase())) return false;
+    const isAudioFile = AUDIO_FILE_EXT.test(file.name);
+    if (audioOnlyStep) return isAudioFile;
+    if (nonAudioStepWithAudioSibling) return !isAudioFile;
+    return true;
+  });
+}
 
 // -- a document result (a generated report) --------------------------------------
 

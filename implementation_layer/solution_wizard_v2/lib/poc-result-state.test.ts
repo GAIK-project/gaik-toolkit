@@ -10,6 +10,7 @@ import {
   publishRunWarnings,
   resultIsStale,
   resultStaleFor,
+  runNeedsReview,
   runWarnings,
   runWarningsFor,
   subscribeResultStale,
@@ -244,5 +245,14 @@ describe("the stale word between the PoC tab and the approve buttons", () => {
     expect(packageReadFor("s1")).toBe(false);
     expect(listener).toHaveBeenCalledTimes(2);
     stop();
+  });
+});
+
+describe("runNeedsReview", () => {
+  it("flags runs with warnings or a failed grounding check as needing review (#252)", () => {
+    expect(runNeedsReview([], { passed: true })).toBe(false);
+    expect(runNeedsReview([], null)).toBe(false);
+    expect(runNeedsReview([], { passed: false })).toBe(true);
+    expect(runNeedsReview([{ code: "empty", message: "Empty answer", records: [1] }], { passed: true })).toBe(true);
   });
 });

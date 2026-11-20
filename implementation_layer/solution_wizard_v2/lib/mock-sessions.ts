@@ -15,6 +15,7 @@ import {
 } from "./wizard-state-machine";
 import { REQUIREMENT_POINTS, openingQuestion } from "./requirements-model";
 import type { TargetOutputSpec } from "./target-output-spec";
+import type { ExtractionProposal } from "./extraction-proposal";
 import { envExampleKeyValues } from "./env-file";
 import {
   ENV_EXAMPLE_NAME,
@@ -130,6 +131,8 @@ export type WizardSession = {
   businessContext?: BusinessContext | null;
   /** Agreed output fields from the agent's draft blueprint (#141). */
   targetOutputSpec?: TargetOutputSpec | null;
+  /** Extraction rules proposal (Phase 4) and generated schema code (#251). */
+  extractionProposal?: ExtractionProposal | null;
   // Open assumptions the agent recorded into the draft blueprint (Gate 1).
   assumptions?: Assumption[];
   /** The sandbox run wizard_api recorded as successful (#143); the deployable

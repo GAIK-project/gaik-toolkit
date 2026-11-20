@@ -192,7 +192,7 @@ test.describe("Gate 3 and a package changed after the test run", () => {
     await page.reload();
     await expect(page.getByTestId("gate-stale-result")).toHaveCount(0);
     await expect(approve(page)).toBeEnabled();
-    await expect(nowLine).toContainText("valitse sitten alareunasta Hyväksy testiajo tai Pyydä muutoksia.");
+    await expect(nowLine).toContainText("valitse sitten Hyväksy testiajo tai Pyydä muutoksia.");
     await expect(nowLine.getByRole("button", { name: "Näytä hyväksyntä sivulla" })).toBeVisible();
   });
 

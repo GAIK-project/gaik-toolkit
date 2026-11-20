@@ -10,7 +10,9 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +65,11 @@ class ReviewRequest(BaseModel):
     comment: str = Field(default="", max_length=2000)
     record: dict[str, Any] | list[dict[str, Any]] | None = None
     return_to: str | None = Field(default=None, max_length=200)
+
+
+class ReusePocInputRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    task: str | None = Field(default=None, max_length=200)
 
 
 def _session(db: Session, session_id: uuid.UUID):
@@ -157,6 +164,106 @@ def _state_error(exc: Exception) -> HTTPException:
     return api_error(409, "case_state", str(exc))
 
 
+_AUDIO_OUTPUT_RE = re.compile(
+    r"(?:^|[^a-zA-ZåäöÅÄÖ])(?:audio|voice|recording|ääni|puhe(?!lin|lu|en))",
+    re.IGNORECASE,
+)
+
+
+def _is_audio_output(name: str | None) -> bool:
+    if not name:
+        return False
+    spaced = re.sub(r"([a-zåäö])([A-ZÅÄÖ])", r"\1 \2", name)
+    return bool(_AUDIO_OUTPUT_RE.search(spaced))
+
+
+def _task_contract_kinds(
+    process: dict[str, Any] | None,
+    task_id: str | None,
+    base_kinds: frozenset[str],
+) -> frozenset[str]:
+    """Narrow reusable kinds to the target BPMN input task when steps split audio and documents."""
+    if not process or not task_id:
+        return base_kinds
+    nodes = [n for n in (process.get("nodes") or []) if isinstance(n, dict)]
+    target = next((n for n in nodes if n.get("id") == task_id), None)
+    if not target:
+        return base_kinds
+    outputs = [o for o in (target.get("outputs") or []) if isinstance(o, str) and o]
+    if not outputs:
+        return base_kinds
+    if all(_is_audio_output(o) for o in outputs):
+        # Never wider than the session's contract: an empty set refuses the file (415).
+        return base_kinds & input_content.AUDIO_KINDS
+    other_human_audio = any(
+        n.get("id") != task_id
+        and n.get("kind") in ("userTask", "manualTask")
+        and any(_is_audio_output(o) for o in (n.get("outputs") or []) if isinstance(o, str))
+        for n in nodes
+    )
+    if not any(_is_audio_output(o) for o in outputs) and other_human_audio:
+        return base_kinds - input_content.AUDIO_KINDS
+    return base_kinds
+
+
+@lru_cache(maxsize=256)
+def _sample_matches_contract(
+    path: Path, _file_version: tuple[int, ...], kinds: frozenset[str]
+) -> bool:
+    """Cache only the listing decision. Reuse always validates the current bytes."""
+    with path.open("rb") as source:
+        data = source.read(poc_service.MAX_INPUT_BYTES + 1)
+    if len(data) > poc_service.MAX_INPUT_BYTES:
+        return False
+    try:
+        input_content.check(path.name, data, kinds)
+    except poc_service.InputRejectedError:
+        return False
+    return True
+
+
+def _reusable_poc_inputs(
+    poc_dir: str,
+    draft: dict[str, Any],
+    latest_run_inputs: Any,
+) -> list[dict[str, Any]]:
+    """Compatible PoC test files the user can explicitly reuse in a case (#253)."""
+    if not os.path.isdir(poc_dir):
+        return []
+    kinds = input_content.contract_kinds(draft)
+    sample_dir = poc_service.sample_input_dir(poc_dir)
+    ran_names = (
+        {name for name in latest_run_inputs if isinstance(name, str)}
+        if isinstance(latest_run_inputs, list)
+        else set()
+    )
+    compatible: list[tuple[tuple[int, int, str], dict[str, Any]]] = []
+    for entry in poc_service.list_sample_inputs(poc_dir):
+        name = entry.get("name")
+        size = entry.get("bytes")
+        if not isinstance(name, str) or not isinstance(size, int):
+            continue
+        if size <= 0 or size > poc_service.MAX_INPUT_BYTES:
+            continue
+        path = Path(sample_dir) / name
+        if not poc_service.regular_file(path, poc_dir):
+            continue
+        try:
+            stat = path.stat()
+            version = (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+            if not 0 < stat.st_size <= poc_service.MAX_INPUT_BYTES or not _sample_matches_contract(
+                path, version, kinds
+            ):
+                continue
+        except OSError:
+            continue
+        uploaded = bool(entry.get("uploaded"))
+        rank = (0 if name in ran_names else 1, 0 if uploaded else 1, name.lower())
+        compatible.append((rank, {"name": name, "bytes": stat.st_size, "uploaded": uploaded}))
+    compatible.sort(key=lambda item: item[0])
+    return [item[1] for item in compatible]
+
+
 @router.get("/{session_id}/cases/model")
 def case_model(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     """What the case UI is built from: the process (BPMN) and the output fields."""
@@ -185,6 +292,7 @@ def case_model(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     problems = poc_service.package_problems(poc) if os.path.isdir(poc) else ["no PoC package"]
     draft = _draft(session.output_dir)
     title = (draft.get("use_case") or {}).get("name") or spec.get("schema_name", "")
+    latest_run_inputs = (session.session_metadata or {}).get("latest_run_inputs")
     return {
         "title": title,
         "spec": spec,
@@ -192,6 +300,8 @@ def case_model(session_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
         # The types an input upload accepts, so the form can say so before a
         # file is picked: the same set upload_case_input checks against.
         "accepted_inputs": input_content.accepted(input_content.allowed_kinds(draft)),
+        # Compatible PoC test files the user may explicitly choose to reuse (#253).
+        "reusable_poc_inputs": _reusable_poc_inputs(poc, draft, latest_run_inputs),
         # The reviewer, decided here and nowhere else (#296).
         "reviewer": case_service.reviewer_task(process),
         "package_ready": not problems,
@@ -344,6 +454,79 @@ async def upload_case_input(
     except case_service.CaseStateError as exc:
         raise _state_error(exc) from exc
     return {"name": name, "bytes": len(data), "task": task}
+
+
+@router.post("/{session_id}/cases/{case_id}/inputs/from-poc", status_code=201)
+async def reuse_poc_input(
+    session_id: uuid.UUID,
+    case_id: str,
+    payload: ReusePocInputRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Copy a compatible PoC test file into a case when explicitly chosen by the user (#253)."""
+    session = _session(db, session_id)
+    _case(session.output_dir, case_id)
+    poc = os.path.join(session.output_dir, "poc")
+    try:
+        safe_name = poc_service.safe_input_name(payload.filename)
+    except poc_service.InputRejectedError as exc:
+        raise api_error(422, "input_rejected", str(exc)) from exc
+    # Contained in sample_input/ where the path is made (for a reader and for the
+    # code scanner), and a regular file there: not a symlink, not reached through one.
+    sample_root = os.path.normpath(poc_service.sample_input_dir(poc))
+    path = os.path.normpath(os.path.join(sample_root, safe_name))
+    if not path.startswith(sample_root + os.sep) or not poc_service.regular_file(path, poc):
+        raise HTTPException(status_code=404, detail="no such PoC test file")
+    src = Path(path)
+    try:
+        try:
+            if src.stat().st_size > poc_service.MAX_INPUT_BYTES:
+                raise poc_service.InputTooLargeError(
+                    f"the file is larger than {poc_service.MAX_INPUT_BYTES // (1024 * 1024)} MB"
+                )
+            data = await asyncio.to_thread(src.read_bytes)
+        except OSError as exc:
+            # Removed or replaced between the check and the read.
+            raise HTTPException(status_code=404, detail="no such PoC test file") from exc
+        draft = _draft(session.output_dir)
+        allowed = input_content.contract_kinds(draft)
+        if payload.task:
+            xml = _bpmn(db, session, session_id)
+            if xml:
+                try:
+                    process = case_service.process_from_bpmn(xml)
+                except case_service.BpmnParseError:
+                    process = None
+                allowed = _task_contract_kinds(process, payload.task, allowed)
+        if not allowed:
+            raise input_content.UnsupportedInputError(
+                "the session's input contract has no file types for this step"
+            )
+        await asyncio.to_thread(input_content.check, safe_name, data, allowed)
+        await malware_scan.check_upload(data)
+        name = await asyncio.to_thread(
+            case_service.save_input,
+            session.output_dir,
+            case_id,
+            safe_name,
+            data,
+            task=payload.task,
+        )
+    except case_service.InputExistsError as exc:
+        raise api_error(409, "input_exists", str(exc)) from exc
+    except poc_service.InputTooLargeError as exc:
+        raise api_error(413, "input_too_large", str(exc)) from exc
+    except input_content.UnsupportedInputError as exc:
+        raise api_error(415, "input_type_not_accepted", str(exc)) from exc
+    except (malware_scan.UnsafeInputError, input_content.UnsafeContentError) as exc:
+        raise api_error(422, "input_unsafe", str(exc)) from exc
+    except malware_scan.ScannerUnavailableError as exc:
+        raise api_error(503, "scanner_unavailable", malware_scan.UNAVAILABLE_MESSAGE) from exc
+    except poc_service.InputRejectedError as exc:
+        raise api_error(422, "input_rejected", str(exc)) from exc
+    except case_service.CaseStateError as exc:
+        raise _state_error(exc) from exc
+    return {"name": name, "bytes": len(data), "task": payload.task}
 
 
 @router.get("/{session_id}/cases/{case_id}/inputs/{filename}")

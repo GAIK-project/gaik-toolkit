@@ -395,16 +395,18 @@ test.describe("PoC tab", () => {
     expect(fake.runs).toBe(0);
   });
 
-  test("without test material the step says what the run waits for", async ({ page }) => {
+  test("without test material the step makes adding a file primary and explains auto-run (#252)", async ({ page }) => {
     await fakePoc(page, { inputs: false });
     await openCheckedPoc(page);
 
+    await expect(page.getByTestId("poc-input-upload-label")).toHaveClass(/\bbtn-brand\b/);
+    await expect(page.getByTestId("poc-run-sandbox")).toHaveClass(/\bbtn-secondary\b/);
     await expect(page.getByTestId("poc-auto-run")).toHaveText(
-      "Lisää testiaineisto, niin testiajo käynnistyy itsestään.",
+      "Lisää testitiedosto, niin ensimmäinen testiajo käynnistyy automaattisesti.",
     );
   });
 
-  test("with only the wizard's example the material step is not ticked, and the run step says both ways on", async ({
+  test("with only the wizard's example the material step is not ticked, and the run step names the ready file (#252)", async ({
     page,
   }) => {
     const fake = await fakePoc(page, { inputs: false });
@@ -416,11 +418,69 @@ test.describe("PoC tab", () => {
 
     await expect(page.getByTestId("poc-input-example")).toBeVisible();
     await expect(page.getByTestId("poc-inputs").locator("[data-mark]")).toHaveAttribute("data-mark", "number");
+    await expect(page.getByTestId("poc-input-upload-label")).toHaveClass(/\bbtn-brand\b/);
+    await expect(page.getByTestId("poc-run-sandbox")).toHaveClass(/\bbtn-secondary\b/);
     await expect(page.getByTestId("poc-auto-run")).toHaveText(
-      "Lisää oma testiaineisto, niin testiajo käynnistyy itsestään, tai aja testi wizardin esimerkillä.",
+      "Valmis esimerkkitiedosto: example_invoice.pdf. Ajo ei käynnisty sillä itsestään — lisää oma testitiedosto automaattista ajoa varten tai paina Aja testi.",
     );
     await page.waitForTimeout(1_000);
     expect(fake.runs).toBe(0);
+  });
+
+  test("an audio run shows live plain-language progress, keeps technical log closed, and avoids red false positives (#252)", async ({
+    page,
+  }) => {
+    await fakePoc(page, { inputs: false });
+    let releaseRun!: () => void;
+    const holdRun = new Promise<void>((resolve) => {
+      releaseRun = resolve;
+    });
+    await page.route(`${API}/runs/run-1/stream`, async (route) => {
+      await holdRun;
+      return route.fulfill({
+        contentType: "text/event-stream",
+        body: sse([
+          { log: "Transcribing audio with Whisper..." },
+          { log: "Fixing transcription errors with TranscriptEnhancer..." },
+          { log: "Extracting structured fields..." },
+          { done: true, phase: "succeeded" },
+        ]),
+      });
+    });
+    await page.route(`${API}/runs/run-1/output`, (route) =>
+      route.fulfill({
+        json: {
+          runId: "run-1",
+          record: RECORDS[0],
+          validation: {
+            passed: false,
+            hallucination_flags: [{ field: "supplier", value: "Lyreco", severity: "high", reason: "Not in transcript" }],
+          },
+          files: [],
+        },
+      }),
+    );
+    await openCheckedPoc(page);
+    await page.getByTestId("poc-run-sandbox").click();
+
+    // While running: plain-language progress is visible and the technical log stays collapsed.
+    const progress = page.getByTestId("poc-run-progress");
+    await expect(progress).toBeVisible();
+    await expect(progress.getByRole("status")).toBeVisible();
+    await expect(page.getByTestId("poc-run-log")).toHaveCount(0);
+
+    // Let the audio run finish.
+    releaseRun();
+    await expect(page.getByTestId("poc-run-output")).toBeVisible({ timeout: 20_000 });
+    // Completed run with grounding failure shows amber needs-review instead of green success.
+    await expect(page.getByTestId("poc-run-phase")).toHaveText("Ajo päättyi, tarkista tulos");
+    // Technical log stays collapsed on completion and TranscriptEnhancer line does not use the error colour.
+    const logDetails = page.getByTestId("poc-run-log");
+    await expect(logDetails).not.toHaveAttribute("open", "");
+    await logDetails.locator("summary").click();
+    const enhancerLine = logDetails.getByText("Fixing transcription errors with TranscriptEnhancer...");
+    await expect(enhancerLine).toBeVisible();
+    await expect(enhancerLine).not.toHaveClass(/\btext-term-err\b/);
   });
 
   test("a file added or removed after the run: the result says it is of other material and offers the run again", async ({

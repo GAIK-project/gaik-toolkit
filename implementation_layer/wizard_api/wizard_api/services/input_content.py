@@ -160,10 +160,9 @@ def _words(value: Any) -> list[Any]:
     return []
 
 
-def allowed_kinds(draft: dict[str, Any] | None) -> frozenset[str]:
-    """The kinds the session's input contract asks for, plus JSON (all, when it names none)."""
+def _wanted_kinds(draft: dict[str, Any] | None) -> set[str]:
     if not isinstance(draft, dict):
-        return ALL_KINDS
+        return set()
     wanted: set[str] = set()
     artifacts = draft.get("artifacts")
     if isinstance(artifacts, dict):
@@ -175,6 +174,23 @@ def allowed_kinds(draft: dict[str, Any] | None) -> frozenset[str]:
         for key in ("input_types", "input_formats"):
             for word in _words(tech.get(key)):
                 wanted |= _kinds_for_word(word)
+    return wanted
+
+
+def contract_kinds(draft: dict[str, Any] | None) -> frozenset[str]:
+    """The kinds the session's input contract explicitly asks for (all, when it names none).
+
+    Unlike ``allowed_kinds``, this does not silently add JSON to an audio or
+    document contract — used to check whether a PoC test file is compatible
+    with a new case (#253).
+    """
+    wanted = _wanted_kinds(draft)
+    return frozenset(wanted) if wanted else ALL_KINDS
+
+
+def allowed_kinds(draft: dict[str, Any] | None) -> frozenset[str]:
+    """The kinds the session's input contract asks for, plus JSON (all, when it names none)."""
+    wanted = _wanted_kinds(draft)
     if not wanted:
         return ALL_KINDS
     # JSON is how a package takes its settings next to the inputs the contract
