@@ -324,6 +324,8 @@ export type Dict = {
   languageLabel: string;
   /** The first message could not start a session; it stays in the field. */
   startFailed: string;
+  /** The account has started as many sessions as it may (429 session_limit). */
+  sessionLimit: string;
   sessionNotFound: string;
   done: string;
   step: string;
@@ -865,6 +867,10 @@ export type Dict = {
     agentBusy: string;
     rateLimited: string;
     turnLimit: string;
+    /** A usage cap is reached (402 usage_cap): this session's, the account's or the month's. */
+    usageSession: string;
+    usageUser: string;
+    usageDeployment: string;
   };
 
   phases: string[];
@@ -1135,6 +1141,8 @@ const fi: Dict = {
   accountLabel: "Käyttäjä",
   languageLabel: "Kieli",
   startFailed: "Session aloitus ei onnistunut. Yritä uudelleen.",
+  sessionLimit:
+    "Tunnuksellasi on jo niin monta sessiota kuin se sallii. Jatka jossakin niistä tai poista sessio, jota et enää tarvitse.",
   sessionNotFound: "Sessiota ei löytynyt.",
   done: "Valmis",
   step: "Vaihe",
@@ -1706,6 +1714,10 @@ const fi: Dict = {
     rateLimited: "Lähetät viestejä nopeammin kuin wizard sallii. Odota hetki ja lähetä uudelleen.",
     turnLimit:
       "Wizard pysähtyi, koska yhden viestin askelraja tuli täyteen. Kirjoita esim. ”jatka”, niin se jatkaa.",
+    usageSession:
+      "Tämän session käyttöraja on täynnä. Työ on tallessa: voit yhä lukea sen ja ladata paketin. Jatka uudessa sessiossa.",
+    usageUser: "Tunnuksesi käyttöraja on täynnä. Pyydä uusi tunnus ylläpitäjältä.",
+    usageDeployment: "Wizardin tämän kuun käyttöraja on täynnä. Ota yhteys ylläpitäjään.",
   },
 
   phases: [
@@ -2000,6 +2012,8 @@ const en: Dict = {
   accountLabel: "Account",
   languageLabel: "Language",
   startFailed: "The session could not be started. Try again.",
+  sessionLimit:
+    "Your account has as many sessions as it allows. Continue in one of them, or remove one you no longer need.",
   sessionNotFound: "Session not found.",
   done: "Done",
   step: "Step",
@@ -2569,6 +2583,10 @@ const en: Dict = {
     rateLimited: "You are sending messages faster than the wizard allows. Wait a moment and resend.",
     turnLimit:
       "The wizard stopped after the most steps one message may take. Send “continue” to let it go on.",
+    usageSession:
+      "This session has reached its usage limit. Its work is kept: you can still read it and download the package. Continue in a new session.",
+    usageUser: "Your account has reached its usage limit. Ask the administrator for a new account.",
+    usageDeployment: "The wizard has reached its usage limit for this month. Contact the administrator.",
   },
 
   phases: [

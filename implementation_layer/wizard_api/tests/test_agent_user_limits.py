@@ -43,7 +43,9 @@ def agents(monkeypatch):
     monkeypatch.setattr(agent_service, "_STARTING", {})
     monkeypatch.setattr(agent_service, "_SDK_AVAILABLE", True)
 
-    async def fake_start(session_id, output_dir, locale, resume_id, transcript, user_id):
+    async def fake_start(
+        session_id, output_dir, locale, resume_id, transcript, user_id, budget_usd=None
+    ):
         sessions[session_id] = _agent(user_id)
         return sessions[session_id]
 

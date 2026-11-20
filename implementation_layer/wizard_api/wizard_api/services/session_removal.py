@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from wizard_api.config import get_session_output_root
 from wizard_api.models import WizardSession
-from wizard_api.services import agent_service, sandbox_runner
+from wizard_api.services import agent_service, sandbox_runner, usage_caps
 
 logger = logging.getLogger(__name__)
 
@@ -98,4 +98,6 @@ def remove(db: Session, session: WizardSession) -> None:
     if folder.exists():
         shutil.rmtree(folder)
     db.delete(session)
+    # Its place under WIZARD_MAX_SESSIONS_PER_USER goes back with it; its spend stays.
+    usage_caps.release_session(db, session.user_id, commit=False)
     db.commit()

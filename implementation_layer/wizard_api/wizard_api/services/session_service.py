@@ -14,7 +14,7 @@ from wizard_api.schemas.blueprint import (
     SessionDetailResponse,
 )
 from wizard_api.schemas.session import SessionCreate, SessionUpdate
-from wizard_api.services import agent_service, artifact_sync, blueprint_service
+from wizard_api.services import agent_service, artifact_sync, blueprint_service, usage_caps
 from wizard_api.session_state import (
     GATE_KEY_TO_STEP,
     GATE_KEYS,
@@ -51,6 +51,10 @@ SERVER_OWNED_METADATA_KEYS = frozenset(
         "approved_content",
         "user_edits",
         "agent_seen_edit",
+        # The session's spend and its warning (services/usage_caps.py): a caller
+        # that could set them could lift its own cap.
+        "usage_cost_usd",
+        "usage_warned",
     }
 )
 
@@ -348,6 +352,8 @@ def move_owner(db: Session, legacy_user_id: str, owner: str) -> int:
         .values(user_id=owner, updated_at=WizardSession.updated_at)
         .execution_options(synchronize_session=False)
     )
+    # The usage caps' spend and session count go with the sessions.
+    usage_caps.move_user(db, legacy_user_id, owner)
     db.commit()
     return result.rowcount or 0
 
@@ -558,6 +564,28 @@ def append_messages(
     metadata["messages"] = messages
     session.session_metadata = metadata
     session.updated_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(session)
+    return session
+
+
+def append_to_last_reply(db: Session, session: WizardSession, text: str) -> WizardSession:
+    """Add ``text`` as a paragraph of its own to the latest stored reply.
+
+    For a line the server adds after the reply was stored (a usage notice), so a
+    reload shows what the chat showed. Nothing is done without a stored reply.
+    """
+    lock_fresh(db, session)
+    metadata = dict(session.session_metadata)
+    messages = list(metadata.get("messages") or [])
+    if not messages or messages[-1].get("role") != "assistant":
+        db.commit()
+        return session
+    last = dict(messages[-1])
+    last["content"] = f"{last.get('content') or ''}\n\n{text}".lstrip()
+    messages[-1] = last
+    metadata["messages"] = messages
+    session.session_metadata = metadata
     db.commit()
     db.refresh(session)
     return session

@@ -21,6 +21,7 @@ export default async function StartPage() {
           aiNotice: t.chatAiNotice,
           tooLong: t.chatErrors.tooLong,
           failed: t.startFailed,
+          sessionLimit: t.sessionLimit,
         }}
       />
     </main>

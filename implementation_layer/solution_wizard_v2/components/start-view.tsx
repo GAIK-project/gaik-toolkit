@@ -26,6 +26,8 @@ export type StartViewLabels = {
   aiNotice: string;
   tooLong: string;
   failed: string;
+  /** The account has started as many sessions as it may. */
+  sessionLimit: string;
 };
 
 /**
@@ -96,7 +98,13 @@ export function StartView({ labels }: { labels: StartViewLabels }) {
       setPending(false);
       setLeaving(false);
       if (result?.error !== "empty") {
-        setError(result?.error === "too_long" ? labels.tooLong : labels.failed);
+        setError(
+          result?.error === "too_long"
+            ? labels.tooLong
+            : result?.error === "session_limit"
+              ? labels.sessionLimit
+              : labels.failed,
+        );
       }
       return;
     }
