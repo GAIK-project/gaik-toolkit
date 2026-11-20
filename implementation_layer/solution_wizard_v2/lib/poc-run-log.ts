@@ -68,7 +68,7 @@ export function runProgressStage(phase: string, logs: readonly string[]): RunPro
   if (phase === "pending") return "queued";
   for (let i = logs.length - 1; i >= 0; i--) {
     const line = logs[i];
-    if (/===\s*poc output|writing output|saving (?:result|output|report|pdf)|generat(?:ing|ed) pdf|report/i.test(line)) {
+    if (/===\s*poc output|writing output|saving (?:result|output|report|pdf)|generat(?:ing|ed) (?:pdf|report)/i.test(line)) {
       return "finalizing";
     }
     if (/grounding|hallucinat|validat(?:ing|ion)|verif(?:y|ying|ication)|source.?trac/i.test(line)) {

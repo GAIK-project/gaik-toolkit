@@ -75,6 +75,8 @@ describe("runProgressStage", () => {
     expect(runProgressStage("pending", [])).toBe("queued");
     expect(runProgressStage("running", [])).toBe("starting");
     expect(runProgressStage("running", ["Transcribing sample.wav with Whisper..."])).toBe("transcribing");
+    expect(runProgressStage("running", ["Transcribing report.wav with Whisper..."])).toBe("transcribing");
+    expect(runProgressStage("running", ["Generating report PDF..."])).toBe("finalizing");
     expect(
       runProgressStage("running", [
         "Transcribing sample.wav...",
