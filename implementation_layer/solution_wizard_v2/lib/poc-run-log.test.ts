@@ -60,6 +60,9 @@ describe("classifyLogLine", () => {
     expect(classifyLogLine("Traceback (most recent call last):")).toBe("error");
     expect(classifyLogLine("ERROR: model call failed")).toBe("error");
     expect(classifyLogLine("✗ extraction failed")).toBe("error");
+    // A real failure stays red even when the line also mentions fixing errors.
+    expect(classifyLogLine("ERROR: failed to fix 3 errors in transcript")).toBe("error");
+    expect(classifyLogLine("Traceback: no module errors")).toBe("error");
   });
 
   it("marks success lines as ok", () => {

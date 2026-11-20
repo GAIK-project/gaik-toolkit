@@ -30,10 +30,6 @@ export function runLogLineFilter(): (line: string) => boolean {
 
 export type LogLineTone = "error" | "ok" | "normal";
 
-/** Benign progress phrases that mention the word "error" without being a failure (#252). */
-const BENIGN_ERROR_PHRASE =
-  /\b(?:fixing|fix|correcting|correct|checking for|check for|no|0|zero)\b[^.\n]{0,40}\berrors?\b/i;
-
 const REAL_ERROR_LINE =
   /✗|\btraceback\b|\b(?:[a-z_]+error|exception)\s*:|^\s*(?:error|fatal|critical)\b|\bfailed\b|\bfailure\b/i;
 
@@ -45,7 +41,9 @@ const OK_LINE = /✓|\bsuccess(?:fully|ful)?\b|\bok\b/i;
  * instead of flashing red as if the run had failed (#252).
  */
 export function classifyLogLine(line: string): LogLineTone {
-  if (!BENIGN_ERROR_PHRASE.test(line) && REAL_ERROR_LINE.test(line)) return "error";
+  // Only real failure markers turn a line red; a progress line that merely says
+  // "errors" ("Fixing transcription errors…", "0 errors found") never matches them.
+  if (REAL_ERROR_LINE.test(line)) return "error";
   if (OK_LINE.test(line)) return "ok";
   return "normal";
 }
