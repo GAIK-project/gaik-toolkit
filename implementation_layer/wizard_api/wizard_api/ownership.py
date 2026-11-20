@@ -27,7 +27,7 @@ import uuid
 from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from wizard_api import config
+from wizard_api import config, telemetry
 from wizard_api.db import get_db
 
 USER_HEADER = "X-Wizard-User-Id"
@@ -52,14 +52,21 @@ def session_belongs_to_requester(
 ) -> None:
     """Router dependency: a ``/sessions/{session_id}/...`` route is served only
     for the session's owner. Routes without a session in the path (list, create)
-    check the user themselves."""
+    check the user themselves.
+
+    A request that is served is also named after its session in its trace, so
+    every request of a session (the PoC tab's too) is listed under that session
+    and not beside it. A refused request is not: it is not part of the session."""
     raw = request.path_params.get("session_id")
-    if raw is None or user_id is None:
+    if raw is None:
         return
     try:
         session_id = uuid.UUID(str(raw))
     except ValueError:
         return  # the handler's own validation answers 422
+    if user_id is None:
+        telemetry.name_session(session_id)
+        return
     # Imported here: services import the router's neighbours and this module
     # must stay importable from the schemas' side without a cycle.
     from wizard_api.services import session_service
@@ -71,6 +78,7 @@ def session_belongs_to_requester(
         ops_metrics.ownership_denied.add(1)
     if session is None or session.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
+    telemetry.name_session(session_id)
 
 
 def require_same_user(user_id: str | None, claimed: str, what: str) -> None:
