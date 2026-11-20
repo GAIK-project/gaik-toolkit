@@ -99,5 +99,5 @@ def remove(db: Session, session: WizardSession) -> None:
         shutil.rmtree(folder)
     db.delete(session)
     # Its place under WIZARD_MAX_SESSIONS_PER_USER goes back with it; its spend stays.
-    usage_caps.release_session(db, session.user_id, commit=False)
+    usage_caps.release_session(db, session.user_id)
     db.commit()
