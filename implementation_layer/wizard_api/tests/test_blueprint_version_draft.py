@@ -137,7 +137,7 @@ def test_the_migration_adds_and_drops_the_column(monkeypatch) -> None:
         return {c["name"] for c in inspect(engine).get_columns("blueprint_versions", schema)}
 
     try:
-        command.upgrade(alembic_config, "003")
+        command.upgrade(alembic_config, "004")
         assert "draft" in columns()
         draft = next(
             c
@@ -146,7 +146,7 @@ def test_the_migration_adds_and_drops_the_column(monkeypatch) -> None:
         )
         assert draft["nullable"] is True
 
-        command.downgrade(alembic_config, "002")
+        command.downgrade(alembic_config, "003")
         assert "draft" not in columns()
         assert "content" in columns()
     finally:
