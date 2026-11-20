@@ -759,6 +759,25 @@ def test_a_class_the_precedence_does_not_name_leaves_the_conflict_unresolved(fak
     assert conflict.status == "unresolved"
 
 
+@pytest.mark.parametrize("numbers", [[], [1], [2, 2]])
+def test_a_conflict_naming_fewer_than_two_units_stays_unresolved(fake, numbers):
+    """An empty unit_numbers reply, or one unit named alone or twice, is no side to rank."""
+    answer = _answer(
+        DOC,
+        NOTE,
+        conflicts=[kc.CuratedConflict(topic="ventilation", description="d", unit_numbers=numbers)],
+    )
+    fake({"a": [answer]})
+
+    conflict = _one_conflict(None, source_precedence=["primary", "secondary"])
+
+    assert (conflict.status, conflict.preferred_unit_ids, conflict.resolved_by) == (
+        "unresolved",
+        [],
+        None,
+    )
+
+
 def test_without_precedence_every_conflict_is_unresolved(fake):
     fake({"a": [_conflicting(DOC, NOTE)]})
 
@@ -863,6 +882,10 @@ def _summarised(summary: str, quote: str, time_qualifier: str | None = None, fil
         ("Seen on 3 March.", "seen 03 March", None),
         ("The flat is 120 m2.", "Area 120 m\u00b2", None),
         ("4 rooms, 120 m2.", "Room count: 4 120 m2", None),
+        # An identifier glued to letters is a name, and its digits are not split.
+        ("ISO9001 compliance.", "Complies with ISO 9001", None),
+        ("Complies with ISO 9001.", "ISO9001 compliance", None),
+        ("Uses R410A refrigerant.", "Refrigerant R410A", None),
     ],
 )
 def test_a_summary_with_only_the_quotes_numbers_passes(summary, quote, time_qualifier):
@@ -879,10 +902,15 @@ def test_a_summary_with_only_the_quotes_numbers_passes(summary, quote, time_qual
         ("Design life 25 years, 3 years left.", "Design life 25 years.", ["3"]),
         ("Cost 12 euros.", "Cost 1 200 euros.", ["12"]),
         ("Built in 1998.", "Built in 1989.", ["1998"]),
+        ("Complies with ISO 9002.", "ISO9001 compliance", ["9002"]),
     ],
 )
 def test_a_summary_number_the_quote_does_not_give_is_found(summary, quote, unsupported):
     assert kc._unsupported_numbers(_summarised(summary, quote)) == unsupported
+
+
+def test_a_number_never_starts_inside_a_digit_run():
+    assert kc._NUMBER.findall("ISO9001 and 1 200 and CO2") == ["1 200"]
 
 
 def test_a_computed_number_is_retried_then_dropped(fake):

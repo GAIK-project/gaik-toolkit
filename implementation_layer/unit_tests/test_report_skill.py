@@ -1315,7 +1315,8 @@ def test_propose_spec_spells_out_every_key_and_leaves_the_spec_alone(
     code, out = propose(capsys, spec, tmp_path, "--provider", "openai")
     assert code == 0 and out["errors"] == []
     proposal = json.loads((tmp_path / "proposal.json").read_text(encoding="utf-8"))
-    # source_precedence stays out unless the user states a priority: gaik 0.11.0 refuses it.
+    # source_precedence stays out unless the user states a priority: gaik 0.11.1 and earlier
+    # refuse it.
     keys = [k for k in rr.SPEC_KEYS if k != "source_precedence"]
     assert list(proposal)[: len(keys)] == keys
     assert "source_precedence" not in proposal
@@ -1476,6 +1477,29 @@ def test_apply_spec_shows_and_tracks_the_source_precedence(capsys, tmp_path, cle
     assert "curate must run again" in out["warnings"]
     assert "synthesize must run again" in out["warnings"]
     assert "normalize must run again" not in out["warnings"]
+
+
+@pytest.mark.parametrize(
+    ("precedence", "shown"),
+    [
+        (["primary", 123], "primary > 123"),
+        ("primary", '"primary"'),
+        ({"top": "primary"}, '{"top": "primary"}'),
+    ],
+)
+def test_the_review_list_shows_a_malformed_source_precedence_without_failing(precedence, shown):
+    # Called on a spec whose schema check already failed: it must not raise as well.
+    spec = {
+        "sources": {"primary": ["a.txt"]},
+        "sections": [],
+        "source_precedence": precedence,
+        "models": {},
+        "settings": {},
+    }
+
+    lines = rr.review_lines(spec, "azure")
+
+    assert f"  source_precedence: {shown} (decides conflicts between these classes)" in lines
 
 
 # ── Pandoc: check, and install only when asked ──────────────────────

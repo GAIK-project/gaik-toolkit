@@ -636,3 +636,26 @@ def test_the_spec_refuses_a_source_precedence_it_cannot_use(tmp_path, precedence
 
     with pytest.raises(ValueError, match=message):
         ReportSpec.model_validate(data)
+
+
+def test_the_docs_name_a_release_after_0_11_1_for_source_precedence():
+    """gaik 0.11.1 is released without source_precedence and refuses it: a text that says
+    "newer than 0.11.0" sends an agent on 0.11.1 into a ValidationError or TypeError."""
+    root = Path(__file__).resolve().parents[1]
+    cards = json.loads(
+        (root / "solution_wizard" / "registries" / "component_reference_cards.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    reference = (
+        root
+        / "no-code-assets/agent-skills/skills/generate-structured-reports/references/report-spec.md"
+    ).read_text(encoding="utf-8")
+    texts = [reference] + [
+        json.dumps(cards[name], ensure_ascii=False) for name in ("ReportWriter", "KnowledgeCurator")
+    ]
+
+    for text in texts:
+        assert "source_precedence" in text
+        assert "newer than 0.11.0" not in text and "on 0.11.0 leave" not in text
+        assert "a release after 0.11.1" in text

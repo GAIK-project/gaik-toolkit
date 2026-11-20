@@ -1506,10 +1506,15 @@ def review_lines(spec: dict, provider: str) -> list[str]:
         files = spec["sources"].get(cls) or []
         lines.append(f"  sources.{cls}: {', '.join(files) if files else '(none)'}")
     precedence = spec.get("source_precedence") or []
+    if not isinstance(precedence, list):
+        # A wrong shape has its own schema error; the list shows the value as it is.
+        shown = show(precedence)
+    else:
+        shown = " > ".join(c if isinstance(c, str) else show(c) for c in precedence)
     lines.append(
         "  source_precedence: "
         + (
-            " > ".join(precedence) + " (decides conflicts between these classes)"
+            shown + " (decides conflicts between these classes)"
             if precedence
             else "(none: every conflict is left for the user to settle)"
         )

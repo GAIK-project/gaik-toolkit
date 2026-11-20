@@ -152,10 +152,14 @@ def _as_cited(answer: CurationResponse, cited: _Cited) -> CurationResponse:
 # A number: a digit run, or groups of three digits with a thousands separator between
 # them ("1 200", "1,200", "1.200"). Any other separator splits numbers, so a date such
 # as 14.3.2026 is 14, 3 and 2026, and a decimal 1,5 is 1 and 5, however a source writes it.
-_NUMBER = re.compile(r"(?<![^\W\d_])(?:\d{1,3}(?:[.,\u00a0\u202f ]\d{3})+(?!\d)|\d+)")
-# A number glued to letters before it, such as the 2 in m2 or CO2, is part of a unit or
-# a name, not a figure of the fact: the lookbehind above leaves it out.
+_NUMBER = re.compile(r"(?<![^\W_])(?:\d{1,3}(?:[.,\u00a0\u202f ]\d{3})+(?!\d)|\d+)")
+# A number glued to letters before it, such as the 2 in m2, CO2 or ISO9001, is part of a
+# unit or a name, not a figure of the fact: the lookbehind above leaves it out, and it
+# never starts inside a digit run, so it does not take the 001 of ISO9001 either.
 _SEPARATORS = re.compile(r"[.,\u00a0\u202f ]")
+# Every digit run, glued to letters or not: what a quote gives. "ISO9001" in a quote
+# supports "ISO 9001" in the summary.
+_DIGIT_RUN = re.compile(r"\d+")
 
 
 def _digits(number: str) -> str:
@@ -164,11 +168,13 @@ def _digits(number: str) -> str:
 
 
 def _given_numbers(text: str) -> set[str]:
-    """The digits of every number in ``text``, and of each group of a grouped one.
+    """The digits of every number in ``text``, of each group of a grouped one, and of
+    every digit run glued to letters.
 
-    "4 120" may be one figure or two (a count and an area), so both readings count.
+    "4 120" may be one figure or two (a count and an area), so both readings count; the
+    9001 of "ISO9001" counts too, so a summary may write it "ISO 9001".
     """
-    given = set()
+    given = {_digits(run) for run in _DIGIT_RUN.findall(text)}
     for n in _NUMBER.findall(text):
         given.add(_digits(n))
         given.update(_digits(part) for part in _SEPARATORS.split(n) if part)
@@ -314,7 +320,9 @@ def _decide(
     name, or no precedence at all: a person decides. So does a top unit of ``low``
     confidence, a source that is itself unsure: the class does not make it right.
     """
-    if not source_precedence:
+    # Fewer than two distinct units (an empty unit_numbers list, or one unit named twice)
+    # is no disagreement to rank: a person decides.
+    if not source_precedence or len(units) < 2:
         return "unresolved", [], None
     rank = {c: i for i, c in enumerate(source_precedence)}
     classes = [u.source_class for u in units]
@@ -322,7 +330,7 @@ def _decide(
         return "unresolved", [], None
     top = min(classes, key=rank.__getitem__)
     preferred = [u.id for u in units if u.source_class == top]
-    if len(preferred) != 1 or len(units) < 2:
+    if len(preferred) != 1:
         return "unresolved", [], None
     if next(u for u in units if u.source_class == top).confidence == "low":
         return "unresolved", [], None
