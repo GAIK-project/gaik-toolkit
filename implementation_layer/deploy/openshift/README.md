@@ -244,11 +244,16 @@ package the api image installs) to generate the extraction schema.
 
 **wizard-v2-web**: `WIZARD_API_URL` (runtime, → `http://wizard-v2-api:8100`),
 `WIZARD_AGENT_CHAT=true` (live agent, not mock), `WIZARD_API_TOKEN` and
-`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (runtime secrets). `NEXT_PUBLIC_SUPABASE_URL`
-/ `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_DEV_AUTH` are **build-time**
-args (baked into the bundle). With Supabase auth, set `WIZARD_ALLOWED_EMAILS`
-(runtime, comma-separated): only the listed accounts get in, and nobody without
-it, since anyone can create an account in the Supabase project with its public key.
+`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (runtime secrets). `NEXT_PUBLIC_DEV_AUTH`
+is a **build-time** arg. Supabase sign-in through the GAIK demo's project is
+chosen at run time: `WIZARD_AUTH_MODE=supabase`, `WIZARD_SUPABASE_URL` and
+`WIZARD_SUPABASE_KEY` (the public key only), and who gets in: a confirmed address
+listed in `WIZARD_ALLOWED_EMAILS`, or, with `WIZARD_SUPABASE_ACCESS=access_requests`,
+one whose row in the demo's `access_requests` is approved or has `wizard_access`
+(solution_wizard_v2/README.md, "Supabase-kirjautuminen"). Without either nobody
+gets in, since anyone can create an account in the project with its public key.
+The older build-time pair `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+is still read when the run-time one is unset.
 `GAIK_DEMO_URL` (runtime, optional) is where the sign-in page and the account
 menu link back to the GAIK demos; it defaults to `https://gaik-demo.2.rahtiapp.fi`,
 and an empty value hides the link.
@@ -258,9 +263,12 @@ and an empty value hides the link.
 Go through this before rolling out a release that contains #43, and when a new
 stack or a new Supabase project is set up.
 
-Since #43 the web app lets a Supabase user in only when their address is listed
-in `WIZARD_ALLOWED_EMAILS` **and** Supabase has confirmed that address. An unset
-or empty `WIZARD_ALLOWED_EMAILS` means nobody gets in.
+The web app lets a Supabase user in only when Supabase has confirmed their
+address **and** it is listed in `WIZARD_ALLOWED_EMAILS` or, with
+`WIZARD_SUPABASE_ACCESS=access_requests`, the demo has approved their row. With
+neither, nobody gets in. With `access_requests` the demo's own approval is the
+gate, so its sign-up may stay open (for an event, only while it runs); the steps
+below on sign-up apply to the list.
 
 1. **Set `WIZARD_ALLOWED_EMAILS` on the live web Deployment first.** It is in no
    manifest. Set it with `oc set env` before the rollout, so the new pods start
