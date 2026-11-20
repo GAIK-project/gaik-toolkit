@@ -176,18 +176,46 @@ def test_page_requests_without_a_session_are_left_out_of_mlflow():
     for span_name, function in PAGE_REQUESTS:
         assert f'name == "{span_name}"{UNLESS_FAILED}' in conditions
         assert f'attributes["code.function.name"] == "wizard_api.routers.{function}"' in conditions
-    # The requests that carry a session (the chat turn, a PATCH of the session) are not named, and
-    # no condition goes by the route that the PATCH shares with opening a session.
-    assert not [c for c in conditions if "chat" in c or "PATCH" in c or "update_session" in c]
+    # A PATCH of the session is a step of it and is not named, and no condition goes by the route
+    # that the PATCH shares with opening a session.
+    assert not [c for c in conditions if "PATCH" in c or "update_session" in c]
     assert not [c for c in conditions if '"/sessions' in c]
 
 
-def test_only_the_server_span_of_a_failed_page_request_is_kept():
+# What the web app reads in the background while a session is open. Each passes the ownership check,
+# so it carries the session and would be a row inside it.
+BACKGROUND_READS = (
+    ("GET /sessions/{session_id}/poc", "sessions.download_poc"),
+    ("GET /sessions/{session_id}/poc/files", "sessions.list_poc_files"),
+    ("GET /sessions/{session_id}/poc/file", "sessions.read_poc_file"),
+    ("GET /sessions/{session_id}/poc/input", "sessions.list_poc_inputs"),
+    ("GET /sessions/{session_id}/chat/stream", "sessions.chat_stream"),
+)
+
+
+def test_a_sessions_background_reads_are_left_out_of_mlflow_and_what_the_user_does_is_not():
+    _, conditions = _wizard_filter()
+    for span_name, function in BACKGROUND_READS:
+        assert f'name == "{span_name}"{UNLESS_FAILED}' in conditions
+        assert f'attributes["code.function.name"] == "wizard_api.routers.{function}"' in conditions
+    # Only reads are named: the chat turn, an upload, a check, a run and a saved file are stored.
+    named = [c for c in conditions if c.startswith("name == ")]
+    assert not [c for c in named if not c.startswith(('name == "GET ', 'name == "POST /sessions"', 'name == "POST /owners/claim"'))]
+    # Of the chat routes only the rejoined stream is named, not the turn.
+    assert [c for c in conditions if "chat" in c] == [
+        f'name == "GET /sessions/{{session_id}}/chat/stream"{UNLESS_FAILED}',
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.chat_stream"',
+    ]
+
+
+def test_only_the_server_span_of_a_failed_request_is_kept():
     # Kept: the server span with an error status (a 5xx). Its child spans go whatever their status,
     # so a refused request, where only a child span is marked as an error, leaves nothing root-less.
     _, conditions = _wizard_filter()
     kept_when_failed = [c for c in conditions if "status.code" in c]
-    assert kept_when_failed == [f'name == "{span_name}"{UNLESS_FAILED}' for span_name, _ in PAGE_REQUESTS]
+    assert kept_when_failed == [
+        f'name == "{span_name}"{UNLESS_FAILED}' for span_name, _ in PAGE_REQUESTS + BACKGROUND_READS
+    ]
 
 
 def test_no_config_filters_spans_before_the_span_metrics():

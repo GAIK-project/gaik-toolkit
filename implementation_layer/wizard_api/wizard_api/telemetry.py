@@ -229,6 +229,14 @@ def record_refusal(span: Span, attribute: str, exc: HTTPException) -> None:
         span.set_status(Status(StatusCode.ERROR, reason))
 
 
+def name_session(session_id: Any) -> None:
+    """Put the session's id on the request's span, so the collector files the
+    request under that session (MLflow groups traces by it). The id is
+    pseudonymised in the collector like every ``gaik.session.id``. Without a
+    recording span this does nothing."""
+    trace.get_current_span().set_attribute("gaik.session.id", str(session_id))
+
+
 def sandbox_start_span(kind: str):
     """Wrap a run-starting endpoint in a ``wizard.sandbox.start`` span.
 

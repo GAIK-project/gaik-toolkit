@@ -27,7 +27,7 @@ import uuid
 from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from wizard_api import config
+from wizard_api import config, telemetry
 from wizard_api.db import get_db
 
 USER_HEADER = "X-Wizard-User-Id"
@@ -52,7 +52,12 @@ def session_belongs_to_requester(
 ) -> None:
     """Router dependency: a ``/sessions/{session_id}/...`` route is served only
     for the session's owner. Routes without a session in the path (list, create)
-    check the user themselves."""
+    check the user themselves.
+
+    A request that passes the check is also named after its session in its
+    trace, so what the user does in a session (the PoC tab's uploads too) is
+    listed under that session and not beside it. A refused request is not named,
+    and neither is one without the header, whose session nothing has checked."""
     raw = request.path_params.get("session_id")
     if raw is None or user_id is None:
         return
@@ -71,6 +76,7 @@ def session_belongs_to_requester(
         ops_metrics.ownership_denied.add(1)
     if session is None or session.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
+    telemetry.name_session(session_id)
 
 
 def require_same_user(user_id: str | None, claimed: str, what: str) -> None:
