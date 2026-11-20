@@ -740,14 +740,15 @@ def create_session(
     except session_service.ServerOwnedMetadataError as exc:
         raise api_error(422, "server_owned_metadata", str(exc), keys=exc.keys) from exc
     try:
-        # Claimed before the session exists: a refused one leaves nothing behind.
+        # Room is made before the session exists, under a lock that creating
+        # it commits: a refused one leaves nothing behind.
         usage_caps.claim_session(db, payload.user_id)
     except usage_caps.SessionLimitError as exc:
         raise api_error(429, "session_limit", str(exc)) from exc
     try:
         session = session_service.create_session(db, payload)
     except Exception:
-        usage_caps.release_session(db, payload.user_id)
+        db.rollback()  # the place it took, and the lock, go with it
         raise
     ops_metrics.sessions_created.add(
         1, {"owner": session.user_id if is_owner_id(session.user_id) else "legacy"}

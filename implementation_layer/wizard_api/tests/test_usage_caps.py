@@ -376,6 +376,9 @@ def test_sessions_are_counted_and_the_limit_holds_under_concurrency(db_engine, c
         db = factory()
         try:
             usage_caps.claim_session(db, "crowd")
+            # The caller creates the session in the same transaction, as the route does.
+            db.add(WizardSession(user_id="crowd", output_dir="/tmp/x"))
+            db.commit()
             outcomes.append("ok")
         except usage_caps.SessionLimitError:
             outcomes.append("refused")
@@ -392,7 +395,9 @@ def test_sessions_are_counted_and_the_limit_holds_under_concurrency(db_engine, c
     db = factory()
     try:
         assert db.get(UsageTotal, ("user", "crowd")).sessions_held == 3
+        assert usage_caps.open_sessions(db, "crowd") == 3
         db.query(UsageTotal).delete()
+        db.query(WizardSession).filter(WizardSession.user_id == "crowd").delete()
         db.commit()
     finally:
         db.close()
@@ -411,7 +416,7 @@ def test_without_a_session_limit_every_session_is_still_counted(db_session, caps
 
 
 @requires_postgres
-def test_the_fourth_session_is_refused_and_removing_one_makes_room_but_keeps_its_spend(
+def test_the_fourth_session_in_progress_is_refused_and_removing_one_makes_room_but_keeps_its_spend(
     client, db_engine, caps
 ) -> None:
     ids = [
@@ -728,3 +733,35 @@ def test_a_message_refused_before_its_turn_gives_its_budget_back(
 
     assert turn_client.post(f"/sessions/{sid}/chat", json={"message": "Hei"}).status_code == 429
     assert "ann" not in usage_caps._RESERVED  # noqa: SLF001
+
+
+@requires_postgres
+def test_a_session_with_all_gates_approved_holds_no_place_until_a_gate_is_reopened(
+    client, db_engine, caps
+) -> None:
+    ids = [
+        client.post("/sessions", json={"user_id": "ann", "title": f"S{n}"}).json()["id"]
+        for n in range(3)
+    ]
+    assert client.post("/sessions", json={"user_id": "ann", "title": "S4"}).status_code == 429
+
+    def set_gates(statuses: dict) -> None:
+        db = sessionmaker(bind=db_engine)()
+        try:
+            row = db.get(WizardSession, uuid.UUID(ids[0]))
+            row.gate_statuses = {**row.gate_statuses, **statuses}
+            db.commit()
+        finally:
+            db.close()
+
+    set_gates({"gate_4": "approved"})  # Gate 4 alone does not finish it
+    assert client.post("/sessions", json={"user_id": "ann", "title": "S4"}).status_code == 429
+    set_gates({f"gate_{n}": "approved" for n in range(1, 5)})  # all four: done
+    fourth = client.post("/sessions", json={"user_id": "ann", "title": "S4"})
+    assert fourth.status_code == 201
+    assert client.post("/sessions", json={"user_id": "ann", "title": "S5"}).status_code == 429
+
+    set_gates({"gate_2": "pending"})  # reopened: in progress again, so ann has four and no room
+    refused = client.post("/sessions", json={"user_id": "ann", "title": "S6"})
+    assert refused.status_code == 429
+    assert "in progress" in refused.json()["detail"]["message"]

@@ -20,7 +20,9 @@ class UsageTotal(Base):
     scope: Mapped[str] = mapped_column(String(16), primary_key=True)
     key: Mapped[str] = mapped_column(String(255), primary_key=True)
     cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    #: The user's sessions that exist now, for WIZARD_MAX_SESSIONS_PER_USER.
+    #: Kept up to date but read by nothing: the session limit counts the user's
+    #: sessions in progress itself (usage_caps.open_sessions). The user row is
+    #: what claim_session locks.
     sessions_held: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     #: The chat has said once that most of the cap is used.
     warned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

@@ -311,33 +311,38 @@ not the provider's bill, which keeps its own cap as the hard limit.
 | `WIZARD_SESSION_MAX_COST_USD` | `5.4` (about 5 €) | what one session may spend in all, across agent restarts |
 | `WIZARD_USER_MAX_COST_USD` | `10.8` (about 10 €) | what one user may spend across all their sessions |
 | `WIZARD_DEPLOYMENT_MAX_COST_USD` | `2000` | what the deployment may spend in one calendar month (UTC) |
-| `WIZARD_MAX_SESSIONS_PER_USER` | `3` | sessions one user may have at a time |
+| `WIZARD_MAX_SESSIONS_PER_USER` | `3` | sessions one user may have in progress at a time; one with all four gates approved is done and holds no place |
 | `WIZARD_COST_WARN_RATIO` | `0.8` | share of a session's or user's cap after which the chat says so, once; kept between 0 and 1, so `0` gives the default |
 
 - After each chat turn its cost is added to the session (`metadata.usage_cost_usd`,
   which only the server writes), to the user's and to the month's row of
-  `usage_totals`. Removing a session gives back its place, not its spend. The
+  `usage_totals`. Finishing a session (all four gates approved) or removing it gives
+  back its place, not its spend. The
   user's spend never resets; the month's starts again each calendar month. To
   start a user or the deployment again (between two events, say), delete their
   rows from `usage_totals`, by `scope` and `key`.
 - Counting starts when revision 003 is applied: spend before it is not known,
-  and the sessions users already have count against their limit.
+  and the sessions users already have in progress count against their limit.
 - Before an agent is woken, a reached cap, or one that leaves less than
   `MIN_TURN_BUDGET_USD` (0.1), refuses the message with `402` and
   `{"error": "usage_cap", "scope": "session" | "user" | "deployment"}`. The agent
-  is started with the smallest amount any cap has left as its `max_budget_usd`.
-  That budget is held against the user's cap until the reply is charged, so
-  replies in several sessions at once cannot each spend what is left; a message
-  that finds the rest held by the user's running replies gets `429 agent_busy`
+  is started with the smallest amount any cap has left as its `max_budget_usd`
   (or `WIZARD_AGENT_MAX_BUDGET_USD`, if smaller), so a long reply stops at the
-  cap; the chat then says the usage limit is reached, without "continue", and
+  cap. That budget is held against the user's cap until the reply is charged, so
+  replies in several sessions at once cannot each spend what is left; a message
+  that finds the rest held by the user's running replies gets `429 agent_busy`. At the
+  cap the chat then says the usage limit is reached, without "continue", and
   `wizard.agent.budget_stops` counts it with `limit=usage_cap`. An idle live agent
   started when the caps left more (the user spent in another session since) is
   ended first and resumed with the smaller budget, once it could pass them by more
   than about 1 USD (`FIT_BUDGET_MARGIN_USD`), so switching sessions does not
   restart it each time.
-- A new session past `WIZARD_MAX_SESSIONS_PER_USER` is refused with `429`
-  `session_limit`, claimed in one statement so two at once cannot both get the last place.
+- A new session past `WIZARD_MAX_SESSIONS_PER_USER` sessions in progress is
+  refused with `429` `session_limit`. The limit is checked when a session
+  starts: reopening a gate of a finished session is not refused, so a user can
+  then have more in progress (their spend stays within the user cap). The user's row is locked while the
+  sessions are counted and the new one is created, so two at once cannot both
+  get the last place.
 - Once a session or a user has used the warning share of its cap, a line is added
   to that reply, once, in the session's language; a turn that did not complete
   leaves it for the next one. The deployment's is logged as a

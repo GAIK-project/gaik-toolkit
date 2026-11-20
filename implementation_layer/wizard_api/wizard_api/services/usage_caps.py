@@ -15,9 +15,10 @@ user's cap until the reply is charged, so replies in several sessions at once
 cannot each spend what is left. Once a session or a user has used
 ``WIZARD_COST_WARN_RATIO`` of its cap, the chat says so, once (``record_cost``).
 
-Sessions per user are claimed before a session is created (``claim_session``):
-one atomic statement that refuses past ``WIZARD_MAX_SESSIONS_PER_USER``. A
-removed session gives its place back (``release_session``), not its spend.
+Sessions in progress per user are counted before a session is created
+(``claim_session``), under a lock on the user's row, and refused past
+``WIZARD_MAX_SESSIONS_PER_USER``. A finished session (Gate 4 approved) holds no
+place; a removed one gives its place back, not its spend.
 """
 
 from __future__ import annotations
@@ -26,12 +27,13 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import and_, func, not_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from wizard_api import config
 from wizard_api.models import UsageTotal, WizardSession
+from wizard_api.session_state import GATE_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -219,44 +221,56 @@ def reserve(user_id: str, caps: list[_Cap]) -> Reservation:
     return Reservation(user_id, amount, budget)
 
 
-def claim_session(db: Session, user_id: str) -> None:
-    """Count a new session for ``user_id``, or raise SessionLimitError at the limit.
+def open_sessions(db: Session, user_id: str) -> int:
+    """``user_id``'s sessions still in progress: every one with a gate not approved.
 
-    One statement, so two sessions created at the same moment cannot both take
-    the last place. Committed at once; a session the caller then fails to
-    create, or that is removed later, gives its place back (``release_session``).
+    A session is done only when all four gates are approved; one with a gate
+    reopened, or approved out of order, still holds its place.
+    """
+    gates = WizardSession.gate_statuses
+    finished = and_(
+        *(func.coalesce(gates[key].astext, "pending") == "approved" for key in GATE_KEYS)
+    )
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(WizardSession)
+            .where(WizardSession.user_id == user_id, not_(finished))
+        )
+        or 0
+    )
+
+
+def claim_session(db: Session, user_id: str) -> None:
+    """Make room for a new session of ``user_id``, or raise SessionLimitError at the limit.
+
+    The limit counts sessions in progress (``open_sessions``): one with all
+    four gates approved is done and holds no place, until a gate of it is
+    reopened. The limit is checked here, when a session starts: reopening a
+    finished session is not refused, so a user can then have more in progress.
+    The user's row is locked first and stays locked, uncommitted, until the
+    caller has created the session and committed: a second session started at
+    the same moment waits, then counts the first, so two cannot both take the
+    last place. On a refusal nothing is left behind; a caller whose creation
+    fails rolls back.
     """
     limit = config.max_sessions_per_user()
     statement = insert(UsageTotal).values(scope=USER, key=user_id, sessions_held=1)
-    if limit is None:
-        statement = statement.on_conflict_do_update(
-            index_elements=[UsageTotal.scope, UsageTotal.key],
-            set_={"sessions_held": UsageTotal.sessions_held + 1, "updated_at": func.now()},
-        )
-    else:
-        statement = statement.on_conflict_do_update(
-            index_elements=[UsageTotal.scope, UsageTotal.key],
-            set_={"sessions_held": UsageTotal.sessions_held + 1, "updated_at": func.now()},
-            where=UsageTotal.sessions_held < limit,
-        )
-    claimed = db.execute(statement.returning(UsageTotal.sessions_held)).scalar_one_or_none()
-    db.commit()
-    if claimed is None:
-        raise SessionLimitError(
-            f"Your account has the {limit} sessions it may have. "
-            "Continue in one of them, or remove one you no longer need."
-        )
-
-
-def release_session(db: Session, user_id: str, *, commit: bool = True) -> None:
-    """Give back the place of a session that could not be created, or was removed.
-
-    With ``commit`` (a create that failed) the caller's failed work is rolled
-    back first; without it (a removal) the place goes back in the caller's
-    transaction, with the session itself.
-    """
-    if commit:
+    statement = statement.on_conflict_do_update(
+        index_elements=[UsageTotal.scope, UsageTotal.key],
+        set_={"sessions_held": UsageTotal.sessions_held + 1, "updated_at": func.now()},
+    )
+    db.execute(statement)
+    if limit is not None and open_sessions(db, user_id) >= limit:
         db.rollback()
+        raise SessionLimitError(
+            f"Your account has {limit} sessions in progress, as many as it may. "
+            "Finish one (approve its last gate) or remove one to start a new session."
+        )
+
+
+def release_session(db: Session, user_id: str) -> None:
+    """Give back the place of a removed session, in the caller's transaction."""
     db.execute(
         update(UsageTotal)
         .where(
@@ -266,8 +280,6 @@ def release_session(db: Session, user_id: str, *, commit: bool = True) -> None:
         )
         .values(sessions_held=UsageTotal.sessions_held - 1, updated_at=func.now())
     )
-    if commit:
-        db.commit()
 
 
 def move_user(db: Session, old_id: str, new_id: str) -> None:
