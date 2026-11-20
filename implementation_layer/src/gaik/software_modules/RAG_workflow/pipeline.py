@@ -191,7 +191,9 @@ class RAGWorkflow:
 
         Each file is one document, with ``document_id`` its entry in
         ``document_ids`` or else its path with forward slashes
-        (``Path(path).as_posix()``). The display name in
+        (``Path(path).as_posix()``). The path is not resolved: ``data/a.pdf``
+        and its absolute path are two documents, and one relative path indexed
+        from two working directories is one. The display name in
         ``filenames`` does not identify it, so two files with the same name are
         two documents. Indexing a document again replaces its chunks: the ones
         it no longer has are deleted, and unchanged ones are not stored twice.

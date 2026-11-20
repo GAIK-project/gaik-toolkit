@@ -24,6 +24,13 @@ DOCUMENT_ID_KEYS = ("document_id", "source", "document_name")
 #: Metadata key that names the owner (a user or session id) of a chunk.
 CHUNK_OWNER_KEY = "gaik_owner"
 
+#: Metadata key under which the stores record a chunk's document id as a string.
+#: Only stores that derive chunk ids write it, so replacing or deleting a document
+#: never touches a chunk stored by an earlier gaik release, even one whose caller
+#: metadata already named a ``document_id``. The caller's ``document_id`` is kept
+#: as given, so a filter on it matches as before.
+DOCUMENT_KEY = "gaik_document_key"
+
 
 class ChunkKey(NamedTuple):
     """A chunk's document, its owner and its id; all ``None`` for no document."""
@@ -132,18 +139,24 @@ def delete_scope(store: Any, document_id: Any, owner: Any) -> tuple[str, str | N
 def in_scope(metadata: dict[str, Any] | None, document_id: str, owner: str | None) -> bool:
     """Whether a stored chunk belongs to ``document_id`` and exactly ``owner``.
 
-    With ``owner=None`` only chunks that name no owner match.
+    Only chunks that carry :data:`DOCUMENT_KEY` match. With ``owner=None`` only
+    chunks that name no owner match.
     """
     metadata = metadata or {}
-    stored_id = metadata.get("document_id")
-    if isinstance(stored_id, bool) or not isinstance(stored_id, (str, int)):
-        return False
-    return str(stored_id) == document_id and metadata.get(CHUNK_OWNER_KEY) == owner
+    return metadata.get(DOCUMENT_KEY) == document_id and metadata.get(CHUNK_OWNER_KEY) == owner
 
 
 def with_document_id(metadata: dict[str, Any] | None, doc_id: str | None) -> dict[str, Any]:
-    """A copy of ``metadata`` with ``document_id`` set to ``doc_id`` (when there is one)."""
+    """A copy of ``metadata`` as a store keeps it for a chunk of ``doc_id``.
+
+    A ``document_id`` the caller set is kept as given (an int stays an int);
+    without one it is set to ``doc_id``. :data:`DOCUMENT_KEY` is set to ``doc_id``,
+    and removed for a chunk that names no document.
+    """
     copied = dict(metadata or {})
+    copied.pop(DOCUMENT_KEY, None)
     if doc_id is not None:
-        copied["document_id"] = doc_id
+        if copied.get("document_id") is None or copied.get("document_id") == "":
+            copied["document_id"] = doc_id
+        copied[DOCUMENT_KEY] = doc_id
     return copied

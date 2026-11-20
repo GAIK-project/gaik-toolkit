@@ -84,10 +84,13 @@ results = store.search(
 
 A chunk's id comes from its document, its owner and its text. The document is
 `metadata["document_id"]`, else `source`, else `document_name` (the RAG parsers set
-the last two), and `add()` stores it with the chunk as `document_id`. A
-`document_id` must be a string (an int is stored as its string); other types raise
-`ValueError`, and document ids are compared exactly. The owner is the store's `owner`
-(recorded as `metadata["gaik_owner"]`).
+the last two). A `document_id` you set is stored as given, so a filter such as
+`filters={"document_id": 7}` matches it; without one, `add()` sets `document_id` to
+the document. `add()` also records the document as a string under
+`metadata["gaik_document_key"]`, and `replace=True` and `delete_document` match on that
+key only. A `document_id` must be a string or an int; other types raise `ValueError`,
+and document ids are compared exactly (an int as its string). The owner is the store's
+`owner` (recorded as `metadata["gaik_owner"]`).
 
 - Adding a document's chunks again replaces them, metadata included, instead of
   storing a second copy.
@@ -95,7 +98,11 @@ the last two), and `add()` stores it with the chunk as `document_id`. A
   one call: pass all of a document's chunks in one call.
 - `add(..., replace=True)` stores the chunks, then deletes the other stored chunks of
   each document in the call, so the chunks a changed document no longer has do not
-  stay behind. If storing fails, nothing is deleted.
+  stay behind. If storing fails, no stored chunk is lost: the stale chunks are deleted
+  only after every chunk is stored, and in Chroma a slice whose add fails (an
+  embedding of another dimension, say) has its earlier versions put back as they were.
+  Chroma takes the chunks in slices of at most its maximum batch size; slices stored
+  before a failure keep their new version.
 - `delete_document(document_id, owner=...)` deletes one document's chunks and returns
   how many.
 - Two owners who index a document under the same id keep separate chunks.
@@ -105,8 +112,9 @@ the last two), and `add()` stores it with the chunk as `document_id`. A
 - A chunk whose metadata names no document is stored as a new one each time.
 
 A Chroma collection built by an earlier gaik release still loads and searches, but
-its chunks have random ids and no `document_id`: `delete_document` and `replace=True`
-do not find them, and adding a document again stores it next to its old copy. Index
+its chunks have random ids and no `gaik_document_key`: `delete_document` and
+`replace=True` never delete them, even when their metadata names a `document_id`, and
+adding a document again stores it next to its old copy. Index
 the documents again into a new `collection_name` (or a new `persist_path`).
 
 ---

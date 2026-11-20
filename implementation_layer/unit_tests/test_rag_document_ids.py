@@ -10,7 +10,9 @@ points at a pgvector database (see ``test_pg_vector_store_sql.py``).
 
 from __future__ import annotations
 
+import json
 import os
+import threading
 import uuid
 from pathlib import Path
 
@@ -182,12 +184,74 @@ def test_a_document_id_that_is_not_text_is_refused(store):
     assert store.count() == 0
 
 
-def test_an_int_document_id_is_stored_and_deleted_as_its_string(store):
+def test_an_int_document_id_is_kept_and_deleted_as_its_string(store):
     store.add([Document(page_content="x", metadata={"document_id": 7})], [A1])
 
     [(doc, _)] = store.search(A1, top_k=1)
-    assert doc.metadata["document_id"] == "7"
+    assert doc.metadata["document_id"] == 7
+    assert store.delete_document("7") == 1
+    store.add([Document(page_content="x", metadata={"document_id": 7})], [A1])
     assert store.delete_document(7) == 1
+
+
+def test_a_filter_on_an_int_document_id_finds_the_chunks(store):
+    store.add(_chunks_with_id(7, ["alpha", "beta"]), [A1, B1])
+    store.add(_chunks_with_id(7, ["alpha", "gamma"]), [A1, C1], replace=True)
+
+    found = store.search(A1, top_k=10, filters={"document_id": 7})
+    assert sorted(doc.page_content for doc, _ in found) == ["alpha", "gamma"]
+
+
+def _chunks_with_id(document_id, texts: list[str]) -> list[Document]:
+    return [Document(page_content=t, metadata={"document_id": document_id}) for t in texts]
+
+
+def _add_legacy(store, text: str, embedding, metadata: dict) -> None:
+    """Store a chunk the way a gaik release before chunk ids did: a random id."""
+    chunk_id = uuid.uuid4().hex
+    if store.persist:
+        store._collection.add(
+            ids=[f"{store.collection_name}_{chunk_id}"],
+            embeddings=[embedding],
+            documents=[text],
+            metadatas=[metadata],
+        )
+    else:
+        store._ids.append(chunk_id)
+        store._documents.append(Document(page_content=text, metadata=dict(metadata)))
+        store._embeddings.append(embedding)
+
+
+def test_replace_and_delete_document_leave_a_legacy_chunk_that_names_the_document(store):
+    _add_legacy(store, "legacy", C1, {"document_id": "report", "page": 0})
+    store.add(_chunks("report", ["alpha"]), [A1])
+    store.add(_chunks("report", ["beta"]), [B1], replace=True)
+
+    assert _texts(store, "report") == ["beta", "legacy"]
+    assert store.delete_document("report") == 1
+    assert _texts(store, "report") == ["legacy"]
+
+
+def test_a_caller_cannot_put_a_chunk_without_a_document_in_scope(store):
+    store.add([Document(page_content="x", metadata={"gaik_document_key": "report"})], [A1])
+
+    assert store.delete_document("report") == 0
+    assert store.count() == 1
+
+
+def test_a_failed_chroma_reindex_keeps_the_stored_chunk(tmp_path):
+    pytest.importorskip("chromadb")
+    from gaik.software_components.RAG.vector_store import VectorStore
+
+    store = VectorStore(persist=True, persist_path=str(tmp_path / "chroma"))
+    store.add(_chunks("report", ["alpha"]), [A1])
+
+    # The same text again, with an embedding of another dimension: Chroma refuses it.
+    with pytest.raises(Exception):
+        store.add(_chunks("report", ["alpha"]), [[1.0, 0.0]], replace=True)
+
+    assert _texts(store, "report") == ["alpha"]
+    assert store.count() == 1
 
 
 def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):
@@ -427,16 +491,22 @@ def test_pg_add_upserts_on_a_key_that_is_the_same_for_the_same_chunk():
 
 PG_DELETE = (
     "DELETE FROM documents WHERE metadata @> %s::jsonb"
-    " AND metadata->>'document_id' = %s AND metadata->>'gaik_owner' "
+    " AND metadata->>'gaik_document_key' = %s AND metadata->>'gaik_owner' "
 )
+PG_KEY = '{"gaik_document_key": "report"}'
+PG_LOCK = "SELECT pg_advisory_xact_lock(%s)"
+
+
+def _writes(recorder):
+    return [(sql, params) for sql, params in recorder.calls if "pg_attribute" not in sql]
 
 
 def test_pg_replace_deletes_the_documents_rows_before_inserting():
     store, recorder = _pg()
     store.add(_chunks("report", ["alpha"]), [A1], replace=True)
 
-    calls = [(sql, params) for sql, params in recorder.calls if not sql.startswith("SELECT")]
-    assert calls[0] == (PG_DELETE + "IS NULL", ('{"document_id": "report"}', "report"))
+    calls = [(sql, params) for sql, params in _writes(recorder) if sql != PG_LOCK]
+    assert calls[0] == (PG_DELETE + "IS NULL", (PG_KEY, "report"))
     assert calls[1][0].startswith("INSERT")
 
 
@@ -444,22 +514,60 @@ def test_pg_replace_deletes_only_the_rows_of_the_stores_owner():
     store, recorder = _pg(owner="user-a")
     store.add(_chunks("report", ["alpha"]), [A1], replace=True)
 
-    sql, params = recorder.calls[1]
+    [(sql, params)] = [c for c in recorder.calls if c[0].startswith("DELETE")]
     assert sql == PG_DELETE + "= %s"
-    assert params == ('{"document_id": "report"}', "report", "user-a")
+    assert params == (PG_KEY, "report", "user-a")
 
 
 def test_pg_delete_document_compares_the_document_id_exactly():
     store, recorder = _pg()
     store.delete_document("report")
 
-    assert recorder.calls[-1] == (PG_DELETE + "IS NULL", ('{"document_id": "report"}', "report"))
+    assert recorder.calls[-1] == (PG_DELETE + "IS NULL", (PG_KEY, "report"))
 
     store.delete_document("report", owner="user-a")
-    assert recorder.calls[-1] == (
-        PG_DELETE + "= %s",
-        ('{"document_id": "report"}', "report", "user-a"),
-    )
+    assert recorder.calls[-1] == (PG_DELETE + "= %s", (PG_KEY, "report", "user-a"))
+
+
+def test_pg_add_keeps_an_int_document_id_and_records_its_string():
+    store, recorder = _pg()
+    store.add(_chunks_with_id(7, ["alpha"]), [A1])
+
+    [(_, params)] = _inserts(recorder)
+    metadata = json.loads(params[2])
+    assert metadata["document_id"] == 7
+    assert metadata["gaik_document_key"] == "7"
+
+
+def test_pg_replace_and_delete_lock_the_document_before_deleting():
+    store, recorder = _pg()
+    store.add(_chunks("report", ["alpha"]) + _chunks("minutes", ["beta"]), [A1, B1], replace=True)
+
+    calls = _writes(recorder)
+    locks = [params[0] for sql, params in calls[:2]]
+    assert [sql for sql, _ in calls[:2]] == [PG_LOCK, PG_LOCK]
+    assert locks == sorted(locks)
+    assert all(sql.startswith("DELETE") for sql, _ in calls[2:4])
+    assert set(locks) == {
+        store._document_lock_key("report", None),
+        store._document_lock_key("minutes", None),
+    }
+
+    store.delete_document("report")
+    assert recorder.calls[-2] == (PG_LOCK, (store._document_lock_key("report", None),))
+
+
+def test_pg_lock_keys_differ_by_document_owner_and_table():
+    store, _ = _pg()
+    keys = {
+        store._document_lock_key("report", None),
+        store._document_lock_key("report", "user-a"),
+        store._document_lock_key("minutes", None),
+    }
+    store.table_name = "other"
+    keys.add(store._document_lock_key("report", None))
+    assert len(keys) == 4
+    assert store._document_lock_key("report", None) == store._document_lock_key("report", None)
 
 
 @pytest.mark.parametrize("bad", [{"$ne": "x"}, ["report"], None, 1.5, True])
@@ -575,3 +683,61 @@ def test_pg_setup_adds_chunk_key_to_a_table_made_without_it(pg_store):
     pg_store.add(_chunks("report", ["alpha"]), [A1])
 
     assert pg_store.count() == 2
+
+
+@live
+def test_pg_replace_and_delete_leave_a_legacy_row_that_names_the_document(pg_store):
+    pg_store.setup()
+    conn = pg_store._get_conn()
+    conn.execute(
+        f"INSERT INTO {pg_store.table_name} (content, metadata, embedding)"
+        " VALUES ('legacy', '{\"document_id\": \"report\"}'::jsonb, '[0,0,1]')"
+    )
+    conn.commit()
+
+    pg_store.add(_chunks("report", ["alpha"]), [A1])
+    pg_store.add(_chunks("report", ["beta"]), [B1], replace=True)
+    assert pg_store.count() == 2
+    assert pg_store.delete_document("report") == 1
+    [row] = pg_store.search(C1, top_k=5, filters={"document_id": "report"})
+    assert row[0].page_content == "legacy"
+
+
+@live
+def test_pg_a_filter_on_an_int_document_id_finds_the_rows(pg_store):
+    pg_store.setup()
+    pg_store.add(_chunks_with_id(7, ["alpha", "beta"]), [A1, B1])
+    pg_store.add(_chunks_with_id(7, ["alpha", "gamma"]), [A1, C1], replace=True)
+
+    found = pg_store.search(A1, top_k=10, filters={"document_id": 7})
+    assert sorted(doc.page_content for doc, _ in found) == ["alpha", "gamma"]
+    assert pg_store.delete_document(7) == 2
+
+
+@live
+def test_pg_replace_waits_for_another_replace_of_the_same_document(pg_store):
+    import psycopg
+
+    pg_store.setup()
+    pg_store.add(_chunks("report", ["alpha"]), [A1])
+    other = psycopg.connect(PG_URL)
+    try:
+        # Another writer holds the document's lock in an open transaction.
+        other.execute(
+            "SELECT pg_advisory_xact_lock(%s)", (pg_store._document_lock_key("report", None),)
+        )
+        done = threading.Event()
+
+        def replace():
+            pg_store.add(_chunks("report", ["beta"]), [B1], replace=True)
+            done.set()
+
+        worker = threading.Thread(target=replace)
+        worker.start()
+        assert not done.wait(1.0)
+        other.rollback()
+        worker.join(10)
+        assert done.is_set()
+    finally:
+        other.close()
+    assert _texts(pg_store, "report") == ["beta"]

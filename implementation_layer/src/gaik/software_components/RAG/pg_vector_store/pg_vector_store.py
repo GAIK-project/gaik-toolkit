@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import logging
 import re
@@ -28,6 +29,7 @@ except ImportError as exc:
 
 from gaik.software_components.RAG._chunk_ids import (
     CHUNK_OWNER_KEY,
+    DOCUMENT_KEY,
     chunk_ids,
     delete_scope,
     document_scopes,
@@ -847,8 +849,10 @@ class PgVectorStore:
 
         Each row gets a ``chunk_key`` from its document, its owner and its
         text: the document is ``metadata["document_id"]``, else ``source``, else
-        ``document_name``, and is stored in the metadata as ``document_id``; the
-        owner is the store's ``owner``.
+        ``document_name``. A ``document_id`` the caller set is stored as given;
+        without one it is set to the document. The document is also stored as
+        a string under ``gaik_document_key``, which ``replace`` and
+        :meth:`delete_document` match on. The owner is the store's ``owner``.
         Adding a chunk that is already stored updates its row instead of
         inserting a second one. A chunk whose metadata names no document gets no
         ``chunk_key`` and is inserted each time, as before. A table made by an older gaik gets the
@@ -857,15 +861,19 @@ class PgVectorStore:
 
         Args:
             documents: List of langchain Documents to store. A ``document_id``
-                in the metadata must be a string (an int is stored as its
-                string); other types raise ``ValueError``.
+                in the metadata must be a string or an int; other types raise
+                ``ValueError``.
             embeddings: Corresponding embedding vectors (same length as documents).
             replace: First delete every stored row of each document in
                 ``documents``, in the same transaction, so chunks the document
                 no longer has do not stay behind. Only rows with the same owner
                 as the ones added (or, without one, rows that name no owner) are
-                deleted. Pass all of a document's chunks in one call. If the add
-                fails, the transaction is rolled back and the old rows stay.
+                deleted, and only rows this release stored (with
+                ``gaik_document_key``). Two calls replacing the same document
+                of the same owner wait for each other (a transaction-scoped
+                advisory lock). Pass all of a document's chunks in one call. If
+                the add fails, the transaction is rolled back and the old rows
+                stay.
 
         Returns:
             List of row IDs, inserted or updated.
@@ -901,7 +909,14 @@ class PgVectorStore:
 
         with conn.cursor() as cur:
             if replace:
-                for doc_id, owner in document_scopes(keyed):
+                scopes = document_scopes(keyed)
+                # Two calls replacing the same document wait for each other, so
+                # one does not delete while the other inserts and leave a mix of
+                # both versions. Locks are taken in a fixed order (no deadlock)
+                # and released at commit or rollback.
+                for lock in sorted({self._document_lock_key(*scope) for scope in scopes}):
+                    cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock,))
+                for doc_id, owner in scopes:
                     cur.execute(*self._delete_document_sql(doc_id, owner))
             for doc, emb, metadata, key in zip(documents, embeddings, metadatas, keyed):
                 chunk_key = key.chunk_id
@@ -1010,15 +1025,17 @@ class PgVectorStore:
     def delete_document(self, document_id: str, *, owner: str | None = None) -> int:
         """Delete every row of one document and one owner.
 
-        ``add()`` stores ``document_id`` in each row's metadata (the chunk's own
-        ``document_id``, else its ``source``, else its ``document_name``). Rows
-        added by a gaik release before that have none and are not found:
-        index them again into a new table.
+        ``add()`` records each row's document in its metadata under
+        ``gaik_document_key`` (the chunk's own ``document_id``, else its
+        ``source``, else its ``document_name``, as a string). Rows added by a
+        gaik release before that have none and are never deleted here, even
+        with a ``document_id`` in their metadata: index them again into a new
+        table.
 
         Args:
             document_id: The document, compared exactly with the metadata's
-                ``document_id``. A string, or an int compared as its string;
-                other types raise ``ValueError``.
+                ``gaik_document_key``. A string, or an int compared as its
+                string; other types raise ``ValueError``.
             owner: Delete only the rows recorded for this owner (metadata
                 ``gaik_owner``). Without it, only rows that name no owner are
                 deleted, so a call without an owner never removes an owner's
@@ -1029,15 +1046,25 @@ class PgVectorStore:
         """
         doc_id, owner = delete_scope(self, document_id, owner)
         conn = self._get_conn()
+        conn.execute("SELECT pg_advisory_xact_lock(%s)", (self._document_lock_key(doc_id, owner),))
         result = conn.execute(*self._delete_document_sql(doc_id, owner))
         conn.commit()
         return result.rowcount
 
+    def _document_lock_key(self, document_id: str, owner: str | None) -> int:
+        """The advisory lock key (a signed bigint) for one document of one owner here."""
+        payload = json.dumps([self.table_name, document_id, owner], ensure_ascii=False)
+        digest = hashlib.sha256(payload.encode("utf-8")).digest()
+        return int.from_bytes(digest[:8], "big", signed=True)
+
     def _delete_document_sql(self, document_id: str, owner: str | None) -> tuple[str, tuple]:
         """The DELETE for one document's rows of exactly one owner (or none).
 
-        The containment test lets the metadata index find the rows; the
-        ``->>`` comparisons then match the document id and owner exactly.
+        Rows match on ``gaik_document_key``, which only this release's ``add()``
+        writes, so rows an older gaik stored are never deleted here, even with a
+        ``document_id`` in their metadata. The containment test lets the
+        metadata index find the rows; the ``->>`` comparisons then match the
+        document and owner exactly.
         """
         if owner is None:
             owner_clause, owner_params = f"metadata->>'{CHUNK_OWNER_KEY}' IS NULL", ()
@@ -1045,9 +1072,9 @@ class PgVectorStore:
             owner_clause, owner_params = f"metadata->>'{CHUNK_OWNER_KEY}' = %s", (owner,)
         sql = (
             f"DELETE FROM {self.table_name} WHERE metadata @> %s::jsonb"
-            f" AND metadata->>'document_id' = %s AND {owner_clause}"
+            f" AND metadata->>'{DOCUMENT_KEY}' = %s AND {owner_clause}"
         )
-        return sql, (json.dumps({"document_id": document_id}), document_id, *owner_params)
+        return sql, (json.dumps({DOCUMENT_KEY: document_id}), document_id, *owner_params)
 
     # ------------------------------------------------------------------
     # Search methods

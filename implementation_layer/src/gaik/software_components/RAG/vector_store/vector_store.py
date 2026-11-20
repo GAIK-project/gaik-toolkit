@@ -7,6 +7,7 @@ import uuid
 import warnings
 
 from gaik.software_components.RAG._chunk_ids import (
+    DOCUMENT_KEY,
     chunk_ids,
     delete_scope,
     document_scopes,
@@ -128,22 +129,27 @@ class VectorStore:
 
         Each chunk's id comes from its document, its owner and its text (see
         ``_chunk_ids``): the document is ``metadata["document_id"]``, else
-        ``source``, else ``document_name``, and is stored as ``document_id``;
-        the owner is the store's ``owner``. Adding a chunk that is already stored
-        replaces it, metadata included, instead of storing a second copy. A
-        chunk whose metadata names no document is stored as a new one each time.
+        ``source``, else ``document_name``. A ``document_id`` the caller set is
+        stored as given; without one it is set to the document. The document
+        is also stored as a string under ``gaik_document_key``, which
+        ``replace`` and :meth:`delete_document` match on. The owner is the
+        store's ``owner``. Adding a chunk that is already stored replaces it,
+        metadata included, instead of storing a second copy. A chunk whose
+        metadata names no document is stored as a new one each time.
 
         Args:
             documents: The chunks. A ``document_id`` in the metadata must be a
-                string (an int is stored as its string); other types raise
-                ``ValueError``.
+                string or an int; other types raise ``ValueError``.
             embeddings: Their embeddings, in the same order.
             replace: After storing, delete the other chunks of each document in
                 ``documents``, so chunks the document no longer has do not stay
                 behind. Only chunks with the same owner as the ones added (or,
-                without one, chunks that name no owner) are deleted. Pass all of
-                a document's chunks in one call. If storing fails, the old
-                chunks are not deleted.
+                without one, chunks that name no owner) are deleted, and only
+                chunks this release stored (with ``gaik_document_key``). Pass
+                all of a document's chunks in one call. If storing fails, no
+                stored chunk is deleted: in Chroma the chunks of the failed
+                slice are put back as they were, and slices stored before it
+                keep their new version.
         """
         if len(documents) != len(embeddings):
             raise ValueError("documents and embeddings must have the same length")
@@ -180,19 +186,11 @@ class VectorStore:
             metadatas = [_chroma_metadata(doc.metadata) for doc in stored]
             # Chroma rejects a single call above its maximum batch size, so send
             # slices. If one fails, the slices before it stay stored.
-            # An upsert would merge the new metadata into the stored one, and a key
-            # the new chunk lacks (a heading it no longer has) would stay. So the
-            # stored chunks with these ids are deleted and the chunks added anew; if
-            # that add fails, the slice's earlier versions are gone too.
             batch = _max_batch_size(self._client) or len(ids)
             for start in range(0, len(ids), batch):
                 end = start + batch
-                self._collection.delete(ids=ids[start:end])  # type: ignore[union-attr]
-                self._collection.add(  # type: ignore[union-attr]
-                    ids=ids[start:end],
-                    embeddings=embeddings[start:end],
-                    documents=texts[start:end],
-                    metadatas=metadatas[start:end],
+                self._replace_slice(
+                    ids[start:end], embeddings[start:end], texts[start:end], metadatas[start:end]
                 )
             keyed = ids
 
@@ -201,13 +199,44 @@ class VectorStore:
             for doc_id, owner in document_scopes(keys):
                 self._delete_ids([i for i in self._ids_in_scope(doc_id, owner) if i not in kept])
 
+    def _replace_slice(self, ids, embeddings, texts, metadatas) -> None:
+        """Store one slice in Chroma in place of the chunks stored with the same ids.
+
+        An upsert would merge the new metadata into the stored one, and a key the
+        new chunk lacks (a heading it no longer has) would stay. So the stored
+        chunks with these ids are read, deleted and the slice added anew; if the
+        add fails (an embedding of another dimension, say), the chunks read are
+        added back as they were and the error is raised.
+        """
+        collection = self._collection
+        old = collection.get(  # type: ignore[union-attr]
+            ids=ids, include=["embeddings", "documents", "metadatas"]
+        )
+        old_ids = list(old.get("ids") or [])
+        if old_ids:
+            collection.delete(ids=old_ids)  # type: ignore[union-attr]
+        try:
+            collection.add(  # type: ignore[union-attr]
+                ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas
+            )
+        except Exception:
+            if old_ids:
+                collection.add(  # type: ignore[union-attr]
+                    ids=old_ids,
+                    embeddings=old["embeddings"],
+                    documents=old["documents"],
+                    metadatas=old["metadatas"],
+                )
+            raise
+
     def delete_document(self, document_id: str, *, owner: str | None = None) -> int:
         """Delete every chunk of one document and one owner.
 
-        ``add()`` stores ``document_id`` with each chunk (the chunk's own
-        ``document_id``, else its ``source``, else its ``document_name``).
-        Chunks stored by a gaik release before that have none and are not
-        found: index them again into a new collection.
+        ``add()`` records each chunk's document under ``gaik_document_key``
+        (the chunk's own ``document_id``, else its ``source``, else its
+        ``document_name``, as a string). Chunks stored by a gaik release before
+        that have none and are never deleted here, even when their metadata
+        names a ``document_id``: index them again into a new collection.
 
         Args:
             document_id: The document, compared exactly. A string, or an int
@@ -234,7 +263,7 @@ class VectorStore:
                 if in_scope(doc.metadata, document_id, owner)
             ]
         found = self._collection.get(  # type: ignore[union-attr]
-            where={"document_id": {"$eq": document_id}}, include=["metadatas"]
+            where={DOCUMENT_KEY: {"$eq": document_id}}, include=["metadatas"]
         )
         return [
             chunk_id

@@ -92,9 +92,13 @@ index_result = workflow.index_documents(
     document_ids: list[str] | None = None,
 )
 # Each file is one document, identified by its entry in document_ids or else its
-# path with forward slashes (Path(path).as_posix()); filenames are display names only, so two files with the same name are two
-# documents. Indexing a document again replaces its chunks. Files saved under a new
-# temporary path each time need document_ids to be replaced.
+# path as given, with forward slashes (Path(path).as_posix()); filenames are display
+# names only, so two files with the same name are two documents. Indexing a document
+# again replaces its chunks. Files saved under a new temporary path each time need
+# document_ids to be replaced.
+# The path is not resolved: "data/a.pdf" and its absolute path are two documents,
+# and one relative path indexed from two working directories is one. Pass paths
+# spelled the same way each time, or document_ids.
 
 deleted = workflow.delete_document(document_id: str)  # chunks deleted
 # A persisted collection from an earlier gaik release still answers, but its
