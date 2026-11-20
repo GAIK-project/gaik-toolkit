@@ -127,6 +127,17 @@ export function runWarnings(raw: unknown): RunWarning[] {
 }
 
 /**
+ * True when a completed run returned warnings or failed its grounding check:
+ * it is shown as finished-needs-review rather than an unqualified success (#252).
+ */
+export function runNeedsReview(
+  warnings: readonly RunWarning[],
+  validation: { passed?: boolean } | null | undefined,
+): boolean {
+  return warnings.length > 0 || validation?.passed === false;
+}
+
+/**
  * What the PoC tab's last step ("use the solution") is about:
  *
  * - `no_package`: there is nothing to use yet;

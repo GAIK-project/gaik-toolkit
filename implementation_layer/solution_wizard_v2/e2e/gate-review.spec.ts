@@ -440,7 +440,7 @@ test.describe("Gates 2–4 — the same decision bar", () => {
     await setMockSessionStep(request, baseURL as string, "ses_laskut", 10, "run-1");
     await page.reload();
     await expect(page.getByTestId("now-line")).toContainText(
-      "Testi onnistui. Tarkista tulos PoC-välilehdellä ja valitse sitten alareunasta Hyväksy testiajo tai Pyydä muutoksia.",
+      "Testi onnistui. Tarkista tulos PoC-välilehdellä ja valitse sitten Hyväksy testiajo tai Pyydä muutoksia.",
     );
     // The line points at the bar it names: the approve button takes the focus.
     await page.getByTestId("now-line").getByRole("button", { name: "Näytä hyväksyntä sivulla" }).click();

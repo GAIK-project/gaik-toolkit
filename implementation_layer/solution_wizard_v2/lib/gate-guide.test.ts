@@ -50,16 +50,17 @@ describe("nowLine", () => {
     }
   });
 
-  it("after a test run that succeeded names the decision bar's two buttons by their labels", () => {
+  it("after a test run that succeeded names the decision bar's two buttons by their labels without naming a screen edge", () => {
     for (const loc of LOCALES) {
       const t = dictionary(loc);
       const line = nowLine(t, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true);
       expect(line).toContain(t.gateDecisions[2]);
       expect(line).toContain(t.gateRequestChanges);
+      expect(line).not.toMatch(/alareunasta|at the bottom/i);
       expect(line).not.toMatch(/\{\w+\}/);
     }
     expect(nowLine(fi, GATE_STEPS[2], buildGateStatus(GATE_STEPS[2]), true)).toBe(
-      "Testi onnistui. Tarkista tulos PoC-välilehdellä ja valitse sitten alareunasta Hyväksy testiajo tai Pyydä muutoksia.",
+      "Testi onnistui. Tarkista tulos PoC-välilehdellä ja valitse sitten Hyväksy testiajo tai Pyydä muutoksia.",
     );
   });
 

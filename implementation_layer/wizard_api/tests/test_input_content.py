@@ -395,3 +395,10 @@ def test_the_accepted_types_are_listed_with_their_extensions():
     assert listed[0] == {"kind": "wav", "label": "WAV", "extensions": [".wav"]}
     # The same labels, in the same order, as the refusal's own words.
     assert ", ".join(item["label"] for item in listed) == input_content.describe(kinds)
+
+
+def test_contract_kinds_excludes_implicit_json_fallback_for_explicit_audio_contract():
+    kinds = input_content.contract_kinds({"technical_spec": {"input_types": ["audio"]}})
+
+    assert kinds == frozenset({"wav", "mp3", "m4a"})
+    assert input_content.contract_kinds({}) == ALL_KINDS

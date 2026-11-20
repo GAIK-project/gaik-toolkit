@@ -286,6 +286,7 @@ def session_detail(
         blueprint=blueprint,
         business_context=_business_context_from_draft(draft),
         target_output_spec=artifact_sync.target_output_spec_from_draft(draft) if draft else None,
+        extraction_proposal=artifact_sync.read_extraction_proposal(session.output_dir),
         assumptions=_assumptions_from_draft(draft),
         messages=messages,
         pending_turn=_pending_turn(session),

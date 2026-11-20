@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type OutputSpec,
   type Process,
+  type ProcessNode,
   currentTask,
   fieldProblem,
   formFields,
@@ -11,6 +12,7 @@ import {
   isTable,
   parseInput,
   problemCount,
+  reusablePocInputsForTask,
   rowProblems,
   shapeProcess,
   stepSegments,
@@ -359,5 +361,45 @@ describe("the stepper's segments", () => {
 
     expect(states(unattended, "running")).toEqual(["done", "current", "current", "current"]);
     expect(states(unattended, "completed")).toEqual(["done", "done", "done", "done"]);
+  });
+});
+
+describe("reusablePocInputsForTask", () => {
+  const audioTask: ProcessNode = {
+    id: "T_audio",
+    kind: "userTask",
+    name: "Record voice note",
+    lane: "L1",
+    inputs: [],
+    outputs: ["Voice Message Audio"],
+  };
+  const docTask: ProcessNode = {
+    id: "T_doc",
+    kind: "userTask",
+    name: "Attach report PDF",
+    lane: "L2",
+    inputs: [],
+    outputs: ["Inspection PDF"],
+  };
+  const reusable = [
+    { name: "call.wav", bytes: 4096, uploaded: true },
+    { name: "report.pdf", bytes: 8192, uploaded: true },
+  ];
+
+  it("matches audio and document files to their respective input steps", () => {
+    expect(reusablePocInputsForTask(reusable, audioTask, [audioTask, docTask], []).map((f) => f.name)).toEqual([
+      "call.wav",
+    ]);
+    expect(reusablePocInputsForTask(reusable, docTask, [audioTask, docTask], []).map((f) => f.name)).toEqual([
+      "report.pdf",
+    ]);
+  });
+
+  it("excludes filenames already attached anywhere in the case", () => {
+    expect(
+      reusablePocInputsForTask(reusable, docTask, [audioTask, docTask], [
+        { name: "report.pdf", bytes: 8192, task: "T_audio" },
+      ]),
+    ).toEqual([]);
   });
 });

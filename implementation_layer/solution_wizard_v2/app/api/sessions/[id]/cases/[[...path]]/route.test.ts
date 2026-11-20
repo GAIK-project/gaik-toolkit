@@ -87,6 +87,23 @@ describe("cases relay", () => {
     expect(vi.mocked(audit)).toHaveBeenCalledWith("case.input.delete", expect.anything());
   });
 
+  it("relays copying a compatible PoC test file into a case and writes it to the audit trail", async () => {
+    vi.mocked(apiCases).mockResolvedValue(
+      Response.json({ name: "report.wav", bytes: 2048, task: "T_report" }, { status: 201 }),
+    );
+    const res = await call("POST", [CASE, "inputs", "from-poc"], {
+      filename: "report.wav",
+      task: "T_report",
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ name: "report.wav", bytes: 2048, task: "T_report" });
+    expect(vi.mocked(apiCases).mock.calls[0].slice(0, 2)).toEqual(["s1", `${CASE}/inputs/from-poc`]);
+    expect(vi.mocked(audit)).toHaveBeenCalledWith(
+      "case.input.upload",
+      expect.objectContaining({ outcome: "success", action: `${CASE}/inputs/from-poc` }),
+    );
+  });
+
   it("turns a BPMN parser error with a server path into the generic message", async () => {
     vi.mocked(apiCases).mockResolvedValue(
       Response.json(

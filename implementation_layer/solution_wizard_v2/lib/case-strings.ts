@@ -29,6 +29,9 @@ const fi = {
   stop: "Lopeta nauhoitus",
   upload: "Lataa tiedosto",
   dropHint: "Pudota tiedosto tähän tai valitse se",
+  reusePocFile: "Käytä testiajossa käytettyä tiedostoa",
+  reusePocFiles: "Käytä testiajossa käytettyä tiedostoa:",
+  reusingPocFile: "Lisätään…",
   acceptedTypes: "Hyväksytyt tiedostotyypit",
   or: "tai",
   errors: {
@@ -185,6 +188,9 @@ const en: CaseStrings = {
   stop: "Stop recording",
   upload: "Upload file",
   dropHint: "Drop a file here or choose it",
+  reusePocFile: "Use the file from the test run",
+  reusePocFiles: "Use a file from the test run:",
+  reusingPocFile: "Adding…",
   acceptedTypes: "Accepted file types",
   or: "or",
   errors: {

@@ -23,6 +23,7 @@ const ALLOWED: Record<string, RegExp[]> = {
   POST: [
     /^$/,
     new RegExp(`^${UUID}/inputs$`),
+    new RegExp(`^${UUID}/inputs/from-poc$`),
     new RegExp(`^${UUID}/submit$`),
     new RegExp(`^${UUID}/step$`),
     new RegExp(`^${UUID}/review$`),
