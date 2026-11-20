@@ -39,6 +39,36 @@ Tämä on prototyyppi näytille, ei vielä toiminnallinen wizard (chat, BPMN ja 
 
 ## Kirjautuminen
 
+### Supabase-kirjautuminen (GAIK-demon tunnukset)
+
+`WIZARD_AUTH_MODE=supabase` kirjaa käyttäjät GAIK-demon Supabase-projektin
+kautta. Tila valitaan ajon aikana, joten sama image käy myös dev-kirjautumisella
+buildattuna (`NEXT_PUBLIC_DEV_AUTH=true` jää silloin pois käytöstä).
+Wizardissa ei ole omaa rekisteröitymistä: tunnus luodaan demossa, ja
+kirjautumissivu linkittää demon rekisteröitymiseen (`WIZARD_SUPABASE_SIGNUP_URL`,
+oletuksena demon `/sign-up`).
+
+Sisään pääsee vain vahvistettu sähköpostiosoite, joka on joko
+`WIZARD_ALLOWED_EMAILS`-listassa tai, kun `WIZARD_SUPABASE_ACCESS=access_requests`,
+jonka oma rivi demon `access_requests`-taulussa on hyväksytty (`status = approved`)
+tai jolle on annettu `wizard_access`. Rivi luetaan käyttäjän omalla istunnolla,
+joten taulun säännöt (RLS) ratkaisevat, mitä näkyy; puuttuva tai lukematon rivi ei
+päästä ketään sisään. Hyväksyntää odottava tunnus kirjataan ulos ja ohjataan
+kirjautumissivulle ilmoituksen kanssa, ja API-kutsu ilman pääsyä saa `401`.
+
+| Muuttuja | Merkitys |
+| --- | --- |
+| `WIZARD_AUTH_MODE` | `supabase` valitsee tämän tilan |
+| `WIZARD_SUPABASE_URL`, `WIZARD_SUPABASE_KEY` | projektin osoite ja julkinen (anon/publishable) avain, luetaan ajon aikana; ei koskaan secret- tai service role -avainta |
+| `WIZARD_SUPABASE_ACCESS` | `access_requests`: pääsy demon taulusta |
+| `WIZARD_SUPABASE_SIGNUP_URL` | rekisteröitymislinkki; tyhjä piilottaa sen |
+| `WIZARD_ALLOWED_EMAILS` | lisäksi päästettävät osoitteet, pilkuin eroteltuna |
+
+Demon Supabase-projektin redirect-listalle lisätään wizardin osoite, ja
+sähköpostivahvistuksen on oltava päällä (vahvistamaton osoite on pelkkä väite).
+
+### Dev-kirjautuminen
+
 - **Rekisteröidy**-napilla luot tilin. Jos Supabase-projektissa on sähköpostivahvistus päällä, vahvista linkki sähköpostista ennen kirjautumista (tai kytke vahvistus pois: Authentication → Providers → Email → Confirm email).
 - **Kirjaudu**-napilla kirjaudut sisään, jolloin pääset wizard-runkoon.
 - **Kirjaudu ulos** -nappi headerissa.

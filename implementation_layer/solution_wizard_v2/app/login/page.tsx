@@ -4,6 +4,7 @@ import Link from "next/link";
 import { login } from "./actions";
 import { getI18n } from "@/lib/i18n";
 import { gaikDemoUrl } from "@/lib/gaik-demo";
+import { supabaseAuthEnabled, supabaseSignUpUrl } from "@/lib/supabase-auth";
 import { Icon } from "@/components/icons";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { getApiVersion } from "@/lib/wizard-api-client";
@@ -21,6 +22,9 @@ export default async function LoginPage({
   const error = loginError(t, params.error);
   const message = loginMessage(t, params.message);
   const demoUrl = gaikDemoUrl();
+  // The wizard has no sign-up of its own: with Supabase sign-in an account is
+  // made in the demo, whose approval also opens the wizard.
+  const signUpUrl = supabaseAuthEnabled() ? supabaseSignUpUrl() : null;
 
   return (
     <main
@@ -116,6 +120,15 @@ export default async function LoginPage({
             </button>
           </div>
         </form>
+        {signUpUrl && (
+          <a
+            href={signUpUrl}
+            data-testid="sign-up-in-demo"
+            className="mt-4 inline-block text-sm font-medium text-text-secondary underline hover:text-text"
+          >
+            {t.signUpInDemo}
+          </a>
+        )}
         <p className="mt-5 text-xs leading-relaxed text-text-muted" data-testid="login-ai-notice">
           {t.loginAiNotice}
         </p>

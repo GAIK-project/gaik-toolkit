@@ -29,6 +29,7 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ audit: state.audit }));
 
 import { resetDevLoginCounter } from "@/lib/login-throttle";
+import { createClient } from "@/lib/supabase/server";
 import { login } from "./actions";
 
 function form(email: string, password: string): FormData {
@@ -154,5 +155,50 @@ describe("dev sign-in attempts are bounded", () => {
     await attempt("alice@example.test", "wrong");
     await attempt("alice@example.test", "wrong");
     expect(await attempt("alice@example.test", "alice-pw")).toBe("/");
+  });
+});
+
+
+describe("Supabase sign-in on a dev-login image", () => {
+  const user = { id: "u1", email: "ada@example.test", email_confirmed_at: "2026-11-20T10:00:00Z" };
+
+  function supabaseWith(row: unknown) {
+    const signOut = vi.fn(async () => ({}));
+    const query = {
+      select: () => query,
+      eq: () => query,
+      maybeSingle: async () => ({ data: row, error: null }),
+    };
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        signInWithPassword: vi.fn(async () => ({ data: { user }, error: null })),
+        signOut,
+      },
+      from: () => query,
+    } as never);
+    return signOut;
+  }
+
+  beforeEach(() => {
+    process.env.WIZARD_AUTH_MODE = "supabase";
+    process.env.WIZARD_SUPABASE_ACCESS = "access_requests";
+  });
+  afterEach(() => {
+    delete process.env.WIZARD_AUTH_MODE;
+    delete process.env.WIZARD_SUPABASE_ACCESS;
+  });
+
+  it("signs in through Supabase, not with the dev accounts", async () => {
+    supabaseWith({ status: "approved" });
+    expect(await attempt("alice@example.test", "alice-pw")).toBe("/");
+    expect(lastAudit()).toMatchObject({ mode: "supabase", outcome: "success" });
+  });
+
+  it("signs an account the demo has not approved out again and says it waits", async () => {
+    const signOut = supabaseWith({ status: "pending" });
+    expect(await attempt("ada@example.test", "right-pw")).toBe("/login?error=pending");
+    expect(signOut).toHaveBeenCalled();
+    expect(lastAudit()).toMatchObject({ outcome: "denied", reason: "no_access", mode: "supabase" });
+    expect(state.cookieSet).not.toHaveBeenCalled();
   });
 });
