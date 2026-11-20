@@ -215,6 +215,42 @@ the web app's `WIZARD_AUTH_MODE=proxy` and `WIZARD_OIDC_*`; `signin-off` undoes
 it. The web app does not take the proxy's word for who the user is: it checks the
 forwarded access token itself (`lib/proxy-auth.ts`).
 
+## Sign-in through the GAIK demo's Supabase
+
+A stack whose users make their accounts in the GAIK demo signs them in through
+the demo's Supabase project instead (`solution_wizard_v2/README.md`,
+"Supabase-kirjautuminen"). The mode is chosen at run time, so the stack's usual
+web image serves it. To move a stack from the Keycloak sign-in to it:
+
+1. Put the project's URL and **public** key in a Secret of the stack's own (the
+   demo's secret key never goes to the wizard):
+
+   ```bash
+   oc create secret generic "$NAME-supabase" -n "$PROJECT" \
+     --from-literal=WIZARD_SUPABASE_URL='<project URL>' \
+     --from-literal=WIZARD_SUPABASE_KEY='<public key>'
+   ```
+
+2. In the demo's Supabase project, add `https://$WEB_HOST/` to the redirect
+   URLs, and check that *Confirm email* is on and the `access_requests` rules
+   are applied (`toolkit_demo_app/docs/AUTH_FLOW.md`).
+3. Take the Keycloak proxy away: `PROJECT=<project> INSTANCE=<name> ./deploy.sh signin-off`.
+   The Route leads to the web app again and its `WIZARD_OIDC_*` settings go.
+4. Set the mode and read the Secret:
+
+   ```bash
+   oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" --from="secret/$NAME-supabase"
+   oc set env "deployment/$WEB_DEPLOYMENT" -n "$PROJECT" \
+     WIZARD_AUTH_MODE=supabase WIZARD_SUPABASE_ACCESS=access_requests WIZARD_DEV_USERS-
+   ```
+
+5. Check: an approved demo account gets in, one still waiting is told so, and
+   the sign-in page links to the demo's sign-up.
+
+Back to Keycloak: `oc set env "deployment/$WEB_DEPLOYMENT" WIZARD_AUTH_MODE-` and
+`./deploy.sh signin`. The sessions are kept either way; they belong to the
+e-mail address.
+
 ## Environment variables
 
 **wizard-v2-api** (runtime):
