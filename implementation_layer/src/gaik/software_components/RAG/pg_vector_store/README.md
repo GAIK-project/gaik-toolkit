@@ -221,8 +221,10 @@ runs; until then `add()` inserts as before and logs a warning. Its existing rows
 working for search but have no `chunk_key` and no `gaik_document_key`, so
 `replace=True` and `delete_document` never delete them (even rows whose metadata
 names a `document_id`), and re-adding a document stores it next to
-its old rows. Re-index into a new `table_name`, or delete the old rows once
-(`DELETE FROM <table> WHERE chunk_key IS NULL`) and index the documents again.
+its old rows. Re-index into a new `table_name`. Deleting the old rows with
+`DELETE FROM <table> WHERE chunk_key IS NULL` is safe only when every chunk you index
+names a document: a chunk without one never gets a `chunk_key`, so that statement
+deletes current rows of that kind too.
 
 ### `health()` — is each arm of the search alive?
 

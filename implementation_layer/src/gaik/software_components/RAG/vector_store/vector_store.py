@@ -163,6 +163,7 @@ class VectorStore:
         keyed = [key.chunk_id or uuid.uuid4().hex for key in keys]
         stored = [
             Document(
+                id=doc.id,  # a caller's own id stays on the in-memory copy, as before
                 page_content=doc.page_content,
                 metadata=with_document_id(doc.metadata, key.document_id),
             )

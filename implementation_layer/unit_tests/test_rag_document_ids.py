@@ -94,6 +94,16 @@ def test_a_text_repeated_in_one_document_keeps_each_occurrence(store):
     assert store.count() == 3
 
 
+def test_the_in_memory_store_keeps_a_callers_document_id():
+    from gaik.software_components.RAG.vector_store import VectorStore
+
+    store = VectorStore(persist=False)
+    store.add([Document(id="my-id", page_content="alpha", metadata={"document_name": "r"})], [A1])
+
+    [(found, _)] = store.search(A1, top_k=1)
+    assert found.id == "my-id"
+
+
 def test_the_same_text_in_two_documents_is_two_chunks(store):
     store.add(_chunks("report", ["shared text"]), [A1])
     store.add(_chunks("minutes", ["shared text"]), [A1])
