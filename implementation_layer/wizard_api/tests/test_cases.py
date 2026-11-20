@@ -2308,6 +2308,27 @@ def test_cases_model_lists_compatible_reusable_poc_inputs_and_from_poc_copies_ex
 
 
 @requires_postgres
+def test_from_poc_rejects_a_step_with_no_types_in_the_session_contract(
+    client, db_session, monkeypatch
+):
+    sid = _session_with_package(client, db_session)
+    _diagram(monkeypatch, BPMN)
+    out = Path(session_service.get_session(db_session, uuid.UUID(sid)).output_dir)
+    (out / artifact_sync.DRAFT_BLUEPRINT_FILE).write_text(
+        json.dumps({"technical_spec": {"input_types": ["txt"]}}), encoding="utf-8"
+    )
+    (out / "poc" / "sample_input" / "report.txt").write_text("Fault report", encoding="utf-8")
+    case = client.post(f"/sessions/{sid}/cases").json()
+    url = f"/sessions/{sid}/cases/{case['id']}"
+
+    result = client.post(f"{url}/inputs/from-poc", json={"filename": "report.txt", "task": "T_rec"})
+
+    assert result.status_code == 415, result.text
+    assert result.json()["detail"]["error"] == "input_type_not_accepted"
+    assert client.get(url).json()["inputs"] == []
+
+
+@requires_postgres
 def test_from_poc_refuses_names_that_leave_the_input_directory(client, db_session):
     sid = _session_with_package(client, db_session)
     case = client.post(f"/sessions/{sid}/cases").json()

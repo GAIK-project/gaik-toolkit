@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -163,7 +164,6 @@ def _state_error(exc: Exception) -> HTTPException:
     return api_error(409, "case_state", str(exc))
 
 
-_AUDIO_KINDS = frozenset({"wav", "mp3", "m4a"})
 _AUDIO_OUTPUT_RE = re.compile(
     r"(?:^|[^a-zA-ZåäöÅÄÖ])(?:audio|voice|recording|ääni|puhe(?!lin|lu|en))",
     re.IGNORECASE,
@@ -194,7 +194,7 @@ def _task_contract_kinds(
         return base_kinds
     if all(_is_audio_output(o) for o in outputs):
         # Never wider than the session's contract: an empty set refuses the file (415).
-        return base_kinds & _AUDIO_KINDS
+        return base_kinds & input_content.AUDIO_KINDS
     other_human_audio = any(
         n.get("id") != task_id
         and n.get("kind") in ("userTask", "manualTask")
@@ -202,9 +202,24 @@ def _task_contract_kinds(
         for n in nodes
     )
     if not any(_is_audio_output(o) for o in outputs) and other_human_audio:
-        narrowed = base_kinds - _AUDIO_KINDS
-        return narrowed or base_kinds
+        return base_kinds - input_content.AUDIO_KINDS
     return base_kinds
+
+
+@lru_cache(maxsize=256)
+def _sample_matches_contract(
+    path: Path, _file_version: tuple[int, ...], kinds: frozenset[str]
+) -> bool:
+    """Cache only the listing decision. Reuse always validates the current bytes."""
+    with path.open("rb") as source:
+        data = source.read(poc_service.MAX_INPUT_BYTES + 1)
+    if len(data) > poc_service.MAX_INPUT_BYTES:
+        return False
+    try:
+        input_content.check(path.name, data, kinds)
+    except poc_service.InputRejectedError:
+        return False
+    return True
 
 
 def _reusable_poc_inputs(
@@ -230,17 +245,21 @@ def _reusable_poc_inputs(
             continue
         if size <= 0 or size > poc_service.MAX_INPUT_BYTES:
             continue
-        path = os.path.join(sample_dir, name)
+        path = Path(sample_dir) / name
         if not poc_service.regular_file(path, poc_dir):
             continue
         try:
-            data = Path(path).read_bytes()
-            input_content.check(name, data, kinds)
-        except (OSError, poc_service.InputRejectedError):
+            stat = path.stat()
+            version = (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+            if not 0 < stat.st_size <= poc_service.MAX_INPUT_BYTES or not _sample_matches_contract(
+                path, version, kinds
+            ):
+                continue
+        except OSError:
             continue
         uploaded = bool(entry.get("uploaded"))
         rank = (0 if name in ran_names else 1, 0 if uploaded else 1, name.lower())
-        compatible.append((rank, {"name": name, "bytes": size, "uploaded": uploaded}))
+        compatible.append((rank, {"name": name, "bytes": stat.st_size, "uploaded": uploaded}))
     compatible.sort(key=lambda item: item[0])
     return [item[1] for item in compatible]
 
@@ -479,6 +498,10 @@ async def reuse_poc_input(
                 except case_service.BpmnParseError:
                     process = None
                 allowed = _task_contract_kinds(process, payload.task, allowed)
+        if not allowed:
+            raise input_content.UnsupportedInputError(
+                "the session's input contract has no file types for this step"
+            )
         await asyncio.to_thread(input_content.check, safe_name, data, allowed)
         await malware_scan.check_upload(data)
         name = await asyncio.to_thread(

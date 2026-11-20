@@ -165,13 +165,20 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
   // the list, oldest first.
   const numberOf = useMemo(() => new Map(cases.map((c, i) => [c.id, c.number ?? cases.length - i])), [cases]);
 
-  const loadCases = useCallback(async () => {
-    const res = await fetch(base, { cache: "no-store" });
-    if (!res.ok) return [];
-    const listed = ((await res.json()) as { cases: ListedCase[] }).cases;
-    setCases(listed);
-    return listed;
-  }, [base]);
+  const loadCases = useCallback(async (onError = setError) => {
+    try {
+      const res = await fetch(base, { cache: "no-store" });
+      if (res.ok) {
+        const listed = ((await res.json()) as { cases: ListedCase[] }).cases;
+        setCases(listed);
+        return listed;
+      }
+      onError(await detailOf(res));
+    } catch {
+      onError(s.networkError);
+    }
+    return null;
+  }, [base, detailOf, s.networkError]);
 
   // Only the latest case asked for is shown: a slower answer to an earlier
   // request must not replace the case the user opened since. Returns whether
@@ -183,18 +190,22 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
   const loadCase = useCallback(
     async (id: string): Promise<boolean> => {
       const request = ++caseRequest.current;
-      const res = await fetch(`${base}/${id}`, { cache: "no-store" });
-      if (request !== caseRequest.current) return false;
-      if (!res.ok) {
-        setError(await detailOf(res));
-        return false;
+      try {
+        const res = await fetch(`${base}/${id}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = (await res.json()) as Case;
+          if (request !== caseRequest.current) return false;
+          setCurrent(data);
+          return true;
+        }
+        const message = await detailOf(res);
+        if (request === caseRequest.current) setError(message);
+      } catch {
+        if (request === caseRequest.current) setError(s.networkError);
       }
-      const data = (await res.json()) as Case;
-      if (request !== caseRequest.current) return false;
-      setCurrent(data);
-      return true;
+      return false;
     },
-    [base, detailOf],
+    [base, detailOf, s.networkError],
   );
 
   useEffect(() => {
@@ -203,13 +214,15 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
       if (!res.ok) return setModelError(await detailOf(res));
       const loaded = (await res.json()) as CaseModel;
       acceptedRef.current = loaded.accepted_inputs ?? NO_ACCEPTED;
-      const listed = await loadCases();
+      const listed = await loadCases(setModelError);
+      if (!listed) return;
       // Open the newest case, as a click on it would: the page said "No cases
       // yet" beside a list that had them. Not when the user has opened one.
       if (listed[0] && !userPicked.current) await loadCase(listed[0].id);
+      setModelError(null);
       setModel(loaded);
-    })();
-  }, [base, loadCases, loadCase, detailOf]);
+    })().catch(() => setModelError(s.networkError));
+  }, [base, loadCases, loadCase, detailOf, s.networkError]);
 
   // A running case settles on the server when its run has finished; ask until it has.
   useEffect(() => {
@@ -312,8 +325,10 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
         // Every upload was refused: remove the empty case only if the server
         // confirms it still has no inputs, so no blank duplicate remains.
         const check = await fetch(caseBase, { cache: "no-store" }).catch(() => null);
+        if (check?.status === 404) pendingFirstCaseId.current = null;
         const serverCase = check?.ok ? ((await check.json().catch(() => null)) as Case | null) : null;
-        if (!serverCase || serverCase.inputs.length === 0) {
+        if (!serverCase) return problem ?? s.networkError;
+        if (serverCase.inputs.length === 0) {
           const del = await fetch(caseBase, { method: "DELETE" }).catch(() => null);
           if (del && (del.ok || del.status === 404)) {
             pendingFirstCaseId.current = null;
@@ -335,9 +350,11 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
       if (caseId) {
         const caseBase = `${base}/${caseId}`;
         const check = await fetch(caseBase, { cache: "no-store" }).catch(() => null);
+        if (check?.status === 404) pendingFirstCaseId.current = null;
         if (check?.ok) {
           const serverCase = (await check.json().catch(() => null)) as Case | null;
-          if (serverCase && serverCase.inputs.length > 0) {
+          if (!serverCase) return s.networkError;
+          if (serverCase.inputs.length > 0) {
             pendingFirstCaseId.current = null;
             prevStatus.current = null;
             await loadCase(caseId);
@@ -377,6 +394,7 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
   function openCase(id: string) {
     userPicked.current = true;
     prevStatus.current = null;
+    setError(null);
     void loadCase(id);
   }
 
@@ -421,7 +439,7 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
         caseRequest.current += 1;
         prevStatus.current = null;
         setCurrent(null);
-        if (listed[0]) await loadCase(listed[0].id);
+        if (listed?.[0]) await loadCase(listed[0].id);
       }
       (listHeading.current ?? pageTitle.current)?.focus();
     } finally {
@@ -630,9 +648,9 @@ export function CaseWorkflow({ sessionId, strings: s, dateLocale, busyMessage }:
         {removedNote}
       </p>
 
-      {/* One case needs no list: the list is for choosing between cases. */}
+      {/* One open case needs no list. A case that failed to open stays selectable. */}
       <div className={`grid items-start gap-4 ${cases.length > 1 ? "lg:grid-cols-[288px_minmax(0,1fr)]" : ""}`}>
-        {cases.length > 1 && (
+        {(cases.length > 1 || (!current && cases.length > 0)) && (
           <aside className="rounded-lg border border-border bg-surface p-2 lg:sticky lg:top-4" data-testid="case-list">
             <h3 ref={listHeading} tabIndex={-1} className="px-2 pb-1.5 pt-1 text-sm font-semibold text-text focus:outline-none">
               {s.cases}

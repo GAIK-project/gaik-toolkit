@@ -81,7 +81,8 @@ test.describe("PoC package status", () => {
     const status = page.getByTestId("poc-package-status");
     await expect(status).toHaveAttribute("data-state", "ready");
     await expect(status).toHaveText("Valmis ajettavaksi");
-    await expect(page.getByTestId("poc-run-sandbox")).toHaveClass(/btn-brand/);
+    await expect(page.getByTestId("poc-input-upload-label")).toHaveClass(/btn-brand/);
+    await expect(page.getByTestId("poc-run-sandbox")).toHaveClass(/btn-secondary/);
   });
 
   test("a failed check says the package has errors and lists them under it", async ({ page }) => {
@@ -112,12 +113,14 @@ test.describe("PoC package status", () => {
     await expect(status).toContainText("Tarkistus ei valmistunut");
     await expect(status).not.toContainText("Paketissa on virheitä");
     await expect(page.getByTestId("poc-check-problems")).toHaveCount(0);
-    // The package is not known to be faulty, so the run stays the next step.
-    await expect(page.getByTestId("poc-run-sandbox")).toHaveClass(/btn-brand/);
+    const run = page.getByTestId("poc-run-sandbox");
+    await expect(run).toBeEnabled();
+    await expect(run).toHaveClass(/btn-secondary/);
 
     await page.getByTestId("poc-check-retry").click();
     await expect(status).toHaveAttribute("data-state", "ready");
     await expect(status).toHaveText("Valmis ajettavaksi");
+    await expect(page.getByTestId("poc-input-upload-label")).toHaveClass(/btn-brand/);
   });
 
   test("while the check runs the package is not called ready yet", async ({ page }) => {

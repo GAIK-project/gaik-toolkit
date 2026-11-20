@@ -611,6 +611,32 @@ test.describe("cases view: direct input on first arrival (#253)", () => {
     await resetMockSessions(request);
   });
 
+  test("a failed case list shows a loading error instead of the first-case form", async ({ page }) => {
+    await fakeCases(page, [fakeCase(1, "draft")]);
+    await page.route(`**${CASES}`, (route) => route.fulfill({ status: 503 }));
+    await loginAsDev(page);
+    await page.goto(`/sessions/${SESSION}/cases`);
+
+    await expect(problem(page)).toContainText("HTTP 503");
+    await expect(page.getByTestId("case-drop")).toHaveCount(0);
+  });
+
+  test("a single case remains selectable when its details fail to load", async ({ page }) => {
+    const existing = fakeCase(1, "draft");
+    await fakeCases(page, [existing]);
+    let failDetails = true;
+    await page.route(`**${CASES}/${existing.id}`, (route) =>
+      failDetails ? route.abort() : route.fallback(),
+    );
+    await openCases(page);
+
+    await expect(problem(page)).toBeVisible();
+    failDetails = false;
+    await page.getByTestId("case-row").click();
+    await expect(page.getByRole("heading", { name: "Tapaus 1" })).toBeVisible();
+    await expect(problem(page)).toHaveCount(0);
+  });
+
   test("arriving with zero cases shows the input drop zone immediately without creating blank cases on reload", async ({
     page,
   }) => {
@@ -665,5 +691,21 @@ test.describe("cases view: direct input on first arrival (#253)", () => {
     expect(fake.created).toBe(1);
     expect(fake.removed).toHaveLength(1);
     expect(fake.cases).toHaveLength(0);
+  });
+
+  test("an unconfirmed first upload leaves its case available for retry", async ({ page }) => {
+    const fake = await fakeCases(page, [], MODEL);
+    await page.route(`**${CASES}/${caseId(1)}`, (route) => route.abort(), { times: 1 });
+    await page.route(`**${CASES}/${caseId(1)}/inputs`, (route) => route.abort(), { times: 1 });
+    await openCases(page);
+
+    const file = { name: "field_recording.wav", mimeType: "audio/wav", buffer: Buffer.from("RIFF....WAVE") };
+    await page.getByTestId("case-file").setInputFiles(file);
+    await expect(page.getByTestId("case-upload-problem")).toBeVisible();
+    expect(fake.removed).toHaveLength(0);
+
+    await page.getByTestId("case-file").setInputFiles(file);
+    await expect(page.getByTestId("case-inputs")).toContainText(file.name);
+    expect(fake.created).toBe(1);
   });
 });

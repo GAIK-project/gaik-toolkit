@@ -131,46 +131,67 @@ def read_draft_blueprint(output_dir: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def _read_poc_text(output_dir: str, relative: str) -> str:
-    """Read a regular UTF-8 file under ``poc/``, refusing symlinks and oversized files."""
-    if not output_dir:
-        return ""
-    poc_root = os.path.realpath(artifact_path(output_dir, POC_DIR))
-    path = os.path.join(artifact_path(output_dir, POC_DIR), relative)
-    if os.path.islink(path) or not os.path.isfile(path):
-        return ""
-    real = os.path.realpath(path)
-    if not real.startswith(poc_root + os.sep):
-        return ""
+def _poc_file_mtime(poc: str, relative: str) -> int | None:
+    # poc_service also imports this module for the package's blueprint.
+    from wizard_api.services import poc_service
+
+    path = os.path.join(poc, relative)
+    if not poc_service.regular_file(path, poc):
+        return None
     try:
-        if os.path.getsize(real) > _MAX_PROPOSAL_TEXT_BYTES:
-            return ""
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return None
+
+
+def _read_poc_text(poc: str, relative: str) -> str:
+    """Read bounded UTF-8 text from a PoC file checked by ``_poc_file_mtime``."""
+    path = os.path.join(poc, relative)
+    try:
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(path, flags)
-        with os.fdopen(fd, "r", encoding="utf-8", errors="replace") as fh:
-            return fh.read().strip()
+        with os.fdopen(fd, "rb") as fh:
+            data = fh.read(_MAX_PROPOSAL_TEXT_BYTES + 1)
     except OSError:
         return ""
+    if len(data) > _MAX_PROPOSAL_TEXT_BYTES:
+        return ""
+    return data.decode("utf-8", errors="replace").strip()
 
 
 def read_extraction_proposal(output_dir: str) -> ExtractionProposal | None:
-    """The extraction rules written in Phase 4, and whether the schema exists (#251).
+    """The Phase 4 extraction rules and whether their schema has been generated (#251).
 
     Returns ``None`` when neither ``extraction_requirements.md`` nor any schema
     file has been written yet.
     """
     if not output_dir:
         return None
-    prompt_markdown = _read_poc_text(output_dir, EXTRACTION_PROMPT_FILE)
-    schema_code = _read_poc_text(output_dir, OUTPUT_SCHEMA_PY_FILE)
     poc = artifact_path(output_dir, POC_DIR)
-    schema_generated = any(os.path.isfile(os.path.join(poc, name)) for name in SCHEMA_FILES)
+    if os.path.islink(poc):
+        return None
+    prompt_mtime = _poc_file_mtime(poc, EXTRACTION_PROMPT_FILE)
+    prompt_markdown = (
+        _read_poc_text(poc, EXTRACTION_PROMPT_FILE) if prompt_mtime is not None else ""
+    )
+    schema_files = []
+    for name in SCHEMA_FILES:
+        mtime = _poc_file_mtime(poc, name)
+        if mtime is not None and (
+            not prompt_markdown or prompt_mtime is None or mtime >= prompt_mtime
+        ):
+            schema_files.append(name)
+    schema_generated = bool(schema_files)
     if not prompt_markdown and not schema_generated:
         return None
     return ExtractionProposal(
         prompt_markdown=prompt_markdown,
         schema_generated=schema_generated,
-        schema_code=schema_code,
+        schema_code=(
+            _read_poc_text(poc, OUTPUT_SCHEMA_PY_FILE)
+            if OUTPUT_SCHEMA_PY_FILE in schema_files
+            else ""
+        ),
     )
 
 

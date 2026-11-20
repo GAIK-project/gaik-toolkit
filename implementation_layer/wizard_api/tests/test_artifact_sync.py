@@ -482,6 +482,21 @@ def test_read_extraction_proposal_reads_prompt_and_generated_schema(tmp_path) ->
     assert generated.schema_generated is True
     assert "class Ticket" in (generated.schema_code or "")
 
+    prompt.write_text("# Updated extraction rules", encoding="utf-8")
+    updated = schema_py.stat().st_mtime_ns + 1_000_000_000
+    os.utime(prompt, ns=(updated, updated))
+    revised = artifact_sync.read_extraction_proposal(str(tmp_path))
+    assert revised is not None
+    assert revised.prompt_markdown == "# Updated extraction rules"
+    assert revised.schema_generated is False
+    assert revised.schema_code == ""
+
+    os.utime(schema_py, ns=(updated, updated))
+    regenerated = artifact_sync.read_extraction_proposal(str(tmp_path))
+    assert regenerated is not None
+    assert regenerated.schema_generated is True
+    assert "class Ticket" in regenerated.schema_code
+
 
 def test_read_extraction_proposal_ignores_symlinks_outside_poc(tmp_path) -> None:
     outside = tmp_path / "secret.txt"
@@ -489,8 +504,11 @@ def test_read_extraction_proposal_ignores_symlinks_outside_poc(tmp_path) -> None
     prompts_dir = tmp_path / "session" / "poc" / "prompts"
     prompts_dir.mkdir(parents=True)
     link = prompts_dir / "extraction_requirements.md"
+    schemas_dir = prompts_dir.parent / "schemas"
+    schemas_dir.mkdir()
     try:
         os.symlink(outside, link)
+        os.symlink(outside, schemas_dir / "output_schema.py")
     except OSError:
         pytest.skip("symlinks unavailable in this environment")
 
