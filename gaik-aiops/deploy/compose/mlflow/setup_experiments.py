@@ -42,8 +42,8 @@ NOT_IN_MLFLOW = {
         # an outage would otherwise fill MLflow with probes, and the error ratio already shows it.
         'attributes["http.route"] == "/health"',
         'attributes["code.function.name"] == "wizard_api.main.health"',
-        # The web app's page requests, which belong to no session and would each be a row of their own
-        # beside the conversation: listing, opening and creating a session, and claiming old ones. The
+        # The web app's page requests, which are no step of a session and would each be a row of their
+        # own beside the conversation: listing, opening and creating a session, and claiming old ones. The
         # server spans are matched by name, because PATCH /sessions/{session_id} (kept: it carries the
         # session) has the same route as the GET. A route that is not listed here is always stored.
         # A page request the API failed (5xx: the server span has an error status) keeps that span,
@@ -57,6 +57,22 @@ NOT_IN_MLFLOW = {
         'attributes["code.function.name"] == "wizard_api.routers.sessions.get_session"',
         'attributes["code.function.name"] == "wizard_api.routers.sessions.create_session"',
         'attributes["code.function.name"] == "wizard_api.routers.owners.claim_legacy_sessions"',
+        # What the web app reads in the background while a session is open: the PoC tab's package,
+        # its file list, one file and the test inputs, every few seconds, and a reply's stream being
+        # rejoined. They carry the session, so each would be a row inside it, between the turns,
+        # gate changes and test runs the session is read for. What the user does there (uploading
+        # an input, checking or running the package, saving a file) is stored. A read the API failed
+        # keeps its server span, as above.
+        'name == "GET /sessions/{session_id}/poc"' + KEEP_FAILED,
+        'name == "GET /sessions/{session_id}/poc/files"' + KEEP_FAILED,
+        'name == "GET /sessions/{session_id}/poc/file"' + KEEP_FAILED,
+        'name == "GET /sessions/{session_id}/poc/input"' + KEEP_FAILED,
+        'name == "GET /sessions/{session_id}/chat/stream"' + KEEP_FAILED,
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.download_poc"',
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.list_poc_files"',
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.read_poc_file"',
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.list_poc_inputs"',
+        'attributes["code.function.name"] == "wizard_api.routers.sessions.chat_stream"',
     ],
 }
 

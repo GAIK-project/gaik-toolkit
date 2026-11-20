@@ -53,7 +53,7 @@ def test_the_header_is_optional_until_the_deployment_requires_it(monkeypatch):
     assert exc.value.status_code == 400
 
 
-# --- pure: a served request is named after its session in its trace ----------
+# --- a served request is named after its session in its trace ----------------
 
 
 def _checked(monkeypatch, owner: str | None, user_id: str | None):
@@ -77,9 +77,10 @@ def test_a_served_request_carries_its_session(monkeypatch):
     assert span.attributes["gaik.session.id"] == sid
 
 
-def test_a_request_without_the_user_header_carries_its_session_too(monkeypatch):
-    span, sid = _checked(monkeypatch, owner="alice@example.com", user_id=None)
-    assert span.attributes["gaik.session.id"] == sid
+def test_a_request_without_the_user_header_is_not_filed_under_a_session(monkeypatch):
+    # Nothing checked that the session exists or whose it is.
+    span, _ = _checked(monkeypatch, owner="alice@example.com", user_id=None)
+    assert "gaik.session.id" not in span.attributes
 
 
 @pytest.mark.parametrize("owner", ["alice@example.com", None])
@@ -227,3 +228,35 @@ def test_a_new_session_keeps_the_callers_own_metadata(client) -> None:
 
     assert res.status_code == 201, res.text
     assert res.json()["metadata"]["note"] == "x"
+
+
+@requires_postgres
+def test_an_upload_to_the_poc_tab_is_filed_under_its_session(client):
+    """Through the route, as the web app calls it: FastAPI's own span for the
+    dependencies is the one that carries the session."""
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        provider = TracerProvider()
+        trace.set_tracer_provider(provider)
+    exporter = InMemorySpanExporter()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    sid = _create(client, "alice@example.com", ALICE)
+    exporter.clear()
+
+    client.post(
+        f"/sessions/{sid}/poc/input",
+        files={"file": ("complaint.txt", b"hello", "text/plain")},
+        headers=ALICE,
+    )
+    client.post(
+        f"/sessions/{sid}/poc/input",
+        files={"file": ("complaint.txt", b"hello", "text/plain")},
+        headers=BOB,
+    )
+
+    named = [s for s in exporter.get_finished_spans() if "gaik.session.id" in s.attributes]
+    assert [s.attributes["gaik.session.id"] for s in named] == [sid]

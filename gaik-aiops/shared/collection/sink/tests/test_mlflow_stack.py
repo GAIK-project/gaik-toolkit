@@ -198,6 +198,12 @@ HEALTH = ("GET /health", "/health", "wizard_api.main.health")
 OPEN_SESSION = ("GET /sessions/{session_id}", "/sessions/{session_id}", "wizard_api.routers.sessions.get_session")
 LIST_SESSIONS = ("GET /sessions", "/sessions", "wizard_api.routers.sessions.list_sessions")
 PATCH_SESSION = ("PATCH /sessions/{session_id}", "/sessions/{session_id}", "wizard_api.routers.sessions.update_session")
+POC_FILES = ("GET /sessions/{session_id}/poc/files", "/sessions/{session_id}/poc/files",
+             "wizard_api.routers.sessions.list_poc_files")
+REJOIN_STREAM = ("GET /sessions/{session_id}/chat/stream", "/sessions/{session_id}/chat/stream",
+                 "wizard_api.routers.sessions.chat_stream")
+POC_UPLOAD = ("POST /sessions/{session_id}/poc/input", "/sessions/{session_id}/poc/input",
+              "wizard_api.routers.sessions.upload_poc_input")
 ERROR = 2  # OTLP STATUS_CODE_ERROR
 
 
@@ -274,6 +280,13 @@ def test_page_requests_without_a_session_stay_out_of_mlflow_and_in_the_span_metr
     patched = _stored_and_left_out("wizard-v2-api", PATCH_SESSION, OPEN_SESSION, LIST_SESSIONS, refused)
     assert len(patched["spans"]) == 2
     _wait_until_counted("wizard-v2-api", "GET /sessions/{session_id}", counted_before)
+
+
+def test_what_the_page_reads_in_the_background_stays_out_of_mlflow_and_what_the_user_does_is_stored():
+    # The PoC tab lists the package's files every few seconds and a reply's stream is rejoined; an
+    # upload to the same tab is something the user did, and is stored with both its spans.
+    uploaded = _stored_and_left_out("wizard-v2-api", POC_UPLOAD, POC_FILES, REJOIN_STREAM)
+    assert len(uploaded["spans"]) == 2
 
 
 def test_a_failed_page_request_keeps_its_server_span_in_mlflow():
