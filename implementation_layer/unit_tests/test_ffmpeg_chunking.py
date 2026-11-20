@@ -2,14 +2,39 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from gaik.software_components.parallel_transcriber.config import TranscriptionConfig
 from gaik.software_components.parallel_transcriber.ffmpeg import (
+    compute_chunk_specs,
     split_into_chunks,
 )
 from gaik.software_components.parallel_transcriber.models import ChunkSpec
+
+# The mocked FFmpeg below writes 1000 bytes per second of audio; the chunk's
+# length is read back from its size instead of with ffprobe.
+_BYTES_PER_SECOND = 1000
+
+
+@pytest.fixture
+def real_ffprobe():
+    """Read chunk lengths with the real ffprobe."""
+
+
+@pytest.fixture(autouse=True)
+def _chunk_length_from_size(request):
+    if "real_ffprobe" in request.fixturenames:
+        yield
+        return
+    with patch(
+        "gaik.software_components.parallel_transcriber.ffmpeg._encoded_seconds",
+        side_effect=lambda path: Path(path).stat().st_size / _BYTES_PER_SECOND,
+    ):
+        yield
 
 
 def _make_spec(index: int, tmp_path: Path) -> ChunkSpec:
@@ -210,53 +235,113 @@ _FFMPEG_AVAILABLE = patch(
 )
 
 
-def _split(tmp_path: Path, sizes: dict[str, list[int | None]]):
-    """Split three chunks; each attempt at a chunk writes the next size in its list,
-    or fails when the size is None. Chunk files are named chunk_00.mp3 to chunk_02.mp3."""
+def _split(tmp_path: Path, seconds: dict[str, list[float | None]]):
+    """Split three chunks (0-65 s, 55-120 s, 115-180 s, the last); each attempt at a
+    chunk writes the next length in its list, its last one again once the list runs
+    out, or fails when the length is None. Chunks not named come out at 65 s.
+    Chunk files are named chunk_00.mp3 to chunk_02.mp3."""
     specs = [_make_spec(0, tmp_path), _make_spec(1, tmp_path), _make_spec(2, tmp_path)]
     specs[2].is_last = True
-    attempts = {name: iter(values) for name, values in sizes.items()}
+    attempts = {name: list(values) for name, values in seconds.items()}
+    calls: list[str] = []
 
     def fake_popen(cmd, **kwargs):
         chunk_path = Path(cmd[-1])
-        size = next(attempts[chunk_path.name]) if chunk_path.name in attempts else 200_000
+        calls.append(chunk_path.name)
+        planned = attempts.get(chunk_path.name, [65.0])
+        length = planned.pop(0) if len(planned) > 1 else planned[0]
         mock = MagicMock()
-        if size is None:
+        if length is None:
             mock.returncode = 1
             mock.communicate.return_value = ("", "busy")
         else:
-            chunk_path.write_bytes(b"\x00" * size)
+            chunk_path.write_bytes(b"\x00" * int(length * _BYTES_PER_SECOND))
             mock.returncode = 0
             mock.communicate.return_value = ("", "")
         return mock
 
     with _FFMPEG_AVAILABLE, patch("subprocess.Popen", side_effect=fake_popen):
-        return split_into_chunks(str(tmp_path / "input.mp3"), specs)
+        return split_into_chunks(str(tmp_path / "input.mp3"), specs), calls
 
 
-def test_near_empty_chunks_past_the_real_end_are_skipped(tmp_path: Path):
-    # A header that overstates the length gives near-empty chunks past the real end.
-    chunks = _split(tmp_path, {"chunk_01.mp3": [10], "chunk_02.mp3": [10]})
-
-    assert [c["metadata"]["index"] for c in chunks] == [0, 2]
+def _indices(chunks: list[dict]) -> list[int]:
+    return [c["metadata"]["index"] for c in chunks]
 
 
-def test_a_near_empty_chunk_with_audio_after_it_raises_with_its_time_range(tmp_path: Path):
+def test_chunks_past_the_real_end_are_skipped(tmp_path: Path):
+    # A header that says 180 s for a recording of 100 s: the second chunk ends early
+    # and the third holds nothing.
+    chunks, _ = _split(tmp_path, {"chunk_01.mp3": [45.0], "chunk_02.mp3": [0.0]})
+
+    assert _indices(chunks) == [0, 1]
+    assert not (tmp_path / "chunk_02.mp3").exists()
+
+
+def test_a_chunk_whose_audio_lies_inside_the_previous_one_is_skipped(tmp_path: Path):
+    # The recording ends at 118 s, inside the second chunk's end overlap: the third
+    # chunk's 3 s are already in the second.
+    chunks, _ = _split(tmp_path, {"chunk_02.mp3": [3.0]})
+
+    assert _indices(chunks) == [0, 1]
+
+
+def test_a_short_chunk_with_audio_after_it_raises_with_its_time_range(tmp_path: Path):
     with pytest.raises(RuntimeError) as raised:
-        _split(tmp_path, {"chunk_01.mp3": [10]})
+        _split(tmp_path, {"chunk_01.mp3": [10.0]})
 
     message = str(raised.value)
     assert "1 of 3 chunks could not be created" in message
     assert "(0:00:55-0:02:00)" in message
-    assert "nearly empty" in message
+    assert "holds 10.0 s of 65.0 s, with audio after it" in message
 
 
-def test_a_retried_chunk_that_comes_out_near_empty_at_the_end_is_skipped(tmp_path: Path):
-    chunks = _split(tmp_path, {"chunk_01.mp3": [None, 10], "chunk_02.mp3": [10]})
+def test_a_short_chunk_from_the_parallel_pass_is_retried(tmp_path: Path):
+    chunks, calls = _split(tmp_path, {"chunk_01.mp3": [10.0, 65.0]})
 
-    assert [c["metadata"]["index"] for c in chunks] == [0, 2]
+    assert _indices(chunks) == [0, 1, 2]
+    assert calls.count("chunk_01.mp3") == 2  # the parallel pass and the retry
 
 
-def test_a_retried_chunk_that_comes_out_near_empty_before_audio_raises(tmp_path: Path):
+def test_a_retried_chunk_that_comes_out_empty_at_the_end_is_skipped(tmp_path: Path):
+    chunks, _ = _split(tmp_path, {"chunk_01.mp3": [None, 0.0], "chunk_02.mp3": [0.0]})
+
+    assert _indices(chunks) == [0]
+
+
+def test_a_retried_chunk_that_comes_out_short_before_audio_raises(tmp_path: Path):
     with pytest.raises(RuntimeError, match=r"\(0:00:55-0:02:00\)"):
-        _split(tmp_path, {"chunk_01.mp3": [None, 10]})
+        _split(tmp_path, {"chunk_01.mp3": [None, 10.0]})
+
+
+def test_a_split_in_which_no_chunk_holds_audio_raises(tmp_path: Path):
+    empty = {name: [0.0] for name in ("chunk_00.mp3", "chunk_01.mp3", "chunk_02.mp3")}
+
+    with pytest.raises(RuntimeError, match="None of the 3 chunks holds any audio"):
+        _split(tmp_path, empty)
+
+
+_HAS_FFMPEG = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="needs ffmpeg and ffprobe on PATH")
+@pytest.mark.parametrize("header_seconds", [120.5, 300.0])
+def test_a_low_bitrate_split_keeps_every_chunk_of_the_recording(
+    tmp_path: Path, header_seconds: float, real_ffprobe
+):
+    # At 8 kbit/s a full 65-second chunk is about 65 KB. 300 s is a header that
+    # overstates the length of the 120.5-second recording.
+    source = tmp_path / "tone.wav"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=120.5"]
+        + ["-ar", "16000", "-ac", "1", "-y", str(source)],
+        check=True,
+        timeout=60,
+    )
+    chunk_dir = tmp_path / "chunks"
+    chunk_dir.mkdir()
+    specs = compute_chunk_specs(header_seconds, 1, 5.0, chunk_dir, "tone")
+
+    chunks = split_into_chunks(source, specs, config=TranscriptionConfig(audio_bitrate="8k"))
+
+    assert _indices(chunks) == [0, 1]
+    assert all(Path(c["file"]).stat().st_size < 0.1 * 1024 * 1024 for c in chunks)

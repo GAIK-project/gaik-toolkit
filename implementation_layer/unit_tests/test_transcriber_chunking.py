@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import traceback
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -336,8 +337,21 @@ def test_a_failed_chunk_raises_with_its_time_range_and_the_rest_are_not_sent(tmp
     assert isinstance(outcome, RuntimeError)
     assert "Segment 2 of 3 (00:40 - 01:20)" in str(outcome)
     assert "provider error" not in str(outcome)
-    assert isinstance(outcome.__cause__, RuntimeError)
     assert len(requests) == 2
+
+
+def test_the_failed_chunk_error_keeps_the_provider_message_out_of_its_traceback(
+    tmp_path: Path,
+):
+    # A logged traceback (logger.exception) shows a chained cause or context in full.
+    _, outcome = _three_chunks(tmp_path, ["One", RuntimeError("provider error"), "Three"])
+
+    assert isinstance(outcome, RuntimeError)
+    assert outcome.__cause__ is None
+    assert outcome.__suppress_context__
+    logged = "".join(traceback.format_exception(type(outcome), outcome, outcome.__traceback__))
+    assert "provider error" not in logged
+    assert "Segment 2 of 3" in logged
 
 
 def test_allow_partial_marks_the_failed_chunk_and_transcribes_the_rest(tmp_path: Path):
@@ -364,7 +378,7 @@ def test_the_transcriber_passes_allow_partial_to_the_chunked_path(
     with (
         patch.object(transcriber, "_needs_chunking", return_value=True),
         patch(
-            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            "gaik.software_components.transcriber.transcriber._decode_audio",
             return_value=_SliceableFakeAudio(duration_ms=1_000),
         ),
         patch(

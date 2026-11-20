@@ -1986,7 +1986,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when recordings can be longer than 6 hours: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option). Since the gaik release after 0.11.0, a chunk FFmpeg cannot create, even on its retry, or one that comes out nearly empty with audio after it, stops transcribe() with a RuntimeError naming the missing time ranges, instead of the transcript leaving that stretch out; there is no option to keep a partial transcript."
+    "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option). Since the gaik release after 0.11.0, a chunk FFmpeg cannot create, even on its retry, or one that comes out shorter than asked for (by encoded length) with audio after it, stops transcribe() with a RuntimeError naming the missing time ranges, instead of the transcript leaving that stretch out; there is no option to keep a partial transcript."
   },
   "MultiSourceReportGenerator": {
     "import": "from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator, save_report_config, load_report_config",

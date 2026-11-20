@@ -232,8 +232,9 @@ def transcription_check(config, transcription_model, budget, work_dir) -> dict:
                 ).transcribe(TRANSCRIPTION_FIXTURE, **(call or {}))
             except RuntimeError as exc:
                 # The budget stop keeps its own message, also when the Transcriber
-                # wraps it as the failure of a chunk ("Segment N of M ...").
-                for stop in (exc, exc.__cause__):
+                # wraps it as the failure of a chunk ("Segment N of M ..."); that error
+                # keeps the provider's exception as its suppressed context.
+                for stop in (exc, exc.__cause__, exc.__context__):
                     if isinstance(stop, RuntimeError) and str(stop).startswith(
                         "Live release request budget"
                     ):

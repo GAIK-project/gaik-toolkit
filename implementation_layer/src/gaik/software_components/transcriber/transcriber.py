@@ -705,7 +705,7 @@ def split_and_transcribe_with_context(
                         f"Segment {i + 1} of {num_chunks} ({start_time} - {end_time}) could "
                         f"not be transcribed ({type(exc).__name__}); pass allow_partial=True "
                         "to get the transcript with this segment marked as failed."
-                    ) from exc
+                    ) from None
                 transcripts.append(f"{chunk_header}[Transcription failed for segment {i + 1}]")
                 time.sleep(5)
             else:
