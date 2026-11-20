@@ -27,12 +27,13 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import and_, func, not_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from wizard_api import config
 from wizard_api.models import UsageTotal, WizardSession
+from wizard_api.session_state import GATE_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -221,16 +222,20 @@ def reserve(user_id: str, caps: list[_Cap]) -> Reservation:
 
 
 def open_sessions(db: Session, user_id: str) -> int:
-    """``user_id``'s sessions still in progress: every one whose Gate 4 is not approved."""
-    gate_4 = WizardSession.gate_statuses["gate_4"].astext
+    """``user_id``'s sessions still in progress: every one with a gate not approved.
+
+    A session is done only when all four gates are approved; one with a gate
+    reopened, or approved out of order, still holds its place.
+    """
+    gates = WizardSession.gate_statuses
+    finished = and_(
+        *(func.coalesce(gates[key].astext, "pending") == "approved" for key in GATE_KEYS)
+    )
     return int(
         db.scalar(
             select(func.count())
             .select_from(WizardSession)
-            .where(
-                WizardSession.user_id == user_id,
-                func.coalesce(gate_4, "pending") != "approved",
-            )
+            .where(WizardSession.user_id == user_id, not_(finished))
         )
         or 0
     )
@@ -239,8 +244,10 @@ def open_sessions(db: Session, user_id: str) -> int:
 def claim_session(db: Session, user_id: str) -> None:
     """Make room for a new session of ``user_id``, or raise SessionLimitError at the limit.
 
-    The limit counts sessions in progress (``open_sessions``): one whose Gate 4
-    is approved is done and holds no place, until a gate of it is reopened.
+    The limit counts sessions in progress (``open_sessions``): one with all
+    four gates approved is done and holds no place, until a gate of it is
+    reopened. The limit is checked here, when a session starts: reopening a
+    finished session is not refused, so a user can then have more in progress.
     The user's row is locked first and stays locked, uncommitted, until the
     caller has created the session and committed: a second session started at
     the same moment waits, then counts the first, so two cannot both take the

@@ -736,7 +736,7 @@ def test_a_message_refused_before_its_turn_gives_its_budget_back(
 
 
 @requires_postgres
-def test_a_finished_session_holds_no_place_until_a_gate_of_it_is_reopened(
+def test_a_session_with_all_gates_approved_holds_no_place_until_a_gate_is_reopened(
     client, db_engine, caps
 ) -> None:
     ids = [
@@ -745,21 +745,23 @@ def test_a_finished_session_holds_no_place_until_a_gate_of_it_is_reopened(
     ]
     assert client.post("/sessions", json={"user_id": "ann", "title": "S4"}).status_code == 429
 
-    def set_gate_4(status: str) -> None:
+    def set_gates(statuses: dict) -> None:
         db = sessionmaker(bind=db_engine)()
         try:
             row = db.get(WizardSession, uuid.UUID(ids[0]))
-            row.gate_statuses = {**row.gate_statuses, "gate_4": status}
+            row.gate_statuses = {**row.gate_statuses, **statuses}
             db.commit()
         finally:
             db.close()
 
-    set_gate_4("approved")  # the first session is done
+    set_gates({"gate_4": "approved"})  # Gate 4 alone does not finish it
+    assert client.post("/sessions", json={"user_id": "ann", "title": "S4"}).status_code == 429
+    set_gates({f"gate_{n}": "approved" for n in range(1, 5)})  # all four: done
     fourth = client.post("/sessions", json={"user_id": "ann", "title": "S4"})
     assert fourth.status_code == 201
     assert client.post("/sessions", json={"user_id": "ann", "title": "S5"}).status_code == 429
 
-    set_gate_4("pending")  # reopened: in progress again, so ann has four and no room
+    set_gates({"gate_2": "pending"})  # reopened: in progress again, so ann has four and no room
     refused = client.post("/sessions", json={"user_id": "ann", "title": "S6"})
     assert refused.status_code == 429
     assert "in progress" in refused.json()["detail"]["message"]

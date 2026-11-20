@@ -311,12 +311,12 @@ not the provider's bill, which keeps its own cap as the hard limit.
 | `WIZARD_SESSION_MAX_COST_USD` | `5.4` (about 5 €) | what one session may spend in all, across agent restarts |
 | `WIZARD_USER_MAX_COST_USD` | `10.8` (about 10 €) | what one user may spend across all their sessions |
 | `WIZARD_DEPLOYMENT_MAX_COST_USD` | `2000` | what the deployment may spend in one calendar month (UTC) |
-| `WIZARD_MAX_SESSIONS_PER_USER` | `3` | sessions one user may have in progress at a time; one whose Gate 4 is approved is done and holds no place |
+| `WIZARD_MAX_SESSIONS_PER_USER` | `3` | sessions one user may have in progress at a time; one with all four gates approved is done and holds no place |
 | `WIZARD_COST_WARN_RATIO` | `0.8` | share of a session's or user's cap after which the chat says so, once; kept between 0 and 1, so `0` gives the default |
 
 - After each chat turn its cost is added to the session (`metadata.usage_cost_usd`,
   which only the server writes), to the user's and to the month's row of
-  `usage_totals`. Finishing a session (Gate 4 approved) or removing it gives
+  `usage_totals`. Finishing a session (all four gates approved) or removing it gives
   back its place, not its spend. The
   user's spend never resets; the month's starts again each calendar month. To
   start a user or the deployment again (between two events, say), delete their
@@ -338,7 +338,9 @@ not the provider's bill, which keeps its own cap as the hard limit.
   than about 1 USD (`FIT_BUDGET_MARGIN_USD`), so switching sessions does not
   restart it each time.
 - A new session past `WIZARD_MAX_SESSIONS_PER_USER` sessions in progress is
-  refused with `429` `session_limit`. The user's row is locked while the
+  refused with `429` `session_limit`. The limit is checked when a session
+  starts: reopening a gate of a finished session is not refused, so a user can
+  then have more in progress (their spend stays within the user cap). The user's row is locked while the
   sessions are counted and the new one is created, so two at once cannot both
   get the last place.
 - Once a session or a user has used the warning share of its cap, a line is added
