@@ -17,6 +17,7 @@ vi.mock("@supabase/ssr", () => ({
 }));
 
 import { updateSession } from "@/lib/supabase/middleware";
+import { forgetAccessReads } from "@/lib/supabase-auth";
 
 const confirmed = { id: "u1", email: "ada@gaik.local", email_confirmed_at: "2026-11-20T10:00:00Z" };
 
@@ -29,6 +30,7 @@ function configure() {
 const request = (path: string) => new NextRequest(`https://wizard.example.test${path}`);
 
 afterEach(() => {
+  forgetAccessReads();
   vi.unstubAllEnvs();
   state.user = null;
   state.row = null;

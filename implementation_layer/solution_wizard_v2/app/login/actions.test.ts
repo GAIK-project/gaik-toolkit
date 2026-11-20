@@ -183,7 +183,8 @@ describe("Supabase sign-in on a dev-login image", () => {
     process.env.WIZARD_AUTH_MODE = "supabase";
     process.env.WIZARD_SUPABASE_ACCESS = "access_requests";
   });
-  afterEach(() => {
+  afterEach(async () => {
+    (await import("@/lib/supabase-auth")).forgetAccessReads();
     delete process.env.WIZARD_AUTH_MODE;
     delete process.env.WIZARD_SUPABASE_ACCESS;
   });
