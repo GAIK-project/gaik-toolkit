@@ -17,7 +17,12 @@ import os
 import secrets
 from pathlib import PurePath
 
-_SALT = os.environ.get("GAIK_LOG_TAG_SALT", "").encode("utf-8") or secrets.token_bytes(16)
+# blake2b takes a key of at most 64 bytes, so a set salt of any length is hashed to 32.
+_SALT = (
+    hashlib.sha256(os.environ["GAIK_LOG_TAG_SALT"].encode("utf-8")).digest()
+    if os.environ.get("GAIK_LOG_TAG_SALT")
+    else secrets.token_bytes(16)
+)
 
 # Only a known file type is kept as the extension: anything else after the last dot can
 # be part of the name ("Virtanen.Matti").
@@ -50,7 +55,9 @@ def error_text(exc: BaseException, *paths: str | PurePath | None, limit: int = 3
         tag = file_tag(path)
         whole = str(path)
         pure = PurePath(whole)
-        for part in sorted({whole, pure.name, pure.stem}, key=len, reverse=True):
+        # An OSError's repr doubles a Windows path's backslashes; tag that form too.
+        forms = {whole, whole.replace("\\", "\\\\"), pure.name, pure.stem}
+        for part in sorted(forms, key=len, reverse=True):
             if len(part) >= 3:
                 text = text.replace(part, tag)
     return text if len(text) <= limit else text[: limit - 1] + "…"

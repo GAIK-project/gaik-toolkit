@@ -147,3 +147,59 @@ def test_a_set_salt_gives_the_same_tag_in_another_process(tmp_path):
         for _ in range(2)
     }
     assert len(runs) == 1 and next(iter(runs)).startswith("file ")
+
+
+def test_a_long_salt_still_gives_a_stable_tag():
+    import subprocess
+    import sys
+
+    code = (
+        "from gaik.software_components._log_names import file_tag;"
+        "print(file_tag('/data/Matti_Virtanen_report.pdf'))"
+    )
+    # blake2b refuses a key over 64 bytes; the set salt is hashed first.
+    env = {**__import__("os").environ, "GAIK_LOG_TAG_SALT": "x" * 96}
+    runs = {
+        subprocess.run(
+            [sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True
+        ).stdout
+        for _ in range(2)
+    }
+    assert len(runs) == 1 and next(iter(runs)).startswith("file ")
+
+
+def test_error_text_tags_the_doubled_backslashes_of_an_oserror_repr():
+    from gaik.software_components._log_names import error_text, file_tag
+
+    path = r"C:\Users\Matti Virtanen\Matti_Virtanen_report.docx"
+    exc = PermissionError(f"[Errno 13] Permission denied: {path!r}")
+    text = error_text(exc, path)
+    assert "Matti" not in text and "Virtanen" not in text, text
+    assert file_tag(path) in text
+
+
+def test_layout_inference_logs_no_file_or_sheet_name(caplog):
+    from gaik.software_components.tabular_agent.loader import _resolve_layout
+    from gaik.software_components.tabular_agent.models import SheetLayout
+
+    grid = [["region", "revenue"], ["North", 1.5], ["South", 2.25]]
+
+    def failing(label, rendered):
+        raise RuntimeError(f"could not read {label}")
+
+    def inferred(label, rendered):
+        return SheetLayout(header_row=0, data_start_row=1, reasoning=f"read {label}")
+
+    for infer in (failing, inferred):
+        caplog.clear()
+        with caplog.at_level(logging.DEBUG):
+            _resolve_layout(
+                grid,
+                sheet_label="Matti_Virtanen_report.xlsx / Matti Virtanen",
+                log_label="a sheet in file 1234abcd.xlsx",
+                layout_inference="always",
+                infer_layout=infer,
+            )
+        messages = [record.getMessage() for record in caplog.records]
+        assert messages
+        assert not any("Matti" in m or "Virtanen" in m for m in messages), messages
