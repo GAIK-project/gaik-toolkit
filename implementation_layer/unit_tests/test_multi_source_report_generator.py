@@ -422,6 +422,12 @@ def test_load_report_config_reads_nested_relative_paths(tmp_path):
     assert loaded["output_dir"] == root / "out/report"
 
 
+def test_a_config_without_strict_review_loads_with_strict_review_on(tmp_path):
+    loaded = msrg.load_report_config(_config(tmp_path))
+    assert loaded["strict_review"] is True
+    assert msrg.load_report_config(_config(tmp_path, strict_review=False))["strict_review"] is False
+
+
 @pytest.mark.parametrize(
     "paths",
     [

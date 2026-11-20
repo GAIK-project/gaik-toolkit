@@ -185,9 +185,10 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 | Method | Description |
 |--------|-------------|
 | `setup()` | Create extensions, table, indexes, SQL functions; concurrent calls on one database run one after another |
-| `add(documents, embeddings)` | Insert documents, returns list of IDs |
+| `add(documents, embeddings, *, replace=False)` | Insert documents, or update the rows of chunks already stored; returns list of IDs. `replace=True` first deletes each document's rows of the same owner, in the same transaction, and waits for another call replacing the same document |
 | `count()` | Document count (this owner's, with `owner`) |
-| `delete(document_ids)` | Delete by ID, returns deleted count |
+| `delete(document_ids)` | Delete by row ID (this owner's rows, with `owner`), returns deleted count |
+| `delete_document(document_id, *, owner=None)` | Delete one document's rows (metadata `gaik_document_key`, compared exactly) of one owner (metadata `gaik_owner`; the store's `owner` when it has one; without one, rows that name no owner), returns deleted count |
 | `search(query_embedding, *, top_k, filters)` | VectorStore-compatible semantic search |
 | `search_semantic(query_embedding, *, top_k, threshold, filters)` | Pure vector search; `threshold` (default 0.7) drops rows below that similarity |
 | `search_keyword(query_text, *, top_k, filters)` | Pure FTS keyword search |
@@ -196,6 +197,34 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 | `health(*, sample_rows=5)` | Check the live table against this store's configuration; returns a `HealthReport` |
 | `relemmatize(*, batch_size=500)` | Recompute the lemma column with the current `text_processor`; returns rows updated |
 | `close()` | Close database connection |
+
+### Chunk keys and re-indexing
+
+`setup()` gives the table a `chunk_key` column with a unique index. `add()` sets it
+from the chunk's document, owner and text: the document is `metadata["document_id"]`,
+else `source`, else `document_name`. A `document_id` you set is stored as given (so
+`filters={"document_id": 7}` matches an int); without one, `add()` sets it to the
+document. The document is also recorded as a string under
+`metadata["gaik_document_key"]`, which `replace=True` and `delete_document` match on. A
+`document_id` must be a string or an int, other types raise `ValueError`. The owner is the store's `owner` (recorded as `metadata["gaik_owner"]`),
+so two owners who index a document under the same id keep separate rows, and `replace=True` and
+`delete_document` touch the rows of one owner only.
+Adding a document's chunks again updates their rows instead of inserting copies;
+`replace=True` also deletes the rows a changed document no longer has; and
+`delete_document(document_id)` removes one document. A chunk whose metadata names no
+document gets no key and is inserted each time, as before. Two calls that replace the
+same document of the same owner take a transaction-scoped advisory lock and run one
+after the other, so the table never holds a mix of both versions.
+
+A table created by an earlier gaik release gets the column the next time `setup()`
+runs; until then `add()` inserts as before and logs a warning. Its existing rows keep
+working for search but have no `chunk_key` and no `gaik_document_key`, so
+`replace=True` and `delete_document` never delete them (even rows whose metadata
+names a `document_id`), and re-adding a document stores it next to
+its old rows. Re-index into a new `table_name`. Deleting the old rows with
+`DELETE FROM <table> WHERE chunk_key IS NULL` is safe only when every chunk you index
+names a document: a chunk without one never gets a `chunk_key`, so that statement
+deletes current rows of that kind too.
 
 ### `health()` — is each arm of the search alive?
 

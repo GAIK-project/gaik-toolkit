@@ -315,7 +315,7 @@ flowchart TD
 - **Verified quotes**: every quote must appear in its cited source, ignoring only whitespace; a fact whose quote still fails after one retry is dropped and listed in `KnowledgeBase.dropped`, and the rest of the section is kept
 - **Role separation**: the curator, the writer and the reviewer are separate calls, each with its own model setting
 - **Explicit gaps**: a required item that no source covers becomes `(missing: <item>)`, and an unresolved conflict is stated with both views
-- **Fails loudly**: an unsupported, unreadable or empty source stops the run; with `settings.strict_review`, so does a reviewer edit that cannot be applied
+- **Fails loudly**: an unsupported, unreadable or empty source stops the run, and so does a reviewer edit that cannot be applied, unless `settings.strict_review` is turned off
 - **Install**: `pip install "gaik[report-writer]"`. The stages save `report.docx` unless `settings.docx` is off, which needs the Pandoc binary. Recordings go to the Transcriber, which needs OpenAI or Azure OpenAI
 - **Token usage**: each stage result has `usage`: transcription and vision for `normalize()`, the curator for `curate()`, the writer and reviewer for `synthesize()`
 

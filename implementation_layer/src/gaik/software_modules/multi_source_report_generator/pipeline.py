@@ -520,7 +520,7 @@ class MultiSourceReportGenerator:
         agentic: bool = False,
         review_options: dict | None = None,
         polish: bool = False,
-        strict_review: bool = False,
+        strict_review: bool = True,
         curate_evidence: bool = False,
         verbose: bool = False,
         progress_callback: Callable[[str], None] | None = None,
@@ -1245,7 +1245,7 @@ def save_report_config(
     agentic: bool = False,
     review_options: dict | None = None,
     polish: bool = False,
-    strict_review: bool = False,
+    strict_review: bool = True,
     curate_evidence: bool = False,
 ) -> Path:
     """Persist all ``run()`` parameters to a JSON config file for later reuse.
@@ -1418,7 +1418,7 @@ def load_report_config(path: str | Path, *, root: str | Path | None = None) -> d
         "agentic": raw.get("agentic", False),
         "review_options": raw.get("review_options"),
         "polish": raw.get("polish", False),
-        "strict_review": raw.get("strict_review", False),
+        "strict_review": raw.get("strict_review", True),
         "curate_evidence": raw.get("curate_evidence", False),
     }
 

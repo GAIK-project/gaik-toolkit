@@ -52,9 +52,9 @@ class RunSettings(BaseModel):
     """Sections curated in parallel."""
     review_attempts: int = Field(5, ge=1)
     """Most reviewer requests per section, the first one included."""
-    strict_review: bool = False
-    """Fail the synthesize stage when a reviewer edit cannot be applied, instead of
-    logging it in the review log."""
+    strict_review: bool = True
+    """Fail the synthesize stage when a reviewer edit cannot be applied (the default);
+    ``False`` logs it in the review log instead."""
     docx: bool = True
     """Also write ``report.docx``; needs ``pypandoc`` and the Pandoc binary."""
     citations: bool = True

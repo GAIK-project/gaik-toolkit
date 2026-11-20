@@ -69,6 +69,10 @@ An explicit `transcription_model` always wins over the one in `api_config`.
   to `1200` and is capped at 1400 even if you pass a larger value. Lower it freely; raising
   it above the ceiling has no effect.
 - `whisper_local` uses the local transcription server path and does not use PyDub chunking.
+- When a chunk cannot be transcribed, `transcribe` raises a `RuntimeError` that names the
+  chunk's time range, and the remaining chunks are not sent. Pass `allow_partial=True` to
+  get the transcript with a `[Transcription failed for segment N]` line under that chunk's
+  timestamp instead.
 
 ## Input limits
 
@@ -125,6 +129,7 @@ Optional local parameters:
 - `min_speakers=None`
 - `max_speakers=None`
 - `initial_prompt=None`
+- `allow_partial=False` (every remote model: see Chunking Behavior)
 
 If these local-only options are given while the model is not `whisper_local`, they are ignored with a message. `language` is the exception: it works with every model.
 

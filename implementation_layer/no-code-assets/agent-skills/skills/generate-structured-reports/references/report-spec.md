@@ -81,15 +81,14 @@ writer or reviewer default. `null` leaves the step to the provider's configured 
 
 ### Settings
 
-`propose-spec` proposes `strict_review` `true`; the other settings start at the library
-defaults below. The user accepts or changes each one.
+`propose-spec` proposes the library defaults below. The user accepts or changes each one.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `transcription_language` | `auto` | Language of the recordings as a two-letter ISO-639-1 code, e.g. `fi`, sent with every transcription request; `auto` lets the model detect it |
 | `curator_workers` | 4 | Sections curated in parallel |
 | `review_attempts` | 5 | Most reviewer requests per section |
-| `strict_review` | `false` | `true` fails synthesis when a reviewer edit cannot be applied. It does not mean every unsupported statement is found |
+| `strict_review` | `true` | Fails synthesis when a reviewer edit cannot be applied; `false` keeps it in the review log and returns the report. It does not mean every unsupported statement is found |
 | `docx` | `true` | Word output. Needs Pandoc; set `false` for Markdown only |
 | `citations` | `true` | Cite the source file and place of each fact. `false` removes visible provenance: tell the user |
 | `curator`, `writer`, `reviewer` | unset | `reasoning_effort` and `temperature` for every call of that step. Set `reasoning_effort` only for models that support it; the skill passes none by default |

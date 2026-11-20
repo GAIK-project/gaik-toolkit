@@ -284,7 +284,8 @@
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "Select an available embedding model/deployment separately from the chat model. Anthropic/Foundry has no native embeddings API; Aitta, compatible endpoints and LiteLLM require an explicit embedding model. Rebuild the index after changing provider, model or vector dimensions.",
       "The default parser='vision' parses PDFs with VisionRagParser (Docling layout + a vision model for images; the rag-workflow extra pulls docling and torch). parser='text' (gaik>=0.8.10, extra rag-workflow-text) reads the text layer without them, but the wizard's RAG template and install_extra use the vision default: choose RAGWorkflow only when image-aware parsing (scans, figures, diagrams) is required, and for text-layer PDFs compose a text parser such as PyMuPDFParser with Embedder, Retriever and AnswerGenerator.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. Change a limit with limits=InputLimits(...).",
+      "Each indexed file is one document identified by its document_ids entry or else its path as given with forward slashes (Path(path).as_posix(), not resolved: a relative and an absolute spelling of one file are two documents, and one relative path from two working directories is one; filenames are display names only); indexing the same id again replaces its chunks (gaik after 0.11.0; a persisted collection from an older gaik needs a new collection_name)"
     ],
     "best_for": [
       "document_qa",
@@ -364,6 +365,7 @@
       "enhanced_transcript_instructions",
       "default_prompt",
       "initial_prompt",
+      "allow_partial",
       "api_config",
       "limits",
       "enhancement_max_change_ratio"
@@ -391,7 +393,8 @@
       "whisper_local requires a self-hosted transcription endpoint (local_api_base + local_api_key); transcribe() raises ValueError without both. Confirm the user has one before selecting this path.",
       "Speaker labels are exposed on .segments only. .srt_content and .vtt_content are built by segments_to_srt/segments_to_vtt, which read start/end/text and drop every other key.",
       "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. Change a limit with limits=InputLimits(...).",
-      "Since gaik 0.11.0, local_api_base must be the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS; otherwise the constructor raises EndpointNotAllowedError. Read it from that variable."
+      "Since gaik 0.11.0, local_api_base must be the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS; otherwise the constructor raises EndpointNotAllowedError. Read it from that variable.",
+      "Since the gaik release after 0.11.0, a chunk of a split recording that cannot be transcribed makes transcribe() raise RuntimeError naming the segment and its time range; the remaining chunks are not sent. allow_partial=True returns the transcript with a '[Transcription failed for segment N]' line instead, as earlier releases did."
     ],
     "best_for": [
       "audio_to_transcript",
@@ -971,7 +974,8 @@
     },
     "known_limitations": [
       "Requires PostgreSQL with pgvector extension (`pip install gaik[pg-vector-store]`)",
-      "Database must be set up separately before use"
+      "Database must be set up separately before use",
+      "Re-indexing replaces a document's rows (add(..., replace=True), delete_document) only for rows added by gaik after 0.11.0 to a table setup() has run on; older rows stay searchable but are not found: re-index into a new table_name"
     ],
     "best_for": [
       "semantic_search",
@@ -1150,7 +1154,8 @@
       "Produces timestamps but never speaker labels, on any backend. gpt-4o-transcribe-diarize requests diarized output and parses the speaker field, then discards it when building the SRT (and TranscriptionResult exposes only .content, so it cannot be recovered); the whisper_local backend hardcodes diarization=False in its request payload. For speaker attribution use Transcriber(transcription_model='whisper_local', diarization=True).",
       "The whisper_local backend takes its endpoint from api_config['api_base'] (required) and api_config['key'] or ['api_key'] (optional -- the auth header is omitted when empty). This differs from Transcriber, which uses the local_api_base/local_api_key constructor kwargs and requires both.",
       "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend) before audio is extracted or any call is made; whisper_local_max_audio_minutes is a second cap for Whisper Local only. A recording without a length in its header (a WebM recorded in a browser) is measured by decoding its audio, and one whose length cannot be read at all is refused. max_media_bytes is off by default. Change a limit with limits=InputLimits(...).",
-      "Since gaik 0.11.0, api_config['api_base'] for whisper_local follows the same rule as Transcriber's local_api_base (LOCAL_TRANSCRIBER_API_BASE, this machine or GAIK_ALLOWED_ENDPOINT_HOSTS), and an Azure audio endpoint must be an Azure host, the address in AZURE_ENDPOINT or a listed host; otherwise EndpointNotAllowedError (at construction for gpt-4o-transcribe-diarize, when the Whisper client is built otherwise)."
+      "Since gaik 0.11.0, api_config['api_base'] for whisper_local follows the same rule as Transcriber's local_api_base (LOCAL_TRANSCRIBER_API_BASE, this machine or GAIK_ALLOWED_ENDPOINT_HOSTS), and an Azure audio endpoint must be an Azure host, the address in AZURE_ENDPOINT or a listed host; otherwise EndpointNotAllowedError (at construction for gpt-4o-transcribe-diarize, when the Whisper client is built otherwise).",
+      "Since the gaik release after 0.11.0, a chunk FFmpeg cannot create, even on its retry, or one that comes out shorter than asked for (by encoded length) with audio after it, makes transcribe() raise RuntimeError naming the missing time ranges, instead of returning a transcript without that stretch; there is no option to keep a partial transcript."
     ],
     "best_for": [
       "long_audio_transcription",
@@ -1682,7 +1687,7 @@
     "known_limitations": [
       "Input is a KnowledgeBase holding exactly one entry per non-derived section and nothing else (usually from KnowledgeCurator; it can also be written by hand). A mismatch, duplicate or cyclic dependency raises ValueError before any LLM call.",
       "A technical section is written only from its own knowledge JSON; a derived section (depends_on) only from the reviewed texts of its prerequisites.",
-      "Unapplied reviewer edits are logged in review_log; strict_review=True raises RuntimeError instead. An empty writer answer raises RuntimeError.",
+      "By default (strict_review=True from the gaik release that ships strict review by default; 0.11.1 and older default to False) a section with unapplied reviewer edits raises RuntimeError; strict_review=False logs them in review_log and returns the report. An empty writer answer raises RuntimeError.",
       "Report.save writes report.docx by default (docx=False skips it); DOCX needs the Pandoc system binary.",
       "usage is not saved, so it is empty after Report.load.",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
@@ -3707,7 +3712,8 @@
       "Default is an in-memory store: the index is lost when the process ends; persist=True keeps it in a local Chroma folder (needs chromadb, installed with gaik[vector-store])",
       "In-memory search compares the query with every stored embedding, so it suits small and medium collections",
       "Metadata filtering is basic",
-      "A single process: not a shared or production index -- use PgVectorStore for that"
+      "A single process: not a shared or production index -- use PgVectorStore for that",
+      "Re-indexing replaces a document's chunks only when each chunk names its document (metadata document_id, source or document_name) and, for a persisted collection, the collection was built by gaik after 0.11.0; otherwise re-index into a new collection_name"
     ],
     "best_for": [
       "proof_of_concept_retrieval",

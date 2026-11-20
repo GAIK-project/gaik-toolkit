@@ -6,6 +6,15 @@ import math
 import uuid
 import warnings
 
+from gaik.software_components.RAG._chunk_ids import (
+    DOCUMENT_KEY,
+    chunk_ids,
+    delete_scope,
+    document_scopes,
+    in_scope,
+    with_document_id,
+)
+
 try:
     from langchain_core.documents import Document
 except ImportError as exc:
@@ -78,6 +87,7 @@ class VectorStore:
 
         self._embeddings: list[list[float]] = []
         self._documents: list[Document] = []
+        self._ids: list[str] = []
 
         self._collection = None
         self._client = None
@@ -108,34 +118,173 @@ class VectorStore:
                     stacklevel=2,
                 )
 
-    def add(self, documents: list[Document], embeddings: list[list[float]]) -> None:
+    def add(
+        self,
+        documents: list[Document],
+        embeddings: list[list[float]],
+        *,
+        replace: bool = False,
+    ) -> None:
+        """Store chunks with their embeddings.
+
+        Each chunk's id comes from its document, its owner and its text (see
+        ``_chunk_ids``): the document is ``metadata["document_id"]``, else
+        ``source``, else ``document_name``. A ``document_id`` the caller set is
+        stored as given; without one it is set to the document. The document
+        is also stored as a string under ``gaik_document_key``, which
+        ``replace`` and :meth:`delete_document` match on. The owner is the
+        store's ``owner``. Adding a chunk that is already stored replaces it,
+        metadata included, instead of storing a second copy. A chunk whose
+        metadata names no document is stored as a new one each time.
+
+        Args:
+            documents: The chunks. A ``document_id`` in the metadata must be a
+                string or an int; other types raise ``ValueError``.
+            embeddings: Their embeddings, in the same order.
+            replace: After storing, delete the other chunks of each document in
+                ``documents``, so chunks the document no longer has do not stay
+                behind. Only chunks with the same owner as the ones added (or,
+                without one, chunks that name no owner) are deleted, and only
+                chunks this release stored (with ``gaik_document_key``). Pass
+                all of a document's chunks in one call. If storing fails, no
+                stored chunk is deleted: in Chroma the chunks of the failed
+                slice are put back as they were, and slices stored before it
+                keep their new version.
+        """
         if len(documents) != len(embeddings):
             raise ValueError("documents and embeddings must have the same length")
         documents = self._owned(documents)
 
-        if not self.persist:
-            self._documents.extend(documents)
-            self._embeddings.extend(embeddings)
-            return
-
         if not documents:
             return
-        # A new id for every document: ids counted from zero on each call collided
-        # with the ones already stored, and Chroma drops such a document silently.
-        ids = [f"{self.collection_name}_{uuid.uuid4().hex}" for _ in documents]
-        texts = [doc.page_content for doc in documents]
-        metadatas = [_chroma_metadata(doc.metadata) for doc in documents]
-        # Chroma rejects a single add above its maximum batch size, so send
-        # slices. If one fails, the slices before it stay stored.
+
+        # A chunk that names no document gets a new id, as before.
+        keys = chunk_ids(documents)
+        keyed = [key.chunk_id or uuid.uuid4().hex for key in keys]
+        stored = [
+            Document(
+                id=doc.id,  # a caller's own id stays on the in-memory copy, as before
+                page_content=doc.page_content,
+                metadata=with_document_id(doc.metadata, key.document_id),
+            )
+            for doc, key in zip(documents, keys)
+        ]
+
+        if not self.persist:
+            position = {chunk_id: index for index, chunk_id in enumerate(self._ids)}
+            for doc, embedding, chunk_id in zip(stored, embeddings, keyed):
+                if chunk_id in position:
+                    self._documents[position[chunk_id]] = doc
+                    self._embeddings[position[chunk_id]] = embedding
+                else:
+                    position[chunk_id] = len(self._ids)
+                    self._ids.append(chunk_id)
+                    self._documents.append(doc)
+                    self._embeddings.append(embedding)
+        else:
+            ids = [f"{self.collection_name}_{chunk_id}" for chunk_id in keyed]
+            texts = [doc.page_content for doc in stored]
+            metadatas = [_chroma_metadata(doc.metadata) for doc in stored]
+            # Chroma rejects a single call above its maximum batch size, so send
+            # slices. If one fails, the slices before it stay stored.
+            batch = _max_batch_size(self._client) or len(ids)
+            for start in range(0, len(ids), batch):
+                end = start + batch
+                self._replace_slice(
+                    ids[start:end], embeddings[start:end], texts[start:end], metadatas[start:end]
+                )
+            keyed = ids
+
+        if replace:
+            kept = set(keyed)
+            for doc_id, owner in document_scopes(keys):
+                self._delete_ids([i for i in self._ids_in_scope(doc_id, owner) if i not in kept])
+
+    def _replace_slice(self, ids, embeddings, texts, metadatas) -> None:
+        """Store one slice in Chroma in place of the chunks stored with the same ids.
+
+        An upsert would merge the new metadata into the stored one, and a key the
+        new chunk lacks (a heading it no longer has) would stay. So the stored
+        chunks with these ids are read, deleted and the slice added anew; if the
+        add fails (an embedding of another dimension, say), the chunks read are
+        added back as they were and the error is raised.
+        """
+        collection = self._collection
+        old = collection.get(  # type: ignore[union-attr]
+            ids=ids, include=["embeddings", "documents", "metadatas"]
+        )
+        old_ids = list(old.get("ids") or [])
+        if old_ids:
+            collection.delete(ids=old_ids)  # type: ignore[union-attr]
+        try:
+            collection.add(  # type: ignore[union-attr]
+                ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas
+            )
+        except Exception:
+            if old_ids:
+                collection.add(  # type: ignore[union-attr]
+                    ids=old_ids,
+                    embeddings=old["embeddings"],
+                    documents=old["documents"],
+                    metadatas=old["metadatas"],
+                )
+            raise
+
+    def delete_document(self, document_id: str, *, owner: str | None = None) -> int:
+        """Delete every chunk of one document and one owner.
+
+        ``add()`` records each chunk's document under ``gaik_document_key``
+        (the chunk's own ``document_id``, else its ``source``, else its
+        ``document_name``, as a string). Chunks stored by a gaik release before
+        that have none and are never deleted here, even when their metadata
+        names a ``document_id``: index them again into a new collection.
+
+        Args:
+            document_id: The document, compared exactly. A string, or an int
+                compared as its string; other types raise ``ValueError``.
+            owner: Delete only the chunks recorded for this owner (metadata
+                ``gaik_owner``). Without it, only chunks that name no owner are
+                deleted, so a call without an owner never removes an owner's
+                chunks. A store with its own ``owner`` uses that one.
+
+        Returns:
+            The number of chunks deleted.
+        """
+        doc_id, owner = delete_scope(self, document_id, owner)
+        ids = self._ids_in_scope(doc_id, owner)
+        self._delete_ids(ids)
+        return len(ids)
+
+    def _ids_in_scope(self, document_id: str, owner: str | None) -> list[str]:
+        """The ids of the stored chunks of ``document_id`` and exactly ``owner``."""
+        if not self.persist:
+            return [
+                chunk_id
+                for chunk_id, doc in zip(self._ids, self._documents)
+                if in_scope(doc.metadata, document_id, owner)
+            ]
+        found = self._collection.get(  # type: ignore[union-attr]
+            where={DOCUMENT_KEY: {"$eq": document_id}}, include=["metadatas"]
+        )
+        return [
+            chunk_id
+            for chunk_id, metadata in zip(found.get("ids") or [], found.get("metadatas") or [])
+            if in_scope(metadata, document_id, owner)
+        ]
+
+    def _delete_ids(self, ids: list[str]) -> None:
+        if not ids:
+            return
+        if not self.persist:
+            gone = set(ids)
+            keep = [index for index, chunk_id in enumerate(self._ids) if chunk_id not in gone]
+            self._documents = [self._documents[i] for i in keep]
+            self._embeddings = [self._embeddings[i] for i in keep]
+            self._ids = [self._ids[i] for i in keep]
+            return
         batch = _max_batch_size(self._client) or len(ids)
         for start in range(0, len(ids), batch):
-            end = start + batch
-            self._collection.add(  # type: ignore[union-attr]
-                ids=ids[start:end],
-                embeddings=embeddings[start:end],
-                documents=texts[start:end],
-                metadatas=metadatas[start:end],
-            )
+            self._collection.delete(ids=ids[start : start + batch])  # type: ignore[union-attr]
 
     def _owned(self, documents: list[Document]) -> list[Document]:
         """``documents`` recorded for this store's owner (copies; the caller's are kept)."""

@@ -140,6 +140,14 @@
         "infer_from": "technical plumbing - leave default unless the API provider has a lower duration limit. Not applicable to whisper_local."
       },
       {
+        "name": "allow_partial",
+        "type": "bool",
+        "default": false,
+        "effect": "Since the gaik release after 0.11.0: when a chunk of a split recording cannot be transcribed, transcribe() raises RuntimeError naming the segment and its time range, and the remaining chunks are not sent. allow_partial=True restores the earlier result: the transcript comes back with a '[Transcription failed for segment N]' line under that chunk's timestamp and the rest transcribed. A recording sent in a single request raises on failure either way.",
+        "selection_relevant": true,
+        "infer_from": "leave False, so a gap in the recording stops the run. Set True only when the user accepts a transcript with missing stretches; then the PoC must look for the '[Transcription failed for segment' line in result.raw_transcript (not the enhanced transcript: transcript enhancement may drop or rewrite the line) and tell the user which part is missing."
+      },
+      {
         "name": "api_config",
         "type": "dict | None",
         "default": null,
@@ -967,7 +975,8 @@
         "selection_relevant": true,
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
-    ]
+    ],
+    "note": "In gaik after 0.11.0, setup() adds a unique chunk_key column, and add() derives it from the chunk's document (metadata document_id, else source, else document_name; a caller's document_id is kept as given, and the document is also recorded as a string under gaik_document_key) and its text: adding a document again updates its rows instead of inserting copies, add(..., replace=True) also deletes the rows a changed document no longer has (one transaction; two calls replacing the same document wait for each other), and store.delete_document(document_id, owner=None) removes one document. A document_id must be a string or an int and is compared exactly (as its string); a chunk's owner (metadata gaik_owner) is part of its key, and replace and delete_document touch one owner's rows only (without an owner, rows that name none). Rows from an older gaik keep working for search but are never deleted by replace or delete_document (they lack gaik_document_key): re-index into a new table_name. delete(ids) still deletes by row id."
   },
   "Retriever": {
     "import": "from gaik.software_components.RAG.retriever import Retriever",
@@ -1501,7 +1510,7 @@
         "name": "transcriber_ctor",
         "type": "dict",
         "default": null,
-        "effect": "Constructor kwargs forwarded to the internal Transcriber -- the general form of the enhanced_transcript option above. This is the only way to configure transcription inside the module; read the Transcriber reference card for its option names. Every name must be a Transcriber constructor parameter (an unknown one raises ValueError before the run starts), and api_config is refused here: pass the audio provider config to the module constructor as transcription_config (or the shared api_config). NOTE the module drives the hosted Transcriber path, so whisper_local options (diarization, speaker_count) do not produce speaker labels here -- see the LIMITATION in the note.",
+        "effect": "Constructor kwargs forwarded to the internal Transcriber -- the general form of the enhanced_transcript option above. This is the only way to configure transcription inside the module; read the Transcriber reference card for its option names. Every name must be a Transcriber constructor parameter (an unknown one raises ValueError before the run starts), and api_config is refused here: pass the audio provider config to the module constructor as transcription_config (or the shared api_config). Since the gaik release after 0.11.0 a failed chunk raises RuntimeError by default; {'allow_partial': True} keeps the transcript with the segment marked instead (see the Transcriber card's allow_partial option). NOTE the module drives the hosted Transcriber path, so whisper_local options (diarization, speaker_count) do not produce speaker labels here -- see the LIMITATION in the note.",
         "selection_relevant": true,
         "infer_from": "any Transcriber option that would have been set on a standalone transcription step, e.g. {'enhanced_transcript': True, 'language': 'fi'}"
       },
@@ -1820,7 +1829,7 @@
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ],
-    "note": "End-to-end module: embeds, stores in an internal Chroma VectorStore, retrieves, and answers. Do NOT also add Embedder / Retriever / AnswerGenerator as separate steps. PgVectorStore is a separate PostgreSQL component and is not subsumed by this module."
+    "note": "End-to-end module: embeds, stores in an internal Chroma VectorStore, retrieves, and answers. Do NOT also add Embedder / Retriever / AnswerGenerator as separate steps. PgVectorStore is a separate PostgreSQL component and is not subsumed by this module. In gaik after 0.11.0, index_documents() treats each file as one document identified by its document_ids entry or else its path as given with forward slashes (Path(path).as_posix(), not resolved: 'data/a.pdf' and its absolute path are two documents, and one relative path from two working directories is one; filenames are display names only, so two files with the same name are two documents), and indexing it again replaces its chunks; workflow.delete_document(document_id) removes one. Files saved under a new temporary path each time need document_ids to be replaced. A persisted collection from an older gaik is not replaced this way: use a new collection_name."
   },
   "ParallelTranscriber": {
     "import": "from gaik.software_components.parallel_transcriber import ParallelTranscriber, TranscriptionConfig",
@@ -1978,12 +1987,12 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when recordings can be longer than 6 hours: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option)."
+    "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option). Since the gaik release after 0.11.0, a chunk FFmpeg cannot create, even on its retry, or one that comes out shorter than asked for (by encoded length) with audio after it, stops transcribe() with a RuntimeError naming the missing time ranges, instead of the transcript leaving that stretch out; there is no option to keep a partial transcript."
   },
   "MultiSourceReportGenerator": {
     "import": "from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator, save_report_config, load_report_config",
     "construct": "generator = MultiSourceReportGenerator(api_config=get_stage_config(config, 'answer'))",
-    "call": "result = generator.run(\n    input_paths=input_paths,\n    sections=[\n        {\"id\": \"findings\", \"title\": \"Findings\", \"instructions\": \"Describe key findings from the evidence.\"},\n        {\"id\": \"recommendations\", \"title\": \"Recommendations\", \"instructions\": \"Give recommendations.\", \"depends_on\": [\"findings\"]}\n    ],\n    report_title=report_title,\n    report_description=report_description,\n    report_language=report_language,\n    sample_report_path=sample_report_path,\n    output_dir=output_dir,\n    output_docx=False,\n    agentic=True,\n    curate_evidence=False,\n    polish=False,\n    writer_options={'api_config': get_stage_config(config, 'answer')}\n)\n    report_markdown = result.markdown\n    written_sections = [s.title for s in result.sections]\n    docx_path = result.docx_path",
+    "call": "result = generator.run(\n    input_paths=input_paths,\n    sections=[\n        {\"id\": \"findings\", \"title\": \"Findings\", \"instructions\": \"Describe key findings from the evidence.\"},\n        {\"id\": \"recommendations\", \"title\": \"Recommendations\", \"instructions\": \"Give recommendations.\", \"depends_on\": [\"findings\"]}\n    ],\n    report_title=report_title,\n    report_description=report_description,\n    report_language=report_language,\n    sample_report_path=sample_report_path,\n    output_dir=output_dir,\n    output_docx=False,\n    agentic=True,\n    strict_review=True,\n    curate_evidence=False,\n    polish=False,\n    writer_options={'api_config': get_stage_config(config, 'answer')}\n)\n    report_markdown = result.markdown\n    written_sections = [s.title for s in result.sections]\n    docx_path = result.docx_path",
     "returns": "ReportGenerationResult(.markdown, .markdown_path, .docx_path, .sections, .evidence_items, .title, .usage)",
     "install_extra": "multi-source-report-generator",
     "install_extra_agentic": "multi-source-report-generator-agentic",
@@ -2072,10 +2081,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "Agentic mode only. When true, raises before writing any output if the diff-editor reviewer has unresolved edits after retries. Use when the report must never be persisted with unresolved reviewer corrections.",
+        "default": true,
+        "effect": "Agentic mode only. True (the default from the gaik release that ships strict review by default; 0.11.1 and older default to false): raises before writing any output if the diff-editor reviewer has unresolved edits after retries, so a report is never saved as reviewed with a correction left out. False writes the report and returns the unresolved edits as section.revision_warnings.",
         "selection_relevant": true,
-        "infer_from": "agentic == true AND (human_review == yes OR accuracy_critical)"
+        "infer_from": "leave true; pass strict_review=True explicitly while the PoC pins any gaik release before the one that ships strict review by default (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections listed as revision warnings for a person to resolve"
       },
       {
         "name": "review_options",
@@ -2124,7 +2133,7 @@
         "name": "transcriber_options",
         "type": "dict",
         "default": null,
-        "effect": "Audio/video Transcriber options use nested ctor and call dictionaries, not flat model/language keys: {'ctor': {'api_config': audio_cfg, 'transcription_model': ..., 'language': ..., 'enhanced_transcript': ...}, 'call': {'custom_context': ...}}. Audio requires native OpenAI/Azure or an explicitly configured supported local mode.",
+        "effect": "Audio/video Transcriber options use nested ctor and call dictionaries, not flat model/language keys: {'ctor': {'api_config': audio_cfg, 'transcription_model': ..., 'language': ..., 'enhanced_transcript': ...}, 'call': {'custom_context': ...}}. Audio requires native OpenAI/Azure or an explicitly configured supported local mode. Since the gaik release after 0.11.0 a failed chunk of a recording raises RuntimeError by default; ctor {'allow_partial': True} keeps the transcript with the segment marked instead (see the Transcriber card).",
         "selection_relevant": true,
         "infer_from": "Audio/video inputs -> provide the transcription stage config under ctor.api_config; select the actual audio deployment separately from chat."
       },
@@ -2198,7 +2207,7 @@
   "ReportWriter": {
     "import": "from gaik.software_modules.report_writer import ReportWriter, ReportSpec, SectionSpec, RunSettings, ModelSettings",
     "construct": "writer = ReportWriter(config=get_stage_config(config, 'answer'))",
-    "call": "settings = RunSettings(transcription_language=language, strict_review=False, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = [entry.model_dump(mode='json') for entry in report.review_log]  # Pydantic models: json.dumps takes their model_dump(mode='json'), or use report.save(dir)",
+    "call": "settings = RunSettings(transcription_language=language, strict_review=True, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = [entry.model_dump(mode='json') for entry in report.review_log]  # Pydantic models: json.dumps takes their model_dump(mode='json'), or use report.save(dir)",
     "call_from_spec_file": "spec = ReportSpec.load(spec_path)  # since gaik 0.10.0 (SourcePathError is exported from report_writer): source paths and the sample report are relative to the spec file's folder and must stay inside it; an absolute path, or one leading out through '..' or a symbolic link, raises SourcePathError before any file is read. ReportSpec.load(spec_path, root=parent_folder) accepts paths inside a wider root (and absolute ones inside it). spec.save(path) writes them back relative",
     "call_resume": "report = writer.synthesize(spec, workspace, progress_callback=print)  # after editing workspace/knowledge/*.json; normalize and curate are not rerun",
     "call_rebuild": "report = writer.rebuild(spec, workspace)  # after editing workspace/report/sections/*.md (keep the '## <title>' first line); no LLM call",
@@ -2260,10 +2269,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "RunSettings field. When true, synthesize fails with RuntimeError when a reviewer edit cannot be applied, instead of logging it in report/review_log.json.",
+        "default": true,
+        "effect": "RunSettings field. True (the default from the gaik release that ships strict review by default; 0.11.1 and older default to false): synthesize fails with RuntimeError when a reviewer edit cannot be applied, so a report is never returned as reviewed with a correction left out. False logs the edit in report/review_log.json and returns the report.",
         "selection_relevant": true,
-        "infer_from": "accuracy_critical == yes OR the report must never be saved with unresolved reviewer corrections -> true; otherwise false and surface review_log to the human reviewer"
+        "infer_from": "leave true; set it explicitly while the PoC pins any gaik release before the one that ships strict review by default (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections and a person reads report/review_log.json before the report is used"
       },
       {
         "name": "review_attempts",
@@ -2442,7 +2451,7 @@
   },
   "ReportSynthesizer": {
     "import": "from gaik.software_components.report_synthesizer import ReportSynthesizer, Report",
-    "construct": "synthesizer = ReportSynthesizer(config=get_stage_config(config, 'answer'), reviewer_model=None, strict_review=False, review_attempts=5)",
+    "construct": "synthesizer = ReportSynthesizer(config=get_stage_config(config, 'answer'), reviewer_model=None, strict_review=True, review_attempts=5)",
     "call": "report = synthesizer.synthesize(knowledge, section_specs, title=report_title, language=report_language, instructions=report_instructions, sample_report=sample_report_markdown, progress_callback=print)\n    report.save(output_dir / 'report', docx=False)\n    report_markdown = report.markdown",
     "call_rebuild": "Report.load(output_dir / 'report').save(output_dir / 'report', docx=False)  # after hand-editing report/sections/*.md; no LLM call",
     "returns": "Report(.title, .sections [ReportSection(.id, .title, .text)], .review_log [ReviewEntry(.section_id, .applied, .unresolved)], .usage, .markdown); .save(dir, docx=True) -> sections/NN_<id>.md, review_log.json, report.md, report.docx; report.model_dump(mode='json') for JSON (json.dumps cannot write the Report, its ReviewEntry or Edit models directly); Report.load(dir)",
@@ -2454,10 +2463,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "When true, a section with unresolved reviewer edits raises RuntimeError and stops the run; otherwise the edits are logged in review_log.",
+        "default": true,
+        "effect": "True (the default from the gaik release that ships strict review by default; 0.11.1 and older default to false): a section with unresolved reviewer edits raises RuntimeError and stops the run, so a report is never returned as reviewed with a correction left out. False logs the edits in review_log and returns the report.",
         "selection_relevant": true,
-        "infer_from": "accuracy_critical == yes OR the report must never be saved with unresolved reviewer corrections -> true"
+        "infer_from": "leave true; pass it explicitly while the PoC pins any gaik release before the one that ships strict review by default (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections and a person reads review_log before the report is used"
       },
       {
         "name": "reviewer_model",
@@ -2561,7 +2570,7 @@
         "name": "max_attempts",
         "type": "int",
         "default": 5,
-        "effect": "Most LLM requests per review, the first one included. Retries re-request only edits whose search text did not match exactly once; edits still failing end up in unresolved.",
+        "effect": "Most LLM requests per review, the first one included. Retries re-request only edits whose search text did not match exactly once; a failed edit that a retry answer leaves out is asked for again; edits still failing or still missing end up in unresolved.",
         "selection_relevant": false,
         "infer_from": "leave at 5; lower it only when reviewer cost dominates"
       },
@@ -3134,7 +3143,7 @@
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ],
-    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. Since gaik 0.11.0, a persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored."
+    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. Since gaik 0.11.0, a persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored. In gaik after 0.11.0, a chunk's id comes from its document (metadata document_id, else source, else document_name; a caller's document_id is kept as given, and the document is also recorded as a string under gaik_document_key) and its text: adding a document again updates its chunks instead of storing copies, add(..., replace=True) also drops the chunks a changed document no longer has (only after every chunk is stored; a failed add keeps the stored chunks), and store.delete_document(document_id, owner=None) removes one document. A document_id must be a string or an int and is compared exactly (as its string); a chunk's owner (metadata gaik_owner) is part of its id, and replace and delete_document touch one owner's chunks only (without an owner, chunks that name none). A chunk naming no document is added as a new one each time. A persisted collection from an older gaik still searches, but its chunks are never deleted by replace or delete_document (they lack gaik_document_key): re-index into a new collection_name."
   },
   "FieldsToDocx": {
     "import": "from gaik.software_components.fields_to_docx import FieldsToDocx",
