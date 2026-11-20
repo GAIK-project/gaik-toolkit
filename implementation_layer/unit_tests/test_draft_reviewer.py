@@ -19,10 +19,12 @@ class _FakeClient:
         self.calls: list[list[dict]] = []
         self.config: dict | None = None
         self.kwargs: list[dict] = []
+        self.formats: list[type] = []
 
     def chat_parsed(self, messages, response_format, **kwargs):
-        assert response_format is dr.EditList
+        assert response_format in (dr.EditList, dr.RetryEditList)
         self.calls.append(messages)
+        self.formats.append(response_format)
         self.kwargs.append(kwargs)
         response = self.responses.pop(0)
         if isinstance(response, Exception):
@@ -163,6 +165,85 @@ def test_one_retried_deletion_answers_only_the_deletion_it_matches(make):
     third = client.calls[2][2]["content"]
     assert "painted bleu" in third
     assert "tol booth" not in third
+
+
+def _retry(edit: Edit, answers: str) -> dr.RetryEdit:
+    return dr.RetryEdit(**edit.model_dump(), answers=answers)
+
+
+def test_retry_request_lists_ids_and_asks_for_them(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    reviewer, client = make(_edits(typo), _edits())
+    reviewer.review(DRAFT, reference=REFERENCE)
+    assert client.formats == [dr.EditList, dr.RetryEditList]
+    retry = client.calls[1][2]["content"]
+    assert "id: F1" in retry
+    assert "'answers'" in retry
+
+
+def test_retry_naming_the_failed_edit_resolves_it_whatever_its_wording(make):
+    # The retry fixes the year with another reason and also makes a change of its own;
+    # the year is named by its id, so the corrected text leaves nothing unresolved.
+    draft = DRAFT + " It is near the town centre."
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    year = Edit(search="1999", replace="1998", reason="The reference gives the opening as 1998.")
+    centre = Edit(search="centre", replace="center", reason="Use one spelling throughout.")
+    answer = dr.RetryEditList(edits=[_retry(year, "F1"), _retry(centre, "")])
+    reviewer, client = make(_edits(typo), answer, _edits())
+    result = reviewer.review(draft, reference=REFERENCE)
+    assert result.text == draft.replace("1999", "1998").replace("centre", "center")
+    assert result.applied == [year, centre]
+    assert all(type(edit) is Edit for edit in result.applied)
+    assert result.unresolved == []
+    assert len(client.calls) == 2
+
+
+def test_failed_edit_is_carried_once_when_its_retry_fails_too(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    again = Edit(search="opend in 1999", replace="opened in 1998", reason="The year is 1998.")
+    still = Edit(search="opned in 1999", replace="opened in 1998", reason="Fix the year.")
+    reviewer, client = make(
+        _edits(typo),
+        dr.RetryEditList(edits=[_retry(again, "F1")]),
+        dr.RetryEditList(edits=[_retry(still, "F1")]),
+        _edits(),
+    )
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.text == DRAFT
+    assert result.unresolved == [still]
+    assert len(client.calls) == 4
+    for call, shown in zip(client.calls[1:], [typo, again, still], strict=True):
+        retry = call[2]["content"]
+        assert retry.count("id: F") == 1
+        assert "id: F1" in retry
+        assert repr(shown.search) in retry
+
+
+def test_failed_edit_not_named_by_an_answer_that_uses_ids_stays_unresolved(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    paint = Edit(search="painted red", replace="painted grey", reason="Wrong colour.")
+    # The paint retry reuses the reason, but names no id: the answer uses ids, so
+    # it does not stand for the paint edit.
+    other = Edit(search="painted blue", replace="painted blue and white", reason="Wrong colour.")
+    answer = dr.RetryEditList(edits=[_retry(YEAR, "F1"), _retry(other, "")])
+    reviewer, client = make(_edits(typo, paint), answer, _edits())
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.applied == [YEAR, other]
+    assert result.unresolved == [paint]
+    third = client.calls[2][2]["content"]
+    assert "id: F2" in third and "'painted red'" in third
+    assert "id: F1" not in third
+
+
+def test_two_retry_edits_naming_one_id_answer_it_once(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    paint = Edit(search="painted red", replace="painted grey", reason="Wrong colour.")
+    count = Edit(search="40,000", replace="45,000", reason="The reference gives 45,000.")
+    answer = dr.RetryEditList(edits=[_retry(YEAR, "F1"), _retry(count, "f1")])
+    reviewer, _ = make(_edits(typo, paint), answer, _edits())
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.applied == [YEAR, count]
+    assert result.unresolved == [paint]
 
 
 def test_empty_replace_deletes_passage(make):

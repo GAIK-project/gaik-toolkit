@@ -19,6 +19,7 @@ from difflib import SequenceMatcher
 
 from pydantic import BaseModel, Field
 
+from gaik.software_components.draft_reviewer.draft_reviewer import _owners
 from gaik.software_components.source_material import (
     SourceMaterial,
     with_source_material_instruction,
@@ -56,6 +57,11 @@ class Correction(BaseModel):
     search: str = Field(description="Letter-for-letter exact string to find in the text.")
     replace: str = Field(description="Replacement string to apply.")
     reason: str = Field(description="Why this correction is needed (1-2 sentences).")
+    answers: str = Field(
+        default="",
+        description="In a retry: the id of the failed edit this correction makes, such as "
+        "F1, copied from the failed_edits block; empty for a correction that makes none.",
+    )
 
 
 class CorrectionList(BaseModel):
@@ -107,7 +113,7 @@ def _apply_corrections(
     current = text
     successful: list[dict] = []
     failed: list[dict] = []
-    for c in corrections:
+    for index, c in enumerate(corrections):
         target = c.search if c.search in current else _find_search_string(current, c.search)
         if target:
             current = current.replace(target, c.replace, 1)
@@ -119,6 +125,7 @@ def _apply_corrections(
                     "replace": c.replace,
                     "reason": c.reason,
                     "error": "search string not found in text",
+                    "index": index,
                 }
             )
     return current, successful, failed
@@ -152,7 +159,8 @@ def _check_prompt(text: str, blocks: SourceMaterial) -> str:
 
 def _retry_prompt(text: str, failed: list[dict], attempt: int, blocks: SourceMaterial) -> str:
     failed_info = "\n\n".join(
-        f"  search: {f['search']!r}\n  replace: {f['replace']!r}\n  error: {f['error']}"
+        f"  id: {f['id']}\n  search: {f['search']!r}\n  replace: {f['replace']!r}\n"
+        f"  error: {f['error']}"
         for f in failed
     )
     return (
@@ -162,8 +170,14 @@ def _retry_prompt(text: str, failed: list[dict], attempt: int, blocks: SourceMat
         + blocks.wrap(failed_info, label="failed_edits")
         + "\n\nRe-read the instructions and decide whether these changes are still needed. "
         "If so, produce NEW corrections whose 'search' strings EXACTLY match the current "
-        "text below.\n\n" + blocks.wrap(text, label="text")
+        "text below, and set 'answers' of each to the id of the failed edit it makes, such "
+        "as F1, or leave it empty for a correction that makes none of them.\n\n"
+        + blocks.wrap(text, label="text")
     )
+
+
+def _edit_fields(failed: dict) -> dict:
+    return {key: failed[key] for key in ("search", "replace", "reason")}
 
 
 Instruction = str | Callable[[SourceMaterial], str]
@@ -201,10 +215,27 @@ def diff_editor_run(
     pending = first.corrections
 
     attempt = 0
+    # Each failed edit keeps one id until a correction that makes it applies. A failed
+    # edit that a retry answer leaves out stays failed, so it is asked for again and
+    # ends in ``warnings`` (and fails a strict review) rather than disappearing.
     failed: list[dict] = []
+    made = 0
     while pending:
-        current, successful, failed = _apply_corrections(current, pending)
+        previous = {f["id"]: Correction(**_edit_fields(f)) for f in failed}
+        owner = _owners(previous, pending) if previous else {}
+        current, successful, missed = _apply_corrections(current, pending)
         applied.extend(successful)
+        failed = [
+            {**f, "error": "left out of the last answer, propose it again"}
+            for f in failed
+            if f["id"] not in owner.values()
+        ]
+        for f in missed:
+            fid = owner.get(f.pop("index"))
+            if fid is None:
+                made += 1
+                fid = f"F{made}"
+            failed.append({**f, "id": fid})
         attempt += 1
         if not failed:
             break

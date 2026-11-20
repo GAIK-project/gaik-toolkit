@@ -2073,9 +2073,9 @@
         "name": "strict_review",
         "type": "bool",
         "default": true,
-        "effect": "Agentic mode only. True (the default after gaik 0.11.0; up to 0.11.0 the default was false): raises before writing any output if the diff-editor reviewer has unresolved edits after retries, so a report is never saved as reviewed with a correction left out. False writes the report and returns the unresolved edits as section.revision_warnings.",
+        "effect": "Agentic mode only. True (the default from the gaik release that ships strict review by default; 0.11.1 and older default to false): raises before writing any output if the diff-editor reviewer has unresolved edits after retries, so a report is never saved as reviewed with a correction left out. False writes the report and returns the unresolved edits as section.revision_warnings.",
         "selection_relevant": true,
-        "infer_from": "leave true; pass strict_review=True explicitly while the PoC pins gaik 0.11.0 or older. False only when the user accepts a report with unresolved reviewer corrections listed as revision warnings for a person to resolve"
+        "infer_from": "leave true; pass strict_review=True explicitly while the PoC pins any gaik release before the one that ships strict review by default (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections listed as revision warnings for a person to resolve"
       },
       {
         "name": "review_options",
@@ -2261,9 +2261,9 @@
         "name": "strict_review",
         "type": "bool",
         "default": true,
-        "effect": "RunSettings field. True (the default after gaik 0.11.0; up to 0.11.0 the default was false): synthesize fails with RuntimeError when a reviewer edit cannot be applied, so a report is never returned as reviewed with a correction left out. False logs the edit in report/review_log.json and returns the report.",
+        "effect": "RunSettings field. True (the default from the gaik release that ships strict review by default; 0.11.1 and older default to false): synthesize fails with RuntimeError when a reviewer edit cannot be applied, so a report is never returned as reviewed with a correction left out. False logs the edit in report/review_log.json and returns the report.",
         "selection_relevant": true,
-        "infer_from": "leave true; set it explicitly while the PoC pins gaik 0.11.0 or older. False only when the user accepts a report with unresolved reviewer corrections and a person reads report/review_log.json before the report is used"
+        "infer_from": "leave true; set it explicitly while the PoC pins any gaik release before the one that ships strict review by default (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections and a person reads report/review_log.json before the report is used"
       },
       {
         "name": "review_attempts",
@@ -2455,9 +2455,9 @@
         "name": "strict_review",
         "type": "bool",
         "default": true,
-        "effect": "True (the default after gaik 0.11.0; up to 0.11.0 the default was false): a section with unresolved reviewer edits raises RuntimeError and stops the run, so a report is never returned as reviewed with a correction left out. False logs the edits in review_log and returns the report.",
+        "effect": "True (the default from the gaik release that ships strict review by default; 0.11.1 and older default to false): a section with unresolved reviewer edits raises RuntimeError and stops the run, so a report is never returned as reviewed with a correction left out. False logs the edits in review_log and returns the report.",
         "selection_relevant": true,
-        "infer_from": "leave true; pass it explicitly while the PoC pins gaik 0.11.0 or older. False only when the user accepts a report with unresolved reviewer corrections and a person reads review_log before the report is used"
+        "infer_from": "leave true; pass it explicitly while the PoC pins any gaik release before the one that ships strict review by default (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections and a person reads review_log before the report is used"
       },
       {
         "name": "reviewer_model",
