@@ -226,11 +226,23 @@ def transcription_check(config, transcription_model, budget, work_dir) -> dict:
             return clients[-1]
 
         with mock.patch.object(transcriber_module, "_create_audio_client", bounded_audio_client):
-            result = Transcriber(
-                api_config=audio_config, output_dir=Path(work_dir) / name, **options
-            ).transcribe(TRANSCRIPTION_FIXTURE, **(call or {}))
+            try:
+                result = Transcriber(
+                    api_config=audio_config, output_dir=Path(work_dir) / name, **options
+                ).transcribe(TRANSCRIPTION_FIXTURE, **(call or {}))
+            except RuntimeError as exc:
+                # The budget stop keeps its own message, also when the Transcriber
+                # wraps it as the failure of a chunk ("Segment N of M ..."); that error
+                # keeps the provider's exception as its suppressed context.
+                for stop in (exc, exc.__cause__, exc.__context__):
+                    if isinstance(stop, RuntimeError) and str(stop).startswith(
+                        "Live release request budget"
+                    ):
+                        raise stop from None
+                # A chunk that fails raises, naming its time range.
+                raise AssertionError(f"A {name} transcription request failed") from exc
         requests = [request for client in clients for request in client.requests]
-        # The chunked path records a failed request in the transcript instead of raising.
+        # A transcript with a failed segment marked in it fails the check as well.
         if "[Transcription failed" in result.raw_transcript or any(
             "text" not in request for request in requests
         ):

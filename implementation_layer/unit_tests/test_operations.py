@@ -483,6 +483,8 @@ def test_transcribe_returns_the_text_and_removes_its_folder(transcriber):
     assert list(transcriber.work.iterdir()) == []
     assert (call["language"], call["custom_context"]) == ("auto", "")
     assert call["config"]["timeout"] == 120.0
+    # A lost part is reported in failed_segments, not raised.
+    assert call["allow_partial"] is True
 
 
 def test_the_folder_is_removed_when_the_transcriber_fails(transcriber):
