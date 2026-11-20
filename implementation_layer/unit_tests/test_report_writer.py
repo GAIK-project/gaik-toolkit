@@ -598,3 +598,8 @@ def test_single_call_prompt_follows_the_citations_setting(tmp_path, rec):
         system = rec.args("chat")["messages"][0]["content"]
         assert ("cite the file and the place" in system) is citations
         assert ("do not cite sources" in system) is (not citations)
+
+
+def test_run_settings_review_strictly_by_default():
+    assert RunSettings().strict_review is True
+    assert RunSettings(strict_review=False).strict_review is False

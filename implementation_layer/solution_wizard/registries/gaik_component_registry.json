@@ -1685,7 +1685,7 @@
     "known_limitations": [
       "Input is a KnowledgeBase holding exactly one entry per non-derived section and nothing else (usually from KnowledgeCurator; it can also be written by hand). A mismatch, duplicate or cyclic dependency raises ValueError before any LLM call.",
       "A technical section is written only from its own knowledge JSON; a derived section (depends_on) only from the reviewed texts of its prerequisites.",
-      "Unapplied reviewer edits are logged in review_log; strict_review=True raises RuntimeError instead. An empty writer answer raises RuntimeError.",
+      "By default (strict_review=True from the gaik release that ships strict review by default; 0.11.1 and older default to False) a section with unapplied reviewer edits raises RuntimeError; strict_review=False logs them in review_log and returns the report. An empty writer answer raises RuntimeError.",
       "Report.save writes report.docx by default (docx=False skips it); DOCX needs the Pandoc system binary.",
       "usage is not saved, so it is empty after Report.load.",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."

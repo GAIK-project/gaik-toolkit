@@ -71,7 +71,7 @@ knowledge = KnowledgeBase(
 )
 
 synthesizer = ReportSynthesizer(get_llm_config())
-# optional: model="...", reviewer_model="...", strict_review=True, review_attempts=5,
+# optional: model="...", reviewer_model="...", strict_review=False, review_attempts=5,
 #           writer_options={"reasoning_effort": "medium"}, reviewer_options={...},
 #           citations=False (no source citations in the report)
 report = synthesizer.synthesize(
@@ -180,9 +180,11 @@ instructions. `(missing: …)` markers are kept. Derived sections are written fr
 prerequisite texts, so they follow the same setting.
 
 The reviewed text is the section text, and it is what derived sections are written from.
-Each section's applied and unresolved edits go into `report.review_log`. With
-`strict_review=True`, a section with unresolved edits raises `RuntimeError` naming the
-section, which stops the run.
+Each section's applied and unresolved edits go into `report.review_log`. By default
+(`strict_review=True`) a section with unresolved edits raises `RuntimeError` naming the
+section, which stops the run, so a report never comes back as reviewed with a correction
+left out. `strict_review=False` returns the report and keeps the unresolved edits in the
+review log only.
 
 ## Saving and editing
 

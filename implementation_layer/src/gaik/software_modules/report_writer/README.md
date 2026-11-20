@@ -105,7 +105,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
     "transcription_language": "auto",
     "curator_workers": 4,
     "review_attempts": 5,
-    "strict_review": false,
+    "strict_review": true,
     "docx": true,
     "citations": true,
     "curator": {"reasoning_effort": null, "temperature": null},
@@ -131,7 +131,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `settings.transcription_language` | Language of the recordings, e.g. `en` or `fi`, or `auto` |
 | `settings.curator_workers` | Sections curated in parallel |
 | `settings.review_attempts` | Most reviewer requests per section, the first one included |
-| `settings.strict_review` | `true` fails `synthesize` when a reviewer edit cannot be applied, instead of logging it in `review_log.json` |
+| `settings.strict_review` | `true` (the default) fails `synthesize` when a reviewer edit cannot be applied; `false` logs it in `review_log.json` and returns the report |
 | `settings.docx` | `false` skips `report.docx` and deletes one of an earlier run |
 | `settings.citations` | `true` (default) cites the source file and place of each fact, as the report instructions say. `false` writes plain statements with no file names, pages or references, even if the instructions ask for citations; the writers and the reviewer both follow it, and so does the `single_call` baseline |
 | `settings.curator` / `writer` / `reviewer` | `reasoning_effort` and `temperature` for every call of that step; `null` leaves the option unset. Where a model does not take `temperature` with reasoning on, it is dropped; an invalid effort raises before the call |

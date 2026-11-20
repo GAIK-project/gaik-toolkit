@@ -54,7 +54,10 @@ export interface RunSettings extends Record<StepKey, StepOptions> {
   citations: boolean;
 }
 
-/** The defaults of gaik's RunSettings. */
+/**
+ * The demo's default run settings. gaik's RunSettings defaults to strict review; the demo
+ * keeps a lenient default (strict_review: false).
+ */
 export const DEFAULT_SETTINGS: RunSettings = {
   transcription_language: "auto",
   curator_workers: 4,
