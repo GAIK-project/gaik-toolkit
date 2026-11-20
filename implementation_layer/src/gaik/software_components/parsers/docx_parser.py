@@ -7,9 +7,9 @@ requiring external APIs or heavy ML models.
 
 import logging
 import os
-import zipfile
 from typing import Any
 
+from ..file_type import check_file_type
 from ..input_limits import InputLimits
 
 try:
@@ -79,6 +79,8 @@ class DocxParser:
             FileNotFoundError: If file does not exist
             ValueError: If keep_structure is used with structured text, or the
                 file's content is not a DOCX
+            FileTypeMismatchError: If the content is not a DOCX, or not the type
+                the file's extension says (a ``ValueError``)
             InputLimitError: If the file is over ``max_file_bytes``, or unpacks
                 to more than ten times that
             Exception: If DOCX parsing fails
@@ -87,10 +89,11 @@ class DocxParser:
             raise FileNotFoundError(f"File not found: {file_path}")
         if keep_structure and not use_markdown:
             raise ValueError("keep_structure needs use_markdown=True")
-        # A DOCX is a ZIP container; python-docx reads it with zipfile, so the
-        # same test decides here whether the content can be one at all.
-        if not zipfile.is_zipfile(file_path):
-            raise ValueError(f"The content of '{file_path}' is not a DOCX document.")
+        # A DOCX is a ZIP container holding word/document.xml; python-docx finds
+        # the container with zipfile, and so does the content check.
+        # The size comes first: the content check reads the archive's directory.
+        self.limits.check_file_size(file_path)
+        check_file_type(file_path, {"docx"})
         self.limits.check_zip_container(file_path)
 
         try:

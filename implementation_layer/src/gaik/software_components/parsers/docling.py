@@ -90,6 +90,7 @@ from gaik.software_components._tesseract import (
     installed_tesserocr_languages,
     with_installed_languages,
 )
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits
 
 # Try to import additional format options
@@ -350,6 +351,8 @@ class DoclingParser:
 
         Raises:
             ValueError: If Docling is not available or file format is not supported
+            FileTypeMismatchError: If the content is not the type the file's
+                extension says (a ``ValueError``)
             InputLimitError: If the file is over ``max_file_bytes``, a PDF over
                 ``max_pages``, or a DOCX/XLSX/PPTX unpacks to over ten times the size limit
         """
@@ -401,6 +404,8 @@ class DoclingParser:
                 pass
 
         # Convert document using docling, within the input limits
+        self.limits.check_file_size(file_path)
+        check_file_type(file_path)
         self.limits.check_document(file_path)
         result = self.converter.convert(file_path, **docling_limits(self.limits))
         doc = result.document

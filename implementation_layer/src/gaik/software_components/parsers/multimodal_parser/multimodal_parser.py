@@ -15,6 +15,7 @@ from markdown_it import MarkdownIt
 
 from gaik.software_components import _http
 from gaik.software_components.endpoints import check_endpoint
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.source_material import with_source_material_instruction
 
@@ -238,6 +239,8 @@ class MultimodalParser:
         pdf_path = Path(pdf_path)
         if not pdf_path.exists():
             raise FileNotFoundError(f"PDF not found: {pdf_path}")
+        self.limits.check_file_size(pdf_path)
+        check_file_type(pdf_path, {"pdf"})
         self.limits.check_pdf(pdf_path, require_count=True)
 
         system_prompt = self._get_system_prompt()
