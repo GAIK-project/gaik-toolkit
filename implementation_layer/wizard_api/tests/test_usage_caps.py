@@ -270,16 +270,29 @@ def test_the_budget_is_the_smallest_amount_left(db_session, caps) -> None:
 
 
 @requires_postgres
-def test_replies_at_once_share_what_the_users_cap_leaves(db_session, caps) -> None:
-    caps(session="0", user="10", deployment="100")
-    row = _session(db_session)
-    usage_caps.record_cost(db_session, "ann", 4.0, session=None, now=NOV)
+def test_a_running_replys_budget_is_held_against_the_users_cap(
+    db_session, caps, monkeypatch
+) -> None:
+    monkeypatch.setattr(usage_caps, "_RESERVED", {})
+    caps(session="5", user="10", deployment="100")
+    first, second, third = (_session(db_session) for _ in range(3))
+    usage_caps.record_cost(db_session, "ann", 3.0, session=None, now=NOV)
 
-    assert usage_caps.chat_budget(db_session, row, now=NOV) == pytest.approx(6.0)
-    assert usage_caps.chat_budget(db_session, row, now=NOV, sharing=1) == pytest.approx(3.0)
-    # The deployment's cap is not split: other users' replies are not counted.
-    caps(session="0", user="0", deployment="100")
-    assert usage_caps.chat_budget(db_session, row, now=NOV, sharing=1) == pytest.approx(96.0)
+    one = usage_caps.reserve("ann", usage_caps.caps_left(db_session, first, now=NOV))
+    assert one.budget == pytest.approx(5.0)  # the session's cap is the smaller
+    two = usage_caps.reserve("ann", usage_caps.caps_left(db_session, second, now=NOV))
+    assert two.budget == pytest.approx(2.0)  # 7 left, 5 held by the first
+    with pytest.raises(usage_caps.UsageReservedError):
+        usage_caps.reserve("ann", usage_caps.caps_left(db_session, third, now=NOV))
+    # Another user is not affected.
+    bob = _session(db_session, user="bob")
+    assert usage_caps.reserve("bob", usage_caps.caps_left(db_session, bob, now=NOV)).budget == 5.0
+
+    one.release()
+    one.release()  # a second release gives nothing back twice
+    assert usage_caps._RESERVED["ann"] == pytest.approx(2.0)  # noqa: SLF001
+    two.release()
+    assert "ann" not in usage_caps._RESERVED  # noqa: SLF001
 
 
 @requires_postgres
@@ -352,20 +365,6 @@ def test_an_agent_whose_turn_just_ended_is_still_fitted(monkeypatch) -> None:
 
     assert asyncio.run(agent_service.fit_budget("a", 1.0)) is True
     assert ended == ["a"]
-
-
-def test_replies_running_in_the_users_other_sessions_are_counted(monkeypatch) -> None:
-    monkeypatch.setattr(
-        agent_service,
-        "AGENT_SESSIONS",
-        {"a": {"user_id": "ann"}, "b": {"user_id": "ann"}, "c": {"user_id": "bob"}},
-    )
-    monkeypatch.setattr(agent_service, "TURNS", {"a": object(), "b": object(), "c": object()})
-
-    assert agent_service.running_turns_of("ann", besides="a") == 1
-    assert agent_service.running_turns_of("ann") == 2
-    assert agent_service.running_turns_of("bob", besides="a") == 1
-    assert agent_service.running_turns_of(None) == 0
 
 
 @requires_postgres
@@ -585,6 +584,7 @@ def test_a_turn_is_counted_and_most_of_the_cap_is_said_once(turn_client, caps, m
     replies = [m["content"] for m in detail["metadata"]["messages"] if m["role"] == "assistant"]
     assert notice in replies[1]  # kept with the reply, for a reload
     assert detail["metadata"][usage_caps.SESSION_COST_KEY] == pytest.approx(6.3)
+    assert "ann" not in usage_caps._RESERVED  # noqa: SLF001 - each reply gave its budget back
     # Now over the cap: the next message is refused.
     refused = turn_client.post(f"/sessions/{sid}/chat", json={"message": "Hei"})
     assert refused.status_code == 402
@@ -679,7 +679,7 @@ def test_the_ops_gauges_show_the_caps_the_months_spend_and_users_near_their_cap(
     stats = usage_caps.usage_stats(db_session)
     assert stats == {
         "deployment_spent": pytest.approx(19.5),
-        "users_near": 2.0,
+        "users_near": 1.0,  # bob is at the cap, not near it
         "users_reached": 1.0,
     }
     monkeypatch.setattr(ops_metrics._usage, "get", lambda: stats)  # noqa: SLF001
@@ -690,6 +690,41 @@ def test_the_ops_gauges_show_the_caps_the_months_spend_and_users_near_their_cap(
     }
     assert list(ops_metrics._deployment_spent()) == [(pytest.approx(19.5), {})]  # noqa: SLF001
     assert list(ops_metrics._users_by_cap()) == [  # noqa: SLF001
-        (2.0, {"state": "near"}),
+        (1.0, {"state": "near"}),
         (1.0, {"state": "reached"}),
     ]
+
+
+@requires_postgres
+def test_moving_sessions_to_a_new_owner_id_moves_their_spend_and_places(db_session, caps) -> None:
+    from wizard_api.services import session_service
+
+    for _ in range(2):
+        db_session.add(WizardSession(user_id="ann@example.test", output_dir="/tmp/x"))
+    db_session.commit()
+    usage_caps.claim_session(db_session, "ann@example.test")
+    usage_caps.claim_session(db_session, "ann@example.test")
+    usage_caps.record_cost(db_session, "ann@example.test", 4.0, session=None, now=NOV)
+    usage_caps.claim_session(db_session, "owner-1")
+    usage_caps.record_cost(db_session, "owner-1", 1.0, session=None, now=NOV)
+
+    assert session_service.move_owner(db_session, "ann@example.test", "owner-1") == 2
+
+    moved = _total(db_session, "user", "owner-1")
+    assert moved.cost_usd == pytest.approx(5.0)
+    assert moved.sessions_held == 3
+    assert _total(db_session, "user", "ann@example.test") is None
+
+
+@requires_postgres
+def test_a_message_refused_before_its_turn_gives_its_budget_back(
+    turn_client, caps, monkeypatch
+) -> None:
+    async def busy(*args, **kwargs):
+        raise agent_service.AgentUserLimitError("busy")
+
+    monkeypatch.setattr(agent_service, "get_or_create_session", busy)
+    sid = turn_client.post("/sessions", json={"user_id": "ann", "title": "S"}).json()["id"]
+
+    assert turn_client.post(f"/sessions/{sid}/chat", json={"message": "Hei"}).status_code == 429
+    assert "ann" not in usage_caps._RESERVED  # noqa: SLF001

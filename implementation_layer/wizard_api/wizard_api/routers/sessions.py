@@ -1270,51 +1270,61 @@ async def chat(
         raise _chat_rate_limited(exc) from exc
     try:
         # A reached usage cap refuses the message before an agent is woken,
-        # and an agent started for it gets what the caps have left as its budget.
-        budget = await asyncio.to_thread(
-            usage_caps.chat_budget,
-            db,
-            session,
-            sharing=agent_service.running_turns_of(owner, besides=str(session_id)),
-        )
+        # and an agent started for it gets what the caps have left as its budget,
+        # held against the user's cap until the reply is charged.
+        caps = await asyncio.to_thread(usage_caps.caps_left, db, session)
+        reservation = usage_caps.reserve(owner, caps)
     except usage_caps.UsageCapError as exc:
         raise _usage_cap(exc) from exc
-    # A live agent started when the caps left more keeps that budget: it is
-    # ended, and resumed below with what they leave now.
-    await agent_service.fit_budget(str(session_id), budget)
-
-    # Before the agent is asked for: a live agent whose interface language
-    # changed is told so in a turn of its own, which must not run into the
-    # reply still on its way.
-    if agent_service.running_turn(str(session_id)) is not None:
-        raise HTTPException(status_code=409, detail="The wizard is still responding.")
-
-    metadata = dict(session.session_metadata)
-    try:
-        agent = await agent_service.get_or_create_session(
-            str(session_id),
-            session.output_dir,
-            payload.locale,
-            resume_id=_resume_id(metadata, session_id),
-            transcript=metadata.get("messages"),
-            user_id=owner,
-            budget_usd=budget,
-        )
-    except agent_service.AgentUserLimitError as exc:
-        raise _agent_busy(exc) from exc
-    except agent_service.AgentCapacityError as exc:
-        raise api_error(503, "agent_capacity", str(exc)) from exc
-    except agent_service.AgentNotConfiguredError as exc:
-        raise internal_error(
-            503, "agent_unavailable", "The wizard is not available right now.", exc
+    except usage_caps.UsageReservedError as exc:
+        raise api_error(
+            429,
+            "agent_busy",
+            str(exc),
+            headers={"Retry-After": str(agent_service.AgentUserLimitError.retry_after_s)},
         ) from exc
+    budget = reservation.budget
+    try:
+        # A live agent started when the caps left more keeps that budget: it is
+        # ended, and resumed below with what they leave now.
+        await agent_service.fit_budget(str(session_id), budget)
 
-    if agent["lock"].locked() or agent_service.running_turn(str(session_id)) is not None:
-        raise HTTPException(status_code=409, detail="The wizard is still responding.")
-    agent_service.record_chat_turn(owner)
-    # Registered before the next await, so a second message that arrives while
-    # this one is being prepared is refused instead of starting beside it.
-    turn = agent_service.begin_turn(str(session_id), payload.message)
+        # Before the agent is asked for: a live agent whose interface language
+        # changed is told so in a turn of its own, which must not run into the
+        # reply still on its way.
+        if agent_service.running_turn(str(session_id)) is not None:
+            raise HTTPException(status_code=409, detail="The wizard is still responding.")
+
+        metadata = dict(session.session_metadata)
+        try:
+            agent = await agent_service.get_or_create_session(
+                str(session_id),
+                session.output_dir,
+                payload.locale,
+                resume_id=_resume_id(metadata, session_id),
+                transcript=metadata.get("messages"),
+                user_id=owner,
+                budget_usd=budget,
+            )
+        except agent_service.AgentUserLimitError as exc:
+            raise _agent_busy(exc) from exc
+        except agent_service.AgentCapacityError as exc:
+            raise api_error(503, "agent_capacity", str(exc)) from exc
+        except agent_service.AgentNotConfiguredError as exc:
+            raise internal_error(
+                503, "agent_unavailable", "The wizard is not available right now.", exc
+            ) from exc
+
+        if agent["lock"].locked() or agent_service.running_turn(str(session_id)) is not None:
+            raise HTTPException(status_code=409, detail="The wizard is still responding.")
+        agent_service.record_chat_turn(owner)
+        # Registered before the next await, so a second message that arrives while
+        # this one is being prepared is refused instead of starting beside it.
+        turn = agent_service.begin_turn(str(session_id), payload.message)
+    except BaseException:
+        # Refused before its turn began: the budget goes back.
+        reservation.release()
+        raise
 
     try:
         # A save in the PoC tab's editor that began before the turn was
@@ -1385,6 +1395,7 @@ async def chat(
         # pool. Before the turn's task exists, which opens a session of its own.
         await asyncio.to_thread(db.commit)
     except BaseException:
+        reservation.release()
         await agent_service.end_turn(str(session_id), turn)
         raise
 
@@ -1644,6 +1655,8 @@ async def chat(
                     except Exception:  # noqa: BLE001
                         logger.warning("usage notice of session %s not stored", stored_id)
             finally:
+                # The reply is charged by now: its budget stops being held.
+                reservation.release()
                 # Whatever happens above, the turn is taken away: one left
                 # registered would refuse every later message.
                 await agent_service.end_turn(str(session_id), turn)

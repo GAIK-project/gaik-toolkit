@@ -214,10 +214,10 @@ def deployment_max_cost_usd() -> float | None:
 
 
 def max_sessions_per_user() -> int | None:
-    """Sessions one user may create in all; None (``0``) means no limit.
+    """Sessions one user may have at a time; None (``0``) means no limit.
 
-    A deleted session still counts, so deleting does not make room. A negative or
-    unreadable value is the default, 3.
+    A removed session gives its place back. A negative or unreadable value is
+    the default, 3.
     """
     raw = os.getenv("WIZARD_MAX_SESSIONS_PER_USER", "").strip()
     if not raw:

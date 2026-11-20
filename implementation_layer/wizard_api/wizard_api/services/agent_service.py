@@ -1426,21 +1426,6 @@ def is_live(session_id: str) -> bool:
     return session_id in AGENT_SESSIONS or session_id in _STARTING
 
 
-def running_turns_of(user_id: str | None, *, besides: str | None = None) -> int:
-    """How many of ``user_id``'s sessions other than ``besides`` have a turn running.
-
-    The usage caps share what the user's cap has left between them
-    (usage_caps.chat_budget), so two replies at once cannot each spend all of it.
-    """
-    if not user_id:
-        return 0
-    return sum(
-        1
-        for sid in list(TURNS)
-        if sid != besides and (AGENT_SESSIONS.get(sid) or {}).get("user_id") == user_id
-    )
-
-
 def is_busy(session_id: str) -> bool:
     """Whether the agent is in the middle of a turn for this session.
 

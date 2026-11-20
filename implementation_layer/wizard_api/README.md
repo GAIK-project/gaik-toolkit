@@ -325,8 +325,10 @@ not the provider's bill, which keeps its own cap as the hard limit.
 - Before an agent is woken, a reached cap, or one that leaves less than
   `MIN_TURN_BUDGET_USD` (0.1), refuses the message with `402` and
   `{"error": "usage_cap", "scope": "session" | "user" | "deployment"}`. The agent
-  is started with the smallest amount any cap has left as its `max_budget_usd`
-  (what the user's cap leaves is split with their other sessions replying then)
+  is started with the smallest amount any cap has left as its `max_budget_usd`.
+  That budget is held against the user's cap until the reply is charged, so
+  replies in several sessions at once cannot each spend what is left; a message
+  that finds the rest held by the user's running replies gets `429 agent_busy`
   (or `WIZARD_AGENT_MAX_BUDGET_USD`, if smaller), so a long reply stops at the
   cap; the chat then says the usage limit is reached, without "continue", and
   `wizard.agent.budget_stops` counts it with `limit=usage_cap`. An idle live agent
@@ -346,7 +348,8 @@ not the provider's bill, which keeps its own cap as the hard limit.
   in `wizard.usage.unreported_queries`.
 - Gauges for the dashboards: `wizard.usage.cap_usd` (by `scope`),
   `wizard.usage.deployment_spent_usd` (this month) and `wizard.usage.users`
-  (`state` near or reached). The "Hackathon live" Grafana view shows the month's
+  (`state` near: past the warning share and below the cap; reached: at it).
+  The "Hackathon live" Grafana view shows the month's
   spend of its cap and the users near or at theirs.
 - Not counted: the model calls of PoC test runs in the sandbox and of
   `generate_schema.py`, which the run and metered-call limits bound.

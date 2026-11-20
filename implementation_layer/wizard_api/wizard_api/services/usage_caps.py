@@ -9,8 +9,10 @@ table, not the provider's bill). After every chat turn that cost is added to
 
 Before an agent is woken for a message, a cap that is already reached, or
 leaves less than ``MIN_TURN_BUDGET_USD``, refuses it, and the agent is started
-with the smallest amount any cap has left as its own budget (``chat_budget``),
-so one long reply cannot run far past a cap. Once a session or a user has used
+with the smallest amount any cap has left as its own budget (``reserve``), so
+one long reply cannot run far past a cap. That budget is held against the
+user's cap until the reply is charged, so replies in several sessions at once
+cannot each spend what is left. Once a session or a user has used
 ``WIZARD_COST_WARN_RATIO`` of its cap, the chat says so, once (``record_cost``).
 
 Sessions per user are claimed before a session is created (``claim_session``):
@@ -24,7 +26,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -82,6 +84,16 @@ class UsageCapError(RuntimeError):
         super().__init__(message or REFUSALS[scope])
 
 
+class UsageReservedError(RuntimeError):
+    """What the user's cap leaves is held by their other replies still running."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Your other replies that are still running hold what is left of your usage "
+            "limit. Send your message again when they are done."
+        )
+
+
 class SessionLimitError(RuntimeError):
     """The user has as many sessions as they may."""
 
@@ -127,26 +139,84 @@ def _caps(db: Session, session: WizardSession, now: datetime | None = None) -> l
     return caps
 
 
-def chat_budget(
-    db: Session, session: WizardSession, now: datetime | None = None, *, sharing: int = 0
-) -> float | None:
-    """What the caps leave for this session's next message; None when no cap is on.
+def caps_left(db: Session, session: WizardSession, now: datetime | None = None) -> list[_Cap]:
+    """The caps that are on, with what each has left; raises UsageCapError for a reached one.
 
-    Raises UsageCapError when a cap is reached or leaves less than
-    ``MIN_TURN_BUDGET_USD``. The deployment's cap is checked first: when it is
-    reached, nobody's message goes through, and the user is told so rather than
-    that their own cap is full. ``sharing`` is how many of the user's other
-    sessions have a reply running: what the user's cap leaves is split with
-    them, so replies at once cannot each spend all of it.
+    A cap leaving less than ``MIN_TURN_BUDGET_USD`` counts as reached. The
+    deployment's cap is checked first: when it is reached, nobody's message
+    goes through, and the user is told so rather than that their own cap is full.
     """
     caps = sorted(_caps(db, session, now), key=lambda c: c.scope != DEPLOYMENT)
     for cap in caps:
         if cap.left < MIN_TURN_BUDGET_USD:
             raise UsageCapError(cap.scope)
+    return caps
+
+
+def budget_of(caps: list[_Cap], reserved: float = 0.0) -> float | None:
+    """The budget ``caps`` leave for a reply; None when no cap is on.
+
+    ``reserved`` is what the user's other running replies were given and have
+    not yet been charged for: it is taken off what the user's cap leaves.
+    Raises UsageReservedError when that leaves too little while they run.
+    """
     if not caps:
         return None
-    shares = [cap.left / (1 + sharing) if cap.scope == USER else cap.left for cap in caps]
-    return max(MIN_TURN_BUDGET_USD, min(shares))
+    lefts = []
+    for cap in caps:
+        left = cap.left - reserved if cap.scope == USER else cap.left
+        if left < MIN_TURN_BUDGET_USD:
+            raise UsageReservedError()
+        lefts.append(left)
+    return min(lefts)
+
+
+def chat_budget(
+    db: Session, session: WizardSession, now: datetime | None = None, *, reserved: float = 0.0
+) -> float | None:
+    """What the caps leave for this session's next message; None when no cap is on."""
+    return budget_of(caps_left(db, session, now), reserved)
+
+
+#: Budgets given to replies still running, by user, not yet charged (``reserve``).
+#: In the process: one API process holds every live agent.
+_RESERVED: dict[str, float] = {}
+
+
+@dataclass
+class Reservation:
+    """The budget a reply was given, held against its user's cap until it is charged."""
+
+    user_id: str
+    amount: float
+    budget: float | None
+    released: bool = False
+
+    def release(self) -> None:
+        """Give the budget back; the reply's real cost is recorded by then. Safe to repeat."""
+        if self.released or not self.amount:
+            return
+        self.released = True
+        left = _RESERVED.get(self.user_id, 0.0) - self.amount
+        if left > 1e-9:
+            _RESERVED[self.user_id] = left
+        else:
+            _RESERVED.pop(self.user_id, None)
+
+
+def reserve(user_id: str, caps: list[_Cap]) -> Reservation:
+    """Give a reply its budget and hold it against ``user_id``'s cap.
+
+    Called on the event loop with no await between reading what is held and
+    holding more, so two messages at once cannot both get the same money; a
+    reply whose agent is still starting is held like a running one. Release it
+    once the reply's cost is recorded, or when the message is refused.
+    """
+    budget = budget_of(caps, _RESERVED.get(user_id, 0.0))
+    amount = budget if budget is not None and any(c.scope == USER for c in caps) else 0.0
+    if amount:
+        _RESERVED[user_id] = _RESERVED.get(user_id, 0.0) + amount
+    return Reservation(user_id, amount, budget)
 
 
 def claim_session(db: Session, user_id: str) -> None:
@@ -198,6 +268,39 @@ def release_session(db: Session, user_id: str, *, commit: bool = True) -> None:
     )
     if commit:
         db.commit()
+
+
+def move_user(db: Session, old_id: str, new_id: str) -> None:
+    """Merge ``old_id``'s spend and sessions into ``new_id``, in the caller's transaction.
+
+    For sessions moved to a new owner id (session_service.move_owner): the
+    person is the same, so their spend and their places go with them.
+    """
+    row = db.execute(
+        select(UsageTotal)
+        .where(UsageTotal.scope == USER, UsageTotal.key == old_id)
+        .with_for_update()
+    ).scalar_one_or_none()
+    if row is None or old_id == new_id:
+        return
+    statement = insert(UsageTotal).values(
+        scope=USER,
+        key=new_id,
+        cost_usd=row.cost_usd,
+        sessions_held=row.sessions_held,
+        warned=row.warned,
+    )
+    statement = statement.on_conflict_do_update(
+        index_elements=[UsageTotal.scope, UsageTotal.key],
+        set_={
+            "cost_usd": UsageTotal.cost_usd + statement.excluded.cost_usd,
+            "sessions_held": UsageTotal.sessions_held + statement.excluded.sessions_held,
+            "warned": or_(UsageTotal.warned, statement.excluded.warned),
+            "updated_at": func.now(),
+        },
+    )
+    db.execute(statement)
+    db.delete(row)
 
 
 def _add(db: Session, scope: str, key: str, cost: float) -> float:
@@ -286,20 +389,22 @@ def record_cost(
 
 
 def usage_stats(db: Session, now: datetime | None = None) -> dict[str, float]:
-    """For the ops gauges: the month's spend, and users past the warning share or their cap."""
+    """For the ops gauges: the month's spend, users past the warning share but below
+    their cap (near), and users at it (reached)."""
     stats = {"deployment_spent": _spent(db, DEPLOYMENT, month(now))}
     cap = config.user_max_cost_usd()
     if cap is not None:
         near = cap * config.cost_warn_ratio()
-        for state, line in (("near", near), ("reached", cap - MIN_TURN_BUDGET_USD)):
-            stats[f"users_{state}"] = float(
-                db.scalar(
-                    select(func.count())
-                    .select_from(UsageTotal)
-                    .where(UsageTotal.scope == USER, UsageTotal.cost_usd >= line)
-                )
-                or 0
+        reached = cap - MIN_TURN_BUDGET_USD
+        for state, low, high in (("near", near, reached), ("reached", reached, None)):
+            query = (
+                select(func.count())
+                .select_from(UsageTotal)
+                .where(UsageTotal.scope == USER, UsageTotal.cost_usd >= low)
             )
+            if high is not None:
+                query = query.where(UsageTotal.cost_usd < high)
+            stats[f"users_{state}"] = float(db.scalar(query) or 0)
     return stats
 
 
