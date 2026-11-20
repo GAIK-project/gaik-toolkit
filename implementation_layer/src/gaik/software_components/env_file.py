@@ -39,13 +39,15 @@ def load_env_file() -> None:
     with _lock:
         if _loaded:
             return
-        try:
-            if os.getenv(NO_DOTENV_ENV, "").strip().lower() in {"1", "true", "yes"}:
-                return
-            try:
-                from dotenv import load_dotenv
-            except ImportError:
-                return
-            load_dotenv()
-        finally:
+        if os.getenv(NO_DOTENV_ENV, "").strip().lower() in {"1", "true", "yes"}:
             _loaded = True
+            return
+        try:
+            from dotenv import load_dotenv
+        except ImportError:
+            _loaded = True
+            return
+        # A read that raises is not marked done: the next config read tries again
+        # instead of going on without the file's keys and endpoints.
+        load_dotenv()
+        _loaded = True

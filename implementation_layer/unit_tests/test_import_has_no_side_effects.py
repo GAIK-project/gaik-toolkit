@@ -105,6 +105,33 @@ def test_the_first_config_read_loads_dotenv_once():
     assert result["keys"] == ["key-from-dotenv"] * 3
 
 
+def test_a_failed_dotenv_read_is_tried_again():
+    result = _run(
+        """
+        def flaky(*args, **kwargs):
+            loads.append(1)
+            if len(loads) == 1:
+                raise OSError("busy")
+            os.environ["OPENAI_API_KEY"] = "key-from-dotenv"
+            return True
+        dotenv.load_dotenv = flaky
+        os.environ.pop("OPENAI_API_KEY", None)
+        from gaik.software_components.llm.config import get_llm_config
+        try:
+            get_llm_config("openai")
+            first = "returned"
+        except OSError:
+            first = "raised"
+        key = get_llm_config("openai")["api_key"]
+        print(json.dumps({"loads": len(loads), "first": first, "key": key}))
+        """
+    )
+
+    assert result["first"] == "raised"
+    assert result["loads"] == 2
+    assert result["key"] == "key-from-dotenv"
+
+
 def test_gaik_no_dotenv_skips_the_file():
     result = _run(
         """
