@@ -309,6 +309,9 @@ class VisionParser:
     def _initialize_client(self) -> AzureOpenAI | OpenAI | ProviderClient:
         if self._use_shared_client:
             return create_llm_client(self._request_config)
+        # Without a base_url the endpoint check and the SDK read OPENAI_BASE_URL (and
+        # the Azure ones) from the environment, so a value kept in .env must be there.
+        _load_env()
         config = self.config
 
         if not config.api_key:

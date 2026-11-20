@@ -84,22 +84,25 @@ def test_importing_the_components_loads_no_dotenv_and_keeps_logging():
 def test_the_first_config_read_loads_dotenv_once():
     result = _run(
         """
+        def from_file(*args, **kwargs):
+            loads.append(1)
+            os.environ["OPENAI_API_KEY"] = "key-from-dotenv"
+            return True
+        dotenv.load_dotenv = from_file
+        os.environ.pop("OPENAI_API_KEY", None)
         from gaik.software_components.llm.config import get_llm_config
         from gaik.software_components.config import get_openai_config
+        keys = []
         for _ in range(3):
-            try:
-                get_llm_config("openai")
-            except Exception:
-                pass
+            keys.append(get_llm_config("openai")["api_key"])
             get_openai_config(use_azure=True)
-        print(json.dumps({
-            "loads": len(loads), "value": os.environ.get("GAIK_TEST_FROM_DOTENV")
-        }))
+        print(json.dumps({"loads": len(loads), "keys": keys}))
         """
     )
 
     assert result["loads"] == 1
-    assert result["value"] == "yes"  # what the file set is there for the config
+    # the first read already returns what the file set
+    assert result["keys"] == ["key-from-dotenv"] * 3
 
 
 def test_gaik_no_dotenv_skips_the_file():
@@ -211,3 +214,103 @@ def test_the_unit_test_setup_loads_the_repository_dotenv():
 
     assert result["loads"] == 1
     assert result["value"] == "yes"
+
+
+# A legacy client config with a key and no base_url: the endpoint check and the SDK
+# then read OPENAI_BASE_URL, so a value kept only in .env must be loaded before that.
+_BASE_URL_FROM_FILE = """
+        def from_file(*args, **kwargs):
+            loads.append(1)
+            os.environ["OPENAI_BASE_URL"] = "https://llm.example.test/v1"
+            return True
+        dotenv.load_dotenv = from_file
+        os.environ.pop("OPENAI_BASE_URL", None)
+        os.environ.pop("GAIK_ALLOWED_ENDPOINT_HOSTS", None)
+        """
+
+
+def test_a_legacy_vision_parser_client_uses_the_base_url_from_dotenv():
+    result = _run(
+        _BASE_URL_FROM_FILE
+        + """
+        from gaik.software_components.parsers.vision import VisionParser
+        parser = VisionParser({"use_azure": False, "api_key": "k", "model": "m"})
+        print(json.dumps({"loads": len(loads), "base_url": str(parser._client.base_url)}))
+        """
+    )
+
+    assert result["loads"] == 1
+    assert result["base_url"].startswith("https://llm.example.test/v1")
+
+
+def test_a_legacy_multimodal_client_uses_the_base_url_from_dotenv():
+    # VisionExtractor builds its OpenAI client with this helper.
+    result = _run(
+        _BASE_URL_FROM_FILE
+        + """
+        from gaik.software_components.parsers.multimodal_parser import config
+        from gaik.software_components.vision_extractor import vision_extractor
+        assert vision_extractor.create_openai_client is config.create_openai_client
+        client = config.create_openai_client({"use_azure": False, "api_key": "k"})
+        print(json.dumps({"loads": len(loads), "base_url": str(client.base_url)}))
+        """
+    )
+
+    assert result["loads"] == 1
+    assert result["base_url"].startswith("https://llm.example.test/v1")
+
+
+def test_a_legacy_shared_config_client_uses_the_base_url_from_dotenv():
+    # Here resolve_provider loads the file before the endpoint is read.
+    result = _run(
+        _BASE_URL_FROM_FILE
+        + """
+        from gaik.software_components.config import create_openai_client
+        client = create_openai_client({"use_azure": False, "api_key": "k"})
+        print(json.dumps({"loads": len(loads), "base_url": str(client.base_url)}))
+        """
+    )
+
+    assert result["loads"] == 1
+    assert result["base_url"].startswith("https://llm.example.test/v1")
+
+
+def test_the_provider_examples_find_keys_kept_in_the_gaik_dotenv(tmp_path):
+    # Keys only in the file gaik loads (the repository .env), none in the examples'
+    # folder: the examples still list the provider.
+    from pathlib import Path
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("ANTHROPIC_API_KEY=key-from-root-dotenv\n", encoding="utf-8")
+    folder = Path(__file__).parents[1] / "examples/software_components/llm"
+    scripts = [
+        str(folder / "example_multi_provider_extractor.py"),
+        str(folder / "example_provider_client_basics.py"),
+    ]
+    result = _run(
+        f"""
+        for name in ("AZURE_API_KEY", "AZURE_ENDPOINT", "OPENAI_API_KEY",
+                     "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"):
+            os.environ.pop(name, None)
+        def gaik_file(*args, **kwargs):
+            # gaik's loader calls load_dotenv() without a path; an example's own call
+            # names its folder's file, which holds nothing here.
+            if args or kwargs.get("dotenv_path"):
+                return False
+            loads.append(1)
+            for key, value in dotenv.dotenv_values({str(env_file)!r}).items():
+                os.environ.setdefault(key, value)
+            return True
+        dotenv.load_dotenv = gaik_file
+        import importlib.util
+        found = []
+        for index, script in enumerate({scripts!r}):
+            spec = importlib.util.spec_from_file_location(f"provider_example_{{index}}", script)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            found.append(module.available_providers())
+        print(json.dumps({{"found": found}}))
+        """
+    )
+
+    assert result["found"] == [["anthropic"], ["anthropic"]]

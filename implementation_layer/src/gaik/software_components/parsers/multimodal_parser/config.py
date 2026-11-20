@@ -56,6 +56,9 @@ def get_openai_config(use_azure: bool = True) -> dict:
 
 def create_openai_client(config: dict):
     """Create an OpenAI or Azure OpenAI client based on configuration."""
+    # Without a base_url the endpoint check and the SDK read OPENAI_BASE_URL from the
+    # environment, so a value kept in .env must be loaded first.
+    load_env_file()
     if config.get("use_azure", False):
         check_openai_endpoint(config, "azure")
         return AzureOpenAI(

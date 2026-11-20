@@ -26,6 +26,7 @@ from datetime import date  # noqa: E402
 
 from pydantic import BaseModel, ConfigDict, Field  # noqa: E402
 
+from gaik.software_components.env_file import load_env_file  # noqa: E402
 from gaik.software_components.extractor import DataExtractor  # noqa: E402
 from gaik.software_components.extractor.schema import ExtractionRequirements, FieldSpec  # noqa: E402
 from gaik.software_components.llm import get_llm_config  # noqa: E402
@@ -87,7 +88,10 @@ def run_one(provider: str) -> None:
         print(record)
 
 
-def main() -> None:
+def available_providers() -> list[str]:
+    # The keys are read here before any gaik config helper runs, so load the .env
+    # file those helpers use (the repository's, found from the gaik package) first.
+    load_env_file()
     candidates: list[str] = []
     if os.getenv("AZURE_API_KEY") and os.getenv("AZURE_ENDPOINT"):
         candidates.append("azure")
@@ -97,7 +101,11 @@ def main() -> None:
         candidates.append("anthropic")
     if os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
         candidates.append("google")
+    return candidates
 
+
+def main() -> None:
+    candidates = available_providers()
     if not candidates:
         print(
             "No provider env vars set. Set at least one of: AZURE_API_KEY, "
