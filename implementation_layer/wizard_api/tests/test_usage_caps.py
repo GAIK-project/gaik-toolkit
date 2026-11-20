@@ -663,3 +663,33 @@ def test_a_query_that_ended_with_no_result_is_charged_an_estimate() -> None:
         pytest.approx(0.3),  # no more than the agent's own budget left
     ]
     assert "query_unfinished" not in roomy
+
+
+@requires_postgres
+def test_the_ops_gauges_show_the_caps_the_months_spend_and_users_near_their_cap(
+    db_session, caps, monkeypatch
+) -> None:
+    from wizard_api import ops_metrics
+
+    caps(user="10", deployment="100", ratio="0.8")
+    usage_caps.record_cost(db_session, "ann", 8.5, session=None)  # past 80 %
+    usage_caps.record_cost(db_session, "bob", 10.0, session=None)  # at the cap
+    usage_caps.record_cost(db_session, "cat", 1.0, session=None)
+
+    stats = usage_caps.usage_stats(db_session)
+    assert stats == {
+        "deployment_spent": pytest.approx(19.5),
+        "users_near": 2.0,
+        "users_reached": 1.0,
+    }
+    monkeypatch.setattr(ops_metrics._usage, "get", lambda: stats)  # noqa: SLF001
+    assert dict((a["scope"], v) for v, a in ops_metrics._usage_caps() if v is not None) == {  # noqa: SLF001
+        "session": 5.0,
+        "user": 10.0,
+        "deployment": 100.0,
+    }
+    assert list(ops_metrics._deployment_spent()) == [(pytest.approx(19.5), {})]  # noqa: SLF001
+    assert list(ops_metrics._users_by_cap()) == [  # noqa: SLF001
+        (2.0, {"state": "near"}),
+        (1.0, {"state": "reached"}),
+    ]

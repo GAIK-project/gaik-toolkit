@@ -285,6 +285,24 @@ def record_cost(
     return notices
 
 
+def usage_stats(db: Session, now: datetime | None = None) -> dict[str, float]:
+    """For the ops gauges: the month's spend, and users past the warning share or their cap."""
+    stats = {"deployment_spent": _spent(db, DEPLOYMENT, month(now))}
+    cap = config.user_max_cost_usd()
+    if cap is not None:
+        near = cap * config.cost_warn_ratio()
+        for state, line in (("near", near), ("reached", cap - MIN_TURN_BUDGET_USD)):
+            stats[f"users_{state}"] = float(
+                db.scalar(
+                    select(func.count())
+                    .select_from(UsageTotal)
+                    .where(UsageTotal.scope == USER, UsageTotal.cost_usd >= line)
+                )
+                or 0
+            )
+    return stats
+
+
 def notice(scope: str, lang: str) -> str:
     """The chat's line for ``scope``, in ``lang`` (fi or en)."""
     texts = NOTICES[scope]
