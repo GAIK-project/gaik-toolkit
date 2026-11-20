@@ -1,5 +1,4 @@
 // The demos the home page lists.
-import { EuFlag } from "@/components/eu-flag";
 import {
   ACCESS,
   CAPTURE,
@@ -64,7 +63,7 @@ export interface Demo {
 // Use cases: the featured ones get an image card, the rest a compact card.
 export const featuredUseCases: Demo[] = [
   {
-    title: "Purchase Order Processing",
+    title: "Purchase order processing",
     description:
       "Extract purchase orders and BOMs, price them from a price list and draft the order",
     href: "/luvata-order",
@@ -79,7 +78,7 @@ export const featuredUseCases: Demo[] = [
     ],
   },
   {
-    title: "Construction Report Writing",
+    title: "Construction report writing",
     description:
       "Turn on-site voice notes and the customer's documents into a source-grounded report",
     href: "/report-writer-v2?example=house_condition_assessment",
@@ -95,46 +94,41 @@ export const featuredUseCases: Demo[] = [
   },
 ];
 
+// EU AI Act screening is no use case: it has its own place under the hero
+// (solution-tools.tsx).
 export const useCases: Demo[] = [
   {
-    title: "EU AI Act Screening",
+    title: "Helpdesk chatbot",
     description:
-      "A preliminary AI Act risk class for your AI idea, pilot or product, and what you must do",
-    href: "/ai-act-screening",
-    icon: EuFlag,
-  },
-  {
-    title: "Helpdesk Chatbot",
-    description:
-      "A customer service chatbot that answers from your own services and FAQ, and hands over to a person",
+      "Answers from a service catalogue and FAQ, with hand-off to a person",
     href: "/helpdesk-chatbot",
     icon: Headset,
   },
   {
-    title: "Video Transcription & Captioning",
+    title: "Video transcription and captioning",
     description:
       "Upload audio or video, or open the ready-made example, to generate subtitles and transcripts",
     href: "/dental-transcription",
     icon: Mic,
   },
   {
-    title: "Semantic Video Search",
+    title: "Semantic video search",
     description:
       "Ask in plain language and jump to the right moment in indexed videos",
     href: "/video-search",
     icon: Video,
   },
   {
-    title: "Incident Reporting",
+    title: "Incident reporting",
     description:
       "Record an incident by voice or text and get a structured report",
     href: "/incident-report",
     icon: AlertTriangle,
   },
   {
-    title: "Construction Diary",
+    title: "Construction diary",
     description:
-      "Log daily site activities by voice or text and extract structured data",
+      "Get one entry per day from site notes or recordings, with links to the source",
     href: "/diary",
     icon: HardHat,
   },
@@ -143,7 +137,7 @@ export const useCases: Demo[] = [
 // Software modules, in the menu's order.
 export const modules: Demo[] = [
   {
-    title: "Audio → Structured Data",
+    title: "Audio → structured data",
     description:
       "Transcribe audio files and automatically extract structured data",
     href: "/audio-structured",
@@ -157,7 +151,7 @@ export const modules: Demo[] = [
     ],
   },
   {
-    title: "Document → Structured Data",
+    title: "Document → structured data",
     description:
       "Parse PDF, Word documents, and images to automatically extract structured data",
     href: "/document-structured",
@@ -171,7 +165,7 @@ export const modules: Demo[] = [
     ],
   },
   {
-    title: "RAG Builder",
+    title: "RAG builder",
     description:
       "Index PDF documents and ask questions with AI-powered citations",
     href: "/rag",
@@ -185,7 +179,7 @@ export const modules: Demo[] = [
     ],
   },
   {
-    title: "Report Writer",
+    title: "Report writer",
     description:
       "Generate structured reports from documents, audio, images and spreadsheets, with per-section review",
     href: "/report-writer",
@@ -199,9 +193,9 @@ export const modules: Demo[] = [
     ],
   },
   {
-    title: "Report Writer v2",
+    title: "Report writer v2",
     description:
-      "Write a report in stages — normalize, curate, synthesize, review — and edit every file in between",
+      "Edit source files and evidence between normalization, curation and synthesis",
     href: "/report-writer-v2",
     icon: FilePen,
     process: SYNTHESIS,
@@ -217,7 +211,7 @@ export const modules: Demo[] = [
 // Software components, in the menu's order.
 export const components: Demo[] = [
   {
-    title: "Schema Generator",
+    title: "Schema generator",
     description:
       "Turn extraction requirements into reusable Pydantic models and field policies",
     href: "/schema-generator",
@@ -233,7 +227,7 @@ export const components: Demo[] = [
     process: CAPTURE,
   },
   {
-    title: "Vision Extractor",
+    title: "Vision extractor",
     description:
       "Extract structured data from PDFs and images in one LLM call, with no separate parsing step",
     href: "/vision-extractor",
@@ -264,7 +258,7 @@ export const components: Demo[] = [
     process: CAPTURE,
   },
   {
-    title: "Source Normalizer",
+    title: "Source normalizer",
     description:
       "Convert documents, spreadsheets, recordings and images into Markdown that keeps each file's name",
     href: "/source-normalizer",
@@ -272,7 +266,7 @@ export const components: Demo[] = [
     process: CAPTURE,
   },
   {
-    title: "Web Scraper",
+    title: "Web scraper",
     description:
       "Crawl a website into clean Markdown and extract structured data, with the page each value came from",
     href: "/web-scraper",
@@ -280,7 +274,7 @@ export const components: Demo[] = [
     process: CAPTURE,
   },
   {
-    title: "Knowledge Curator",
+    title: "Knowledge curator",
     description:
       "Collect verified facts per topic from normalized sources, each with its exact quote and location",
     href: "/knowledge-curator",
@@ -288,7 +282,7 @@ export const components: Demo[] = [
     process: CAPTURE,
   },
   {
-    title: "PostgreSQL Agent",
+    title: "PostgreSQL agent",
     description:
       "Ask a database questions in plain language — the agent writes and runs read-only SQL",
     href: "/postgres-agent",
@@ -296,7 +290,7 @@ export const components: Demo[] = [
     process: ACCESS,
   },
   {
-    title: "Tabular Agent",
+    title: "Tabular agent",
     description:
       "Upload a CSV or Excel file and ask it questions — even messy report-style sheets",
     href: "/tabular-agent",
@@ -304,7 +298,7 @@ export const components: Demo[] = [
     process: ACCESS,
   },
   {
-    title: "Text-to-Speech",
+    title: "Text-to-speech",
     description:
       "Generate downloadable spoken audio from text in Finnish or English",
     href: "/text-to-speech",
@@ -312,7 +306,7 @@ export const components: Demo[] = [
     process: SYNTHESIS,
   },
   {
-    title: "LLM-as-Judge",
+    title: "LLM as judge",
     description:
       "Score extractor output, detect hallucinations, and run a multi-model judge panel",
     href: "/llm-judge",
@@ -320,7 +314,7 @@ export const components: Demo[] = [
     process: SYNTHESIS,
   },
   {
-    title: "Knowledge Synthesizer",
+    title: "Knowledge synthesizer",
     description:
       "Write a reviewed, source-grounded report from curated facts, with citations and visible review edits",
     href: "/knowledge-synthesis",

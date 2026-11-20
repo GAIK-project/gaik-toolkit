@@ -53,12 +53,12 @@ USE_SAMPLE_REPORT = True
 
 # # The report structure is entirely user-defined: a title plus a list of
 # # sections, each with instructions describing what the section should contain.
-REPORT_TITLE = "Q2 Product Planning Meeting Report"
+REPORT_TITLE = "Q3 Product Roadmap Review Meeting Report"
 
 # Optional high-level description of the report's purpose. Passed to the writer,
 # reviewer, curator, and polish pass as shared context. Set to None to omit.
 REPORT_DESCRIPTION = (
-    "A structured report of the Q2 product planning meeting held on September 10, 2024, "
+    "A structured report of the Q3 product roadmap review meeting held on December 15, 2024, "
     "documenting decisions, priorities, action items, and open questions."
 )
 
@@ -72,7 +72,7 @@ SECTIONS = [
     {
         "title": "Executive Summary",
         "instructions": (
-            "Summarize the purpose and outcome of the Q2 product planning meeting. "
+            "Summarize the purpose and outcome of the meeting. "
             "Cover the main themes discussed, the overall direction the team aligned on, "
             "and any high-level capacity or resource considerations mentioned."
         ),

@@ -97,6 +97,8 @@ Optional pass-through instructions:
 
 If `enhanced_transcript_instructions` is provided, it is forwarded to the second pass of `TranscriptEnhancer` as `additional_instructions`.
 
+`enhancement_max_change_ratio` (default `0.25`) is passed to `TranscriptEnhancer` as `max_change_ratio`. A pass that changes digits or more than that share of the letters is refused and the text before it is kept; the refusals are in `TranscriptionResult.enhancement_refused_passes` (see the enhance_transcript README).
+
 Example:
 
 ```python

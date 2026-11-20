@@ -143,9 +143,13 @@ function Preview({ doc }: { doc: Doc }) {
           </Button>
         )}
         <Button asChild size="sm" variant="outline">
-          <a href={url} download={doc.name}>
+          <a
+            href={url}
+            download={doc.name}
+            aria-label={`Download ${doc.name}`}
+          >
             <Download className="size-4" />
-            Download {doc.name}
+            Download file
           </a>
         </Button>
       </div>
@@ -213,7 +217,7 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
           <CardDescription>{example.description}</CardDescription>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
           <div className="space-y-4">
             {groups.map((group) => {
               const items = docs.filter((doc) => doc.group === group.id);
@@ -273,7 +277,7 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
             })}
           </div>
 
-          <div className="space-y-3 rounded-xl border p-4">
+          <div className="min-w-0 space-y-3 border-t pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-4">
             <div>
               <h4 className="font-semibold">{labelOf(current.name)}</h4>
               <p className="text-muted-foreground text-sm">

@@ -17,12 +17,14 @@ Main Interface:
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 import time
 import types
 from collections.abc import Callable
 from dataclasses import dataclass
+from dataclasses import field as _dc_field
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Union, get_args, get_origin
@@ -2335,6 +2337,317 @@ def normalize_composite_extracted_data(
 # -----------------------------------------------------------------------------
 
 
+# Compared per field. ``default`` is compared as the default the model actually gets
+# (see :func:`_normalize_explicit_default`), so a switched-off explicit default counts
+# and ``""`` versus ``None`` without one does not; descriptions are reported apart.
+_COMPARED_ATTRIBUTES = (
+    "field_type",
+    "required_in_output",
+    "nullable",
+    "enum",
+    "pattern",
+    "format",
+    "default",
+)
+
+_Requirements = Union["ExtractionRequirements", "CompositeExtractionRequirements"]
+
+
+@dataclass
+class FieldChange:
+    """One field (or container) present in both schemas whose specification differs."""
+
+    field_name: str
+    """The field, prefixed with its child collection in a nested schema (``items.sku``);
+    a container itself is named with a trailing ``[]`` (``items[]``), the schema as a
+    whole as ``(schema)``."""
+    changes: dict[str, tuple[object, object]]
+    """Attribute name -> ``(approved value, new value)``."""
+
+
+@dataclass
+class SchemaDiff:
+    """How a newly generated schema differs from the one a person approved.
+
+    The requirement text steers which fields a generated schema gets, so a field can
+    drop out or change between two runs. Show this diff to a person before the new
+    schema replaces the approved one.
+
+    ``is_empty`` is true only when nothing differs and nothing is unknown: no field or
+    container added, removed or changed, no structure change, no reworded description
+    (a description is part of what the extraction model reads, so "net" becoming
+    "gross" changes the result) and no note that the structure could not be compared.
+    ``changes_output`` is the narrower test: a field, container or structure change.
+    Reworded descriptions are listed apart in ``wording``, with both texts.
+    """
+
+    added: list[str]
+    removed: list[str]
+    changed: list[FieldChange]
+    structure: tuple[str, str] | None = None
+    """``(approved, new)`` structure (``flat``, ``nested_list in records``, ...) when it
+    changed; ``None`` when it is the same or the approved one was not given."""
+    wording: list[FieldChange] = _dc_field(default_factory=list)
+    notes: list[str] = _dc_field(default_factory=list)
+
+    @property
+    def changes_output(self) -> bool:
+        return bool(self.added or self.removed or self.changed or self.structure)
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.changes_output or self.wording or self.notes)
+
+    def __str__(self) -> str:
+        lines = []
+        if self.structure:
+            lines.append(f"! structure: {_shown(self.structure[0])} -> {_shown(self.structure[1])}")
+        lines += [f"+ {_shown(name)}" for name in self.added]
+        lines += [f"- {_shown(name)}" for name in self.removed]
+        for change in self.changed:
+            parts = ", ".join(
+                f"{attr}: {_shown(old)} -> {_shown(new)}"
+                for attr, (old, new) in change.changes.items()
+            )
+            lines.append(f"~ {_shown(change.field_name)} ({parts})")
+        for c in self.wording:
+            old, new = c.changes["description"]
+            lines.append(f"~ {_shown(c.field_name)} (description: {_shown(old)} -> {_shown(new)})")
+        if not lines:
+            lines.append(
+                "No changes to the approved schema."
+                if not self.notes
+                else "No field changes found, but the comparison is incomplete:"
+            )
+        lines += [f"  note: {n}" for n in self.notes]
+        return "\n".join(lines)
+
+
+_SHOWN_MAX = 200
+
+
+def _shown(value) -> str:
+    """``value`` for a person to read: quoted, control characters escaped, cut to 200.
+
+    Names and values can come from a saved or edited dict, so a newline or a terminal
+    code in them must not make up a line of the diff, and a huge value must not push
+    the other lines out of view.
+    """
+    text = repr(value)
+    return text if len(text) <= _SHOWN_MAX else text[: _SHOWN_MAX - 1] + "…"
+
+
+def _coerce_requirements(value, what: str):
+    """``value`` as requirements; a saved ``requirements`` dict is read as one.
+
+    The dict is copied first: validation would otherwise write into the caller's dict.
+    """
+    if isinstance(value, (ExtractionRequirements, CompositeExtractionRequirements)):
+        return value
+    if isinstance(value, dict):
+        value = copy.deepcopy(value)
+        if value.get("structure_type") == "parent_with_nested_list":
+            return CompositeExtractionRequirements.model_validate(value)
+        return ExtractionRequirements.model_validate(value)
+    raise TypeError(
+        f"{what} must be ExtractionRequirements, CompositeExtractionRequirements or their "
+        f"model_dump() dict, not {type(value).__name__}"
+    )
+
+
+_STRUCTURE_KINDS = ("flat", "nested_list", "parent_with_nested_list")
+
+
+def _coerce_structure(value, what: str = "structure") -> StructureAnalysis | str | None:
+    """``value`` as a structure: a :class:`StructureAnalysis`, its saved
+    ``model_dump()`` dict (read as one), or one of the structure kinds.
+
+    Raises ``ValueError`` for anything else, so a caller can check it before any
+    model call.
+    """
+    if value is None or isinstance(value, StructureAnalysis):
+        return value
+    if isinstance(value, dict):
+        try:
+            return StructureAnalysis.model_validate(copy.deepcopy(value))
+        except ValidationError as error:
+            raise ValueError(
+                f"{what} is not a saved StructureAnalysis: {error.error_count()} "
+                "field(s) missing or invalid"
+            ) from None
+    if isinstance(value, str) and value in _STRUCTURE_KINDS:
+        return value
+    shown = _shown(value) if isinstance(value, str) else type(value).__name__
+    raise ValueError(
+        f"{what} must be a StructureAnalysis, its model_dump() dict or one of "
+        f"{_STRUCTURE_KINDS}, not {shown}"
+    )
+
+
+def _structure_key(structure, requirements) -> tuple[str, str | None] | None:
+    """``(kind, container)`` of the output's shape, or None when it cannot be told.
+
+    The requirements decide where they can: parent-with-children requirements are that
+    shape, and plain requirements are never it, whatever an analysis says (a failed
+    parent-with-children parse falls back to flat ones). A string names only the kind.
+    ``structure`` has been through :func:`_coerce_structure`.
+    """
+    if isinstance(requirements, CompositeExtractionRequirements):
+        return ("parent_with_nested_list", None)
+    if structure is None:
+        return None
+    if isinstance(structure, StructureAnalysis):
+        kind, container = structure.structure_type, structure.parent_container_name
+    else:
+        kind, container = structure, None
+    if kind == "parent_with_nested_list":
+        kind = "flat"
+    if kind != "nested_list":
+        container = None
+    return kind, _sanitize_field_name(container) if container else None
+
+
+def _same_structure(a: tuple[str, str | None], b: tuple[str, str | None]) -> bool:
+    """Same kind, and the same container where both name one (a container named on
+    one side only gets a note in the diff instead)."""
+    return a[0] == b[0] and (a[1] is None or b[1] is None or a[1] == b[1])
+
+
+def _label(key: tuple[str, str | None]) -> str:
+    return f"{key[0]} in {key[1]}" if key[1] else key[0]
+
+
+def _fields_by_name(requirements) -> dict[str, FieldSpec]:
+    if isinstance(requirements, CompositeExtractionRequirements):
+        found = {f.field_name: f for f in requirements.parent_requirements.fields}
+        for child in requirements.children:
+            for f in child.requirements.fields:
+                found[f"{child.container_name}.{f.field_name}"] = f
+        return found
+    return {f.field_name: f for f in requirements.fields}
+
+
+def _containers(requirements) -> dict[str, str]:
+    if isinstance(requirements, CompositeExtractionRequirements):
+        return {f"{c.container_name}[]": c.container_description for c in requirements.children}
+    return {}
+
+
+def _effective(f: FieldSpec, attr: str):
+    if attr == "default":
+        honoured, value = _normalize_explicit_default(f)
+        return value if honoured else None
+    if attr == "enum" and f.enum is not None:
+        return sorted(f.enum)
+    return getattr(f, attr)
+
+
+def compare_requirements(
+    approved: _Requirements | dict,
+    new: _Requirements | dict,
+    *,
+    approved_structure: StructureAnalysis | str | None = None,
+    new_structure: StructureAnalysis | str | None = None,
+) -> SchemaDiff:
+    """The fields ``new`` adds, removes or changes compared with ``approved``.
+
+    Fields are matched by name (``container.field`` inside a parent-with-children
+    schema). A field whose type, output policy, allowed values, pattern, format or
+    effective default differs is listed in ``changed`` with each change; a field whose
+    description alone differs goes to ``wording``. A child container added or removed
+    is listed as ``name[]``, and a changed container description in ``changed``.
+
+    A flat schema and a nested-list one hold the same fields; only the structure tells
+    them apart. Pass ``approved_structure`` and ``new_structure`` (a
+    :class:`StructureAnalysis` or its ``model_dump()`` dict, or ``"flat"`` /
+    ``"nested_list"``) to compare it; a parent-with-children schema is recognised from
+    its requirements. A nested-list schema's list container (its name and description)
+    is compared only when both structures are a :class:`StructureAnalysis` or its
+    dict; a bare ``"nested_list"`` on either side adds a note instead. ``approved`` and
+    ``new`` may also be the ``model_dump()`` dicts of saved requirements.
+    """
+    approved = _coerce_requirements(approved, "approved")
+    new = _coerce_requirements(new, "new")
+    old_fields, new_fields = _fields_by_name(approved), _fields_by_name(new)
+    old_boxes, new_boxes = _containers(approved), _containers(new)
+    changed, wording = [], []
+    for name in old_fields.keys() & new_fields.keys():
+        old, cur = old_fields[name], new_fields[name]
+        diffs = {
+            attr: (_effective(old, attr), _effective(cur, attr))
+            for attr in _COMPARED_ATTRIBUTES
+            if _effective(old, attr) != _effective(cur, attr)
+        }
+        if diffs:
+            changed.append(FieldChange(field_name=name, changes=diffs))
+        if old.description != cur.description:
+            wording.append(
+                FieldChange(
+                    field_name=name, changes={"description": (old.description, cur.description)}
+                )
+            )
+    for box in old_boxes.keys() & new_boxes.keys():
+        if old_boxes[box] != new_boxes[box]:
+            changed.append(
+                FieldChange(
+                    field_name=box,
+                    changes={"container_description": (old_boxes[box], new_boxes[box])},
+                )
+            )
+    approved_structure = _coerce_structure(approved_structure, "approved_structure")
+    new_structure = _coerce_structure(new_structure, "new_structure")
+    old_key = _structure_key(approved_structure, approved)
+    new_key = _structure_key(new_structure, new)
+    notes = []
+    if old_key is None or new_key is None:
+        notes.append(
+            "the structure of one schema is not known, so a flat versus nested-list "
+            "change cannot be seen; pass approved_structure and new_structure"
+        )
+    elif old_key[0] == new_key[0] == "nested_list" and (old_key[1] is None or new_key[1] is None):
+        notes.append(
+            "the list container of one nested-list schema is not known, so a renamed "
+            "container cannot be seen; pass its StructureAnalysis (or the model_dump() "
+            'dict) instead of "nested_list"'
+        )
+    elif (
+        old_key == new_key
+        and old_key[0] == "nested_list"
+        and isinstance(approved_structure, StructureAnalysis)
+        and isinstance(new_structure, StructureAnalysis)
+        and approved_structure.parent_description != new_structure.parent_description
+    ):
+        # The extraction model reads the list container's description too.
+        changed.append(
+            FieldChange(
+                field_name=f"{old_key[1]}[]",
+                changes={
+                    "container_description": (
+                        approved_structure.parent_description,
+                        new_structure.parent_description,
+                    )
+                },
+            )
+        )
+    structure = (
+        (_label(old_key), _label(new_key))
+        if old_key and new_key and not _same_structure(old_key, new_key)
+        else None
+    )
+    return SchemaDiff(
+        added=sorted(
+            (new_fields.keys() - old_fields.keys()) | (new_boxes.keys() - old_boxes.keys())
+        ),
+        removed=sorted(
+            (old_fields.keys() - new_fields.keys()) | (old_boxes.keys() - new_boxes.keys())
+        ),
+        changed=sorted(changed, key=lambda c: c.field_name),
+        structure=structure,
+        wording=sorted(wording, key=lambda c: c.field_name),
+        notes=notes,
+    )
+
+
 @dataclass
 class SchemaGenerationResult:
     """Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`.
@@ -2352,6 +2665,8 @@ class SchemaGenerationResult:
             ``None`` when none of the responses carried a usage payload.
         duration_s: Wall-clock seconds the schema generation took.
         model: Resolved model identifier the calls used.
+        diff: With ``approved_requirements``, how the new schema differs from the
+            approved one; ``None`` without it.
     """
 
     schema: type[BaseModel]
@@ -2360,6 +2675,7 @@ class SchemaGenerationResult:
     usage: UsageRecord | None
     duration_s: float
     model: str
+    diff: SchemaDiff | None = None
 
 
 class SchemaGenerator:
@@ -2531,14 +2847,44 @@ class SchemaGenerator:
 
         return self.extraction_model
 
-    def generate_schema_with_usage(self, user_requirements: str) -> SchemaGenerationResult:
+    def generate_schema_with_usage(
+        self,
+        user_requirements: str,
+        *,
+        approved_requirements: ExtractionRequirements
+        | CompositeExtractionRequirements
+        | dict
+        | None = None,
+        approved_structure: StructureAnalysis | str | None = None,
+    ) -> SchemaGenerationResult:
         """
         Generate schema and report token usage + latency + cost.
 
         Same input as :meth:`generate_schema`; returns a
         :class:`SchemaGenerationResult` aggregating usage across the
         underlying LLM calls (structure detection + requirement parsing).
+
+        Args:
+            user_requirements: Natural language description of fields to extract.
+            approved_requirements: The requirements of the schema a person approved,
+                e.g. from a saved schema. The result's ``diff`` then lists the fields
+                the new schema adds, removes or changes, for a person to review
+                before the new schema replaces the approved one. A saved
+                ``requirements`` dict is accepted; anything else raises
+                ``TypeError`` before any model call.
+            approved_structure: The approved schema's structure (its
+                :class:`StructureAnalysis` or its saved ``model_dump()`` dict, or
+                ``"flat"`` / ``"nested_list"``), so a change between a flat and a
+                nested-list schema shows in ``diff``; with the analysis or its dict, a
+                renamed or reworded list container shows too. Anything else raises
+                ``ValueError`` before any model call.
         """
+        if approved_requirements is not None:
+            approved_requirements = _coerce_requirements(
+                approved_requirements, "approved_requirements"
+            )
+        # Checked before any model call, so a wrong value loses no paid generation.
+        approved_structure = _coerce_structure(approved_structure, "approved_structure")
         print("Generating schema from requirements...")
         schema, usage, duration_s = self._generate_schema_inner(user_requirements)
 
@@ -2554,6 +2900,16 @@ class SchemaGenerator:
             usage=usage,
             duration_s=duration_s,
             model=self.model,
+            diff=(
+                compare_requirements(
+                    approved_requirements,
+                    self.item_requirements,
+                    approved_structure=approved_structure,
+                    new_structure=self.structure_analysis,
+                )
+                if approved_requirements is not None
+                else None
+            ),
         )
 
     def get_schema_info(self) -> dict:

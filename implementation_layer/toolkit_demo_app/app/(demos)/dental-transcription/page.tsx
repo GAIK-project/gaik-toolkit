@@ -8,7 +8,7 @@ import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { StepIndicator } from "@/components/demo/step-indicator";
 import { FeedbackButton } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
   CardContent,
@@ -242,7 +242,8 @@ export default function VideoTranscriptionPage() {
   async function handleSubmit(): Promise<void> {
     if (busy || !file) return;
     abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsLoading(true);
     clearResult();
 
@@ -260,7 +261,7 @@ export default function VideoTranscriptionPage() {
       const response = await apiFetch("/api/dental-transcribe/stream", {
         method: "POST",
         body: formData,
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
       if (!response.ok)
         throw new Error(
@@ -294,7 +295,11 @@ export default function VideoTranscriptionPage() {
       });
       if (streamError) throw streamError;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
       setSteps((previous) =>
@@ -305,8 +310,16 @@ export default function VideoTranscriptionPage() {
         ),
       );
     } finally {
-      setIsLoading(false);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortControllerRef.current === controller) setIsLoading(false);
     }
+  }
+
+  /** Cancels the run in the browser; the page is ready again with its input. */
+  function stopRun(): void {
+    abortControllerRef.current?.abort();
+    setSteps([]);
+    setIsLoading(false);
   }
 
   return (
@@ -541,24 +554,17 @@ export default function VideoTranscriptionPage() {
                 )}
               </div>
 
-              <Button
-                onClick={() => void handleSubmit()}
-                disabled={!file || busy}
+              <RunButton
+                running={isLoading}
+                onRun={() => void handleSubmit()}
+                onStop={stopRun}
+                icon={Subtitles}
+                disabled={!file || isLoadingExample}
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Transcribing…
-                  </>
-                ) : (
-                  <>
-                    <Subtitles className="mr-2 h-4 w-4" />
-                    Transcribe
-                  </>
-                )}
-              </Button>
+                Transcribe
+              </RunButton>
               {!file && (
                 <p className="text-muted-foreground text-center text-xs">
                   Add a recording first.

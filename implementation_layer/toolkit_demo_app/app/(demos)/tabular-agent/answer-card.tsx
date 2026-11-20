@@ -18,7 +18,14 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { barsOf, columnsOf, sortRows, toCsv, type Row } from "./tabular-data";
+import {
+  barsOf,
+  cellText,
+  columnsOf,
+  sortRows,
+  toCsv,
+  type Row,
+} from "./tabular-data";
 
 export interface AskResponse {
   question: string;
@@ -113,7 +120,7 @@ function RowsTable({ rows }: { rows: Row[] }) {
                   {row[column] === null || row[column] === undefined ? (
                     <span className="text-muted-foreground">—</span>
                   ) : (
-                    String(row[column])
+                    cellText(row[column])
                   )}
                 </td>
               ))}

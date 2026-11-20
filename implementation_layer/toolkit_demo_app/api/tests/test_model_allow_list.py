@@ -81,10 +81,11 @@ def test_a_team_only_model_needs_the_team_tier(server_env):
 
 def test_a_team_only_model_stays_so_without_its_providers_credentials(server_env, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_FOUNDRY_API_KEY")
-    assert "claude-sonnet-5-5" in allow.team_only_models()
+    assert "claude-opus-5-5" in allow.team_only_models()
+    assert "claude-sonnet-5-5" not in allow.team_only_models()  # open to everyone
     monkeypatch.setenv("DEMO_SERVER_MODELS", "azure:gpt-6-sol,azure:gpt-6-astra")
     team_only = allow.team_only_models()
-    assert "claude-sonnet-5-5" in team_only  # not listed: the built-in flag holds
+    assert "claude-opus-5-5" in team_only  # not listed: the built-in flag holds
     assert "gpt-6-astra" not in team_only  # listed without :staff
     assert "gpt-6-luna" not in team_only  # the server's own model
 
@@ -121,8 +122,9 @@ async def test_the_vision_catalogue_lists_team_only_models_for_the_team(server_e
     app = _app((vision_extractor, "/extract-vision"))
     everyone = (await _send(app, "GET", "/extract-vision/models")).json()["models"]
     team = (await _send(app, "GET", "/extract-vision/models", staff=True)).json()["models"]
+    # Sonnet and Haiku are open to everyone; the vision list has no team-only Claude model.
     assert "claude-sonnet-5-5" in team["claude"]
-    assert "claude-sonnet-5-5" not in everyone["claude"]
+    assert "claude-sonnet-5-5" in everyone["claude"]
     assert "claude-haiku-5-5" in everyone["claude"]
 
 

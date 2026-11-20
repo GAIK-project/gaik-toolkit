@@ -24,6 +24,8 @@ export interface AccessStatus {
   emailUnconfirmed: boolean;
   /** The per-user grant that runs the first Solution Wizard in the browser (`wizard_access`). */
   wizardAccess: boolean;
+  /** The access request's own status, or null without a request (or a user). */
+  requestStatus: "pending" | "approved" | "rejected" | null;
   bypassAuth: boolean;
 }
 
@@ -38,6 +40,7 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
       ownKeyRuns: true,
       emailUnconfirmed: false,
       wizardAccess: true,
+      requestStatus: "approved",
       bypassAuth: true,
     };
   }
@@ -55,6 +58,7 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
       ownKeyRuns: false,
       emailUnconfirmed: false,
       wizardAccess: false,
+      requestStatus: null,
       bypassAuth: false,
     };
   }
@@ -74,6 +78,7 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
     ownKeyRuns: data?.status === "approved" || pendingConfirmed,
     emailUnconfirmed: pending && !pendingConfirmed,
     wizardAccess: data?.wizard_access === true,
+    requestStatus: data?.status ?? null,
     bypassAuth: false,
   };
 });

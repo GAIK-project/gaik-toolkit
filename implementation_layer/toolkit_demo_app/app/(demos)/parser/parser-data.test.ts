@@ -109,6 +109,14 @@ test("toPlainText drops the marks and keeps the words", () => {
   expect(plain).not.toContain("**");
 });
 
+test("toPlainText turns <br> in table cells into spaces", () => {
+  const table =
+    "| Item | Note |\n| --- | --- |\n| Milk | 1 l<br>Lactose free<BR/>Org |";
+  const plain = toPlainText(table);
+  expect(plain).toContain("Milk\t1 l Lactose free Org");
+  expect(plain).not.toMatch(/<br/i);
+});
+
 describe("search", () => {
   test("counts matches without caring about case", () => {
     expect(countMatches("Pen pen PEN", "pen")).toBe(3);

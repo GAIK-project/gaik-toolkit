@@ -42,7 +42,7 @@ def test_gpt_transcription_chunks_when_duration_exceeds_limit(tmp_path: Path):
 
     with (
         patch(
-            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            "gaik.software_components.transcriber.transcriber._decode_audio",
             return_value=_FakeAudio(duration_ms=2_000),
         ),
         patch(
@@ -69,7 +69,7 @@ def test_gpt_transcription_single_pass_when_within_size_and_duration(tmp_path: P
 
     with (
         patch(
-            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            "gaik.software_components.transcriber.transcriber._decode_audio",
             return_value=_FakeAudio(duration_ms=1_000),
         ),
         patch(
@@ -113,7 +113,7 @@ def test_transcribe_sends_only_explicit_prompt_context(
 
     with (
         patch(
-            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            "gaik.software_components.transcriber.transcriber._decode_audio",
             side_effect=OSError("duration unavailable in test"),
         ),
         patch(
@@ -141,7 +141,7 @@ def test_custom_context_does_not_leak_into_later_transcriptions(tmp_path: Path):
 
     with (
         patch(
-            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            "gaik.software_components.transcriber.transcriber._decode_audio",
             side_effect=OSError("duration unavailable in test"),
         ),
         patch(
@@ -172,7 +172,7 @@ def test_local_whisper_path_remains_independent_of_remote_prompt(tmp_path: Path)
 
     with (
         patch(
-            "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+            "gaik.software_components.transcriber.transcriber._decode_audio",
             side_effect=OSError("duration unavailable in test"),
         ),
         patch.object(
@@ -219,7 +219,7 @@ def test_duration_just_over_the_api_ceiling_is_chunked_by_default(
     transcriber = _transcriber(max_duration_seconds=DEFAULT_MAX_DURATION_SECONDS)
 
     with patch(
-        "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+        "gaik.software_components.transcriber.transcriber._decode_audio",
         return_value=_FakeAudio(duration_ms=int(duration_s * 1000)),
     ):
         assert transcriber._needs_chunking(audio) is True
@@ -232,7 +232,7 @@ def test_duration_limit_above_the_api_ceiling_is_capped(tmp_path: Path):
     transcriber = _transcriber(max_duration_seconds=1500)
 
     with patch(
-        "gaik.software_components.transcriber.transcriber.AudioSegment.from_file",
+        "gaik.software_components.transcriber.transcriber._decode_audio",
         return_value=_FakeAudio(duration_ms=1_433_728),
     ):
         assert transcriber._needs_chunking(audio) is True
@@ -491,3 +491,10 @@ def test_azure_keeps_the_configured_deployment_name():
     )
 
     assert transcriber._resolve_transcription_model() == "whisper"
+
+
+def test_a_bad_enhancement_ratio_fails_when_the_transcriber_is_built():
+    for ratio in (0, 1.5, -0.1):
+        with pytest.raises(ValueError, match="enhancement_max_change_ratio"):
+            _transcriber(enhancement_max_change_ratio=ratio)
+    assert _transcriber(enhancement_max_change_ratio=None).enhancement_max_change_ratio is None

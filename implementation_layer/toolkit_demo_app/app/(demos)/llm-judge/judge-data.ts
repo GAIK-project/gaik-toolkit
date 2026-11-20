@@ -44,7 +44,7 @@ export const PAIR_EXAMPLES: PairExample[] = [
     summary:
       "The words differ, the meaning is the same. A strict comparison fails it; a judge should not.",
     expected: "The computer was not locked.",
-    extracted: "Computer left unlocked at the workstation.",
+    extracted: "The computer was left unlocked.",
     fieldName: "incident_summary",
     expect: "ok",
   },

@@ -1,6 +1,7 @@
 """Shared configuration utilities for the demo API."""
 
 import os
+import re
 
 import fitz
 from fastapi import HTTPException, UploadFile
@@ -13,6 +14,7 @@ from .model_settings import (
     model_name,
     reads_images,
     request_model_settings,
+    request_reasoning_effort,
     request_server_model,
 )
 
@@ -188,11 +190,19 @@ def server_api_config():
 
 
 def get_model_options(config: dict, *, schema: bool = False) -> dict:
-    """Use only sampling options supported by the selected model family."""
+    """Use only sampling options supported by the selected model family.
+
+    A reasoning effort picked in the model menu replaces the GPT-6 default below.
+    Other models never get it.
+    """
     model = str(config.get("model", "")).lower()
     if model.startswith("gpt-6"):
-        # gpt-6.1 models reject "none"; the earlier gpt-6 ones accept it.
-        if model.startswith("gpt-6.1"):
+        picked = request_reasoning_effort()
+        if picked:
+            effort = picked
+        # gpt-6.1 and later point releases (gpt-6.2-sol) reject "none"; the first
+        # gpt-6 models accept it.
+        elif re.match(r"gpt-6\.[1-9]", model):
             effort = "medium"
         else:
             effort = "low" if "astra" in model else "none"
