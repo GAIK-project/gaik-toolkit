@@ -8,6 +8,7 @@ from pathlib import Path
 import requests
 
 from gaik.software_components.endpoints import check_endpoint
+from gaik.software_components.input_limits import media_input_args
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".m4v"}
 
@@ -41,8 +42,7 @@ def extract_audio_from_video(
     cmd = [
         "ffmpeg",
         "-y",
-        "-i",
-        str(video_path),
+        *media_input_args(video_path),
         "-vn",
         "-ac",
         "1",

@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from gaik.software_components.endpoints import check_openai_endpoint
+from gaik.software_components.file_type import IMAGE_TYPES, MIME_TYPES, check_file_type
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
@@ -226,11 +227,15 @@ class VisionParser:
         InputLimitError
             If the PDF is over ``max_file_bytes`` or ``max_pages``, or a page
             rendered at ``dpi`` is over ``max_image_pixels``.
+        FileTypeMismatchError
+            If the content is another known type, or not the type the file's
+            extension says (a ``ValueError``).
         """
 
         if first_pages is not None and first_pages < 1:
             raise ValueError("first_pages must be at least 1")
         self.limits.check_file_size(pdf_path)
+        check_file_type(pdf_path, {"pdf"})
         images = self._pdf_to_images(pdf_path, dpi=dpi, first_pages=first_pages)
         markdown_pages: list[str] = []
 
@@ -264,6 +269,9 @@ class VisionParser:
         ------
         InputLimitError
             If the file is over ``max_file_bytes`` or ``max_image_pixels``.
+        FileTypeMismatchError
+            If the content is not a PNG, JPEG, GIF, WebP, TIFF or BMP image, or
+            not the type the file's extension says (a ``ValueError``).
         """
 
         image_path = Path(image_path)
@@ -271,12 +279,12 @@ class VisionParser:
             _IMAGE_MIME_TYPES.get(image_path.suffix.lower())
             or mimetypes.guess_type(image_path.name)[0]
         )
-        if mime_type is None:
-            # An unknown or missing suffix (e.g. a temporary upload) was sent as
-            # PNG before 0.8.0; keep that. Known non-image types still fail.
-            mime_type = "image/png"
-        if not mime_type.startswith("image/"):
+        if mime_type is not None and not mime_type.startswith("image/"):
             raise ValueError(f"Unsupported image type: {image_path.suffix}")
+        # The content decides the type sent to the model, also for an unknown or
+        # missing suffix (e.g. a temporary upload).
+        self.limits.check_file_size(image_path)
+        mime_type = MIME_TYPES[check_file_type(image_path, IMAGE_TYPES)]
         self.limits.check_image_file(image_path)
         image_bytes = image_path.read_bytes()
         return self._parse_image(image_bytes, page=1, previous_context=None, mime_type=mime_type)
@@ -421,6 +429,9 @@ class VisionParser:
         mat = fitz.Matrix(zoom, zoom)
 
         with fitz.open(pdf_path) as doc:
+            # PyMuPDF opens other formats too; ask what it opened.
+            if not doc.is_pdf:
+                raise ValueError(f"The content of '{name}' is not a PDF document.")
             page_count = doc.page_count
             if first_pages is not None:
                 page_count = min(page_count, first_pages)

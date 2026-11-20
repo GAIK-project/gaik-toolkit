@@ -2,17 +2,25 @@
 
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { buttonVariants } from "@/components/ui/button";
-import { buildAccessRequestMailto } from "@/lib/onboarding/mailto";
+import {
+  buildAccessRequestMailto,
+  GAIK_CONTACT_EMAIL,
+  GAIK_CONTACT_URL,
+} from "@/lib/onboarding/mailto";
+import { cn } from "@/lib/utils";
 import { ArrowRight, ArrowUpRight, BookOpen, Wand2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { FirstWizardTerminal } from "./first-wizard-terminal";
 
-// Two wizards. Wizard V2 is its own service, where each session's agent and its
-// PoC runs are kept apart from other services, and it needs an account from the
-// GAIK team. The first version is a Claude Code skill: it runs in this demo for
-// users an admin has granted it (/solution-wizard/first), and on anyone's own
-// computer in Claude Code.
+// Two wizards, side by side with the same three facts, so a visitor sees at once
+// which one fits and how to get in. Wizard V2 is its own service, where each
+// session's agent and its PoC runs are kept apart from other services, and it
+// needs an account from the GAIK team; the demo's sign-in does not open it. The
+// first version is a Claude Code skill: it runs on anyone's own computer in Claude
+// Code, and in this demo (/solution-wizard/first) for users an admin has granted
+// it (`wizard_access`).
 const CLASSIC_WIZARD_DOCS =
   "https://gaik-project.github.io/gaik-toolkit/guidance-layer/solution-configuration-wizard/";
 
@@ -36,6 +44,29 @@ const GATES = [
   },
 ];
 
+const cardClassName =
+  "flex flex-col gap-5 rounded-2xl border p-5 shadow-sm sm:p-6";
+
+const linkClassName =
+  "text-primary font-medium underline-offset-4 hover:underline";
+
+/** The same three facts for each wizard, as label and value rows. */
+function Facts({ rows }: { rows: { label: string; value: ReactNode }[] }) {
+  return (
+    <dl className="divide-y border-y text-sm">
+      {rows.map(({ label, value }) => (
+        <div
+          key={label}
+          className="grid gap-1 py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4"
+        >
+          <dt className="text-muted-foreground font-medium">{label}</dt>
+          <dd className="space-y-1.5 leading-6">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export function SolutionWizardNotice({
   wizardUrl,
   canRunFirstWizard,
@@ -44,71 +75,86 @@ export function SolutionWizardNotice({
   /** The signed-in user holds the first wizard's grant. */
   canRunFirstWizard: boolean;
 }) {
-  const requestAccess = (
-    <a
-      href={buildAccessRequestMailto()}
-      className="text-primary font-medium underline-offset-4 hover:underline"
-    >
-      Request access
-    </a>
-  );
-
   return (
     <div className="mx-auto max-w-5xl space-y-6 sm:p-6">
       <DemoPageHeader
         icon={Wand2}
         iconClassName="h-8 w-8 text-primary"
         title="Solution Configuration Wizard"
-        description="From a use case description to a blueprint, a runnable PoC and its documentation"
+        description="Two versions turn a use case description into a blueprint, a runnable PoC and its documentation."
         className="mb-8"
       />
 
-      <section
-        aria-labelledby="wizard-v2-heading"
-        className="from-primary/10 via-card to-card overflow-hidden rounded-2xl border bg-gradient-to-br shadow-sm"
-      >
-        <div className="grid gap-8 p-5 sm:p-6 md:p-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-10">
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <p className="text-primary text-sm font-medium">Recommended</p>
-              <h2
-                id="wizard-v2-heading"
-                className="font-serif text-2xl font-semibold tracking-tight md:text-3xl"
-              >
-                Wizard V2
-              </h2>
-              <p className="text-muted-foreground">
-                Describe your business problem in a chat. The wizard turns it
-                into a solution built from GAIK components and stops at four
-                gates for you to check the result.
-              </p>
-            </div>
-
-            <div className="space-y-2.5">
-              {wizardUrl ? (
-                <a
-                  href={wizardUrl}
-                  rel="noopener"
-                  className={buttonVariants({
-                    size: "lg",
-                    className:
-                      "gap-2 transition-[background-color,scale] active:scale-[0.98]",
-                  })}
-                >
-                  Open Wizard V2
-                  <ArrowUpRight className="size-4" />
-                </a>
-              ) : null}
-              <p className="text-muted-foreground text-sm">
-                {wizardUrl
-                  ? "Sign in with an account from the GAIK team. "
-                  : "Wizard V2 needs an account from the GAIK team. "}
-                No account yet? {requestAccess}
-              </p>
-            </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section
+          aria-labelledby="wizard-v2-heading"
+          className={cn(
+            cardClassName,
+            "border-primary/40 from-primary/10 via-card to-card border-2 bg-gradient-to-br",
+          )}
+        >
+          <div className="space-y-2">
+            <h2
+              id="wizard-v2-heading"
+              className="flex items-center gap-3 font-serif text-2xl font-semibold tracking-tight"
+            >
+              <span className="bg-primary text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg shadow-sm">
+                <Wand2 className="size-5" />
+              </span>
+              Wizard V2
+            </h2>
+            <p className="text-muted-foreground">
+              A guided chat that turns your business problem into a solution
+              built from GAIK components. It stops at four gates for you to
+              check the result.
+            </p>
           </div>
 
-          <ol aria-label="The four gates" className="space-y-3 lg:pt-1">
+          <Facts
+            rows={[
+              {
+                label: "Who it is for",
+                value:
+                  "Anyone with a use case in mind. No coding and nothing to install.",
+              },
+              {
+                label: "Where it runs",
+                value: "In your browser, on a GAIK service of its own.",
+              },
+              {
+                label: "Access",
+                value: (
+                  <p>
+                    An account from the GAIK team. Your sign-in to this demo
+                    does not open it.{" "}
+                    <a
+                      href={buildAccessRequestMailto("Wizard V2")}
+                      className={linkClassName}
+                    >
+                      Request an account
+                    </a>
+                  </p>
+                ),
+              },
+            ]}
+          />
+
+          {wizardUrl ? (
+            <a
+              href={wizardUrl}
+              rel="noopener"
+              className={buttonVariants({
+                size: "lg",
+                className:
+                  "w-fit gap-2 transition-[background-color,scale] active:scale-[0.98]",
+              })}
+            >
+              Open Wizard V2
+              <ArrowUpRight className="size-4" />
+            </a>
+          ) : null}
+
+          <ol aria-label="The four gates" className="space-y-3 border-t pt-5">
             {GATES.map((gate, index) => (
               <li key={gate.title} className="flex gap-3">
                 <span
@@ -124,47 +170,83 @@ export function SolutionWizardNotice({
               </li>
             ))}
           </ol>
-        </div>
+        </section>
 
-        <div className="px-4 md:px-8">
-          <Image
-            src="/solution-wizard/wizard-v2.webp"
-            alt="Wizard V2 at its test run gate: the four gates along the top, the use case's process steps and workflow diagram in the middle, and the chat on the right."
-            width={1440}
-            height={900}
-            loading="eager"
-            fetchPriority="high"
-            className="animate-in fade-in slide-in-from-bottom-3 bg-background w-full rounded-t-xl border border-b-0 shadow-[0_-12px_40px_-20px_rgb(15_23_42/0.25)] duration-700 ease-out motion-reduce:animate-none"
+        <section
+          aria-labelledby="first-wizard-heading"
+          className={cn(cardClassName, "bg-card")}
+        >
+          <div className="space-y-2">
+            <h2
+              id="first-wizard-heading"
+              className="flex items-center gap-3 font-serif text-2xl font-semibold tracking-tight"
+            >
+              <span className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a 20 px brand mark */}
+                <img
+                  src="/logos/claude-code.svg"
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="size-5"
+                />
+              </span>
+              First wizard
+            </h2>
+            <p className="text-muted-foreground">
+              The first version, a Claude Code skill. It builds the whole
+              package in one conversation: the blueprint, the workflow diagrams,
+              a PoC and its documentation.
+            </p>
+          </div>
+
+          <Facts
+            rows={[
+              {
+                label: "Who it is for",
+                value: "Developers who use Claude Code.",
+              },
+              {
+                label: "Where it runs",
+                value:
+                  "In Claude Code on your own computer, or in this demo's browser.",
+              },
+              {
+                label: "Access",
+                value: (
+                  <>
+                    <p>
+                      In Claude Code: your own Claude account, no GAIK account
+                      needed.
+                    </p>
+                    <p>
+                      In the browser:{" "}
+                      {canRunFirstWizard ? (
+                        "your account has access."
+                      ) : (
+                        <>
+                          a demo account the GAIK team has opened it for.{" "}
+                          <a
+                            href={buildAccessRequestMailto(
+                              "first wizard in the browser",
+                            )}
+                            className={linkClassName}
+                          >
+                            Request access
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  </>
+                ),
+              },
+            ]}
           />
-        </div>
-      </section>
 
-      <section
-        aria-labelledby="first-wizard-heading"
-        className="bg-card space-y-6 rounded-2xl border p-5 sm:p-6 md:p-8"
-      >
-        <div className="max-w-2xl space-y-2">
-          <h2
-            id="first-wizard-heading"
-            className="text-xl font-semibold tracking-tight"
-          >
-            The first wizard
-          </h2>
-          <p className="text-muted-foreground">
-            The first version builds the whole package in one conversation: the
-            blueprint, the workflow diagrams, a PoC and its documentation.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-10">
-          <div className="space-y-3">
-            <h3 className="font-medium">In the browser</h3>
-            {canRunFirstWizard ? (
-              <>
-                <p className="text-muted-foreground text-sm">
-                  Nothing to install. Keep the tab open: the session and its
-                  files end when you leave the page.
-                </p>
+          <div className="mt-auto space-y-3">
+            <FirstWizardTerminal />
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+              {canRunFirstWizard ? (
                 <Link
                   href="/solution-wizard/first"
                   className={buttonVariants({
@@ -173,46 +255,63 @@ export function SolutionWizardNotice({
                       "gap-2 transition-[background-color,scale] active:scale-[0.98]",
                   })}
                 >
-                  Start the first wizard
+                  Start in the browser
                   <ArrowRight className="size-4" />
                 </Link>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                It runs here for accounts the GAIK team has opened it for.{" "}
-                {requestAccess}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2.5">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a 20 px brand mark */}
-              <img
-                src="/logos/claude-code.svg"
-                alt=""
-                width={20}
-                height={20}
-                className="size-5"
-              />
-              <h3 className="font-medium">On your own computer</h3>
+              ) : null}
+              <a
+                href={CLASSIC_WIZARD_DOCS}
+                rel="noopener"
+                className={cn(
+                  linkClassName,
+                  "inline-flex items-center gap-1.5 text-sm",
+                )}
+              >
+                <BookOpen className="size-4" />
+                How to run it
+              </a>
             </div>
-            <p className="text-muted-foreground text-sm">
-              It is a Claude Code skill in the gaik-toolkit repository and runs
-              with your own Claude account, no GAIK account needed.
-            </p>
-            <FirstWizardTerminal />
-            <a
-              href={CLASSIC_WIZARD_DOCS}
-              rel="noopener"
-              className="text-primary inline-flex items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline"
-            >
-              <BookOpen className="size-4" />
-              How to run it
-            </a>
+            {canRunFirstWizard ? (
+              <p className="text-muted-foreground text-sm">
+                In the browser, keep the tab open: the session and its files end
+                when you leave the page.
+              </p>
+            ) : null}
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
+
+      {/* The request links above open a mail app; this works without one. */}
+      <p className="text-muted-foreground text-sm">
+        Requests go to{" "}
+        <a href={`mailto:${GAIK_CONTACT_EMAIL}`} className={linkClassName}>
+          {GAIK_CONTACT_EMAIL}
+        </a>
+        , or write through the{" "}
+        <a
+          href={GAIK_CONTACT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={linkClassName}
+        >
+          GAIK contact page
+        </a>
+        .
+      </p>
+
+      <figure className="space-y-2">
+        <Image
+          src="/solution-wizard/wizard-v2.webp"
+          alt="Wizard V2 at its test run gate: the four gates along the top, the use case's process steps and workflow diagram in the middle, and the chat on the right."
+          width={1440}
+          height={900}
+          sizes="(min-width: 1024px) 976px, 100vw"
+          className="bg-background w-full rounded-xl border shadow-sm"
+        />
+        <figcaption className="text-muted-foreground text-sm">
+          Wizard V2 at its test run gate.
+        </figcaption>
+      </figure>
     </div>
   );
 }

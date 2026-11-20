@@ -12,6 +12,7 @@ import {
   useVisionModels,
 } from "@/components/demo/vision-settings";
 import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
   CardContent,
@@ -49,7 +50,7 @@ import {
   X,
 } from "lucide-react";
 import posthog from "posthog-js";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   type CustomField,
@@ -484,6 +485,9 @@ export function CustomUseCase() {
   const [generating, setGenerating] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [loadingExample, setLoadingExample] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const multi = mode === "multi";
   const prompt =
@@ -580,6 +584,9 @@ export function CustomUseCase() {
   };
 
   const generateSchema = async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setGenerating(true);
     setResult(null);
     try {
@@ -589,6 +596,7 @@ export function CustomUseCase() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user_requirements: prompt }),
+            signal: controller.signal,
           })
         : await apiFetch("/api/luvata-order/custom/schema", {
             method: "POST",
@@ -597,6 +605,7 @@ export function CustomUseCase() {
               requirements: prompt,
               regenerate: schemaReady,
             }),
+            signal: controller.signal,
           });
       if (!response.ok) {
         throw new Error(
@@ -615,16 +624,24 @@ export function CustomUseCase() {
         vision,
       });
     } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       toast.error(
         error instanceof Error ? error.message : "Failed to generate schema",
       );
     } finally {
-      setGenerating(false);
+      if (abortRef.current === controller) setGenerating(false);
     }
   };
 
   const extract = async () => {
     if (!poFile) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setExtracting(true);
     setResult(null);
     const started = performance.now();
@@ -649,7 +666,7 @@ export function CustomUseCase() {
       }
       const response = await apiFetch(
         vision ? "/api/extract-vision" : "/api/luvata-order/custom/extract",
-        { method: "POST", body: formData },
+        { method: "POST", body: formData, signal: controller.signal },
       );
       if (!response.ok) {
         throw new Error(await errorMessage(response, "Extraction failed"));
@@ -668,9 +685,14 @@ export function CustomUseCase() {
         bom_count: bomFiles.length,
       });
     } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       toast.error(error instanceof Error ? error.message : "Extraction failed");
     } finally {
-      setExtracting(false);
+      if (abortRef.current === controller) setExtracting(false);
     }
   };
 
@@ -1027,41 +1049,31 @@ export function CustomUseCase() {
               3. Generate schema and extract
             </h3>
             <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
+              {/* No Stop: the server caches the schema this run makes, and a stopped
+                  run finishing late could replace the schema of a retry. */}
+              <RunButton
+                running={generating}
+                onRun={generateSchema}
+                icon={FileCode2}
+                spinner
                 variant="secondary"
+                size="default"
                 disabled={busy || !promptValid}
-                onClick={generateSchema}
               >
-                {generating ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Generating schema...
-                  </>
-                ) : (
-                  <>
-                    <FileCode2 className="mr-2 size-4" />
-                    {schemaReady ? "Regenerate schema" : "Generate schema"}
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
+                {schemaReady ? "Regenerate schema" : "Generate schema"}
+              </RunButton>
+              {/* No Stop: the server caches the schema this run makes, and a stopped
+                  run finishing late could replace the schema of a retry. */}
+              <RunButton
+                running={extracting}
+                onRun={extract}
+                icon={Sparkles}
+                spinner
+                size="default"
                 disabled={busy || !schemaReady || !filesReady}
-                onClick={extract}
               >
-                {extracting ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Extracting...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 size-4" />
-                    Extract data
-                  </>
-                )}
-              </Button>
+                Extract data
+              </RunButton>
               <Button
                 type="button"
                 variant="outline"

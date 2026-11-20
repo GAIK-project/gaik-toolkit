@@ -167,6 +167,10 @@ export function modelUse(path: string, active: ActiveModel): ModelUse {
         ? `${active.label} cannot read images, and this demo sends pages as images. Pick a model that reads images.`
         : `${active.label} cannot read images. Text works here; scans and image parsers need a model that reads images.`;
   }
+  // The API refuses it too (api: AITTA_REFUSAL in routers/vision_extractor.py).
+  if (path === "/vision-extractor" && aitta)
+    problem =
+      "The Vision Extractor does not run on CSC Aitta: its models took 5 to 15 minutes per receipt here and refused scanned pages as too large. Pick a GPT, Claude or Gemini model.";
   return {
     runsHere,
     summary: active.own

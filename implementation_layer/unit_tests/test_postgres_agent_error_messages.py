@@ -120,7 +120,8 @@ def test_a_rejected_query_reaches_result_answer_and_model_without_database_text(
     assert expected in answer.answer
     assert expected in prompts[1] and "SELECT CAST(name AS int) FROM t" in prompts[1]
     for text in (answer.query_result.error, answer.answer, *prompts):
-        assert "Jane" not in text and "555" not in text
+        # The whole number: a prompt's random source_material id can hold "555".
+        assert "Jane" not in text and "555-0100" not in text
 
 
 def test_a_canceled_query_reports_the_timeout_without_database_text():

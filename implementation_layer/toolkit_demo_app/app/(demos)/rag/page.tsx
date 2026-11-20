@@ -2,6 +2,7 @@
 
 import { ComponentSource } from "@/components/demo/component-source";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { RunButton } from "@/components/demo/run-button";
 import { PageTransition } from "@/components/demo/page-transition";
 import {
   DocumentList,
@@ -32,12 +33,6 @@ import {
   SourcesContent,
   Source as SourceItem,
 } from "@/components/ai-elements/sources";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -72,6 +67,7 @@ import {
   ArrowLeft,
   Bot,
   Eye,
+  Info,
   FileText,
   MessageSquare,
   Plus,
@@ -292,14 +288,18 @@ function UploadDialogContent({
           </div>
         )}
         {pendingFiles.length > 0 && (
-          <Button onClick={onIndex} disabled={isIndexing} className="w-full">
-            <Sparkles className="mr-2 h-4 w-4" />
-            {isIndexing ? (
-              <Shimmer className="text-inherit">{`Indexing ${pendingFiles.length} document(s)...`}</Shimmer>
-            ) : (
-              `Index ${pendingFiles.length} Document${pendingFiles.length !== 1 ? "s" : ""}`
-            )}
-          </Button>
+          // No Stop: the server would still add the files to the collection,
+          // and indexing them again would add a second copy.
+          <RunButton
+            running={isIndexing}
+            onRun={onIndex}
+            icon={Sparkles}
+            spinner
+            size="default"
+            className="w-full"
+          >
+            {`Index ${pendingFiles.length} Document${pendingFiles.length !== 1 ? "s" : ""}`}
+          </RunButton>
         )}
       </div>
     </DialogContent>
@@ -350,7 +350,8 @@ export default function RAGPage() {
     "vision_plus" | "docling_rag" | "pymupdf"
   >("docling_rag");
 
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const indexAbortRef = useRef<AbortController | null>(null);
+  const queryAbortRef = useRef<AbortController | null>(null);
 
   // Load from localStorage on mount and verify collection exists
   useEffect(() => {
@@ -420,7 +421,8 @@ export default function RAGPage() {
 
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort();
+      indexAbortRef.current?.abort();
+      queryAbortRef.current?.abort();
     };
   }, []);
 
@@ -452,8 +454,12 @@ export default function RAGPage() {
   async function handleIndexDocuments(): Promise<void> {
     if (pendingFiles.length === 0 || isIndexing) return;
 
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    indexAbortRef.current?.abort();
+    // An answer still streaming from the collection this replaces must not
+    // appear under the new one.
+    queryAbortRef.current?.abort();
+    const controller = new AbortController();
+    indexAbortRef.current = controller;
 
     setIsIndexing(true);
 
@@ -477,7 +483,7 @@ export default function RAGPage() {
       const response = await apiFetch("/api/rag/index", {
         method: "POST",
         body: formData,
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -512,11 +518,7 @@ export default function RAGPage() {
       setPendingFiles([]);
       setUploadDialogOpen(false);
 
-      if (data.status === "success") {
-        toast.success(
-          `Indexed ${data.document_count} document(s) with ${data.chunk_count} chunks`,
-        );
-      } else {
+      if (data.status !== "success") {
         const firstError = data.documents?.find(
           (d: { status: string; error?: string }) =>
             d.status === "error" && d.error,
@@ -526,7 +528,11 @@ export default function RAGPage() {
         });
       }
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return; // Toast already shown
 
       let errorMessage = "Failed to index documents";
@@ -544,13 +550,14 @@ export default function RAGPage() {
         ),
       );
     } finally {
-      setIsIndexing(false);
+      if (indexAbortRef.current === controller) setIsIndexing(false);
     }
   }
 
   async function handleLoadExample(): Promise<void> {
     if (isIndexing) return;
 
+    queryAbortRef.current?.abort(); // as when indexing: the collection changes
     setIsIndexing(true);
     try {
       const formData = new FormData();
@@ -577,7 +584,6 @@ export default function RAGPage() {
           }),
         ),
       );
-      toast.success("Example documents loaded! Try asking a question.");
     } catch (error) {
       if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(
@@ -589,10 +595,13 @@ export default function RAGPage() {
   }
 
   async function handleQuery(question: string): Promise<void> {
-    if (!question.trim() || !collectionId || isQuerying) return;
+    // Not while indexing: it can switch the collection, and the answer would
+    // appear under documents it was not drawn from.
+    if (!question.trim() || !collectionId || isQuerying || isIndexing) return;
 
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    queryAbortRef.current?.abort();
+    const controller = new AbortController();
+    queryAbortRef.current = controller;
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -623,7 +632,7 @@ export default function RAGPage() {
       const response = await apiFetch("/api/rag/query/stream", {
         method: "POST",
         body: formData,
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -684,14 +693,28 @@ export default function RAGPage() {
         }
       }
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(error instanceof Error ? error.message : "Query failed");
     } finally {
-      setIsQuerying(false);
-      setStreamingAnswer([]);
-      setStreamingSources([]);
+      if (queryAbortRef.current === controller) {
+        setIsQuerying(false);
+        setStreamingAnswer([]);
+        setStreamingSources([]);
+      }
     }
+  }
+
+  /** Cancels the answer in the browser; the question stays in the chat. */
+  function stopQuery() {
+    queryAbortRef.current?.abort();
+    setIsQuerying(false);
+    setStreamingAnswer([]);
+    setStreamingSources([]);
   }
 
   async function handleClearCollection(): Promise<void> {
@@ -702,7 +725,6 @@ export default function RAGPage() {
       setCollectionId(null);
       setIndexedDocuments([]);
       setMessages([]);
-      toast.success("Collection cleared");
     } catch {
       toast.error("Failed to clear collection");
     }
@@ -737,10 +759,10 @@ export default function RAGPage() {
             <Bot className="text-primary h-6 w-6 sm:h-7 sm:w-7" />
             <div>
               <h1 className="font-serif text-xl font-semibold tracking-tight sm:text-2xl">
-                RAG Builder
+                RAG builder
               </h1>
-              <p className="text-muted-foreground hidden text-sm sm:block">
-                Ask questions about your documents
+              <p className="text-muted-foreground text-sm">
+                Ask questions about PDFs and check the cited sources.
               </p>
               <ComponentSource className="mt-1.5 hidden sm:flex" />
             </div>
@@ -798,7 +820,7 @@ export default function RAGPage() {
                 <DialogTrigger asChild>
                   <Button size="sm" className="gap-2">
                     <Plus className="h-4 w-4" />
-                    Upload PDF
+                    Upload PDFs
                   </Button>
                 </DialogTrigger>
                 <UploadDialogContent
@@ -826,7 +848,7 @@ export default function RAGPage() {
                 <div className="space-y-4 p-3">
                   <div className="space-y-2">
                     <Label htmlFor="topK" className="text-xs">
-                      Results (Top K)
+                      Chunks to retrieve
                     </Label>
                     <Select
                       value={String(topK)}
@@ -859,10 +881,10 @@ export default function RAGPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="vision_plus">
-                          Vision+ Parser
+                          Vision+ parser
                         </SelectItem>
                         <SelectItem value="docling_rag">
-                          Docling RAG Parser
+                          Docling RAG parser
                         </SelectItem>
                         <SelectItem value="pymupdf">PyMuPDF</SelectItem>
                       </SelectContent>
@@ -880,66 +902,10 @@ export default function RAGPage() {
         </div>
       </header>
 
-      <Accordion
-        type="single"
-        collapsible
-        className="mb-2 rounded-lg border bg-white px-4"
-      >
-        <AccordionItem value="how-it-works" className="border-b-0">
-          <AccordionTrigger className="py-2.5 text-xs">
-            <span className="text-muted-foreground">How it works</span>
-          </AccordionTrigger>
-          <AccordionContent className="text-muted-foreground space-y-2 pb-3 text-xs leading-5">
-            <p>
-              This demo parses one or more PDF documents, breaks them into
-              searchable chunks with metadata, stores them in an in-memory
-              vector database, and lets you ask questions against the indexed
-              content.
-            </p>
-            <p>
-              <strong>1. Upload one or more PDFs:</strong> You can index several
-              PDF documents in one run. They are all added into the same
-              temporary in-memory collection for retrieval.
-            </p>
-            <p>
-              <strong>2. Choose the parser:</strong> The parser determines how
-              the PDF is converted into chunked content before embedding.
-            </p>
-            <p>
-              <strong>3. Understand parser differences:</strong>{" "}
-              <strong>Vision+ Parser:</strong> Used for high-quality parsing. It
-              can interpret images and place their interpretation in the right
-              location in the document flow. It is intended to extract
-              everything from a document and produce vision-enhanced RAG chunks
-              with metadata. In this demo, Vision+ is limited to 10 pages. Read
-              more at{" "}
-              <a
-                href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5"
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary underline underline-offset-2"
-              >
-                this article
-              </a>
-              . <strong>Docling RAG Parser:</strong> Uses the Docling parser
-              running in Haaga-Helia as a service. It provides high quality
-              parsing with metadata and returns ready-made RAG chunks.{" "}
-              <strong>PyMuPDF:</strong> Uses direct PDF text extraction locally.
-              It is the simplest parser and serves as the fallback path.
-            </p>
-            <p>
-              <strong>4. Build the vector store:</strong> The parsed chunks are
-              embedded and stored in an in-memory vector store. This collection
-              is available only for the current backend process and session.
-            </p>
-            <p>
-              <strong>5. Ask questions:</strong> The retriever finds the most
-              relevant chunks, and the answer generator uses them to produce an
-              answer with source citations.
-            </p>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+      <p className="text-muted-foreground flex items-start gap-2 text-sm">
+        <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        Indexed PDFs are available only for the current backend process and session.
+      </p>
 
       {/* Chat area */}
       <Conversation className="flex-1 rounded-xl border bg-white">
@@ -949,7 +915,7 @@ export default function RAGPage() {
             <>
               {hasDocuments && isExample ? (
                 <ExampleStart
-                  disabled={isQuerying}
+                  disabled={isQuerying || isIndexing}
                   onAsk={handleQuery}
                   onAbout={() => setExampleOpen(true)}
                 />
@@ -968,14 +934,7 @@ export default function RAGPage() {
                     <div className="bg-primary/10 mb-4 rounded-full p-4">
                       <Upload className="text-primary h-8 w-8" />
                     </div>
-                    <h2 className="mb-1.5 text-lg font-semibold">
-                      Get started
-                    </h2>
-                    <p className="text-muted-foreground mb-4 max-w-sm text-center text-sm">
-                      Try our example documents or upload your own PDFs to ask
-                      questions and get AI-powered answers with citations.
-                    </p>
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap justify-center gap-3">
                       <Button
                         size="lg"
                         className="gap-2"
@@ -988,7 +947,7 @@ export default function RAGPage() {
                       <DialogTrigger asChild>
                         <Button size="lg" variant="outline" className="gap-2">
                           <Plus className="h-5 w-5" />
-                          Upload PDF
+                          Upload PDFs
                         </Button>
                       </DialogTrigger>
                     </div>
@@ -1068,7 +1027,9 @@ export default function RAGPage() {
           <div />
           <PromptInputSubmit
             status={isQuerying ? "streaming" : "ready"}
-            disabled={!hasDocuments}
+            onStop={stopQuery}
+            // The documents are needed to ask, never to stop an answer.
+            disabled={!isQuerying && (!hasDocuments || isIndexing)}
           />
         </PromptInputFooter>
       </PromptInput>

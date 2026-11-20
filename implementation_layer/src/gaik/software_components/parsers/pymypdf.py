@@ -9,6 +9,8 @@ import logging
 import os
 from typing import Any
 
+from .._ligatures import expand_ligatures
+from ..file_type import check_file_type
 from ..input_limits import InputLimits
 
 try:
@@ -75,6 +77,8 @@ class PyMuPDFParser:
             FileNotFoundError: If file does not exist
             ValueError: If page_markers is used with structured text, or the
                 file's content is not a PDF
+            FileTypeMismatchError: If the content is another known type, or not
+                the type the file's extension says (a ``ValueError``)
             InputLimitError: If the file is over ``max_file_bytes`` or ``max_pages``
             Exception: If PDF parsing fails
         """  # noqa: E501
@@ -83,6 +87,7 @@ class PyMuPDFParser:
         if page_markers and not use_markdown:
             raise ValueError("page_markers needs use_markdown=True")
         self.limits.check_file_size(file_path)
+        check_file_type(file_path, {"pdf"})
 
         try:
             doc = fitz.open(file_path)
@@ -104,7 +109,7 @@ class PyMuPDFParser:
                     page = doc[page_num]
                     if page_markers:
                         text_content += f"[Page {page_num + 1}]\n"
-                    text_content += str(page.get_text())
+                    text_content += expand_ligatures(str(page.get_text()))
                     text_content += "\n\n"  # Add page separator
             else:
                 # Structured extraction preserving layout
@@ -210,7 +215,9 @@ class PyMuPDFParser:
                             if span["text"].strip():
                                 # Add positioning info for structured extraction
                                 x, y = span["bbox"][0], span["bbox"][1]
-                                line_text.append(f"[x:{x:.0f},y:{y:.0f}] {span['text']}")
+                                line_text.append(
+                                    f"[x:{x:.0f},y:{y:.0f}] {expand_ligatures(span['text'])}"
+                                )
                         if line_text:
                             block_text.append(" ".join(line_text))
                     if block_text:
