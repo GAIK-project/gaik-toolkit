@@ -410,7 +410,7 @@ def _apply(db: Session, session, base_version: int | None, change: _Change) -> _
         if written is None:
             db.rollback()
             return None
-        # A version saved before migration 003 has no copy of the draft: keep
+        # A version saved before migration 004 has no copy of the draft: keep
         # the one this write is about to replace, so it can be gone back to.
         blueprint_service.backfill_active_draft(db, session, draft)
         taken = draft_store.snapshot(output_dir)

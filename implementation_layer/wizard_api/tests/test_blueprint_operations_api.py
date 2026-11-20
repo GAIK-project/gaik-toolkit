@@ -312,7 +312,7 @@ def test_an_edit_after_gate_3_reopens_gate_2(client, db_session, not_busy) -> No
 def test_the_first_edit_of_an_old_session_backs_up_its_draft(client, db_session, not_busy) -> None:
     created = _create(client)
     sid = created["id"]
-    # Saved before migration 003: the active version has no draft.
+    # Saved before migration 004: the active version has no draft.
     assert all(v.draft is None for v in _versions(db_session, sid))
     before = json.loads(_read_bytes(created["output_dir"]))
 

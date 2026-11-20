@@ -209,7 +209,7 @@ def get_previous_draft_version(
 def backfill_active_draft(db: Session, session: WizardSession, draft: dict) -> bool:
     """Store ``draft`` on the active version when it carries none; True when stored.
 
-    Versions saved before migration 003 have no draft. The first edit of such a
+    Versions saved before migration 004 have no draft. The first edit of such a
     session writes over the agent's file, and without this the version before
     the edit would hold no copy of it to go back to. Called only on an edit,
     inside its transaction: sessions nobody edits are left as they are.
