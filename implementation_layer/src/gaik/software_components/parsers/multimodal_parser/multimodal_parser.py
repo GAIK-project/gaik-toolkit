@@ -14,6 +14,7 @@ from typing import Literal
 from markdown_it import MarkdownIt
 
 from gaik.software_components import _http
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits
@@ -246,7 +247,7 @@ class MultimodalParser:
         system_prompt = self._get_system_prompt()
         user_prompt = self._get_user_prompt()
 
-        logger.info("Parsing %s with %s provider", pdf_path.name, self.model_provider)
+        logger.info("Parsing %s with %s provider", file_tag(pdf_path), self.model_provider)
 
         callers = {
             "openai": self._call_openai,

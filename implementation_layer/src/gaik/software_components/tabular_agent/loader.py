@@ -34,6 +34,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from .._log_names import file_tag
 from ..input_limits import InputLimits, count_table_rows
 from .models import SheetLayout
 
@@ -262,7 +263,7 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
                 [_EURO_DECIMAL],
             ).fetchone()
         except Exception as exc:  # pragma: no cover - defensive
-            logger.debug("Decimal probe failed for %s.%s: %s", table_name, column, exc)
+            logger.debug("Decimal probe failed for a column: %s", type(exc).__name__)
             continue
         if not total or matching != total:
             continue
@@ -273,11 +274,9 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
             )
             converted.append(column)
         except Exception as exc:
-            logger.debug("Could not retype %s.%s as DOUBLE: %s", table_name, column, exc)
+            logger.debug("Could not retype a column as DOUBLE: %s", type(exc).__name__)
     if converted:
-        logger.info(
-            "Converted comma-decimal column(s) in '%s': %s", table_name, ", ".join(converted)
-        )
+        logger.info("Converted %d comma-decimal column(s)", len(converted))
     return converted
 
 
@@ -319,7 +318,7 @@ def _load_excel(
             grid = _read_grid(worksheet, limits, f"{path.name} / {sheet_name}")
             grid = _trim_grid(grid)
             if len(grid) < 2:
-                logger.info("Skipping empty sheet '%s' in %s", sheet_name, path.name)
+                logger.info("Skipping an empty sheet in %s", file_tag(path))
                 continue
 
             layout, messy = _resolve_layout(
@@ -330,7 +329,7 @@ def _load_excel(
             )
             header, rows = _apply_layout(grid, layout, drop_outliers=messy)
             if not header or not rows:
-                logger.info("Sheet '%s' in %s has no data rows", sheet_name, path.name)
+                logger.info("A sheet in %s has no data rows", file_tag(path))
                 continue
 
             # One sheet keeps the caller's name; extra sheets get suffixed.

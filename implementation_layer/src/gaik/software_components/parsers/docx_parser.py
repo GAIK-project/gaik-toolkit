@@ -9,6 +9,7 @@ import logging
 import os
 from typing import Any
 
+from .._log_names import file_tag
 from ..file_type import check_file_type
 from ..input_limits import InputLimits
 
@@ -126,7 +127,7 @@ class DocxParser:
             return text_content.strip()
 
         except Exception as e:
-            logger.error(f"Error parsing DOCX {file_path}: {e}")
+            logger.error("Error parsing DOCX %s: %s", file_tag(file_path), type(e).__name__)
             raise
 
     def parse_document(self, file_path: str, use_markdown: bool = True) -> dict[str, Any]:
@@ -164,13 +165,13 @@ class DocxParser:
             )
 
         format_type = "markdown" if use_markdown else "structured"
-        logger.info(f"Parsing document: {file_name} (format: {format_type})")
+        logger.info("Parsing document: %s (format: %s)", file_tag(file_path), format_type)
 
         # Extract text
         text_content = self.parse_docx(file_path, use_markdown)
 
         if not text_content:
-            logger.warning(f"No text content extracted from {file_name}")
+            logger.warning("No text content extracted from %s", file_tag(file_path))
 
         return {
             "file_path": file_path,
@@ -287,6 +288,6 @@ def parse_docx(
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result["text_content"])
-        logger.info(f"Parsed content saved to: {output_path}")
+        logger.info("Parsed content saved to %s", file_tag(output_path))
 
     return result

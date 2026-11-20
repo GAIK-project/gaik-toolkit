@@ -23,6 +23,7 @@ try:
 except Exception:
     pass
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
 
 if TYPE_CHECKING:
@@ -306,7 +307,7 @@ class VisionRagParser:
 
     def _convert_with_vision(self, pdf_path: str) -> tuple[Any, str, dict[int, list[str]]]:
         if self.verbose:
-            print(f"Processing PDF with vision enhancement: {pdf_path}")
+            print(f"Processing PDF with vision enhancement: {file_tag(pdf_path)}")
 
         self.limits.check_pdf(pdf_path)
         result = self.converter.convert(pdf_path, **docling_limits(self.limits))
@@ -340,7 +341,7 @@ class VisionRagParser:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(markdown_text)
         if self.verbose:
-            print(f"Markdown saved to: {output_path}")
+            print(f"Markdown saved to: {file_tag(output_path)}")
 
     def _collect_images(self, doc) -> list[dict[str, Any]]:
         images_with_positions: list[dict[str, Any]] = []

@@ -18,6 +18,7 @@ from gaik.observability import (
     measure_duration,
     openai_usage_to_dict,
 )
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.source_material import (
     SourceMaterial,
@@ -69,7 +70,7 @@ def save_to_json(results: list[dict], json_path: str) -> None:
     """
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, default=str)
-    print(f"OK Results saved to: {json_path}")
+    print(f"OK Results saved to: {file_tag(json_path)}")
 
 
 class DataExtractor:

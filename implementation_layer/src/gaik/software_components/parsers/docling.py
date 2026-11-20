@@ -85,6 +85,7 @@ import os
 import re
 from collections import OrderedDict
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components._tesseract import (
     installed_tesseract_cli_languages,
     installed_tesserocr_languages,
@@ -540,6 +541,6 @@ def parse_document(
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result["text_content"])
-        print(f"Parsed content saved to: {output_path}")
+        print(f"Parsed content saved to: {file_tag(output_path)}")
 
     return result

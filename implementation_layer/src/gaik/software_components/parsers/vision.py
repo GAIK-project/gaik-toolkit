@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.endpoints import check_openai_endpoint
 from gaik.software_components.file_type import IMAGE_TYPES, MIME_TYPES, check_file_type
 from gaik.software_components.input_limits import InputLimits
@@ -306,7 +307,7 @@ class VisionParser:
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as handle:
             handle.write(payload)
-        logger.info("Markdown saved to %s", output_path)
+        logger.info("Markdown saved to %s", file_tag(output_path))
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -420,7 +421,7 @@ class VisionParser:
 
         Returns a list of PNG image data as bytes objects.
         """
-        logger.info("Converting PDF %s to images at %s DPI", pdf_path, dpi)
+        logger.info("Converting PDF %s to images at %s DPI", file_tag(pdf_path), dpi)
         images: list[bytes] = []
         name = Path(pdf_path).name
 

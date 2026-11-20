@@ -20,6 +20,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS, media_input_args
 
 from .config import TranscriptionConfig
@@ -93,7 +94,7 @@ def get_audio_duration(
     try:
         return float(result.stdout.strip())
     except ValueError:
-        logger.info("%s has no duration in its header; decoding it", Path(file_path).name)
+        logger.info("%s has no duration in its header; decoding it", file_tag(file_path))
         return decoded_audio_seconds(file_path, timeout=decode_timeout)
 
 
@@ -240,7 +241,7 @@ def extract_audio(
         str(output_path),
     ]
 
-    logger.info("Extracting audio: %s -> %s", input_path.name, output_path.name)
+    logger.info("Extracting audio: %s -> %s", file_tag(input_path), file_tag(output_path))
 
     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
     process = subprocess.Popen(
@@ -382,11 +383,10 @@ def split_into_chunks(
     output_dir = specs[0].chunk_path.parent
 
     logger.info(
-        "Splitting %d chunks (workers=%d, threads_per=%d, temp=%s)",
+        "Splitting %d chunks (workers=%d, threads_per=%d)",
         total_specs,
         max_workers,
         cfg.ffmpeg_threads_per_process,
-        output_dir,
     )
 
     def _encode_chunk(spec: ChunkSpec) -> dict:
@@ -470,10 +470,9 @@ def split_into_chunks(
                 return {"error": f"chunk too small ({chunk_size_mb:.2f} MB)", "index": spec.index}
 
             logger.info(
-                "Chunk %d/%d: %s (%.1f MB)",
+                "Chunk %d/%d (%.1f MB)",
                 spec.index + 1,
                 total_specs,
-                chunk_path.name,
                 chunk_size_mb,
             )
 

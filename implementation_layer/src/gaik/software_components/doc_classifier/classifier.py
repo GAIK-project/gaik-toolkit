@@ -12,6 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
@@ -144,7 +145,7 @@ class DocumentClassifier:
         # Validate input path
         path = Path(file_or_dir)
         if not path.exists():
-            logger.error(f"Path does not exist: {file_or_dir}")
+            logger.error("Path does not exist: %s", file_tag(file_or_dir))
             raise FileNotFoundError(f"Path does not exist: {file_or_dir}")
 
         # Ensure 'unknown' class is included
@@ -158,7 +159,7 @@ class DocumentClassifier:
         elif path.is_dir():
             return self._classify_directory(str(path), classes, parser)
         else:
-            logger.error(f"Invalid path type: {file_or_dir}")
+            logger.error("Invalid path type: %s", file_tag(file_or_dir))
             raise ValueError(f"Invalid path type: {file_or_dir}")
 
     def _classify_single_file(
@@ -179,11 +180,11 @@ class DocumentClassifier:
             ValueError: If file format is unsupported or corrupt
             InputLimitError: If the file is over one of ``limits``
         """
-        logger.info(f"Classifying file: {Path(file_path).name}")
+        logger.info("Classifying file: %s", file_tag(file_path))
 
         # Validate file format
         if not self._is_valid_file(file_path):
-            logger.error(f"Unsupported file format: {file_path}")
+            logger.error("Unsupported file format: %s", file_tag(file_path))
             raise ValueError(
                 f"Unsupported file format: {Path(file_path).suffix}. "
                 f"Supported formats: .pdf, .docx, .doc, .png, .jpg, .jpeg"
@@ -197,7 +198,7 @@ class DocumentClassifier:
             text = self._extract_text(file_path, parser_type)
 
             if not text or len(text.strip()) == 0:
-                logger.warning(f"No text extracted from {file_path}")
+                logger.warning("No text extracted from %s", file_tag(file_path))
                 return {
                     "class": "unknown",
                     "confidence": 0.0,
@@ -211,7 +212,7 @@ class DocumentClassifier:
         except InputLimitError:
             raise
         except Exception as e:
-            logger.error(f"Error classifying {file_path}: {e}")
+            logger.error("Error classifying %s: %s", file_tag(file_path), type(e).__name__)
             raise ValueError(f"Failed to classify {file_path}: {str(e)}")
 
     def _classify_directory(
@@ -240,7 +241,7 @@ class DocumentClassifier:
         ]
 
         if not valid_files:
-            logger.error(f"No valid files found in directory: {dir_path}")
+            logger.error("No valid files found in the directory given")
             raise ValueError(
                 f"Directory is empty or contains no valid files: {dir_path}\n"
                 f"Supported formats: .pdf, .docx, .doc, .png, .jpg, .jpeg"
@@ -254,7 +255,7 @@ class DocumentClassifier:
                 result = self._classify_single_file(str(file_path), classes, parser_override)
                 results[file_path.name] = result
             except Exception as e:
-                logger.error(f"Skipping {file_path.name}: {e}")
+                logger.error("Skipping %s: %s", file_tag(file_path), type(e).__name__)
                 results[file_path.name] = {
                     "class": "unknown",
                     "confidence": 0.0,
