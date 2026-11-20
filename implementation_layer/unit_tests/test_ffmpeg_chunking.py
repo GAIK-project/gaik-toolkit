@@ -320,6 +320,39 @@ def test_a_split_in_which_no_chunk_holds_audio_raises(tmp_path: Path):
         _split(tmp_path, empty)
 
 
+def test_a_chunk_whose_length_cannot_be_read_raises_instead_of_being_dropped(tmp_path: Path):
+    # Reading the last chunk's length times out on both attempts: it may hold audio, so
+    # the split stops with its time range instead of dropping it as an empty tail.
+    def timed_out_for_the_last(path):
+        if Path(path).name == "chunk_02.mp3":
+            return None
+        return Path(path).stat().st_size / _BYTES_PER_SECOND
+
+    with patch(
+        "gaik.software_components.parallel_transcriber.ffmpeg._encoded_seconds",
+        side_effect=timed_out_for_the_last,
+    ):
+        with pytest.raises(RuntimeError) as raised:
+            _split(tmp_path, {})
+
+    message = str(raised.value)
+    assert "(0:01:55-0:03:00)" in message
+    assert "the length of chunk 3 could not be read" in message
+
+
+def test_a_probe_timeout_is_an_unknown_length_not_an_empty_chunk(tmp_path: Path, real_ffprobe):
+    from gaik.software_components.parallel_transcriber import ffmpeg
+
+    chunk = tmp_path / "chunk_00.mp3"
+    chunk.write_bytes(b"\x00" * 10)
+    with patch.object(
+        ffmpeg, "get_audio_duration", side_effect=subprocess.TimeoutExpired("ffprobe", 1)
+    ):
+        assert ffmpeg._encoded_seconds(chunk) is None
+    with patch.object(ffmpeg, "get_audio_duration", side_effect=ValueError("no audio")):
+        assert ffmpeg._encoded_seconds(chunk) == 0.0
+
+
 _HAS_FFMPEG = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
 
 

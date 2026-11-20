@@ -39,10 +39,14 @@ DECODE_TIMEOUT_SECONDS = 600
 _CHUNK_LENGTH_TOLERANCE_SECONDS = 1.0
 
 
-def _encoded_seconds(chunk_path: Path) -> float:
-    """Length in seconds of an encoded chunk; 0.0 when it holds no readable audio."""
+def _encoded_seconds(chunk_path: Path) -> float | None:
+    """Length in seconds of an encoded chunk; 0.0 when it holds no readable audio, and
+    None when reading its length timed out, so its length is not known."""
     try:
         return get_audio_duration(chunk_path, decode_timeout=FFPROBE_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        logger.warning("Reading the length of %s timed out", Path(chunk_path).name)
+        return None
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         logger.warning("Could not read the length of %s: %s", Path(chunk_path).name, exc)
         return 0.0
@@ -493,7 +497,7 @@ def split_into_chunks(
                 spec.index + 1,
                 total_specs,
                 chunk_path.name,
-                seconds,
+                seconds if seconds is not None else float("nan"),
                 spec.duration,
                 chunk_path.stat().st_size / (1024 * 1024),
             )
@@ -530,6 +534,9 @@ def split_into_chunks(
     tolerance = _CHUNK_LENGTH_TOLERANCE_SECONDS
 
     def _is_short(result: dict) -> bool:
+        # A chunk whose length could not be read is retried like a short one.
+        if result["seconds"] is None:
+            return True
         return result["seconds"] < specs[result["metadata"]["index"]].duration - tolerance
 
     # ── Sequential retry for failed and short chunks ─────────────
@@ -551,7 +558,15 @@ def split_into_chunks(
             results[index] = retry
 
     failed = [r for r in results if "error" in r]
-    encoded = [r for r in results if "file" in r]
+    # A chunk whose length is still unknown may hold audio: a gap, not an empty tail.
+    for r in results:
+        if "file" in r and r["seconds"] is None:
+            index = r["metadata"]["index"]
+            Path(r["file"]).unlink(missing_ok=True)
+            failed.append(
+                {"error": f"the length of chunk {index + 1} could not be read", "index": index}
+            )
+    encoded = [r for r in results if "file" in r and r["seconds"] is not None]
 
     # The audio ends where the last chunk that holds audio ends. A file whose header
     # overstates its length gives chunks past that point, which are skipped; a chunk
