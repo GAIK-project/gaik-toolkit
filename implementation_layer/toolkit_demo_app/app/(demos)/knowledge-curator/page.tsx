@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -41,6 +42,7 @@ import {
   DEFAULT_OPTIONS,
   EFFORTS,
   knowledgePath,
+  PRIMARY_FIRST,
   parseKnowledge,
   readKnowledge,
   readWorkspaceZip,
@@ -49,6 +51,7 @@ import {
   type DroppedUnit,
   type Effort,
   type SectionKnowledge,
+  type SourceClass,
   type VerifyResult,
 } from "@/lib/knowledge-curator/workspace";
 import { processSSEStream } from "@/lib/sse";
@@ -115,7 +118,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 const GUIDE_NOTES = [
-  "Every quote must appear word for word in its source. A fact whose quote is not there, even after asking again, is dropped and listed. The instructions decide whether a conflict between sources is resolved: for example, primary sources outrank secondary ones.",
+  "Every quote must appear word for word in its source. A fact whose quote is not there, even after asking again, is dropped and listed. A conflict between sources is resolved only when primary sources outrank secondary ones and exactly one side is primary; otherwise it stays for you to settle.",
   "The result lives in this browser tab. Reloading or closing the tab loses it, so download the .zip first.",
 ];
 
@@ -169,6 +172,7 @@ export default function KnowledgeCuratorPage() {
   const [loadingExample, setLoadingExample] = useState(false);
   const [sections, setSections] = useState<SectionRow[]>([newRow(0)]);
   const [instructions, setInstructions] = useState("");
+  const [precedence, setPrecedence] = useState<SourceClass[]>([]);
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
 
   const [knowledge, setKnowledge] = useState<Record<string, string>>({});
@@ -267,6 +271,7 @@ export default function KnowledgeCuratorPage() {
       setOrigin(example.title);
       setSections(example.sections.map((s, i) => newRow(i, { ...s })));
       setInstructions(example.instructions);
+      setPrecedence(example.source_precedence);
       setExampleId(example.id);
     } catch (e) {
       toast.error(`Loading the example failed: ${message(e)}`);
@@ -282,6 +287,7 @@ export default function KnowledgeCuratorPage() {
     setExampleId(null);
     setSections([newRow(0)]);
     setInstructions("");
+    setPrecedence([]);
     setOptions(DEFAULT_OPTIONS);
     resetResult();
   }
@@ -333,7 +339,7 @@ export default function KnowledgeCuratorPage() {
       const form = new FormData();
       form.append(
         "request",
-        JSON.stringify(buildRequest(inputs, instructions, options)),
+        JSON.stringify(buildRequest(inputs, instructions, options, precedence)),
       );
       form.append(
         "artifacts",
@@ -604,12 +610,25 @@ export default function KnowledgeCuratorPage() {
               <CardHeader>
                 <CardTitle>3. Instructions</CardTitle>
                 <CardDescription>
-                  Which sources to trust more, scope and style, and the language
-                  of the summaries. When sources disagree, this decides whether
-                  a conflict is resolved.
+                  Scope and style, and the language of the summaries. Whether a
+                  conflict between sources is resolved is set by the switch
+                  below, not by the text.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1">
+              <CardContent className="flex flex-1 flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="primary-first"
+                    checked={precedence.length > 0}
+                    onCheckedChange={(on) =>
+                      setPrecedence(on ? PRIMARY_FIRST : [])
+                    }
+                    disabled={busy}
+                  />
+                  <Label htmlFor="primary-first" className="text-sm">
+                    Primary sources outrank secondary ones in a conflict
+                  </Label>
+                </div>
                 <Textarea
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}

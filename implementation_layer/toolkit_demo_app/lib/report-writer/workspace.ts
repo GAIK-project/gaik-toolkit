@@ -30,6 +30,11 @@ export interface ReportSpec {
   language: string;
   sections: SpecSection[];
   instructions: string;
+  /**
+   * Source classes, highest first: which side of a conflict the curator follows. Empty
+   * leaves every conflict for a person to settle. A spec may omit it, which means empty.
+   */
+  source_precedence: SourceClass[];
   sources: Record<SourceClass, string[]>;
   sample_report: string | null;
   models: Record<ModelKey, string | null>;
@@ -160,18 +165,46 @@ export function settingsForSpec(settings: RunSettings): SpecSettings {
   return citations ? rest : { ...rest, citations: false };
 }
 
+/**
+ * The precedence as a spec carries it: written only when it names a class, since gaik
+ * releases before `source_precedence` reject the key.
+ */
+export function precedenceForSpec(
+  precedence: SourceClass[],
+): { source_precedence?: SourceClass[] } {
+  return precedence.length ? { source_precedence: [...precedence] } : {};
+}
+
+function parsePrecedence(v: unknown): SourceClass[] {
+  if (v === undefined) return [];
+  const classes = strs(v, "source_precedence");
+  const unknown = classes.filter((c) => c !== "primary" && c !== "secondary");
+  if (unknown.length)
+    fail(`source_precedence names unknown classes ${unknown.join(", ")}`);
+  if (new Set(classes).size !== classes.length)
+    fail("source_precedence names a class more than once");
+  return classes as SourceClass[];
+}
+
 export function parseSpec(value: unknown): ReportSpec {
-  const o = exactObject(value, "spec", [
-    "title",
-    "description",
-    "language",
-    "sections",
-    "instructions",
-    "sources",
-    "sample_report",
-    "models",
-    "settings",
-  ]);
+  const o = exactObject(
+    value,
+    "spec",
+    [
+      "title",
+      "description",
+      "language",
+      "sections",
+      "instructions",
+      "source_precedence",
+      "sources",
+      "sample_report",
+      "models",
+      "settings",
+    ],
+    // Older specs, and specs for a gaik without the key, have no source_precedence.
+    ["source_precedence"],
+  );
   if (!Array.isArray(o.sections)) fail("sections must be an array");
   const sections = o.sections.map((s, i) => {
     const w = `sections[${i}]`;
@@ -204,6 +237,7 @@ export function parseSpec(value: unknown): ReportSpec {
     language: str(o.language, "language"),
     sections,
     instructions: str(o.instructions, "instructions"),
+    source_precedence: parsePrecedence(o.source_precedence),
     sources: {
       primary: strs(src.primary, "sources.primary"),
       secondary: strs(src.secondary, "sources.secondary"),
