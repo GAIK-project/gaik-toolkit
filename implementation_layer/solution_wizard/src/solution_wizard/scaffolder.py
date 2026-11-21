@@ -1070,6 +1070,24 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
     )
 
 
+def _component_import_lines(registry, entry: dict) -> list[str]:
+    """The import lines for a registry entry's classes.
+
+    Most entries are named after their class. A family entry such as
+    ``Extractor`` is not a class: its module exports the classes it lists in
+    ``uses_components`` (``SchemaGenerator``, ``DataExtractor``), and importing
+    the family name fails at the run's first line. Those classes are imported
+    instead, the ones the same module exports.
+    """
+    import_path = entry["import_path"]
+    members = [
+        name
+        for name in entry.get("uses_components") or []
+        if (registry.lookup_by_name(name) or {}).get("import_path") == import_path
+    ]
+    return [f"from {import_path} import {name}" for name in (members or [entry["name"]])]
+
+
 def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     """Build the substitution variables dict from the blueprint."""
     bc = blueprint
@@ -1119,9 +1137,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         if step.component and step.component not in ("custom", "human_review"):
             entry = registry.lookup_by_name(step.component) or registry.lookup_by_id(step.component)
             if entry and entry.get("import_path"):
-                class_name = entry["name"]
-                import_path = entry["import_path"]
-                import_lines.append(f"from {import_path} import {class_name}")
+                for line in _component_import_lines(registry, entry):
+                    if line not in import_lines:
+                        import_lines.append(line)
 
     language = (
         bc.technical_spec.get("language", "en")
