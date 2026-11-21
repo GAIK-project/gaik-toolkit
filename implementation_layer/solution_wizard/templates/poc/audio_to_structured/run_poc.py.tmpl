@@ -31,6 +31,15 @@ from provider_config import (  # noqa: E402
 )
 import poc_output  # noqa: E402
 
+#: For the transcript enhancement: dates, month names, numbers, identifiers and
+#: names are what the extracted record is built from, so they stay as spoken.
+KEEP_SPOKEN_FACTS = (
+    "Keep every date, month name, time, number, unit, identifier (such as P-17 "
+    "or B2) and personal name exactly as it was spoken. Do not convert a spoken "
+    "date or month name into digits or another format, and do not change its "
+    "day, month or year."
+)
+
 
 def load_config() -> dict:
     config_path = Path(__file__).parent / "config.yaml"
@@ -268,6 +277,8 @@ def main() -> None:
         "compress_audio": True,
         # Enhancement sends the transcript to the transcription stage's cloud provider.
         "enhanced_transcript": not external_model_forbidden(config),
+        # The facts a ticket or record is built from stay as they were spoken.
+        "enhanced_transcript_instructions": KEEP_SPOKEN_FACTS,
         "language": language,
         # Self-hosted Whisper: its endpoint and key from LOCAL_TRANSCRIBER_API_*.
         **local_transcriber_options(config, audio_config),
@@ -324,6 +335,12 @@ ${source_tracing_section}${llm_judge_section}
         if transcript_text:
             transcript_path.write_text(transcript_text, encoding="utf-8")
             print(f"Transcript saved to: {transcript_path}")
+        if raw and enhanced and raw != enhanced:
+            # Kept beside it, so a changed date or name can be traced to the
+            # transcription or to the enhancement.
+            raw_path = output_dir / f"{input_file.stem}_transcript_raw.txt"
+            raw_path.write_text(raw, encoding="utf-8")
+            print(f"Raw transcript saved to: {raw_path}")
 
     _pdf_source = result.extracted_fields
 ${pdf_report_section}
