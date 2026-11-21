@@ -1070,22 +1070,40 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
     )
 
 
-def _component_import_lines(registry, entry: dict) -> list[str]:
+def _card_import_names(card: dict | None) -> set[str] | None:
+    """The names a reference card's import line imports, or None without a card."""
+    if not card or not card.get("import"):
+        return None
+    names: set[str] = set()
+    for line in card["import"].splitlines():
+        _, sep, imported = line.strip().partition(" import ")
+        if sep:
+            names.update(n.strip() for n in imported.split(",") if n.strip())
+    return names
+
+
+def _component_import_lines(registry, entry: dict, card: dict | None = None) -> list[str]:
     """The import lines for a registry entry's classes.
 
-    Most entries are named after their class. A family entry such as
-    ``Extractor`` is not a class: its module exports the classes it lists in
-    ``uses_components`` (``SchemaGenerator``, ``DataExtractor``), and importing
-    the family name fails at the run's first line. Those classes are imported
-    instead, the ones the same module exports.
+    Most entries are named after their class, and the classes they list in
+    ``uses_components`` that the same module exports are imported beside it:
+    ``LLMJudgePanel`` is built from ``LLMJudge`` instances. A family entry such
+    as ``Extractor`` is not a class: its module exports ``SchemaGenerator`` and
+    ``DataExtractor``, and importing the family name fails at the run's first
+    line. The entry's reference card tells the two apart: its import line names
+    the entry when the entry is a class, and leaves a family's name out.
     """
     import_path = entry["import_path"]
+    own = entry["name"]
     members = [
         name
         for name in entry.get("uses_components") or []
-        if (registry.lookup_by_name(name) or {}).get("import_path") == import_path
+        if name != own and (registry.lookup_by_name(name) or {}).get("import_path") == import_path
     ]
-    return [f"from {import_path} import {name}" for name in (members or [entry["name"]])]
+    card_names = _card_import_names(card)
+    is_class = card_names is None or own in card_names
+    names = ([own] if is_class else []) + members
+    return [f"from {import_path} import {name}" for name in (names or [own])]
 
 
 def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
@@ -1131,13 +1149,17 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     )
 
     # Component imports placeholder for _generic
+    from .registry import get_reference_cards
+
     registry = get_registry()
+    cards = get_reference_cards()
     import_lines = []
     for step in bc.workflow.steps:
         if step.component and step.component not in ("custom", "human_review"):
             entry = registry.lookup_by_name(step.component) or registry.lookup_by_id(step.component)
             if entry and entry.get("import_path"):
-                for line in _component_import_lines(registry, entry):
+                card = cards.get(entry["name"])
+                for line in _component_import_lines(registry, entry, card):
                     if line not in import_lines:
                         import_lines.append(line)
 

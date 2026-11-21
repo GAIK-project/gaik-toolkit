@@ -11,8 +11,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from solution_wizard.blueprint import Blueprint
+from solution_wizard.registry import get_reference_cards, get_registry
 from solution_wizard.scaffolder import (
     _build_variables,
+    _component_import_lines,
     _derive_pattern_key,
     _determine_pattern,
     scaffold_poc,
@@ -474,15 +476,51 @@ def test_generic_imports_name_classes_not_component_families():
     assert len(lines) == len(set(lines))
 
 
+def _entry_import_lines(name: str) -> list[str]:
+    registry = get_registry()
+    entry = registry.lookup_by_name(name)
+    return _component_import_lines(registry, entry, get_reference_cards().get(name))
+
+
+def test_generic_imports_keep_a_class_entry_beside_its_members():
+    """'LLMJudgePanel' is a class built from LLMJudge, which its module also exports."""
+    lines = _entry_import_lines("LLMJudgePanel")
+    assert lines == [
+        "from gaik.software_components.validators.llm_judge import LLMJudgePanel",
+        "from gaik.software_components.validators.llm_judge import LLMJudge",
+    ]
+
+
+def test_generic_imports_only_change_family_and_member_entries():
+    """Only entries with same-module members gain imports; only families lose their name."""
+    registry = get_registry()
+    changed = {}
+    for entry in registry.all():
+        lines = _entry_import_lines(entry["name"])
+        if lines != [f"from {entry['import_path']} import {entry['name']}"]:
+            changed[entry["name"]] = lines
+    assert set(changed) == {"Extractor", "LLMJudgePanel"}
+
+
 def test_generic_imports_exist_in_gaik():
-    """Every generated import names something its module really exports."""
+    """Every generated import names something its module really exports.
+
+    A module whose extra is missing is left out and the other lines are still
+    checked; the test skips only when no line could be checked at all.
+    """
     import importlib
 
     imports = _build_variables(_hybrid_blueprint(), "_generic")["component_imports_placeholder"]
-    for line in imports.splitlines():
+    lines = imports.splitlines() + _entry_import_lines("LLMJudgePanel")
+    checked, missing = 0, []
+    for line in lines:
         module, name = line.removeprefix("from ").split(" import ")
         try:
             mod = importlib.import_module(module)
         except ImportError:
-            pytest.skip(f"{module} needs an extra that is not installed")
+            missing.append(module)
+            continue
         assert hasattr(mod, name), line
+        checked += 1
+    if not checked:
+        pytest.skip(f"no module could be imported (extras missing: {sorted(set(missing))})")
