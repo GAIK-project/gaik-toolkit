@@ -462,3 +462,27 @@ def test_legacy_promoted_template_requires_explicit_provider_migration(tmp_path,
     with pytest.raises(ValueError, match="needs a provider migration"):
         scaffolder_mod._determine_pattern(bp)
     assert candidate.read_text() == "# existing specialized pipeline\n"
+
+
+def test_generic_imports_name_classes_not_component_families():
+    """'Extractor' is a family: its module exports SchemaGenerator and DataExtractor."""
+    imports = _build_variables(_hybrid_blueprint(), "_generic")["component_imports_placeholder"]
+    lines = imports.splitlines()
+    assert "from gaik.software_components.extractor import Extractor" not in lines
+    assert "from gaik.software_components.extractor import DataExtractor" in lines
+    assert "from gaik.software_components.extractor import SchemaGenerator" in lines
+    assert len(lines) == len(set(lines))
+
+
+def test_generic_imports_exist_in_gaik():
+    """Every generated import names something its module really exports."""
+    import importlib
+
+    imports = _build_variables(_hybrid_blueprint(), "_generic")["component_imports_placeholder"]
+    for line in imports.splitlines():
+        module, name = line.removeprefix("from ").split(" import ")
+        try:
+            mod = importlib.import_module(module)
+        except ImportError:
+            pytest.skip(f"{module} needs an extra that is not installed")
+        assert hasattr(mod, name), line
