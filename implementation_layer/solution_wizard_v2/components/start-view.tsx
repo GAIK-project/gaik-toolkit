@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { startSessionFromMessage } from "@/app/actions";
+import { startText } from "@/lib/start-text";
 import {
   BackgroundChoice,
   ExampleChips,
@@ -63,6 +64,13 @@ export function StartView({ labels }: { labels: StartViewLabels }) {
     el.setSelectionRange(el.value.length, el.value.length);
   }, []);
 
+  // Text that reached the field before the page had loaded never went through
+  // onChange: take it into the state, so the view shows and sends the same.
+  useEffect(() => {
+    const early = field.current?.value;
+    if (early) setInput((current) => current || early);
+  }, []);
+
   useEffect(() => {
     // Not on a touch screen, where the cursor would raise the keyboard.
     if (window.matchMedia("(pointer: fine)").matches) requestAnimationFrame(focusField);
@@ -82,7 +90,7 @@ export function StartView({ labels }: { labels: StartViewLabels }) {
   );
 
   async function send() {
-    const text = input.trim();
+    const text = startText(input, field.current?.value);
     if (!text || sending.current) return;
     sending.current = true;
     setPending(true);
