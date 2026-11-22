@@ -1121,3 +1121,43 @@ def test_a_month_word_supports_only_the_same_date(summary, quote, unsupported):
     unit = _summarised(summary, quote)
 
     assert kc._unsupported_numbers(unit, source_text=quote) == unsupported
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "Seen 14th March 2026.",
+        "Seen on the 14th of March 2026.",
+        "Seen 14 march 2026.",
+        "Seen 14 MARCH 2026.",
+        "Nähty 14.maaliskuuta 2026.",
+        "Nähty 14. päivänä maaliskuuta 2026.",
+    ],
+)
+def test_a_day_month_and_year_in_words_support_the_numeric_date(quote):
+    unit = _summarised("Seen on 14.3.2026.", quote)
+
+    assert kc._unsupported_numbers(unit, source_text=quote) == []
+
+
+@pytest.mark.parametrize(
+    ("quote", "unsupported"),
+    [
+        ("Korjattu maaliskuussa 2026.", []),
+        ("Repaired in March 2026.", []),
+        ("Repaired on 14 March 2026.", []),
+        ("Repaired in March 2025.", ["3", "2026"]),
+    ],
+)
+def test_a_month_and_a_year_in_words_support_a_month_and_a_year(quote, unsupported):
+    unit = _summarised("Repaired 3/2026.", quote)
+
+    assert kc._unsupported_numbers(unit, source_text=quote) == unsupported
+
+
+def test_lowercase_may_and_mar_still_need_a_day_before_or_a_year_after():
+    for summary, quote in (("Seen 2.5.", "may 2 units fail."), ("Damage 2.3.", "mar 2 walls.")):
+        unit = _summarised(summary, quote)
+        assert kc._unsupported_numbers(unit, source_text=quote) != []
+    unit = _summarised("Seen 14.5.", "Seen on 14 may.")
+    assert kc._unsupported_numbers(unit, source_text=unit.quote) == []

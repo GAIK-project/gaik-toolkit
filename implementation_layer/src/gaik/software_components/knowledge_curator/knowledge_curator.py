@@ -166,51 +166,58 @@ _SEPARATORS = re.compile(r"[.,\u00a0\u202f ]")
 # Every digit run, glued to letters or not: what a quote gives. "ISO9001" in a quote
 # supports "ISO 9001" in the summary.
 _DIGIT_RUN = re.compile(r"\d+")
-# A date: the day, the month and the year, or None for a year it does not give.
-_Date = tuple[int, int, int | None]
+# A date: the day, the month and the year; None for a day or a year it does not give
+# ("March 2026" has no day).
+_Date = tuple[int | None, int, int | None]
 
 _ENGLISH_MONTHS = {
     name: n
     for n, names in enumerate(
         [
-            ("January", "Jan"),
-            ("February", "Feb"),
-            ("March", "Mar"),
-            ("April", "Apr"),
-            ("May",),
-            ("June", "Jun"),
-            ("July", "Jul"),
-            ("August", "Aug"),
-            ("September", "Sep", "Sept"),
-            ("October", "Oct"),
-            ("November", "Nov"),
-            ("December", "Dec"),
+            ("january", "jan"),
+            ("february", "feb"),
+            ("march", "mar"),
+            ("april", "apr"),
+            ("may",),
+            ("june", "jun"),
+            ("july", "jul"),
+            ("august", "aug"),
+            ("september", "sep", "sept"),
+            ("october", "oct"),
+            ("november", "nov"),
+            ("december", "dec"),
         ],
         start=1,
     )
     for name in names
 }
 # Also ordinary words ("may", "mar"): they count only next to a day before or a year after.
-_AMBIGUOUS_MONTHS = frozenset({"May", "Mar"})
+_AMBIGUOUS_MONTHS = frozenset({"may", "mar"})
 _FINNISH_MONTHS = ("tammi helmi maalis huhti touko kesä heinä elo syys loka marras joulu").split()
 _WORD = re.compile(r"[^\W\d_]+")
-_DAY_BEFORE = re.compile(r"(?<!\d)(\d{1,2})\.?\s+$")
+# The day before a month name: "14 March", "14th of March", "14.maaliskuuta",
+# "14. päivänä maaliskuuta".
+_DAY_BEFORE = re.compile(
+    r"(?<!\d)(\d{1,2})(?:st|nd|rd|th)?(?:\.\s*|\s+)(?:(?:of|p\u00e4iv\u00e4n\u00e4)\s+)?$",
+    re.IGNORECASE,
+)
 _DAY_AFTER = re.compile(r"\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?!\d)")
 _YEAR_AFTER = re.compile(r"\.?\s+(?:\d{1,2}(?:st|nd|rd|th)?,?\s+)?(\d{4})(?!\d)")
 # A date written with numbers: 14.3.2026, 14.3. (the closing dot tells it from 14.3, a
-# decimal) or 2026-03-14.
+# decimal), 2026-03-14, or a month and a year, 3/2026.
 _NUMERIC_DATE = re.compile(
     r"(?<![\d.])(?P<d>\d{1,2})\.(?P<m>\d{1,2})\.(?P<y>\d{4}(?!\d))?"
     r"|(?<![\d-])(?P<iy>\d{4})-(?P<im>\d{1,2})-(?P<id>\d{1,2})(?!\d)"
+    r"|(?<![\d./])(?P<mm>\d{1,2})/(?P<my>\d{4})(?!\d)"
 )
 
 
 def _month_number(word: str) -> int | None:
-    """The number of a month name: English with a capital letter, or Finnish in any
-    case or inflection ("maaliskuuta"); None for any other word."""
-    if word in _ENGLISH_MONTHS:
-        return _ENGLISH_MONTHS[word]
+    """The number of a month name, English or Finnish, in any case or inflection
+    ("March", "MARCH", "maaliskuuta", "maaliskuussa"); None for any other word."""
     lower = word.lower()
+    if lower in _ENGLISH_MONTHS:
+        return _ENGLISH_MONTHS[lower]
     for n, stem in enumerate(_FINNISH_MONTHS, start=1):
         if lower.startswith(stem + "kuu"):
             return n
@@ -218,8 +225,10 @@ def _month_number(word: str) -> int | None:
 
 
 def _word_dates(text: str) -> set[_Date]:
-    """Every date in ``text`` whose month is a word: "14 March 2026", "14. maaliskuuta",
-    "March 14, 2026", "Seen on 14 March". A month name with no day beside it gives none."""
+    """Every date in ``text`` whose month is a word: "14 March 2026", "the 14th of March",
+    "14. maaliskuuta", "March 14, 2026", and a month with a year, "maaliskuussa 2026". A
+    month name with neither a day nor a year beside it gives none; "may" and "mar" count
+    only after a day or before a year, since they are also words."""
     dates: set[_Date] = set()
     for match in _WORD.finditer(text):
         word = match.group(0)
@@ -229,10 +238,12 @@ def _word_dates(text: str) -> set[_Date]:
         before = _DAY_BEFORE.search(text, 0, match.start())
         after = _DAY_AFTER.match(text, match.end())
         year = _YEAR_AFTER.match(text, match.end())
-        if word in _AMBIGUOUS_MONTHS and not before and not year:
+        if word.lower() in _AMBIGUOUS_MONTHS and not before and not year:
             continue  # "May 2 units fail": a day after "May" alone is not a date
         day = int(before.group(1)) if before else int(after.group(1)) if after else None
-        if day is None or not 1 <= day <= 31:
+        if day is not None and not 1 <= day <= 31:
+            continue
+        if day is None and not year:
             continue
         dates.add((day, month, int(year.group(1)) if year else None))
     return dates
@@ -241,8 +252,14 @@ def _word_dates(text: str) -> set[_Date]:
 def _numeric_dates(text: str) -> list[tuple[_Date, list[tuple[int, int]], int | None]]:
     """Every date in ``text`` written with numbers, with the spans of its day and month
     and the start of its year (None without one)."""
-    found = []
+    found: list[tuple[_Date, list[tuple[int, int]], int | None]] = []
     for match in _NUMERIC_DATE.finditer(text):
+        if match.group("mm") is not None:
+            month = int(match.group("mm"))
+            if 1 <= month <= 12:
+                year = int(match.group("my"))
+                found.append(((None, month, year), [match.span("mm")], match.start("my")))
+            continue
         if match.group("d") is not None:
             d, m, y = "d", "m", "y"
         else:
@@ -263,9 +280,15 @@ def _dates(text: str) -> set[_Date]:
 
 def _same_day(date: _Date, given: set[_Date]) -> _Date | None:
     """A date of ``given`` on the same day and month as ``date``, with the same year if
-    both have one; one with the same year first."""
+    both have one; one with the same year first. A month and a year (no day) needs the
+    same month and year."""
     day, month, year = date
-    matches = [g for g in given if g[:2] == (day, month) and (year is None or g[2] in (year, None))]
+    if day is None:
+        matches = [g for g in given if g[1] == month and g[2] == year]
+    else:
+        matches = [
+            g for g in given if g[:2] == (day, month) and (year is None or g[2] in (year, None))
+        ]
     return max(matches, key=lambda g: g[2] == year, default=None)
 
 
