@@ -2,12 +2,19 @@
 
 ## Schema corrections reach the PoC through the model file
 
-The PoC's `load_schema()` reads `schemas/output_schema_model.json` and never imports
-`output_schema.py`. After editing `output_schema.py` (SKILL.md Step 4.5), run
-`python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas`: it says at
-once whether the edit can be saved. The audio and document PoCs also write the model file
-again themselves when `output_schema.py` is newer, and stop when it does not import or
-cannot be saved.
+With gaik 0.11 or later, the audio and document PoCs' `load_schema()` rebuilds the model
+from `schemas/output_schema_model.json` without importing `output_schema.py`; the PoC
+itself imports `output_schema.py` only when it is newer than the model file, to write the
+model file again, and stops when it does not import or cannot be saved. With gaik 0.10
+`load_schema()` imports `output_schema.py`, and the custom (`_generic`) and hybrid PoCs
+import it directly with every release. After editing `output_schema.py` (SKILL.md Step 4.5),
+run `python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas`: it says
+at once whether the edit can be saved. It refuses field constraints (`ge`, `max_length`
+and the like) as well as validators, methods and other options the saved format cannot
+hold. A pattern on a text field is kept only as the schema generator writes it,
+`Annotated[str, constr(pattern=r"...")]` (also inside `Optional[...]` or `list[...]`);
+`Field(pattern=...)`, a bare `constr(pattern=...)` type and `StringConstraints(pattern=...)`
+are refused.
 
 ## Schema generation constraints
 
