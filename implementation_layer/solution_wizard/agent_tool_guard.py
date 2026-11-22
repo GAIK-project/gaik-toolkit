@@ -11,8 +11,9 @@ also sees the calls the CLI would approve by itself (``ls``, reading a file):
 * ``.env`` files are not read or written, wherever they are: they hold keys
   (``.env.example`` is a template and may be);
 * Bash runs only the wizard's scripts, one plain command at a time, with the
-  options ``scripts/agent_scripts.json`` lists: no shell operators,
-  redirection or variables, so nothing else can be chained on;
+  options ``scripts/agent_scripts.json`` lists (or ``--help`` alone): no shell
+  operators, redirection or variables, so nothing else can be chained on; a
+  script does not run while a folder it writes into holds a link it would follow;
 * every other tool (web fetch and search, subagents, notebooks, MCP tools) is
   refused.
 
@@ -33,7 +34,7 @@ import shlex
 import site
 import sys
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -88,6 +89,11 @@ def load_left_out(table: Path = SCRIPTS_TABLE) -> dict[str, str]:
     """Scripts the agent may not run at all, with the reason the refusal gives."""
     left_out = json.loads(table.read_text(encoding="utf-8"))["left_out"]
     return {name: reason for name, reason in left_out.items() if " " not in name}
+
+
+def load_writes(table: Path = SCRIPTS_TABLE) -> dict[str, list[str]]:
+    """The folders each script writes into, relative to the folder it writes in."""
+    return json.loads(table.read_text(encoding="utf-8")).get("writes", {})
 
 
 def endpoint_ok(value: str) -> bool:
@@ -180,16 +186,30 @@ def _real(path: str, cwd: Path) -> Path:
     return Path(os.path.realpath(target))
 
 
-def _inside(path: str, roots: list[Path], cwd: Path) -> bool:
-    """Whether ``path`` opens inside one of ``roots``, compared as written.
+def _folded_under(path: PurePath, root: PurePath, fold: Callable[[str], str]) -> bool:
+    """Whether ``path`` is ``root`` or inside it, each name folded with ``fold``."""
+    parts, root_parts = path.parts, root.parts
+    return len(parts) >= len(root_parts) and all(
+        fold(part) == fold(root_part) for part, root_part in zip(parts, root_parts)
+    )
 
-    An allow check: a path written in another case is judged outside, so on a
-    case-sensitive filesystem it cannot reach a folder next to the root.
+
+def _inside(path: str, roots: list[Path], cwd: Path) -> bool:
+    """Whether ``path`` opens inside one of ``roots``.
+
+    An allow check. Names are compared as written, except under a root whose
+    filesystem opens a name in either case (macOS and Windows by default): there
+    ``realpath`` keeps the case a path was typed in, so the output folder typed in
+    one case and a path Glob returns in the disk's case name the same folder, and
+    they are compared in lower case. On a case-sensitive filesystem a path written
+    in another case is judged outside, so it cannot reach a folder next to the root.
     """
     if _expands(path):
         return False
     real = _real(path, cwd)
-    return any(real == root or root in real.parents for root in roots)
+    if any(real == root or root in real.parents for root in roots):
+        return True
+    return any(_ignores_case(root) and _folded_under(real, root, str.lower) for root in roots)
 
 
 def _ignores_case(folder: Path) -> bool:
@@ -218,11 +238,8 @@ def under_any(path: Path, roots: list[Path]) -> bool:
     for root in roots:
         if path == root or root in path.parents:
             return True
-        if _ignores_case(root):
-            key, root_key = str(path).casefold(), str(root).casefold()
-            sep = os.sep.casefold()
-            if key == root_key or key.startswith(root_key.rstrip(sep) + sep):
-                return True
+        if _ignores_case(root) and _folded_under(path, root, str.casefold):
+            return True
     return False
 
 
@@ -270,17 +287,25 @@ def _is_link(path: str) -> bool:
     return os.path.islink(path) or bool(isjunction and isjunction(path))
 
 
-def has_link(folder: Path) -> bool:
-    """Whether ``folder`` holds a link or a junction (True when it is too large
-    to tell). A script that writes into the folder would follow it elsewhere."""
-    seen = 0
-    for root, dirs, files in os.walk(folder):
-        seen += len(dirs) + len(files)
-        if seen > _MAX_SEARCHED_ENTRIES:
-            return True
-        if any(_is_link(os.path.join(root, name)) for name in [*dirs, *files]):
-            return True
-    return False
+def find_link(folders: list[Path]) -> Path | None:
+    """The first link or junction a script writing in ``folders`` would follow.
+
+    That is one of the folders, or an entry directly in one: a file the script
+    writes, or a folder it writes under (which is then in ``folders`` itself).
+    Nothing else is looked at, so a virtual environment the user made in the
+    output folder (its ``bin/python`` is a link) does not stop the scripts.
+    """
+    for folder in folders:
+        if _is_link(str(folder)):
+            return folder
+        try:
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    if _is_link(entry.path):
+                        return Path(entry.path)
+        except (FileNotFoundError, NotADirectoryError):
+            continue  # not made yet, or a file the script will refuse
+    return None
 
 
 class ToolGuard:
@@ -296,6 +321,7 @@ class ToolGuard:
         left_out: dict[str, str] | None = None,
         extra_tools: frozenset[str] = frozenset(),
         protected: list[Path] | None = None,
+        writes: dict[str, list[str]] | None = None,
     ) -> None:
         self.cwd = Path(os.path.realpath(wizard_dir))
         self.output = Path(os.path.realpath(output_dir))
@@ -310,6 +336,8 @@ class ToolGuard:
         self.blueprint_check = blueprint_check
         self.scripts = scripts if scripts is not None else load_scripts()
         self.left_out = left_out if left_out is not None else load_left_out()
+        #: The folders each script writes into, checked for links before it runs.
+        self.writes = writes if writes is not None else load_writes()
         #: The caller's own tools (v2's in-process gate tools), which check
         #: their own input.
         self.extra_tools = extra_tools
@@ -409,6 +437,8 @@ class ToolGuard:
         options = self.scripts.get(Path(script).name)
         if options is None or not _inside(script, [self.cwd / "scripts"], self.cwd):
             return allowed
+        if argv[2:] == ["--help"]:
+            return None  # argparse lists the options and exits before the script runs
         given = self._options(argv[2:], options)
         if isinstance(given, str):
             return f"{given} {Path(script).name} takes {', '.join(options)}. " + allowed
@@ -421,14 +451,45 @@ class ToolGuard:
                     f"{option} must be a provider's own https endpoint; leave it out to use "
                     "the endpoint configured in the environment. " + allowed
                 )
-        if any(options[o] == _PATH for o in given) and has_link(self.output):
+        link = find_link(self._written_folders(name, given))
+        if link is not None:
             return (
-                "The output folder holds a link or junction, and a script writing there "
-                "would follow it. Remove the link first. " + allowed
+                f"{link.as_posix()} is a link or junction where {name} writes, and the "
+                "script would follow it. Remove that link first. " + allowed
             )
-        if Path(script).name in _SCAFFOLDING_SCRIPTS:
+        if name in _SCAFFOLDING_SCRIPTS:
             return self._check_blueprint(given)
         return None
+
+    def _written_folders(self, script: str, given: dict[str, str]) -> list[Path]:
+        """The folders ``script`` writes into with these options (``writes`` in
+        agent_scripts.json): under its --output-dir, or without one where it
+        writes instead, the --blueprint's folder or, for the scaffolder, the
+        blueprint's package.output_dir."""
+        subfolders = self.writes.get(script) or []
+        if "--output-dir" in given:
+            base = _real(given["--output-dir"], self.cwd)
+        elif "--blueprint" in given:
+            base = _real(given["--blueprint"], self.cwd).parent
+            if script in _SCAFFOLDING_SCRIPTS:
+                package = (self._read_blueprint(given["--blueprint"]) or {}).get("package")
+                output_dir = package.get("output_dir") if isinstance(package, dict) else None
+                # One outside the output folder is refused by _check_blueprint.
+                if isinstance(output_dir, str) and output_dir and self._writable(output_dir):
+                    base = _real(output_dir, self.cwd)
+        else:
+            return []  # the script stops without them
+        return [base if sub == "." else base / sub for sub in subfolders]
+
+    def _read_blueprint(self, path: str) -> dict[str, Any] | None:
+        """The blueprint at ``path`` as JSON, or None when it cannot be read."""
+        path = _native(path)
+        target = Path(path) if os.path.isabs(path) else self.cwd / path
+        try:
+            blueprint = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        return blueprint if isinstance(blueprint, dict) else None
 
     @staticmethod
     def _options(args: list[str], options: dict[str, str]) -> dict[str, str] | str:
@@ -474,14 +535,9 @@ class ToolGuard:
         path = given.get("--blueprint")
         if path is None:
             return None  # the script refuses to run without one
-        path = _native(path)
-        target = Path(path) if os.path.isabs(path) else self.cwd / path
-        try:
-            blueprint = json.loads(target.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        blueprint = self._read_blueprint(path)
+        if blueprint is None:
             return None  # the script reports an unreadable blueprint itself
-        if not isinstance(blueprint, dict):
-            return None
         if "--output-dir" not in given:
             # Without --output-dir the scaffolder writes where the blueprint says.
             package = blueprint.get("package")
