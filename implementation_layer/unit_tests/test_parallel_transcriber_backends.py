@@ -398,8 +398,10 @@ def test_cancelling_stops_the_queued_chunks(tmp_path):
     files, metadata = _chunks(tmp_path, 4)
     cancel = SimpleCancellation()
     client = _FakeAudioClient([])
+    sent: list[str] = []
 
     def first_then_cancel(**kwargs):
+        sent.append(Path(kwargs["file"].name).name)
         cancel.cancel()
         return "1\n00:00:00,000 --> 00:00:01,000\nx\n"
 
@@ -408,6 +410,9 @@ def test_cancelling_stops_the_queued_chunks(tmp_path):
 
     with pytest.raises(TranscriptionCancelled):
         transcriber._transcribe_chunks_whisper(files, metadata, 1, cancel.check, None)
+
+    # The chunk that was running when the run was cancelled is the only one sent.
+    assert sent == ["rec_chunk_01.mp3"]
 
 
 # -- a file that is not media (#227) -----------------------------------------------
