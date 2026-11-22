@@ -269,13 +269,15 @@ def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
 def _csv_delimiter(text: str) -> str:
     """The delimiter that splits the CSV's rows into the same number of fields, at least two.
 
-    A delimiter counts only when the header (the first non-empty row) has the most common
-    field count and at least ``_CSV_CONSISTENT_ROWS`` of the rows have it too, so a
-    one-column file whose cells hold an odd ``;`` stays one column. Delimiters are then
-    compared by how many rows have that count, then by the count. A tie goes to tab,
-    then ``;``, ``|`` and ``,``: a semicolon CSV, which Excel writes in a locale with a
-    decimal comma, often has commas in its cells, while a comma CSV seldom has
-    semicolons. ``,`` when no delimiter counts.
+    The header is the first non-empty row that the delimiter splits; rows above it with
+    one field, such as an unpadded title ("Sales report"), are skipped. A delimiter
+    counts only when the header has the most common field count of the rows from it on,
+    and at least ``_CSV_CONSISTENT_ROWS`` of those rows have it. After skipped rows, two
+    data rows must agree with the header, so a one-column file whose cells hold an odd
+    ``;`` stays one column. Delimiters are then compared by how many rows have that
+    count, then by the count. A tie goes to tab, then ``;``, ``|`` and ``,``: a
+    semicolon CSV, which Excel writes in a locale with a decimal comma, often has commas
+    in its cells, while a comma CSV seldom has semicolons. ``,`` when no delimiter counts.
     """
     sample = text[:_CSV_SAMPLE_CHARS]
     best, best_score = ",", None
@@ -284,11 +286,13 @@ def _csv_delimiter(text: str) -> str:
         if len(sample) < len(text) and rows:
             rows.pop()  # The sample may end inside this row.
         counts = [len(row) for row in rows if any(cell.strip() for cell in row)]
-        if not counts:
+        header = next((n for n, count in enumerate(counts) if count >= 2), None)
+        if header is None or (header and len(counts) - header < 3):
             continue
+        counts = counts[header:]
         fields = Counter(counts).most_common(1)[0][0]
         consistency = counts.count(fields) / len(counts)
-        if fields < 2 or counts[0] != fields or consistency < _CSV_CONSISTENT_ROWS:
+        if counts[0] != fields or consistency < _CSV_CONSISTENT_ROWS:
             continue
         score = (consistency, fields, -preference)
         if best_score is None or score > best_score:

@@ -71,7 +71,8 @@ single table with no sheet heading.
   stored results (one written by a library such as openpyxl and never opened in Excel)
   raises `ValueError`; open and save it in Excel or LibreOffice first.
 - A CSV's delimiter (`,`, `;`, tab or `|`) is read from its rows: the one that splits the
-  header and at least 80% of the rows into the same number of fields. So a CSV that Excel saves
+  header (the first row it splits; an unpadded title row above it is skipped) and at
+  least 80% of the rows into the same number of fields. So a CSV that Excel saves
   in a locale with a decimal comma (`Tuote;Määrä;Hinta` / `Maito;2;1,49`) keeps its
   columns and its decimal commas. Its text is read as UTF-8, as UTF-16 with a byte order
   mark, or else as Windows-1252 (cp1252), the "ANSI" code page of a plain Excel CSV on
