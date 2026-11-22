@@ -212,7 +212,10 @@ def test_an_attachment_is_not_used_while_the_scanner_is_down(api, monkeypatch) -
 def test_too_long_a_message_and_too_many_files_are_refused(api) -> None:
     sid = _start(api, ALICE)
     long_text = {"text": "x" * (route.MAX_MESSAGE_CHARS + 1)}
-    many = {"text": "hi", "files": [_file(f"n{i}.txt", b"a") for i in range(6)]}
+    many = {
+        "text": "hi",
+        "files": [_file(f"n{i}.txt", b"a") for i in range(route.MAX_ATTACHMENTS + 1)],
+    }
 
     assert api.post(f"/wizard/message/{sid}", json=long_text, headers=ALICE).status_code == 422
     assert api.post(f"/wizard/message/{sid}", json=many, headers=ALICE).status_code == 422
