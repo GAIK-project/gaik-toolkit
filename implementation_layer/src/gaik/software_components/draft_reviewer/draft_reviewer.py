@@ -100,24 +100,31 @@ def _closeness(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+_DELETION_CLOSENESS = 0.8
+"""How alike a retried deletion's search must be to the failed one's to stand for it."""
+
+
 def _answer_score(edit: Edit, earlier: Edit) -> float | None:
     """How well a retry edit stands for an earlier failed edit, or None when it does not.
 
-    Used only for a retry answer without the ``answers`` field. It does when it gives
-    the same reason, or makes the same correction: a replacement whose text contains the
-    earlier replacement or is contained in it, or a deletion of text like the text the
-    earlier deletion meant to delete. Closer search texts score higher, so each earlier
-    edit is paired with the retry edit nearest to it.
+    Used only for a retry answer in which no edit names a failed edit by its id. It does
+    when it makes the same correction: a replacement whose text contains the earlier
+    replacement or is contained in it, or, for a deletion, a deletion of nearly the same
+    text (search texts at least 80% alike). A shared reason alone is not enough, since a
+    generic one ("Not in the reference.") fits unrelated deletions; it only ranks a pair
+    higher. Closer search texts score higher, so each earlier edit is paired with the
+    retry edit nearest to it.
     """
     closeness = _closeness(edit.search, earlier.search)
-    if edit.reason.strip() and edit.reason.strip() == earlier.reason.strip():
-        return 2.0 + closeness
     old, new = earlier.replace.strip(), edit.replace.strip()
     if not old:
-        return 1.0 + closeness if not new and closeness >= 0.5 else None
-    if new and (old in new or new in old):
-        return 1.0 + closeness
-    return None
+        matched = not new and closeness >= _DELETION_CLOSENESS
+    else:
+        matched = bool(new) and (old in new or new in old)
+    if not matched:
+        return None
+    same_reason = bool(edit.reason.strip()) and edit.reason.strip() == earlier.reason.strip()
+    return 1.0 + closeness + (1.0 if same_reason else 0.0)
 
 
 def _match_by_text(previous: dict[str, Edit], edits: list[Edit]) -> dict[int, str]:
@@ -142,40 +149,24 @@ def _match_by_text(previous: dict[str, Edit], edits: list[Edit]) -> dict[int, st
     return owner
 
 
-def _named(edit: Edit) -> list[str] | None:
-    """The failed-edit ids a retry edit names, or None when it has no ``answers`` field.
-
-    An edit without the field, a plain :class:`Edit` or one whose model left the field
-    out, names nothing either way; an empty list is an explicit "none of them".
-    """
-    if "answers" not in getattr(edit, "model_fields_set", ()):
-        return None
-    return _split_ids(edit.answers)
-
-
 def _owners(previous: dict[str, Edit], edits: list[Edit]) -> dict[int, list[str]]:
     """Which earlier failed edits each retry edit makes, as {retry index: failed ids}.
 
-    A retry edit names the failed edits it makes by id, one or several. Each id is taken
-    by the first edit that names it; an edit that names no known id is a new edit. Only
-    when no edit of the answer has the ``answers`` field at all (a model that ignores
-    it) are the edits paired with the failed ones by their text instead: an empty
-    ``answers`` says the edit makes none of them, so an unrelated edit with the same
-    generic reason cannot stand for a failed one.
+    A retry edit names the failed edits it makes by id, one or several, in ``answers``.
+    Each id is taken by the first edit that names it. When some edit of the answer names
+    a known id, an edit that names none is a new edit. When no edit names a known id (a
+    model that leaves ``answers`` empty or out, or writes ids that do not exist), the
+    edits are paired with the failed ones by their text instead (:func:`_answer_score`).
     """
     owner: dict[int, list[str]] = {}
     taken: set[str] = set()
-    explicit = False
     for j, edit in enumerate(edits):
-        named = _named(edit)
-        if named is None:
-            continue
-        explicit = True
+        named = _split_ids(getattr(edit, "answers", None) or [])
         mine = [fid for fid in named if fid in previous and fid not in taken]
         if mine:
             owner[j] = mine
             taken.update(mine)
-    if explicit:
+    if owner:
         return owner
     return {j: [fid] for j, fid in _match_by_text(previous, edits).items()}
 

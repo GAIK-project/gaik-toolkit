@@ -766,3 +766,14 @@ def test_strip_title_heading_takes_only_the_section_title():
         _strip_title_heading("Body.\n## Key Findings", "Key Findings") == "Body.\n## Key Findings"
     )
     assert _strip_title_heading("", "Key Findings") == ""
+
+
+def test_diff_editor_a_correct_retry_with_empty_answers_resolves_the_failed_edit():
+    fixed = Correction(search="opened in 1999", replace="opened in 1998", reason="r", answers=[])
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR]), CorrectionList(corrections=[fixed])
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace("1999", "1998")
+    assert warnings == []
+    assert len(editor.prompts) == 2

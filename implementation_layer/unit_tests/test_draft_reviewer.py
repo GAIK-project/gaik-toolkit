@@ -345,3 +345,28 @@ def test_client_exception_propagates(make):
     reviewer, _ = make(RuntimeError("provider down"))
     with pytest.raises(RuntimeError, match="provider down"):
         reviewer.review(DRAFT, reference=REFERENCE)
+
+
+@pytest.mark.parametrize("answers", [[], "", ["F7"]], ids=["empty-list", "empty", "unknown-id"])
+def test_a_correct_retry_that_names_no_known_id_is_matched_by_its_text(make, answers):
+    # A model may return [] for the field under structured output: the corrected edit
+    # still stands for the failed one, so no extra call is made and nothing is left.
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    fixed = Edit(search="opened in 1999", replace="opened in 1998", reason="Wrong year.")
+    reviewer, client = make(_edits(typo), dr.RetryEditList(edits=[_retry(fixed, answers)]))
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.text == DRAFT.replace("1999", "1998")
+    assert result.unresolved == []
+    assert len(client.calls) == 2
+
+
+@pytest.mark.parametrize("as_retry_edit", [True, False], ids=["answers-empty", "no-field"])
+def test_a_shared_generic_reason_alone_does_not_pair_two_deletions(make, as_retry_edit):
+    draft = DRAFT + " It has a toll booth."
+    paint = Edit(search=" It was painted bleu.", replace="", reason="Not in the reference.")
+    toll = Edit(search=" It has a toll booth.", replace="", reason="Not in the reference.")
+    answer = dr.RetryEditList(edits=[_retry(toll, [])]) if as_retry_edit else _edits(toll)
+    reviewer, _ = make(_edits(paint), answer, _edits())
+    result = reviewer.review(draft, reference=REFERENCE)
+    assert result.applied == [toll]
+    assert result.unresolved == [paint]
