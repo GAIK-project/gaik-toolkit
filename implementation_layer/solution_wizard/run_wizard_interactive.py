@@ -88,7 +88,8 @@ Run the preflight check to verify credentials before a full session:
     python run_wizard_interactive.py --model claude-sonnet-5-5
 
     # Stop once the session's estimated model cost reaches $5 (default: no limit;
-    # the CLI counts the whole session, across your messages):
+    # the CLI counts the whole session, across your messages, and checks it
+    # between turns, so a session can end a little over):
     python run_wizard_interactive.py --max-budget-usd 5
 
 See also: run_wizard_sdk.py for a headless smoke-test (no user interaction).
@@ -399,7 +400,8 @@ def build_session_options(
 
     ``max_budget_usd`` ends the session once its estimated model cost reaches it.
     With one streaming client the CLI counts the whole session, across messages,
-    not each message (the SDK's docs say "for the query").
+    not each message (the SDK's docs say "for the query"). It checks the total
+    between turns, so the session can end a little over the limit.
     """
     # The repository is never written either: with an editable install the
     # scripts import gaik from it.
@@ -511,7 +513,10 @@ async def run_interactive(
     print(f"{DIM}Model: {model}  |  Wizard dir: {WIZARD_DIR}")
     print(f"Output dir: {output_dir}")
     if max_budget_usd is not None:
-        print(f"Budget: ${max_budget_usd:g} for the whole session")
+        print(
+            f"Budget: {_money(max_budget_usd)} for the whole session (checked between "
+            "turns, so it can end a little over)"
+        )
     print(f"Ctrl+C or Ctrl+D to exit{RESET}\n")
 
     async with ClaudeSDKClient(options=options) as client:
@@ -543,6 +548,12 @@ async def run_interactive(
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
+
+
+def _money(amount: float) -> str:
+    """US dollars as a price is written: $1,000,000.00, $2.50, or $0.125 for a fraction."""
+    whole, _, fraction = f"{amount:,.4f}".rstrip("0").partition(".")
+    return f"${whole}.{fraction.ljust(2, '0')}"
 
 
 def _dollars(value: str) -> float:
@@ -611,7 +622,8 @@ def parse_args() -> argparse.Namespace:
         default=None,
         metavar="USD",
         help="Stop the session once its estimated model cost reaches this many US dollars, "
-        "counted over the whole session, across your messages (default: no limit).",
+        "counted over the whole session, across your messages. The CLI checks the cost "
+        "between turns, so a session can end a little over it (default: no limit).",
     )
     p.add_argument(
         "--preflight",

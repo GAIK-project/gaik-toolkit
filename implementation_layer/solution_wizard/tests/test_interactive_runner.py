@@ -160,11 +160,91 @@ def test_the_budget_must_be_a_positive_amount(monkeypatch, value) -> None:
         runner.parse_args()
 
 
-def test_the_budget_option_reaches_the_session(monkeypatch) -> None:
-    monkeypatch.setattr(sys, "argv", ["run_wizard_interactive.py", "--max-budget-usd", "2.5"])
-    assert runner.parse_args().max_budget_usd == 2.5
-    monkeypatch.setattr(sys, "argv", ["run_wizard_interactive.py"])
-    assert runner.parse_args().max_budget_usd is None
+@pytest.mark.parametrize(
+    ("given", "on_the_command_line", "shown"),
+    [("2.5", "2.5", "$2.50"), ("1000000", "1000000.0", "$1,000,000.00"), (None, None, None)],
+)
+def test_the_budget_option_reaches_the_cli_through_main(
+    tmp_path, monkeypatch, capsys, shell_env, given, on_the_command_line, shown
+) -> None:
+    """main -> run_interactive -> build_session_options -> the CLI's --max-budget-usd."""
+    _temp_is_an_ordinary_folder(monkeypatch, tmp_path)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "CLAUDE_CODE_USE_FOUNDRY=1\nANTHROPIC_FOUNDRY_API_KEY=k\nANTHROPIC_FOUNDRY_RESOURCE=r\n"
+    )
+    for name in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"):
+        os.environ.pop(name, None)
+    cli = tmp_path / "claude"
+    cli.write_text("")
+    build = runner.build_session_options
+    monkeypatch.setattr(
+        runner, "build_session_options", lambda *a, **k: build(*a, cli_path=str(cli), **k)
+    )
+    command: list[str] = []
+
+    async def open_process(cmd, *_args, **_kwargs):
+        command.extend(cmd)
+        raise _CLIStartError
+
+    monkeypatch.setattr(anyio, "open_process", open_process)
+    argv = ["run_wizard_interactive.py", "--output-dir", str(tmp_path / "out")]
+    argv += ["--env-file", str(env_file)]
+    if given is not None:
+        argv += ["--max-budget-usd", given]
+    monkeypatch.setattr(sys, "argv", argv)
+
+    with pytest.raises(SystemExit):
+        runner.main()
+
+    assert command, "main did not reach the point where the SDK starts the CLI"
+    printed = capsys.readouterr().out
+    if given is None:
+        assert "--max-budget-usd" not in command
+        assert "Budget:" not in printed
+    else:
+        assert command[command.index("--max-budget-usd") + 1] == on_the_command_line
+        assert f"Budget: {shown} for the whole session" in printed
+        assert "a little over" in printed
+        assert "e+" not in printed
+
+
+@pytest.mark.parametrize(
+    ("amount", "shown"),
+    [(2.5, "$2.50"), (5, "$5.00"), (1e6, "$1,000,000.00"), (0.125, "$0.125"), (0.5, "$0.50")],
+)
+def test_a_budget_is_shown_as_money(amount, shown) -> None:
+    assert runner._money(amount) == shown
+
+
+class _OneResult:
+    """A client whose turn ends with one result message."""
+
+    def __init__(self, message) -> None:
+        self.message = message
+
+    async def receive_response(self):
+        yield self.message
+
+
+def test_a_session_stopped_by_its_budget_says_so(capsys) -> None:
+    from claude_agent_sdk import ResultMessage
+
+    stopped = ResultMessage(
+        subtype="error_max_budget_usd",
+        duration_ms=1,
+        duration_api_ms=1,
+        is_error=True,
+        num_turns=7,
+        session_id="s",
+        total_cost_usd=2.5123,
+    )
+
+    assert asyncio.run(runner._drain_response(_OneResult(stopped))) is stopped
+
+    printed = capsys.readouterr().out
+    assert "Session stopped: the --max-budget-usd limit was reached ($2.5123)" in printed
+    assert "Session ended with error" not in printed
 
 
 def test_output_to_a_file_or_a_pipe_takes_any_character(tmp_path, monkeypatch, shell_env):
