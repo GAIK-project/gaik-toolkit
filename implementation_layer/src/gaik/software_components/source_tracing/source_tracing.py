@@ -23,6 +23,7 @@ from .matching import (
     _locate_in_words,
     _word_spans,
     find_all,
+    quote_needles,
     tokens,
     value_around_quote,
     value_at,
@@ -102,17 +103,21 @@ class SourceTracing:
         def check(
             index: int, paired: bool, field: str, quote: str, document: int, page: int, value: Any
         ) -> _Found:
-            needle = tokens(quote)
+            needles = quote_needles(quote)
+            needle = needles[0]
             preferred = (
                 index if paired else (document - 1 if 1 <= document <= len(documents) else 0)
             )
             order = [preferred, *(i for i in range(len(documents)) if i != preferred)]
             found_in = None
             span = None
-            for number in order:
-                span = _locate_in_words(spans[number], span_words[number], needle)
-                if span is not None:
-                    found_in = number
+            for candidate in needles:
+                for number in order:
+                    span = _locate_in_words(spans[number], span_words[number], candidate)
+                    if span is not None:
+                        found_in, needle = number, candidate
+                        break
+                if found_in is not None:
                     break
             state = value_status(value, quote, self.policy)
             if (
@@ -185,7 +190,7 @@ class SourceTracing:
                 # A document number beyond the files: some models count pages, or invent a
                 # number. The quote is looked for in the PDFs, starting with the first.
                 document = min(pages)
-            needle = tokens(quote)
+            needles = quote_needles(quote)
             # The named page first, then the rest of that file, then the other files.
             order = [(document, page)]
             order += [(document, p) for p in range(1, len(pages[document]) + 1) if p != page]
@@ -198,7 +203,9 @@ class SourceTracing:
                 readings = pages.get(doc_number, [])
                 if not 1 <= page_number <= len(readings):
                     continue
-                for reading in readings[page_number - 1]:
+                for reading, needle in (
+                    (reading, needle) for needle in needles for reading in readings[page_number - 1]
+                ):
                     starts = find_all(reading.tokens, needle)
                     if not starts:
                         continue
