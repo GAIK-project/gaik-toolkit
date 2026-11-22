@@ -443,3 +443,14 @@ def test_a_failed_agentic_rerun_keeps_the_earlier_report_and_removes_nothing(tmp
 
     assert sorted(_files(out)) == names
     assert (out / "report.md").read_bytes() == report
+
+
+def test_a_section_folder_in_another_case_is_still_cleaned_up(tmp_path, client):
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    (out / "Sections").mkdir(parents=True)
+    _run(tmp_path, ["Roof", "Walls"])
+    record = json.loads((out / msrg.OUTPUT_RECORD).read_text(encoding="utf-8"))
+    assert "sections/02_walls.md" in record["files"]
+    _run(tmp_path, ["Roof"])
+    assert not (out / "sections" / "02_walls.md").exists()

@@ -1035,8 +1035,13 @@ class MultiSourceReportGenerator:
         from gaik.software_components.file_type import IMAGE_TYPES, check_file_type
 
         # The content decides, as in VisionParser: a PNG named .bmp is sent as it is,
-        # a TIFF named .png is converted. A file that is no image raises here.
-        if check_file_type(path, IMAGE_TYPES) in _CONVERTED_IMAGE_TYPES:
+        # a TIFF named .png is converted. A file that cannot be read or is no image
+        # goes on as it is, for the parser to report as before.
+        try:
+            detected = check_file_type(path, IMAGE_TYPES)
+        except (OSError, ValueError):
+            detected = None
+        if detected in _CONVERTED_IMAGE_TYPES:
             # TIFF and BMP go to the model as PNG, one per page of a multi-page TIFF.
             limits = self._limited(image_options.get("ctor", {})).get("limits")
             with tempfile.TemporaryDirectory(prefix="gaik-image-") as folder:
@@ -1403,11 +1408,15 @@ def _replace_earlier_outputs(out: Path, written: list[Path]) -> None:
     written_keys = {key for p in written if (key := _same_file_key(Path(p))) is not None}
     now: dict[str, str] = {}
     for path in written:
+        path = Path(path)
         try:
-            rel = Path(path).resolve().relative_to(base).as_posix()
-            now[rel] = _digest(Path(path))
+            if not path.resolve().is_relative_to(base):
+                continue  # a written file that is not inside the folder is not recorded
+            # The name as written (sections/01_x.md), not as the drive spells its
+            # folders, so the allowlist recognises it in the next run.
+            now[path.relative_to(out).as_posix()] = _digest(path)
         except (OSError, ValueError):
-            continue  # a written file that is not inside the folder is not recorded
+            continue
 
     record = out / OUTPUT_RECORD
     earlier: dict = {}
