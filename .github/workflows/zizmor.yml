@@ -8,12 +8,16 @@ on:
   push:
     branches:
       - main
+      - develop
+      - release/wizard-v2
     paths:
       - '.github/workflows/**'
       - '.github/dependabot.yml'
   pull_request:
     branches:
       - main
+      - develop
+      - release/wizard-v2
     paths:
       - '.github/workflows/**'
       - '.github/dependabot.yml'
