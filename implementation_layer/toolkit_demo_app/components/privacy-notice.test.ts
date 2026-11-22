@@ -8,17 +8,34 @@ import { UPLOAD_REMINDER_TEXT, UploadReminder } from "./upload-reminder";
 
 const notice = renderToStaticMarkup(createElement(PrivacyContent));
 
-test("the notice covers sign-up details, uploads, services, logs and analytics", () => {
+test("the notice covers the account, uploads, services, logs, analytics and the browser", () => {
   for (const heading of [
     "Controller and legal basis",
-    "Sign-up details",
+    "Account details and feedback",
     "Uploads and demo inputs",
     "AI model and processing services",
     "Logs and usage limits",
     "Analytics",
+    "In your browser",
   ])
     expect(notice).toContain(heading);
   expect(notice).toContain('id="uploads"');
+});
+
+// Facts of the code: each one is said, with how long it is kept where the code sets it.
+test("the notice names the services and stores the code uses", () => {
+  for (const fact of [
+    "Aitta", // a server-offered model, transcription and embedding provider
+    "Demo feedback", // rated in Supabase with the account
+    "These counts do not expire", // the first wizard's use, in Upstash
+    "until the server restarts", // extraction prompts and schemas
+    "until the next order is processed", // Luvata order drafts
+    "Helpdesk Chatbot and EU AI Act Screening", // no audit line
+  ])
+    expect(notice).toContain(fact);
+  expect(notice).not.toContain(
+    "the longest time the server keeps uploads and results",
+  );
 });
 
 // The owner replaces them with the facts; until then each one says it is open.
