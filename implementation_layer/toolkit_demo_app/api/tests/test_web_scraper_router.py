@@ -158,10 +158,9 @@ def test_page_of_reads_a_document_without_blocks_by_its_source_lines():
     assert route._page_of(document, pages, 0) is None
 
 
-def test_the_extractor_reads_the_pages_as_marked_data_and_each_quote_names_its_page(
-    client, monkeypatch
-):
-    pages = [_page(*page) for page in PAGES]
+def _run(client, monkeypatch, pages: list, quote: str) -> tuple[str, dict]:
+    """A run on a fake crawl of ``pages`` whose extractor gives the title ``quote`` and
+    cites it: the text the extractor read and the checked citation."""
 
     class FakeScraper:
         def __init__(self, allowed_domains, **kwargs):
@@ -187,8 +186,8 @@ def test_the_extractor_reads_the_pages_as_marked_data_and_each_quote_names_its_p
 
         def extract(self, *, documents, **kwargs):
             read.extend(documents)
-            quote = {"field": "title", "document": 1, "page": 1, "quote": "Text of page b."}
-            return [{"title": "Text of page b.", "field_sources": {"items": [quote]}}]
+            cited = {"field": "title", "document": 1, "page": 1, "quote": quote}
+            return [{"title": quote, "field_sources": {"items": [cited]}}]
 
     monkeypatch.setattr("gaik.software_components.web_scraper.WebScraper", FakeScraper)
     monkeypatch.setattr("gaik.software_components.extractor.DataExtractor", FakeExtractor)
@@ -200,9 +199,65 @@ def test_the_extractor_reads_the_pages_as_marked_data_and_each_quote_names_its_p
         found = events(response)
 
     (document,) = read
-    assert document.startswith("The <web_page> blocks below hold web pages")
-    assert document.count('<web_page id="') == 2
     result = next(data for kind, data in found if kind == "result")
     (source,) = result["sources"]
+    return document, source
+
+
+def test_the_extractor_reads_the_pages_as_marked_data_and_each_quote_names_its_page(
+    client, monkeypatch
+):
+    document, source = _run(
+        client, monkeypatch, [_page(*page) for page in PAGES], "Text of page b."
+    )
+
+    assert document.startswith("The <web_page> blocks below hold web pages")
+    assert document.count('<web_page id="') == 2
     assert source["verdict"] == "verified"
     assert source["page_url"] == "https://gaik.ai/b"
+
+
+def test_a_quote_whose_words_the_notice_also_has_names_its_page(client, monkeypatch):
+    """The notice before the blocks says "GAIK" and "data" too: the quote is the page's."""
+    pages = [
+        _page("https://gaik.ai/", "Start", "Welcome."),
+        _page("https://gaik.ai/b", "Open data", "We publish data."),
+    ]
+    document, source = _run(client, monkeypatch, pages, "data")
+
+    assert document.index("data") < document.index("<web_page ")  # in the notice too
+    assert source["status"] == "found"
+    assert source["verdict"] == "verified"
+    assert source["page_url"] == "https://gaik.ai/b"
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "GAIK web scraper",  # only in the notice before the blocks
+        "web page id",  # only in the blocks' tags
+    ],
+)
+def test_a_quote_of_the_scrapers_own_words_is_not_verified(client, monkeypatch, quote):
+    pages = [_page(*page) for page in PAGES]
+    document, source = _run(client, monkeypatch, pages, quote)
+
+    assert route._pages_only(document) != document
+    assert source["status"] == "not_found"
+    assert source["verdict"] == "check"
+    assert source["page_url"] is None
+
+
+def test_pages_only_keeps_every_offset_and_a_document_without_blocks():
+    from gaik.software_components.web_scraper import CrawlResult
+
+    pages = [_page(*page) for page in PAGES]
+    document = CrawlResult(start_url=PAGES[0][0], pages=pages).to_model_text()
+    text = route._pages_only(document)
+
+    assert len(text) == len(document)
+    assert "GAIK web scraper" not in text and "<web_page" not in text
+    for kept in ("# GAIK project", "Source: https://gaik.ai/b\n", "Text of page b."):
+        assert text.index(kept) == document.index(kept)
+    markdown = "# A\n\nSource: https://gaik.ai/\n\ntext a\n"
+    assert route._pages_only(markdown) == markdown

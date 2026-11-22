@@ -172,6 +172,28 @@ def _page_of(document: str, pages: list, position: int) -> str | None:
     return owner
 
 
+#: A block's opening or closing tag in ``to_model_text()``. The scraper escapes a
+#: ``<web_page`` or ``</web_page`` written in a page, and the tag's attributes escape
+#: ``>``, so this matches the blocks' own tags only.
+_BLOCK_TAG = re.compile(r"</?web_page\b[^>]*>")
+
+
+def _pages_only(document: str) -> str:
+    """``document`` with only the pages' text left, to look a quote up in.
+
+    The notice before the first ``<web_page>`` block and the blocks' tags are the
+    scraper's words, not a page's: a quote found only there is no page's, and a page's
+    quote whose words the notice also has ("GAIK", "data") must be found in its page.
+    They are blanked out with spaces, so every offset is the one in ``document`` that
+    ``_page_of`` reads. A document without blocks (``to_markdown()``) is all pages.
+    """
+    first = document.find("<web_page ")
+    if first == -1:
+        return document
+    text = " " * first + document[first:]
+    return _BLOCK_TAG.sub(lambda tag: " " * len(tag.group()), text)
+
+
 def _named_fields(schema: type[BaseModel]) -> type[BaseModel]:
     """The schema with every top-level field name a usable snake_case identifier.
 
@@ -332,7 +354,8 @@ async def run(request: RunRequest):
                 user_requirements=traced_task,
                 documents=[document],
             )
-            traced = trace_text_results(records, document)
+            # Quotes are looked up in the pages' text, at the offsets of `document`.
+            traced = trace_text_results(records, _pages_only(document))
             sources = traced["sources"] if traced else []
             for source in sources:
                 span = source.get("span")
