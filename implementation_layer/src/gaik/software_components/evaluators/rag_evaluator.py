@@ -264,7 +264,7 @@ class RAGEvaluator:
         if not flags:
             errors[metric] = judge_error or "judge returned no flags"
             return 0, "judge returned no flags", cost
-        flag = _flag_for(metric, flags)
+        flag = _flag_for(metric, flags, judge_error)
         if flag is None or not flag.score:
             reason = f"judge gave no score for {metric}"
             errors[metric] = f"{reason}; {judge_error}" if judge_error else reason
@@ -317,16 +317,17 @@ def _name(field_name: str) -> str:
     return re.sub(r"[\W_]+", "", field_name.casefold())
 
 
-def _flag_for(metric: str, flags: list):
+def _flag_for(metric: str, flags: list, judge_error: str | None = None):
     """The judge's flag for ``metric``: the one whose field names it, or the only flag.
 
     The judge is asked for one flag holding the metric. A reply with several flags for
-    other fields (``query``, ``answer``) has none for the metric.
+    other fields (``query``, ``answer``) has none for the metric, and neither has one whose
+    other flags could not be read: the unread one may be the metric's.
     """
     named = [flag for flag in flags if _name(flag.field) == _name(metric)]
     if named:
         return named[0]
-    return flags[0] if len(flags) == 1 else None
+    return flags[0] if len(flags) == 1 and judge_error is None else None
 
 
 def _grading_prompts(

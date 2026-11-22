@@ -109,3 +109,19 @@ def test_a_metric_no_item_was_scored_on_is_zero_and_all_failed() -> None:
 
     assert metrics.faithfulness == 0.0 and metrics.failed["faithfulness"] == 2
     assert metrics.context_recall == 0.0 and metrics.failed["context_recall"] == 2
+
+
+def test_a_reply_whose_metric_flag_cannot_be_read_gives_no_score() -> None:
+    # The faithfulness flag lacks its severity, so only the query's flag is read.
+    reply = (
+        '{"flags": [{"field": "query", "severity": "ok", "score": 5},'
+        ' {"field": "faithfulness", "score": 2}]}'
+    )
+    judge, _ = _judge([reply])
+
+    item = RAGEvaluator(judge).evaluate_item(query="q", answer="a", context=["c"])
+
+    assert item.faithfulness_score == 0
+    assert item.errors["faithfulness"] == (
+        "judge gave no score for faithfulness; 1 of 2 flags could not be read"
+    )
