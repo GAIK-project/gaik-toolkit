@@ -7,7 +7,9 @@ Pure Python. No database, no model, no dependencies — it ships with `gaik`.
 ```python
 from gaik.software_components.RAG.relevance_gate import RelevanceGate
 
-# PgVectorStore.search_semantic returns cosine similarity, higher is closer
+# PgVectorStore.search_semantic returns cosine similarity, higher is closer.
+# threshold=0.0 keeps every row the gate should judge; it still drops rows with
+# a negative similarity (rare with text embeddings), so pass -1.0 to keep all.
 gate = RelevanceGate(floor=0.40, lower_is_better=False)
 hits = store.search_semantic(query_embedding, top_k=20, threshold=0.0)
 

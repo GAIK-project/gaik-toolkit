@@ -136,7 +136,8 @@ starts once all of its prerequisites are reviewed.
   report-wide inputs. Fact units carry `source.file`, `locator`, `source_class` and
   `time_qualifier`, so the writer can cite and attribute them as the instructions say.
 - **Derived section** (with `depends_on`): written only from the reviewed texts of its
-  prerequisites, each wrapped as `<section id=".." title="..">`, with no knowledge JSON.
+  prerequisites, each in its own `<source_material>` block labelled `section <id>: <title>`
+  (see "Source material as data" below), with no knowledge JSON.
   Derived sections can depend on other derived sections, e.g. `recommendations` on the
   technical sections and `summary` on everything.
 - The writer uses only the facts in its material, writes `(missing: <item>)` for each
