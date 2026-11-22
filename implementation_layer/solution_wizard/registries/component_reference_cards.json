@@ -457,7 +457,7 @@
     "import": "from gaik.software_components.parsers import MultimodalParser",
     "construct": "parser = MultimodalParser(api_config=get_stage_config(config, 'parser'))",
     "call": "pr = parser.parse(str(input_path))\n    parsed_text = pr.clean_markdown",
-    "returns": "ParseResult(.raw_markdown, .clean_markdown, .html [None unless create_html=True], .usage)",
+    "returns": "ParseResult(.raw_markdown, .clean_markdown, .html [None unless create_html=True], .usage, .truncated [True when the reply stopped at the output-token cap, so the end of the document is missing])",
     "install_extra": "multimodal-parser",
     "options": [
       {
@@ -558,7 +558,7 @@
     "construct": "parser = VisionParser(openai_config=get_stage_config(config, 'parser'))",
     "call": "pages = parser.convert_pdf(str(input_path), clean_output=True)\n    parsed_text = '\\n\\n'.join(pages)",
     "call_page_citations": "pages = parser.convert_pdf(str(input_path), clean_output=False)\n    # DO NOT join -- each list index is one page, needed for file_name|page_number citations\n    file_name = input_path.name\n    cited_pages = [(file_name, page_num, page_text) for page_num, page_text in enumerate(pages, start=1)]",
-    "returns": "list[str] (markdown pages). With clean_output=True and >1 page, this is a ONE-ELEMENT list containing the merged/cleaned markdown for the whole document -- NOT one element per page. Page-level attribution requires clean_output=False.",
+    "returns": "list[str] (markdown pages). With clean_output=True and >1 page, this is a ONE-ELEMENT list containing the merged/cleaned markdown for the whole document -- NOT one element per page; if the cleanup reply stops at max_tokens, the per-page list is returned instead (a warning is logged), so do not assume one element. Page-level attribution requires clean_output=False.",
     "install_extra": "parser",
     "options": [
       {
