@@ -682,7 +682,11 @@ function WorkflowFlowTab({
                 setShowData(show);
               }}
               // Other tabs get a change once the server has it, never while it is being typed.
-              onSynced={({ blueprint: synced, version, via }) => {
+              onSynced={({ blueprint: synced, xml: syncedXml, version, via }) => {
+                // The diagram of the edit is kept, so the panel opens with it again
+                // after the simple flow; read again when the panel could not read it.
+                if (syncedXml) setBpmnXml(syncedXml);
+                else setRetry((n) => n + 1);
                 onBlueprintChange(synced);
                 onVersionChange(version);
                 onSaved(via ?? "save");

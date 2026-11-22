@@ -534,6 +534,75 @@ test.describe("Workflow tab", () => {
     expect(sent).toHaveLength(3);
   });
 
+  test("the diagram comes back from the simple flow with the edit in it, and a second edit is sent on the same version", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openFlow(page);
+    await waitForDiagram(page);
+    await openBlueprintEditor(page);
+    await page.getByTestId("blueprint-json-toggle").click();
+    const blueprint = JSON.parse(await page.getByTestId("blueprint-json-editor").inputValue()) as {
+      steps: { id: string; name: string }[];
+    };
+    await page.getByTestId("blueprint-done").click();
+    const renamed = {
+      ...blueprint,
+      steps: blueprint.steps.map((s) => (s.id === "ingest" ? { ...s, name: "Receive the invoice" } : s)),
+    };
+    let edited = false;
+    const sent: { base_version: number; operations: unknown[] }[] = [];
+    await standInForWizardApi(page, async (route, body) => {
+      sent.push(body);
+      edited = true;
+      // The stand-in writes no version to the mock store, so the session stays on the one sent.
+      const session = { id: "ses_laskut", active_version: body.base_version, blueprint: renamed };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ session, warnings: [], needs_attention: [], bpmn_changed: true }),
+      });
+    });
+    // The server's diagram carries the rename once the edit is made.
+    await page.route(/\/api\/sessions\/ses_laskut\/bpmn(\?.*)?$/, async (route) => {
+      const res = await route.fetch();
+      const text = await res.text();
+      await route.fulfill({ response: res, body: edited ? text.replaceAll("Invoice intake", "Receive the invoice") : text });
+    });
+    // The stand-ins come before the canvas reads its mapping again.
+    await page.reload();
+    await setChatOpen(page, false);
+    await selectWorkspaceTab(page, "Työnkulku");
+    await openBpmnView(page);
+    await waitForDiagram(page);
+    const ingest = page.locator('.bpmn-editable [data-element-id="Activity_ingest"]');
+    await expect(ingest).toContainText("Invoice intake");
+
+    const rows = page.getByTestId("flow-step-list").locator("li");
+    await rows.nth(0).getByRole("button").first().click();
+    const name = page.getByTestId("bpmn-property-name");
+    await name.fill("Receive the invoice");
+    await name.press("Enter");
+    await expect.poll(() => sent.length).toBe(1);
+    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu");
+    await expect(ingest).toContainText("Receive the invoice");
+
+    // To the simple flow and back: the editor opens with the diagram that has the edit.
+    await page.getByTestId("flow-view-diagram").click();
+    await expect(page.getByTestId("bpmn-panel")).toHaveCount(0);
+    await page.getByTestId("flow-view-bpmn").click();
+    await waitForDiagram(page);
+    await expect(ingest).toContainText("Receive the invoice");
+    await expect(ingest).not.toContainText("Invoice intake");
+
+    // A later edit is sent from it.
+    await rows.nth(1).getByRole("button").first().click();
+    await name.fill("Read the amounts");
+    await name.press("Enter");
+    await expect.poll(() => sent.length).toBe(2);
+    expect(sent[1].operations).toEqual([{ op: "rename_step", step_id: "extract", name: "Read the amounts" }]);
+  });
+
   test("before the agent has written its blueprint the canvas is read-only and says why", async ({ page }) => {
     const sent: unknown[] = [];
     await standInForWizardApi(page, async (route, body) => {

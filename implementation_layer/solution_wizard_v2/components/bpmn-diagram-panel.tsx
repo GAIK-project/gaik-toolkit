@@ -149,7 +149,8 @@ export function BpmnDiagramPanel({
    * After an edit or an undo: the blueprint and diagram as the server has
    * them now, and the version it wrote. `via` says which, for the PoC note.
    */
-  onSynced: (result: { blueprint: Blueprint; xml: string; version?: number; via?: "save" | "undo" }) => void;
+  /** `xml` is the diagram the server drew after the edit; null when it could not be read. */
+  onSynced: (result: { blueprint: Blueprint; xml: string | null; version?: number; via?: "save" | "undo" }) => void;
   t: Dict;
 }) {
   const modelerRef = useRef<BpmnModelerHandle>(null);
@@ -465,7 +466,7 @@ export function BpmnDiagramPanel({
       }
       busy.current = false;
       if (next) showDiagram(next);
-      onSynced({ blueprint: result.blueprint, xml: next?.xml ?? propXml.current, version: result.version, via: result.via });
+      onSynced({ blueprint: result.blueprint, xml: next?.xml ?? null, version: result.version, via: result.via });
       // Made, but its diagram did not come: the way to read it again.
       const warnings = "warnings" in result ? result.warnings : [];
       setStatus(

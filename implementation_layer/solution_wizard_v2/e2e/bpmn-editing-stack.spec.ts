@@ -135,4 +135,51 @@ test.describe("BPMN canvas edits as operations (stack)", () => {
     expect((await steps()).some((s) => s.id === "deliver")).toBe(true);
     expect((await steps()).find((s) => s.id === "extract")?.name).toBe("Read the fields");
   });
+
+  test("the editor comes back from the simple flow with the last edit in the diagram, also after an Undo", async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(240_000);
+    const id = await sessionAtBpmn(page, request);
+    await writeDraft(request, id);
+    const steps = () => draftSteps(request, id);
+    await page.reload();
+    await openEditor(page);
+    await expect(rows(page)).toHaveCount(4);
+    const rename = async (row: number, value: string) => {
+      await rows(page).nth(row).getByRole("button").first().click();
+      const answered = page.waitForResponse((r) => r.url().includes("/blueprint/operations"));
+      const field = page.getByTestId("bpmn-property-name");
+      await field.fill(value);
+      await field.press("Enter");
+      expect((await answered).status()).toBe(200);
+      await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu", { timeout: 20_000 });
+    };
+    const throughTheSimpleFlow = async () => {
+      await page.getByTestId("flow-view-diagram").click();
+      await expect(page.getByTestId("bpmn-panel")).toHaveCount(0);
+      await page.getByTestId("flow-view-bpmn").click();
+      await expect(page.getByTestId("bpmn-panel")).toHaveAttribute("data-ops", "on", { timeout: 45_000 });
+    };
+
+    await rename(1, "Read the fields");
+    await throughTheSimpleFlow();
+    await expect(task(page, "extract")).toContainText("Read the fields");
+
+    // An edit made from the remounted editor goes to the server on the newest version and stays.
+    await rename(0, "Take the file in");
+    await throughTheSimpleFlow();
+    const [first] = await steps();
+    expect(first.name).toBe("Take the file in");
+    await expect(task(page, first.id)).toContainText("Take the file in");
+
+    // Undo takes the second rename back; the editor shows that after the round trip too.
+    const undone = page.waitForResponse((r) => r.url().includes("/blueprint/undo"));
+    await page.getByTestId("bpmn-undo").click();
+    expect((await undone).status()).toBe(200);
+    await throughTheSimpleFlow();
+    await expect(task(page, first.id)).not.toContainText("Take the file in");
+    await expect(task(page, "extract")).toContainText("Read the fields");
+  });
 });
