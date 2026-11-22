@@ -210,6 +210,9 @@ def test_a_swapped_date_needs_a_person() -> None:
         (DATE, "Lomalla 11.–15.4.2025 koko viikon", "11 15 4 2025"),
         (DATE, "Delivered 12th April 2025 and 11th April 2025", "11th april 2025"),
         ("2025-04-04", "Delivered 04.11.2025, signed 4.4.2025", "4 4 2025"),
+        # A list of days whose dots are gone: each day takes the month and year after it.
+        ("2025-04-09", "Työpäivät 9., 11. ja 15.4.2025", "9 11 ja 15 4 2025"),
+        (DATE, "Työpäivät 9., 11. ja 15.4.2025", "11 ja 15 4 2025"),
     ],
 )
 def test_the_date_is_located_in_the_words_of_its_quote(value, quote, boxed) -> None:

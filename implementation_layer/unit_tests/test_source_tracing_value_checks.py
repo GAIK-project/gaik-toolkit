@@ -28,6 +28,8 @@ def _check(value, quote: str, text: str | None = None) -> str:
         (2025, "PO-2025-15903", "match"),
         (15, "Lomalla 11.–15. päivä", "match"),
         (-1014.5, "Discount (5%) - EUR 1,014.50", "match"),  # a sign set apart, as before
+        (250, "Hyvitys -1 250,00 EUR", "mismatch"),  # one negative number, not -1 and 250
+        (-1250, "Hyvitys -1 250,00 EUR", "match"),
     ],
 )
 def test_the_sign_of_a_number_counts(value, quote, expected) -> None:
@@ -40,6 +42,12 @@ def test_the_sign_of_a_number_counts(value, quote, expected) -> None:
         ("PO-2025-15903", "PO Number: PO-2025-15908", "check"),
         ("04/2026", "Voimassa 03/2026", "check"),
         ("3 kpl", "Määrä: 2 kpl", "check"),
+        ("04/2026", "Voimassa 03.2026", "check"),  # other separators
+        ("PO-2025-15903", "PO 2025.15908", "check"),
+        ("Total 250 EUR", "Hyvitys -250 EUR", "check"),  # another sign
+        ("4 kpl", "Toimitettu 11.04.2025, määrä 2 kpl", "check"),  # not the month of a date
+        ("12.5 kg", "Erä 5, paino 12 kg", "check"),  # not two other numbers
+        ("Delivered 04.11.2025", "Toimitettu 11.04.2025", "check"),  # a swapped date
         # The model's own wording with the same numbers, or numbers the quote spells out.
         ("2 weeks", "Toimitusaika 2 viikkoa", "reworded"),
         ("12.5 kg", "Paino 12,50 kg", "reworded"),
@@ -47,6 +55,7 @@ def test_the_sign_of_a_number_counts(value, quote, expected) -> None:
         ("Room 12B, floor 3", "Huone 12B, kerros kolme", "reworded"),
         ("Delivered 11.4.2025", "Toimitettu 2025-04-11", "reworded"),
         ("Delivered 2025-04-11", "Toimitettu 11.4.2025", "reworded"),
+        ("+358 40 1234567", "puh. 040 123 4567", "reworded"),
         ("Minor bruise", "lievä ruhje", "reworded"),
     ],
 )
@@ -67,6 +76,13 @@ def test_a_quote_of_an_escaped_closing_tag_is_found() -> None:
 
     assert item.status == "found" and item.verdict == "verified"
     assert text[slice(*item.span)].startswith("Ohje: </source_material>")
+
+
+def test_a_value_and_a_located_quote_read_the_escaped_tag_as_the_source_has_it() -> None:
+    quote = "Merkki &lt;/source_material> ja summa 10 EUR"
+
+    assert value_status("Merkki </source_material>", quote) == "match"
+    assert locate_in_text("Merkki </source_material> ja summa 10 EUR", quote) == (0, 41)
 
 
 def test_an_escape_elsewhere_in_a_quote_is_not_taken_for_a_bracket() -> None:
@@ -121,6 +137,14 @@ def test_a_quote_is_located_whatever_unicode_form_either_side_uses(text, quote) 
     assert span is not None
     located = unicodedata.normalize("NFC", text[slice(*span)])
     assert located.casefold() == unicodedata.normalize("NFC", quote).casefold()
+
+
+def test_a_quote_is_located_in_text_with_ligatures() -> None:
+    text = _nfd("Päivä: ﬁnal Jyväskylä")
+
+    span = locate_in_text(text, "final jyväskylä")
+
+    assert span is not None and text[slice(*span)] == _nfd("ﬁnal Jyväskylä")
 
 
 def test_a_decomposed_value_matches_a_composed_quote() -> None:

@@ -36,6 +36,7 @@ _MONTHS = {
     )
 }
 _MINUS = "-\u2212\u2013"  # hyphen-minus, minus sign, en dash
+_LIGATURE = re.compile("[\ufb00-\ufb06]")  # the ones _ligatures expands
 # The parts of a date in a text: runs of digits, and words, of which month names count.
 _DATE_ITEM = re.compile(r"\d+|[^\W\d_]+")
 _DASHES = "\\-\u2010\u2011\u2012\u2013\u2014"
@@ -128,8 +129,10 @@ def _number_groups(text: str) -> list[list[float]]:
         readings = [sign * reading for reading in _readings_of(match.group())]
         if len(pieces) > 1:
             readings += [sign * reading for reading in _readings_of(pieces[0])]
-            for piece in pieces[1:]:
-                readings += _readings_of(piece)
+            if sign > 0:
+                # -1 250,00 is one negative number: its last group is not a 250 of its own.
+                for piece in pieces[1:]:
+                    readings += _readings_of(piece)
         groups.append(readings)
     return groups
 
@@ -394,7 +397,8 @@ def _chains(items: list[_Item], gaps: list[str], loose: bool) -> list[tuple[int,
             index = ends[-1] + size
             for part in _chain_parts(items, gaps, size, ends, kinds):
                 chains.append((size, part))
-                if size == 2:
+                if size == 2 and not loose:
+                    # Read loosely (no punctuation), 9 11 15 4 may be days or days and months.
                     covered.update(range(part[0], part[-1] + size))
     return chains
 
@@ -500,6 +504,7 @@ def value_status(value: Any, quote: str, policy: TracePolicy = _DEFAULT_POLICY) 
     """Whether the extracted value is in the quote, tolerant of number and date formats."""
     if value is None or isinstance(value, bool | dict | list):
         return "unchecked"
+    quote = _unescape_closing_tags(quote)  # the source's own text, as quote_needles reads it
     number = as_number(value)
     if number is not None:
         tolerance = policy.number_tolerance
@@ -604,12 +609,18 @@ def locate_in_text(text: str, quote: str) -> tuple[int, int] | None:
     line breaks, spacing or punctuation is still found.
     """
     spans = _word_spans(text)
-    return _locate_in_words(spans, [word for word, _, _ in spans], tokens(quote))
+    words = [word for word, _, _ in spans]
+    for needle in quote_needles(quote):
+        found = _locate_in_words(spans, words, needle)
+        if found is not None:
+            return found
+    return None
 
 
 def _word_spans(text: str) -> list[tuple[str, int, int]]:
-    """Lowercased words of ``text`` in NFC form, with their offsets in ``text`` as given."""
-    if unicodedata.is_normalized("NFC", text):
+    """Lowercased words of ``text`` in NFC form and with ligatures written as their letters
+    (as :func:`tokens` reads them), with their offsets in ``text`` as given."""
+    if unicodedata.is_normalized("NFC", text) and not _LIGATURE.search(text):
         return [
             (match.group().lower(), match.start(), match.end()) for match in _WORD.finditer(text)
         ]
@@ -621,7 +632,8 @@ def _word_spans(text: str) -> list[tuple[str, int, int]]:
 
 
 def _composed(text: str) -> tuple[str, list[tuple[int, int]]]:
-    """``text`` in NFC form, and for each of its characters the span of ``text`` it came from.
+    """``text`` in NFC form with ligatures expanded, and for each of its characters the span
+    of ``text`` it came from.
 
     The text is composed one cluster at a time: a character with the marks and the
     conjoining letters (Hangul jamo) that compose with it.
@@ -633,7 +645,7 @@ def _composed(text: str) -> tuple[str, list[tuple[int, int]]]:
         end = start + 1
         while end < len(text) and _composes_with(text, start, end):
             end += 1
-        piece = unicodedata.normalize("NFC", text[start:end])
+        piece = expand_ligatures(unicodedata.normalize("NFC", text[start:end]))
         pieces.append(piece)
         origin += [(start, end)] * len(piece)
         start = end
@@ -746,25 +758,43 @@ def verdict_of(
 def _other_numbers(value: str, quote: str, tolerance: float) -> bool:
     """Whether a text value holds a number its quote does not, the quote having as many.
 
-    Numbers are compared as numbers (``12.5 kg`` is in ``12,50 kg``), or by their runs of
-    digits (``11.4.2025`` is in ``2025-04-11``), so only a different number counts: an
-    identifier with another digit, another month or year, another count.
+    Numbers are compared as numbers, sign included (``12.5 kg`` is in ``12,50 kg``, ``250``
+    is not in ``-250``), and a date as a date (``11.4.2025`` is in ``2025-04-11``, not in
+    ``04.11.2025``), so only a different number counts: an identifier with another digit,
+    another month or year, another count. With fewer runs of digits in the quote than in
+    the value, the quote may spell a number in words, and nothing is said.
     """
     wanted = list(_NUMBER.finditer(value))
-    if not wanted:
+    if not wanted or len(_DATE_PARTS.findall(quote)) < len(_DATE_PARTS.findall(value)):
         return False
-    written = _number_groups(quote)
-    if len(written) < len(wanted):
-        return False
-    readings = [reading for group in written for reading in group]
-    runs = {_digits(run) for run in _DATE_PARTS.findall(quote)}
+    readings = [reading for group in _number_groups(quote) for reading in group]
+    in_shared_date = _shared_date_parts(value, quote)
     for match, group in zip(wanted, _number_groups(value)):
         if any(abs(mine - theirs) < tolerance for mine in group for theirs in readings):
             continue
-        if all(_digits(run) in runs for run in _DATE_PARTS.findall(match.group())):
-            continue
+        written = match.group()
+        if date_parts(written) is not None and _date_in(written, quote):
+            continue  # 11.4.2025 in the value, 2025-04-11 in the quote
+        if all(_digits(run) in in_shared_date for run in _DATE_PARTS.findall(written)):
+            continue  # a part of a date both write (the 2025 of 2025-04-11 and 11.4.2025)
         return True
     return False
+
+
+def _shared_date_parts(value: str, quote: str) -> set[str]:
+    """The year, month and day digits of each date that both texts write."""
+    value_items, value_gaps = _date_items(value)
+    mine = {date for date, _, _ in _dates_with_places(value_items, value_gaps)}
+    if not mine:
+        return set()
+    quote_items, quote_gaps = _date_items(quote)
+    parts: set[str] = set()
+    for date, _, _ in _dates_with_places(quote_items, quote_gaps):
+        for other in mine:
+            if _same_date(date, other):
+                for found in (date, other):
+                    parts |= {str(found[0]), str(found[0] % 100), str(found[2]), str(found[3])}
+    return parts
 
 
 def _digits(run: str) -> str:

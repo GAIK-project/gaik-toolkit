@@ -316,7 +316,9 @@ the quote exactly.
   first.
 - A date's parts must be written together: a quote that gives the year apart from the day and
   the month (`Report 2025, approved 11 April`), or labels them (`Day 11 Month 04 Year 2025`), is
-  `check`, and so is a day written with three digits (`011`).
+  `check`, and so is a day written with three digits (`011`). Two days joined only by a comma,
+  `&` or `/` (`11, 12.4.2025`) count as a list next to a month name or after a dot (`11., 12.4.`),
+  not otherwise: `Qty 1, 09.01.98` looks the same.
 - A text value with fewer numbers in its quote than in itself is `reworded`, not `check`: the
   quote may spell a number in words (`kerros kolme` for `floor 3`).
 - A number with one dot or comma and three digits after it, such as `4.200`, can be read as
