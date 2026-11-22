@@ -158,3 +158,31 @@ def test_docling_structured_text_keeps_tables_in_reading_order():
     assert "Widget" in table and "12" in table and table.startswith("| Item")
     # The page footer was in the structured text before, and stays.
     assert (footer, after) == ("Page 1", "After the table")
+
+
+def test_docling_structured_text_gives_a_table_caption_and_footnote_once():
+    pytest.importorskip("docling")
+    from docling_core.types.doc import DocItemLabel, DoclingDocument, TableCell, TableData
+    from gaik.software_components.parsers.docling import DoclingParser
+
+    document = DoclingDocument(name="prices")
+    cell = TableCell(
+        text="A",
+        start_row_offset_idx=0,
+        end_row_offset_idx=1,
+        start_col_offset_idx=0,
+        end_col_offset_idx=1,
+        column_header=True,
+    )
+    table = document.add_table(data=TableData(num_rows=1, num_cols=1, table_cells=[cell]))
+    caption = document.add_text(label=DocItemLabel.CAPTION, text="Table 1: Prices", parent=table)
+    table.captions.append(caption.get_ref())
+    footnote = document.add_text(label=DocItemLabel.FOOTNOTE, text="Source: shop", parent=table)
+    table.footnotes.append(footnote.get_ref())
+    document.add_text(label=DocItemLabel.TEXT, text="After")
+
+    text = DoclingParser._extract_structured_text(DoclingParser.__new__(DoclingParser), document)
+
+    assert text.count("Table 1: Prices") == 1
+    assert text.count("Source: shop") == 1
+    assert text.endswith("After")

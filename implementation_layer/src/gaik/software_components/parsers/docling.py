@@ -460,11 +460,19 @@ class DoclingParser:
         if hasattr(doc, "iterate_items"):
             from docling_core.types.doc import ContentLayer, TableItem
 
+            # A table's Markdown holds its captions and footnotes; they are not repeated.
+            in_tables = {
+                ref.cref
+                for table in getattr(doc, "tables", [])
+                for ref in (*table.captions, *table.footnotes)
+            }
             parts, seen = [], set()
             for item, _level in doc.iterate_items(
                 traverse_pictures=True, included_content_layers=set(ContentLayer)
             ):
                 seen.add(getattr(item, "self_ref", None))
+                if getattr(item, "self_ref", None) in in_tables:
+                    continue
                 if isinstance(item, TableItem):
                     text = item.export_to_markdown(doc=doc)
                 else:
