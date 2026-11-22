@@ -216,6 +216,34 @@ def test_every_function_the_transcriber_cards_call_is_imported_by_the_generic_po
     )
 
 
+def test_every_text_that_has_the_agent_call_local_transcriber_options_passes_the_enhancement():
+    """Left out, enhanced_transcript defaults to on when external model APIs are allowed,
+    so a non-Finnish whisper_local Transcriber (enhancement off) without OpenAI/Azure keys
+    stopped at local_transcriber_options with a missing-credentials error."""
+    import json
+    import re
+
+    card = json.loads(
+        (Path(__file__).parent.parent / "registries" / "component_reference_cards.json").read_text(
+            encoding="utf-8"
+        )
+    )["Transcriber"]
+    texts = {key: value for key, value in card.items() if isinstance(value, str)}
+    for option in card["options"]:
+        texts.update({f"{option['name']}.{k}": v for k, v in option.items() if isinstance(v, str)})
+    texts["SKILL.md"] = (Path(__file__).parent.parent / "SKILL.md").read_text(encoding="utf-8")
+    calls = {
+        where: re.findall(r"local_transcriber_options\(([^)]*)\)", text)
+        for where, text in texts.items()
+    }
+    calls = {where: found for where, found in calls.items() if found}
+    assert {"construct_whisper_local", "local_api_base.infer_from", "SKILL.md"} <= set(calls)
+    assert "local_api_key.infer_from" in calls
+    for where, found in calls.items():
+        for arguments in found:
+            assert "enhanced_transcript=" in arguments, (where, arguments)
+
+
 def test_every_component_that_calls_a_model_has_its_stages_checked():
     """A component missing from the stage map was never checked against the flags."""
     import json

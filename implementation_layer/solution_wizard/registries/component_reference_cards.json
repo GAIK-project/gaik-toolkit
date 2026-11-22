@@ -49,7 +49,7 @@
         "default": null,
         "effect": "Base URL of the self-hosted whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it. Since gaik 0.11.0, the constructor accepts only the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for that address), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS or api_config['allowed_endpoint_hosts']; any other address raises EndpointNotAllowedError (a ValueError).",
         "selection_relevant": true,
-        "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code pass **local_transcriber_options(config, audio_config) from provider_config.py, which reads it from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app) and checks its host against the blueprint's governance flags; never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
+        "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code pass **local_transcriber_options(config, audio_config, enhanced_transcript=enhance) from provider_config.py, with the enhance value the Transcriber's enhanced_transcript gets (see construct_whisper_local). The helper reads the URL from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app) and checks its host against the blueprint's governance flags; never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
       {
         "name": "local_api_key",
@@ -57,7 +57,7 @@
         "default": null,
         "effect": "Auth key for the whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it.",
         "selection_relevant": true,
-        "infer_from": "transcription_model == whisper_local -> in generated code pass **local_transcriber_options(config, audio_config) from provider_config.py, which reads it from the env var LOCAL_TRANSCRIBER_API_KEY (the convention used by toolkit_demo_app); never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
+        "infer_from": "transcription_model == whisper_local -> in generated code pass **local_transcriber_options(config, audio_config, enhanced_transcript=enhance) from provider_config.py, with the enhance value the Transcriber's enhanced_transcript gets (see construct_whisper_local). The helper reads the key from the env var LOCAL_TRANSCRIBER_API_KEY (the convention used by toolkit_demo_app); never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
       {
         "name": "diarization",
