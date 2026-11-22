@@ -1,4 +1,5 @@
-"""Valid queries the SQL validators used to refuse or render wrongly (issue #146).
+"""Valid queries the SQL validators used to refuse or render wrongly (issue #146),
+and calls whose arguments sqlglot drops while parsing (issues #146 and #219).
 
 Each accepted form is paired with a check that the read-only refusals still
 hold inside it.
@@ -27,11 +28,54 @@ from gaik.software_components.tabular_agent.sql_safety import (  # noqa: E402
 )
 from sqlglot.dialects.dialect import Dialect  # noqa: E402
 
-# sqlglot's compiled build (sqlglot[c]) skips the check for dropped arguments.
+# Whether the installed sqlglot is its compiled build (sqlglot[c]).
 COMPILED = bool(getattr(sqlglot.tokens, "SQLGLOTC_INSTALLED", False))
-needs_argument_check = pytest.mark.skipif(
-    COMPILED, reason="sqlglot's compiled build skips the argument check"
-)
+
+# --- sqlglot's compiled build (sqlglot[c]) ----------------------------------
+#
+# Its parser classes are native: an instance attribute cannot be set on them and a
+# Python class cannot derive from them. Where the pure-Python build is installed, a
+# parser that refuses the attribute the same way stands in for it; where sqlglotc
+# is installed, the installed build is the compiled one. The stand-in does not show
+# that the native tokens and nodes carry the positions the written-call check reads
+# (Token.start and .end, FUNC_TOKENS, meta["start"]), so run this file on the real
+# build too, with sqlglotc at the installed sqlglot's version:
+#   uv run --with sqlglotc==<sqlglot version> pytest <this file>
+# (passed with sqlglot and sqlglotc 30.33.0).
+
+
+def _read_only_functions(parser_class):
+    class ReadOnlyFunctions(parser_class):
+        def __setattr__(self, name, value):
+            if name == "FUNCTIONS":
+                raise AttributeError(
+                    f"'{parser_class.__name__}' object attribute 'FUNCTIONS' is read-only"
+                )
+            super().__setattr__(name, value)
+
+    return ReadOnlyFunctions
+
+
+def _use_read_only_parsers(monkeypatch):
+    for name in ("duckdb", "postgres"):
+        dialect = type(Dialect.get_or_raise(name))
+        monkeypatch.setattr(dialect, "parser_class", _read_only_functions(dialect.parser_class))
+
+
+@pytest.fixture(params=["installed build", "compiled build"])
+def sqlglot_build(request, monkeypatch):
+    if request.param == "compiled build":
+        if COMPILED:
+            pytest.skip("the installed build is the compiled one")
+        _use_read_only_parsers(monkeypatch)
+    return request.param
+
+
+@pytest.fixture
+def compiled_build(monkeypatch):
+    if not COMPILED:
+        _use_read_only_parsers(monkeypatch)
+
 
 # --- ALL, SOME and ROW are syntax, not functions (Postgres) -----------------
 
@@ -167,18 +211,19 @@ def test_postgres_date_trunc_keeps_its_time_zone():
 # --- An argument sqlglot drops while parsing is refused ---------------------
 
 
-@needs_argument_check
-def test_duckdb_refuses_the_time_zone_date_trunc_drops():
+_LOSES = "loses one of its arguments"
+
+
+def test_duckdb_refuses_the_time_zone_date_trunc_drops(sqlglot_build):
     # sqlglot reads DuckDB's date_trunc with two arguments and drops the third while
     # parsing, so the render matches the tree and only the parse shows the loss.
-    with pytest.raises(TabularUnsafeSQLError, match="loses one of its arguments"):
+    with pytest.raises(TabularUnsafeSQLError, match=_LOSES):
         validate_duckdb(
             "SELECT date_trunc('month', ts, 'Europe/Helsinki') FROM orders",
             allowed_tables=["orders"],
         )
 
 
-@needs_argument_check
 @pytest.mark.parametrize(
     "sql",
     [
@@ -187,15 +232,55 @@ def test_duckdb_refuses_the_time_zone_date_trunc_drops():
         "SELECT encode(note, 'latin1') FROM orders",
     ],
 )
-def test_duckdb_refuses_other_dropped_arguments(sql):
-    with pytest.raises(TabularUnsafeSQLError, match="loses one of its arguments"):
+def test_duckdb_refuses_other_dropped_arguments(sqlglot_build, sql):
+    with pytest.raises(TabularUnsafeSQLError, match=_LOSES):
         validate_duckdb(sql, allowed_tables=["orders"])
 
 
-@needs_argument_check
-def test_postgres_refuses_a_dropped_argument():
-    with pytest.raises(UnsafeSQLError, match="loses one of its arguments"):
+def test_postgres_refuses_a_dropped_argument(sqlglot_build):
+    with pytest.raises(UnsafeSQLError, match=_LOSES):
         validate_pg("SELECT array_agg(name, ', ') FROM orders")
+
+
+# Functions sqlglot reads with a parser of its own rather than from a list of
+# written arguments (issue #219).
+_SHARED_PARSER_CALLS = [
+    ("SELECT arg_max(name, amount, 2, 9) FROM orders", "ARG_MAX(name, amount, 2)"),
+    ("SELECT argmax(name, amount, 2, 9) FROM orders", "ARG_MAX(name, amount, 2)"),
+    ("SELECT arg_min(name, amount, 2, 9) FROM orders", "ARG_MIN(name, amount, 2)"),
+    ("SELECT max_by(name, amount, 2, 9) FROM orders", "ARG_MAX(name, amount, 2)"),
+    ("SELECT min_by(name, amount, 2, 9) FROM orders", "ARG_MIN(name, amount, 2)"),
+    ("SELECT ceil(amount, 1, 2) FROM orders", None),
+    ("SELECT floor(amount, 1, 2) FROM orders", None),
+    ("SELECT initcap(name, ' ', '-') FROM orders", None),
+    ("SELECT region, sum(amount) FILTER (WHERE ceil(amount, 1, 2) > 0) FROM orders", None),
+]
+
+
+@pytest.mark.parametrize(
+    ("sql", "runs_as"),
+    _SHARED_PARSER_CALLS
+    + [
+        ("SELECT quantile(amount, 0.5, 9) FROM orders", "QUANTILE(amount, 0.5)"),
+        ("SELECT quantile_cont(amount, 0.5, 9) FROM orders", "QUANTILE_CONT(amount, 0.5)"),
+        ("SELECT quantile_disc(amount, 0.5, 9) FROM orders", "QUANTILE_DISC(amount, 0.5)"),
+        ("SELECT map(keys, vals, extra) FROM orders", "MAP(keys, vals)"),
+        ("SELECT upper(map(keys, vals, extra)[1]) FROM orders", "MAP(keys, vals)"),
+    ],
+)
+def test_duckdb_refuses_an_argument_a_function_parser_drops(sqlglot_build, sql, runs_as):
+    with pytest.raises(TabularUnsafeSQLError, match=_LOSES) as refused:
+        validate_duckdb(sql, allowed_tables=["orders"])
+    if runs_as:
+        assert f"would run as {runs_as}." in str(refused.value)
+
+
+@pytest.mark.parametrize(("sql", "runs_as"), _SHARED_PARSER_CALLS)
+def test_postgres_refuses_an_argument_a_function_parser_drops(sqlglot_build, sql, runs_as):
+    with pytest.raises(UnsafeSQLError, match=_LOSES) as refused:
+        validate_pg(sql)
+    if runs_as:
+        assert f"would run as {runs_as}." in str(refused.value)
 
 
 @pytest.mark.parametrize(
@@ -209,9 +294,27 @@ def test_postgres_refuses_a_dropped_argument():
         "SELECT json_extract_string(doc, 'a'), doc ->> '$.b' FROM orders",
         "SELECT list_sort(tags, 'DESC'), list_sort(tags, 'ASC', 'NULLS FIRST') FROM orders",
         "SELECT log10(amount), epoch_ms(ms) FROM orders",
+        # Function parsers, with every argument they read.
+        "SELECT arg_max(name, amount), arg_max(name, amount, 2), max_by(name, amount) FROM orders",
+        "SELECT quantile(amount, 0.5), quantile_cont(amount, [0.25, 0.5]) FROM orders",
+        "SELECT quantile_disc(DISTINCT amount, 0.5), approx_quantile(amount, 0.5) FROM orders",
+        "SELECT ceil(amount), floor(amount), max(amount), min(amount), max(amount, 2) FROM orders",
+        "SELECT map([1], [2]), map(), initcap(name) FROM orders",
+        "SELECT string_agg(name, ',' ORDER BY ts), listagg(name, ','), group_concat(name, ',') "
+        "FROM orders",
+        "SELECT cast(amount AS INT), try_cast(name AS INT), trim(both 'x' from name) FROM orders",
+        "SELECT substring(name, 1, 2), position('a' in name), extract(year FROM ts) FROM orders",
+        # Arguments that leave no trace of their own in the tree.
+        "SELECT coalesce(amount, NULL), if(amount > 1, NULL, TRUE), count(*) FROM orders",
+        "SELECT extract(year FROM CURRENT_DATE), coalesce(NULL, CURRENT_DATE) FROM orders",
+        # Parentheses that are not calls, and calls with nested brackets.
+        "SELECT list_transform(tags, x -> x || ','), {'a': 1, 'b': [1, 2]} FROM orders",
+        "SELECT sum(amount) OVER (PARTITION BY region, name ORDER BY ts) FROM orders AS o(a, b)",
+        "SELECT CAST(amount AS DECIMAL(10, 2)), amount::VARCHAR(20) FROM orders",
+        "SELECT name FROM orders WHERE EXISTS (SELECT name, ts FROM orders) AND id IN (1, 2)",
     ],
 )
-def test_duckdb_keeps_arguments_sqlglot_rewrites(sql):
+def test_duckdb_keeps_arguments_sqlglot_rewrites(sqlglot_build, sql):
     validate_duckdb(sql, allowed_tables=["orders"])
 
 
@@ -221,51 +324,18 @@ def test_duckdb_keeps_arguments_sqlglot_rewrites(sql):
         "SELECT to_char(ts, 'YYYY-MM'), date_trunc('month', ts) FROM orders",
         "SELECT json_extract_path(doc, 'a', 'b') FROM orders",
         "SELECT date_bin('15 minutes', ts, TIMESTAMP '2001-01-01') FROM orders",
+        "SELECT date_trunc('month', ts, 'Europe/Helsinki') FROM orders",
+        "SELECT ceil(amount), floor(amount), initcap(name), date_part('year', ts) FROM orders",
+        "SELECT position('a' in name), overlay(name placing 'b' from 1 for 2) FROM orders",
+        "SELECT substring(name from 1 for 2), trim(both 'x' from name) FROM orders",
+        "SELECT string_agg(name, ',' ORDER BY ts), json_agg(name), json_object('a', 1) FROM orders",
+        "SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY amount) FROM orders",
+        "SELECT coalesce(amount, NULL), amount::numeric(10, 2), round(amount, 2) FROM orders",
+        "SELECT id FROM orders WHERE id = ANY (ARRAY[1, 2]) AND EXISTS (SELECT id, ts FROM orders)",
     ],
 )
-def test_postgres_keeps_arguments_sqlglot_rewrites(sql):
+def test_postgres_keeps_arguments_sqlglot_rewrites(sqlglot_build, sql):
     validate_pg(sql)
-
-
-# --- sqlglot's compiled build (sqlglot[c]) ----------------------------------
-#
-# Its parser classes are native: an instance attribute cannot be set on them and a
-# Python class cannot derive from them. Where the pure-Python build is installed, a
-# parser that refuses the attribute the same way stands in for it; where sqlglotc
-# is installed, the installed build is the compiled one.
-
-
-def _read_only_functions(parser_class):
-    class ReadOnlyFunctions(parser_class):
-        def __setattr__(self, name, value):
-            if name == "FUNCTIONS":
-                raise AttributeError(
-                    f"'{parser_class.__name__}' object attribute 'FUNCTIONS' is read-only"
-                )
-            super().__setattr__(name, value)
-
-    return ReadOnlyFunctions
-
-
-def _use_read_only_parsers(monkeypatch):
-    for name in ("duckdb", "postgres"):
-        dialect = type(Dialect.get_or_raise(name))
-        monkeypatch.setattr(dialect, "parser_class", _read_only_functions(dialect.parser_class))
-
-
-@pytest.fixture(params=["installed build", "compiled build"])
-def sqlglot_build(request, monkeypatch):
-    if request.param == "compiled build":
-        if COMPILED:
-            pytest.skip("the installed build is the compiled one")
-        _use_read_only_parsers(monkeypatch)
-    return request.param
-
-
-@pytest.fixture
-def compiled_build(monkeypatch):
-    if not COMPILED:
-        _use_read_only_parsers(monkeypatch)
 
 
 def test_both_builds_validate_a_plain_query(sqlglot_build):
@@ -333,17 +403,16 @@ def test_postgres_refusals_hold_on_both_builds(sqlglot_build, sql, reason):
         validate_pg(sql, allowlist=["customers", "orders"])
 
 
-def test_compiled_build_skips_only_the_argument_check(compiled_build, caplog):
-    _sql_parse._warn_unchecked.cache_clear()
+def test_compiled_build_checks_arguments_from_the_written_calls(compiled_build, caplog):
     with caplog.at_level(logging.WARNING, logger=_sql_parse.__name__):
-        # Not refused: without the check, this lossy call passes as plain sqlglot reads it.
-        for _ in range(2):
+        with pytest.raises(TabularUnsafeSQLError, match=_LOSES) as refused:
             validate_duckdb(
                 "SELECT date_trunc('month', ts, 'Europe/Helsinki') FROM orders",
                 allowed_tables=["orders"],
             )
+        assert "would run as DATE_TRUNC('MONTH', ts)." in str(refused.value)
+        with pytest.raises(UnsafeSQLError, match=_LOSES):
+            validate_pg("SELECT array_agg(name, ', ') FROM orders")
         with pytest.raises(TabularUnsafeSQLError, match="cannot be checked as written"):
             validate_duckdb("SELECT TO_CHAR(ordered_on, 'YYYY-MM') FROM orders")
-    warnings = [r for r in caplog.records if "compiled build" in r.getMessage()]
-    assert len(warnings) == 1
-    assert "duckdb" in warnings[0].getMessage()
+    assert not caplog.records
