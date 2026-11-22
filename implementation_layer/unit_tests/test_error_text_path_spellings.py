@@ -112,12 +112,34 @@ def test_the_stem_is_tagged_where_it_reads_as_a_file_name_and_a_tag_is_not_rewri
         ("/x/Value.txt", "bad value"),
         ("/x/file.csv", "The file is empty"),
         ("/x/data.csv", "no data in the data table"),
-        ("/x/report.pdf", "report not ready; reporting later"),
-        ("/x/README", "README is a word here"),
+        ("/x/notes.pdf", "notes not ready; noted later"),
+        ("/x/TODO", "TODO is a word here"),
+        # A short stem inside a longer name or word is not the file.
+        ("/x/data.csv", "'user_data' and metadata"),
+        # What still passes, as documented: a short stem standing as a word.
+        ("/x/notes.pdf", "cannot open notes (corrupt)"),
     ],
 )
 def test_a_stem_as_an_ordinary_word_and_the_type_name_are_left_alone(given, message):
     assert error_text(ValueError(message), given) == f"ValueError: {message}"
+
+
+@pytest.mark.parametrize(
+    ("given", "message", "expected"),
+    [
+        # A distinctive stem before a space, a parenthesis, punctuation or the end.
+        ("/x/report.pdf", "cannot open report (corrupt)", "cannot open {tag} (corrupt)"),
+        ("/x/Matti Virtanen.pdf", "cannot open Matti Virtanen.", "cannot open {tag}."),
+        ("/x/scan01.png", "no text in scan01", "no text in {tag}"),
+        ("/x/pöytäkirja.docx", "pöytäkirja, page 2", "{tag}, page 2"),
+        # Not inside a longer word.
+        ("/x/report.pdf", "reporting and myreport", "reporting and myreport"),
+    ],
+)
+def test_a_distinctive_stem_is_tagged_as_a_word(given, message, expected):
+    text = error_text(ValueError(message), given)
+
+    assert text == "ValueError: " + expected.format(tag=file_tag(given))
 
 
 def test_a_name_named_like_the_error_type_leaves_the_type_name():

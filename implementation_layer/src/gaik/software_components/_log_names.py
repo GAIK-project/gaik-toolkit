@@ -83,15 +83,30 @@ def _spellings(whole: str) -> tuple[set[str], set[str]]:
     return {form for form in forms if len(form) >= 3}, {stem for stem in stems if len(stem) >= 3}
 
 
-def _stem_pattern(stem: str) -> str:
-    """The stem as a whole word next to a path separator or a quote before it, or an
-    extension, a quote, a path separator, ``_`` or ``-`` after it (a file named after
-    it, such as ``report_chunk_001.wav``)."""
-    word = re.escape(stem)
-    return (
-        rf"(?<=[/\\'\"`]){word}(?![^\W_])"
-        rf"|(?<![^\W_]){word}(?=\.[^\W\d_]|['\"`/\\_-])"
+def _distinctive(stem: str) -> bool:
+    """Unlikely to be an ordinary word: six or more characters, or a space, a digit or
+    a letter outside ASCII in it (``Matti Virtanen``, ``scan01``, ``pöytäkirja``)."""
+    return len(stem) >= 6 or any(
+        char.isspace() or char.isdigit() or (char.isalpha() and not char.isascii()) for char in stem
     )
+
+
+def _stem_pattern(stem: str) -> str:
+    """Where the stem reads as a file name rather than as a word of the message.
+
+    Before it: the start, a path separator, a quote or any other non-word character,
+    never a letter, digit or ``_`` (``user_data`` stays). After it: an extension, a
+    quote, a path separator, ``_`` or ``-`` (a file named after it, such as
+    ``report_chunk_001.wav``); for a distinctive stem (see :func:`_distinctive`) also
+    whitespace, a parenthesis, punctuation or the end (``cannot open report (corrupt)``).
+
+    What still passes: a short ASCII stem such as ``notes`` or ``data`` standing as a
+    word of the message ("no notes found"), since it is more likely the word than the
+    file; the file's path and name are replaced wherever they appear.
+    """
+    word = re.escape(stem)
+    after = r"(?![^\W_])" if _distinctive(stem) else r"(?=\.[^\W\d_]|['\"`/\\_-])"
+    return rf"(?<=[/\\'\"`]){word}(?![^\W_])|(?<!\w){word}{after}"
 
 
 def error_text(exc: BaseException, *paths: str | PurePath | None, limit: int = 300) -> str:
