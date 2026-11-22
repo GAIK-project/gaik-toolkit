@@ -323,38 +323,17 @@ EXPECTED_B4 = {
 # Test runner
 # ===================================================================
 
-# A2 and B4 failed when the cases were one test (May 2026); each is marked on its own,
-# so the other six fail when their assertion does. strict=False: a fixed case shows
-# as XPASS, and its mark can then go.
-XFAIL_A2 = pytest.mark.xfail(
-    reason=(
-        "#98: A2 (Format: DD.MM.YYYY) kept the document's ISO date 2024-08-15 instead "
-        "of 15.08.2024. normalize_extracted_data reformats it offline on 0.8.14, so "
-        "this mark may be out of date; a live run settles it."
-    ),
-    strict=False,
-)
-XFAIL_B4 = pytest.mark.xfail(
-    reason=(
-        "#98: B4 (no date in the document, no format) returned an empty chairperson "
-        "instead of 'David Park'."
-    ),
-    strict=False,
-)
-
+# One test per case, so each fails on its own. A2 and B4 were xfail while the cases
+# were one test (May 2026); both pass live on gaik 0.11 (#98), so no case is marked.
 FORMAT_CASES = [
     pytest.param(TASK_FORMAT_DD_SLASH_MM_SLASH_YYYY, DOC_A1, EXPECTED_A1, id="A1-dd-mm-yyyy-slash"),
-    pytest.param(
-        TASK_FORMAT_DD_DOT_MM_DOT_YYYY, DOC_A2, EXPECTED_A2, id="A2-dd-mm-yyyy-dot", marks=XFAIL_A2
-    ),
+    pytest.param(TASK_FORMAT_DD_DOT_MM_DOT_YYYY, DOC_A2, EXPECTED_A2, id="A2-dd-mm-yyyy-dot"),
     pytest.param(TASK_FORMAT_YYYY_MM_DD, DOC_A3, EXPECTED_A3, id="A3-yyyy-mm-dd"),
     pytest.param(TASK_FORMAT_MM_SLASH_DD_SLASH_YYYY, DOC_A4, EXPECTED_A4, id="A4-mm-dd-yyyy-slash"),
     pytest.param(TASK_NO_FORMAT_EU_DOT, DOC_B1, EXPECTED_B1, id="B1-no-format-eu-dot-to-iso"),
     pytest.param(TASK_NO_FORMAT_WRITTEN, DOC_B2, EXPECTED_B2, id="B2-no-format-written-to-iso"),
     pytest.param(TASK_NO_FORMAT_SLASH, DOC_B3, EXPECTED_B3, id="B3-no-format-slash-to-iso"),
-    pytest.param(
-        TASK_NO_FORMAT_MISSING, DOC_B4, EXPECTED_B4, id="B4-no-format-missing-date", marks=XFAIL_B4
-    ),
+    pytest.param(TASK_NO_FORMAT_MISSING, DOC_B4, EXPECTED_B4, id="B4-no-format-missing-date"),
 ]
 
 
