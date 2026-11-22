@@ -454,7 +454,8 @@ def test_data_inside_a_description_and_a_plural_do_not_make_a_field_a_date(name,
 @pytest.mark.parametrize(
     ("name", "task_line", "expected_format"),
     [
-        # FieldSpec lowercases a camelCase name without splitting it.
+        # FieldSpec splits a camelCase name (due_date); its line in the task
+        # is still found in camelCase.
         ("dueDate", "- dueDate (DD.MM.YYYY)", "%d.%m.%Y"),
         ("invoiceDate", "- invoiceDate", None),
         ("dateOfBirth", "- dateOfBirth", None),
