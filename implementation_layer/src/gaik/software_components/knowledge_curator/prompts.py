@@ -44,7 +44,10 @@ report instructions; without one, in the language of the source. Use neutral, fa
 wording. You may use the surrounding text to name what the quote refers to, but state no \
 more than the source says. Every number in the summary (a year, a count, a measure, \
 an amount) must appear in the quote or the time_qualifier as the source writes it; do not \
-compute ages, totals or differences.
+compute ages, totals or differences. A number of the time_qualifier counts only where the \
+cited source has the same digits. A month the source writes as a word in a date counts \
+as its number, so "14 March 2026" in the source lets the summary write 14.3.2026; any \
+other number the source writes in words does not, so write it in words too.
 - quote: the exact words of one source that support the summary, copied letter for \
 letter: a short contiguous span, such as a sentence or a clause. No ellipses, no \
 paraphrase, no translation, and no corrected spelling; keep transcription and OCR errors \
@@ -172,7 +175,9 @@ def build_retry_prompt(failures: list[str], conflict_failures: Sequence[str] = (
 
 Quotes must be copied verbatim, letter for letter, from the cited source, and \
 source.file must be the label of that source's block exactly. Every number in a summary \
-must appear in its quote or time_qualifier. Fix each failing unit by copying the exact \
+must appear in its quote or time_qualifier, and a time_qualifier number counts only where \
+the cited source has the same digits (a month written as a word in a date counts as its \
+number; other numbers written in words do not). Fix each failing unit by copying the exact \
 words from its source, or by stating in the summary only the numbers the quote gives; \
 drop a unit only if no exact words support it, and then list its required item as \
 missing if no other unit covers it.""")

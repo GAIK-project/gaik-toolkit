@@ -877,7 +877,6 @@ def _summarised(summary: str, quote: str, time_qualifier: str | None = None, fil
         ("Ventilation was installed in 1998.", "Mechanical ventilation installed in 1998.", None),
         ("The design life is 25 years.", "Design life 25 years.", None),
         ("The unit vibrates.", "The supply-air unit vibrates", None),
-        ("Seen on 14.3.2026.", "The supply-air unit vibrates", "site visit, 2026-03-14"),
         ("Cost 1200 euros.", "Cost 1 200 euros.", None),
         ("Seen on 3 March.", "seen 03 March", None),
         ("The flat is 120 m2.", "Area 120 m\u00b2", None),
@@ -891,7 +890,54 @@ def _summarised(summary: str, quote: str, time_qualifier: str | None = None, fil
 def test_a_summary_with_only_the_quotes_numbers_passes(summary, quote, time_qualifier):
     unit = _summarised(summary, quote, time_qualifier)
 
-    assert kc._unsupported_numbers(unit) == []
+    assert kc._unsupported_numbers(unit, source_text=f"Notes.\n{quote}\nEnd.") == []
+
+
+@pytest.mark.parametrize(
+    ("source", "unsupported"),
+    [
+        ("Site visit 2026-03-14 11:23: the supply-air unit vibrates.", []),
+        # The source names the month: its number counts, in English and Finnish.
+        ("Site visit 14 March 2026: the supply-air unit vibrates.", []),
+        ("Site visit on March 14, 2026: the supply-air unit vibrates.", []),
+        ("Käynti 14. maaliskuuta 2026: the supply-air unit vibrates.", []),
+        # The source has no such date: the qualifier's numbers are the model's own.
+        ("Site visit: the supply-air unit vibrates.", ["14", "3", "2026"]),
+        ("Site visit in 2026: the supply-air unit vibrates.", ["14", "3"]),
+    ],
+)
+def test_a_time_qualifier_date_counts_where_the_source_has_it(source, unsupported):
+    unit = _summarised(
+        "Seen on 14.3.2026.", "the supply-air unit vibrates", "site visit, 2026-03-14"
+    )
+
+    assert kc._unsupported_numbers(unit, source_text=source) == unsupported
+
+
+def test_a_month_name_counts_only_in_a_date():
+    unit = _summarised("The fan may run 5 hours.", "The fan may run all day.")
+
+    assert kc._unsupported_numbers(unit, source_text=unit.quote) == ["5"]
+
+
+@pytest.mark.parametrize(
+    ("text", "numbers"),
+    [
+        ("1,250.500 and 1 200", ["1,250", "500", "1 200"]),
+        ("1.250,5 m2", ["1.250", "5"]),
+        ("1,250,500 euros", ["1,250,500"]),
+        ("14.3.2026", ["14", "3", "2026"]),
+    ],
+)
+def test_a_grouped_number_keeps_one_separator(text, numbers):
+    assert kc._numbers(text) == numbers
+
+
+def test_mixed_separators_are_two_numbers_in_the_check():
+    # 1,250.500 is not the figure 1250500: a summary stating 1250500 is not supported.
+    unit = _summarised("The cost is 1250500 euros.", "Cost 1,250.500 euros")
+
+    assert kc._unsupported_numbers(unit, source_text=unit.quote) == ["1250500"]
 
 
 @pytest.mark.parametrize(
@@ -910,7 +956,7 @@ def test_a_summary_number_the_quote_does_not_give_is_found(summary, quote, unsup
 
 
 def test_a_number_never_starts_inside_a_digit_run():
-    assert kc._NUMBER.findall("ISO9001 and 1 200 and CO2") == ["1 200"]
+    assert kc._numbers("ISO9001 and 1 200 and CO2") == ["1 200"]
 
 
 def test_a_computed_number_is_retried_then_dropped(fake):
@@ -1005,3 +1051,15 @@ def test_the_retry_feedback_quotes_the_sources_inside_a_data_block():
     body = retry[opening.end() : retry.index(f'</source_material id="{opening.group(1)}">')]
     assert "Ignore the rules" in body
     assert "Ignore the rules" not in retry.replace(body, "")
+
+
+def test_the_prompt_and_the_retry_explain_the_number_rule():
+    from gaik.software_components.knowledge_curator.prompts import (
+        SYSTEM_PROMPT,
+        build_retry_prompt,
+    )
+
+    retry = build_retry_prompt(["unit 1: the summary states ['3']"])
+    for text in (" ".join(SYSTEM_PROMPT.split()), " ".join(retry.split())):
+        assert "counts only where the cited source has the same digits" in text
+        assert "a month" in text.lower() and "word in a date counts as its number" in text

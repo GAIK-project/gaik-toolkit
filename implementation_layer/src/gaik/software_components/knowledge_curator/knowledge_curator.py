@@ -149,10 +149,13 @@ def _as_cited(answer: CurationResponse, cited: _Cited) -> CurationResponse:
     return answer.model_copy(update={"units": units})
 
 
-# A number: a digit run, or groups of three digits with a thousands separator between
-# them ("1 200", "1,200", "1.200"). Any other separator splits numbers, so a date such
-# as 14.3.2026 is 14, 3 and 2026, and a decimal 1,5 is 1 and 5, however a source writes it.
-_NUMBER = re.compile(r"(?<![^\W_])(?:\d{1,3}(?:[.,\u00a0\u202f ]\d{3})+(?!\d)|\d+)")
+# A number: a digit run, or groups of three digits with one thousands separator between
+# them ("1 200", "1,200", "1.200", "1,250,500"). Any other separator splits numbers, so a
+# date such as 14.3.2026 is 14, 3 and 2026, a decimal 1,5 is 1 and 5, and 1,250.500 is
+# 1250 and 500, however a source writes it.
+_NUMBER = re.compile(
+    r"(?<![^\W_])(?:\d{1,3}(?P<sep>[.,\u00a0\u202f ])\d{3}(?:(?P=sep)\d{3})*(?!\d)|\d+)"
+)
 # A number glued to letters before it, such as the 2 in m2, CO2 or ISO9001, is part of a
 # unit or a name, not a figure of the fact: the lookbehind above leaves it out, and it
 # never starts inside a digit run, so it does not take the 001 of ISO9001 either.
@@ -160,6 +163,46 @@ _SEPARATORS = re.compile(r"[.,\u00a0\u202f ]")
 # Every digit run, glued to letters or not: what a quote gives. "ISO9001" in a quote
 # supports "ISO 9001" in the summary.
 _DIGIT_RUN = re.compile(r"\d+")
+# A month written as a word in a date, "14 March 2026", "March 14", "14. maaliskuuta":
+# the source gives the month's number, so a summary may write the date 14.3.2026.
+_MONTH_IN_DATE = re.compile(
+    r"(?<!\d)\d{1,2}\.?\s+(?P<after>[^\W\d_]+)|(?P<before>[^\W\d_]+)\.?\s+\d{1,4}(?!\d)"
+)
+_MONTHS = {
+    name: n
+    for n, names in enumerate(
+        [
+            ("january", "jan"),
+            ("february", "feb"),
+            ("march", "mar"),
+            ("april", "apr"),
+            ("may",),
+            ("june", "jun"),
+            ("july", "jul"),
+            ("august", "aug"),
+            ("september", "sep", "sept"),
+            ("october", "oct"),
+            ("november", "nov"),
+            ("december", "dec"),
+        ],
+        start=1,
+    )
+    for name in names
+}
+_FINNISH_MONTHS = (
+    "tammi helmi maalis huhti touko kes\u00e4 hein\u00e4 elo syys loka marras joulu"
+).split()
+
+
+def _month_number(word: str) -> int | None:
+    """The number of a month name in English or Finnish (any case or inflection)."""
+    word = word.lower()
+    if word in _MONTHS:
+        return _MONTHS[word]
+    for n, stem in enumerate(_FINNISH_MONTHS, start=1):
+        if word.startswith(stem + "kuu"):
+            return n
+    return None
 
 
 def _digits(number: str) -> str:
@@ -167,17 +210,26 @@ def _digits(number: str) -> str:
     return _SEPARATORS.sub("", number).lstrip("0") or "0"
 
 
+def _numbers(text: str) -> list[str]:
+    """Every number in ``text`` as written, by :data:`_NUMBER`."""
+    return [m.group(0) for m in _NUMBER.finditer(text)]
+
+
 def _given_numbers(text: str) -> set[str]:
-    """The digits of every number in ``text``, of each group of a grouped one, and of
-    every digit run glued to letters.
+    """The digits of every number in ``text``, of each group of a grouped one, of
+    every digit run glued to letters, and of every month written as a word in a date.
 
     "4 120" may be one figure or two (a count and an area), so both readings count; the
     9001 of "ISO9001" counts too, so a summary may write it "ISO 9001".
     """
     given = {_digits(run) for run in _DIGIT_RUN.findall(text)}
-    for n in _NUMBER.findall(text):
+    for n in _numbers(text):
         given.add(_digits(n))
         given.update(_digits(part) for part in _SEPARATORS.split(n) if part)
+    for match in _MONTH_IN_DATE.finditer(text):
+        month = _month_number(match.group("after") or match.group("before"))
+        if month is not None:
+            given.add(str(month))
     return given
 
 
@@ -187,8 +239,9 @@ def _unsupported_numbers(unit: CuratedUnit, source_text: str | None = None) -> l
     The quote check confirms only that the quote is in its source; this confirms that the
     summary states no number of its own, such as an age computed from a year or a figure
     copied from another part of the source. Numbers are compared by their digits, so
-    "1 200" in the quote supports "1200" in the summary and "03" supports "3"; a number
-    written in words is not checked.
+    "1 200" in the quote supports "1200" in the summary and "03" supports "3", and a month
+    the quote writes as a word in a date ("14 March 2026") supports its number; a number
+    the summary writes in words is not checked.
     """
     given = _given_numbers(unit.quote)
     # The time qualifier is the model's own text: its numbers count only where the
@@ -197,7 +250,7 @@ def _unsupported_numbers(unit: CuratedUnit, source_text: str | None = None) -> l
     if source_text is not None:
         qualifier &= _given_numbers(source_text)
     given |= qualifier
-    return [n for n in _NUMBER.findall(unit.summary) if _digits(n) not in given]
+    return [n for n in _numbers(unit.summary) if _digits(n) not in given]
 
 
 def _failing_units(answer: CurationResponse, cited: _Cited) -> list[tuple[int, str, str]]:
