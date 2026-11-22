@@ -4,6 +4,7 @@
   (on Windows an open file cannot be deleted).
 - DoclingParser and VisionPlusParser accept enable_table_structure=False: Docling refuses
   table_structure_options=None.
+- DoclingParser reads the .txt it advertises, and its structured text keeps tables.
 """
 
 from __future__ import annotations
@@ -90,3 +91,60 @@ def test_vision_plus_parser_takes_table_structure_off():
     )
 
     assert parser.pipeline_options.do_table_structure is False
+
+
+@pytest.mark.parametrize("use_markdown", [True, False])
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig", "cp1252", "utf-16"])
+def test_docling_parser_reads_the_txt_it_advertises(tmp_path, use_markdown, encoding):
+    parser = _docling_parser()
+    path = tmp_path / "notes.txt"
+    path.write_bytes("Kokous 3.5.\nPäätös: hyväksytty, 1 200 €\n".encode(encoding))
+
+    assert parser.is_supported_file(str(path))
+    result = parser.parse_document(str(path), use_markdown=use_markdown)
+
+    assert result["text_content"] == "Kokous 3.5.\nPäätös: hyväksytty, 1 200 €\n"
+    assert result["file_extension"] == ".txt"
+    assert result["parsing_method"] == "docling"
+    assert result["format_used"] == ("markdown" if use_markdown else "structured")
+
+
+def test_docling_structured_text_keeps_tables_in_reading_order():
+    pytest.importorskip("docling")
+    from docling_core.types.doc import (
+        ContentLayer,
+        DocItemLabel,
+        DoclingDocument,
+        TableCell,
+        TableData,
+    )
+    from gaik.software_components.parsers.docling import DoclingParser
+
+    document = DoclingDocument(name="report")
+    document.add_text(label=DocItemLabel.TEXT, text="Before the table")
+    rows = [["Item", "Qty"], ["Widget", "12"]]
+    cells = [
+        TableCell(
+            text=text,
+            start_row_offset_idx=r,
+            end_row_offset_idx=r + 1,
+            start_col_offset_idx=c,
+            end_col_offset_idx=c + 1,
+            column_header=r == 0,
+        )
+        for r, row in enumerate(rows)
+        for c, text in enumerate(row)
+    ]
+    document.add_table(data=TableData(num_rows=2, num_cols=2, table_cells=cells))
+    document.add_text(
+        label=DocItemLabel.PAGE_FOOTER, text="Page 1", content_layer=ContentLayer.FURNITURE
+    )
+    document.add_text(label=DocItemLabel.TEXT, text="After the table")
+
+    text = DoclingParser._extract_structured_text(DoclingParser.__new__(DoclingParser), document)
+
+    before, table, footer, after = text.split("\n\n")
+    assert before == "Before the table"
+    assert "Widget" in table and "12" in table and table.startswith("| Item")
+    # The page footer was in the structured text before, and stays.
+    assert (footer, after) == ("Page 1", "After the table")
