@@ -18,12 +18,10 @@ Main Interface:
 from __future__ import annotations
 
 import copy
-import hashlib
 import math
 import re
 import time
 import types
-import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field as _dc_field
@@ -259,85 +257,6 @@ def _schema_effort(
 # Fixed schema for parsing the user's extraction requirements
 # -----------------------------------------------------------------------------
 
-# Letters without a Unicode decomposition to ASCII, written as they are read.
-_LETTER_SPELLINGS = {
-    "ß": "ss",
-    "ẞ": "Ss",
-    "æ": "ae",
-    "Æ": "Ae",
-    "œ": "oe",
-    "Œ": "Oe",
-    "ø": "o",
-    "Ø": "O",
-    "ð": "d",
-    "Ð": "D",
-    "đ": "d",
-    "Đ": "D",
-    "þ": "th",
-    "Þ": "Th",
-    "ł": "l",
-    "Ł": "L",
-    "ı": "i",
-    "ħ": "h",
-    "Ħ": "H",
-}
-
-
-def _has_letter(text: str) -> bool:
-    """Whether ``text`` has a letter of any script (``²`` and ``Ⅳ`` are not letters)."""
-    return any(unicodedata.category(char).startswith("L") for char in text)
-
-
-def _fold_letter(char: str) -> str:
-    """An accented or special Latin letter as ASCII letters; any other character as is.
-
-    Only letters are folded. A superscript, subscript, fraction or Roman numeral
-    (``²``, ``₁``, ``½``, ``Ⅳ``) is not a letter and stays, so a name loses it as
-    before instead of gaining a digit. A letter without an ASCII form (Cyrillic,
-    Greek, CJK) stays too. An invisible format character (a soft hyphen, a
-    zero-width joiner) is dropped, so it does not split a word.
-    """
-    if char.isascii():
-        return char
-    category = unicodedata.category(char)
-    if category == "Cf":
-        return ""
-    if not category.startswith("L"):
-        return char
-    if char in _LETTER_SPELLINGS:
-        return _LETTER_SPELLINGS[char]
-    base = "".join(
-        part for part in unicodedata.normalize("NFKD", char) if not unicodedata.combining(part)
-    )
-    return base if base.isascii() and base.isalpha() else char
-
-
-def _fold_letters(text: str) -> str:
-    """``text`` with its accented Latin letters in ASCII: ``päivämäärä`` -> ``paivamaara``."""
-    return "".join(_fold_letter(char) for char in text)
-
-
-def _to_snake_case(name: str) -> str:
-    """``name`` as ASCII snake_case, or ``""`` when nothing of it is left.
-
-    Accented Latin letters are folded to ASCII (``työmaan_sää`` ->
-    ``tyomaan_saa``), camelCase is split (``dateOfBirth`` -> ``date_of_birth``,
-    ``VATNumber`` -> ``vat_number``), and every run of other characters becomes
-    one underscore. The result is lowercase ASCII, so a second pass changes
-    nothing.
-    """
-    text = _fold_letters(name or "")
-    text = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", text)
-    text = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", text)
-    return re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_").lower()
-
-
-def _fallback_field_name(name: str) -> str:
-    """A stable name for one whose letters have no ASCII form: ``field_`` + 8 hex digits."""
-    normal = unicodedata.normalize("NFC", name.strip())
-    return "field_" + hashlib.sha256(normal.encode("utf-8")).hexdigest()[:8]
-
-
 AllowedTypes = Literal["str", "int", "float", "bool", "list[str]", "date", "decimal", "list[dict]"]
 NUMERIC_FIELD_TYPES = {"int", "float", "decimal"}
 RequirementsParseMode = Literal["normal", "repeated_item"]
@@ -379,22 +298,7 @@ class FieldSpec(BaseModel):
     @field_validator("field_name")
     @classmethod
     def _snake_case(cls, v: str) -> str:
-        """The name as ASCII snake_case: the key the output and saved schemas use.
-
-        Letters are transliterated to readable ASCII rather than kept, because
-        the name is a property key in the provider's schema, and Anthropic takes
-        only ``[a-zA-Z0-9_.-]`` there: ``toimituspäivämäärä`` is
-        ``toimituspaivamaara``, ``größe`` is ``grosse``. camelCase is split
-        (``dueDate`` is ``due_date``). Anything else that is not a letter or an
-        ASCII digit separates words, so ``Pinta-ala (m²)`` is ``pinta_ala_m``, as
-        before. A name that is already snake_case ASCII is unchanged, and the
-        rule gives the same name when it is applied again. A name whose letters
-        have no ASCII form (Cyrillic, Greek, CJK) gets ``field_`` and a stable
-        hash of the name. See :func:`_to_snake_case`.
-        """
-        v2 = _to_snake_case(v)
-        if not re.search(r"[a-z]", v2) and _has_letter(v):
-            v2 = _fallback_field_name(v)
+        v2 = re.sub(r"[^a-zA-Z0-9]+", "_", v).strip("_").lower()
         if not re.match(r"^[a-z][a-z0-9_]*$", v2 or ""):
             raise ValueError("field_name must be snake_case and start with a letter")
         return v2
@@ -669,12 +573,7 @@ def detect_structure_type(
 
 
 def _sanitize_field_name(name: str, fallback: str = "records") -> str:
-    """A container name as FieldSpec writes a field name (:func:`_to_snake_case`).
-
-    An empty result is ``fallback``, and one that starts with a digit gets it in
-    front.
-    """
-    field_name = _to_snake_case(name or "")
+    field_name = re.sub(r"[^a-zA-Z0-9]+", "_", name or "").strip("_").lower()
     if not field_name:
         field_name = fallback
     if not re.match(r"^[a-z]", field_name):
@@ -1561,11 +1460,11 @@ def _label_re(field_name: str) -> re.Pattern[str]:
     """How the task text names a field.
 
     As prose ("delivery date"), as the identifier itself ("delivery_date", often
-    in backticks), in camelCase ("deliveryDate") or with a possessive
-    ("Patient's date of birth" for ``patient_date_of_birth``).
+    in backticks) or with a possessive ("Patient's date of birth" for
+    ``patient_date_of_birth``).
     """
     words = [re.escape(word) + r"(?:['’]s)?" for word in field_name.split("_")]
-    return re.compile(r"\b" + r"[\s_\-]*".join(words) + r"\b", re.IGNORECASE)
+    return re.compile(r"\b" + r"[ _]".join(words) + r"\b", re.IGNORECASE)
 
 
 _SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+")
@@ -1596,11 +1495,9 @@ def _field_specific_context(
     the last fallback, cannot tell an output format from one it only mentions.
     """
     pieces: list[str] = []
-    # The name is ASCII ("toimituspaivamaara"), so the task's letters are folded
-    # the same way ("toimituspäivämäärä") before the search.
     label_re = _label_re(field.field_name)
     other_res = [_label_re(f.field_name) for f in other_fields if f.field_name != field.field_name]
-    lines = _fold_letters(original_text).splitlines()
+    lines = original_text.splitlines()
 
     def names_another_field(text: str) -> bool:
         return any(other.search(text) for other in other_res)
