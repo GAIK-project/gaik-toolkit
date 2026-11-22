@@ -3,9 +3,10 @@ genericized.
 
 A mandatory fact/format repair pass for one section: the LLM returns a
 structured ``CorrectionList`` of ``{search, replace, reason}`` edits. Each is
-applied where its search occurs, or else at the one passage it means once case,
-quotes, dashes and whitespace are ignored, or at the one passage within 10% of it
-(``_span.locate``); an edit that fits no passage, or more than one, is retried (up
+applied where its search occurs once, or else at the one passage it means once case,
+quotes, dashes and whitespace are ignored, or at the one passage within 10% of it and
+with the same numbers (``_span.locate``); an edit that fits no passage, or more than
+one, is retried (up
 to ``MAX_ATTEMPTS``). Whatever cannot be applied is returned as human-readable
 warnings rather than raising. An optional style-only ``polish`` pass reuses the
 same editor.

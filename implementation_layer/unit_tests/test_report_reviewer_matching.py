@@ -76,13 +76,39 @@ def test_almost_every_one_letter_change_is_still_applied():
 
 
 def test_a_typo_inside_the_passage_is_found():
-    search = "The roof covering was replaced in 2021 and the gutters were renewed in 2015."
+    search = "The roof covering was replacd in 2012 and the gutters were renewed in 2015."
     text, failed = _apply(
         search, "The roof covering was replaced in 2013 and the gutters were renewed in 2015."
     )
     assert failed == []
     assert "replaced in 2013 and the gutters" in text
     assert text.replace("2013", "2012") == SECTION
+
+
+@pytest.mark.parametrize(
+    "search",
+    [
+        # Within 10% of the passage, but a different number is a different fact.
+        "The roof covering was replaced in 2021 and the gutters were renewed in 2015.",
+        "The roof covering was replaced in 2012 and the gutters were renewed in 2016.",
+        "two tiles near the chimney are cracked, 3 of them",
+    ],
+)
+def test_a_close_match_that_changes_a_number_is_refused(search):
+    text, failed = _apply(search)
+    assert text == SECTION
+    assert failed[0]["error"] in (_span.NUMBER_DIFFERS, _span.NOT_FOUND)
+
+
+def test_a_number_differs_error_is_given_for_a_changed_year():
+    text = "Intro. The roof was repaired in 2020. Walls are intact. Doors are new."
+    assert _span.locate(text, "The roof was repaired in 2021. Walls are intact.") == (
+        _span.NUMBER_DIFFERS
+    )
+    # Swapped words are more than a typo.
+    assert not isinstance(
+        _span.locate(text, "The walls were repaired in 2020. Roof is intact."), _span.Span
+    )
 
 
 def test_quotes_dashes_case_and_spaces_are_ignored():
@@ -101,7 +127,7 @@ def test_quotes_dashes_case_and_spaces_are_ignored():
 
 def test_an_edit_that_fits_two_passages_is_unresolved():
     text = "The roof leaks badly. Later: The roof leaks badly."
-    for search in ("the roof leaks badly.", "The roof leaks badlx."):
+    for search in ("The roof leaks badly.", "the roof leaks badly.", "The roof leaks badlx."):
         new, applied, failed = _apply_corrections(
             text, [Correction(search=search, replace="X", reason="r")]
         )

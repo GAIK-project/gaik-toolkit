@@ -4,12 +4,12 @@ A reviewer copies its ``search`` from the draft, but not always letter for lette
 curly quote, a double space, a changed case or a typo. :func:`locate` finds the one
 passage of the text such a search means, or says why it cannot:
 
-1. the search as it is;
+1. the search as it is, when it occurs exactly once;
 2. the search with case, quote and dash styles and whitespace runs ignored, when that
    form occurs exactly once;
 3. a close match: the pieces of the search that occur exactly once in the text anchor
    it, and the characters between and around them must differ in no more than
-   ``1 - threshold`` of the passage. Where an edge of the search is changed, the
+   ``1 - threshold`` of the passage, never in a number. Where an edge of the search is changed, the
    passage's edge is taken only when one place for it is clearly better; two spans
    that fit (two passages, or a passage with and without the character beside it)
    leave the edit unresolved, so an edit never lands on a shifted or a second span.
@@ -21,6 +21,7 @@ whatever the lengths of the text and the search.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 # Curly quotes, dashes and the no-break spaces as their plain forms.
@@ -53,6 +54,9 @@ _MAX_CELLS = 250_000
 
 NOT_FOUND = "not found in the text"
 AMBIGUOUS = "fits more than one passage; copy it exactly, with enough words to be unique"
+NUMBER_DIFFERS = "not found in the text: the closest passage has other numbers; copy it exactly"
+
+_DIGITS = re.compile(r"\d+")
 
 
 @dataclass(frozen=True)
@@ -298,9 +302,11 @@ def _fuzzy(search: str, text: str, threshold: float) -> tuple[int, int] | str:
 
 def locate(text: str, search: str, threshold: float = 0.9) -> Span | str:
     """The :class:`Span` of ``text`` that ``search`` means, or why there is none
-    (:data:`NOT_FOUND` or :data:`AMBIGUOUS`)."""
+    (:data:`NOT_FOUND`, :data:`AMBIGUOUS` or :data:`NUMBER_DIFFERS`)."""
     if search and search in text:
         start = text.find(search)
+        if text.find(search, start + 1) >= 0:
+            return AMBIGUOUS
         return Span(start, start + len(search))
     core = search.strip()
     if not core:
@@ -319,6 +325,12 @@ def locate(text: str, search: str, threshold: float = 0.9) -> Span | str:
         return NOT_FOUND
     else:
         span = _fuzzy(folded_core, folded_text, threshold)
+        # A close match may differ in a letter, never in a number: "2021" for a
+        # passage that says "2020" is a different fact, not a typo.
+        if not isinstance(span, str) and _DIGITS.findall(
+            folded_text[span[0] : span[1]]
+        ) != _DIGITS.findall(folded_core):
+            return NUMBER_DIFFERS
     if isinstance(span, str):
         return span
     start, end = where[span[0]], where[span[1] - 1] + 1
