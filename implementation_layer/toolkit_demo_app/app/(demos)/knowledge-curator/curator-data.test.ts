@@ -144,3 +144,11 @@ test("the examples rank primary sources first, as their instructions describe", 
     expect(example.summary).not.toContain("instructions say");
   }
 });
+
+test("the example with conflicts does not promise them settled where gaik cannot rank sources", () => {
+  // Its instructions only label the sources primary or secondary, so on gaik 0.11.1
+  // the model may well leave its conflicts open.
+  const sale = EXAMPLES.find((example) => example.id === "sale")!;
+  expect(sale.tags).toContain("conflicts");
+  expect(sale.summary).toContain("may leave the conflicts open");
+});

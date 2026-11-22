@@ -64,7 +64,7 @@ export const EXAMPLES: CuratorExample[] = [
     id: "sale",
     title: "A pre-sale inspection where sources disagree",
     summary:
-      "An inspector's notes and readings, the primary sources, against the seller's disclosure. They disagree about the roof and the bathroom.",
+      "An inspector's notes and readings, the primary sources, against the seller's disclosure. They disagree about the roof and the bathroom. A gaik release that cannot rank sources by class may leave the conflicts open for you to settle.",
     tags: ["3 sources", "3 topics", "conflicts"],
     url: "/knowledge-curator-examples/sale-inspection.json",
     sections: [
