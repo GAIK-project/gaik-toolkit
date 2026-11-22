@@ -123,6 +123,7 @@ def test_a_listed_host_may_use_plain_http_and_a_malformed_entry_is_named(tmp_pat
         "134744072",  # the same address as one number
         "0x08080808",  # and in hex
         "8.8.8",  # a short form the resolver reads as 8.8.0.8
+        "0.0.0.0",  # where a server listens, not a server
         "api.openai.com",
         "my-resource.openai.azure.com",
         "aitta-api.csc.fi",
@@ -138,6 +139,12 @@ def test_local_endpoints_refuse_public_addresses_and_cloud_model_hosts(tmp_path,
     assert any(repr(entry) in p for p in problems), problems
     with pytest.raises(ValueError, match="local_endpoints entry"):
         scaffold_poc(_document(models=models, external=external), tmp_path)
+
+
+def test_a_public_ip_address_refusal_says_to_list_the_servers_dns_name():
+    models = {**LOCAL, "local_endpoints": ["8.8.8.8"]}
+    problems = _rule13(validate(_document(models=models, external=False)))
+    assert any("public IP address" in p and "DNS name" in p for p in problems), problems
 
 
 def test_local_endpoints_keep_private_addresses_and_own_host_names(tmp_path):

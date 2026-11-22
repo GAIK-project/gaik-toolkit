@@ -402,7 +402,9 @@ def _local_endpoint_problem(entry: object) -> str | None:
 
     The PoC sends the stage's key to a listed host, over plain http too, and treats
     a stage there as local. A public IP address or a cloud model API host is never a
-    server of the user's own; a public domain name cannot be checked here.
+    server of the user's own, and 0.0.0.0 is no server's address; a public domain
+    name cannot be checked here, so a server of the user's own on a public IP
+    address is listed by its DNS name.
     """
     import ipaddress
 
@@ -420,10 +422,17 @@ def _local_endpoint_problem(entry: object) -> str | None:
                 f"models.local_endpoints entry {entry!r} reads as an IP address; write it "
                 "as four decimal numbers such as '192.168.1.20'"
             )
+        if address.is_unspecified:
+            return (
+                f"models.local_endpoints entry {entry!r} is the address a server listens on, "
+                "not one to connect to; list the server's own address or host name "
+                "('localhost' for this machine needs no entry)"
+            )
         if address.is_global:
             return (
                 f"models.local_endpoints entry {entry!r} is a public IP address; list only "
-                "servers on your own network"
+                "servers on your own network. For a server of your own on a public IP "
+                "address, list its DNS name instead"
             )
     if _cloud_model_api_host(text):
         return (
