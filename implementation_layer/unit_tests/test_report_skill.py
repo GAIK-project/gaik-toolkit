@@ -432,6 +432,39 @@ def test_preflight_checks_the_source_files(tmp_path, capsys, monkeypatch):
     assert "report instructions are empty" in warnings
 
 
+def test_preflight_names_a_source_or_sample_over_the_input_limits(tmp_path, capsys, monkeypatch):
+    from gaik.software_components.input_limits import InputLimits
+
+    # The normalizer's limits, made small enough for a test file to exceed them.
+    monkeypatch.setattr(
+        InputLimits,
+        "local_parsing",
+        classmethod(lambda cls: cls(max_file_bytes=200, max_pages=None)),
+    )
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "big_notes.txt").write_text("x" * 500, encoding="utf-8")
+    (tmp_path / "sample.md").write_text("# Sample\n\n" + "y" * 500, encoding="utf-8")
+    spec_path = write_spec(
+        tmp_path,
+        sources={"primary": ["inputs/site_notes.txt", "inputs/big_notes.txt"]},
+        sample_report="sample.md",
+    )
+    code, out = cli(capsys, "preflight", spec_path, tmp_path / "ws")
+
+    assert code == rr.EXIT_INPUT
+    limit_errors = [e for e in out["errors"] if "InputLimits.max_file_bytes" in e]
+    assert len(limit_errors) == 2, out["errors"]
+    assert any(e.startswith("big_notes.txt is 500 bytes") for e in limit_errors)
+    assert any(e.startswith("sample.md is ") for e in limit_errors)
+    assert not any("site_notes.txt" in e for e in out["errors"])
+
+    # normalize stops in the same check, before the writer converts any file.
+    code, out = cli(capsys, "normalize", spec_path, tmp_path / "ws")
+    assert code == rr.EXIT_INPUT
+    assert not (tmp_path / "ws" / "normalized").exists()
+
+
 def test_preflight_rejects_a_sample_report_that_needs_a_model(tmp_path, capsys):
     (tmp_path / "sample.mp3").write_bytes(b"x")
     spec_path = write_spec(tmp_path, sample_report="sample.mp3")

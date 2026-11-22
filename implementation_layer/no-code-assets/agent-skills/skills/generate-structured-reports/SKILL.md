@@ -141,7 +141,8 @@ python <skill>/scripts/run_report.py preflight --spec SPEC --workspace WS --chec
 It costs nothing. It loads the spec with `ReportSpec.load()` and adds the checks the library
 makes only after money is spent, or never: PDF pages with no text layer (and pages with so
 little text they may be scans), duplicate file names, unsupported files, recordings with a
-provider that cannot transcribe them, a missing Pandoc (when it is reported and the user wants
+provider that cannot transcribe them, sources or a sample report over gaik's input limits
+(step 4), a missing Pandoc (when it is reported and the user wants
 Word, offer the install as in step 1; otherwise set `settings.docx` to `false`), and any input
 placed inside the workspace's stage folders, which the stages delete. Fix every error. Show the user each warning that changes the report, such as pages that
 will be missing.
@@ -159,6 +160,19 @@ speech model mishears some of them, especially names it has not seen. Never corr
 your own. Propose each correction to the user with the source that supports it and, once they
 agree, make it in the normalized text and keep a note of it
 (`references/review-and-resume.md`). What no other source settles stays as transcribed.
+
+**Input limits.** Since gaik 0.11.0 the normalizer refuses a file over its input limits with
+`InputLimitError`: the stage fails (exit 5, `normalize-failed`) and the message names the file
+and the limit. The helper keeps gaik's defaults and cannot raise them: a document, spreadsheet,
+text or image file up to 100 MiB (a DOCX or XLSX may unpack to ten times that), an image up to
+89,478,485 pixels, a recording up to 6 hours, and up to 1,000,000 data rows per sheet or CSV
+file. A PDF's page count is not limited. Preflight reports every limit but the rows, at no
+cost; the normalizer checks the sources before it converts any of them, but counts a sheet's
+rows only while reading it, after the files listed before it were converted (recordings and
+images included, which are paid). Tell the user which file is over which limit, and let them
+choose: a smaller file (a document split in parts, part of a sheet exported, a recording
+shortened or split) or the file left out. Never cut a file or drop it from the spec without
+their yes.
 
 ### 5. The report spec, agreed in chat
 
