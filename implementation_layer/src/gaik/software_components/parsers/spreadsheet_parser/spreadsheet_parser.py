@@ -342,7 +342,12 @@ class SpreadsheetParser:
         elif suffix == ".csv":
             self.limits.check_file_size(path)
             check_file_type(path, TEXT_TYPES)
-            text = decode_text(path.read_bytes(), path, self.csv_encoding)
+            text = decode_text(
+                path.read_bytes(),
+                path,
+                self.csv_encoding,
+                advice="save it as UTF-8 (in Excel: CSV UTF-8) or pass csv_encoding",
+            )
             delimiter = self.csv_delimiter or _csv_delimiter(text)
             reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
             rows = count_table_rows(reader, self.limits, path.name)

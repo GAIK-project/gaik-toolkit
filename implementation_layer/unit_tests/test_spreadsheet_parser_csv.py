@@ -116,3 +116,35 @@ def test_csv_neither_utf8_nor_cp1252_is_refused_with_the_fix(tmp_path):
 
     with pytest.raises(ValueError, match="neither UTF-8 nor Windows-1252.*CSV UTF-8"):
         SpreadsheetParser().parse_spreadsheet(path)
+
+
+def test_a_utf8_csv_with_a_stray_byte_stays_utf8_without_its_byte_order_mark(tmp_path, caplog):
+    # The mark says UTF-8: one bad byte must not turn the file into cp1252 mojibake.
+    path = tmp_path / "places.csv"
+    path.write_bytes(b"\xef\xbb\xbf" + "name;city\nAda;Hämeenlinna\nBo;caf".encode() + b"\xe9\n")
+
+    with caplog.at_level("WARNING"):
+        lines = SpreadsheetParser().parse_spreadsheet(path).splitlines()
+
+    assert lines[0] == "| Row | name | city |"
+    assert lines[2] == "| 2 | Ada | Hämeenlinna |"
+    assert lines[3] == "| 3 | Bo | caf\ufffd |"
+    assert "byte order mark" in caplog.text
+
+
+def test_binary_content_with_nul_bytes_after_the_first_8_kib_is_refused(tmp_path):
+    # The type check reads 8 KiB; content past it that is no UTF-8 and holds NUL
+    # bytes is binary, not cp1252 text.
+    path = tmp_path / "data.csv"
+    path.write_bytes(b"a;b\n" * 3000 + b"\x00\x00\xff\x00" + b"c;d\n")
+
+    with pytest.raises(ValueError, match=r"data\.csv: the content holds NUL bytes.*csv_encoding"):
+        SpreadsheetParser().parse_spreadsheet(path)
+
+
+def test_a_utf8_csv_with_nul_bytes_is_still_read(tmp_path):
+    # Valid UTF-8 was read before cp1252 existed here; a NUL in it does not change that.
+    path = tmp_path / "data.csv"
+    path.write_bytes(b"a;b\n" * 3000 + b"c;d\x00\n")
+
+    assert "| 3001 | c | d\x00 |" in SpreadsheetParser().parse_spreadsheet(path)

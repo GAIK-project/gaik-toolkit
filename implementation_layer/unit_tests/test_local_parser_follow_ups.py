@@ -109,6 +109,16 @@ def test_docling_parser_reads_the_txt_it_advertises(tmp_path, use_markdown, enco
     assert result["format_used"] == ("markdown" if use_markdown else "structured")
 
 
+def test_docling_parser_refuses_undecodable_txt_without_naming_csv_options(tmp_path):
+    parser = _docling_parser()
+    path = tmp_path / "notes.txt"
+    path.write_bytes(b"Notes\n\x81\x8d\n")
+
+    with pytest.raises(ValueError, match="notes.txt: .*save it as UTF-8") as raised:
+        parser.parse_document(str(path))
+    assert "CSV" not in str(raised.value) and "encoding" not in str(raised.value)
+
+
 def test_docling_structured_text_keeps_tables_in_reading_order():
     pytest.importorskip("docling")
     from docling_core.types.doc import (
