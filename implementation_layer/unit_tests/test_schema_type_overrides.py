@@ -572,3 +572,185 @@ def test_a_model_typed_date_is_a_date_whatever_its_name():
 
     assert requirements.fields[0].field_type == "date"
     assert requirements.fields[0].format == "%d.%m.%Y"
+
+
+# Issue #96: a task-level rule to keep dates as written.
+DRAWING_TASK = """Top-level fields:
+- Drawing title
+- Drawing date
+
+Rules:
+- Preserve original wording, dimensions, dates, and labels.
+"""
+
+
+def _drawing(*extra: FieldSpec) -> ExtractionRequirements:
+    return _requirements(
+        FieldSpec(field_name="drawing_title", field_type="str", description="Drawing title"),
+        FieldSpec(field_name="drawing_date", field_type="date", description="Drawing date"),
+        *extra,
+    )
+
+
+def test_a_task_level_rule_to_keep_dates_keeps_a_date_field_as_written():
+    requirements = _drawing()
+
+    _apply_type_overrides(requirements, original_text=DRAWING_TASK)
+
+    by_name = {field.field_name: field for field in requirements.fields}
+    assert by_name["drawing_date"].field_type == "str"
+    assert by_name["drawing_date"].format is None
+    assert by_name["drawing_title"].field_type == "str"
+    for written in ("12.10.2025", "12 OCT 25"):
+        assert normalize_extracted_data({"drawing_date": written}, requirements) == {
+            "drawing_date": written
+        }
+
+
+def test_the_fields_own_line_format_wins_over_the_task_level_rule():
+    requirements = _drawing()
+    task = DRAWING_TASK.replace("- Drawing date", "- Drawing date (DD/MM/YYYY)")
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    field = requirements.fields[1]
+    assert field.field_type == "date"
+    assert field.format == "%d/%m/%Y"
+    assert normalize_extracted_data({"drawing_date": "2025-10-12"}, requirements) == {
+        "drawing_date": "12/10/2025"
+    }
+
+
+def test_preserve_dates_if_no_format_can_be_inferred_keeps_only_dates_without_one():
+    requirements = _requirements(
+        FieldSpec(field_name="visit_date", field_type="date", description="Visit date"),
+        FieldSpec(field_name="birth_date", field_type="date", description="Date of birth"),
+    )
+    task = (
+        "- Visit date\n"
+        "- Birth date (DD.MM.YYYY)\n"
+        "Preserve dates exactly if the required format cannot be inferred.\n"
+    )
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    by_name = {field.field_name: field for field in requirements.fields}
+    assert by_name["visit_date"].field_type == "str"
+    assert by_name["birth_date"].field_type == "date"
+    assert by_name["birth_date"].format == "%d.%m.%Y"
+
+
+def test_an_all_dates_format_in_the_task_wins_over_the_keep_rule():
+    requirements = _drawing()
+    task = "Use DD.MM.YYYY for all dates.\n" + DRAWING_TASK
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    assert requirements.fields[1].field_type == "date"
+    assert requirements.fields[1].format == "%d.%m.%Y"
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        "Preserve original wording, dimensions, dates, and labels.",
+        "Preserve dates exactly if the required format cannot be inferred.",
+        "Keep all dates as they appear in the document.",
+        "Keep dates as written.",
+        "Leave the dates unchanged.",
+        "Retain the original format of all dates.",
+        "Do not reformat dates.",
+        "Never convert the dates; copy them.",
+        "Do not guess: keep dates as written.",
+        # Directly under the last field bullet, with no blank line.
+        "- Keep dates as written.",
+        "Keep date fields as text.",
+        "Return dates as written.",
+        "Extract all dates exactly as they appear.",
+    ],
+)
+def test_these_task_level_rules_keep_every_date_as_written(rule):
+    requirements = _requirements(
+        FieldSpec(field_name="order_date", field_type="date", description="Order date"),
+        FieldSpec(field_name="due_date", field_type="str", description="Due date"),
+    )
+    task = f"- Order date\n- Due date\n{rule}\n"
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    assert [field.field_type for field in requirements.fields] == ["str", "str"]
+
+
+@pytest.mark.parametrize(
+    "task",
+    [
+        # Issue #96: a rule about something else.
+        "- Drawing date\n\nRules:\n- Preserve original wording of the notes.\n",
+        # PR #204 review: the keep phrase is about another value.
+        "Extract the invoice date and the due date. Dates may appear in several "
+        "formats; keep the amounts unchanged.",
+        "Extract the invoice and due dates, and retain the line item descriptions as written.",
+        "Extract all dates mentioned in the report and keep the original language for "
+        "free-text fields.",
+        "Keep the notes as written and convert dates to ISO.",
+        "Do not keep dates as written; use ISO.",
+        "Don't preserve the dates.",
+        "Keep the notes verbatim, dates in ISO.",
+        # A rule that names a format is a format rule.
+        "Keep the dates in DD.MM.YYYY format.",
+        "Keep dates in ISO format.",
+        "Never return dates as text.",
+        # A singular date names one field's own value.
+        "- Invoice date\n- Drawing date as written on the sheet title block",
+    ],
+)
+def test_a_rule_that_does_not_keep_the_dates_leaves_them_dates(task):
+    requirements = _requirements(
+        FieldSpec(field_name="invoice_date", field_type="date", description="Invoice date"),
+        FieldSpec(field_name="drawing_date", field_type="date", description="Drawing date"),
+    )
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    assert [field.field_type for field in requirements.fields] == ["date", "date"]
+
+
+def test_a_rule_naming_some_dates_keeps_only_those():
+    requirements = _requirements(
+        FieldSpec(field_name="revision_date", field_type="date", description="Revision date"),
+        FieldSpec(field_name="drawing_date", field_type="date", description="Drawing date"),
+        FieldSpec(field_name="invoice_date", field_type="date", description="Invoice date"),
+        FieldSpec(field_name="due_date", field_type="date", description="Due date"),
+    )
+    task = "Keep revision dates as written. Keep the invoice and due dates as printed."
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    assert {f.field_name: f.field_type for f in requirements.fields} == {
+        "revision_date": "str",
+        "drawing_date": "date",
+        "invoice_date": "str",
+        "due_date": "str",
+    }
+
+
+def test_a_rule_in_one_collections_section_does_not_reach_the_parents_dates():
+    # The parent parse reads the whole task, child sections included (PR #204).
+    task = (
+        "Header: drawing number and drawing date.\n"
+        "For each revision: revision number, revision date and note. "
+        "Keep revision dates as written.\n"
+    )
+    parent = _requirements(
+        FieldSpec(field_name="drawing_number", field_type="str", description="Number"),
+        FieldSpec(field_name="drawing_date", field_type="date", description="Drawing date"),
+    )
+    row = _requirements(
+        FieldSpec(field_name="revision_date", field_type="date", description="Revision date")
+    )
+
+    _apply_type_overrides(parent, original_text=task)
+    _apply_type_overrides(row, original_text=task)
+
+    assert parent.fields[1].field_type == "date"
+    assert row.fields[0].field_type == "str"
