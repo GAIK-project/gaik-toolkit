@@ -8,14 +8,14 @@ of documents and categorizing them using LLM-based classification.
 import logging
 from dataclasses import replace
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 from gaik.software_components._log_names import error_text, file_tag
 from gaik.software_components.file_type import detect_file_type
 from gaik.software_components.input_limits import InputLimitError, InputLimits
-from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.base import FIT_TO_BOUNDS, ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.source_material import (
@@ -65,10 +65,12 @@ def _create_classification_model(classes: list[str]):
         document_class: ClassLiteral = Field(  # type: ignore
             ..., description="The classification category"
         )
-        confidence: float = Field(
+        # The classifier's own score and explanation: a strict Claude tool cannot
+        # carry their bounds, so an answer past one is fitted to it instead of failing.
+        confidence: Annotated[float, FIT_TO_BOUNDS] = Field(
             ..., ge=0.0, le=1.0, description="Confidence score between 0 and 1"
         )
-        reasoning: str = Field(
+        reasoning: Annotated[str, FIT_TO_BOUNDS] = Field(
             ..., max_length=200, description="Brief explanation for the classification"
         )
 
@@ -93,7 +95,12 @@ class DocumentClassifier:
     """
 
     def __init__(
-        self, config: dict, model: str | None = None, *, limits: InputLimits | None = None
+        self,
+        config: dict,
+        model: str | None = None,
+        *,
+        limits: InputLimits | None = None,
+        temperature: float | None = 0.0,
     ):
         """
         Initialize document classifier.
@@ -103,6 +110,11 @@ class DocumentClassifier:
             model: Optional model override. If not provided, uses config['model']
             limits: Input limits passed to the parsers; defaults to
                 :class:`~gaik.software_components.input_limits.InputLimits`.
+            temperature: Sampling temperature of the classification call on the
+                OpenAI and Azure client. Defaults to ``0.0``. Pass ``None`` to
+                leave it out, for a model that refuses an explicit temperature
+                (its 400 would otherwise become ``unknown``). Other providers'
+                clients are not sent a temperature, as before.
 
         Example:
             >>> from gaik.software_components.doc_classifier import (
@@ -115,6 +127,7 @@ class DocumentClassifier:
         self.model = model or config["model"]
         self.client = build_compat_client(config)
         self.limits = limits or InputLimits()
+        self.temperature = temperature
 
     def classify(self, file_or_dir: str, classes: list[str], parser: str | None = None) -> dict:
         """
@@ -399,11 +412,12 @@ Provide your classification with:
                     model=self.model,
                 )
             else:
+                sampling = {} if self.temperature is None else {"temperature": self.temperature}
                 response = self.client.beta.chat.completions.parse(
                     model=self.model,
                     messages=messages,
                     response_format=ClassificationModel,
-                    **normalize_chat_kwargs(self.model, {"temperature": 0}, config=self.config),
+                    **normalize_chat_kwargs(self.model, sampling, config=self.config),
                     timeout=30,
                 )
                 parsed = response.choices[0].message.parsed

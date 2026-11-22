@@ -40,8 +40,13 @@ for field in understander.describe_labels(fields, language_hint="fi"):
   cryptic generated id it is always true and `original` tells the person little; a
   label steered through the page's HTML looks the same as a correct one.
 - Invisible format characters (soft hyphens, bidi controls) are removed from both
-  `label` and `original`, so what is compared is what is shown. Escape the labels for
-  the place you show them (HTML, a terminal) as with any page text.
+  `label` and `original`, so what is compared is what is shown. A zero-width joiner
+  between two letters, marks, digits or symbols (it builds an emoji sequence or a letter
+  form) and a zero-width non-joiner between two letters stay, so a label that gained or
+  lost one is `changed`; at an edge or beside a space they go, except a joiner right after
+  a virama, which writes a Malayalam chillu. A model label that shows
+  nothing, only spacing, joiners or marks, is dropped and the page label kept. Escape
+  the labels for the place you show them (HTML, a terminal) as with any page text.
 
 `label` is at most 60 characters, like `clean_labels()`. Field ids must be unique (a
 repeated id raises `ValueError`, since the model answers per id), and `language_hint` is

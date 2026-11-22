@@ -787,7 +787,8 @@
       "model",
       "parser",
       "config",
-      "limits"
+      "limits",
+      "temperature"
     ],
     "supported_providers": [
       "openai",
