@@ -28,9 +28,16 @@ export interface AittaHelper {
   model: string;
   status: string | null;
 }
+/** The kind of model a report demo's model field names. */
+export type ReportModelKind = "chat" | "transcription";
 export interface ServerModels {
   default: string | null;
   models: ServerModel[];
+  /**
+   * The names the report demos' model fields accept for this user, from the lists
+   * their routes check (api/utils/model_allow_list.py). Absent from an older API.
+   */
+  report_models?: Partial<Record<ReportModelKind, string[]>> | null;
   /** With an Aitta model picked, these transcribe and embed. */
   aitta?: { speech: AittaHelper; embedding: AittaHelper } | null;
   /** Where the server's own models run, in the deployment's words. */
@@ -143,6 +150,17 @@ function loadCatalog() {
       catalogRequest = null;
       emit();
     });
+}
+
+/** The names a report demo's model field of this kind accepts; empty until known. */
+export function reportModelNames(
+  catalog: ServerModels | null,
+  kind: ReportModelKind,
+): string[] {
+  const names = catalog?.report_models?.[kind];
+  return Array.isArray(names)
+    ? names.filter((name) => typeof name === "string" && name !== "")
+    : [];
 }
 
 /** The server's models, or null while they load. Empty when it offers none. */
