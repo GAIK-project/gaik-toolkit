@@ -687,7 +687,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "is_supported_file() returns True for both .docx and legacy binary .doc, but parse_document() calls python-docx's Document(), which cannot open the legacy .doc format at all -- a real .doc file is refused with FileTypeMismatchError (a ValueError) before python-docx opens it. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
+    "note": "Reads .docx only: python-docx cannot open the legacy binary .doc (Word 97-2003) format, so a real .doc file is refused with FileTypeMismatchError (a ValueError) whose message says to save it as .docx, and is_supported_file() returns False for .doc; a DOCX saved under the .doc name is still read. Text in content controls and tracked insertions is read; tracked deletions and placeholder-styled text are not. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DoclingParser": {
     "import": "from gaik.software_components.parsers import DoclingParser",
@@ -3108,9 +3108,25 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when sheets can have more than 1,000,000 rows: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "csv_delimiter",
+        "type": "str | None",
+        "default": null,
+        "effect": "The CSV field delimiter, one character. None reads it from the rows: the one of ',', ';', tab and '|' that splits the header and at least 80% of the rows into the same number of fields, else ','. A CSV from Excel in a locale with a decimal comma uses ';'.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; set it only when the user names a delimiter that the rows do not show"
+      },
+      {
+        "name": "csv_encoding",
+        "type": "str | None",
+        "default": null,
+        "effect": "The CSV text encoding, such as utf-8 or cp1252. None reads UTF-8, UTF-16 with a byte order mark, or else Windows-1252 (the ANSI code page of a plain Excel CSV on Western-European Windows); other content raises ValueError.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; set it only when the user names the encoding of files in another code page"
       }
     ],
-    "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
+    "note": "Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "VectorStore": {
     "import": "from gaik.software_components.RAG.vector_store import VectorStore",

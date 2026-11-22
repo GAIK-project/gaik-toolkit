@@ -10,7 +10,7 @@ Vision-based Parsing:
 Local Parsing:
     - PyMuPDFParser: Fast local PDF text extraction using PyMuPDF
     - parse_pdf: Convenience function for PyMuPDF parsing
-    - DocxParser: Fast local Word document (.docx, .doc) text extraction using python-docx
+    - DocxParser: Fast local Word document (.docx) text extraction using python-docx
     - parse_docx: Convenience function for DOCX parsing
     - SpreadsheetParser: Local .xlsx/.csv to Markdown tables with source row numbers
 

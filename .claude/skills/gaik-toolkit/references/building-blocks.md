@@ -466,7 +466,8 @@ the environment variables of the `model_provider` + flag combination. Other opti
 `additional_instructions`.
 
 **Returns:** `ParseResult` — a dataclass with `raw_markdown`, `clean_markdown`, `html`
-(only when `create_html=True`) and `usage`. It has **no `save()` method**; write the file
+(only when `create_html=True`), `usage` and `truncated` (the reply stopped at the
+output-token cap). It has **no `save()` method**; write the file
 yourself.
 
 ---
