@@ -1,5 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { accessDenial, clientIp, forwardReportRun, reportRunHeaders } from "./gate";
+import {
+  accessDenial,
+  clientIp,
+  forwardReportRun,
+  refusalMessage,
+  reportRunHeaders,
+} from "./gate";
 
 const realFetch = globalThis.fetch;
 
@@ -88,6 +94,38 @@ test("an unreachable backend is reported with an id, not the connection error", 
   expect(error).toContain("error id");
   expect(error).not.toContain("ECONNREFUSED");
   expect(error).not.toContain("10.1.2.3");
+});
+
+test("a refused run reaches the page as the API's sentence, not its JSON", async () => {
+  const detail =
+    "The writer model 'any-deployment' is not available on this demo. Leave the field empty for the server's model, or use one of: gpt-6-luna.";
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ detail }), {
+      status: 422,
+      headers: { "content-type": "application/json" },
+    })) as unknown as typeof fetch;
+
+  const response = await forwardReportRun(
+    "/report-writer/run",
+    new FormData(),
+    false,
+    async () => {},
+  );
+
+  expect(response.status).toBe(422);
+  expect(await response.json()).toEqual({ error: detail });
+});
+
+test("a refusal without a sentence in detail is passed on as it came", () => {
+  const validation = JSON.stringify({
+    detail: [{ loc: ["body", "config"], msg: "Field required" }],
+  });
+  expect(refusalMessage(validation)).toBe(validation);
+  expect(refusalMessage("Bad Gateway")).toBe("Bad Gateway");
+  expect(refusalMessage(JSON.stringify({ detail: "" }))).toBe(
+    JSON.stringify({ detail: "" }),
+  );
+  expect(refusalMessage("")).toBe("Generation failed");
 });
 
 test("a report run carries the run token to the backend only when one is set", () => {

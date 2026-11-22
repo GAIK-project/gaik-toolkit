@@ -170,12 +170,34 @@ export function settingsForSpec(settings: RunSettings): SpecSettings {
 
 /**
  * The precedence as a spec carries it: written only when it names a class, since gaik
- * releases before `source_precedence` reject the key.
+ * releases before `source_precedence` reject the key. With `backendTakesIt` false (the
+ * demo's API says its gaik has no such key) it is left out as well, for a run's spec.
  */
 export function precedenceForSpec(
   precedence: SourceClass[],
+  backendTakesIt = true,
 ): { source_precedence?: SourceClass[] } {
-  return precedence.length ? { source_precedence: [...precedence] } : {};
+  return precedence.length && backendTakesIt
+    ? { source_precedence: [...precedence] }
+    : {};
+}
+
+/**
+ * What the page says when the spec ranks source classes but the demo's API runs a gaik
+ * without `source_precedence` (0.11.1): a run leaves the key out, and that release has
+ * the curator resolve a conflict from the report instructions. Null when there is
+ * nothing to say, also while the API has not said (`backendTakesIt` null).
+ */
+export function precedenceNotice(
+  precedence: SourceClass[],
+  backendTakesIt: boolean | null,
+): string | null {
+  if (backendTakesIt !== false || precedence.length === 0) return null;
+  return (
+    `This demo's gaik release has no source precedence, so a run leaves out the spec's ` +
+    `(${precedence.join(" over ")}): conflicts are resolved where the report ` +
+    `instructions rank the sources. The exported spec keeps it.`
+  );
 }
 
 function parsePrecedence(v: unknown): SourceClass[] {

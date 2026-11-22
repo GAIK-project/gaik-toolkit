@@ -87,6 +87,26 @@ def test_each_label_comes_with_the_page_label_and_whether_it_changed(monkeypatch
     assert len(calls) == 1
 
 
+def test_a_page_label_cut_to_60_characters_is_truncated_not_changed(monkeypatch):
+    long_label = "Henkilön koko virallinen nimi sellaisena kuin se on väestörekisterissä"
+    assert len(long_label) > 60
+    # "a": the model gives back the page's own label, cut to 60 by the understander;
+    # "b": the model gives no label, so the page's label is kept, cut to 60.
+    client, _ = _client(monkeypatch, {"a": long_label})
+
+    response = client.post(
+        "/form/understand/",
+        json={"fields": [{"id": "a", "label": long_label}, {"id": "b", "label": long_label}]},
+    )
+
+    assert response.status_code == 200
+    cut = long_label[:60]
+    assert response.json()["labels"] == [
+        {"id": key, "label": cut, "pageLabel": long_label, "changed": False, "truncated": True}
+        for key in ("a", "b")
+    ]
+
+
 def test_the_route_calls_describe_labels_with_the_fields(monkeypatch):
     seen = {}
 

@@ -14,9 +14,10 @@ It can detect and build three schema shapes:
   one repeated child collection, such as purchase order header fields plus line
   items.
 
-Alongside the Pydantic model, it also creates `requirements.json`, which stores
-field metadata used later for post-processing, defaults, date normalization, and
-schema reuse.
+The script saves the model as data in `schema_model.json`, and beside it
+`requirements.json`, which stores field metadata used later for post-processing,
+defaults, date normalization, and schema reuse. It also writes the model as
+`schema.py`, for people to read; gaik never imports that file.
 
 ## Example Script
 
@@ -40,8 +41,9 @@ schema_generated_single_doc/
 The generated folder contains:
 
 ```text
-schema.py
+schema_model.json
 requirements.json
+schema.py
 schema_info.json
 ```
 
@@ -77,18 +79,20 @@ Change this to `use_azure=False` if you want to use standard OpenAI.
 
 ## Using The Generated Schema With DataExtractor
 
-The generated `schema.py` contains a Pydantic model class. The generated
-`requirements.json` contains the field metadata needed for post-processing and
-normalization.
+`schema_model.json` describes the Pydantic model as data, and
+`saved_schema.read_model_file` rebuilds the model from it without importing or
+running any file. The generated `requirements.json` contains the field metadata
+needed for post-processing and normalization. To save a model of your own, use
+`saved_schema.write_model_file(Model, path)`.
 
 Minimal example:
 
 ```python
-import importlib.util
 import json
 from pathlib import Path
 
 from gaik.software_components.extractor import DataExtractor
+from gaik.software_components.extractor.saved_schema import read_model_file
 from gaik.software_components.extractor.schema import (
     CompositeExtractionRequirements,
     ExtractionRequirements,
@@ -97,7 +101,7 @@ from gaik.software_components.config import get_openai_config
 
 
 schema_dir = Path("schema_generated_single_doc")
-schema_path = schema_dir / "schema.py"
+model_path = schema_dir / "schema_model.json"
 requirements_path = schema_dir / "requirements.json"
 
 payload = json.loads(requirements_path.read_text(encoding="utf-8"))
@@ -108,10 +112,9 @@ if payload.get("requirements_type") == "parent_with_nested_list":
 else:
     requirements = ExtractionRequirements(**payload["requirements"])
 
-spec = importlib.util.spec_from_file_location("_generated_schema", schema_path)
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
-extraction_model = getattr(module, model_name)
+# Rebuilt from data: schema.py is never imported.
+extraction_model = read_model_file(model_path)
+assert extraction_model.__name__ == model_name
 
 config = get_openai_config(use_azure=True)
 extractor = DataExtractor(config=config)

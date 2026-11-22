@@ -2,8 +2,8 @@
   "Transcriber": {
     "import": "from gaik.software_components.transcriber import Transcriber",
     "construct": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language)",
-    "construct_finnish": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language, enhanced_transcript=True)  # ONLY when language == 'fi' -- see the enhanced_transcript option's infer_from",
-    "construct_whisper_local": "import os  # not imported by the PoC templates -- add it\n    transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), transcription_model=\"whisper_local\", language=language, diarization=True, speaker_count=speaker_count, local_api_base=os.environ[\"LOCAL_TRANSCRIBER_API_BASE\"], local_api_key=os.environ[\"LOCAL_TRANSCRIBER_API_KEY\"])",
+    "construct_finnish": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language, enhanced_transcript=not external_model_forbidden(config))  # ONLY when language == 'fi' -- see the enhanced_transcript option's infer_from; stays off when the blueprint allows no external model API",
+    "construct_whisper_local": "audio_config = get_stage_config(config, 'transcription')  # config.yaml: stages.transcription.transcription_model: whisper_local\n    enhance = False  # Finnish audio: not external_model_forbidden(config), as in construct_finnish\n    transcriber = Transcriber(api_config=audio_config, transcription_model=\"whisper_local\", language=language, diarization=True, speaker_count=speaker_count, enhanced_transcript=enhance, **local_transcriber_options(config, audio_config, enhanced_transcript=enhance))  # endpoint and key from LOCAL_TRANSCRIBER_API_*, host checked against the governance flags",
     "call": "tr = transcriber.transcribe(input_path)\n    text = tr.enhanced_transcript or tr.raw_transcript",
     "call_whisper_local": "tr = transcriber.transcribe(input_path)\n    segments = tr.segments or []  # each: start, end, text (+ speaker when diarization=True)\n    srt = tr.srt_content          # timings only, no speaker labels",
     "returns": "TranscriptionResult(.raw_transcript, .enhanced_transcript, .job_id, .segments, .srt_content, .vtt_content, .duration_s, .audio_duration_s, .model_used)",
@@ -49,7 +49,7 @@
         "default": null,
         "effect": "Base URL of the self-hosted whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it. Since gaik 0.11.0, the constructor accepts only the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for that address), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS or api_config['allowed_endpoint_hosts']; any other address raises EndpointNotAllowedError (a ValueError).",
         "selection_relevant": true,
-        "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code read it from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app), never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
+        "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code pass **local_transcriber_options(config, audio_config, enhanced_transcript=enhance) from provider_config.py, with the enhance value the Transcriber's enhanced_transcript gets (see construct_whisper_local). The helper reads the URL from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app) and checks its host against the blueprint's governance flags; never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
       {
         "name": "local_api_key",
@@ -57,7 +57,7 @@
         "default": null,
         "effect": "Auth key for the whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it.",
         "selection_relevant": true,
-        "infer_from": "transcription_model == whisper_local -> in generated code read it from the env var LOCAL_TRANSCRIBER_API_KEY (the convention used by toolkit_demo_app), never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
+        "infer_from": "transcription_model == whisper_local -> in generated code pass **local_transcriber_options(config, audio_config, enhanced_transcript=enhance) from provider_config.py, with the enhance value the Transcriber's enhanced_transcript gets (see construct_whisper_local). The helper reads the key from the env var LOCAL_TRANSCRIBER_API_KEY (the convention used by toolkit_demo_app); never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
       {
         "name": "diarization",
@@ -253,7 +253,7 @@
         "infer_from": "keep the default; raise it only for heavily garbled ASR where large repairs are wanted. Where figures and names matter (medical, legal, inspection), keep the raw transcript as the record and have the PoC report result.refused_passes and diff_chunks"
       }
     ],
-    "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=True) instead, which calls this internally. Use this standalone only to enhance an already-existing transcript (text input)."
+    "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=not external_model_forbidden(config)) instead, which calls this internally (off when the blueprint allows no external model API). Use this standalone only to enhance an already-existing transcript (text input)."
   },
   "SchemaGenerator": {
     "import": "from gaik.software_components.extractor import SchemaGenerator",
@@ -2332,7 +2332,7 @@
         "infer_from": "role separation or independent fact-checking wanted (human_review == yes, accuracy_critical) -> a different model on the same provider as the writer; otherwise None"
       }
     ],
-    "note": "End-to-end CURACT report module (report writer v2): SourceNormalizer -> KnowledgeCurator -> ReportSynthesizer (with DraftReviewer). Do NOT add parsers, Transcriber, VisionParser, SourceNormalizer, KnowledgeCurator, ReportSynthesizer or DraftReviewer as separate steps, and do not add LLMJudge. Behaviour knobs other than mode/config are ReportSpec fields, not constructor or run() kwargs: see spec_fields and spec_settings (same shape as options; RunSettings and ModelSettings fields). Build one ReportSpec from the blueprint: target_output_spec.fields -> sections (SectionSpec keys only: id, title, instructions, required_items, depends_on), report-wide rules -> instructions, input files grouped as primary/secondary -> sources. Each stage writes plain files to the workspace, so a human can edit knowledge/*.json and call writer.synthesize(spec, workspace), or edit report/sections/*.md and call writer.rebuild(spec, workspace). Prefer this over the legacy MultiSourceReportGenerator unless the SKILL.md Phase 5 report-writer rule says otherwise (scanned PDFs, unsupported file types, audio with a non-OpenAI/Azure text provider)."
+    "note": "End-to-end CURACT report module (report writer v2): SourceNormalizer -> KnowledgeCurator -> ReportSynthesizer (with DraftReviewer). Do NOT add parsers, Transcriber, VisionParser, SourceNormalizer, KnowledgeCurator, ReportSynthesizer or DraftReviewer as separate steps, and do not add LLMJudge. Behaviour knobs other than mode/config are ReportSpec fields, not constructor or run() kwargs: see spec_fields and spec_settings (same shape as options; RunSettings and ModelSettings fields). Build one ReportSpec from the blueprint: target_output_spec.fields -> sections (SectionSpec keys only: id, title, instructions, required_items, depends_on), report-wide rules -> instructions, input files grouped as primary/secondary -> sources. Each stage writes plain files to the workspace, so a human can edit knowledge/*.json and call writer.synthesize(spec, workspace), or edit report/sections/*.md and call writer.rebuild(spec, workspace). Prefer this over the legacy MultiSourceReportGenerator unless the SKILL.md Phase 5 report-writer rule says otherwise (scanned PDFs, unsupported file types, audio with a non-OpenAI/Azure text provider). When the input includes a file that defines the sections (e.g. report_spec.json with sections of id, title, instructions), those sections take the place of target_output_spec.fields: load them from the file at run time and build each SectionSpec from the section's own id, title, instructions, required_items and depends_on, unchanged (SectionSpec refuses any other key); do not write sections or instructions of your own over the user's."
   },
   "SourceNormalizer": {
     "import": "from gaik.software_components.source_normalizer import SourceNormalizer, NormalizedSources",

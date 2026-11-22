@@ -36,7 +36,9 @@ with PgVectorStore("postgresql://postgres:postgres@localhost:5432/mydb") as stor
 
     # Semantic search (pure vector similarity). The default threshold=0.7
     # drops every row below that cosine similarity; pass 0.0 for recall, for
-    # example when the results go to a Ranker or a RelevanceGate.
+    # example when the results go to a Ranker or a RelevanceGate. Similarity
+    # runs from -1 to 1, so 0.0 still drops rows with a negative similarity
+    # (rare with text embeddings); pass -1.0 to keep every row.
     results = store.search_semantic(query_embedding, top_k=5, threshold=0.0)
 
     # Keyword search (PostgreSQL full-text search)
