@@ -110,7 +110,7 @@ Three constructor arguments decide how well the search works:
 | --- | --- | --- |
 | `tsquery_mode` | `"or"` | Lets a passage match on some of the query's words and ranks by how many matched and how close together. It is the default from 0.8.4. Before that the default was `"websearch"`, which requires **every** word: a nine-word question matches nothing, and the keyword arm goes quiet without an error. |
 | `fts_language` | `"english"`, `"finnish"`, ... | Selects stemming and stop words. The default, `"simple"`, only lowercases, so `claims` does not find `claim`. |
-| `hnsw_ef_search` | `100` | pgvector's default of 40 trades recall for a latency saving most document search would rather not take. |
+| `hnsw_ef_search` | `100` | pgvector's default of 40 trades recall for a latency saving most document search would rather not take. It also caps the rows an index scan returns: at 40, a semantic search with `top_k` above 40 returns 40 rows, and above `top_k=13` the vector arm of a hybrid search (it reads `3 * top_k`) gets fewer candidates than it asked for. Set it to at least the largest number of rows a vector search asks for. |
 
 ## 3. Search
 
@@ -140,7 +140,7 @@ Every method returns `(Document, score)` pairs, best first. On a ten-chunk handb
 The keyword arm returns only passages that contain the words, which is why it is the precise one for a form number such as `ML-204`. The vector arm always returns its nearest neighbours, relevant or not.
 
 - **`filters`** restricts any mode to rows whose metadata contains the given keys, for example `filters={"category": "finance"}`.
-- **`search_semantic()` defaults to `threshold=0.7`**, which cuts most results for many embedding models. Pass `threshold=0.0` and apply your own floor (step 5).
+- **`search_semantic()` defaults to `threshold=0.7`**, which cuts most results for many embedding models. Pass `threshold=0.0` and apply your own floor (step 5). Cosine similarity runs from -1 to 1, so 0.0 still drops rows that point away from the query; that is rare with text embeddings, and `threshold=-1.0` keeps every row.
 - **`search_hybrid()`** takes `semantic_weight`, `keyword_weight` and `rrf_k`. Tune them on your own queries; equal weights are a starting point, not a recommendation.
 - Each hybrid result carries `semantic_rank` and `keyword_rank` in its metadata. A missing key means that arm did not find the row. It also carries `semantic_similarity`, the cosine similarity to the query, which is the value to hold against a relevance floor (step 5).
 
