@@ -96,10 +96,9 @@ The agent executes LLM-generated SQL. Three layers limit what it can do:
    - the SQL that runs is rendered from the checked syntax tree. A query that
      `sqlglot` cannot render without dropping part of it, or that it reads
      without one of a function's arguments, is rejected, so the agent asks the
-     LLM for another one. The argument check leaves out functions `sqlglot`
-     reads with a parser of their own (such as `ceil` and `floor`), and it is
-     skipped, with a warning, when sqlglot's compiled build (`sqlglot[c]`) is
-     installed; the other checks run either way;
+     LLM for another one. The argument check also covers functions `sqlglot`
+     reads with a parser of their own (such as `ceil` and `floor`), and it runs
+     the same with sqlglot's compiled build (`sqlglot[c]`);
    - identifiers are compared as PostgreSQL does: unquoted names fold to
      lower case, quoted names keep their case. `"Users"` and `users` are two
      tables. `schema_name` is an unquoted name and folds to lower case too. A
