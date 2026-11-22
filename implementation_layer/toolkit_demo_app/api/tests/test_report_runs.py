@@ -96,3 +96,17 @@ def test_the_evidence_ceiling_is_capped_at_the_limit(monkeypatch, requested, exp
         config["max_evidence_chars"] = requested
     report_writer._apply_limits(config, [])
     assert config["max_evidence_chars"] == expected
+
+
+@pytest.mark.parametrize("name", ["costs.xls", "COSTS.XLS"])
+def test_the_report_writer_refuses_an_xls_upload_before_any_source_is_read(
+    client, monkeypatch, name
+):
+    monkeypatch.delenv("REPORT_RUN_TOKEN", raising=False)
+    files = (("files", ("notes.md", b"notes")), ("files", (name, b"\xd0\xcf\x11\xe0rest")))
+    response = _run(client, {"sections": [{"title": "Summary"}]}, files=files)
+    assert response.status_code == 415
+    assert response.json() == {
+        "detail": f"{name}: the old Excel format .xls is not supported; save it as .xlsx"
+    }
+    assert ".xls" not in report_writer._SUPPORTED_EXTS

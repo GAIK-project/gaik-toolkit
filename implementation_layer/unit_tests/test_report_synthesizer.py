@@ -467,3 +467,21 @@ def test_the_writer_follows_the_code_chosen_side_of_a_resolved_conflict(citation
 
     assert "follow the units listed in its preferred_unit_ids" in prompt
     assert "follow the side its description gives" not in prompt
+
+
+@pytest.mark.parametrize(
+    ("answer", "kept"),
+    [
+        # A section that mirrors a sample's subsections starts with its own sub-heading.
+        ("### Roof\n\nDRAFT structures roof.\n\n### Attic\n\nDry.", "### Roof\n\nREVIEWED"),
+        ("## Structures\n\n### Roof\n\nDRAFT structures roof.", "### Roof\n\nREVIEWED"),
+        ("## 2. Structures\n\nDRAFT structures roof.", "REVIEWED structures roof."),
+        ("#### Foundations\n\nDRAFT structures fine.", "#### Foundations\n\nREVIEWED"),
+    ],
+    ids=["sub-heading", "echoed-then-sub-heading", "numbered-echo", "other-heading"],
+)
+def test_only_a_heading_that_repeats_the_title_is_stripped(fakes, answer, kept):
+    fakes.answers["structures"] = answer
+    report = _synthesize()
+    text = next(s.text for s in report.sections if s.id == "structures")
+    assert text.startswith(kept)
