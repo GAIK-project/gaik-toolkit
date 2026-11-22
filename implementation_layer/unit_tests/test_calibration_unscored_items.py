@@ -90,3 +90,24 @@ def test_an_unreadable_reply_is_not_an_ok_verdict() -> None:
     assert first["judge_error"].startswith("response is not JSON")
     # Only the two readable verdicts count: one agrees, one does not.
     assert report.severity_agreement_rate == pytest.approx(0.5)
+
+
+def test_a_reply_read_only_in_part_is_left_out() -> None:
+    # The low-scoring flag has an unknown severity and is dropped: the rest is not the verdict.
+    reply = json.dumps(
+        {
+            "flags": [
+                {"field": "vendor", "severity": "ok", "score": 5},
+                {"field": "total", "severity": "bad", "score": 1},
+            ]
+        }
+    )
+    judge, _ = _judge([reply, _flags(("total", 2)), _flags(("total", 4))])
+    items = _calibration_items([1, 2, 4])
+
+    report = calibrate_against_human_labels(judge, items)
+
+    first = report.per_item[0]
+    assert first["scored"] is False and first["judge_severity"] is None
+    assert first["judge_error"] == "1 of 2 flags could not be read"
+    assert report.pearson_r == pytest.approx(1.0)

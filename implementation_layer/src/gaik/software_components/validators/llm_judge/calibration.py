@@ -58,12 +58,12 @@ def calibrate_against_human_labels(
         means, and a per-item dump for inspection. ``n_items`` is the size of
         the dataset. Pearson r and both means are over the items the judge
         scored; an item with no score (no flag for ``field_filter``, flags
-        without a score, or a reply that could not be read) is left out of
-        them, not counted as 0 on the 1-5 scale. Its ``per_item`` entry has
-        ``"scored": False`` (its ``"judge_score"`` stays 0.0, which is no
-        score) and, for an unreadable reply, the ``"judge_error"``;
-        a reply that could not be read is also left out of the severity
-        agreement. A warning says how many items were left out.
+        without a score, or a reply that could not be read in full) is left
+        out of them, not counted as 0 on the 1-5 scale. Its ``per_item`` entry
+        has ``"scored": False`` (its ``"judge_score"`` stays 0.0, which is no
+        score) and, for a reply not read in full, the ``"judge_error"``; such a
+        reply is also left out of the severity agreement. A warning says how
+        many items were left out.
     """
     rubric = rubric or ValidationRubric(scoring_mode="likert_1_5")
     if rubric.scoring_mode == "severity":
@@ -85,8 +85,11 @@ def calibrate_against_human_labels(
 
         judge_error = result.judge_error
         judge_severity: Severity | None
-        if judge_error and not relevant:
-            judge_severity = None  # nothing could be read: no verdict, not "ok"
+        if judge_error:
+            # Some or all of the reply could not be read: the flag left out may be the one
+            # that matters, so the item has no verdict (as a panel leaves such a judge out).
+            judge_score = None
+            judge_severity = None
         elif relevant:
             judge_severity = max((f.severity for f in relevant), key=lambda s: _SEVERITY_RANK[s])
         else:
