@@ -437,6 +437,10 @@ def split_into_chunks(
 
         cmd = [
             "ffmpeg",
+            # stderr then holds the error alone, not the banner and progress lines.
+            "-hide_banner",
+            "-loglevel",
+            "error",
             "-ss",
             str(spec.actual_start),
             *media_input_args(audio_file_path),
@@ -489,8 +493,11 @@ def split_into_chunks(
             _stdout, stderr = process.communicate(timeout=cfg.ffmpeg_chunk_timeout_seconds)
 
             if process.returncode != 0:
+                # FFmpeg's message names the input and the chunk file (built from the
+                # input's name): it goes into the error raised to the caller, and the
+                # log line keeps only the exit code.
                 msg = f"FFmpeg exit {process.returncode}: {stderr[:300]}"
-                logger.error("Chunk %d failed: %s", spec.index + 1, msg)
+                logger.error("Chunk %d failed: FFmpeg exit %d", spec.index + 1, process.returncode)
                 return {"error": msg, "index": spec.index}
 
             chunk_path = spec.chunk_path
@@ -530,7 +537,11 @@ def split_into_chunks(
             spec.chunk_path.unlink(missing_ok=True)
             return {"error": "FFmpeg timed out", "index": spec.index}
         except Exception as exc:
-            logger.error("Error creating chunk %d: %s", spec.index + 1, exc)
+            logger.error(
+                "Error creating chunk %d: %s",
+                spec.index + 1,
+                error_text(exc, audio_file_path, Path(audio_file_path).absolute(), spec.chunk_path),
+            )
             spec.chunk_path.unlink(missing_ok=True)
             return {"error": f"{type(exc).__name__}: {exc}", "index": spec.index}
 

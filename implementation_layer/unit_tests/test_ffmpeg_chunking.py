@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 from pathlib import Path
@@ -442,3 +443,71 @@ def test_a_real_tail_of_0_8_seconds_is_kept_with_real_ffmpeg(tmp_path: Path, rea
     chunks = split_into_chunks(source, specs, config=TranscriptionConfig(audio_bitrate="8k"))
 
     assert _indices(chunks) == [0, 1, 2]
+
+
+# -- chunk errors are logged without the file's folder or name (#305 item 2) ---------
+
+
+def _private_recording(tmp_path: Path) -> tuple[Path, list[ChunkSpec]]:
+    folder = tmp_path / "Matti Virtanen"
+    folder.mkdir()
+    recording = folder / "Matti_Virtanen_interview.mp3"
+    recording.write_bytes(b"\x00" * 10)
+    chunk_dir = tmp_path / "chunks"
+    chunk_dir.mkdir()
+    return recording, compute_chunk_specs(120.0, 1, 5.0, chunk_dir, recording.stem)
+
+
+def _assert_no_name_in_logs(caplog, recording: Path) -> None:
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("Chunk 1 failed" in m or "Error creating chunk 1" in m for m in messages)
+    for message in messages:
+        for private in (str(recording.parent), recording.name, "Matti", "Virtanen"):
+            assert private not in message, message
+
+
+def test_a_failing_encode_logs_only_its_exit_code(tmp_path: Path, caplog):
+    recording, specs = _private_recording(tmp_path)
+    commands: list[list[str]] = []
+
+    def failing_ffmpeg(cmd, **_kwargs):
+        commands.append(cmd)
+        process = MagicMock()
+        process.returncode = 1
+        process.communicate.return_value = (
+            "",
+            f"{recording.absolute()}: Invalid data found\n{cmd[-1]}: could not write",
+        )
+        return process
+
+    with (
+        caplog.at_level(logging.DEBUG),
+        _FFMPEG_AVAILABLE,
+        patch("subprocess.Popen", side_effect=failing_ffmpeg),
+        pytest.raises(RuntimeError) as raised,
+    ):
+        split_into_chunks(str(recording), specs)
+
+    _assert_no_name_in_logs(caplog, recording)
+    assert any("FFmpeg exit 1" in record.getMessage() for record in caplog.records)
+    # The caller still gets FFmpeg's message, and FFmpeg prints the error alone.
+    assert "Invalid data found" in str(raised.value)
+    assert commands[0][:4] == ["ffmpeg", "-hide_banner", "-loglevel", "error"]
+
+
+def test_an_encode_that_cannot_start_logs_no_file_name(tmp_path: Path, caplog):
+    recording, specs = _private_recording(tmp_path)
+
+    def cannot_start(cmd, **_kwargs):
+        raise OSError(2, "No such file or directory", cmd[-1])
+
+    with (
+        caplog.at_level(logging.DEBUG),
+        _FFMPEG_AVAILABLE,
+        patch("subprocess.Popen", side_effect=cannot_start),
+        pytest.raises(RuntimeError),
+    ):
+        split_into_chunks(str(recording), specs)
+
+    _assert_no_name_in_logs(caplog, recording)
+    assert any("FileNotFoundError" in record.getMessage() for record in caplog.records)
