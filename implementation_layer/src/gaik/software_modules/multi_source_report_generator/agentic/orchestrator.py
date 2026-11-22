@@ -13,10 +13,8 @@ The report is always assembled in the user's original section order.
 
 from __future__ import annotations
 
-import re
-
 from .._material import Evidence
-from ..models import GeneratedSection, ReportSectionSpec
+from ..models import GeneratedSection, ReportSectionSpec, _strip_title_heading
 from .section_writer import _merge_usage, create_section_writer_graph
 from .state import ReportState
 
@@ -266,9 +264,9 @@ def run_agentic_report(
     total_usage: dict = {}
     for spec in specs:
         body = (section_content.get(spec.id) or "").strip()
-        # Strip any leading heading the LLM echoed despite being told not to,
-        # so the orchestrator-added "## title" below is never duplicated.
-        body = re.sub(r"^#{1,6}\s+.*\n*", "", body, count=1).strip()
+        # Strip a heading that repeats the section title, so the "## title" added
+        # below is never duplicated; a sub-heading such as "### Roof" stays.
+        body = _strip_title_heading(body, spec.title).strip()
         warnings = list(section_warnings.get(spec.id, []))
         usage = section_usage.get(spec.id, {})
         total_usage = _merge_usage(total_usage, usage)

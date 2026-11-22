@@ -717,3 +717,52 @@ def test_diff_editor_warning_names_a_left_out_edit_as_left_out():
     assert len(warnings) == 1
     assert warnings[0].startswith("Unresolved reviewer edit (left out of the last answer")
     assert "painted red" in warnings[0]
+
+
+class _SubheadingClient(_FakeClient):
+    """Writes each section as the given body: a sample with subsections is mirrored."""
+
+    def __init__(self, body: str):
+        super().__init__(review_mode="none")
+        self.body = body
+
+    def chat(self, messages, **kwargs):
+        super().chat(messages, **kwargs)
+        return _FakeResponse(self.body)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "### Roof\n\nThe roof is old.\n\n### Walls\n\nBrick.",
+        "## Findings\n\n### Roof\n\nThe roof is old.\n\n### Walls\n\nBrick.",
+        "## 1. FINDINGS\n### Roof\n\nThe roof is old.\n\n### Walls\n\nBrick.",
+    ],
+    ids=["sub-heading-first", "echoed-title-then-sub-heading", "numbered-echo"],
+)
+def test_agentic_keeps_a_first_sub_heading_and_strips_only_the_echoed_title(
+    tmp_path, patch_llm, body
+):
+    patch_llm(_SubheadingClient(body))
+    (tmp_path / "src.txt").write_text("The roof is old. The walls are brick.", encoding="utf-8")
+    result = _gen().run(
+        input_paths=[tmp_path / "src.txt"],
+        sections=[{"title": "Findings", "instructions": "Describe each part."}],
+        report_title="R",
+        agentic=True,
+    )
+    content = result.sections[0].content_markdown
+    assert content.startswith("### Roof\n\nThe roof is old.")
+    assert result.markdown.count("## Findings") == 1
+
+
+def test_strip_title_heading_takes_only_the_section_title():
+    from gaik.software_modules.multi_source_report_generator.models import _strip_title_heading
+
+    assert _strip_title_heading("## SECTION: Key Findings\nBody.", "Key findings") == "Body."
+    assert _strip_title_heading("# Key findings!\n\nBody.", "Key Findings") == "Body."
+    assert _strip_title_heading("### Roof\nBody.", "Key Findings") == "### Roof\nBody."
+    assert (
+        _strip_title_heading("Body.\n## Key Findings", "Key Findings") == "Body.\n## Key Findings"
+    )
+    assert _strip_title_heading("", "Key Findings") == ""

@@ -50,6 +50,7 @@ from .models import (
     GeneratedSection,
     ReportGenerationResult,
     ReportSectionSpec,
+    _normalize_heading,
     _slug,
 )
 
@@ -316,21 +317,6 @@ def _split_into_sections(markdown: str, specs: list[ReportSectionSpec]) -> list[
 # ---------------------------------------------------------------------------
 # Sample-report section matching (used by the agentic path only)
 # ---------------------------------------------------------------------------
-
-
-def _normalize_heading(text: str) -> str:
-    """Normalize a heading for tolerant matching.
-
-    Lowercase; strip leading markdown markers and section numbering; drop
-    punctuation; collapse whitespace.
-    """
-    t = text.strip()
-    t = re.sub(r"^#+\s*", "", t)  # markdown heading markers
-    t = re.sub(r"^\d+([.)]\d*)*[.)]?\s+", "", t)  # leading numbering e.g. "1." / "1.2)"
-    t = t.lower()
-    t = re.sub(r"[^\w\s]", " ", t)  # punctuation -> space
-    t = re.sub(r"\s+", " ", t).strip()
-    return t
 
 
 def _split_sample_sections(sample_markdown: str) -> dict[str, tuple[str, str]]:

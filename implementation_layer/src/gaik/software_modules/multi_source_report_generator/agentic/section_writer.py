@@ -18,7 +18,7 @@ from gaik.software_components.source_material import (
 )
 
 from .._material import EvidenceSource
-from ..models import _slug
+from ..models import _slug, _strip_title_heading
 from .prompts import SECTION_WRITER_SYSTEM_PROMPT, build_curation_prompt, build_section_user_prompt
 from .reviewer import review_and_polish
 from .state import SectionWriterState
@@ -51,15 +51,6 @@ def _merge_usage(left: dict, right: dict) -> dict:
         if isinstance(v, int):
             out[k] = out.get(k, 0) + v
     return out
-
-
-def _strip_leading_heading(text: str) -> str:
-    """Drop a leading markdown heading line if the model emitted one anyway."""
-    stripped = text.lstrip()
-    if stripped.startswith("#"):
-        lines = stripped.splitlines()
-        return "\n".join(lines[1:]).lstrip()
-    return text
 
 
 def create_section_writer_graph(
@@ -158,7 +149,8 @@ def create_section_writer_graph(
             ],
             **writer_kwargs,
         )
-        draft = _strip_leading_heading(blocks.strip_echo(response.text or "").strip())
+        # Only an echoed section title goes; a first sub-heading is the section's own.
+        draft = _strip_title_heading(blocks.strip_echo(response.text or "").strip(), title)
         usage = _merge_usage(state.get("usage", {}), _usage_of(response))
         reporter.emit(f"[{title}] draft written ({len(draft.split())} words) -> reviewer")
         return {"draft": draft, "usage": usage}
