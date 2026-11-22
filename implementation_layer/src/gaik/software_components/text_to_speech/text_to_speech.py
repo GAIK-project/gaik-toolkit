@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import uuid
@@ -14,6 +15,8 @@ from gaik.software_components.endpoints import check_endpoint, log_endpoint
 from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED_LANGUAGES = {
     "fi": "Finnish",
@@ -133,6 +136,18 @@ class TextToSpeech:
             # Refuse a wrong address when the speaker is built, not at the first request.
             self._check_azure_tts_endpoint(self._azure_tts_endpoint())
         self.model = model or self._resolve_default_model()
+        if (
+            self.send_instructions is None
+            and not _TTS_1_FAMILY.fullmatch(self.model.strip())
+            and "gpt" not in self.model.lower()
+        ):
+            # The name says neither tts-1 nor gpt: say once, here, what is not sent.
+            logger.warning(
+                "TextToSpeech: the model %r is not known to take instructions, so the language "
+                "line and any instructions are not sent; pass send_instructions=True for a "
+                "gpt-4o-mini-tts deployment.",
+                self.model,
+            )
         if language not in SUPPORTED_LANGUAGES:
             supported = ", ".join(SUPPORTED_LANGUAGES)
             raise ValueError(f"Unsupported language '{language}'. Supported languages: {supported}")

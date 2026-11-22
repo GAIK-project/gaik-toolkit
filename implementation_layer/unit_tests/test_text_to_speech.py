@@ -6,6 +6,7 @@ No test calls a real TTS API: Azure synthesis is exercised through a mocked
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -104,6 +105,49 @@ def test_a_gpt_named_model_gets_the_instructions(monkeypatch, deployment):
 
     assert "in Finnish" in payloads[0]["instructions"]
     assert result.instructions == payloads[0]["instructions"]
+
+
+def _instruction_warnings(caplog) -> list[str]:
+    return [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == tts_module.__name__ and "send_instructions=True" in record.getMessage()
+    ]
+
+
+def test_a_name_that_decides_nothing_warns_once_that_instructions_are_not_sent(monkeypatch, caplog):
+    _capture_azure_posts(monkeypatch)
+    config = {"use_azure": True, "api_key": "k"}
+
+    with caplog.at_level(logging.WARNING, logger=tts_module.__name__):
+        tts = TextToSpeech(api_config=config, model="speech-fi")
+        tts.synthesize("Hei")
+        tts.synthesize("Moi")
+
+    warned = _instruction_warnings(caplog)
+    assert len(warned) == 1 and "'speech-fi'" in warned[0]
+
+
+@pytest.mark.parametrize(
+    ("deployment", "options"),
+    [
+        ("gpt-4o-mini-tts", {}),
+        ("tts-hd", {}),
+        ("speech-fi", {"send_instructions": True}),
+        ("speech-fi", {"send_instructions": False}),
+        (
+            "speech-fi",
+            {"api_config": {"use_azure": True, "api_key": "k", "tts_instructions": True}},
+        ),
+    ],
+)
+def test_a_name_that_decides_or_an_explicit_switch_warns_nothing(caplog, deployment, options):
+    options = {"api_config": {"use_azure": True, "api_key": "k"}, **options}
+
+    with caplog.at_level(logging.WARNING, logger=tts_module.__name__):
+        TextToSpeech(model=deployment, **options)
+
+    assert _instruction_warnings(caplog) == []
 
 
 @pytest.mark.parametrize("deployment", ["tts-fi", "tts-prod", "my-tts", "speech-fi"])

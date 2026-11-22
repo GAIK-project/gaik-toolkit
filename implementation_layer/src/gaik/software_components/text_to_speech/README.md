@@ -93,7 +93,8 @@ the deployment names `tts` and `tts-hd`, with an optional dated suffix such as `
 which reads the text as written. Any other name, which may be a `tts-1` deployment that
 answers 400 to them, gets them only when you opt in: `TextToSpeech(..., send_instructions=True)`
 or `api_config["tts_instructions"] = True`, for a `gpt-4o-mini-tts` deployment named, say,
-`speech-fi`; `send_instructions=False` turns them off for a `gpt` name.
+`speech-fi`; `send_instructions=False` turns them off for a `gpt` name. A `TextToSpeech` built
+with such a name and no switch logs one warning that the instructions are not sent.
 `result.instructions` holds what was sent, or `None`. `speed` always goes to a model without
 instructions, and to one with them only when it is not the default 1.0.
 
