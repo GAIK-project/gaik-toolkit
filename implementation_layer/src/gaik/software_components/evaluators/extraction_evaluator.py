@@ -239,7 +239,8 @@ class ExtractionEvaluator:
         Strings compare stripped and case-folded (as configured). A number compares as a
         number with a number of another type or a numeric string, also inside lists and
         dicts: ``Decimal("19.99")`` equals ``19.99`` and ``"19.99"``. Two strings stay
-        strings, so ``"007"`` is not ``"7"``.
+        strings, so ``"007"`` is not ``"7"``, and a string with a leading zero is a code, so
+        ``"007"`` is not ``7`` either.
         """
         if isinstance(a, str) and isinstance(b, str):
             if self.strip_whitespace:
@@ -285,7 +286,8 @@ _NUMERIC_TEXT = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
 def _as_decimal(value: Any) -> Decimal | None:
     """A number (not a bool) or a numeric string as an exact :class:`Decimal`, else None.
 
-    A float goes through its shortest repr, so ``19.99`` is ``Decimal("19.99")``.
+    A float goes through its shortest repr, so ``19.99`` is ``Decimal("19.99")``. A string
+    with a leading zero (``"007"``, ``"00100"``) is a code, not a number.
     """
     if isinstance(value, bool):
         return None
@@ -295,7 +297,13 @@ def _as_decimal(value: Any) -> Decimal | None:
         return Decimal(value)
     if isinstance(value, float):
         return Decimal(repr(value)) if math.isfinite(value) else None
-    if isinstance(value, str) and _NUMERIC_TEXT.fullmatch(value.strip()):
+    if (
+        isinstance(value, str)
+        and _NUMERIC_TEXT.fullmatch(value.strip())
+        # A leading zero makes it a code (a postal code, a phone number), not a number:
+        # "007" is not 7. "0" and "0.5" are numbers.
+        and not re.match(r"[+-]?0\d", value.strip())
+    ):
         try:
             return Decimal(value.strip())
         except InvalidOperation:

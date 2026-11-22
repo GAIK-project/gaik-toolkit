@@ -56,6 +56,11 @@ def teardown_function():
         (True, 1, True),  # as before: True == 1
         (Decimal(19.99), 19.99, True),  # a Decimal made from the float, as before
         ([1, 2], (1, 2), False),  # as before: a list is not a tuple
+        ("007", 7, False),  # a leading zero makes a code, not a number
+        ("00100", 100, False),
+        ("0401234567", 401234567, False),
+        ("0", 0, True),
+        ("0.5", 0.5, True),
     ],
 )
 def test_numbers_compare_as_numbers(expected, extracted, matched) -> None:
