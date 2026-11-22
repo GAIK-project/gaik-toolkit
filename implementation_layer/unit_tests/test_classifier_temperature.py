@@ -46,3 +46,22 @@ def test_a_temperature_is_sent_as_given(monkeypatch, temperature):
     classifier, calls = _classifier(monkeypatch, temperature=temperature)
     _classify(classifier)
     assert calls[0]["temperature"] == temperature
+
+
+def test_the_solution_wizard_knows_every_constructor_option():
+    """The registry and the card list each keyword, so the wizard can set temperature=None."""
+    import inspect
+    import json
+    from pathlib import Path
+
+    registries = Path(__file__).resolve().parents[1] / "solution_wizard" / "registries"
+    registry = json.loads((registries / "gaik_component_registry.json").read_text("utf-8"))
+    cards = json.loads((registries / "component_reference_cards.json").read_text("utf-8"))
+    entry = next(c for c in registry if c["name"] == "DocumentClassifier")
+    card_options = {o["name"]: o for o in cards["DocumentClassifier"]["options"]}
+
+    keywords = set(inspect.signature(module.DocumentClassifier.__init__).parameters)
+    keywords -= {"self"}
+    assert keywords <= set(entry["optional_parameters"]) | {"config"}
+    assert keywords <= set(card_options)
+    assert card_options["temperature"]["default"] == 0.0

@@ -793,6 +793,14 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for each file, through its parsers: size (100 MiB) and image pixels; with parser='vision' only the first page of a PDF is rendered and sent. The error is not wrapped in the classification ValueError. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "temperature",
+        "type": "float | None",
+        "default": 0.0,
+        "effect": "Since the gaik release after 0.11.1: the sampling temperature of the classification call on the OpenAI and Azure client, 0.0 by default as before. None leaves it out, for a model that refuses an explicit temperature (its 400 would otherwise come back as class 'unknown' with confidence 0.0). Other providers' clients are not sent a temperature.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; pass None only for an OpenAI or Azure model that refuses an explicit temperature, and only with a gaik release that has this option"
       }
     ]
   },
