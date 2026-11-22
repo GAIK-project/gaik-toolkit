@@ -86,7 +86,7 @@ def profile_tables(
             # A table is named after its file or sheet, and DuckDB's message can name
             # it and the other tables, so the log line carries tags instead.
             logger.warning(
-                "Could not profile the table from %s: %s", file_tag(name), error_text(exc, *names)
+                "Could not profile table %s: %s", file_tag(name), error_text(exc, *names)
             )
             profiles.append(TableProfile(name=name, source=source))
     return TabularSchema(tables=profiles)

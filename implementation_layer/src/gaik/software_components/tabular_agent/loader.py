@@ -281,7 +281,7 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
                 [_DECIMAL_COMMA, _THOUSANDS_COMMA],
             ).fetchone()
         except Exception as exc:  # pragma: no cover - defensive
-            logger.debug("Decimal probe failed for column %s: %s", column, type(exc).__name__)
+            logger.debug("Decimal probe failed for a column: %s", type(exc).__name__)
             continue
         if not total or decimal != total:
             continue
@@ -296,7 +296,7 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
             )
             converted.append(column)
         except Exception as exc:
-            logger.debug("Could not retype column %s as DOUBLE: %s", column, type(exc).__name__)
+            logger.debug("Could not retype a column as DOUBLE: %s", type(exc).__name__)
     # Counts only: a column name is the file's content (a header row of people's
     # names, say); the caller gets the converted names back.
     if converted:

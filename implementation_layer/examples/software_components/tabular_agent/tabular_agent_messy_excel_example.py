@@ -76,7 +76,8 @@ def show_loaded_table() -> None:
     print("=" * 70)
     with TabularAgent(MESSY_FILE) as agent:
         table = agent.get_schema().tables[0]
-        regions = next(c for c in table.columns if c.name == "region")
+        # Columns keep the header text as written ("Region"), as CSV columns do.
+        regions = next(c for c in table.columns if c.name.lower() == "region")
         print(f"rows loaded  : {table.row_count}  (titles, subtotals and notes removed)")
         print(f"region values: {regions.top_values or regions.samples}")
         print()
