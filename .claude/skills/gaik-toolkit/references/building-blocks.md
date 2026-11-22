@@ -541,6 +541,7 @@ When `enhanced_transcript=True`, the Transcriber runs the raw transcript through
 | `segments` | list[dict] \| None | Whisper segments with start/end/text (whisper_local only) |
 | `srt_content` | str \| None | SRT subtitle content (whisper_local only) |
 | `vtt_content` | str \| None | VTT subtitle content (whisper_local only) |
+| `failed_segments` | list[dict] | With `allow_partial=True`, the chunks that failed (`segment`, `start_seconds`, `end_seconds`); empty when none failed. A run in which every chunk failed raises `RuntimeError` |
 
 **Methods:**
 - `result.save(directory, *, save_raw=True, save_enhanced=True, encoding="utf-8")` - Persist to disk. Returns `dict[str, Path | None]` mapping `"raw"` and `"enhanced"` to saved file paths.

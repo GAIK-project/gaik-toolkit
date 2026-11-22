@@ -128,24 +128,36 @@ chunk shorter than asked for is retried like a failed one; if it is still short 
 continues past it, it is a missing stretch and stops the run. Chunks past the real end of
 the audio, which a file whose header overstates its length produces, are skipped and
 logged, and a recording in which no chunk holds audio stops the run with a `RuntimeError`.
-A last chunk that adds even a fraction of a second past the chunks before it is kept.
+A last chunk that adds more than 0.25 s past the chunks before it is kept; a smaller tail
+(part of a word at most) is not sent, since OpenAI refuses audio under 0.1 s and a model
+asked about near-silence can make words up.
 
 ### Models on the Whisper backend
 
 `TranscriptionModel.WHISPER` sends `api_config["transcription_model"]`. A Whisper model or
 deployment (`whisper`, `whisper-1`) is asked for SRT, which gives subtitle timestamps and
-the overlap merge. A GPT-4o transcription model (any name containing `gpt`, such as
-`gpt-4o-transcribe`, the default of `get_openai_config()`) takes only `json` or `text`, so
-it is asked for `json` and gives text without timestamps: each chunk becomes one subtitle
-over its own stretch of the recording, and the words two chunks both give for their
-overlap are kept once (the longest run of at least 4 matching words; without one, both
-texts are kept whole). Use Whisper or `GPT4O_DIARIZE` where per-sentence timestamps matter.
+the overlap merge. A GPT-4o transcription model (`gpt-4o-transcribe`, the default of
+`get_openai_config()`, or `gpt-4o-mini-transcribe`) takes only `json` or `text`, so it is
+asked for `json` and gives text without timestamps: each chunk becomes one subtitle over its
+own stretch of the recording, and the words two chunks both give for their overlap are kept
+once. Only a run of at least 4 matching words that reaches the end of one chunk's text and
+the start of the next one's counts, so a phrase said twice elsewhere is never taken for the
+overlap; without such a run both texts are kept whole. Use Whisper or `GPT4O_DIARIZE` where
+per-sentence timestamps matter. Such a model also refuses a request over 1400 s, so a
+recording longer than 23 minutes is split even when it is small, into chunks of at most
+`(1400 - 2 x chunk_overlap_seconds) / 60` minutes.
+
+The name decides the format: `json` for a name that contains `gpt` and not `whisper`, SRT
+otherwise. For a deployment whose name says neither, set
+`TranscriptionConfig(whisper_request_format="json")` (or `"srt"`), or `WHISPER_REQUEST_FORMAT`.
 
 On Azure the Whisper backend resolves the provider as `Transcriber` does
-(`provider: "azure"` needs no `use_azure` flag), sends to `azure_audio_endpoint` when it is
-set, else to `base_url` or `azure_endpoint`, and cuts an Azure endpoint at its `/openai`
-path, so one given as `https://<resource>.openai.azure.com/openai/v1` works for Whisper and
-GPT-4o Diarize alike.
+(`provider: "azure"` needs no `use_azure` flag) and sends to `azure_audio_endpoint` when it
+is set, else to `base_url`, else to `azure_endpoint`, as that resource's deployment route
+(`/openai/deployments/<model>/audio/transcriptions`). A trailing `/openai/v1` or
+`/openai/deployments/...` is cut from the endpoint, and a bare trailing `/openai` on an Azure
+host, so `https://<resource>.openai.azure.com/openai/v1` works for Whisper and GPT-4o Diarize
+alike, while a gateway such as `https://gw.example.com/openai/prod` keeps its own path.
 
 ### TranscriptionConfig
 
@@ -234,6 +246,7 @@ result = transcriber.transcribe(
 | `TRANSCRIPTION_LANGUAGE` | auto | Language code or auto-detect |
 | `WHISPER_PROMPT` | — | Optional Whisper prompt |
 | `TRANSCRIPTION_MODEL` | whisper | `whisper` or `gpt-4o-transcribe-diarize` |
+| `WHISPER_REQUEST_FORMAT` | — | `srt` or `json`; unset decides by the model name |
 
 ---
 

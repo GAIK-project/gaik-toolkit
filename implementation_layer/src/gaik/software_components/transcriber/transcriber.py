@@ -15,6 +15,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from openai import AzureOpenAI
 from pydub import AudioSegment
@@ -152,25 +153,53 @@ def _transcription_usage(response) -> dict[str, int]:
     raise ValueError(f"Unknown transcription usage type {usage.type!r}")
 
 
+# The path the SDK adds itself, at the end of an Azure endpoint's path.
+_AZURE_OPENAI_SUFFIX = re.compile(r"/openai(?:/v1|/deployments(?:/.*)?)?$", re.IGNORECASE)
+
+
 def _azure_resource_endpoint(endpoint: str) -> str:
-    """The resource address of an Azure endpoint, without its ``/openai`` path:
-    ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``."""
-    base = endpoint.rstrip("/")
-    if base.endswith("/openai"):
-        base = base[: -len("/openai")]
-    return base.split("/openai/")[0]
+    """The address the SDK puts ``/openai/...`` after, from an Azure endpoint.
+
+    A trailing ``/openai/v1`` or ``/openai/deployments/...`` is cut, a trailing bare
+    ``/openai`` only on an Azure host (``*.azure.com``), with the query and a trailing
+    slash: ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``.
+    The rest of the path stays, so a gateway's ``https://gw.example.com/openai/prod``
+    keeps its own path. ParallelTranscriber has the same cut.
+    """
+    parts = urlsplit(endpoint.strip())
+    if not parts.scheme or not parts.netloc:
+        return endpoint.strip().rstrip("/")
+    path = parts.path.rstrip("/")
+    suffix = _AZURE_OPENAI_SUFFIX.search(path)
+    if suffix and (
+        suffix.group(0).lower() != "/openai" or (parts.hostname or "").endswith(".azure.com")
+    ):
+        path = path[: suffix.start()]
+    return f"{parts.scheme}://{parts.netloc}{path}"
 
 
 def _create_audio_client(api_config: dict):
-    """Create an isolated SDK client, preserving the caller's HTTP transport."""
+    """Create an isolated SDK client, preserving the caller's HTTP transport.
+
+    On Azure the audio goes to ``azure_audio_endpoint``, else ``azure_endpoint``, else
+    ``base_url``, cut to the resource address and passed as ``azure_endpoint``, so the
+    SDK requests ``/openai/deployments/<model>/audio/...`` (a ``/openai/v1``
+    ``base_url`` kept as it is gives ``/openai/v1/deployments/...``, which Azure does
+    not serve).
+    """
     provider = _audio_provider(api_config)
     audio_config = {**api_config, "provider": provider, "use_azure": provider == "azure"}
     if provider == "azure":
-        endpoint = api_config.get("azure_audio_endpoint") or api_config.get("azure_endpoint")
+        endpoint = (
+            api_config.get("azure_audio_endpoint")
+            or api_config.get("azure_endpoint")
+            or api_config.get("base_url")
+        )
         if endpoint:
             audio_config["azure_endpoint"] = _azure_resource_endpoint(endpoint)
             audio_config.pop("base_url", None)
-        audio_config.setdefault("api_version", "2024-12-01-preview")
+        if not audio_config.get("api_version"):
+            audio_config["api_version"] = "2024-12-01-preview"
     return create_openai_client(audio_config)
 
 

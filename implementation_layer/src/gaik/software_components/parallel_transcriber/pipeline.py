@@ -14,7 +14,6 @@ and ``audio_pipeline.py``.  Provides a single entry point that handles:
 from __future__ import annotations
 
 import concurrent.futures
-import difflib
 import logging
 import math
 import re
@@ -26,6 +25,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.input_limits import InputLimitError, InputLimits
@@ -58,31 +58,47 @@ _GPT4O_API_DURATION_LIMIT_SECONDS = 1400
 # decoder need not agree to the last fraction of a second.
 _MAX_GPT4O_DURATION_SECONDS = 1380
 
-# Joining the text of two overlapping chunks from a model without timestamps: the
-# longest run of words both give for their shared audio is kept once, when it is at
-# least this many words; each side is searched over this many words per second of
-# shared audio (fast speech is about 3.5).
+# Joining the text of two overlapping chunks from a model without timestamps: a run of
+# at least _MIN_REPEATED_WORDS words both give is kept once, but only a run that reaches
+# the end of the previous chunk's text and the start of the next one's, give or take
+# _EDGE_WORDS words (a word cut in half where a chunk ends). Each side is searched over
+# _MAX_WORDS_PER_SECOND words per second of shared audio (fast speech is about 3.5).
 _MIN_REPEATED_WORDS = 4
+_EDGE_WORDS = 3
 _MAX_WORDS_PER_SECOND = 4
+
+# The path the SDK adds itself, at the end of an Azure endpoint's path.
+_AZURE_OPENAI_SUFFIX = re.compile(r"/openai(?:/v1|/deployments(?:/.*)?)?$", re.IGNORECASE)
 
 
 def _azure_resource_endpoint(endpoint: str) -> str:
-    """The resource address of an Azure endpoint, without its ``/openai`` path:
-    ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``.
+    """The address the SDK puts ``/openai/...`` after, from an Azure endpoint.
 
-    The same cut as the Transcriber's, which this package cannot import (pydub).
+    A trailing ``/openai/v1`` or ``/openai/deployments/...`` is cut, a trailing bare
+    ``/openai`` only on an Azure host (``*.azure.com``), with the query and a trailing
+    slash: ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``.
+    The rest of the path stays, so a gateway's ``https://gw.example.com/openai/prod``
+    keeps its own path. The same cut as the Transcriber's, which this package cannot
+    import (pydub).
     """
-    base = endpoint.rstrip("/")
-    if base.endswith("/openai"):
-        base = base[: -len("/openai")]
-    return base.split("/openai/")[0]
+    parts = urlsplit(endpoint.strip())
+    if not parts.scheme or not parts.netloc:
+        return endpoint.strip().rstrip("/")
+    path = parts.path.rstrip("/")
+    suffix = _AZURE_OPENAI_SUFFIX.search(path)
+    if suffix and (
+        suffix.group(0).lower() != "/openai" or (parts.hostname or "").endswith(".azure.com")
+    ):
+        path = path[: suffix.start()]
+    return f"{parts.scheme}://{parts.netloc}{path}"
 
 
-def _returns_text_only(deployment: str) -> bool:
-    """True for a GPT-4o transcription model or deployment (``gpt-4o-transcribe``,
-    ``gpt-4o-mini-transcribe``): it answers in ``json`` or ``text`` only, without the
-    ``srt`` and its timestamps that Whisper gives."""
-    return "gpt" in deployment.lower()
+def _named_like_gpt4o_transcribe(deployment: str) -> bool:
+    """True for a name like ``gpt-4o-transcribe`` or ``gpt-4o-mini-transcribe``: one that
+    contains ``gpt`` and not ``whisper``. Such a model takes ``json`` or ``text`` only,
+    without the ``srt`` and its timestamps that Whisper gives."""
+    name = deployment.lower()
+    return "gpt" in name and "whisper" not in name
 
 
 def _srt_cue_text(text: str) -> str:
@@ -107,10 +123,12 @@ def _drop_repeated_words(
 ) -> tuple[list[str], list[str]]:
     """Keep the words two overlapping chunks both give for their shared audio once.
 
-    The longest run of the same words in the end of ``previous`` and the start of
-    ``following`` is the shared speech: ``previous`` is cut after it and ``following``
-    goes on after it. Without such a run of ``_MIN_REPEATED_WORDS`` both are kept whole,
-    so a word can repeat but none is lost.
+    The shared speech is the longest run of the same words that ends within
+    ``_EDGE_WORDS`` of the end of ``previous`` and starts within ``_EDGE_WORDS`` of the
+    start of ``following``: ``previous`` is cut after it and ``following`` goes on
+    after it, so what is dropped from either side is the other's copy of the shared
+    audio. A phrase said again elsewhere, or a run that does not reach both edges, is
+    not taken: then both are kept whole, so a word can repeat but none is lost.
     """
     window = max(_MIN_REPEATED_WORDS, math.ceil(shared_seconds * _MAX_WORDS_PER_SECOND))
     tail = previous[-window:]
@@ -118,13 +136,20 @@ def _drop_repeated_words(
     # A word that is only punctuation has no key; it never matches.
     tail_keys = [_word_key(word) or f"\0a{i}" for i, word in enumerate(tail)]
     head_keys = [_word_key(word) or f"\0b{i}" for i, word in enumerate(head)]
-    match = difflib.SequenceMatcher(None, tail_keys, head_keys, autojunk=False).find_longest_match(
-        0, len(tail_keys), 0, len(head_keys)
-    )
-    if match.size < _MIN_REPEATED_WORDS:
+    best_size, best_tail_end, best_head_end = 0, 0, 0
+    # runs[j + 1]: length of the run of equal words ending at tail[i] and head[j].
+    runs = [0] * (len(head_keys) + 1)
+    for i, key in enumerate(tail_keys):
+        runs = [0] + [runs[j] + 1 if key == other else 0 for j, other in enumerate(head_keys)]
+        if i < len(tail_keys) - 1 - _EDGE_WORDS:
+            continue  # a run ending here does not reach the end of the previous chunk
+        for j, size in enumerate(runs[1:]):
+            if size > best_size and j - size + 1 <= _EDGE_WORDS:
+                best_size, best_tail_end, best_head_end = size, i, j
+    if best_size < _MIN_REPEATED_WORDS:
         return previous, following
-    kept = len(previous) - len(tail) + match.a + match.size
-    return previous[:kept], following[match.b + match.size :]
+    kept = len(previous) - len(tail) + best_tail_end + 1
+    return previous[:kept], following[best_head_end + 1 :]
 
 
 def _text_chunks_as_srt(
@@ -241,6 +266,10 @@ class ParallelTranscriber:
         limits: InputLimits | None = None,
     ) -> None:
         cfg = config or TranscriptionConfig()
+        if cfg.whisper_request_format not in (None, "srt", "json"):
+            raise ValueError(
+                f"whisper_request_format={cfg.whisper_request_format!r}: use 'srt', 'json' or None."
+            )
         provider: str | None = None
         # Whisper Local has its own on-prem auth (api_base + key) — skip the
         # OpenAI/Azure provider check that the cloud-only models require.
@@ -358,7 +387,11 @@ class ParallelTranscriber:
 
             # These backends need the length before the first call: a file that is not
             # audio or video is refused here (_measured_seconds), not with ffprobe's error.
-            if model == TranscriptionModel.GPT4O_DIARIZE:
+            # A GPT-4o model on the Whisper backend has the same 1400 s per-request limit.
+            gpt4o_on_whisper = model == TranscriptionModel.WHISPER and self._asks_for_json(
+                self._get_whisper_deployment()
+            )
+            if model == TranscriptionModel.GPT4O_DIARIZE or gpt4o_on_whisper:
                 total_duration = self._measured_seconds(audio_path, file_path.name)
                 if total_duration > _MAX_GPT4O_DURATION_SECONDS:
                     needs_chunking = True
@@ -425,6 +458,12 @@ class ParallelTranscriber:
                 force_duration = True
             else:
                 chunk_minutes = cfg.chunk_duration_minutes
+                if gpt4o_on_whisper:
+                    # The same 1400 s ceiling per request as GPT-4o Diarize, overlap included.
+                    budget_seconds = (
+                        _GPT4O_API_DURATION_LIMIT_SECONDS - 2 * cfg.chunk_overlap_seconds
+                    )
+                    chunk_minutes = max(1, min(chunk_minutes, int(budget_seconds // 60)))
                 parallelism = cfg.transcription_workers
                 # only True when duration forced it
                 force_duration = file_size_mb <= cfg.max_single_file_mb
@@ -512,11 +551,12 @@ class ParallelTranscriber:
         try:
             return get_audio_duration(str(audio_path))
         except (OSError, subprocess.SubprocessError, ValueError) as exc:
-            reason = (
-                "reading its length timed out"
-                if isinstance(exc, subprocess.TimeoutExpired)
-                else "ffprobe and ffmpeg cannot read it as audio or video"
-            )
+            if shutil.which("ffprobe") is None:
+                reason = "ffprobe is not installed"
+            elif isinstance(exc, subprocess.TimeoutExpired):
+                reason = "reading its length timed out"
+            else:
+                reason = "ffprobe and ffmpeg cannot read it as audio or video"
             if self._limits.max_media_seconds is None:
                 raise ValueError(
                     f"The length of {name} cannot be read ({reason}), so it was not transcribed."
@@ -581,22 +621,29 @@ class ParallelTranscriber:
         """The client config for the Whisper backend, built as the Transcriber builds it.
 
         The provider is resolved as in the constructor (``provider: "azure"`` works
-        without the legacy ``use_azure`` flag). On Azure ``azure_audio_endpoint``, cut
-        at its ``/openai`` path, wins over ``base_url`` and ``azure_endpoint``; without
-        it a ``base_url`` is kept (the SDK then ignores ``azure_endpoint``), and a bare
-        ``azure_endpoint`` is cut the same way.
+        without the legacy ``use_azure`` flag). On Azure the audio goes to
+        ``azure_audio_endpoint``, else ``base_url`` (a leftover ``azure_endpoint`` beside
+        it does not count, as before), else ``azure_endpoint``, cut to the resource
+        address (:func:`_azure_resource_endpoint`) and passed as ``azure_endpoint``. The
+        SDK then requests ``/openai/deployments/<model>/audio/...``; a ``/openai/v1``
+        ``base_url`` kept as it is would have given ``/openai/v1/deployments/...``,
+        which Azure does not serve.
         """
         provider = self._provider or resolve_provider(
             config={"use_azure": False, **self._api_config}
         )
         config = {**self._api_config, "provider": provider, "use_azure": provider == "azure"}
         if provider == "azure":
-            if config.get("azure_audio_endpoint"):
-                config["azure_endpoint"] = _azure_resource_endpoint(config["azure_audio_endpoint"])
+            endpoint = (
+                config.get("azure_audio_endpoint")
+                or config.get("base_url")
+                or config.get("azure_endpoint")
+            )
+            if endpoint:
+                config["azure_endpoint"] = _azure_resource_endpoint(endpoint)
                 config.pop("base_url", None)
-            elif config.get("azure_endpoint") and not config.get("base_url"):
-                config["azure_endpoint"] = _azure_resource_endpoint(config["azure_endpoint"])
-            config.setdefault("api_version", "2024-12-01-preview")
+            if not config.get("api_version"):
+                config["api_version"] = "2024-12-01-preview"
         return config
 
     def _make_whisper_client(self):
@@ -607,6 +654,15 @@ class ParallelTranscriber:
 
     def _get_whisper_deployment(self) -> str:
         return self._api_config.get("transcription_model", "whisper")
+
+    def _asks_for_json(self, deployment: str) -> bool:
+        """Whether the Whisper backend asks ``deployment`` for ``json`` rather than SRT:
+        ``TranscriptionConfig.whisper_request_format`` when set, else by the name
+        (:func:`_named_like_gpt4o_transcribe`)."""
+        chosen = self._config.whisper_request_format
+        if chosen is not None:
+            return chosen == "json"
+        return _named_like_gpt4o_transcribe(deployment)
 
     def _whisper_request(self, deployment: str, file) -> dict:
         """The keyword arguments of one Whisper-backend transcription request.
@@ -619,7 +675,7 @@ class ParallelTranscriber:
         kwargs: dict = {
             "model": deployment,
             "file": file,
-            "response_format": "json" if _returns_text_only(deployment) else "srt",
+            "response_format": "json" if self._asks_for_json(deployment) else "srt",
         }
         if cfg.language and cfg.language != "auto":
             kwargs["language"] = cfg.language
@@ -627,10 +683,9 @@ class ParallelTranscriber:
             kwargs["prompt"] = cfg.prompt
         return kwargs
 
-    @staticmethod
-    def _whisper_answer(response, deployment: str) -> str:
+    def _whisper_answer(self, response, deployment: str) -> str:
         """SRT for Whisper; the transcript's text for a model asked for ``json``."""
-        if _returns_text_only(deployment):
+        if self._asks_for_json(deployment):
             return response.text or ""
         return str(response)
 
@@ -655,7 +710,7 @@ class ParallelTranscriber:
             base_delay=cfg.retry_base_delay_seconds,
             max_429_retries=cfg.max_429_retries,
         )
-        if _returns_text_only(deployment):
+        if self._asks_for_json(deployment):
             return _text_as_srt(answer, self._seconds_or_zero(audio_path))
         return answer
 
@@ -731,7 +786,7 @@ class ParallelTranscriber:
         if progress_callback:
             progress_callback("merging", 0, 1, "Merging transcriptions …")
 
-        if _returns_text_only(deployment):
+        if self._asks_for_json(deployment):
             combined = _text_chunks_as_srt(
                 ordered, chunk_metadata, self._seconds_or_zero(chunk_files[-1])
             )

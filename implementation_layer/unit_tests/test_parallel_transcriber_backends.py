@@ -51,6 +51,36 @@ def test_both_transcribers_cut_an_azure_endpoint_to_its_resource(endpoint):
 
 
 @pytest.mark.parametrize(
+    ("endpoint", "expected"),
+    [
+        # A gateway keeps its own path; only the SDK's part at the end is cut.
+        (
+            "https://gw.example.com/openai/azure-prod/openai/v1",
+            "https://gw.example.com/openai/azure-prod",
+        ),
+        (
+            "https://gw.example.com/openai/prod/openai/deployments/whisper/audio/transcriptions"
+            "?api-version=2024-06-01",
+            "https://gw.example.com/openai/prod",
+        ),
+        # A bare /openai is cut on an Azure host only: elsewhere it can be the gateway's.
+        ("https://gw.example.com/openai", "https://gw.example.com/openai"),
+        ("https://gw.example.com/openai/", "https://gw.example.com/openai"),
+        ("https://gw.example.com/openai-proxy", "https://gw.example.com/openai-proxy"),
+        ("https://R.OPENAI.AZURE.COM/OpenAI/V1", "https://R.OPENAI.AZURE.COM"),
+        ("https://r.cognitiveservices.azure.com/OPENAI", "https://r.cognitiveservices.azure.com"),
+    ],
+)
+def test_both_transcribers_keep_a_gateway_path(endpoint, expected):
+    from gaik.software_components.transcriber.transcriber import (
+        _azure_resource_endpoint as transcriber_cut,
+    )
+
+    assert pipeline._azure_resource_endpoint(endpoint) == expected
+    assert transcriber_cut(endpoint) == expected
+
+
+@pytest.mark.parametrize(
     "flags",
     [{"provider": "azure"}, {"use_azure": True}, {"provider": "azure", "use_azure": True}],
 )
@@ -83,7 +113,7 @@ def test_the_whisper_client_falls_back_to_the_chat_endpoint_and_a_default_api_ve
     assert client_config["api_version"] == "2024-12-01-preview"
 
 
-def test_a_v1_base_url_is_kept_unless_an_audio_endpoint_is_given():
+def test_a_v1_base_url_gives_the_resource_unless_an_audio_endpoint_is_given():
     config = {
         "provider": "azure",
         "api_key": "test-key",
@@ -92,13 +122,97 @@ def test_a_v1_base_url_is_kept_unless_an_audio_endpoint_is_given():
         "api_version": "2025-03-01-preview",
     }
 
-    kept = ParallelTranscriber(config)._whisper_client_config()
+    from_base_url = ParallelTranscriber(config)._whisper_client_config()
     audio = ParallelTranscriber(
         {**config, "azure_audio_endpoint": f"{_AUDIO}/openai/v1"}
     )._whisper_client_config()
 
-    assert kept["base_url"] == f"{_CHAT}/openai/v1"
+    # The base_url wins over a leftover azure_endpoint, as before, as its resource address.
+    assert "base_url" not in from_base_url and from_base_url["azure_endpoint"] == _CHAT
     assert "base_url" not in audio and audio["azure_endpoint"] == _AUDIO
+
+
+def _transcription_requests(respond):
+    import httpx
+
+    requests: list = []
+
+    def record(request):
+        requests.append(request)
+        return respond(request)
+
+    return requests, httpx.Client(transport=httpx.MockTransport(record))
+
+
+def test_a_v1_base_url_sends_whisper_to_the_deployment_route(tmp_path):
+    import httpx
+
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"\x00" * 10)
+    srt = "1\n00:00:00,000 --> 00:00:01,000\nHei\n"
+    requests, transport = _transcription_requests(
+        lambda _r: httpx.Response(200, text=srt, headers={"content-type": "text/plain"})
+    )
+    with transport:
+        transcriber = ParallelTranscriber(
+            {
+                "provider": "azure",
+                "api_key": "test-key",
+                "base_url": f"{_CHAT}/openai/v1",
+                "api_version": "2025-03-01-preview",
+                "transcription_model": "whisper",
+                "http_client": transport,
+                "max_retries": 0,
+            },
+            TranscriptionConfig(max_retries=0, max_429_retries=0),
+        )
+        assert transcriber._call_whisper_single(audio) == srt
+
+    assert requests[0].url.host == "chat-resource.openai.azure.com"
+    assert requests[0].url.path == "/openai/deployments/whisper/audio/transcriptions"
+    assert requests[0].url.params["api-version"] == "2025-03-01-preview"
+
+
+def test_the_transcriber_sends_a_v1_base_url_to_the_deployment_route(tmp_path):
+    import httpx
+    from gaik.software_components.transcriber.transcriber import Transcriber
+
+    audio = tmp_path / "a.mp3"
+    audio.write_bytes(b"\x00" * 10)
+    requests, transport = _transcription_requests(
+        lambda _r: httpx.Response(200, json={"text": "Hei"})
+    )
+    with transport:
+        transcriber = Transcriber(
+            {
+                "provider": "azure",
+                "api_key": "test-key",
+                "base_url": f"{_CHAT}/openai/v1",
+                "api_version": "2025-03-01-preview",
+                "http_client": transport,
+                "max_retries": 0,
+            },
+            output_dir=tmp_path / "w",
+        )
+        assert transcriber._single_pass_transcription(audio, None, "whisper") == "Hei"
+
+    assert requests[0].url.host == "chat-resource.openai.azure.com"
+    assert requests[0].url.path == "/openai/deployments/whisper/audio/transcriptions"
+
+
+def test_an_api_version_of_none_gets_the_default():
+    from gaik.software_components.transcriber import transcriber as module
+
+    config = {"provider": "azure", "api_key": "k", "azure_endpoint": _AUDIO, "api_version": None}
+
+    assert ParallelTranscriber(config)._whisper_client_config()["api_version"] == (
+        "2024-12-01-preview"
+    )
+    client = module._create_audio_client(config)
+    try:
+        assert client._api_version == "2024-12-01-preview"
+    finally:
+        client.close()
 
 
 def test_a_bare_openai_config_keeps_openai():
@@ -181,12 +295,78 @@ def _whisper(model: str, client: _FakeAudioClient, **config) -> ParallelTranscri
         ("my-gpt-4o-transcribe-deployment", "json"),
         ("whisper", "srt"),
         ("whisper-1", "srt"),
+        # A Whisper deployment with gpt in its name keeps its timestamps.
+        ("gpt-whisper", "srt"),
+        ("transcribe-prod", "srt"),
     ],
 )
 def test_each_model_is_asked_for_a_format_it_supports(model, expected):
     transcriber = _whisper(model, _FakeAudioClient([]))
 
     assert transcriber._whisper_request(model, file=None)["response_format"] == expected
+
+
+@pytest.mark.parametrize(
+    ("model", "chosen", "expected"),
+    [("transcribe-prod", "json", "json"), ("gpt-4o-transcribe", "srt", "srt")],
+)
+def test_the_request_format_can_be_set_for_a_name_that_says_neither(model, chosen, expected):
+    transcriber = _whisper(model, _FakeAudioClient([]), whisper_request_format=chosen)
+
+    assert transcriber._whisper_request(model, file=None)["response_format"] == expected
+
+
+def test_a_request_format_other_than_srt_or_json_is_refused():
+    with pytest.raises(ValueError, match="whisper_request_format"):
+        ParallelTranscriber({"api_key": "k"}, TranscriptionConfig(whisper_request_format="vtt"))
+
+
+def test_the_request_format_is_read_from_the_environment(monkeypatch):
+    monkeypatch.setenv("WHISPER_REQUEST_FORMAT", "json")
+
+    assert TranscriptionConfig.from_env().whisper_request_format == "json"
+
+
+def _long_whisper_run(tmp_path, monkeypatch, model: str, seconds: float, **config):
+    """Transcribe a small file of ``seconds`` on the Whisper backend; returns the
+    split_audio keyword arguments, or None when it went in a single request."""
+    audio = tmp_path / "meeting.mp3"
+    audio.write_bytes(b"\x00" * 1000)
+    monkeypatch.setattr(pipeline, "get_audio_duration", lambda _p: seconds)
+    monkeypatch.setattr(pipeline, "has_video_stream", lambda _p: False)
+    splits: list[dict] = []
+
+    def split(path, **kwargs):
+        splits.append(kwargs)
+        return ["c1.mp3", "c2.mp3"], [{"nominal_start": 0}, {"nominal_start": 1200}]
+
+    monkeypatch.setattr(pipeline, "split_audio", split)
+    transcriber = ParallelTranscriber(
+        {"api_key": "k", "transcription_model": model},
+        TranscriptionConfig(**config),
+        limits=InputLimits.unlimited(),
+    )
+    srt = "1\n00:00:00,000 --> 00:00:01,000\nx\n"
+    transcriber._transcribe_single = lambda *a: SimpleNamespace(single=True)
+    transcriber._transcribe_chunks_whisper = lambda *a: srt
+    transcriber._cleanup_chunks = lambda *a: None
+    result = transcriber.transcribe(audio)
+    return None if getattr(result, "single", False) else splits[0]
+
+
+def test_a_gpt4o_model_on_the_whisper_backend_is_split_under_1400_seconds(tmp_path, monkeypatch):
+    # 30 minutes in a small file: one request would be over GPT-4o's 1400 s limit.
+    split = _long_whisper_run(
+        tmp_path, monkeypatch, "gpt-4o-transcribe", 1800.0, chunk_duration_minutes=30
+    )
+
+    assert split is not None
+    # A middle chunk is chunk + 2 x 15 s of overlap: 22 minutes keeps it under 1400 s.
+    assert split["chunk_duration_minutes"] == 22
+
+
+def test_whisper_still_sends_a_long_small_file_in_one_request(tmp_path, monkeypatch):
+    assert _long_whisper_run(tmp_path, monkeypatch, "whisper", 1800.0) is None
 
 
 def test_a_gpt4o_single_pass_becomes_one_srt_cue(tmp_path, monkeypatch):
@@ -297,6 +477,26 @@ def test_shared_words_are_kept_once_and_nothing_else_is_dropped():
     assert kept_previous + kept_following == "a b c one two three four five six seven".split()
 
 
+def test_a_phrase_said_again_elsewhere_is_not_taken_for_the_overlap():
+    # The longest common run is "sanotaan tämä on tärkeä asia", said twice, but the
+    # chunks' shared speech is "loppu on tässä lopussa", at the edges where they meet.
+    previous = "alku keskellä sanotaan tämä on tärkeä asia ja loppu on tässä lopussa".split()
+    following = "loppu on tässä lopussa sitten sanotaan tämä on tärkeä asia taas".split()
+
+    kept_previous, kept_following = pipeline._drop_repeated_words(previous, following, 30.0)
+
+    assert kept_previous + kept_following == previous + following[4:]
+
+
+def test_a_phrase_repeated_far_from_the_edges_drops_nothing():
+    # Silence in the overlap, and one phrase said before it and again after it.
+    phrase = "kuten me aiemmin sovittiin".split()
+    previous = [f"a{i}" for i in range(45)] + phrase + [f"p{i}" for i in range(10)]
+    following = [f"n{i}" for i in range(10)] + phrase + [f"b{i}" for i in range(45)]
+
+    assert pipeline._drop_repeated_words(previous, following, 30.0) == (previous, following)
+
+
 def test_three_shared_words_are_not_enough_to_drop_any():
     previous = "a b c one two three".split()
     following = "one two three d e".split()
@@ -361,8 +561,10 @@ def test_a_failed_chunk_with_parallel_workers_stops_what_is_not_running_yet(tmp_
     with pytest.raises(RuntimeError, match="HTTP 401"):
         transcriber._transcribe_chunks_gpt4o(files, metadata, 2, None, None)
 
-    # Two ran at once; at most one more could start before the failure was seen.
-    assert len(sent) <= 3
+    # Chunks 1 and 2 may run at once; a worker that frees up after chunk 1 failed
+    # finds the run stopped, so no later chunk is sent.
+    assert sent[0] == "rec_chunk_01.mp3"
+    assert set(sent) <= {"rec_chunk_01.mp3", "rec_chunk_02.mp3"}
 
 
 def test_a_failed_whisper_local_chunk_stops_the_queued_ones(tmp_path):
@@ -389,29 +591,25 @@ def test_a_failed_whisper_local_chunk_stops_the_queued_ones(tmp_path):
     assert sent == ["rec_chunk_01.mp3"]
 
 
-def test_cancelling_stops_the_queued_chunks(tmp_path):
-    from gaik.software_components.parallel_transcriber import (
-        SimpleCancellation,
-        TranscriptionCancelled,
-    )
+def test_a_cancellation_raised_in_a_chunk_stops_the_queued_ones(tmp_path):
+    from gaik.software_components.parallel_transcriber import TranscriptionCancelled
 
     files, metadata = _chunks(tmp_path, 4)
-    cancel = SimpleCancellation()
     client = _FakeAudioClient([])
     sent: list[str] = []
 
-    def first_then_cancel(**kwargs):
+    def cancelled_while_the_first_runs(**kwargs):
         sent.append(Path(kwargs["file"].name).name)
-        cancel.cancel()
-        return "1\n00:00:00,000 --> 00:00:01,000\nx\n"
+        raise TranscriptionCancelled("cancelled")
 
-    client.audio.transcriptions.create = first_then_cancel
+    client.audio.transcriptions.create = cancelled_while_the_first_runs
     transcriber = _whisper("whisper", client)
 
+    # No check_cancelled callback, so only the executor can keep chunks 2-4 from
+    # being sent after chunk 1 raised.
     with pytest.raises(TranscriptionCancelled):
-        transcriber._transcribe_chunks_whisper(files, metadata, 1, cancel.check, None)
+        transcriber._transcribe_chunks_whisper(files, metadata, 1, None, None)
 
-    # The chunk that was running when the run was cancelled is the only one sent.
     assert sent == ["rec_chunk_01.mp3"]
 
 
@@ -472,6 +670,22 @@ def test_a_timeout_reading_the_length_is_named_as_one(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="reading its length timed out"):
         transcriber.transcribe(_not_media(tmp_path))
+
+
+def test_a_missing_ffprobe_is_named_as_such_not_blamed_on_the_file(tmp_path, monkeypatch):
+    def no_ffprobe(_path):
+        raise FileNotFoundError(2, "The system cannot find the file specified", "ffprobe")
+
+    monkeypatch.setattr(pipeline, "get_audio_duration", no_ffprobe)
+    monkeypatch.setattr(pipeline, "has_video_stream", lambda _p: False)
+    monkeypatch.setattr(pipeline, "has_audio_stream", lambda _p: True)
+    monkeypatch.setattr(pipeline.shutil, "which", lambda _name: None)
+    transcriber = _diarize(InputLimits.unlimited())
+    _no_transcription_calls(transcriber, monkeypatch)
+
+    with pytest.raises(ValueError, match="ffprobe is not installed") as raised:
+        transcriber.transcribe(_not_media(tmp_path))
+    assert "cannot read it as audio or video" not in str(raised.value)
 
 
 @pytest.mark.skipif(
