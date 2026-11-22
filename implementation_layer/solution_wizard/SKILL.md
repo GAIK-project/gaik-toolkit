@@ -319,8 +319,10 @@ python scripts/generate_schema.py \
 
 Add `--base-url` for `openai_compatible` or LiteLLM. Without `--provider` the script uses Azure; if the provider is still `"configurable"` or unknown, ask before this paid call. The model must support structured output (see Phase 6, step 8).
 
-This calls the GAIK `SchemaGenerator` once and writes three files:
+This calls the GAIK `SchemaGenerator` once and writes these files:
 - `poc/schemas/output_schema.py` -- the generated Pydantic model
+- `poc/schemas/output_schema_model.json` -- the same model as data (gaik 0.11 and later),
+  which the audio and document PoCs load (see Step 4.5)
 - `poc/schemas/output_schema_requirements.json` -- the `ExtractionRequirements` payload
 - `poc/schemas/output_schema.json` -- JSON Schema (documentation)
 
@@ -348,21 +350,34 @@ If the user requests changes, apply them **directly** to `output_schema.py` and
 Update only the specific fields the user asked to change. SchemaGenerator was called once
 to establish the base schema; all subsequent refinements are made by you as the agent.
 
-The PoC does not import `output_schema.py`: `load_schema()` reads
-`output_schema_model.json`. After every edit to `output_schema.py`, write that file again:
+How the PoC reads the schema depends on its template and on the gaik release:
+
+- **Audio and document PoCs**, with gaik 0.11 or later (the release the PoC pins):
+  `load_schema()` rebuilds the model from `output_schema_model.json` and does not import
+  `output_schema.py`. Before that, the PoC itself imports `output_schema.py` when it is
+  newer than the model file, to write the model file again, and stops with the reason when
+  that cannot be done. With gaik 0.10, which has no saved-schema format, `load_schema()`
+  imports `output_schema.py`.
+- **Custom (`_generic`) and hybrid PoCs** import `output_schema.py` directly with every
+  gaik release: for them the `.py` file is the schema, and the model file is not read.
+
+After every edit to `output_schema.py`, write the model file again:
 
 ```bash
 python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas
 ```
 
-The audio and document PoCs do the same themselves when `output_schema.py` is newer than
-the model file, and stop with the reason when it cannot be done; the script tells you now
-instead of at the next run. If it exits with an error, nothing was written: fix
-`output_schema.py` (the class name must match `model_name` in the requirements JSON,
-the field types must be ones the schema generator produces, and the class adds no
-validators, serializers, methods, private attributes or config options other than
-`extra`; keep the generated `DecimalField` / `OptionalDecimalField` helpers as they are)
-and run it again.
+The script tells you now what the audio and document PoCs would otherwise find at the next
+run. If it exits with an error, nothing was written: fix `output_schema.py` and run it
+again. It refuses what the saved format cannot hold: a class name other than `model_name`
+in the requirements JSON, a field type the schema generator does not produce, a field
+constraint (`ge`, `le`, `min_length`, `max_length`, `max_digits` and the like; only a
+`pattern` on a text field is kept), a `Field` option other than the description and the
+default, and validators, serializers, methods, private attributes or config options other
+than `extra` on the class. Keep the generated `DecimalField` / `OptionalDecimalField`
+helpers as they are. When the wizard's own gaik has no saved-schema format, the script
+writes nothing and warns if an older `output_schema_model.json` is there: run it again with
+gaik 0.11 or later before an audio or document PoC run.
 
 After each edit, confirm the change with the user before proceeding.
 
