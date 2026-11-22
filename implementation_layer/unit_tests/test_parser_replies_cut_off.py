@@ -225,6 +225,15 @@ def test_a_cut_off_cleanup_through_a_shared_client_returns_the_pages(monkeypatch
             "```python\r\nprint(1)\r\n```\r\n\r\nText after",
         ),
         ("```markdown\r\n# Title\r\n```", "# Title"),
+        # A four-backtick wrapper: a three-backtick fence inside it is its text.
+        ("````markdown\n# T\n\n```py\nx\n```\n````", "# T\n\n```py\nx\n```"),
+        ("````markdown\n# T\n```\nx\n```\n````", "# T\n```\nx\n```"),
+        ("````\ncode\n```\nmore\n````", "code\n```\nmore"),
+        # Tildes, and a tilde fence that a backtick fence does not close.
+        ("~~~markdown\n# T\n~~~", "# T"),
+        ("~~~markdown\n# T\n```py\nx\n```\n~~~", "# T\n```py\nx\n```"),
+        # Two backticks are no fence.
+        ("``markdown\n# T\n``", "``markdown\n# T\n``"),
     ],
 )
 def test_the_cleanup_takes_off_a_wrapping_fence_with_its_language_tag(monkeypatch, reply, expected):

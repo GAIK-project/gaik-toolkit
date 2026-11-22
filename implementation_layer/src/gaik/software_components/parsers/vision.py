@@ -59,40 +59,52 @@ __all__ = ["OpenAIConfig", "VisionParser", "get_openai_config"]
 
 logger = logging.getLogger(__name__)
 
-# A fence line: ``` with an optional language tag such as markdown or python.
-_FENCE = re.compile(r"```(?P<info>[^`]*)\Z")
+# A fence line: three or more backticks or tildes, with an optional language tag such
+# as markdown or python (a backtick fence's tag holds no backtick).
+_FENCE = re.compile(r"(?P<marks>`{3,}(?=[^`]*\Z)|~{3,})(?P<info>.*)\Z")
 # Tags a model puts on a fence around the whole document.
 _DOCUMENT_TAGS = frozenset({"markdown", "md"})
+
+
+def _closes(fence: re.Match, opening: re.Match) -> bool:
+    """A bare fence of the opening's character, at least as long, closes it."""
+    marks, opened = fence["marks"], opening["marks"]
+    return not fence["info"].strip() and marks[0] == opened[0] and len(marks) >= len(opened)
 
 
 def _unwrap_fence(text: str) -> str:
     """The text without a code fence the model put around all of it.
 
-    Fences are paired by nesting: one with a language tag opens a block, a bare one
-    closes the innermost. When the first fence closes on the last line, or the first
-    fence is tagged markdown and the last line is a bare fence, the pair wraps the
-    whole text and is taken off. A first fence that closes earlier opens a code block
-    of the document, which is kept; one that never closes is taken off.
+    Fences are paired by nesting: one with a language tag opens a block, and a bare one
+    closes the innermost open block when it has that block's character and at least
+    its length; a shorter bare fence is text of the block. When the first fence closes
+    on the last line, or the first fence is tagged markdown and the last line would
+    close it, the pair wraps the whole text and is taken off. A first fence that closes
+    earlier opens a code block of the document, which is kept; one that never closes is
+    taken off.
     """
     lines = text.split("\n")
     fences = [_FENCE.match(line.strip()) for line in lines]
     if fences[0] is None:
         return text
-    depth, closed_at = 1, None
+    open_blocks, closed_at = [fences[0]], None
     for number, fence in enumerate(fences[1:], start=1):
         if fence is None:
             continue
-        depth += 1 if fence["info"].strip() else -1
-        if depth == 0:
-            closed_at = number
-            break
+        if _closes(fence, open_blocks[-1]):
+            open_blocks.pop()
+            if not open_blocks:
+                closed_at = number
+                break
+        elif fence["info"].strip():
+            open_blocks.append(fence)
     last = len(lines) - 1
     if closed_at is None:
         body = lines[1:]
     elif closed_at == last or (
         fences[0]["info"].strip().lower() in _DOCUMENT_TAGS
         and fences[last] is not None
-        and not fences[last]["info"].strip()
+        and _closes(fences[last], fences[0])
     ):
         body = lines[1:last]
     else:
