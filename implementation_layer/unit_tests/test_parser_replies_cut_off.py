@@ -3,7 +3,8 @@
 VisionParser merges the pages of a PDF with one cleanup call (clean_output=True, the
 default). When that reply stopped at max_tokens, it replaced the complete per-page
 Markdown and the later pages were lost without an error. MultimodalParser had no check
-of a stop reason either.
+of a stop reason either. Also here: the cleanup's code-fence
+language tag.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from unittest.mock import MagicMock
 import fitz
 import pytest
 from gaik.software_components.llm.base import ChatResponse
-from gaik.software_components.parsers._cut_off import reply_cut_off
+from gaik.software_components.parsers._cut_off import Reply, reply_cut_off
 from gaik.software_components.parsers.multimodal_parser import MultimodalParser
 from gaik.software_components.parsers.multimodal_parser import multimodal_parser as multimodal
 from gaik.software_components.parsers.vision import OpenAIConfig, VisionParser
@@ -159,6 +160,27 @@ def test_a_cut_off_cleanup_through_a_shared_client_returns_the_pages(monkeypatch
     parser = VisionParser({"provider": "anthropic", "model": "vision-model", "api_key": "k"})
 
     assert parser._clean_markdown(["first", "second"]) is None
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected"),
+    [
+        ("```markdown\n# Title\n\nText\n```", "# Title\n\nText"),
+        ("```md\n# Title\n```", "# Title"),
+        ("```\n# Title\n```", "# Title"),
+        # A wrapper that never closes.
+        ("```markdown\n# Title", "# Title"),
+        # A code block that opens the document is the document's own.
+        ("```python\nprint(1)\n```\n\nText after", "```python\nprint(1)\n```\n\nText after"),
+        ("# Title\n\n```json\n{}\n```", "# Title\n\n```json\n{}\n```"),
+        ("No fence", "No fence"),
+    ],
+)
+def test_the_cleanup_takes_off_a_wrapping_fence_with_its_language_tag(monkeypatch, reply, expected):
+    parser = _vision_parser(monkeypatch, SimpleNamespace())
+    monkeypatch.setattr(parser, "_chat_content", lambda messages: Reply(reply))
+
+    assert parser._clean_markdown(["first", "second"]) == expected
 
 
 def _shared_parser(monkeypatch, raw):

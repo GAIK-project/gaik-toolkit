@@ -17,6 +17,7 @@ import base64
 import logging
 import mimetypes
 import os
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,6 +58,27 @@ except ImportError as exc:  # pragma: no cover - optional dependency guard
 __all__ = ["OpenAIConfig", "VisionParser", "get_openai_config"]
 
 logger = logging.getLogger(__name__)
+
+# A fence around the whole reply: ``` with an optional language tag such as markdown.
+_FENCE_OPEN = re.compile(r"```[^`\n]*\Z")
+_FENCE_CLOSE = re.compile(r"```[ \t]*\Z")
+
+
+def _unwrap_fence(text: str) -> str:
+    """The text without a code fence the model put around all of it.
+
+    A fence that closes before the end opens a code block of the document, which is
+    kept; one that never closes is taken off.
+    """
+    lines = text.split("\n")
+    if not _FENCE_OPEN.match(lines[0]):
+        return text
+    closing = [n for n, line in enumerate(lines[1:], start=1) if _FENCE_CLOSE.match(line)]
+    if closing and closing[0] != len(lines) - 1:
+        return text
+    body = lines[1:-1] if closing else lines[1:]
+    return "\n".join(body).strip()
+
 
 # mimetypes maps .webp only from Python 3.13 on (or via the OS type table).
 _IMAGE_MIME_TYPES = {".webp": "image/webp"}
@@ -525,10 +547,7 @@ class VisionParser:
         if not content:
             raise RuntimeError("Cleanup LLM returned empty output")
 
-        trimmed = material.strip_echo(content).strip()
-        if trimmed.startswith("```"):
-            trimmed = trimmed.strip("`").strip()
-        return trimmed
+        return _unwrap_fence(material.strip_echo(content).strip())
 
     def _chat_content(self, messages: list[dict]) -> str | None:
         """The reply's text as a :class:`Reply`, which says whether it was cut off.
