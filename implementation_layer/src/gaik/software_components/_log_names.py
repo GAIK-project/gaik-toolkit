@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import secrets
-from pathlib import PurePath
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 
 # blake2b takes a key of at most 64 bytes, so a set salt of any length is hashed to 32.
 _SALT = (
@@ -45,19 +46,43 @@ def file_tag(path: str | PurePath | None) -> str:
     return f"file {digest.hexdigest()}{suffix}"
 
 
+def _absolute(whole: str) -> set[str]:
+    """The path made absolute, as given and with links resolved; empty if it cannot be."""
+    forms = set()
+    for make in (os.path.abspath, lambda text: str(Path(text).resolve())):
+        try:
+            forms.add(make(whole))
+        except (OSError, RuntimeError, ValueError):
+            pass
+    return forms
+
+
+def _spellings(whole: str) -> set[str]:
+    """Each way a message can spell the path: as given, normalized (``str(PurePath())``,
+    ``as_posix()``) by Windows and by POSIX rules, made absolute or resolved, each with
+    the doubled backslashes of an OSError's repr; and the file's name and stem."""
+    paths = {whole} | _absolute(whole)
+    forms = set()
+    for path in paths:
+        for pure in (PureWindowsPath(path), PurePosixPath(path)):
+            forms |= {path, str(pure), pure.as_posix()}
+    forms |= {form.replace("\\", "\\\\") for form in forms}
+    for pure in (PureWindowsPath(whole), PurePosixPath(whole)):
+        forms |= {pure.name, pure.stem}
+    return {form for form in forms if len(form) >= 3}
+
+
 def error_text(exc: BaseException, *paths: str | PurePath | None, limit: int = 300) -> str:
-    """``"ValueError: cannot open file 3f9a1c2b.pdf"``: the error with each path's text,
-    file name and stem replaced by its tag, so a log line keeps the cause."""
+    """``"ValueError: cannot open file 3f9a1c2b.pdf"``: the error with each path, however
+    it is spelled (see :func:`_spellings`), and its file name and stem replaced by its tag,
+    so a log line keeps the cause."""
     text = f"{type(exc).__name__}: {exc}"
     for path in paths:
         if not path:
             continue
-        tag = file_tag(path)
-        whole = str(path)
-        pure = PurePath(whole)
-        # An OSError's repr doubles a Windows path's backslashes; tag that form too.
-        forms = {whole, whole.replace("\\", "\\\\"), pure.name, pure.stem}
-        for part in sorted(forms, key=len, reverse=True):
-            if len(part) >= 3:
-                text = text.replace(part, tag)
+        forms = sorted(_spellings(str(path)), key=len, reverse=True)
+        if forms:
+            # One pass, longest spelling first, so a tag is never rewritten.
+            pattern = re.compile("|".join(re.escape(form) for form in forms))
+            text = pattern.sub(file_tag(path), text)
     return text if len(text) <= limit else text[: limit - 1] + "…"
