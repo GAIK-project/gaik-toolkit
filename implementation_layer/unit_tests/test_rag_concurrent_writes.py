@@ -215,6 +215,10 @@ def test_a_chroma_store_keeps_the_folder_it_opened_after_a_chdir(tmp_path, monke
 def test_a_folder_key_ignores_case_on_macos(monkeypatch):
     from gaik.software_components.RAG.vector_store import vector_store as module
 
+    # macOS's os.path.normcase keeps the case; Windows' would fold it and hide the check.
+    monkeypatch.setattr(module.os.path, "normcase", lambda path: path)
+    monkeypatch.setattr(module.sys, "platform", "linux")
+    assert module._folder_key("/Data/Chroma") != module._folder_key("/data/chroma")
     monkeypatch.setattr(module.sys, "platform", "darwin")
     assert module._folder_key("/Data/Chroma") == module._folder_key("/data/chroma")
 
@@ -339,28 +343,147 @@ def test_pg_threads_sharing_a_store_do_not_run_inside_each_others_transaction(
     assert "second" not in names[: conn.log.index(("first", "COMMIT")) + 1], conn.log
 
 
-def test_pg_close_waits_a_bounded_time_for_a_call_in_another_thread():
+class _LongStatementPg:
+    """A fake connection whose statement runs until it is cancelled (or let go).
+
+    Like psycopg, ``cancel_safe`` may be called from another thread, and a cancelled
+    statement raises ``QueryCanceled``. Using the connection after ``close()`` raises
+    ``OperationalError``, as psycopg does; ``close()`` while a statement runs is
+    recorded, because psycopg would free the handle under it.
+    """
+
+    def __init__(self, *, cancellable: bool = True) -> None:
+        self.closed = False
+        self.cancellable = cancellable
+        self.running = threading.Event()
+        self.cancelled = threading.Event()
+        self.let_go = threading.Event()
+        self.in_statement = False
+        self.closed_under_a_statement = False
+        self.closed_by: str | None = None
+
+    def execute(self, sql, params=()):
+        import psycopg
+
+        if self.closed:
+            raise psycopg.OperationalError("the connection is closed")
+        self.in_statement = True
+        try:
+            self.running.set()
+            if self.cancellable:
+                if self.cancelled.wait(10):
+                    raise psycopg.errors.QueryCanceled("canceling statement due to user request")
+            else:
+                self.let_go.wait(10)
+        finally:
+            self.in_statement = False
+        return self
+
+    def fetchone(self):
+        return {"cnt": 3}
+
+    def cancel_safe(self, *, timeout: float = 30.0) -> None:
+        self.cancelled.set()
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        self.closed_under_a_statement = self.in_statement
+        self.closed_by = threading.current_thread().name
+        self.closed = True
+
+
+def test_pg_close_cancels_a_long_call_and_a_later_call_gets_a_psycopg_error(monkeypatch):
     import time
 
-    store, conn = _pg_store()
-    holding, done = threading.Event(), threading.Event()
+    import psycopg
+    from gaik.software_components.RAG.pg_vector_store import pg_vector_store as module
 
-    def long_call():  # a relemmatize() of a big table, say
-        with store._lock:
-            holding.set()
-            done.wait(10)
+    store, _ = _pg_store()
+    store._conn = conn = _LongStatementPg()
 
-    worker = threading.Thread(target=long_call, daemon=True)
-    worker.start()
-    assert holding.wait(5)
+    def refused(*args, **kwargs):
+        raise psycopg.OperationalError("connection refused")
+
+    monkeypatch.setattr(module.psycopg, "connect", refused)
+    errors: list[BaseException] = []
+    closed = threading.Event()
+
+    def call():
+        try:
+            store.count()
+        except BaseException as exc:  # noqa: BLE001 - checked below
+            errors.append(exc)
+
+    def worker():  # a relemmatize() of a big table, say, then a call after the close
+        call()
+        if closed.wait(5):
+            call()
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    assert conn.running.wait(5)
     started = time.monotonic()
     store.close(timeout=0.2)
     elapsed = time.monotonic() - started
-    done.set()
-    worker.join(5)
+    closed.set()
+    thread.join(5)
 
-    assert conn.closed and store._conn is None
-    assert 0.15 <= elapsed < 3, elapsed
+    assert conn.cancelled.is_set(), "close() did not cancel the running statement"
+    assert conn.closed and not conn.closed_under_a_statement
+    assert store._conn is None
+    assert elapsed < 3, elapsed
+    # The cancelled call fails, and the next one opens a new connection: both with
+    # a psycopg error, never an AttributeError from a connection set to None.
+    assert [type(exc) for exc in errors] == [
+        psycopg.errors.QueryCanceled,
+        psycopg.OperationalError,
+    ], errors
+
+
+def test_pg_close_cancels_with_cancel_on_psycopg_before_3_2():
+    pytest.importorskip("psycopg")
+    from gaik.software_components.RAG.pg_vector_store import pg_vector_store as module
+
+    class _Psycopg31:  # cancel(), and no cancel_safe()
+        def __init__(self) -> None:
+            self.cancelled = 0
+
+        def cancel(self) -> None:
+            self.cancelled += 1
+
+    conn = _Psycopg31()
+    module._cancel_quietly(conn, 0.1)
+    module._cancel_quietly(None, 0.1)
+    assert conn.cancelled == 1
+
+
+def test_pg_close_leaves_a_call_that_cannot_be_cancelled_to_close_it(caplog):
+    import logging
+
+    store, _ = _pg_store()
+    store._conn = conn = _LongStatementPg(cancellable=False)
+    results = []
+    thread = threading.Thread(
+        target=lambda: results.append(store.count()), name="holder", daemon=True
+    )
+    thread.start()
+    assert conn.running.wait(5)
+
+    with caplog.at_level(logging.WARNING):
+        store.close(timeout=0.1)
+    assert not conn.closed, "close() closed the connection under a running call"
+    assert any("still using the connection" in r.getMessage() for r in caplog.records)
+
+    conn.let_go.set()
+    thread.join(5)
+    assert results == [3]
+    assert conn.closed and conn.closed_by == "holder" and not conn.closed_under_a_statement
+    assert store._conn is None
 
 
 def _held_by_caller(lock) -> bool:

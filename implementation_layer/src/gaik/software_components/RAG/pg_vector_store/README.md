@@ -198,7 +198,7 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 | `search_hybrid_weighted(query_embedding, query_text, *, top_k, semantic_weight, keyword_weight, filters)` | Weighted hybrid search |
 | `health(*, sample_rows=5)` | Check the live table against this store's configuration; returns a `HealthReport` |
 | `relemmatize(*, batch_size=500)` | Recompute the lemma column with the current `text_processor`; returns rows updated |
-| `close(*, timeout=5.0)` | Close database connection; a call another thread is in gets up to `timeout` seconds to end its transaction, then fails |
+| `close(*, timeout=5.0)` | Close database connection (a later call opens a new one). A call another thread is in gets `timeout` seconds to end its transaction; then its statement is cancelled, so it fails and rolls back. A call that still holds on after another `timeout` closes the connection when it ends, with a warning logged; the connection is never closed under it |
 
 ### Chunk keys and re-indexing
 
@@ -222,8 +222,10 @@ Threads can share one store, but they share its one connection and its transacti
 so the store's calls take turns: each runs until its transaction ends. The
 `text_processor` runs before a call takes its turn, so a slow lemmatizer does not hold
 up the others (`health()` and `relemmatize()` lemmatize rows they read, inside theirs).
-A shallow copy (`copy.copy`) shares the connection and takes turns with the original.
-Give each worker its own store to run queries in parallel.
+Two threads can therefore run the `text_processor` at once: it must be thread-safe, or
+give each thread its own store and processor. A shallow copy (`copy.copy`) shares the
+lock, so its calls take turns with the original's. Give each worker its own store to
+run queries in parallel.
 
 A table created by an earlier gaik release gets the column the next time `setup()`
 runs; until then `add()` inserts as before and logs a warning. Its existing rows keep
