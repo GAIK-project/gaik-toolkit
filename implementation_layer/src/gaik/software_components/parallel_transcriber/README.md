@@ -111,7 +111,10 @@ video says little about its audio. The length is read with ffprobe; when that fa
 is measured again from the extracted audio before the first call. A file whose header
 holds no length (a WebM a browser wrote while recording) is measured by decoding its
 audio, and a recording whose length cannot be read at all is refused. Every ffprobe
-call has a 60-second timeout, decoding a 10-minute one.
+call has a 60-second timeout, decoding a 10-minute one. GPT-4o Diarize, Whisper Local and
+a recording to split need the length before the first call, so a file that is not audio or
+video at all is refused there with `InputLimitError` (or `ValueError` with
+`max_media_seconds=None`), not with ffprobe's `CalledProcessError`.
 
 A chunk that FFmpeg cannot create, even on its sequential retry, stops the run with a
 `RuntimeError` that names the missing time ranges, and a chunk whose transcription fails

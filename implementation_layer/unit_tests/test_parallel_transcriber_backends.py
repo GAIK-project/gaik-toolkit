@@ -1,16 +1,19 @@
 """ParallelTranscriber backends: the Azure audio client, the request format each model
-takes, and stopping the queued chunks after a failure.
+takes, stopping the queued chunks after a failure, and refusing a file that is not media.
 
 No test calls a provider: the SDK client and the HTTP posts are fakes.
 """
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 import threading
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.parallel_transcriber import (
     ParallelTranscriber,
     TranscriptionConfig,
@@ -405,3 +408,78 @@ def test_cancelling_stops_the_queued_chunks(tmp_path):
 
     with pytest.raises(TranscriptionCancelled):
         transcriber._transcribe_chunks_whisper(files, metadata, 1, cancel.check, None)
+
+
+# -- a file that is not media (#227) -----------------------------------------------
+
+
+def _diarize(limits: InputLimits) -> ParallelTranscriber:
+    return ParallelTranscriber(
+        {"provider": "azure", "api_key": "k", "azure_endpoint": _AUDIO, "api_version": "v"},
+        TranscriptionConfig(model=TranscriptionModel.GPT4O_DIARIZE),
+        limits=limits,
+    )
+
+
+def _not_media(tmp_path: Path) -> Path:
+    path = tmp_path / "notes.mp3"
+    path.write_text("This is a text file, not a recording.\n" * 20, encoding="utf-8")
+    return path
+
+
+def _no_transcription_calls(transcriber, monkeypatch):
+    import httpx
+
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: pytest.fail("a transcription was sent"))
+    transcriber._transcribe_single = lambda *a: pytest.fail("a transcription was sent")
+
+
+@pytest.mark.parametrize(
+    ("limits", "error"),
+    [(InputLimits(), InputLimitError), (InputLimits.unlimited(), ValueError)],
+)
+def test_gpt4o_refuses_a_file_ffprobe_cannot_read(tmp_path, monkeypatch, limits, error):
+    def unreadable(_path):
+        raise subprocess.CalledProcessError(1, ["ffprobe", str(tmp_path)])
+
+    monkeypatch.setattr(pipeline, "get_audio_duration", unreadable)
+    monkeypatch.setattr(pipeline, "has_video_stream", lambda _p: False)
+    monkeypatch.setattr(pipeline, "has_audio_stream", lambda _p: False)
+    transcriber = _diarize(limits)
+    _no_transcription_calls(transcriber, monkeypatch)
+
+    with pytest.raises(error, match="cannot read it as audio or video") as raised:
+        transcriber.transcribe(_not_media(tmp_path))
+
+    assert not isinstance(raised.value, subprocess.CalledProcessError)
+    assert isinstance(raised.value.__cause__, subprocess.CalledProcessError)
+
+
+def test_a_timeout_reading_the_length_is_named_as_one(tmp_path, monkeypatch):
+    def slow(_path):
+        raise subprocess.TimeoutExpired("ffprobe", 60)
+
+    monkeypatch.setattr(pipeline, "get_audio_duration", slow)
+    monkeypatch.setattr(pipeline, "has_video_stream", lambda _p: False)
+    monkeypatch.setattr(pipeline, "has_audio_stream", lambda _p: True)
+    transcriber = _diarize(InputLimits.unlimited())
+    _no_transcription_calls(transcriber, monkeypatch)
+
+    with pytest.raises(ValueError, match="reading its length timed out"):
+        transcriber.transcribe(_not_media(tmp_path))
+
+
+@pytest.mark.skipif(
+    shutil.which("ffprobe") is None or shutil.which("ffmpeg") is None,
+    reason="needs ffmpeg and ffprobe on PATH",
+)
+@pytest.mark.parametrize(
+    ("limits", "error"),
+    [(InputLimits(), InputLimitError), (InputLimits.unlimited(), ValueError)],
+)
+def test_gpt4o_refuses_a_text_file_with_the_real_ffprobe(tmp_path, monkeypatch, limits, error):
+    transcriber = _diarize(limits)
+    _no_transcription_calls(transcriber, monkeypatch)
+
+    with pytest.raises(error, match="notes.mp3 cannot be read"):
+        transcriber.transcribe(_not_media(tmp_path))

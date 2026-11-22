@@ -311,7 +311,11 @@ class ParallelTranscriber:
 
         Raises:
             InputLimitError: If the file is over ``max_media_bytes`` or
-                ``max_media_seconds``.
+                ``max_media_seconds``, or its length cannot be read (a file that is
+                not audio or video) while ``max_media_seconds`` is set.
+            ValueError: If the length is needed (GPT-4o Diarize, Whisper Local, a
+                recording to split) and cannot be read while ``max_media_seconds``
+                is off.
         """
         file_path = Path(file_path)
         if not file_path.exists():
@@ -352,8 +356,10 @@ class ParallelTranscriber:
             needs_chunking = file_size_mb > cfg.max_single_file_mb
             total_duration: float | None = None
 
+            # These backends need the length before the first call: a file that is not
+            # audio or video is refused here (_measured_seconds), not with ffprobe's error.
             if model == TranscriptionModel.GPT4O_DIARIZE:
-                total_duration = get_audio_duration(str(audio_path))
+                total_duration = self._measured_seconds(audio_path, file_path.name)
                 if total_duration > _MAX_GPT4O_DURATION_SECONDS:
                     needs_chunking = True
 
@@ -363,7 +369,7 @@ class ParallelTranscriber:
             # length must be chunked, and anything past max_audio_minutes is
             # rejected so callers fall back to the cloud path immediately.
             if model == TranscriptionModel.WHISPER_LOCAL:
-                total_duration = get_audio_duration(str(audio_path))
+                total_duration = self._measured_seconds(audio_path, file_path.name)
                 duration_minutes = total_duration / 60
                 if duration_minutes > cfg.whisper_local_max_audio_minutes:
                     raise ValueError(
@@ -395,7 +401,7 @@ class ParallelTranscriber:
 
             # ── Stage 3: measure duration ──────────────────────────────
             if total_duration is None:
-                total_duration = get_audio_duration(str(audio_path))
+                total_duration = self._measured_seconds(audio_path, file_path.name)
                 self._limits.check_media_seconds(total_duration, file_path.name)
             logger.info("Total duration: %.1f min", total_duration / 60)
 
@@ -498,14 +504,26 @@ class ParallelTranscriber:
     def _measured_seconds(self, audio_path: Path, name: str) -> float:
         """The length of ``audio_path``, decoded when its header has none.
 
-        ``InputLimitError`` when neither ffprobe nor decoding can read it.
+        Raises:
+            InputLimitError: If neither ffprobe nor decoding can read it while
+                ``max_media_seconds`` is set (a file that is not audio or video).
+            ValueError: The same with ``max_media_seconds`` off.
         """
         try:
             return get_audio_duration(str(audio_path))
         except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            reason = (
+                "reading its length timed out"
+                if isinstance(exc, subprocess.TimeoutExpired)
+                else "ffprobe and ffmpeg cannot read it as audio or video"
+            )
+            if self._limits.max_media_seconds is None:
+                raise ValueError(
+                    f"The length of {name} cannot be read ({reason}), so it was not transcribed."
+                ) from exc
             raise InputLimitError(
-                f"The length of {name} cannot be read, so it cannot be checked against "
-                "InputLimits.max_media_seconds.",
+                f"The length of {name} cannot be read ({reason}), so it cannot be checked "
+                "against InputLimits.max_media_seconds.",
                 limit="max_media_seconds",
                 actual=float("inf"),
                 maximum=self._limits.max_media_seconds,
