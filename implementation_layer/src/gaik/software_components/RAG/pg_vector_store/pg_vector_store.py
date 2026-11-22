@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import re
+import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -158,23 +159,45 @@ class HealthReport:
 
 
 def _rolls_back_on_error(method):
-    """Roll the connection back when *method* raises, then re-raise.
+    """Run *method* as the only user of the store's connection; roll back if it raises.
 
     psycopg opens a transaction on the first statement. After a failed
     statement, every later one fails with "current transaction is aborted"
     until a rollback; after a failure in Python partway through ``add()``, the
     rows already sent stay pending and the next commit would store them.
+
+    Threads that share a store share its connection and so its transaction: one
+    thread's commit would store another's half-done ``add()``, its rollback undo
+    it, and an advisory lock taken by one would not stop the other. So each such
+    method holds the store's lock until its transaction ends. The outermost call
+    then closes the connections a ``close()`` made inside it asked to close.
     """
 
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
-        try:
-            return method(self, *args, **kwargs)
-        except BaseException:
-            self._rollback_quietly()
-            raise
+        with self._lock:
+            turns = self._turns
+            turns.calls += 1
+            try:
+                return method(self, *args, **kwargs)
+            except BaseException:
+                self._rollback_quietly()
+                raise
+            finally:
+                turns.calls -= 1
+                if not turns.calls:
+                    while turns.close_requests:
+                        turns.close_requests.pop()._close_locked(quietly=True)
 
     return wrapper
+
+
+class _Turns:
+    """What a store's calls share with its shallow copies besides the lock."""
+
+    def __init__(self) -> None:
+        self.calls = 0  # store calls running under the lock: one thread's, nested
+        self.close_requests: list[Any] = []  # stores close() was called on inside a call
 
 
 class PgVectorStore:
@@ -224,6 +247,11 @@ class PgVectorStore:
             sees only its rows. ``health()`` and ``relemmatize()`` are table-wide
             maintenance and read every owner's rows. Without an owner, ``add()``
             refuses metadata that names one.
+
+    Threads can share a store. They also share its one connection, so their calls
+    take turns, each until its transaction ends; give each worker its own store to
+    run queries in parallel. The ``text_processor`` runs before a call takes its
+    turn, so threads sharing a store may run it at once: it must be thread-safe.
 
     Example::
 
@@ -330,6 +358,31 @@ class PgVectorStore:
         self.hnsw_iterative_scan = hnsw_iterative_scan
         self._conn: psycopg.Connection | None = None
         self._has_chunk_key: bool | None = None
+        self._init_turns()
+
+    def _init_turns(self) -> None:
+        # Held for each transaction on ``_conn``, which threads sharing the store share.
+        self._lock = threading.RLock()
+        self._turns = _Turns()
+
+    def __getstate__(self) -> dict:
+        # A lock cannot be pickled or deep-copied; a store not yet connected could be.
+        # The copy made from this state has a connection of its own, and its own lock.
+        state = self.__dict__.copy()
+        for name in ("_lock", "_turns"):
+            state.pop(name, None)
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        self.__dict__.update(state)
+        self._init_turns()
+
+    def __copy__(self) -> PgVectorStore:
+        # A shallow copy starts on the same connection, so its calls take turns with
+        # the original's: it shares the lock and the count of calls under it.
+        clone = type(self).__new__(type(self))
+        clone.__dict__.update(self.__dict__)
+        return clone
 
     @property
     def _vec(self) -> str:
@@ -341,18 +394,24 @@ class PgVectorStore:
     # ------------------------------------------------------------------
 
     def _get_conn(self) -> psycopg.Connection:
-        """Return (and lazily create) the database connection."""
-        if self._conn is not None and not self._conn.closed:
-            status = _transaction_status(self._conn)
+        """Return (and lazily create) the database connection.
+
+        Called with the store's lock held. The connection is read once into a local,
+        and the one returned is the one checked.
+        """
+        conn = self._conn
+        if conn is not None and not conn.closed:
+            status = _transaction_status(conn)
             if status == "INERROR":
-                self._conn.rollback()
+                conn.rollback()
             elif status == "UNKNOWN":
                 self._rollback_quietly()
-                self._conn = None
-        if self._conn is None or self._conn.closed:
-            self._conn = psycopg.connect(self.connection_string, row_factory=dict_row)
-            self._apply_session_settings(self._conn)
-        return self._conn
+                self._conn = conn = None
+        if conn is None or conn.closed:
+            conn = psycopg.connect(self.connection_string, row_factory=dict_row)
+            self._apply_session_settings(conn)
+            self._conn = conn
+        return conn
 
     def _rollback_quietly(self) -> None:
         """Roll back the open transaction; drop a connection that cannot."""
@@ -394,11 +453,50 @@ class PgVectorStore:
                 conn.rollback()
                 logger.warning("Could not set %s = %s: %s", name, value, exc)
 
-    def close(self) -> None:
-        """Close the database connection."""
-        if self._conn is not None and not self._conn.closed:
-            self._conn.close()
-            self._conn = None
+    def close(self, *, timeout: float | None = None) -> None:
+        """Close the database connection; a later call opens a new one.
+
+        Waits for a call another thread is in to end its transaction: as long as it
+        takes with ``timeout=None``, else up to ``timeout`` seconds, after which
+        ``TimeoutError`` is raised and the connection is left open and untouched.
+        Called from inside one of this store's calls on the same thread (a callback,
+        say), it closes the connection once the outermost call ends.
+
+        Raises:
+            TimeoutError: The other thread's call did not end within ``timeout``.
+        """
+        if timeout is None:
+            acquired = self._lock.acquire()
+        else:
+            acquired = self._lock.acquire(timeout=max(timeout, 0))
+        if not acquired:
+            raise TimeoutError(
+                f"close(): a call in another thread still used the connection after "
+                f"{timeout} s; the connection was left open"
+            )
+        try:
+            if self._turns.calls:
+                # This thread is inside a call (only the lock's holder can be), so
+                # the connection is in use: the outermost call closes it.
+                if not any(store is self for store in self._turns.close_requests):
+                    self._turns.close_requests.append(self)
+                return
+            self._close_locked()
+        finally:
+            self._lock.release()
+
+    def _close_locked(self, *, quietly: bool = False) -> None:
+        """Close and forget the connection; the store's lock is held."""
+        conn, self._conn = self._conn, None
+        if conn is None or conn.closed:
+            return
+        try:
+            conn.close()
+        except Exception as exc:
+            if not quietly:
+                raise
+            # A call's own error, if any, is the one raised.
+            logger.warning("Could not close a database connection: %s", exc)
 
     def __enter__(self) -> PgVectorStore:
         return self
@@ -835,7 +933,6 @@ class PgVectorStore:
     # CRUD operations
     # ------------------------------------------------------------------
 
-    @_rolls_back_on_error
     def add(
         self,
         documents: list[Document],
@@ -871,7 +968,8 @@ class PgVectorStore:
                 deleted, and only rows this release stored (with
                 ``gaik_document_key``). Two calls replacing the same document
                 of the same owner wait for each other (a transaction-scoped
-                advisory lock). Pass all of a document's chunks in one call. If
+                advisory lock across connections; threads sharing this store
+                take turns). Pass all of a document's chunks in one call. If
                 the add fails, the transaction is rolled back and the old rows
                 stay.
 
@@ -899,12 +997,34 @@ class PgVectorStore:
                 for doc in documents
             ]
 
-        conn = self._get_conn()
-        has_chunk_key = self._chunk_key_column(conn)
+        # The document ids are checked, and the text processor run, before the
+        # store's lock is taken and a connection opened: a slow lemmatizer does not
+        # hold up the other threads' calls.
         keyed = chunk_ids(documents)
         metadatas = [
             with_document_id(doc.metadata, key.document_id) for doc, key in zip(documents, keyed)
         ]
+        lemmas = (
+            None
+            if self.text_processor is None
+            else [self.text_processor.to_tsvector_text(doc.page_content) for doc in documents]
+        )
+        return self._insert(documents, embeddings, metadatas, keyed, lemmas, replace=replace)
+
+    @_rolls_back_on_error
+    def _insert(
+        self,
+        documents: list[Document],
+        embeddings: list[list[float]],
+        metadatas: list[dict[str, Any]],
+        keyed: list[Any],
+        lemmas: list[str] | None,
+        *,
+        replace: bool,
+    ) -> list[int]:
+        """The transaction of :meth:`add`: lock, delete when replacing, upsert."""
+        conn = self._get_conn()
+        has_chunk_key = self._chunk_key_column(conn)
         ids: list[int] = []
 
         with conn.cursor() as cur:
@@ -918,17 +1038,19 @@ class PgVectorStore:
                     cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock,))
                 for doc_id, owner in scopes:
                     cur.execute(*self._delete_document_sql(doc_id, owner))
-            for doc, emb, metadata, key in zip(documents, embeddings, metadatas, keyed):
+            for index, (doc, emb, metadata, key) in enumerate(
+                zip(documents, embeddings, metadatas, keyed)
+            ):
                 chunk_key = key.chunk_id
                 title = metadata.get("title", "")
                 vec_str = _format_vector(emb)
                 columns = ["title", "content", "metadata", "embedding"]
                 values = ["%s", "%s", "%s::jsonb", f"%s::{self._vec}"]
                 params: list[Any] = [title, doc.page_content, json.dumps(metadata), vec_str]
-                if self.text_processor is not None:
+                if lemmas is not None:
                     columns.insert(2, "content_lemmatized")
                     values.insert(2, "%s")
-                    params.insert(2, self.text_processor.to_tsvector_text(doc.page_content))
+                    params.insert(2, lemmas[index])
                 upsert = ""
                 if has_chunk_key:
                     columns.append("chunk_key")
@@ -1022,7 +1144,7 @@ class PgVectorStore:
         return result.rowcount
 
     @_rolls_back_on_error
-    def delete_document(self, document_id: str, *, owner: str | None = None) -> int:
+    def delete_document(self, document_id: str | int, *, owner: str | None = None) -> int:
         """Delete every row of one document and one owner.
 
         ``add()`` records each row's document in its metadata under
@@ -1052,8 +1174,12 @@ class PgVectorStore:
         return result.rowcount
 
     def _document_lock_key(self, document_id: str, owner: str | None) -> int:
-        """The advisory lock key (a signed bigint) for one document of one owner here."""
-        payload = json.dumps([self.table_name, document_id, owner], ensure_ascii=False)
+        """The advisory lock key (a signed bigint) for one document of one owner here.
+
+        The table name is lower-cased, as Postgres folds it: ``Documents`` and
+        ``documents`` are one table and take one lock.
+        """
+        payload = json.dumps([self.table_name.lower(), document_id, owner], ensure_ascii=False)
         digest = hashlib.sha256(payload.encode("utf-8")).digest()
         return int.from_bytes(digest[:8], "big", signed=True)
 
@@ -1133,7 +1259,6 @@ class PgVectorStore:
 
         return self._rows_to_results(rows, score_key="similarity")
 
-    @_rolls_back_on_error
     def search_keyword(
         self,
         query_text: str,
@@ -1151,9 +1276,15 @@ class PgVectorStore:
         Returns:
             List of ``(Document, ts_rank_score)`` tuples, highest first.
         """
+        # The text processor runs before the store's lock is taken (see add()).
+        return self._search_keyword(self._lemmatize_query(query_text), top_k=top_k, filters=filters)
+
+    @_rolls_back_on_error
+    def _search_keyword(
+        self, effective_query: str, *, top_k: int, filters: dict | None
+    ) -> list[tuple[Document, float]]:
         conn = self._get_conn()
         filter_clause, filter_params = _build_filter_clause(self._scoped(filters))
-        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""
@@ -1175,7 +1306,6 @@ class PgVectorStore:
 
         return self._rows_to_results(rows, score_key="score")
 
-    @_rolls_back_on_error
     def search_hybrid(
         self,
         query_embedding: list[float],
@@ -1209,11 +1339,33 @@ class PgVectorStore:
             The RRF score is built from rank positions and cannot tell a real
             match from the nearest neighbour of gibberish; the similarity can.
         """
+        # The text processor runs before the store's lock is taken (see add()).
+        return self._search_hybrid(
+            query_embedding,
+            self._lemmatize_query(query_text),
+            top_k=top_k,
+            rrf_k=rrf_k,
+            semantic_weight=semantic_weight,
+            keyword_weight=keyword_weight,
+            filters=filters,
+        )
+
+    @_rolls_back_on_error
+    def _search_hybrid(
+        self,
+        query_embedding: list[float],
+        effective_query: str,
+        *,
+        top_k: int,
+        rrf_k: int,
+        semantic_weight: float,
+        keyword_weight: float,
+        filters: dict | None,
+    ) -> list[tuple[Document, float]]:
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
         filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
-        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""
@@ -1250,7 +1402,6 @@ class PgVectorStore:
             extra_keys=("semantic_rank", "keyword_rank", "semantic_similarity"),
         )
 
-    @_rolls_back_on_error
     def search_hybrid_weighted(
         self,
         query_embedding: list[float],
@@ -1281,11 +1432,31 @@ class PgVectorStore:
         Returns:
             List of ``(Document, combined_score)`` tuples, highest first.
         """
+        # The text processor runs before the store's lock is taken (see add()).
+        return self._search_hybrid_weighted(
+            query_embedding,
+            self._lemmatize_query(query_text),
+            top_k=top_k,
+            semantic_weight=semantic_weight,
+            keyword_weight=keyword_weight,
+            filters=filters,
+        )
+
+    @_rolls_back_on_error
+    def _search_hybrid_weighted(
+        self,
+        query_embedding: list[float],
+        effective_query: str,
+        *,
+        top_k: int,
+        semantic_weight: float,
+        keyword_weight: float,
+        filters: dict | None,
+    ) -> list[tuple[Document, float]]:
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
         filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
-        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""

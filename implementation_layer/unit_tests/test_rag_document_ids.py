@@ -264,6 +264,176 @@ def test_a_failed_chroma_reindex_keeps_the_stored_chunk(tmp_path):
     assert store.count() == 1
 
 
+def _chroma(tmp_path, *, in_place: bool = False):
+    pytest.importorskip("chromadb")
+    from gaik.software_components.RAG.vector_store import VectorStore
+    from gaik.software_components.RAG.vector_store import vector_store as module
+
+    if in_place and not module._chroma_removes_none_values():
+        pytest.skip("this chromadb cannot remove a metadata key: the store deletes, then adds")
+    return VectorStore(persist=True, persist_path=str(tmp_path / "chroma"))
+
+
+def test_an_interrupted_chroma_reindex_keeps_the_stored_chunk(tmp_path, monkeypatch):
+    store = _chroma(tmp_path, in_place=True)
+    store.add(_chunks("report", ["alpha"]), [A1])
+
+    # The process stops while the new version is written: Ctrl-C, say. Writing
+    # the chunk in place leaves it old or new; deleting it first lost it.
+    def interrupted(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(store._collection, "add", interrupted)
+    monkeypatch.setattr(store._collection, "upsert", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        store.add(_chunks("report", ["alpha"]), [B1], replace=True)
+    monkeypatch.undo()
+
+    assert _texts(store, "report") == ["alpha"]
+
+
+def test_a_chroma_write_that_fails_partway_is_undone(tmp_path, monkeypatch):
+    store = _chroma(tmp_path, in_place=True)
+    [old] = _chunks("report", ["alpha"])
+    old.metadata["heading"] = "Old heading"
+    store.add([old], [A1])
+    upsert = store._collection.upsert
+    calls = []
+
+    def fails_after_writing(*args, **kwargs):
+        calls.append(kwargs["ids"])
+        upsert(*args, **kwargs)
+        if len(calls) == 1:
+            raise RuntimeError("disk full")
+
+    monkeypatch.setattr(store._collection, "upsert", fails_after_writing)
+    new = _chunks("report", ["alpha", "beta"])
+    new[0].metadata["section"] = "New section"
+    with pytest.raises(RuntimeError):
+        store.add(new, [B1, C1], replace=True)
+    monkeypatch.undo()
+
+    assert len(calls) == 2, "the failed write was not undone"
+    [(doc, score)] = store.search(A1, top_k=5)
+    assert doc.page_content == "alpha" and score == pytest.approx(1.0)
+    assert doc.metadata["heading"] == "Old heading"
+    assert "section" not in doc.metadata
+    assert store.count() == 1
+
+
+def test_an_older_chroma_without_key_removal_still_drops_a_key(tmp_path, monkeypatch):
+    from gaik.software_components.RAG.vector_store import vector_store as module
+
+    store = _chroma(tmp_path)
+    monkeypatch.setattr(module, "_chroma_removes_none_values", lambda: False)
+    [chunk] = _chunks("report", ["alpha"])
+    chunk.metadata["heading"] = "Old heading"
+    store.add([chunk], [A1])
+    store.add(_chunks("report", ["alpha"]), [A1], replace=True)
+
+    [(doc, _)] = store.search(A1, top_k=5)
+    assert "heading" not in doc.metadata
+    assert store.count() == 1
+
+
+def test_the_installed_chroma_removes_a_key_sent_as_none():
+    pytest.importorskip("chromadb")
+    import chromadb
+    from gaik.software_components.RAG.vector_store import vector_store as module
+
+    major = int(chromadb.__version__.split(".")[0])
+    assert module._chroma_removes_none_values() is (major >= 1)
+
+
+class _KeepsKeysCollection:
+    """A Chroma collection that accepts a None value but keeps the key."""
+
+    def __init__(self) -> None:
+        self.metadata: dict = {}
+
+    def add(self, ids, embeddings, metadatas):
+        self.metadata = dict(metadatas[0])
+
+    def upsert(self, ids, embeddings, metadatas):
+        self.metadata.update({k: v for k, v in metadatas[0].items() if v is not None})
+
+    def get(self, ids, include):
+        return {"metadatas": [self.metadata]}
+
+
+class _RefusesNoneCollection(_KeepsKeysCollection):
+    """A Chroma collection before 1.0: a None value is refused."""
+
+    def upsert(self, ids, embeddings, metadatas):
+        raise ValueError("Expected metadata value to be a str, int, float or bool, got None")
+
+
+class _UpsertFailsCollection(_KeepsKeysCollection):
+    """A Chroma whose upsert with a None value fails in some other way."""
+
+    def upsert(self, ids, embeddings, metadatas):
+        raise RuntimeError("TypeError in the bindings")
+
+
+def _probe_with(monkeypatch, client_class):
+    pytest.importorskip("chromadb")
+    import chromadb
+    from gaik.software_components.RAG.vector_store import vector_store as module
+
+    monkeypatch.setattr(chromadb, "EphemeralClient", client_class)
+    monkeypatch.setattr(module, "_removes_none", None)
+    monkeypatch.setattr(module, "_probe_runs_left", 3)
+    return module
+
+
+@pytest.mark.parametrize(
+    "collection",
+    [_KeepsKeysCollection, _RefusesNoneCollection, _UpsertFailsCollection],
+    ids=["keeps", "refuses", "upsert-fails"],
+)
+def test_a_chroma_that_does_not_remove_a_key_gets_delete_then_add(monkeypatch, collection):
+    made, deleted = [], []
+
+    class _Client:
+        def create_collection(self, name):
+            made.append(name)
+            return collection()
+
+        def delete_collection(self, name):
+            deleted.append(name)
+
+    module = _probe_with(monkeypatch, _Client)
+    # A check of the client alone passes "keeps": the probe writes and reads back.
+    for _ in range(3):
+        assert module._chroma_removes_none_values() is False
+    assert module._removes_none is False and len(made) == 1, "a definite answer is kept"
+    assert deleted == made, "the throwaway collection was left"
+
+
+def test_a_probe_that_could_not_run_is_tried_a_few_times(monkeypatch):
+    attempts = []
+
+    class _Unavailable:
+        def __init__(self):
+            attempts.append(1)
+            raise RuntimeError("could not start an in-memory Chroma")
+
+    module = _probe_with(monkeypatch, _Unavailable)
+    assert module._chroma_removes_none_values() is False
+    assert len(attempts) == 1 and module._removes_none is None, "it is tried again"
+    for _ in range(5):
+        assert module._chroma_removes_none_values() is False
+    assert len(attempts) == 3 and module._removes_none is False, "it stops after three"
+
+    import chromadb
+
+    monkeypatch.undo()
+    module = _probe_with(monkeypatch, chromadb.EphemeralClient)
+    major = int(chromadb.__version__.split(".")[0])
+    assert module._chroma_removes_none_values() is (major >= 1)
+    assert module._removes_none is (major >= 1)
+
+
 def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):
     store.add(_chunks("report", ["alpha", "beta"]), [A1, B1])
 
@@ -272,6 +442,7 @@ def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):
 
     if store.persist:
         monkeypatch.setattr(store._collection, "add", fail)
+        monkeypatch.setattr(store._collection, "upsert", fail)
     else:
         monkeypatch.setattr(store, "_ids", _FailingList(store._ids))
     with pytest.raises(RuntimeError):
@@ -385,6 +556,34 @@ def test_workflow_document_ids_identify_the_files(workflow):
     assert workflow.delete_document("doc-7") == 1
     with pytest.raises(ValueError):
         workflow.index_documents(["/tmp/x1.pdf"], document_ids=[])
+
+
+@pytest.mark.parametrize("bad", [{"$gt": ""}, None, 1.5, ""])
+def test_workflow_checks_every_document_id_before_it_parses_a_file(workflow, bad):
+    parsed = []
+    parse = workflow.parser.convert_doc_to_chunks
+
+    def counting(path, document_name=None):
+        parsed.append(path)
+        return parse(path, document_name=document_name)
+
+    workflow.parser.convert_doc_to_chunks = counting
+    workflow.parser.texts = {"/in/a.pdf": ["one"], "/in/b.pdf": ["two"]}
+
+    with pytest.raises(ValueError):
+        workflow.index_documents(["/in/a.pdf", "/in/b.pdf"], document_ids=["doc-1", bad])
+    # Parsing a file can cost vision calls; none is parsed for a call that fails.
+    assert parsed == []
+    assert workflow.vector_store.count() == 0
+
+
+def test_workflow_takes_file_paths_from_a_generator_and_int_ids(workflow):
+    workflow.parser.texts = {"/in/a.pdf": ["one"], "/in/b.pdf": ["two"]}
+    result = workflow.index_documents((p for p in ["/in/a.pdf", "/in/b.pdf"]), document_ids=[7, 8])
+
+    assert result.num_documents == 2
+    assert workflow.delete_document(7) == 1
+    assert [d.page_content for d in workflow.vector_store._documents] == ["two"]
 
 
 def test_workflow_keeps_the_old_chunks_when_the_store_add_fails(workflow, monkeypatch):
@@ -578,6 +777,30 @@ def test_pg_lock_keys_differ_by_document_owner_and_table():
     keys.add(store._document_lock_key("report", None))
     assert len(keys) == 4
     assert store._document_lock_key("report", None) == store._document_lock_key("report", None)
+
+
+def test_pg_one_table_named_in_two_cases_takes_one_lock():
+    # Postgres folds an unquoted name: Documents and documents are one table.
+    store, _ = _pg()
+    lower = store._document_lock_key("report", None)
+    store.table_name = "Documents"
+    assert store._document_lock_key("report", None) == lower
+
+
+def test_pg_add_checks_the_document_id_before_it_connects(monkeypatch):
+    pytest.importorskip("psycopg")
+    from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+    from gaik.software_components.RAG.pg_vector_store import pg_vector_store as module
+
+    def connect(*args, **kwargs):
+        raise AssertionError("add() connected before it checked the document id")
+
+    monkeypatch.setattr(module.psycopg, "connect", connect)
+    store = PgVectorStore("postgresql://unused", embedding_dim=3)
+    doc = Document(page_content="x", metadata={"document_id": ["report"]})
+    with pytest.raises(ValueError):
+        store.add([doc], [A1], replace=True)
+    assert store._conn is None
 
 
 @pytest.mark.parametrize("bad", [{"$ne": "x"}, ["report"], None, 1.5, True])

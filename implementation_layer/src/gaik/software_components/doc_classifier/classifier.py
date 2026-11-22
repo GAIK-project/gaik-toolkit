@@ -13,6 +13,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from gaik.software_components._log_names import error_text, file_tag
+from gaik.software_components.file_type import detect_file_type
 from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.llm.base import FIT_TO_BOUNDS, ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
@@ -27,6 +28,18 @@ from ..parsers.pymypdf import PyMuPDFParser
 from ..parsers.vision import VisionParser
 
 logger = logging.getLogger(__name__)
+
+_SUPPORTED_FORMATS = ".pdf, .docx, .png, .jpg, .jpeg"
+# DocxParser reads a DOCX saved as .doc, not a Word 97-2003 document.
+_DOC_FIX = "A Word 97-2003 .doc file is not read: save it as .docx first."
+
+
+def _holds_docx(file_path: str) -> bool:
+    try:
+        return detect_file_type(file_path) == "docx"
+    except OSError:
+        return False
+
 
 # System prompt for classification
 SYSTEM_PROMPT = """You are a document classification expert.
@@ -197,9 +210,10 @@ class DocumentClassifier:
         # Validate file format
         if not self._is_valid_file(file_path):
             logger.error("Unsupported file format: %s", file_tag(file_path))
+            suffix = Path(file_path).suffix
             raise ValueError(
-                f"Unsupported file format: {Path(file_path).suffix}. "
-                f"Supported formats: .pdf, .docx, .doc, .png, .jpg, .jpeg"
+                f"Unsupported file format: {suffix}. Supported formats: {_SUPPORTED_FORMATS}"
+                + (f". {_DOC_FIX}" if suffix.lower() == ".doc" else "")
             )
 
         try:
@@ -252,11 +266,19 @@ class DocumentClassifier:
             f for f in dir_path_obj.iterdir() if f.is_file() and self._is_valid_file(str(f))
         ]
 
+        legacy_doc = sum(
+            1
+            for f in dir_path_obj.iterdir()
+            if f.is_file() and f.suffix.lower() == ".doc" and f not in valid_files
+        )
+        if legacy_doc:
+            logger.warning("Skipping %d .doc file(s). %s", legacy_doc, _DOC_FIX)
+
         if not valid_files:
             logger.error("No valid files found in the directory given")
             raise ValueError(
                 f"Directory is empty or contains no valid files: {dir_path}\n"
-                f"Supported formats: .pdf, .docx, .doc, .png, .jpg, .jpeg"
+                f"Supported formats: {_SUPPORTED_FORMATS}" + (f"\n{_DOC_FIX}" if legacy_doc else "")
             )
 
         logger.info(f"Found {len(valid_files)} valid files to classify")
@@ -429,6 +451,7 @@ Provide your classification with:
         if suffix == ".pdf":
             return "pdf"
         elif suffix in [".docx", ".doc"]:
+            # A .doc gets here only when it holds a DOCX (see _is_valid_file).
             return "docx"
         elif suffix in [".png", ".jpg", ".jpeg"]:
             return "image"
@@ -487,5 +510,7 @@ Provide your classification with:
         Returns:
             True if file format is supported, False otherwise
         """
-        supported = [".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg"]
-        return Path(file_path).suffix.lower() in supported
+        suffix = Path(file_path).suffix.lower()
+        if suffix == ".doc":
+            return _holds_docx(file_path)
+        return suffix in [".pdf", ".docx", ".png", ".jpg", ".jpeg"]

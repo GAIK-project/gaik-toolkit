@@ -341,18 +341,20 @@ def test_parallel_transcriber_diarize_refuses_an_audio_endpoint_outside_azure():
 def test_parallel_transcriber_whisper_checks_the_address_its_client_uses():
     from gaik.software_components.parallel_transcriber import ParallelTranscriber
 
-    # With a base_url the SDK ignores azure_endpoint, so a leftover one does not matter.
-    transcriber = ParallelTranscriber(
-        {
-            "provider": "azure",
-            "use_azure": True,
-            "api_key": "k",
-            "api_version": "2025-03-01-preview",
-            "base_url": "https://res.openai.azure.com/openai/v1",
-            "azure_endpoint": "https://old.example.test",
-        }
-    )
-    assert transcriber._make_whisper_client()
+    # A base_url alone is the address used. With an azure_endpoint beside it, the
+    # azure_endpoint is (the Transcriber's order), so that is the address checked.
+    config = {
+        "provider": "azure",
+        "use_azure": True,
+        "api_key": "k",
+        "api_version": "2025-03-01-preview",
+        "base_url": "https://res.openai.azure.com/openai/v1",
+    }
+    client = ParallelTranscriber(config)._make_whisper_client()
+    assert client.base_url.host == "res.openai.azure.com"
+    leftover = ParallelTranscriber({**config, "azure_endpoint": "https://old.example.test"})
+    with pytest.raises(EndpointNotAllowedError):
+        leftover._make_whisper_client()
     other = ParallelTranscriber(
         {
             "provider": "azure",
