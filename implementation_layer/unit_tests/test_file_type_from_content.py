@@ -626,6 +626,20 @@ def test_the_rag_parsers_refuse_another_type_named_pdf(tmp_path, kind, data, det
         assert parser.converter.calls == []
 
 
+@pytest.mark.parametrize("kind", ["docling_rag", "vision_rag"])
+@pytest.mark.parametrize(
+    ("name", "data"), [("notes.docx", DOCX), ("scan.png", PNG)], ids=["docx", "png"]
+)
+def test_the_docling_rag_parsers_still_convert_what_docling_reads(tmp_path, kind, name, data):
+    # Docling converts DOCX and images too: content that matches its extension
+    # reaches the converter (the fake raises AssertionError once it runs).
+    build, parse = _RAG_BUILDERS[kind]
+    parser = build()
+    with pytest.raises(AssertionError, match="the converter ran"):
+        parse(parser, _file(tmp_path, name, data))
+    assert len(parser.converter.calls) == 1
+
+
 @pytest.mark.parametrize(
     ("name", "data"),
     [("notes.docx", XLSX), ("notes.md", PNG), ("notes.txt", PDF)],

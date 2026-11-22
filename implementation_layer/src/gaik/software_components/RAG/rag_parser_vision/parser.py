@@ -313,7 +313,9 @@ class VisionRagParser:
 
         # The size first: the content check reads the start of the file.
         self.limits.check_file_size(pdf_path)
-        check_file_type(pdf_path, {"pdf"})
+        # By the extension: Docling also converts DOCX, PPTX and images, so a
+        # .docx must hold a DOCX and a .pdf a PDF.
+        check_file_type(pdf_path)
         self.limits.check_pdf(pdf_path)
         result = self.converter.convert(pdf_path, **docling_limits(self.limits))
         doc = result.document

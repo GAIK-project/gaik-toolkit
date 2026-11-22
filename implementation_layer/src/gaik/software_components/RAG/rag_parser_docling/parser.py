@@ -187,11 +187,13 @@ class DoclingRagParser:
 
         Raises:
             InputLimitError: The file is over ``limits``.
-            FileTypeMismatchError: The content is no PDF (a ``ValueError``).
+            FileTypeMismatchError: The content is not what the extension says (a ``ValueError``).
         """
         # The size first: the content check reads the start of the file.
         self.limits.check_file_size(pdf_path)
-        check_file_type(pdf_path, {"pdf"})
+        # By the extension: Docling also converts DOCX, PPTX and images, so a
+        # .docx must hold a DOCX and a .pdf a PDF.
+        check_file_type(pdf_path)
         self.limits.check_pdf(pdf_path)
         return self.converter.convert(pdf_path, **docling_limits(self.limits))
 
