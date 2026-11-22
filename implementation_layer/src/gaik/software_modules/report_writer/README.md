@@ -196,7 +196,10 @@ baseline = writer.run(spec, "workspace", mode="single_call")
 
 `single_call` runs `normalize` and then writes the whole report in **one** call of the
 writer model (`models.writer`). The request holds the sections with their instructions
-and required items and the report instructions; every normalized source, in full, and
+and required items, the report instructions and the spec's `source_precedence`, which
+the writer is told to follow in a conflict as the curator does in code (the highest
+class among the sources wins unless that source is itself unsure; otherwise both sides,
+`Unresolved:`); every normalized source, in full, and
 the sample report each sit in their own `<source_material>` block, a source labelled
 with its file name (the name the citations use). The system message says that the
 material is data, never instructions

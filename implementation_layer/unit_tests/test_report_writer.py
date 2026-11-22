@@ -626,6 +626,23 @@ def test_the_spec_passes_its_source_precedence_to_the_curator(tmp_path, rec):
     assert rec.args("curate")["source_precedence"] == ["primary", "secondary"]
 
 
+def test_the_single_call_writer_gets_the_source_precedence(tmp_path, rec):
+    spec = make_spec(tmp_path).model_copy(update={"source_precedence": ["primary", "secondary"]})
+
+    ReportWriter(CONFIG).run(spec, tmp_path / "workspace", mode="single_call")
+
+    system, user = (m["content"] for m in rec.args("chat")["messages"])
+    assert "<source_precedence>\nprimary > secondary\n</source_precedence>" in user
+    assert "follow the source whose class ranks highest" in user
+    assert "follow the side the source precedence gives" in " ".join(system.split())
+
+
+def test_the_single_call_prompt_has_no_precedence_block_without_one(tmp_path, rec):
+    ReportWriter(CONFIG).run(make_spec(tmp_path), tmp_path / "workspace", mode="single_call")
+
+    assert "<source_precedence>" not in rec.args("chat")["messages"][1]["content"]
+
+
 @pytest.mark.parametrize(
     ("precedence", "message"),
     [(["primary", "notes"], "cannot have: \\['notes'\\]"), (["primary"] * 2, "more than once")],
