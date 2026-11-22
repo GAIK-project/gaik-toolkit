@@ -182,7 +182,7 @@ class RAGWorkflow:
 
     def index_documents(
         self,
-        file_paths: list[str | Path],
+        file_paths: Iterable[str | Path],
         *,
         filenames: list[str] | None = None,
         document_ids: list[str | int] | None = None,

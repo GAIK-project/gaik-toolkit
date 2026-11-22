@@ -87,7 +87,7 @@ workflow = RAGWorkflow(
 
 ```python
 index_result = workflow.index_documents(
-    file_paths: list[str | Path],
+    file_paths: Iterable[str | Path],
     filenames: list[str] | None = None,
     document_ids: list[str | int] | None = None,
 )
