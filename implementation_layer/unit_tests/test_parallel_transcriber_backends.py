@@ -728,6 +728,8 @@ def test_gpt4o_refuses_a_file_ffprobe_cannot_read(tmp_path, monkeypatch, limits,
     monkeypatch.setattr(pipeline, "get_audio_duration", unreadable)
     monkeypatch.setattr(pipeline, "has_video_stream", lambda _p: False)
     monkeypatch.setattr(pipeline, "has_audio_stream", lambda _p: False)
+    # ffprobe is there but cannot read the file (CI has no ffprobe at all).
+    monkeypatch.setattr(pipeline.shutil, "which", lambda _name: "/usr/bin/ffprobe")
     transcriber = _diarize(limits)
     _no_transcription_calls(transcriber, monkeypatch)
 
@@ -745,6 +747,7 @@ def test_a_timeout_reading_the_length_is_named_as_one(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "get_audio_duration", slow)
     monkeypatch.setattr(pipeline, "has_video_stream", lambda _p: False)
     monkeypatch.setattr(pipeline, "has_audio_stream", lambda _p: True)
+    monkeypatch.setattr(pipeline.shutil, "which", lambda _name: "/usr/bin/ffprobe")
     transcriber = _diarize(InputLimits.unlimited())
     _no_transcription_calls(transcriber, monkeypatch)
 
