@@ -81,7 +81,9 @@ def test_the_vision_parser_prints_no_file_name_or_heading(fake_chunker, monkeypa
 
 
 def test_the_docling_parser_prints_no_file_name_or_heading(fake_chunker, monkeypatch, capsys):
-    pytest.importorskip("docling")
+    # Without Docling, fake_chunker has put an empty "docling" module in place, which
+    # importorskip("docling") would find; the parser needs the converter module.
+    pytest.importorskip("docling.document_converter")
     from gaik.software_components.RAG.rag_parser_docling.parser import DoclingRagParser
 
     parser = DoclingRagParser.__new__(DoclingRagParser)
