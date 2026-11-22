@@ -386,13 +386,36 @@ def test_a_chroma_that_does_not_remove_a_key_gets_delete_then_add(monkeypatch, c
             deleted.append(name)
 
     monkeypatch.setattr(chromadb, "EphemeralClient", _Client)
-    module._chroma_removes_none_values.cache_clear()
-    try:
-        # A check of the client alone passes "keeps": the probe writes and reads back.
-        assert module._chroma_removes_none_values() is False
-    finally:
-        module._chroma_removes_none_values.cache_clear()
+    monkeypatch.setattr(module, "_removes_none", None)
+    # A check of the client alone passes "keeps": the probe writes and reads back.
+    assert module._chroma_removes_none_values() is False
+    assert module._removes_none is False, "a definite answer is kept"
     assert len(deleted) == 1, "the throwaway collection was left"
+
+
+def test_a_probe_that_could_not_run_is_tried_again(monkeypatch):
+    pytest.importorskip("chromadb")
+    import chromadb
+    from gaik.software_components.RAG.vector_store import vector_store as module
+
+    attempts = []
+
+    class _Unavailable:
+        def __init__(self):
+            attempts.append(1)
+            raise RuntimeError("could not start an in-memory Chroma")
+
+    monkeypatch.setattr(chromadb, "EphemeralClient", _Unavailable)
+    monkeypatch.setattr(module, "_removes_none", None)
+    assert module._chroma_removes_none_values() is False
+    assert module._chroma_removes_none_values() is False
+    assert len(attempts) == 2 and module._removes_none is None
+
+    monkeypatch.undo()
+    monkeypatch.setattr(module, "_removes_none", None)
+    major = int(chromadb.__version__.split(".")[0])
+    assert module._chroma_removes_none_values() is (major >= 1)
+    assert module._removes_none is (major >= 1)
 
 
 def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):

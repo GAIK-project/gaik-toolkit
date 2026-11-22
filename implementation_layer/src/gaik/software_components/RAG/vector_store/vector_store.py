@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import functools
 import math
 import os
 import sys
@@ -570,32 +569,49 @@ def _replacing(metadata: dict | None, stored: dict | None) -> dict | None:
     return {**removed, **new} or None
 
 
-@functools.lru_cache(maxsize=1)
+_removes_none: bool | None = None  # what the probe found, once it found an answer
+
+
 def _chroma_removes_none_values() -> bool:
     """Whether this chromadb removes a metadata key that an upsert sends as ``None``.
 
     Chroma 1.x does; 0.5 and 0.6 refuse the value. A client that accepts ``None``
     does not show what the store then does with it, so this is a real upsert into
-    a throwaway in-memory collection, once per process. Any failure answers
-    ``False``, which keeps the delete-then-add path.
+    a throwaway in-memory collection. A definite answer is kept for the process; a
+    probe that fails for another reason answers ``False`` (the delete-then-add
+    path) this time and is tried again on the next write.
     """
+    global _removes_none
+    if _removes_none is None:
+        found = _probe_none_removal()
+        if found is None:
+            return False
+        _removes_none = found
+    return _removes_none
+
+
+def _probe_none_removal() -> bool | None:
+    """``True`` or ``False`` as the probe write shows, ``None`` if it could not run."""
     try:
         import chromadb
 
         client = chromadb.EphemeralClient()
         name = f"gaik-probe-{uuid.uuid4().hex}"
         collection = client.create_collection(name)
-    except Exception:  # noqa: BLE001 - no in-memory client: the safe path
-        return False
+    except Exception:  # noqa: BLE001 - no in-memory client now: ask again later
+        return None
     try:
         collection.add(ids=["probe"], embeddings=[[1.0, 0.0]], metadatas=[{"kept": 1, "gone": 1}])
-        collection.upsert(
-            ids=["probe"], embeddings=[[1.0, 0.0]], metadatas=[{"kept": 1, "gone": None}]
-        )
+        try:
+            collection.upsert(
+                ids=["probe"], embeddings=[[1.0, 0.0]], metadatas=[{"kept": 1, "gone": None}]
+            )
+        except ValueError:  # 0.5 and 0.6: "Expected metadata value to be a str, ..."
+            return False
         [metadata] = collection.get(ids=["probe"], include=["metadatas"])["metadatas"]
         return metadata == {"kept": 1}
-    except Exception:  # noqa: BLE001 - 0.5 and 0.6 raise ValueError for the None
-        return False
+    except Exception:  # noqa: BLE001 - the probe itself failed: ask again later
+        return None
     finally:
         try:
             client.delete_collection(name)
