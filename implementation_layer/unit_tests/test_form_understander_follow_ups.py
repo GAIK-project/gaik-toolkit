@@ -114,3 +114,51 @@ def test_many_fields_are_checked_for_repeated_ids_quickly(monkeypatch):
     # A scan per field took seconds for this many; one pass takes milliseconds.
     assert time.perf_counter() - started < 1.0
     assert client.calls == 0
+
+
+# ── Retries (#146 item 10) ──────────────────────────────────────────
+
+
+def _status_error(status):
+    import httpx
+    import openai
+
+    request = httpx.Request("POST", "https://api.example.test/v1/chat/completions")
+    response = httpx.Response(status, request=request)
+    cls = openai.BadRequestError if status == 400 else openai.RateLimitError
+    return cls("x", response=response, body=None)
+
+
+def _failing_form(monkeypatch, failures):
+    from gaik.software_components.llm import retries
+
+    form, client = _form(monkeypatch, [{"id": "a", "label": "Etunimi"}])
+    waits = []
+    monkeypatch.setattr(retries.time, "sleep", waits.append)
+    answer = client.chat_parsed
+
+    def chat_parsed(**kwargs):
+        if failures:
+            client.calls += 1
+            raise failures.pop(0)
+        return answer(**kwargs)
+
+    client.chat_parsed = chat_parsed
+    return form, client, waits
+
+
+def test_a_bad_request_is_not_sent_again(monkeypatch):
+    import openai
+
+    form, client, waits = _failing_form(monkeypatch, [_status_error(400)])
+
+    with pytest.raises(openai.BadRequestError):
+        form.clean_labels([{"id": "a", "raw": "fn"}])
+    assert (client.calls, waits) == (1, [])
+
+
+def test_a_rate_limit_is_tried_again(monkeypatch):
+    form, client, waits = _failing_form(monkeypatch, [_status_error(429), _status_error(429)])
+
+    assert form.clean_labels([{"id": "a", "raw": "fn"}]) == {"a": "Etunimi"}
+    assert (client.calls, waits) == (3, [1, 2])

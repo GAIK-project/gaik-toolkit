@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import re
-import time
 import unicodedata
 from collections import Counter
 from typing import Literal
 
-from openai import APIError, APITimeoutError, RateLimitError
 from pydantic import BaseModel, Field
 
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.llm.retries import with_retries
 from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 LanguageHint = Literal["fi", "en"]
@@ -123,16 +122,6 @@ def _words(text: str) -> str:
 def _same_words(a: str, b: str) -> bool:
     """The same words, case, spacing and sentence punctuation aside ("Name:", "name")."""
     return _words(a) == _words(b)
-
-
-def _with_retries(call, tries: int = 3):
-    for i in range(tries):
-        try:
-            return call()
-        except (RateLimitError, APITimeoutError, APIError):
-            if i == tries - 1:
-                raise
-            time.sleep(2**i)
 
 
 class FormUnderstander:
@@ -265,7 +254,9 @@ class FormUnderstander:
             )
             return response.choices[0].message.parsed
 
-        parsed: LabelMapping | None = _with_retries(_call)
+        # A refused request (400, 401) is raised at once; rate limits, server errors
+        # and timeouts are tried three times in all.
+        parsed: LabelMapping | None = with_retries(_call, tries=3)
         if parsed is None:
             raise ValueError("The model did not return a structured label mapping")
 
