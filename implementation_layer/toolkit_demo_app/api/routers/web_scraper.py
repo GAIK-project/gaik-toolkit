@@ -92,8 +92,9 @@ _schema_cache: dict[str, tuple[Any, Any]] = {}
 _SCHEMA_CACHE_LIMIT = 32
 
 TASK_CONTEXT = (
-    "The text is a set of web pages. Each page starts with a '# <title>' heading and a "
-    "'Source: <url>' line; when a field asks for a URL or a source page, use that URL."
+    "The text is a set of web pages, one <web_page> block each. Each page starts with a "
+    "'# <title>' heading and a 'Source: <url>' line; when a field asks for a URL or a "
+    "source page, use that URL."
 )
 
 
@@ -150,12 +151,22 @@ def _page_event(page) -> dict:
 
 
 def _page_of(document: str, pages: list, position: int) -> str | None:
-    """The URL of the page whose section of ``document`` holds ``position``."""
+    """The URL of the page whose block of ``document`` holds ``position``.
+
+    ``document`` is ``CrawlResult.to_model_text()``: one ``<web_page ...>`` block per
+    page, in crawl order, each with the page's ``Source: <url>`` line after its title
+    heading. A block starts at its opening tag, so a quote of the title is the page's
+    own; the notice before the first block belongs to no page. The scraper escapes a
+    ``<web_page`` written in a page, so only the blocks' own tags open a block.
+    """
     owner = None
     start = 0
     for page in pages:
         marker = document.find(f"Source: {page.final_url}\n", start)
-        if marker == -1 or marker > position:
+        if marker == -1:
+            break
+        opening = document.rfind("<web_page ", start, marker)
+        if (opening if opening != -1 else marker) > position:
             break
         owner, start = page.final_url, marker + 1
     return owner
@@ -304,7 +315,8 @@ async def run(request: RunRequest):
                 },
             )
 
-            document = result.to_markdown(max_chars_per_page=MAX_CHARS_PER_PAGE)
+            # The pages marked as fetched data, not instructions, for the model.
+            document = result.to_model_text(max_chars_per_page=MAX_CHARS_PER_PAGE)
             emit(
                 "progress",
                 {

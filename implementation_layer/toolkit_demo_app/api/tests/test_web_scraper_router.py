@@ -103,7 +103,47 @@ def test_named_fields_fixes_an_empty_container_name():
     assert route._named_fields(named) is named
 
 
-def test_page_of_finds_the_section_of_a_position():
+def _page(url: str, title: str, markdown: str):
+    from gaik.software_components.web_scraper import ScrapedPage
+
+    return ScrapedPage(
+        url=url,
+        final_url=url,
+        status_code=200,
+        title=title,
+        description=None,
+        language="en",
+        published=None,
+        canonical_url=None,
+        markdown=markdown,
+    )
+
+
+PAGES = [
+    ("https://gaik.ai/", "GAIK project", "Text of the start page."),
+    ("https://gaik.ai/b", "News", "Text of page b."),
+]
+
+
+def test_page_of_finds_the_page_block_of_a_position():
+    """The extractor reads ``to_model_text``: a quote is in the block of its own page."""
+    from gaik.software_components.web_scraper import CrawlResult
+
+    pages = [_page(*page) for page in PAGES]
+    document = CrawlResult(start_url=PAGES[0][0], pages=pages).to_model_text()
+
+    def page_of(text: str) -> str | None:
+        return route._page_of(document, pages, document.index(text))
+
+    assert page_of("Text of the start page") == "https://gaik.ai/"
+    assert page_of("Text of page b") == "https://gaik.ai/b"
+    # A quote of a title belongs to its own page, not to the page before it.
+    assert page_of("# News") == "https://gaik.ai/b"
+    assert page_of("# GAIK project") == "https://gaik.ai/"
+    assert route._page_of(document, pages, 0) is None  # the notice before the blocks
+
+
+def test_page_of_reads_a_document_without_blocks_by_its_source_lines():
     class Page:
         def __init__(self, url):
             self.final_url = url
@@ -116,3 +156,53 @@ def test_page_of_finds_the_section_of_a_position():
     assert route._page_of(document, pages, document.index("text a")) == "https://gaik.ai/"
     assert route._page_of(document, pages, document.index("text b")) == "https://gaik.ai/b"
     assert route._page_of(document, pages, 0) is None
+
+
+def test_the_extractor_reads_the_pages_as_marked_data_and_each_quote_names_its_page(
+    client, monkeypatch
+):
+    pages = [_page(*page) for page in PAGES]
+
+    class FakeScraper:
+        def __init__(self, allowed_domains, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return None
+
+        def iter_crawl(self, start_url, *, on_request, **kwargs):
+            yield from pages
+
+    class Item(BaseModel):
+        title: str
+
+    read: list[str] = []
+
+    class FakeExtractor:
+        def __init__(self, config, **kwargs):
+            pass
+
+        def extract(self, *, documents, **kwargs):
+            read.extend(documents)
+            quote = {"field": "title", "document": 1, "page": 1, "quote": "Text of page b."}
+            return [{"title": "Text of page b.", "field_sources": {"items": [quote]}}]
+
+    monkeypatch.setattr("gaik.software_components.web_scraper.WebScraper", FakeScraper)
+    monkeypatch.setattr("gaik.software_components.extractor.DataExtractor", FakeExtractor)
+    monkeypatch.setattr(route, "get_api_config", lambda: {"provider": "azure", "model": "m"})
+    monkeypatch.setattr(route, "get_model_options", lambda config: {})
+    monkeypatch.setattr(route, "_schema_for", lambda config, requirements: (Item, None))
+    body = {"url": "https://gaik.ai/", "requirements": "The title of each page"}
+    with client.stream("POST", "/web-scraper/run", json=body) as response:
+        found = events(response)
+
+    (document,) = read
+    assert document.startswith("The <web_page> blocks below hold web pages")
+    assert document.count('<web_page id="') == 2
+    result = next(data for kind, data in found if kind == "result")
+    (source,) = result["sources"]
+    assert source["verdict"] == "verified"
+    assert source["page_url"] == "https://gaik.ai/b"
