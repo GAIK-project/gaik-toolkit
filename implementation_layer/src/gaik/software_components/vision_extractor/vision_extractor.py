@@ -106,23 +106,26 @@ def _clamped_confidence_score(value):
     """A provider's confidence score moved into 0.01..1.0 before validation.
 
     Not every provider enforces the schema's bounds (Gemini's schema drops them),
-    and one score of 0.0 or 1.2 used to fail the whole extraction. A score written
-    as a percentage ("85%") is read as one. A score that is not a number, or is
-    missing, becomes the lowest one, 0.01.
+    and one score of 0.0 or 1.2 used to fail the whole extraction. A score above 1
+    and at most 100, or written with a percent sign, is a percentage: 85, "85" and
+    "85%" are 0.85. A score that is not a number, or is missing, becomes the
+    lowest one, 0.01.
     """
+    percent = False
     if isinstance(value, str):
         text = value.strip()
+        percent = text.endswith("%")
         try:
             value = float(text.removesuffix("%").strip())
         except ValueError:
             return _MIN_CONFIDENCE
-        if text.endswith("%"):
-            value /= 100
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return _MIN_CONFIDENCE
     value = float(value)
     if math.isnan(value):
         return _MIN_CONFIDENCE
+    if percent or 1 < value <= 100:
+        value /= 100
     return min(max(value, _MIN_CONFIDENCE), _MAX_CONFIDENCE)
 
 
@@ -146,8 +149,9 @@ class VerifiableField(BaseModel):
     The schema sent to the provider asks for a score from 0.01 to 1.0 and a reason
     of at most 400 characters. A value outside them is moved inside before
     validation, so it cannot fail the extraction: a score below 0.01 (or missing,
-    or not a number) becomes 0.01, one above 1.0 becomes 1.0, and a longer reason
-    is cut to 400 characters.
+    or not a number) becomes 0.01, one above 1 and at most 100 is read as a
+    percentage, one above that becomes 1.0, and a longer reason is cut to 400
+    characters.
     """
 
     confidence_score: Annotated[float, BeforeValidator(_clamped_confidence_score)] = Field(

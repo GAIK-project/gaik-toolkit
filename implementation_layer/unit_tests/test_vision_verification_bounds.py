@@ -26,10 +26,16 @@ def _verifiable(value_type=str) -> type[BaseModel]:
     [
         (0.0, 0.01),
         (-1, 0.01),
-        (1.2, 1.0),
-        (85, 1.0),
+        (1.0, 1.0),
+        # Above 1 and at most 100: a percentage (review of #317).
+        (85, 0.85),
+        ("85", 0.85),
+        (100, 1.0),
+        (1.2, 0.012),
+        (150, 1.0),
         ("0.8", 0.8),
         ("85%", 0.85),
+        ("0.5%", 0.01),
         ("high", 0.01),
         (None, 0.01),
         (float("nan"), 0.01),
@@ -107,7 +113,7 @@ def test_extract_with_out_of_range_verification_values_does_not_raise(tmp_path, 
             "confidence_score": 0.0,
             "confidence_reason": "x" * 401,
         },
-        "total": {"value": 12.5, "confidence_score": 1.3, "confidence_reason": "Stated."},
+        "total": {"value": 12.5, "confidence_score": 130, "confidence_reason": "Stated."},
     }
     extractor = VisionExtractor(
         api_config={"api_key": "unused", "model": "test-model"}, include_verification=True
