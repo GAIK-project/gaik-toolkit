@@ -42,7 +42,7 @@ test("framing stays same-origin and plugins and foreign bases are off", () => {
   expect(directive(csp, "form-action")).toEqual(["'self'"]);
 });
 
-test("the browser may call this site, Supabase and PostHog, nothing else by default", () => {
+test("the browser may call this site, Supabase and PostHog, and read its own blob: files, nothing else by default", () => {
   const csp = buildCsp({
     nonce: "abc",
     nodeEnv: "production",
@@ -52,6 +52,7 @@ test("the browser may call this site, Supabase and PostHog, nothing else by defa
   });
   expect(directive(csp, "connect-src")).toEqual([
     "'self'",
+    "blob:",
     "https://ref.supabase.co",
     "https://eu.i.posthog.com",
   ]);
@@ -68,6 +69,7 @@ test("a configured chat widget may connect and frame; a bad URL adds nothing", (
   });
   expect(directive(csp, "connect-src")).toEqual([
     "'self'",
+    "blob:",
     "https://chat.example",
   ]);
   for (const name of ["frame-src", "style-src", "font-src"])

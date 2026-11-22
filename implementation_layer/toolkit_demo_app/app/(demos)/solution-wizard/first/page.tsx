@@ -101,7 +101,7 @@ function friendlyActivity(name: string, summary: string): string {
   return "Working…";
 }
 
-const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENTS = 8;
 const MAX_ATTACHMENT_MB = 10;
 
 /** The decoded size of a base64 data URL, in bytes. */

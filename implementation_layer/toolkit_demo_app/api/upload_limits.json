@@ -23,7 +23,7 @@
     "/rag/index": { "max_mb": 102, "max_files": 20, "message": "Uploads exceed the 100 MB limit" },
     "/luvata-order/process": { "max_mb": 102, "max_files": 12, "message": "Uploads exceed the 100 MB limit" },
     "/luvata-order/custom/extract": { "max_mb": 102, "max_files": 11, "message": "Uploads exceed the 100 MB limit" },
-    "/wizard/message/": { "max_mb": 68, "max_files": 0, "message": "Attachments exceed the limit: at most 5 files of 10 MB each." },
+    "/wizard/message/": { "max_mb": 108, "max_files": 0, "message": "Attachments exceed the limit: at most 8 files of 10 MB each." },
     "/knowledge-curator/verify": { "max_mb": 128, "max_files": 1, "message": "Uploads exceed the 100 MB limit" },
     "/knowledge-curator/run": { "max_mb": 128, "max_files": 1, "message": "Uploads exceed the 100 MB limit" },
     "/knowledge-synthesis/run": { "max_mb": 128, "max_files": 2, "message": "Uploads exceed the 100 MB limit" },

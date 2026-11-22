@@ -106,3 +106,24 @@ def test_the_name_given_to_the_agent_cannot_close_its_tag():
 if __name__ == "__main__":
     test_pdf_uses_docling_api_when_pymupdf_extracts_no_text()
     print("Solution Wizard attachment regression tests passed.")
+
+
+def test_a_message_takes_up_to_eight_attachments_and_no_more():
+    from api.routers.solution_wizard import MAX_ATTACHMENTS, MessageRequest
+    from pydantic import ValidationError
+
+    assert MAX_ATTACHMENTS == 8
+    files = [_attachment(f"f{i}.png", PNG) for i in range(8)]
+    assert len(MessageRequest(text="x", files=files).files) == 8
+    with pytest.raises(ValidationError):
+        MessageRequest(text="x", files=files + [_attachment("f9.png", PNG)])
+
+
+def test_the_request_limit_holds_eight_full_size_attachments():
+    from api.routers.solution_wizard import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, MAX_MESSAGE_CHARS
+    from api.utils.upload_limits import limit_for
+
+    one_file = MAX_ATTACHMENT_BYTES * 4 // 3 + 512
+    assert (
+        limit_for("/wizard/message/abc").max_bytes >= MAX_ATTACHMENTS * one_file + MAX_MESSAGE_CHARS
+    )

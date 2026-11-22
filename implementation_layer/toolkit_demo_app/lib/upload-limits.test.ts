@@ -39,7 +39,7 @@ function streamed(chunks: number, size: number, declared?: number) {
 test("routes are looked up by their API path, a '/' entry by prefix", () => {
   expect(bodyLimitFor("/parse").maxBytes).toBe(22 * MIB);
   expect(bodyLimitFor("/transcribe").maxFiles).toBe(1);
-  expect(bodyLimitFor("/wizard/message/abc").maxBytes).toBe(68 * MIB);
+  expect(bodyLimitFor("/wizard/message/abc").maxBytes).toBe(108 * MIB);
   expect(bodyLimitFor("/rag/query")).toBe(DEFAULT_LIMIT);
   expect(DEFAULT_LIMIT.maxFiles).toBe(0);
 });

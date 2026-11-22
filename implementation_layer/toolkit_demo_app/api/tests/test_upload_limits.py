@@ -201,7 +201,7 @@ def test_counter_splits_the_body_on_the_boundary_the_form_parser_uses(content_ty
 def test_route_limits_are_looked_up_by_path_and_prefix():
     assert limit_for("/parse").max_bytes == 22 * MIB
     assert limit_for("/transcribe").max_files == 1
-    assert limit_for("/wizard/message/abc").max_bytes == 68 * MIB
+    assert limit_for("/wizard/message/abc").max_bytes == 108 * MIB
     assert limit_for("/rag/query") == DEFAULT_LIMIT
     assert DEFAULT_LIMIT.max_files == 0
 

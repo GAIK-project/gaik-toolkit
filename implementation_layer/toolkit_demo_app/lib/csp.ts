@@ -90,9 +90,11 @@ export function buildCsp({
     // Uploaded PDFs are previewed from blob: URLs; the examples from this site.
     join("frame-src 'self' blob:", ...chat),
     // This site's own API and PostHog proxy (/a), Supabase for the session,
-    // PostHog's host for the provider's own init, and the chat widget.
+    // PostHog's host for the provider's own init, and the chat widget. blob:
+    // lets the prompt box read a file the user attached (its blob: URL) into
+    // the data URL it sends; a blob: URL is a file in this tab's own memory.
     join(
-      "connect-src 'self'",
+      "connect-src 'self' blob:",
       ...originOf(supabaseUrl),
       ...originOf(posthogHost),
       ...chat,

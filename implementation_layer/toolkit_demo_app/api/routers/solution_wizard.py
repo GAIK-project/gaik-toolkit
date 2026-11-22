@@ -195,7 +195,7 @@ def _agent_budget_usd() -> float | None:
 
 
 MAX_MESSAGE_CHARS = 20_000
-MAX_ATTACHMENTS = 5
+MAX_ATTACHMENTS = 8
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 # base64 of MAX_ATTACHMENT_BYTES, plus room for the "data:<mime>;base64," prefix.
 _MAX_ATTACHMENT_CHARS = MAX_ATTACHMENT_BYTES * 4 // 3 + 512
