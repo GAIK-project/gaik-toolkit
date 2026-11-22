@@ -24,6 +24,7 @@ except Exception:
     pass
 
 from gaik.software_components._log_names import error_text, file_tag
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
 
 if TYPE_CHECKING:
@@ -121,17 +122,18 @@ class VisionRagParser:
             "generate_picture_images": True,  # Must be True to extract images
             "generate_page_images": False,
             "do_formula_enrichment": enable_formula_enrichment,
-            "table_structure_options": TableStructureOptions(
-                kind="docling_tableformer",
-                do_cell_matching=True,
-            )
-            if enable_table_structure
-            else None,
             "accelerator_options": AcceleratorOptions(
                 num_threads=num_threads,
                 device=device,
             ),
         }
+        # Without table structure the options keep Docling's default: it refuses
+        # table_structure_options=None.
+        if enable_table_structure:
+            pipeline_kwargs["table_structure_options"] = TableStructureOptions(
+                kind="docling_tableformer",
+                do_cell_matching=True,
+            )
 
         if enable_ocr:
             pipeline_kwargs["ocr_options"] = _build_ocr_options(ocr_engine)
@@ -309,6 +311,9 @@ class VisionRagParser:
         if self.verbose:
             print(f"Processing PDF with vision enhancement: {file_tag(pdf_path)}")
 
+        # The size first: the content check reads the start of the file.
+        self.limits.check_file_size(pdf_path)
+        check_file_type(pdf_path, {"pdf"})
         self.limits.check_pdf(pdf_path)
         result = self.converter.convert(pdf_path, **docling_limits(self.limits))
         doc = result.document
