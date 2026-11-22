@@ -757,24 +757,6 @@ def test_a_rule_in_one_collections_section_does_not_reach_the_parents_dates():
 
 
 # Issue #97: cases where a field took a format or type the task did not ask for.
-def test_a_sentence_about_another_field_on_the_fields_own_line_does_not_apply_to_it():
-    requirements = _requirements(
-        FieldSpec(field_name="order_date", field_type="date", description="Order date"),
-        FieldSpec(field_name="po_number", field_type="str", description="PO number"),
-    )
-    task = (
-        "- `order_date`: the order date, formatted DD/MM/YYYY. "
-        "Keep `po_number` exactly as written.\n"
-    )
-
-    _apply_type_overrides(requirements, original_text=task)
-
-    by_name = {field.field_name: field for field in requirements.fields}
-    assert by_name["order_date"].field_type == "date"
-    assert by_name["order_date"].format == "%d/%m/%Y"
-    assert by_name["po_number"].field_type == "str"
-
-
 def test_a_possessive_label_finds_the_fields_own_line():
     requirements = _requirements(
         FieldSpec(
@@ -801,15 +783,39 @@ def test_a_short_label_inside_a_neighbours_longer_label_is_the_neighbours():
     assert by_name["date_of_birth"].format == "%d/%m/%Y"
 
 
-def test_every_mention_of_a_field_on_a_line_counts():
+@pytest.mark.parametrize(
+    ("task", "fields", "expected"),
+    [
+        # Review of PR #317: a later sentence on a field's own line stays its own,
+        # and a generic "date" field does not take it from inside that line.
+        (
+            "- Document date: top right corner\n"
+            "- Delivery date: when the goods arrive. Write the date as DD.MM.YYYY.",
+            [("date", "date"), ("delivery_date", "date")],
+            {"date": None, "delivery_date": "%d.%m.%Y"},
+        ),
+        (
+            "- File format: PDF or Word\n"
+            "- Delivery date: when the goods arrive. Use the format DD.MM.YYYY.",
+            [("format", "str"), ("delivery_date", "date")],
+            {"format": None, "delivery_date": "%d.%m.%Y"},
+        ),
+        (
+            "- Due date: payment deadline. Write the due date as DD.MM.YYYY, not like "
+            "the invoice date.\n- Invoice date",
+            [("due_date", "date"), ("invoice_date", "date")],
+            {"due_date": "%d.%m.%Y", "invoice_date": None},
+        ),
+    ],
+)
+def test_a_later_sentence_on_a_fields_own_line_stays_with_that_field(task, fields, expected):
     requirements = _requirements(
-        FieldSpec(field_name="invoice_date", field_type="date", description="Invoice date")
+        *[FieldSpec(field_name=n, field_type=t, description=n) for n, t in fields]
     )
-    task = "Extract the invoice date. Write the invoice date as DD.MM.YYYY.\n"
 
     _apply_type_overrides(requirements, original_text=task)
 
-    assert requirements.fields[0].format == "%d.%m.%Y"
+    assert {f.field_name: f.format for f in requirements.fields} == expected
 
 
 def test_a_prose_clause_keeps_a_dotted_format_whole():

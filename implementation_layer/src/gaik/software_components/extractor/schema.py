@@ -1467,9 +1467,6 @@ def _label_re(field_name: str) -> re.Pattern[str]:
     return re.compile(r"\b" + r"[ _]".join(words) + r"\b", re.IGNORECASE)
 
 
-_SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+")
-
-
 def _field_specific_context(
     field: FieldSpec, original_text: str, other_fields: list[FieldSpec] | tuple = ()
 ) -> str:
@@ -1481,56 +1478,49 @@ def _field_specific_context(
     field's format. This prevents ``Delivery Date (DD/MM/YYYY)`` from silently
     changing ``Order Date`` as well.
 
-    ``other_fields`` are the other fields of the same requirements. A mention of
-    this field inside a longer mention of another one is the other field's ("Date"
-    in "Date of birth" for a field ``date``), and on the field's own line a later
-    sentence that names another field is about that field ("Keep `po_number`
-    exactly as written"). Every mention of the field on a line counts.
+    ``other_fields`` are the other fields of the same requirements. When the
+    field's first mention on a line lies inside a longer mention of another one,
+    the line is the other field's ("Date" in "Date of birth" for a field
+    ``date``, or in "Delivery date" for ``date`` next to ``delivery_date``).
 
-    Known limits (issue #97): a paragraph under a field's heading counts whole
-    until the next blank line or list item, also a sentence about something else
-    that names no other field ("The log file prints its timestamps as
-    DD/MM/YYYY"); a format that the field's own clause mentions for another value
-    ("not the delivery date (DD/MM/YYYY)") counts; and the parsed description,
-    the last fallback, cannot tell an output format from one it only mentions.
+    Known limits (issue #97): only the field's first mention on a line is read,
+    so "Extract the invoice date. Write the invoice date as DD.MM.YYYY." gives no
+    format; a line the field heads counts whole, also a later sentence about
+    another field ("Keep `po_number` exactly as written" on ``order_date``'s
+    line); a paragraph under a field's heading counts whole until the next blank
+    line or list item, also a sentence about something else ("The log file prints
+    its timestamps as DD/MM/YYYY"); a format the field's own clause mentions for
+    another value ("not the delivery date (DD/MM/YYYY)") or rules out ("not
+    DD/MM/YYYY; write it as YYYY.MM.DD") counts; a parent field's mention inside
+    a child collection's field ("Delivery date (DD/MM/YYYY)" in a line-item
+    section, for a parent ``date``) counts, since only the fields of the same
+    part are known here; and the parsed description, the last fallback, cannot
+    tell an output format from one it only mentions.
     """
     pieces: list[str] = []
     label_re = _label_re(field.field_name)
     other_res = [_label_re(f.field_name) for f in other_fields if f.field_name != field.field_name]
     lines = original_text.splitlines()
 
-    def names_another_field(text: str) -> bool:
-        return any(other.search(text) for other in other_res)
-
-    def about_this_field(text: str) -> str:
-        """``text`` without its later sentences that name another field."""
-        sentences = _SENTENCE_END_RE.split(text)
-        kept = sentences[:1] + [s for s in sentences[1:] if not names_another_field(s)]
-        return " ".join(kept)
-
     for index, line in enumerate(lines):
-        # A longer mention of another field that holds this one ("Date of birth").
-        taken = [(m.start(), m.end()) for other in other_res for m in other.finditer(line)]
-        mentions = [
-            match
-            for match in label_re.finditer(line)
-            if not any(
-                start <= match.start()
-                and match.end() <= end
-                and end - start > match.end() - match.start()
-                for start, end in taken
-            )
-        ]
-        if not mentions:
+        match = label_re.search(line)
+        if not match:
             continue
+        if any(
+            other.start() <= match.start()
+            and match.end() <= other.end()
+            and other.end() - other.start() > match.end() - match.start()
+            for other_re in other_res
+            for other in other_re.finditer(line)
+        ):
+            continue  # another field's longer mention holds this one
 
-        for number, match in enumerate(mentions):
-            if number == 0 and _heads_own_line(line, match.start(), match.end()):
-                # The field heads its own bullet, numbered item or heading
-                # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
-                # line is about this field, commas included.
-                pieces.append(about_this_field(line[match.start() :]))
-                break
+        if _heads_own_line(line, match.start(), match.end()):
+            # The field heads its own bullet, numbered item or heading
+            # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
+            # line is about this field, commas included.
+            pieces.append(line[match.start() :])
+        else:
             # A prose line often lists several fields. Keep only this field's
             # comma/semicolon/period-delimited clause so one field's
             # parenthesized format cannot leak into another field on the same
@@ -1556,7 +1546,7 @@ def _field_specific_context(
             for following in lines[index + 1 :]:
                 if not following.strip() or _ITEM_START_RE.match(following):
                     break
-                pieces.append(about_this_field(following))
+                pieces.append(following)
 
     return "\n".join(piece for piece in pieces if piece)
 
