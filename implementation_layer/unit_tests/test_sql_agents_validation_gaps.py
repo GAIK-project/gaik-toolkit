@@ -36,7 +36,12 @@ COMPILED = bool(getattr(sqlglot.tokens, "SQLGLOTC_INSTALLED", False))
 # Its parser classes are native: an instance attribute cannot be set on them and a
 # Python class cannot derive from them. Where the pure-Python build is installed, a
 # parser that refuses the attribute the same way stands in for it; where sqlglotc
-# is installed, the installed build is the compiled one.
+# is installed, the installed build is the compiled one. The stand-in does not show
+# that the native tokens and nodes carry the positions the written-call check reads
+# (Token.start and .end, FUNC_TOKENS, meta["start"]), so run this file on the real
+# build too, with sqlglotc at the installed sqlglot's version:
+#   uv run --with sqlglotc==<sqlglot version> pytest <this file>
+# (passed with sqlglot and sqlglotc 30.33.0).
 
 
 def _read_only_functions(parser_class):
