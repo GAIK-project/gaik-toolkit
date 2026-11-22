@@ -256,19 +256,17 @@ def test_the_judge_builds_a_new_provider_when_the_location_changes(world, monkey
     assert world["clients"][0].closed == 0
 
 
-def test_threads_sharing_a_judge_build_one_provider(world, monkeypatch):
+def test_threads_sharing_a_judge_get_one_provider(world, monkeypatch):
     import threading
     import time as real_time
 
     from gaik.software_components.validators.llm_judge import llm_judge as judge_module
 
     monkeypatch.setenv("GOOGLE_VERTEXAI_PROJECT", "project")
-    built = []
     original = google_provider.GoogleProvider.__init__
 
     def slow_init(self, config):
-        built.append(config)
-        real_time.sleep(0.05)  # widen the window two unguarded threads would share
+        real_time.sleep(0.05)  # widen the window in which threads build at once
         original(self, config)
 
     monkeypatch.setattr(google_provider.GoogleProvider, "__init__", slow_init)
@@ -285,8 +283,44 @@ def test_threads_sharing_a_judge_build_one_provider(world, monkeypatch):
         thread.start()
     for thread in threads:
         thread.join()
-    assert len(built) == 1
-    assert len({id(provider) for provider in providers}) == 1
+    assert {id(provider) for provider in providers} == {id(judge._vertex_provider)}
+    # A provider built by a thread that lost the race is closed; the one in use is not.
+    published = judge._vertex_provider.raw
+    assert published.closed == 0
+    assert all(c.closed == 1 for c in world["clients"] if c is not published)
+
+
+def test_building_a_provider_does_not_hold_up_another_judge(world, monkeypatch):
+    import threading
+
+    from gaik.software_components.validators.llm_judge import llm_judge as judge_module
+
+    monkeypatch.setenv("GOOGLE_VERTEXAI_PROJECT", "project")
+    ready = _judge()
+    ready_provider = judge_module._vertex_provider(ready)
+    building, release = threading.Event(), threading.Event()
+    original = google_provider.GoogleProvider.__init__
+
+    def blocking_init(self, config):
+        building.set()
+        release.wait(5)
+        original(self, config)
+
+    monkeypatch.setattr(google_provider.GoogleProvider, "__init__", blocking_init)
+    slow = threading.Thread(target=judge_module._vertex_provider, args=(_judge(),))
+    slow.start()
+    assert building.wait(5)
+    found = []
+    quick = threading.Thread(target=lambda: found.append(judge_module._vertex_provider(ready)))
+    try:
+        quick.start()
+        quick.join(2)
+        # Answered while the other judge's provider is still being built.
+        assert found == [ready_provider]
+    finally:
+        release.set()
+        slow.join(5)
+        quick.join(5)
 
 
 # ── The records stay small, and clients are built once ──────────────

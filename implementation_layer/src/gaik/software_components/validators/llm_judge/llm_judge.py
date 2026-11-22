@@ -528,10 +528,12 @@ def _vertex_provider(judge: Any) -> Any:
     endpoint for a model the EU does not serve or while the EU does not answer.
     The provider is built once per project and location and kept on the judge, so
     its clients are not built again for each call; what the EU was found not to
-    serve is shared by every provider in the process. A lock keeps threads that
-    share a judge from building one each. A provider replaced after the settings
-    changed is not closed, since another thread may still be using it; it is
-    collected once unused.
+    serve is shared by every provider in the process. Threads that share a judge
+    get the one provider published under a lock; it is built outside the lock, so
+    building one (which may load credentials) does not hold up other judges, and
+    a thread that loses the race closes the one it built. A provider replaced
+    after the settings changed is not closed, since another thread may still be
+    using it; it is collected once unused.
     """
     from gaik.software_components.llm.google_provider import GoogleProvider
 
@@ -539,20 +541,33 @@ def _vertex_provider(judge: Any) -> Any:
         os.environ["GOOGLE_VERTEXAI_PROJECT"],
         os.environ.get("GOOGLE_VERTEXAI_LOCATION") or None,
     )
-    with _VERTEX_PROVIDER_LOCK:
+
+    def published():
         provider = getattr(judge, "_vertex_provider", None)
-        if provider is None or getattr(judge, "_vertex_settings", None) != settings:
-            provider = GoogleProvider(
-                {
-                    "provider": "vertex",
-                    "project_id": settings[0],
-                    "location": settings[1],
-                    "model": judge.model,
-                    "_location_env": "GOOGLE_VERTEXAI_LOCATION",
-                }
-            )
-            judge._vertex_provider, judge._vertex_settings = provider, settings
+        same = provider is not None and getattr(judge, "_vertex_settings", None) == settings
+        return provider if same else None
+
+    with _VERTEX_PROVIDER_LOCK:
+        provider = published()
+    if provider is not None:
         return provider
+    built = GoogleProvider(
+        {
+            "provider": "vertex",
+            "project_id": settings[0],
+            "location": settings[1],
+            "model": judge.model,
+            "_location_env": "GOOGLE_VERTEXAI_LOCATION",
+        }
+    )
+    with _VERTEX_PROVIDER_LOCK:
+        provider = published()
+        if provider is None:
+            judge._vertex_provider, judge._vertex_settings = built, settings
+            return built
+    # Another thread published first; this one was never used.
+    built.close()
+    return provider
 
 
 def _call_vertex(
