@@ -6,6 +6,7 @@ import base64
 import json
 import logging
 import os
+import threading
 import time
 from typing import Any, Literal
 
@@ -35,6 +36,9 @@ from .schema import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Guards building a judge's Vertex AI provider (see _vertex_provider).
+_VERTEX_PROVIDER_LOCK = threading.Lock()
 
 ModelProvider = Literal["openai", "azure", "anthropic", "google"]
 
@@ -506,25 +510,28 @@ class LLMJudge:
             )
 
         resp = generate(client)
-        text = resp.text or ""
-        meta = getattr(resp, "usage_metadata", None)
+        # The provider's count, which holds the thinking tokens Gemini bills as output.
+        from gaik.software_components.llm.google_provider import _usage as google_usage
+
+        usage = google_usage(resp)
         return (
-            text,
-            getattr(meta, "prompt_token_count", 0) or 0,
-            getattr(meta, "candidates_token_count", 0) or 0,
+            resp.text or "",
+            usage.get("prompt_tokens", 0),
+            usage.get("completion_tokens", 0),
         )
 
 
-def _call_vertex(
-    judge: Any, source_pages: list[bytes], user_prompt: str, system_prompt: str
-) -> tuple[str, int, int]:
-    """The judge's call on Vertex AI, through the judge's own :class:`GoogleProvider`.
+def _vertex_provider(judge: Any) -> Any:
+    """The judge's :class:`GoogleProvider` for the current Vertex AI settings.
 
     The EU multi-region unless ``GOOGLE_VERTEXAI_LOCATION`` is set, and the global
     endpoint for a model the EU does not serve or while the EU does not answer.
-    What the EU was found not to serve is shared by every provider in the process,
-    so the EU is not asked again for each judgement, and the judge keeps its
-    provider, so its clients are not built again for each call either.
+    The provider is built once per project and location and kept on the judge, so
+    its clients are not built again for each call; what the EU was found not to
+    serve is shared by every provider in the process. A lock keeps threads that
+    share a judge from building one each. A provider replaced after the settings
+    changed is not closed, since another thread may still be using it; it is
+    collected once unused.
     """
     from gaik.software_components.llm.google_provider import GoogleProvider
 
@@ -532,20 +539,27 @@ def _call_vertex(
         os.environ["GOOGLE_VERTEXAI_PROJECT"],
         os.environ.get("GOOGLE_VERTEXAI_LOCATION") or None,
     )
-    provider = getattr(judge, "_vertex_provider", None)
-    if provider is None or getattr(judge, "_vertex_settings", None) != settings:
-        if provider is not None:
-            provider.close()
-        provider = GoogleProvider(
-            {
-                "provider": "vertex",
-                "project_id": settings[0],
-                "location": settings[1],
-                "model": judge.model,
-                "_location_env": "GOOGLE_VERTEXAI_LOCATION",
-            }
-        )
-        judge._vertex_provider, judge._vertex_settings = provider, settings
+    with _VERTEX_PROVIDER_LOCK:
+        provider = getattr(judge, "_vertex_provider", None)
+        if provider is None or getattr(judge, "_vertex_settings", None) != settings:
+            provider = GoogleProvider(
+                {
+                    "provider": "vertex",
+                    "project_id": settings[0],
+                    "location": settings[1],
+                    "model": judge.model,
+                    "_location_env": "GOOGLE_VERTEXAI_LOCATION",
+                }
+            )
+            judge._vertex_provider, judge._vertex_settings = provider, settings
+        return provider
+
+
+def _call_vertex(
+    judge: Any, source_pages: list[bytes], user_prompt: str, system_prompt: str
+) -> tuple[str, int, int]:
+    """The judge's call on Vertex AI, through its :func:`_vertex_provider`."""
+    provider = _vertex_provider(judge)
     content: list[dict] = [{"type": "text", "text": user_prompt}]
     content.extend(
         {

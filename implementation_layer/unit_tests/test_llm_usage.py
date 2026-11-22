@@ -95,3 +95,31 @@ def test_the_judges_gemini_cost_includes_thinking(monkeypatch):
     result = judge.validate([b"png"], {"total": "12"})
     assert (result.usage.input_tokens, result.usage.output_tokens) == (10, 43)
     assert result.usage.cost_usd == compute_judge_cost_usd("gemini-3-flash-preview", 10, 43)
+
+
+def test_the_judges_gemini_api_cost_includes_thinking(monkeypatch):
+    """The Gemini Developer API path (use_vertexai=False) counts the same way."""
+    from gaik.software_components.validators.llm_judge.llm_judge import LLMJudge
+    from gaik.software_components.validators.llm_judge.pricing import compute_judge_cost_usd
+    from google import genai
+    from google.genai import types as genai_types
+
+    metadata = genai_types.GenerateContentResponseUsageMetadata(
+        prompt_token_count=10, candidates_token_count=3, thoughts_token_count=40
+    )
+
+    class Client:
+        def __init__(self, **kwargs):
+            assert "api_key" in kwargs
+            self.models = SimpleNamespace(
+                generate_content=lambda **kw: SimpleNamespace(
+                    text='{"flags": []}', usage_metadata=metadata
+                )
+            )
+
+    monkeypatch.setattr(genai, "Client", Client)
+    monkeypatch.setenv("GOOGLE_GEMINI_API_KEY", "test-key")
+    judge = LLMJudge(model_provider="google", model="gemini-3-flash-preview", use_vertexai=False)
+    result = judge.validate([b"png"], {"total": "12"})
+    assert (result.usage.input_tokens, result.usage.output_tokens) == (10, 43)
+    assert result.usage.cost_usd == compute_judge_cost_usd("gemini-3-flash-preview", 10, 43)

@@ -252,5 +252,38 @@ def test_the_judge_builds_a_new_provider_when_the_location_changes(world, monkey
     monkeypatch.setenv("GOOGLE_VERTEXAI_LOCATION", "europe-north1")
     judge._call_google([], "user", "system")
     assert [c.kwargs["location"] for c in world["clients"]] == ["eu", "europe-north1"]
-    # The replaced provider's client is closed.
-    assert world["clients"][0].closed == 1
+    # The replaced provider is not closed: another thread may still be using it.
+    assert world["clients"][0].closed == 0
+
+
+def test_threads_sharing_a_judge_build_one_provider(world, monkeypatch):
+    import threading
+    import time as real_time
+
+    from gaik.software_components.validators.llm_judge import llm_judge as judge_module
+
+    monkeypatch.setenv("GOOGLE_VERTEXAI_PROJECT", "project")
+    built = []
+    original = google_provider.GoogleProvider.__init__
+
+    def slow_init(self, config):
+        built.append(config)
+        real_time.sleep(0.05)  # widen the window two unguarded threads would share
+        original(self, config)
+
+    monkeypatch.setattr(google_provider.GoogleProvider, "__init__", slow_init)
+    judge = _judge()
+    start = threading.Barrier(8)
+    providers = []
+
+    def build():
+        start.wait()
+        providers.append(judge_module._vertex_provider(judge))
+
+    threads = [threading.Thread(target=build) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert len(built) == 1
+    assert len({id(provider) for provider in providers}) == 1
