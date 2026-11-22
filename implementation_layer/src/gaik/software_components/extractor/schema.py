@@ -335,6 +335,14 @@ class ChildRequirements(BaseModel):
     container_name: str
     container_description: str
     requirements: ExtractionRequirements
+    nullable: bool = Field(
+        default=False,
+        description=(
+            "The collection may be null instead of a list, as the task allowed for the "
+            "list field it was parsed from. Otherwise it is a list, empty when there are "
+            "no rows."
+        ),
+    )
 
 
 class CompositeExtractionRequirements(BaseModel):
@@ -595,10 +603,16 @@ def _create_parent_with_nested_list_model(
     }
     for child in children:
         ChildModel = create_extraction_model(child.requirements)  # noqa: N806
-        combined_fields[child.container_name] = (
-            list[ChildModel],
-            Field(description=child.container_description),
-        )
+        if child.nullable:
+            combined_fields[child.container_name] = (
+                list[ChildModel] | None,
+                Field(default=None, description=child.container_description),
+            )
+        else:
+            combined_fields[child.container_name] = (
+                list[ChildModel],
+                Field(description=child.container_description),
+            )
 
     suffix = "_Extraction"
     base_name = sanitize_model_name(parent_requirements.use_case_name, suffix=suffix)
@@ -717,20 +731,94 @@ def _reroute_leaked_collections(
     return stripped, recovered
 
 
-def _collection_as_list_str_field(spec: ChildContainerSpec) -> FieldSpec:
+def _collection_as_list_str_field(spec: ChildContainerSpec, *, nullable: bool = False) -> FieldSpec:
     """Represent an underspecified repeated collection as a ``list[str]`` field.
 
     Used when a child collection has no per-item fields defined (e.g. the task
     says "items purchased" or "services offered" without naming any sub-fields).
     A list of strings is a faithful, non-degenerate representation — better than
-    a ``list`` of empty objects, which would extract nothing.
+    a ``list`` of empty objects, which would extract nothing. ``nullable`` keeps
+    the null policy of the list field the collection was parsed from.
     """
     label = spec.container_name.replace("_", " ")
     return FieldSpec(
         field_name=spec.container_name,
         field_type="list[str]",
         description=spec.container_description or f"List of {label}",
+        nullable=nullable,
     )
+
+
+def _nullable_collections(requirements: ExtractionRequirements) -> set[str]:
+    """Container names of the ``list[dict]`` fields the task lets be null."""
+    return {
+        _sanitize_field_name(f.field_name, fallback="records")
+        for f in requirements.fields
+        if f.field_type == "list[dict]" and f.nullable
+    }
+
+
+def _parse_child_collections(
+    user_description: str,
+    container_specs: list[ChildContainerSpec],
+    parent_requirements: ExtractionRequirements,
+    *,
+    nullable_containers: set[str],
+    client,
+    model: str,
+    _usage_sink: list | None,
+    sampling: dict,
+) -> list[ChildRequirements]:
+    """Parse the row fields of each repeated collection.
+
+    A collection whose rows have no fields of their own is added to
+    ``parent_requirements`` as a ``list[str]`` field instead, and is not returned.
+    """
+    children: list[ChildRequirements] = []
+    for spec in container_specs:
+        cname = spec.container_name
+        cdesc = spec.container_description or f"Repeated {cname} records"
+        print(f"\nParsing child fields for '{cname}'...")
+        _child_task = (
+            f"From the requirements below, parse only the fields for each repeated "
+            f"{cname.replace('_', ' ')} record. "
+            "Treat every field as a scalar value. "
+            "Ignore any once-per-document, header, or summary fields. "
+            "Ignore any other repeated sections not related to this collection.\n\n"
+            + user_description
+        )
+        child_req = parse_user_requirements(
+            _child_task,
+            client=client,
+            model=model,
+            _usage_sink=_usage_sink,
+            parse_mode="repeated_item",
+            **sampling,
+        )
+        _ensure_no_list_dict_fields(child_req, context=f"Child requirements for '{cname}'")
+
+        if not child_req.fields:
+            # Underspecified collection — no per-item fields were described.
+            # Represent it as a list[str] on the parent instead of a list of
+            # empty objects (which would extract nothing).
+            print(f"  '{cname}' has no per-item fields -> representing as list[str] on parent")
+            existing_names = {f.field_name for f in parent_requirements.fields}
+            if cname not in existing_names:
+                parent_requirements.fields.append(
+                    _collection_as_list_str_field(spec, nullable=cname in nullable_containers)
+                )
+            continue
+
+        print(f"  Fields: {[f.field_name for f in child_req.fields]}")
+        children.append(
+            ChildRequirements(
+                container_name=cname,
+                container_description=cdesc,
+                requirements=child_req,
+                nullable=cname in nullable_containers,
+            )
+        )
+    return children
 
 
 def parse_nested_requirements(
@@ -785,8 +873,52 @@ def parse_nested_requirements(
         requirements = parse_user_requirements(
             user_description, client=client, model=model, _usage_sink=_usage_sink, **sampling
         )
-        extraction_model = create_extraction_model(requirements)
-        return extraction_model, requirements, analysis
+        if not any(f.field_type == "list[dict]" for f in requirements.fields):
+            extraction_model = create_extraction_model(requirements)
+            return extraction_model, requirements, analysis
+
+        # A list[dict] field would reach the provider as an object with open
+        # properties, which a strict schema rejects. Handle it as the parent
+        # branch handles a leaked collection: the flat fields stay as parsed and
+        # each list[dict] field is parsed into a child collection of its own.
+        nullable_containers = _nullable_collections(requirements)
+        container_specs: list[ChildContainerSpec] = []
+        parent_requirements, recovered = _reroute_leaked_collections(
+            requirements, container_specs, set()
+        )
+        for cname, original in recovered:
+            print(f"  Flat field '{original}' holds repeated records -> child container '{cname}'")
+        _ensure_no_list_dict_fields(parent_requirements, context="Flat requirements")
+        children = _parse_child_collections(
+            user_description,
+            container_specs,
+            parent_requirements,
+            nullable_containers=nullable_containers,
+            client=client,
+            model=model,
+            _usage_sink=_usage_sink,
+            sampling=sampling,
+        )
+        if not children:
+            # Every collection became a list[str] field: the record stays flat.
+            extraction_model = create_extraction_model(parent_requirements)
+            return extraction_model, parent_requirements, analysis
+        # The analysis describes the structure the schema now has.
+        analysis.structure_type = "parent_with_nested_list"
+        analysis.child_containers = [
+            ChildContainerSpec(
+                container_name=c.container_name, container_description=c.container_description
+            )
+            for c in children
+        ]
+        extraction_model = _create_parent_with_nested_list_model(
+            parent_requirements=parent_requirements, children=children
+        )
+        composite_requirements = CompositeExtractionRequirements(
+            parent_requirements=parent_requirements, children=children
+        )
+        print(f"Created combined model: {extraction_model.__name__}")
+        return extraction_model, composite_requirements, analysis
 
     if analysis.structure_type == "parent_with_nested_list":
         print("Using parent-with-nested-list structure")
@@ -814,7 +946,8 @@ def parse_nested_requirements(
         # each leaked field out of the parent and route it through the child
         # pipeline as its own container. This keeps the parser robust for any
         # number of repeated collections, whether or not the structure detector
-        # enumerated them up front.
+        # enumerated them up front. A null policy on the leaked field is kept.
+        nullable_containers = _nullable_collections(parent_requirements)
         parent_requirements, recovered = _reroute_leaked_collections(
             parent_requirements, container_specs, seen_container_names
         )
@@ -830,47 +963,16 @@ def parse_nested_requirements(
             context="Parent requirements for parent_with_nested_list",
         )
 
-        children: list[ChildRequirements] = []
-        for spec in container_specs:
-            cname = spec.container_name
-            cdesc = spec.container_description or f"Repeated {cname} records"
-            print(f"\nParsing child fields for '{cname}'...")
-            _child_task = (
-                f"From the requirements below, parse only the fields for each repeated "
-                f"{cname.replace('_', ' ')} record. "
-                "Treat every field as a scalar value. "
-                "Ignore any once-per-document, header, or summary fields. "
-                "Ignore any other repeated sections not related to this collection.\n\n"
-                + user_description
-            )
-            child_req = parse_user_requirements(
-                _child_task,
-                client=client,
-                model=model,
-                _usage_sink=_usage_sink,
-                parse_mode="repeated_item",
-                **sampling,
-            )
-            _ensure_no_list_dict_fields(child_req, context=f"Child requirements for '{cname}'")
-
-            if not child_req.fields:
-                # Underspecified collection — no per-item fields were described.
-                # Represent it as a list[str] on the parent instead of a list of
-                # empty objects (which would extract nothing).
-                print(f"  '{cname}' has no per-item fields -> representing as list[str] on parent")
-                existing_names = {f.field_name for f in parent_requirements.fields}
-                if cname not in existing_names:
-                    parent_requirements.fields.append(_collection_as_list_str_field(spec))
-                continue
-
-            print(f"  Fields: {[f.field_name for f in child_req.fields]}")
-            children.append(
-                ChildRequirements(
-                    container_name=cname,
-                    container_description=cdesc,
-                    requirements=child_req,
-                )
-            )
+        children = _parse_child_collections(
+            user_description,
+            container_specs,
+            parent_requirements,
+            nullable_containers=nullable_containers,
+            client=client,
+            model=model,
+            _usage_sink=_usage_sink,
+            sampling=sampling,
+        )
 
         print(f"Identified parent fields: {[f.field_name for f in parent_requirements.fields]}")
 
@@ -2128,6 +2230,21 @@ def normalize_extracted_data(
 # -----------------------------------------------------------------------------
 
 
+def _list_item_model(annotation) -> type[BaseModel] | None:
+    """The row model of a ``list[Model]`` or ``list[Model] | None`` annotation."""
+    if get_origin(annotation) in (Union, types.UnionType):
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) != 1:
+            return None
+        annotation = args[0]
+    if get_origin(annotation) is not list:
+        return None
+    args = get_args(annotation)
+    if len(args) == 1 and isinstance(args[0], type) and issubclass(args[0], BaseModel):
+        return args[0]
+    return None
+
+
 def print_pydantic_schema(model: type[BaseModel], title: str = "Generated Pydantic Schema") -> None:
     """
     Print the exact Pydantic model as Python class definition.
@@ -2142,19 +2259,12 @@ def print_pydantic_schema(model: type[BaseModel], title: str = "Generated Pydant
     # Collect all models to print (handle nested structures)
     models_to_print = []
 
-    # Check if this model has nested Pydantic models
+    # Check if this model has nested Pydantic models: List[SomeModel], or
+    # Optional[List[SomeModel]] for a collection the task lets be null.
     for field_name, field_info in model.model_fields.items():
-        annotation = field_info.annotation
-
-        # Check for List[SomeModel] pattern
-        origin = get_origin(annotation)
-        if origin is list:
-            args = get_args(annotation)
-            if args and len(args) > 0:
-                inner_type = args[0]
-                # Check if it's a Pydantic model
-                if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
-                    models_to_print.append(inner_type)
+        inner_type = _list_item_model(field_info.annotation)
+        if inspect.isclass(inner_type):
+            models_to_print.append(inner_type)
 
     # Print inner models first
     for inner_model in models_to_print:
@@ -2548,9 +2658,9 @@ def _fields_by_name(requirements) -> dict[str, FieldSpec]:
     return {f.field_name: f for f in requirements.fields}
 
 
-def _containers(requirements) -> dict[str, str]:
+def _containers(requirements) -> dict[str, ChildRequirements]:
     if isinstance(requirements, CompositeExtractionRequirements):
-        return {f"{c.container_name}[]": c.container_description for c in requirements.children}
+        return {f"{c.container_name}[]": c for c in requirements.children}
     return {}
 
 
@@ -2608,13 +2718,13 @@ def compare_requirements(
                 )
             )
     for box in old_boxes.keys() & new_boxes.keys():
-        if old_boxes[box] != new_boxes[box]:
-            changed.append(
-                FieldChange(
-                    field_name=box,
-                    changes={"container_description": (old_boxes[box], new_boxes[box])},
-                )
-            )
+        box_changes = {
+            attr: (getattr(old_boxes[box], attr), getattr(new_boxes[box], attr))
+            for attr in ("container_description", "nullable")
+            if getattr(old_boxes[box], attr) != getattr(new_boxes[box], attr)
+        }
+        if box_changes:
+            changed.append(FieldChange(field_name=box, changes=box_changes))
     approved_structure = _coerce_structure(approved_structure, "approved_structure")
     new_structure = _coerce_structure(new_structure, "new_structure")
     old_key = _structure_key(approved_structure, approved)

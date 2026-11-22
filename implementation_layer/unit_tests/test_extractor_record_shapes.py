@@ -182,3 +182,203 @@ def test_vision_repairs_blank_numbers_in_every_child_collection(tmp_path, monkey
 
     assert result.data["line_items"][0]["qty"]["value"] is None
     assert result.data["payments"][0]["days"]["value"] is None
+
+
+# ---------------------------------------------------------------------------
+# #141 item 4: a list[dict] field in a flat parse becomes a child collection
+# ---------------------------------------------------------------------------
+
+
+def _structure(kind: str, **extra):
+    from gaik.software_components.extractor.schema import StructureAnalysis
+
+    return StructureAnalysis(
+        structure_type=kind,
+        parent_container_name="",
+        parent_description="",
+        item_description="",
+        reasoning="test",
+        **extra,
+    )
+
+
+def _generate(monkeypatch, analysis, flat_fields, row_fields):
+    """parse_nested_requirements with the structure and both parses canned."""
+    from gaik.software_components.extractor import schema as schema_module
+
+    calls = []
+
+    def parse(task, *, parse_mode="normal", **kwargs):
+        calls.append(parse_mode)
+        row = parse_mode == "repeated_item"
+        return ExtractionRequirements(
+            use_case_name="line item" if row else "invoice",
+            fields=[f.model_copy(deep=True) for f in (row_fields if row else flat_fields)],
+        )
+
+    monkeypatch.setattr(schema_module, "detect_structure_type", lambda *a, **k: analysis)
+    monkeypatch.setattr(schema_module, "parse_user_requirements", parse)
+    model, requirements, analysis = schema_module.parse_nested_requirements(
+        "Extract the invoice number and the table of line items.",
+        client=object(),
+        model="test-model",
+    )
+    return model, requirements, analysis, calls
+
+
+def _open_objects(node) -> list:
+    """Every object node a strict schema refuses: additionalProperties left open."""
+    found = []
+    if isinstance(node, dict):
+        if node.get("additionalProperties") is True:
+            found.append(node)
+        for value in node.values():
+            found += _open_objects(value)
+    elif isinstance(node, list):
+        for value in node:
+            found += _open_objects(value)
+    return found
+
+
+_LINE_ITEMS = FieldSpec(
+    field_name="line_items", field_type="list[dict]", description="Line items with product, qty"
+)
+_ROW = [
+    FieldSpec(field_name="product", field_type="str", description="Product"),
+    FieldSpec(field_name="qty", field_type="int", description="Quantity"),
+]
+_NUMBER = FieldSpec(field_name="invoice_number", field_type="str", description="Number")
+
+
+def test_a_flat_parse_with_a_list_dict_field_gets_a_typed_child_collection(monkeypatch):
+    from gaik.software_components.extractor import CompositeExtractionRequirements
+
+    model, requirements, analysis, calls = _generate(
+        monkeypatch, _structure("flat"), [_NUMBER, _LINE_ITEMS], _ROW
+    )
+
+    # The flat fields are kept as parsed, not parsed again.
+    assert calls == ["normal", "repeated_item"]
+    assert isinstance(requirements, CompositeExtractionRequirements)
+    assert [f.field_name for f in requirements.parent_requirements.fields] == ["invoice_number"]
+    [child] = requirements.children
+    assert child.container_name == "line_items"
+    assert child.nullable is False
+    assert [f.field_name for f in child.requirements.fields] == ["product", "qty"]
+    assert analysis.structure_type == "parent_with_nested_list"
+    assert [c.container_name for c in analysis.child_containers] == ["line_items"]
+    assert _open_objects(model.model_json_schema()) == []
+    record = model.model_validate(
+        {"invoice_number": "1", "line_items": [{"product": "Bolt", "qty": 3}]}
+    ).model_dump()
+    assert record == {"invoice_number": "1", "line_items": [{"product": "Bolt", "qty": 3}]}
+
+
+def test_a_flat_collection_the_task_lets_be_null_stays_nullable(monkeypatch, tmp_path):
+    from gaik.software_components.extractor.saved_schema import (
+        build_model,
+        describe_model,
+        rebuild_from_requirements,
+    )
+    from gaik.software_components.vision_extractor.vision_extractor import (
+        _make_schema_strict,
+        _prepare_google_schema,
+        _save_schema_to_python,
+        _wrap_model_for_verification,
+    )
+
+    nullable_items = _LINE_ITEMS.model_copy(update={"nullable": True})
+    model, requirements, _, _ = _generate(
+        monkeypatch, _structure("flat"), [_NUMBER, nullable_items], _ROW
+    )
+
+    assert requirements.children[0].nullable is True
+    assert model.model_validate({"invoice_number": "1", "line_items": None}).line_items is None
+    assert model.model_validate({"invoice_number": "1"}).line_items is None
+    rows = model.model_validate(
+        {"invoice_number": "1", "line_items": [{"product": "Bolt", "qty": 3}]}
+    ).line_items
+    assert rows[0].qty == 3
+    # Every provider schema still has typed rows.
+    assert _open_objects(_make_schema_strict(model.model_json_schema())) == []
+    google = _prepare_google_schema(model.model_json_schema())
+    assert google["properties"]["line_items"]["nullable"] is True
+    assert set(google["properties"]["line_items"]["items"]["properties"]) == {"product", "qty"}
+    # The saved schema and a rebuild from the requirements give the same model.
+    assert build_model(describe_model(model)).model_json_schema() == model.model_json_schema()
+    rebuilt = rebuild_from_requirements(model.__name__, requirements)
+    assert rebuilt.model_json_schema() == model.model_json_schema()
+    # Verification wraps each row's fields, as for any other collection.
+    wrapped = _wrap_model_for_verification(model)
+    checked = wrapped.model_validate(
+        {
+            "invoice_number": _wrapped("1"),
+            "line_items": [{"product": _wrapped("Bolt"), "qty": _wrapped(3)}],
+        }
+    )
+    assert checked.line_items[0].qty.value == 3
+    assert wrapped.model_validate({"invoice_number": _wrapped("1"), "line_items": None})
+    # The readable schema.py defines the row class too.
+    _save_schema_to_python(model, tmp_path / "schema.py")
+    source = (tmp_path / "schema.py").read_text(encoding="utf-8")
+    assert source.count("\nclass ") == 2, source
+    assert "Optional[list[" in source
+
+
+def test_a_null_collection_passes_the_policies_and_post_processing(monkeypatch):
+    nullable_items = _LINE_ITEMS.model_copy(update={"nullable": True})
+    _, requirements, _, _ = _generate(
+        monkeypatch, _structure("flat"), [_NUMBER, nullable_items], _ROW
+    )
+    record = {"invoice_number": None, "line_items": None}
+
+    assert _extract_one(record, requirements) == {"invoice_number": "", "line_items": None}
+    assert VisionExtractor._post_process(None, dict(record), requirements) == {
+        "invoice_number": "",
+        "line_items": None,
+    }
+
+
+def test_a_flat_collection_without_row_fields_stays_a_flat_list_and_keeps_its_null(monkeypatch):
+    nullable_items = _LINE_ITEMS.model_copy(update={"nullable": True})
+    model, requirements, analysis, _ = _generate(
+        monkeypatch, _structure("flat"), [_NUMBER, nullable_items], []
+    )
+
+    assert isinstance(requirements, ExtractionRequirements)
+    by_name = {f.field_name: f for f in requirements.fields}
+    assert by_name["line_items"].field_type == "list[str]"
+    assert by_name["line_items"].nullable is True
+    assert analysis.structure_type == "flat"
+    assert model.model_validate({"invoice_number": "1", "line_items": None}).line_items is None
+
+
+def test_a_leaked_parent_collection_keeps_its_null_policy(monkeypatch):
+    from gaik.software_components.extractor.schema import ChildContainerSpec
+
+    analysis = _structure(
+        "parent_with_nested_list",
+        child_containers=[
+            ChildContainerSpec(container_name="payments", container_description="Payments")
+        ],
+    )
+    nullable_items = _LINE_ITEMS.model_copy(update={"nullable": True})
+    _, requirements, _, _ = _generate(monkeypatch, analysis, [_NUMBER, nullable_items], _ROW)
+
+    by_name = {c.container_name: c for c in requirements.children}
+    assert by_name["payments"].nullable is False
+    assert by_name["line_items"].nullable is True
+
+
+def test_the_schema_diff_reports_a_collection_that_may_now_be_null(monkeypatch):
+    from gaik.software_components.extractor import compare_requirements
+
+    _, approved, _, _ = _generate(monkeypatch, _structure("flat"), [_NUMBER, _LINE_ITEMS], _ROW)
+    nullable_items = _LINE_ITEMS.model_copy(update={"nullable": True})
+    _, new, _, _ = _generate(monkeypatch, _structure("flat"), [_NUMBER, nullable_items], _ROW)
+
+    diff = compare_requirements(approved, new)
+
+    assert [(c.field_name, c.changes) for c in diff.changed] == [
+        ("line_items[]", {"nullable": (False, True)})
+    ]

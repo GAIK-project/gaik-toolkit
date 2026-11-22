@@ -29,6 +29,7 @@ from gaik.software_components.extractor.schema import (
     DECIMAL_PERSISTED_HELPER_SOURCE,
     NUMERIC_FIELD_TYPES,
     _holds_items,
+    _list_item_model,
     apply_field_policies,
     decimal_field_repr,
     normalize_extracted_data,
@@ -118,7 +119,15 @@ def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
         # example the safe Decimal schema/cleaner) survive verification wrapping.
         annotation = finfo.rebuild_annotation()
         outer_field = Field(description=finfo.description)
-        if get_origin(annotation) is list:
+        item_model = _list_item_model(annotation)
+        if item_model is not None and get_origin(annotation) is not list:
+            # A child collection the task lets be null: list[ItemModel] | None.
+            # Its rows are wrapped like those of any other collection.
+            wrapped_fields[fname] = (
+                list[_wrap_model_for_verification(item_model)] | None,
+                Field(default=None, description=finfo.description),
+            )
+        elif get_origin(annotation) is list:
             args = get_args(annotation)
             if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
                 # list[ItemModel] — recursively wrap the item model
@@ -491,10 +500,9 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
             return
         seen.add(m)
         for finfo in m.model_fields.values():
-            if get_origin(finfo.annotation) is list:
-                args = get_args(finfo.annotation)
-                if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
-                    collect(args[0])
+            item_model = _list_item_model(finfo.annotation)
+            if item_model is not None:
+                collect(item_model)
         ordered.append(m)
 
     collect(model)
