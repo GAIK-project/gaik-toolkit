@@ -7,7 +7,10 @@ request would wait; in a process of its own only that process does:
 
 - It is stopped after ``PROCESS_SECONDS`` and the file refused as too complex.
 - On Linux it may map at most ``PROCESS_MEMORY`` and runs at a lower priority
-  than the API; on other systems the check's budgets alone bound it.
+  than the API. On other systems nothing caps its memory: the check's budgets
+  bound most of its work but not every step, so a hard file can take much
+  memory there until the process is stopped. A limit the process could not set
+  is logged as a warning.
 - It runs ``pdf_content.py`` as a script on the standard library alone, with
   none of the API's environment variables.
 - Each process checks one file. ``SPARE_PROCESSES`` wait ready, so a check
@@ -89,6 +92,16 @@ def _process() -> subprocess.Popen[bytes]:
     return process
 
 
+def _log_limit_notices(err: bytes) -> list[str]:
+    """The process's stderr as lines, after logging each limit it could not set
+    (``pdf_content.LIMIT_NOTICE``): it then ran without that limit."""
+    lines = err.decode("utf-8", "replace").strip().splitlines()
+    for line in lines:
+        if line.startswith(pdf_content.LIMIT_NOTICE):
+            logger.warning("%s", line[:200])
+    return lines
+
+
 def check(data: bytes) -> None:
     """``pdf_content.check`` in a process of its own; raises as it does.
 
@@ -106,7 +119,7 @@ def check(data: bytes) -> None:
         out, err = process.communicate(data, timeout=PROCESS_SECONDS)
     except subprocess.TimeoutExpired:
         process.kill()
-        process.communicate()
+        _log_limit_notices(process.communicate()[1] or b"")
         raise pdf_content.TooComplexError(pdf_content.TOO_COMPLEX) from None
     except OSError as exc:  # the process went away while the file was sent
         process.kill()
@@ -115,6 +128,7 @@ def check(data: bytes) -> None:
     except BaseException:
         process.kill()  # this thread is being stopped, and so is its check
         raise
+    errors = _log_limit_notices(err)
     kind = message = ""
     if process.returncode == 0:
         try:
@@ -128,6 +142,6 @@ def check(data: bytes) -> None:
         raise pdf_content.ActiveContentError(message)
     if kind == "complex":
         raise pdf_content.TooComplexError(message)
-    last = err.decode("utf-8", "replace").strip().splitlines()[-1:] or [""]
+    last = errors[-1:] or [""]
     logger.warning("The PDF check's process ended with %s: %s", process.returncode, last[0][:200])
     raise pdf_content.TooComplexError(pdf_content.NOT_CHECKABLE)
