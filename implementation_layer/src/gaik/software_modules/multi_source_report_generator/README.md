@@ -401,7 +401,7 @@ the credential-bearing stage configs when running the report.
 | Word | `.docx` | Parsed by `DocxParser` with `keep_structure=True`: document order, headings and every table cell |
 | Audio | `.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.ogg` | Transcribed by `Transcriber` |
 | Video | `.mp4`, `.mov`, `.mkv`, `.avi`, `.webm` | Transcribed by `Transcriber` |
-| Images | `.png`, `.jpg`, `.jpeg`, `.webp`, `.tiff`, `.tif`, `.bmp`, `.gif` | Parsed by `VisionParser` or extracted by `VisionExtractor`. TIFF and BMP are converted to PNG first (one image per page of a multi-page TIFF), since the providers take PNG, JPEG, GIF and WebP only |
+| Images | `.png`, `.jpg`, `.jpeg`, `.webp`, `.tiff`, `.tif`, `.bmp`, `.gif` | Parsed by `VisionParser` or extracted by `VisionExtractor`. A TIFF or BMP image (by its content, whatever its extension) is converted to PNG first, one image per page of a multi-page TIFF, with a 16-bit or float scan scaled to 8 bits, since the providers take PNG, JPEG, GIF and WebP only |
 
 ## Agentic Mode Details
 

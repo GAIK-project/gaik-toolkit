@@ -82,7 +82,7 @@ _AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 _VIDEO_EXT = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 _IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".tiff", ".tif", ".bmp", ".gif"}
 # Sent to a model as PNG: the providers take PNG, JPEG, GIF and WebP only.
-_CONVERTED_IMAGE_EXT = {".tiff", ".tif", ".bmp"}
+_CONVERTED_IMAGE_TYPES = {"tiff", "bmp"}  # by content, as file_type detects it
 # Refused before any source is read: openpyxl reads only .xlsx.
 _REFUSED_EXT = {".xls": "the old Excel format .xls is not supported; save it as .xlsx"}
 
@@ -301,13 +301,34 @@ def _xlsx_to_markdown(path: Path) -> str:
     return "\n\n".join(blocks) if blocks else "_(no tabular data found)_"
 
 
+def _eight_bit(frame: Any) -> Any:
+    """A Pillow image in a mode PNG keeps as the model sees it, 8 bits per channel.
+
+    A 16- or 32-bit grayscale page (``I;16``, ``I``) or a float one (``F``) is scaled
+    from its darkest to its lightest value: converted directly, Pillow clips every value
+    over 255, so a 16-bit scan would turn white and a float one black. Other modes
+    (CMYK, YCbCr, ...) become RGB.
+    """
+    from PIL import Image
+
+    if frame.mode in {"1", "L", "LA", "P", "RGB", "RGBA"}:
+        return frame
+    if frame.mode.startswith("I") or frame.mode == "F":
+        values = frame if frame.mode == "F" else frame.convert("F")
+        low, high = values.getextrema()
+        if high <= low:
+            return Image.new("L", frame.size, 255 if high > 0 else 0)
+        scale = 255.0 / (high - low)
+        return values.point(lambda v: (v - low) * scale).convert("L")
+    return frame.convert("RGB")
+
+
 def _as_png_pages(path: Path, folder: Path, limits: InputLimits) -> list[Path]:
     """A TIFF or BMP image as one PNG file per page in ``folder``.
 
     The model providers take PNG, JPEG, GIF and WebP only. The image is checked against
     ``limits`` (size, pixels, and pages for a multi-page TIFF) before it is decoded.
     """
-    from gaik.software_components.file_type import check_file_type
 
     try:
         from PIL import Image, ImageSequence
@@ -318,7 +339,6 @@ def _as_png_pages(path: Path, folder: Path, limits: InputLimits) -> list[Path]:
         ) from exc
 
     limits.check_image_file(path)
-    check_file_type(path, {"tiff", "bmp"})
     pages: list[Path] = []
     with Image.open(path) as image:
         frames = getattr(image, "n_frames", 1)
@@ -326,8 +346,7 @@ def _as_png_pages(path: Path, folder: Path, limits: InputLimits) -> list[Path]:
             limits.check_pages(frames, path.name)
         for number, frame in enumerate(ImageSequence.Iterator(image), start=1):
             limits.check_image_pixels(frame.width, frame.height, path.name)
-            if frame.mode not in {"1", "L", "LA", "P", "RGB", "RGBA"}:
-                frame = frame.convert("RGB")
+            frame = _eight_bit(frame)
             page = folder / f"page_{number:04d}.png"
             frame.save(page, format="PNG")
             pages.append(page)
@@ -1013,7 +1032,11 @@ class MultiSourceReportGenerator:
         return ctor
 
     def _parse_image(self, path: Path, *, image_options: dict) -> str:
-        if path.suffix.lower() in _CONVERTED_IMAGE_EXT:
+        from gaik.software_components.file_type import IMAGE_TYPES, check_file_type
+
+        # The content decides, as in VisionParser: a PNG named .bmp is sent as it is,
+        # a TIFF named .png is converted. A file that is no image raises here.
+        if check_file_type(path, IMAGE_TYPES) in _CONVERTED_IMAGE_TYPES:
             # TIFF and BMP go to the model as PNG, one per page of a multi-page TIFF.
             limits = self._limited(image_options.get("ctor", {})).get("limits")
             with tempfile.TemporaryDirectory(prefix="gaik-image-") as folder:
