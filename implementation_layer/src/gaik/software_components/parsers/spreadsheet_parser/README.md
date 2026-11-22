@@ -56,8 +56,13 @@ single table with no sheet heading.
   `0%` is `25.6%`), and no thousands separator is added, because its character depends
   on the reader's locale. A date keeps the ISO form above whatever its format, and text
   cells are not changed.
+- A negative number takes the format's negative section (the second, after `;`), as Excel
+  shows it: `-1200` with `#,##0.00" Cr";#,##0.00" Dr"` is `1200.00 Dr`, and `-0.05` with
+  `"Up "0%;"Down "0%` is `Down 5%`. A format with one section puts a minus sign in front.
+  Zero takes the first section.
 - A format the parser does not render (scientific notation, fractions, conditions, digits
-  split by text) stays next to the stored value: `0.5 (number format: # ?/?)`.
+  split by text, or a negative section that would hide the sign, such as `0;0`) stays
+  next to the stored value: `0.5 (number format: # ?/?)`.
 - A workbook is read row by row, so a sheet whose stated size (`<dimension ref>`) is
   stale is still read whole.
 - Formula cells show the result stored in the file. A workbook whose formulas have no

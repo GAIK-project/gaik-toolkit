@@ -28,8 +28,38 @@ class _NumberLayout(NamedTuple):
     percent: bool
 
 
+def _sections(number_format: str) -> list[str] | None:
+    """The ``;``-separated sections of a number format: positive, negative, zero, text.
+
+    None for a format with a condition (``[>100]``), which picks its sections by value
+    rather than by sign, or with an unterminated quote or bracket.
+    """
+    sections: list[str] = []
+    start = index = 0
+    while index < len(number_format):
+        char = number_format[index]
+        if char in '"[':
+            end = number_format.find('"' if char == '"' else "]", index + 1)
+            if end < 0:
+                return None
+            if char == "[" and number_format[index + 1 : index + 2] in ("<", ">", "="):
+                return None
+            index = end + 1
+            continue
+        if char in "\\_*":
+            # An escaped character, room for one or a fill with one: never a separator.
+            index += 2
+            continue
+        if char == ";":
+            sections.append(number_format[start:index])
+            start = index + 1
+        index += 1
+    sections.append(number_format[start:])
+    return sections
+
+
 def _number_layout(number_format: str) -> _NumberLayout | None:
-    """Read the first section of an Excel number format, the one for positive numbers.
+    """Read one section of an Excel number format (see :func:`_sections`).
 
     None for a format this parser does not render: scientific notation, fractions,
     conditions, digits scaled by a trailing comma or split by text (``000-000``).
@@ -42,8 +72,6 @@ def _number_layout(number_format: str) -> _NumberLayout | None:
     while index < len(number_format):
         char = number_format[index]
         index += 1
-        if char == ";":
-            break
         if char in "_*":
             # Room for the next character, or a fill with it: neither is text.
             index += 1
@@ -96,25 +124,41 @@ def _number_layout(number_format: str) -> _NumberLayout | None:
     )
 
 
+def _laid_out(value: int | float, layout: _NumberLayout, sign: str = "") -> str:
+    """The absolute value laid out as ``layout`` says, after ``sign``."""
+    number = abs(Decimal(repr(value))) * (100 if layout.percent else 1)
+    whole, _, fraction = format(number, "f").partition(".")
+    fraction = fraction.rstrip("0").ljust(layout.decimal_digits, "0")
+    text = whole.zfill(layout.integer_digits) + (f".{fraction}" if fraction else "")
+    return " ".join(f"{sign}{layout.before}{text}{layout.after}".split())
+
+
 def _formatted_number(value: int | float, number_format: str) -> str | None:
     """The number as its format shows it, or None when the format is not rendered.
 
     Nothing of the stored value is lost: digits the format would round away are kept, and
     no thousands separator is added, since its character depends on the reader's locale.
+    A negative number takes the format's second section when it has one, as Excel does
+    (``-1200`` with ``0.00" Cr";0.00" Dr"`` is ``1200.00 Dr``); a section that would hide
+    the sign (``0;0``) is not rendered. Zero takes the first section.
     """
-    layout = _number_layout(number_format)
-    if layout is None or not math.isfinite(value):
+    sections = _sections(number_format)
+    if sections is None or not math.isfinite(value):
         return None
-    signs = set(layout.before + layout.after) & set("+-()")
-    if value < 0 and signs:
+    positive = _number_layout(sections[0])
+    if positive is None:
+        return None
+    if value < 0 and len(sections) > 1:
+        negative = _number_layout(sections[1])
+        if negative is None:
+            return None
+        shown = _laid_out(value, negative)
+        # Excel adds no minus to a negative section: its text must tell the sign.
+        return shown if shown != _laid_out(value, positive) else None
+    if value < 0 and set(positive.before + positive.after) & set("+-()"):
         # The format's own sign is for a positive number.
         return None
-    number = Decimal(repr(value)) * (100 if layout.percent else 1)
-    whole, _, fraction = format(abs(number), "f").partition(".")
-    fraction = fraction.rstrip("0").ljust(layout.decimal_digits, "0")
-    text = whole.zfill(layout.integer_digits) + (f".{fraction}" if fraction else "")
-    sign = "-" if number < 0 else ""
-    return " ".join(f"{sign}{layout.before}{text}{layout.after}".split())
+    return _laid_out(value, positive, "-" if value < 0 else "")
 
 
 def _number(value: int | float, number_format: str | None) -> str:

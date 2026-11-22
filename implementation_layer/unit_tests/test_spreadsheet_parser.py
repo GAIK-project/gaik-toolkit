@@ -98,7 +98,24 @@ ACCOUNTING_EUR = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "�
         (-1234.5, ACCOUNTING_EUR, "-1234.50 €"),
         (0, ACCOUNTING_EUR, "0.00 €"),
         (1234.5, '"$"#,##0.00_);[Red]("$"#,##0.00)', "$1234.50"),
-        (-1234.5, '"$"#,##0.00_);[Red]("$"#,##0.00)', "-$1234.50"),
+        # A negative number takes the format's negative section, as Excel shows it.
+        (-1234.5, '"$"#,##0.00_);[Red]("$"#,##0.00)', "($1234.50)"),
+        (-1200, '#,##0.00" Cr";#,##0.00" Dr"', "1200.00 Dr"),
+        (1200, '#,##0.00" Cr";#,##0.00" Dr"', "1200.00 Cr"),
+        (-0.05, '"Up "0%;"Down "0%', "Down 5%"),
+        (-3, '"Profit "0;"Loss "0', "Loss 3"),
+        (-3, '"Profit "0;"Loss "0;"Even"', "Loss 3"),
+        (-5, "+0;-0", "-5"),
+        (-1234.5, '0.00;[Red]"-"0.00', "-1234.50"),
+        (-7, '0;\\-0;0;"text;"@', "-7"),
+        # A negative section that would hide the sign, or that is not rendered,
+        # leaves the stored value.
+        (-5, "0;0", "-5 (number format: 0;0)"),
+        (-5, "0.00;[Red]0.00", "-5 (number format: 0.00;[Red]0.00)"),
+        (-5, "0;;0", "-5 (number format: 0;;0)"),
+        (-5, '0;"minus"', '-5 (number format: 0;"minus")'),
+        # Zero takes the first section.
+        (0, '"Profit "0;"Loss "0;"Even"', "Profit 0"),
         (1234.5, "[$€-40B] #,##0.00", "€ 1234.50"),
         (1234.5, "#,##0.00 [$kr-41D]", "1234.50 kr"),
         (12, '0.0" kg"', "12.0 kg"),
@@ -121,7 +138,6 @@ ACCOUNTING_EUR = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "�
         (0.5, "# ?/?", "0.5 (number format: # ?/?)"),
         (1500000, "#,##0,", "1500000 (number format: #,##0,)"),
         (358401234567, "000-000 0000", "358401234567 (number format: 000-000 0000)"),
-        (-5, "+0;-0", "-5 (number format: +0;-0)"),
         (5, "[>100]0.0;0", "5 (number format: [>100]0.0;0)"),
     ],
 )
