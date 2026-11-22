@@ -1263,7 +1263,8 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         ),
         "sample_field_lines": sample_field_lines,
         "workflow_steps_summary": steps_summary,
-        "component_imports_placeholder": "\n".join(import_lines),
+        # Every line commented out: the agent uncomments each as it wires its step.
+        "component_imports_placeholder": "\n".join(f"# {line}" for line in import_lines),
         "input_instructions": _input_instructions(bc),
         "output_instructions": _output_instructions(bc),
         # _generic template extras
