@@ -64,6 +64,9 @@ def test_a_cp1252_csv_is_logged_as_read_in_that_code_page(tmp_path, caplog):
         ("Maito;1,49\nLeipä;2,10\n", "| 2 | Leipä | 2,10 |"),
         # One column: nothing to split.
         ("Item\nRoof\n", "| 2 | Roof |"),
+        # One column of free text with a ";" in some cells: the header does not split.
+        ("comment\nhello; world\nfoo; bar\n", "| 2 | hello; world |"),
+        ("comment\nhello\tworld\nfoo\tbar\n", "| 2 | hello\tworld |"),
     ],
 )
 def test_csv_delimiter_is_read_from_the_rows(tmp_path, text, row):

@@ -114,8 +114,15 @@ ACCOUNTING_EUR = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "�
         (-5, "0.00;[Red]0.00", "-5 (number format: 0.00;[Red]0.00)"),
         (-5, "0;;0", "-5 (number format: 0;;0)"),
         (-5, '0;"minus"', '-5 (number format: 0;"minus")'),
-        # Zero takes the first section.
+        # A negative section that differs only by colour, decimals or a percent sign
+        # shows no sign either.
+        (-5, "0.00;[Red]0.0", "-5 (number format: 0.00;[Red]0.0)"),
+        (-5, "0;[Red]0.00", "-5 (number format: 0;[Red]0.00)"),
+        (-5, "#,##0.00;#,##0", "-5 (number format: #,##0.00;#,##0)"),
+        (-0.05, "0%;0", "-0.05 (number format: 0%;0)"),
+        # Zero takes the first section, not a zero section's dash.
         (0, '"Profit "0;"Loss "0;"Even"', "Profit 0"),
+        (0, '#,##0;(#,##0);"-"', "0"),
         (1234.5, "[$€-40B] #,##0.00", "€ 1234.50"),
         (1234.5, "#,##0.00 [$kr-41D]", "1234.50 kr"),
         (12, '0.0" kg"', "12.0 kg"),

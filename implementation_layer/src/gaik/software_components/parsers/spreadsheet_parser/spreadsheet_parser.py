@@ -20,6 +20,8 @@ from .._text import decode_text
 _CSV_DELIMITERS = ("\t", ";", "|", ",")
 # How much of a CSV its delimiter is read from.
 _CSV_SAMPLE_CHARS = 64 * 1024
+# The share of rows that must have the header's field count for a delimiter to count.
+_CSV_CONSISTENT_ROWS = 0.8
 
 # Characters a number format shows as they are, without quotes.
 _PLAIN_TEXT = frozenset("  -+()$€£¥")
@@ -132,6 +134,11 @@ def _number_layout(number_format: str) -> _NumberLayout | None:
     )
 
 
+def _section_text(layout: _NumberLayout) -> str:
+    """The text a section shows around the digits, without spacing or a percent sign."""
+    return " ".join(f"{layout.before} {layout.after}".replace("%", " ").split())
+
+
 def _laid_out(value: int | float, layout: _NumberLayout, sign: str = "") -> str:
     """The absolute value laid out as ``layout`` says, after ``sign``."""
     number = abs(Decimal(repr(value))) * (100 if layout.percent else 1)
@@ -147,8 +154,11 @@ def _formatted_number(value: int | float, number_format: str) -> str | None:
     Nothing of the stored value is lost: digits the format would round away are kept, and
     no thousands separator is added, since its character depends on the reader's locale.
     A negative number takes the format's second section when it has one, as Excel does
-    (``-1200`` with ``0.00" Cr";0.00" Dr"`` is ``1200.00 Dr``); a section that would hide
-    the sign (``0;0``) is not rendered. Zero takes the first section.
+    (``-1200`` with ``0.00" Cr";0.00" Dr"`` is ``1200.00 Dr``). Excel adds no minus there,
+    so a section whose own text shows no sign and does not differ from the positive
+    section's (``0;0``, ``0.00;[Red]0.0``, where only a colour or the decimals differ) is
+    not rendered: the plain value keeps the sign. Zero takes the first section, not the
+    third: a zero section mostly shows a dash or nothing in place of the value.
     """
     sections = _sections(number_format)
     if sections is None or not math.isfinite(value):
@@ -160,9 +170,10 @@ def _formatted_number(value: int | float, number_format: str) -> str | None:
         negative = _number_layout(sections[1])
         if negative is None:
             return None
-        shown = _laid_out(value, negative)
-        # Excel adds no minus to a negative section: its text must tell the sign.
-        return shown if shown != _laid_out(value, positive) else None
+        text = _section_text(negative)
+        if not set(text) & set("-()") and text == _section_text(positive):
+            return None
+        return _laid_out(value, negative)
     if value < 0 and set(positive.before + positive.after) & set("+-()"):
         # The format's own sign is for a positive number.
         return None
@@ -258,10 +269,13 @@ def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
 def _csv_delimiter(text: str) -> str:
     """The delimiter that splits the CSV's rows into the same number of fields, at least two.
 
-    Rows are compared by how many of them have the most common field count, then by that
-    count. A tie goes to tab, then ``;``, ``|`` and ``,``: a semicolon CSV, which Excel
-    writes in a locale with a decimal comma, often has commas in its cells, while a comma
-    CSV seldom has semicolons. ``,`` when no delimiter gives two fields.
+    A delimiter counts only when the header (the first non-empty row) has the most common
+    field count and at least ``_CSV_CONSISTENT_ROWS`` of the rows have it too, so a
+    one-column file whose cells hold an odd ``;`` stays one column. Delimiters are then
+    compared by how many rows have that count, then by the count. A tie goes to tab,
+    then ``;``, ``|`` and ``,``: a semicolon CSV, which Excel writes in a locale with a
+    decimal comma, often has commas in its cells, while a comma CSV seldom has
+    semicolons. ``,`` when no delimiter counts.
     """
     sample = text[:_CSV_SAMPLE_CHARS]
     best, best_score = ",", None
@@ -273,9 +287,10 @@ def _csv_delimiter(text: str) -> str:
         if not counts:
             continue
         fields = Counter(counts).most_common(1)[0][0]
-        if fields < 2:
+        consistency = counts.count(fields) / len(counts)
+        if fields < 2 or counts[0] != fields or consistency < _CSV_CONSISTENT_ROWS:
             continue
-        score = (counts.count(fields) / len(counts), fields, -preference)
+        score = (consistency, fields, -preference)
         if best_score is None or score > best_score:
             best, best_score = delimiter, score
     return best
