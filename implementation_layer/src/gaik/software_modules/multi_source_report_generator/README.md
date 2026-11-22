@@ -348,7 +348,7 @@ for section in result.sections:
 | `strict_review` | `True` | Agentic only. If unresolved reviewer edits remain, raise before final report outputs are written; `False` returns them as revision warnings. |
 | `curate_evidence` | `False` | Agentic only. Creates one section-specific evidence brief before drafting each section. |
 | `verbose` | `False` | Agentic only. Prints workflow progress events. |
-| `progress_callback` | `None` | Agentic only. Callable receiving progress strings. Overrides default printing behavior. |
+| `progress_callback` | `None` | Callable receiving progress strings: source normalization in both modes, and the agentic workflow's handovers. Overrides default printing behavior. Without it, normalization progress is printed with each file named by a tag (`file 3f9a1c2b.pdf`, as the parsers' log lines do), not its name; the callback gets the file names. |
 | `output_docx` | `False` | Also write `report.docx` alongside `report.md` when `output_dir` is set. Requires the `multi-source-report-generator-docx` extra and the Pandoc system binary. |
 
 ## Separate providers for each stage

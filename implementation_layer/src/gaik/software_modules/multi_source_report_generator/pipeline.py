@@ -711,9 +711,13 @@ class MultiSourceReportGenerator:
 
         Shared by the single-call and agentic paths. When ``progress_callback``
         is provided, normalization progress is routed through it instead of
-        ``print`` so callers (e.g. the demo SSE backend) receive the messages.
+        ``print`` so callers (e.g. the demo SSE backend) receive the messages, each
+        file by its name. The default ``print`` names a file by its tag
+        (``file 3f9a1c2b.pdf``), as the parsers' log lines do: stdout often ends up in
+        a log, and a file name can carry personal data.
         """
         _emit = progress_callback or print
+        _name = (lambda p: p.name) if progress_callback else file_tag
 
         files = _collect_input_files(input_paths)
         if not files:
@@ -726,7 +730,7 @@ class MultiSourceReportGenerator:
         evidence_items: list[EvidenceItem] = []
         for index, path in enumerate(files, start=1):
             source_type = _EXT_TO_TYPE[path.suffix.lower()]
-            _emit(f"Normalizing [{index}/{total}]: {path.name} ({source_type})")
+            _emit(f"Normalizing [{index}/{total}]: {_name(path)} ({source_type})")
             evidence_items.append(
                 self._build_evidence_item(
                     path,

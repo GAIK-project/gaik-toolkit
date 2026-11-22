@@ -268,3 +268,28 @@ def test_an_agentic_rerun_removes_an_unchanged_brief_it_did_not_write(tmp_path, 
     assert sorted(p.name for p in briefs.iterdir()) == ["roof.md", "walls.md"]
     _run(tmp_path, ["Roof"], agentic=True, curate_evidence=True)
     assert sorted(p.name for p in briefs.iterdir()) == ["roof.md"]
+
+
+# -- the default progress sink ------------------------------------------------------------
+
+
+def test_the_default_progress_print_names_no_file(tmp_path, client, capsys):
+    (tmp_path / "Matti_Virtanen_lab_results.txt").write_text("Values.", encoding="utf-8")
+    _gen().run(
+        input_paths=[tmp_path / "Matti_Virtanen_lab_results.txt"],
+        sections=[{"title": "Summary", "instructions": "Sum up."}],
+    )
+    printed = capsys.readouterr().out
+    assert "Normalizing [1/1]: file " in printed and ".txt (text)" in printed
+    assert "Virtanen" not in printed
+
+
+def test_a_progress_callback_still_gets_the_file_name(tmp_path, client):
+    (tmp_path / "site_notes.txt").write_text("Values.", encoding="utf-8")
+    messages: list[str] = []
+    _gen().run(
+        input_paths=[tmp_path / "site_notes.txt"],
+        sections=[{"title": "Summary", "instructions": "Sum up."}],
+        progress_callback=messages.append,
+    )
+    assert "Normalizing [1/1]: site_notes.txt (text)" in messages
