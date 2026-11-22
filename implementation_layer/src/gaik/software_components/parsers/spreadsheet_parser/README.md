@@ -58,6 +58,8 @@ single table with no sheet heading.
   cells are not changed.
 - A format the parser does not render (scientific notation, fractions, conditions, digits
   split by text) stays next to the stored value: `0.5 (number format: # ?/?)`.
+- A workbook is read row by row, so a sheet whose stated size (`<dimension ref>`) is
+  stale is still read whole.
 - Formula cells show the result stored in the file. A workbook whose formulas have no
   stored results (one written by a library such as openpyxl and never opened in Excel)
   raises `ValueError`; open and save it in Excel or LibreOffice first.

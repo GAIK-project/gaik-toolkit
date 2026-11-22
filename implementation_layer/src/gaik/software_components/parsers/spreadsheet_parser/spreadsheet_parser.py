@@ -174,6 +174,10 @@ def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
     try:
         blocks, results = [], []
         for sheet, formula_sheet in zip(values.worksheets, formulas.worksheets):
+            # Read-only mode trusts the size a sheet states (<dimension ref>), which a
+            # writer can leave stale ("A1" over six rows); read the rows themselves.
+            sheet.reset_dimensions()
+            formula_sheet.reset_dimensions()
             rows, number_formats = [], []
             sheet_rows = count_table_rows(sheet.iter_rows(), limits, f"{path.name} / {sheet.title}")
             for row, formula_cells in zip(sheet_rows, formula_sheet.iter_rows()):
