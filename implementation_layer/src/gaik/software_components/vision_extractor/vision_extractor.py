@@ -5,12 +5,13 @@ Single-pass vision extraction: PDF/image → structured data in one LLM call.
 from __future__ import annotations
 
 import json
+import math
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Union, get_args, get_origin
+from typing import Annotated, Literal, Union, get_args, get_origin
 
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, BeforeValidator, Field, create_model
 from pydantic_core import PydanticUndefined
 
 from gaik.observability import UsageRecord, build_usage_record
@@ -94,16 +95,65 @@ def _is_pdf(path: Path) -> bool:
 # ---------------------------------------------------------------------------
 
 
+_MIN_CONFIDENCE = 0.01
+_MAX_CONFIDENCE = 1.0
+_MAX_REASON_LENGTH = 400
+
+
+def _clamped_confidence_score(value):
+    """A provider's confidence score moved into 0.01..1.0 before validation.
+
+    Not every provider enforces the schema's bounds (Gemini's schema drops them),
+    and one score of 0.0 or 1.2 used to fail the whole extraction. A score written
+    as a percentage ("85%") is read as one. A score that is not a number, or is
+    missing, becomes the lowest one, 0.01.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        try:
+            value = float(text.removesuffix("%").strip())
+        except ValueError:
+            return _MIN_CONFIDENCE
+        if text.endswith("%"):
+            value /= 100
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return _MIN_CONFIDENCE
+    value = float(value)
+    if math.isnan(value):
+        return _MIN_CONFIDENCE
+    return min(max(value, _MIN_CONFIDENCE), _MAX_CONFIDENCE)
+
+
+def _shortened_confidence_reason(value):
+    """A provider's reason cut to 400 characters before validation; None is ``""``."""
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else str(value)
+    if len(text) <= _MAX_REASON_LENGTH:
+        return text
+    return text[: _MAX_REASON_LENGTH - 1] + "…"
+
+
 class VerifiableField(BaseModel):
     """Base model for a field wrapped with verification metadata.
 
     Each field in a wrapped extraction model is represented as a subclass of
     VerifiableField with a typed ``value`` attribute. Use ``include_verification=True``
     on VisionExtractor to enable wrapping automatically at runtime.
+
+    The schema sent to the provider asks for a score from 0.01 to 1.0 and a reason
+    of at most 400 characters. A value outside them is moved inside before
+    validation, so it cannot fail the extraction: a score below 0.01 (or missing,
+    or not a number) becomes 0.01, one above 1.0 becomes 1.0, and a longer reason
+    is cut to 400 characters.
     """
 
-    confidence_score: float = Field(ge=0.01, le=1.0)
-    confidence_reason: str = Field(max_length=400)
+    confidence_score: Annotated[float, BeforeValidator(_clamped_confidence_score)] = Field(
+        ge=_MIN_CONFIDENCE, le=_MAX_CONFIDENCE
+    )
+    confidence_reason: Annotated[str, BeforeValidator(_shortened_confidence_reason)] = Field(
+        max_length=_MAX_REASON_LENGTH
+    )
 
 
 def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
