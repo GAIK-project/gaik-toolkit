@@ -1,5 +1,5 @@
 """
-Python-docx based parser for Word document (.docx, .doc) text extraction.
+Python-docx based parser for Word document (.docx) text extraction.
 
 This module uses python-docx to extract text from Word documents without
 requiring external APIs or heavy ML models.
@@ -10,7 +10,7 @@ import os
 from typing import Any
 
 from .._log_names import error_text, file_tag
-from ..file_type import check_file_type
+from ..file_type import FileTypeMismatchError, check_file_type
 from ..input_limits import InputLimits
 
 try:
@@ -61,11 +61,12 @@ class DocxParser:
     A Word document parser using python-docx library for text extraction.
 
     Features:
-    - Fast local DOCX/DOC parsing without external APIs
+    - Fast local DOCX parsing without external APIs
     - Extract text from paragraphs and tables, including the text in content
       controls and tracked insertions (not tracked deletions), in document order
     - Simple text extraction or structured output with formatting info
-    - Support for Word 2007+ documents (.docx)
+    - Support for Word 2007+ documents (.docx); a Word 97-2003 ``.doc`` file is
+      refused with the fix (save it as .docx)
     - Refuses a file over its input limits (size, unpacked size) with
       ``InputLimitError`` before reading it
     """
@@ -87,7 +88,8 @@ class DocxParser:
             )
 
         self.limits = limits or InputLimits()
-        self.supported_extensions = [".docx", ".doc"]
+        # A Word 97-2003 .doc is not read; a DOCX saved under that name still is.
+        self.supported_extensions = [".docx"]
 
     def parse_docx(
         self, file_path: str, use_markdown: bool = True, keep_structure: bool = False
@@ -110,7 +112,8 @@ class DocxParser:
             ValueError: If keep_structure is used with structured text, or the
                 file's content is not a DOCX
             FileTypeMismatchError: If the content is not a DOCX, or not the type
-                the file's extension says (a ``ValueError``)
+                the file's extension says (a ``ValueError``). For a Word 97-2003
+                document (.doc), the message says to save it as .docx.
             InputLimitError: If the file is over ``max_file_bytes``, or unpacks
                 to more than ten times that
             Exception: If DOCX parsing fails
@@ -123,7 +126,19 @@ class DocxParser:
         # the container with zipfile, and so does the content check.
         # The size comes first: the content check reads the archive's directory.
         self.limits.check_file_size(file_path)
-        check_file_type(file_path, {"docx"})
+        try:
+            check_file_type(file_path, {"docx"})
+        except FileTypeMismatchError as exc:
+            if exc.detected != "ole":
+                raise
+            raise FileTypeMismatchError(
+                f"{exc} DocxParser reads .docx only: open the file in Word or "
+                "LibreOffice and save it as .docx.",
+                file_name=exc.file_name,
+                extension=exc.extension,
+                detected=exc.detected,
+                expected=exc.expected,
+            ) from None
         self.limits.check_zip_container(file_path)
 
         try:
@@ -172,7 +187,7 @@ class DocxParser:
             Dictionary containing:
                 - file_path: Original file path
                 - file_name: File name
-                - file_extension: File extension (.docx, .doc)
+                - file_extension: File extension (.docx)
                 - text_content: Parsed document content
                 - content_length: Length of parsed content
                 - word_count: Number of words in content
@@ -181,7 +196,8 @@ class DocxParser:
 
         Raises:
             FileNotFoundError: If file does not exist
-            ValueError: If file is not a DOCX/DOC
+            ValueError: If file is not a DOCX; a Word 97-2003 .doc is refused
+                with ``FileTypeMismatchError`` saying to save it as .docx
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -189,9 +205,11 @@ class DocxParser:
         file_extension = os.path.splitext(file_path)[1].lower()
         file_name = os.path.basename(file_path)
 
-        if file_extension not in self.supported_extensions:
+        # A .doc goes on to parse_docx, which reads a DOCX saved under that name and
+        # refuses a Word 97-2003 document with the fix.
+        if file_extension not in self.supported_extensions and file_extension != ".doc":
             raise ValueError(
-                f"Unsupported file type: {file_extension}. Only DOCX/DOC files are supported."
+                f"Unsupported file type: {file_extension}. Only DOCX files are supported."
             )
 
         format_type = "markdown" if use_markdown else "structured"
@@ -215,7 +233,7 @@ class DocxParser:
         }
 
     def is_supported_file(self, file_path: str) -> bool:
-        """Check if file format is supported (.docx or .doc)."""
+        """Check if file format is supported (.docx)."""
         extension = os.path.splitext(file_path)[1].lower()
         return extension in self.supported_extensions
 
@@ -281,11 +299,11 @@ def parse_docx(
     """
     Convenience function to parse a Word document with minimal setup.
 
-    This function provides a simple interface to parse DOCX/DOC files using python-docx.
+    This function provides a simple interface to parse DOCX files using python-docx.
     Fast local parsing without external APIs or ML models.
 
     Args:
-        file_path: Path to the DOCX/DOC file
+        file_path: Path to the DOCX file
         use_markdown: Return simple text (True) or structured text with formatting (False)
         output_path: Optional path to save the parsed content
 
@@ -295,7 +313,7 @@ def parse_docx(
     Raises:
         ImportError: If python-docx is not installed
         FileNotFoundError: If file does not exist
-        ValueError: If file is not a DOCX/DOC
+        ValueError: If file is not a DOCX
 
     Example:
         >>> from docx_parser import parse_docx
