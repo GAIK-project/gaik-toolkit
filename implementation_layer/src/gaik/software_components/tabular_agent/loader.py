@@ -295,12 +295,13 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
             converted.append(column)
         except Exception as exc:
             logger.debug("Could not retype column %s as DOUBLE: %s", column, type(exc).__name__)
+    # Counts only: a column name is the file's content (a header row of people's
+    # names, say); the caller gets the converted names back.
     if converted:
-        logger.info("Converted comma-decimal column(s): %s", ", ".join(converted))
+        logger.info("Converted %d comma-decimal column(s) to numbers", len(converted))
     if ambiguous:
         logger.info(
-            "Left column(s) as text, as their commas may separate thousands: %s",
-            ", ".join(ambiguous),
+            "Left %d column(s) as text, as their commas may separate thousands", len(ambiguous)
         )
     return converted
 

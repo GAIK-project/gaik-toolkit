@@ -110,14 +110,20 @@ def _column(con, table, column):
     return types[column], values
 
 
-def test_us_thousands_commas_are_not_read_as_decimals(con, tmp_path):
+def test_us_thousands_commas_are_not_read_as_decimals(con, tmp_path, caplog):
     """1,200 is as likely to be twelve hundred as one point two: the column stays text."""
+    import logging
+
     path = tmp_path / "orders.csv"
-    path.write_text('id,amount\n1,"1,200"\n2,"3,450"\n3,"12,000"\n', encoding="utf-8")
-    _load(con, path)
-    data_type, values = _column(con, "orders", "amount")
+    path.write_text('id,Matti Virtanen\n1,"1,200"\n2,"3,450"\n3,"12,000"\n', encoding="utf-8")
+    with caplog.at_level(logging.INFO, logger="gaik.software_components.tabular_agent"):
+        _load(con, path)
+    data_type, values = _column(con, "orders", "Matti Virtanen")
     assert data_type == "VARCHAR"
     assert values == ["1,200", "3,450", "12,000"]
+    # The log line says how many columns, not which: a header can name a person.
+    assert "Left 1 column(s) as text" in caplog.text
+    assert "Virtanen" not in caplog.text
 
 
 @pytest.mark.parametrize(
