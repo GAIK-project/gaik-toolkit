@@ -141,12 +141,14 @@ class SourceMaterial:
         The material cannot end its block: the closing tag carries this call's
         random id, and any closing tag written inside the material is escaped
         first, so a fake one reaches the model as plain text. Only that tag
-        changes; the rest of the material is sent as it is.
+        changes; the rest of the material is sent as it is. A value that is not
+        a string (``None``, a number) is sent as its ``str()``.
         """
+        text = text if isinstance(text, str) else str(text)
         if self.boundary in text:
             # Only a caller-chosen boundary can collide; refuse rather than guess.
             raise ValueError("source material contains the block id; draw a new one")
-        body = _escape(str(text))
+        body = _escape(text)
         return f"{self.opening_tag(label)}\n{body}\n{self.closing_tag}"
 
     def strip_echo(self, text: str) -> str:
