@@ -18,9 +18,9 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePath
 
-from gaik.software_components._log_names import error_text, file_tag
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS, media_input_args
 
 from .config import TranscriptionConfig
@@ -40,10 +40,40 @@ DECODE_TIMEOUT_SECONDS = 600
 # holds at every bitrate.
 _CHUNK_LENGTH_TOLERANCE_SECONDS = 1.0
 # The least audio a chunk must hold, and must add past the chunks before it, to be
-# kept: about one MP3 frame. FFmpeg encodes a chunk that starts past the end of the
-# audio as empty, and one that starts 0.1 s before it as 0.1 s, so a real tail shorter
-# than the tolerance above is still kept.
-_FRAME_MARGIN_SECONDS = 0.1
+# sent: OpenAI refuses audio under 0.1 s, and a model asked about a fraction of a second
+# of near-silence can make words up. FFmpeg encodes a chunk that starts past the end of
+# the audio as empty, so this only decides about a real tail, which at 0.25 s is part
+# of a word at most; a longer tail shorter than the tolerance above is kept.
+_MIN_TAIL_SECONDS = 0.25
+
+
+def _paths_tagged(exc: BaseException, *paths: str | PurePath | None, limit: int = 300) -> str:
+    """``"OSError: ... file 3f9a1c2b.mp3"``: the error with every spelling of each path,
+    and of the folder it is in, replaced by its tag.
+
+    Like :func:`~gaik.software_components._log_names.error_text`, but the spellings of
+    all the paths are replaced together, longest first: path by path, one path's name
+    tagged inside another's spelling first would leave that other's folders in the text.
+    """
+    text = f"{type(exc).__name__}: {exc}"
+    tags: dict[str, str] = {}
+    for path in paths:
+        if not path:
+            continue
+        whole = str(path)
+        pure = PurePath(whole)
+        tag = file_tag(whole)
+        for form in (whole, whole.replace("\\", "\\\\"), pure.name, pure.stem):
+            tags.setdefault(form, tag)
+        folder = str(pure.parent)
+        if folder not in (".", "", pure.anchor):
+            folder_tag = "folder " + file_tag(folder).split(" ", 1)[1]
+            for form in (folder, folder.replace("\\", "\\\\")):
+                tags.setdefault(form, folder_tag)
+    for form in sorted(tags, key=len, reverse=True):
+        if len(form) >= 3:
+            text = text.replace(form, tags[form])
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def _encoded_seconds(chunk_path: Path) -> float | None:
@@ -56,7 +86,9 @@ def _encoded_seconds(chunk_path: Path) -> float | None:
         return None
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         logger.warning(
-            "Could not read the length of %s: %s", file_tag(chunk_path), error_text(exc, chunk_path)
+            "Could not read the length of %s: %s",
+            file_tag(chunk_path),
+            _paths_tagged(exc, chunk_path),
         )
         return 0.0
 
@@ -540,7 +572,9 @@ def split_into_chunks(
             logger.error(
                 "Error creating chunk %d: %s",
                 spec.index + 1,
-                error_text(exc, audio_file_path, Path(audio_file_path).absolute(), spec.chunk_path),
+                _paths_tagged(
+                    exc, audio_file_path, Path(audio_file_path).absolute(), spec.chunk_path
+                ),
             )
             spec.chunk_path.unlink(missing_ok=True)
             return {"error": f"{type(exc).__name__}: {exc}", "index": spec.index}
@@ -550,7 +584,7 @@ def split_into_chunks(
         results = list(executor.map(_encode_chunk, specs))
 
     tolerance = _CHUNK_LENGTH_TOLERANCE_SECONDS
-    margin = _FRAME_MARGIN_SECONDS
+    least = _MIN_TAIL_SECONDS
 
     def _is_short(result: dict) -> bool:
         # A chunk whose length could not be read is retried like a short one.
@@ -593,7 +627,7 @@ def split_into_chunks(
     audio_ends = [
         specs[r["metadata"]["index"]].actual_start + r["seconds"]
         for r in encoded
-        if r["seconds"] > margin
+        if r["seconds"] > least
     ]
     if not audio_ends and not failed:
         raise RuntimeError(
@@ -617,13 +651,15 @@ def split_into_chunks(
                     "index": spec.index,
                 }
             )
-        elif r["seconds"] <= margin or chunk_end <= covered_until + margin:
-            # Nothing that the chunks before it do not already hold. The margin, not
-            # the tolerance: a recording that ends 0.8 s past the previous chunk's
-            # end overlap has 0.8 s more to transcribe.
+        elif r["seconds"] <= least or chunk_end <= covered_until + least:
+            # Nothing, or too little to send, that the chunks before it do not already
+            # hold. _MIN_TAIL_SECONDS, not the tolerance: a recording that ends 0.8 s
+            # past the previous chunk's end overlap has 0.8 s more to transcribe.
             logger.warning(
-                "Chunk %d holds no audio past the end of the recording, skipping",
+                "Chunk %d adds %.2f s past the chunks before it, at the end of the "
+                "recording; skipping",
                 spec.index + 1,
+                max(0.0, min(r["seconds"], chunk_end - covered_until)),
             )
             Path(r["file"]).unlink(missing_ok=True)
             continue

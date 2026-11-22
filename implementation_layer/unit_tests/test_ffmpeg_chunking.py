@@ -392,6 +392,36 @@ def test_a_tail_under_a_second_past_the_previous_chunk_is_kept(tmp_path: Path):
     assert _indices(chunks) == [0, 1, 2]
 
 
+@pytest.mark.parametrize(("last_seconds", "kept"), [(5.2, [0, 1]), (5.3, [0, 1, 2])])
+def test_a_tail_of_a_quarter_second_or_less_is_not_sent(
+    tmp_path: Path, last_seconds: float, kept: list[int]
+):
+    # The third chunk (115 s on) adds 0.2 s or 0.3 s past the second's end at 120 s:
+    # a model asked about 0.2 s of near-silence can make words up.
+    chunks, _ = _split(tmp_path, {"chunk_02.mp3": [last_seconds]})
+
+    assert _indices(chunks) == kept
+
+
+def test_a_chunk_that_holds_only_a_fraction_of_a_second_is_not_sent(tmp_path: Path):
+    # Two minutes in the header, no overlap, and the audio ends 0.11 s into the second
+    # chunk: it alone would be sent with 0.11 s of audio.
+    specs = compute_chunk_specs(120.0, 1, 0.0, tmp_path, "rec")
+    lengths = {"rec_chunk_01.mp3": 60.0, "rec_chunk_02.mp3": 0.11}
+
+    def encoder(cmd, **_kwargs):
+        Path(cmd[-1]).write_bytes(b"\x00" * int(lengths[Path(cmd[-1]).name] * _BYTES_PER_SECOND))
+        process = MagicMock()
+        process.returncode = 0
+        process.communicate.return_value = ("", "")
+        return process
+
+    with _FFMPEG_AVAILABLE, patch("subprocess.Popen", side_effect=encoder):
+        chunks = split_into_chunks(str(tmp_path / "rec.mp3"), specs)
+
+    assert _indices(chunks) == [0]
+
+
 def _exact_encoder(cmd, **_kwargs):
     """A fake FFmpeg that encodes exactly the -t seconds it is asked for."""
     seconds = float(cmd[cmd.index("-t") + 1])
@@ -511,3 +541,39 @@ def test_an_encode_that_cannot_start_logs_no_file_name(tmp_path: Path, caplog):
 
     _assert_no_name_in_logs(caplog, recording)
     assert any("FileNotFoundError" in record.getMessage() for record in caplog.records)
+
+
+def test_a_relative_input_and_a_private_chunk_folder_stay_out_of_the_log(
+    tmp_path: Path, caplog, monkeypatch
+):
+    # The input is given relative to its folder, whose name holds the input's stem, and
+    # the chunks go to a temporary folder under the user's home, as on Windows.
+    home = tmp_path / "Matti Virtanen"
+    folder = home / "interviews"
+    folder.mkdir(parents=True)
+    recording = folder / "interview.mp3"
+    recording.write_bytes(b"\x00" * 10)
+    chunk_dir = home / "AppData" / "Local" / "Temp" / "parallel_transcriber_chunks_abc"
+    chunk_dir.mkdir(parents=True)
+    specs = compute_chunk_specs(120.0, 1, 5.0, chunk_dir, recording.stem)
+    monkeypatch.chdir(folder)
+
+    def cannot_start(cmd, **_kwargs):
+        # Chunk 1 names the absolute input, chunk 2 its own chunk file.
+        named = str(recording) if cmd[-1].endswith("_01.mp3") else cmd[-1]
+        raise OSError(2, "No such file or directory", named)
+
+    with (
+        caplog.at_level(logging.DEBUG),
+        _FFMPEG_AVAILABLE,
+        patch("subprocess.Popen", side_effect=cannot_start),
+        pytest.raises(RuntimeError),
+    ):
+        split_into_chunks("interview.mp3", specs)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("Error creating chunk 1" in m for m in messages)
+    assert any("Error creating chunk 2" in m for m in messages)
+    for message in messages:
+        for private in (str(tmp_path), str(home), "Matti", "Virtanen", "interview"):
+            assert private not in message, message
