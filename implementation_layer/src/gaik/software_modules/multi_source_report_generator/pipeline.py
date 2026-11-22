@@ -1441,6 +1441,8 @@ def _replace_earlier_outputs(out: Path, written: list[Path]) -> None:
         key = _same_file_key(path)
         if key is None or key in written_keys:
             continue  # never a file this run wrote, whatever the record says
+        if key != os.path.normcase(str(base.joinpath(*pure.parts))):
+            continue  # a link or junction somewhere under the folder, even one inside it
         try:
             if path.is_symlink() or not path.is_file():
                 continue

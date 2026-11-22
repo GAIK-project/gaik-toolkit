@@ -454,3 +454,15 @@ def test_a_section_folder_in_another_case_is_still_cleaned_up(tmp_path, client):
     assert "sections/02_walls.md" in record["files"]
     _run(tmp_path, ["Roof"])
     assert not (out / "sections" / "02_walls.md").exists()
+
+
+def test_the_record_removes_nothing_through_a_folder_linked_inside_the_folder(tmp_path, client):
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    _run(tmp_path, ["Roof", "Walls"])
+    (out / "sections").rename(out / "real_sections")
+    _link_dir(out / "sections", out / "real_sections")
+
+    _run(tmp_path, ["Roof"])
+
+    assert (out / "real_sections" / "02_walls.md").exists()

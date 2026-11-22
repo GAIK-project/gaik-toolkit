@@ -712,7 +712,8 @@ replaces the first one's generated files; to keep both, give each report its own
 folder. A file is removed only if the record lists it, it is one of the names the
 generator writes (`report.md`, `report.docx`, `usage.json`, `evidence_index.json`,
 `evidence/normalized_sources.md`, `sections/*.md`, `evidence/curated_sections/*.md`),
-its content is still what that run wrote, it is not a link, it resolves inside the
+its content is still what that run wrote, no part of its path under the folder is a
+link or junction, it resolves inside the
 folder, and it is not a file this run wrote. Your own files, a file you edited, and
 files from a run before the record existed stay, and a warning counts them. A run that
 fails removes nothing; with `curate_evidence=True` its curated briefs may already have
