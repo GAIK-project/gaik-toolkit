@@ -15,6 +15,7 @@ from ..input_limits import InputLimits
 
 try:
     from docx import Document
+    from docx.oxml.ns import qn
     from docx.table import Table
 
     DOCX_AVAILABLE = True
@@ -26,6 +27,34 @@ logger = logging.getLogger(__name__)
 
 _HEADING_LEVELS = {"Title": 1, **{f"Heading {n}": n for n in range(1, 7)}}
 
+# Elements that hold paragraphs, table rows, cells or runs that python-docx only reads
+# as direct children: content controls (w:sdt), tracked insertions and moves (w:ins,
+# w:moveTo), custom XML and smart tags, and simple fields such as a merge field.
+# Tracked deletions (w:del, w:moveFrom) stay out, as Word shows the document.
+_WRAPPERS = ("w:sdt", "w:ins", "w:moveTo", "w:customXml", "w:smartTag", "w:fldSimple")
+_WRAPPER_PROPERTIES = ("w:sdtPr", "w:sdtEndPr", "w:customXmlPr", "w:smartTagPr", "w:fldData")
+
+
+def _unwrap_content(body) -> None:
+    """Put the content of each wrapper element (see ``_WRAPPERS``) in its place.
+
+    A content control showing its placeholder text ("Click here to enter text") is
+    empty, so it is dropped.
+    """
+    properties = {qn(tag) for tag in _WRAPPER_PROPERTIES}
+    for element in body.xpath(" | ".join(f".//{tag}" for tag in _WRAPPERS)):
+        parent = element.getparent()
+        if parent is None:
+            continue
+        if element.tag == qn("w:sdt"):
+            content = element.find(qn("w:sdtContent"))
+            placeholder = element.find(f"{qn('w:sdtPr')}/{qn('w:showingPlcHdr')}")
+            children = [] if content is None or placeholder is not None else list(content)
+        else:
+            children = [child for child in element if child.tag not in properties]
+        index = parent.index(element)
+        parent[index : index + 1] = children
+
 
 class DocxParser:
     """
@@ -33,7 +62,8 @@ class DocxParser:
 
     Features:
     - Fast local DOCX/DOC parsing without external APIs
-    - Extract text from paragraphs and tables
+    - Extract text from paragraphs and tables, including the text in content
+      controls and tracked insertions (not tracked deletions), in document order
     - Simple text extraction or structured output with formatting info
     - Support for Word 2007+ documents (.docx)
     - Refuses a file over its input limits (size, unpacked size) with
@@ -98,6 +128,7 @@ class DocxParser:
 
         try:
             doc = Document(file_path)
+            _unwrap_content(doc.element.body)
 
             if keep_structure:
                 text_content = self._extract_markdown_docx(doc)
