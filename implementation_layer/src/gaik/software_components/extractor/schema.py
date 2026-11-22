@@ -1557,7 +1557,23 @@ def _heads_own_line(line: str, start: int, end: int) -> bool:
     return not rest or rest[0] in _OWN_LINE_SEPARATORS
 
 
-def _field_specific_context(field: FieldSpec, original_text: str) -> str:
+def _label_re(field_name: str) -> re.Pattern[str]:
+    """How the task text names a field.
+
+    As prose ("delivery date"), as the identifier itself ("delivery_date", often
+    in backticks), in camelCase ("deliveryDate") or with a possessive
+    ("Patient's date of birth" for ``patient_date_of_birth``).
+    """
+    words = [re.escape(word) + r"(?:['’]s)?" for word in field_name.split("_")]
+    return re.compile(r"\b" + r"[\s_\-]*".join(words) + r"\b", re.IGNORECASE)
+
+
+_SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+")
+
+
+def _field_specific_context(
+    field: FieldSpec, original_text: str, other_fields: list[FieldSpec] | tuple = ()
+) -> str:
     """Return task text scoped to ``field`` instead of the whole task.
 
     The requirements LLM is allowed to summarize field descriptions, so an
@@ -1565,42 +1581,74 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
     task. Search the field's own clause/bullet and never borrow a neighboring
     field's format. This prevents ``Delivery Date (DD/MM/YYYY)`` from silently
     changing ``Order Date`` as well.
+
+    ``other_fields`` are the other fields of the same requirements. A mention of
+    this field inside a longer mention of another one is the other field's ("Date"
+    in "Date of birth" for a field ``date``), and on the field's own line a later
+    sentence that names another field is about that field ("Keep `po_number`
+    exactly as written"). Every mention of the field on a line counts.
+
+    Known limits (issue #97): a paragraph under a field's heading counts whole
+    until the next blank line or list item, also a sentence about something else
+    that names no other field ("The log file prints its timestamps as
+    DD/MM/YYYY"); a format that the field's own clause mentions for another value
+    ("not the delivery date (DD/MM/YYYY)") counts; and the parsed description,
+    the last fallback, cannot tell an output format from one it only mentions.
     """
     pieces: list[str] = []
-    # The task may name the field as prose ("delivery date"), as the identifier
-    # itself ("delivery_date", often in backticks) or in camelCase
-    # ("deliveryDate"), and in its own letters: the name is ASCII
-    # ("toimituspaivamaara"), so the task's letters are folded the same way
-    # ("toimituspäivämäärä") before the search.
-    label_re = re.compile(
-        r"\b" + r"[\s_\-]*".join(re.escape(word) for word in field.field_name.split("_")) + r"\b",
-        re.IGNORECASE,
-    )
+    # The name is ASCII ("toimituspaivamaara"), so the task's letters are folded
+    # the same way ("toimituspäivämäärä") before the search.
+    label_re = _label_re(field.field_name)
+    other_res = [_label_re(f.field_name) for f in other_fields if f.field_name != field.field_name]
     lines = _fold_letters(original_text).splitlines()
 
+    def names_another_field(text: str) -> bool:
+        return any(other.search(text) for other in other_res)
+
+    def about_this_field(text: str) -> str:
+        """``text`` without its later sentences that name another field."""
+        sentences = _SENTENCE_END_RE.split(text)
+        kept = sentences[:1] + [s for s in sentences[1:] if not names_another_field(s)]
+        return " ".join(kept)
+
     for index, line in enumerate(lines):
-        match = label_re.search(line)
-        if not match:
+        # A longer mention of another field that holds this one ("Date of birth").
+        taken = [(m.start(), m.end()) for other in other_res for m in other.finditer(line)]
+        mentions = [
+            match
+            for match in label_re.finditer(line)
+            if not any(
+                start <= match.start()
+                and match.end() <= end
+                and end - start > match.end() - match.start()
+                for start, end in taken
+            )
+        ]
+        if not mentions:
             continue
 
-        if _heads_own_line(line, match.start(), match.end()):
-            # The field heads its own bullet, numbered item or heading
-            # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
-            # line is about this field, commas included.
-            pieces.append(line[match.start() :])
-        else:
+        for number, match in enumerate(mentions):
+            if number == 0 and _heads_own_line(line, match.start(), match.end()):
+                # The field heads its own bullet, numbered item or heading
+                # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
+                # line is about this field, commas included.
+                pieces.append(about_this_field(line[match.start() :]))
+                break
             # A prose line often lists several fields. Keep only this field's
             # comma/semicolon/period-delimited clause so one field's
             # parenthesized format cannot leak into another field on the same
-            # line.
+            # line. A period ends the clause only at a sentence end, not inside
+            # a format such as DD.MM.YYYY.
             clause_chars: list[str] = []
             depth = 0
-            for char in line[match.start() :]:
+            rest = line[match.start() :]
+            for position, char in enumerate(rest):
                 if char in "([":
                     depth += 1
                 elif char in ")]" and depth:
                     depth -= 1
-                if depth == 0 and char in ",;." and clause_chars:
+                ends_sentence = char == "." and rest[position + 1 : position + 2] in ("", " ", "\t")
+                if depth == 0 and (char in ",;" or ends_sentence) and clause_chars:
                     break
                 clause_chars.append(char)
             pieces.append("".join(clause_chars))
@@ -1611,7 +1659,7 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
             for following in lines[index + 1 :]:
                 if not following.strip() or _ITEM_START_RE.match(following):
                     break
-                pieces.append(following)
+                pieces.append(about_this_field(following))
 
     return "\n".join(piece for piece in pieces if piece)
 
@@ -1940,7 +1988,7 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
     keep_dates_rule = _keep_dates_rule(original_text)
 
     for field in requirements.fields:
-        field_context = _field_specific_context(field, original_text)
+        field_context = _field_specific_context(field, original_text, requirements.fields)
 
         # ``pattern`` and ``format`` remain permissive strings in the
         # LLM-facing FieldSpec so a non-OpenAI provider cannot fail validation

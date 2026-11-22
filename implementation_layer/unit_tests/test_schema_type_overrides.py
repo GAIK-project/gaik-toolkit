@@ -755,3 +755,73 @@ def test_a_rule_in_one_collections_section_does_not_reach_the_parents_dates():
 
     assert parent.fields[1].field_type == "date"
     assert row.fields[0].field_type == "str"
+
+
+# Issue #97: cases where a field took a format or type the task did not ask for.
+def test_a_sentence_about_another_field_on_the_fields_own_line_does_not_apply_to_it():
+    requirements = _requirements(
+        FieldSpec(field_name="order_date", field_type="date", description="Order date"),
+        FieldSpec(field_name="po_number", field_type="str", description="PO number"),
+    )
+    task = (
+        "- `order_date`: the order date, formatted DD/MM/YYYY. "
+        "Keep `po_number` exactly as written.\n"
+    )
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    by_name = {field.field_name: field for field in requirements.fields}
+    assert by_name["order_date"].field_type == "date"
+    assert by_name["order_date"].format == "%d/%m/%Y"
+    assert by_name["po_number"].field_type == "str"
+
+
+def test_a_possessive_label_finds_the_fields_own_line():
+    requirements = _requirements(
+        FieldSpec(
+            field_name="patient_date_of_birth", field_type="date", description="Date of birth"
+        )
+    )
+
+    _apply_type_overrides(requirements, original_text="- Patient's date of birth (DD-MM-YYYY)")
+
+    assert requirements.fields[0].format == "%d-%m-%Y"
+
+
+def test_a_short_label_inside_a_neighbours_longer_label_is_the_neighbours():
+    requirements = _requirements(
+        FieldSpec(field_name="date", field_type="date", description="Date"),
+        FieldSpec(field_name="date_of_birth", field_type="date", description="Date of birth"),
+    )
+    task = "- Date (DD.MM.YYYY)\n- Date of birth (DD/MM/YYYY)\n"
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    by_name = {field.field_name: field for field in requirements.fields}
+    assert by_name["date"].format == "%d.%m.%Y"
+    assert by_name["date_of_birth"].format == "%d/%m/%Y"
+
+
+def test_every_mention_of_a_field_on_a_line_counts():
+    requirements = _requirements(
+        FieldSpec(field_name="invoice_date", field_type="date", description="Invoice date")
+    )
+    task = "Extract the invoice date. Write the invoice date as DD.MM.YYYY.\n"
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    assert requirements.fields[0].format == "%d.%m.%Y"
+
+
+def test_a_prose_clause_keeps_a_dotted_format_whole():
+    requirements = _requirements(
+        FieldSpec(field_name="order_date", field_type="date", description="Order date"),
+        FieldSpec(field_name="delivery_date", field_type="date", description="Delivery date"),
+    )
+    task = "Extract the order date as DD.MM.YYYY, and the delivery date.\n"
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    by_name = {field.field_name: field for field in requirements.fields}
+    assert by_name["order_date"].format == "%d.%m.%Y"
+    assert by_name["delivery_date"].format is None
