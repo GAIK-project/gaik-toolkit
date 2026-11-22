@@ -1,0 +1,70 @@
+{
+  "format": "gaik-saved-schema",
+  "version": 1,
+  "root": "Site_survey_Extraction",
+  "models": [
+    {
+      "name": "Site_survey_Extraction",
+      "doc": "Extraction model for Site survey",
+      "extra": "forbid",
+      "fields": [
+        {
+          "name": "rating",
+          "type": {
+            "type": "optional",
+            "inner": {
+              "type": "literal",
+              "values": [
+                "",
+                "1",
+                "2",
+                "3",
+                "4",
+                "5"
+              ]
+            }
+          },
+          "description": "Overall rating from 1 to 5",
+          "default": null
+        },
+        {
+          "name": "moisture_level",
+          "type": {
+            "type": "optional",
+            "inner": {
+              "type": "literal",
+              "values": [
+                "",
+                "0.5",
+                "1"
+              ]
+            }
+          },
+          "description": "Moisture level: 0.5 or 1",
+          "default": null
+        },
+        {
+          "name": "hazard_types",
+          "type": {
+            "type": "literal",
+            "values": [
+              "",
+              "fire",
+              "chemical",
+              "electrical"
+            ]
+          },
+          "description": "Hazards seen: fire, chemical or electrical",
+          "default_factory": "list"
+        },
+        {
+          "name": "inspector",
+          "type": {
+            "type": "str"
+          },
+          "description": "Inspector's name"
+        }
+      ]
+    }
+  ]
+}

@@ -745,7 +745,9 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
     noise = re.compile(r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]")
     single = re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
 
-    def clean(v: Any) -> Any:
+    # Named like gaik's cleaner: saved_schema refuses a Decimal cleaner under
+    # another name, since the rebuilt field uses gaik's.
+    def _clean_decimal_string(v: Any) -> Any:
         if not isinstance(v, str):
             return v
         text = noise.sub("", v.strip()).strip()
@@ -753,11 +755,13 @@ def _model_from_spec(target_output_spec: dict[str, Any], name: str) -> Any:
             return None
         return text.replace(",", "")
 
-    decimal_field = Annotated[Decimal, WithJsonSchema({"type": "string"}), BeforeValidator(clean)]
+    decimal_field = Annotated[
+        Decimal, WithJsonSchema({"type": "string"}), BeforeValidator(_clean_decimal_string)
+    ]
     optional_decimal_field = Annotated[
         Decimal | None,
         WithJsonSchema({"anyOf": [{"type": "string"}, {"type": "null"}]}),
-        BeforeValidator(clean),
+        BeforeValidator(_clean_decimal_string),
     ]
     simple = {"str": str, "int": int, "float": float, "bool": bool, "list[str]": list[str]}
 

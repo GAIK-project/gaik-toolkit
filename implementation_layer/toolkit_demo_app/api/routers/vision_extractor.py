@@ -242,6 +242,21 @@ class VisionExtractResponse(BaseModel):
     usage: UsageMetadata | None = None
 
 
+def _with_uploaded_names(node: Any, uploaded_names: dict[str, str]) -> Any:
+    """Verification entries with ``file`` as the uploaded name, not the temporary one.
+
+    Only an entry of the text-layer check (it has ``found_in_text``) is changed, so
+    an extracted field that happens to be called ``file`` keeps its value.
+    """
+    if isinstance(node, list):
+        return [_with_uploaded_names(item, uploaded_names) for item in node]
+    if not isinstance(node, dict):
+        return node
+    if "found_in_text" in node and isinstance(node.get("file"), str):
+        return {**node, "file": uploaded_names.get(node["file"], node["file"])}
+    return {key: _with_uploaded_names(value, uploaded_names) for key, value in node.items()}
+
+
 def _usage_from(usage: Any) -> UsageMetadata | None:
     if usage is None:
         return None
@@ -549,6 +564,7 @@ async def extract_vision(
 
     temp_paths: list[Path] = []
     documents: list[UploadedDocument] = []
+    uploaded_names: dict[str, str] = {}
     try:
         for uploaded_file in files:
             content = await validate_file_size(uploaded_file)
@@ -559,6 +575,7 @@ async def extract_vision(
                 tmp.write(content)
                 temp_paths.append(Path(tmp.name))
             documents.append(UploadedDocument(uploaded_file.filename or "", Path(tmp.name)))
+            uploaded_names[Path(tmp.name).name] = uploaded_file.filename or ""
 
         try:
             from gaik.software_components.vision_extractor import VisionExtractor
@@ -617,8 +634,10 @@ async def extract_vision(
                 status_code=500, detail=f"Vision extraction failed: {provider_error_detail(exc)}"
             ) from exc
 
-        data = dict(result.data)
-        verification = result.verification
+        # The text-layer check names the file a value is in; the extractor read
+        # the server's temporary copy, so give the user's file name back.
+        data = _with_uploaded_names(dict(result.data), uploaded_names)
+        verification = _with_uploaded_names(result.verification, uploaded_names)
         sources = None
         if include_sources:
             raw_sources = data.pop(SOURCES_FIELD, None)
