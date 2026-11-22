@@ -600,8 +600,9 @@ class VisionExtractionResult:
 
     With ``include_verification=True`` every checked field carries
     ``confidence_score`` and ``confidence_reason`` (the model's own rating, from
-    the same call that extracted the value) and ``found_in_text`` and ``page``
-    (whether the value is written in a PDF's text layer, and where). See
+    the same call that extracted the value) and ``found_in_text``, ``file`` and
+    ``page`` (whether the value is written in a PDF's text layer, in which file,
+    and on which page of that file). See
     :mod:`gaik.software_components.vision_extractor.text_layer`.
     """
 
@@ -811,7 +812,7 @@ class VisionExtractor:
             # confidence_score is the model's own rating; the text layer is an
             # independent check of whether the value is written in the PDF.
             verification = text_layer.annotate(
-                result_dict, verification, text_layer.read_pdf_pages(file_path_list)
+                result_dict, verification, text_layer.read_pdf_page_texts(file_path_list)
             )
             result_dict = _combine_with_verification(result_dict, verification)
 
