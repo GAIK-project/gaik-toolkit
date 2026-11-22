@@ -98,6 +98,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import codecs
 import math
 import os
 import re
@@ -555,18 +556,35 @@ def _dollars(value: str) -> float:
     return amount
 
 
+def _is_utf8(encoding: str | None) -> bool:
+    try:
+        return bool(encoding) and codecs.lookup(encoding).name == "utf-8"
+    except LookupError:
+        return False
+
+
 def use_utf8_output() -> None:
     """Print every character the agent sends, also to a file or a pipe.
 
     On Windows, output that is not a console is written in the ANSI code page
     (cp1252), which has no ≥ or →, so the first such character the agent quoted
-    ended the run with a UnicodeEncodeError. A character the terminal cannot
-    show now comes out as a replacement instead.
+    ended the run with a UnicodeEncodeError. Output to a file or a pipe is now
+    written in UTF-8. A terminal keeps the encoding it shows: a UTF-8 one is left
+    as it is, and one in another encoding prints a character it has no sign for
+    as a replacement instead of stopping. A stream that is not a text stream
+    (none at all under pythonw) is left as it is.
     """
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
-        if reconfigure is not None:
-            reconfigure(encoding="utf-8", errors="replace")
+        if reconfigure is None:
+            continue
+        try:
+            if not stream.isatty():
+                reconfigure(encoding="utf-8", errors="replace")
+            elif not _is_utf8(getattr(stream, "encoding", None)):
+                reconfigure(errors="replace")
+        except (OSError, ValueError):  # a closed stream: nothing is printed to it
+            continue
 
 
 def parse_args() -> argparse.Namespace:

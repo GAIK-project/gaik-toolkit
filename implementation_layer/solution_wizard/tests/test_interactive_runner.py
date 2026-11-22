@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import io
 import json
 import os
 import sys
@@ -188,6 +189,62 @@ def test_output_to_a_file_or_a_pipe_takes_any_character(tmp_path, monkeypatch, s
     print("≥ 0.5")
     sys.stdout.flush()
     assert out.getvalue().decode("utf-8").strip() == "≥ 0.5"
+
+
+class _Terminal(io.BytesIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def _terminal(monkeypatch, encoding: str):
+    raw = _Terminal()
+    stream = io.TextIOWrapper(raw, encoding=encoding)
+    monkeypatch.setattr(sys, "stdout", stream)
+    monkeypatch.setattr(sys, "stderr", io.TextIOWrapper(_Terminal(), encoding=encoding))
+    return stream, raw
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "UTF8", "cp65001"])
+def test_a_utf8_terminal_is_left_as_it_is(monkeypatch, encoding) -> None:
+    stream, raw = _terminal(monkeypatch, encoding)
+    before = (stream.encoding, stream.errors)
+
+    runner.use_utf8_output()
+
+    assert (sys.stdout.encoding, sys.stdout.errors) == before == (encoding, "strict")
+    print("≥ ä")
+    sys.stdout.flush()
+    assert raw.getvalue().decode("utf-8").strip() == "≥ ä"
+
+
+def test_a_terminal_in_another_encoding_keeps_it_and_replaces_what_it_cannot_show(
+    monkeypatch,
+) -> None:
+    """Writing UTF-8 to a cp850 console would turn every ä into two wrong signs."""
+    stream, raw = _terminal(monkeypatch, "cp850")
+
+    runner.use_utf8_output()
+
+    assert (sys.stdout.encoding, sys.stdout.errors) == ("cp850", "replace")
+    print("≥ ä")
+    sys.stdout.flush()
+    assert raw.getvalue().decode("cp850").strip() == "? ä"
+
+
+@pytest.mark.parametrize("stream", [None, "string", "closed"])
+def test_output_that_is_no_text_stream_is_left_as_it_is(monkeypatch, stream) -> None:
+    """pythonw has no stdout at all, and a caller may give one without reconfigure."""
+    if stream == "string":
+        stream = io.StringIO()
+    elif stream == "closed":
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+        stream.close()
+    monkeypatch.setattr(sys, "stdout", stream)
+    monkeypatch.setattr(sys, "stderr", stream)
+
+    runner.use_utf8_output()
+
+    assert sys.stdout is stream
 
 
 # --- the guard through the SDK's own control protocol ------------------------
