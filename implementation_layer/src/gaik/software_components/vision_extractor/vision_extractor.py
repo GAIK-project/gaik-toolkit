@@ -1092,7 +1092,7 @@ class VisionExtractor:
         coerce_fields(result_dict, requirements)
         for key, value in result_dict.items():
             # The rows of a flat record's own list[dict] field are not its records.
-            if _holds_items(key, value, requirements):
+            if _holds_items(key, value, requirements, result_dict):
                 for row in value:
                     if isinstance(row, dict):
                         coerce_fields(row, requirements)
@@ -1411,14 +1411,14 @@ class VisionExtractor:
 
         has_nested = False
         for key, value in list(result_dict.items()):
-            if _holds_items(key, value, requirements):
+            if _holds_items(key, value, requirements, result_dict):
                 has_nested = True
                 result_dict[key] = [apply_field_policies(item, requirements) for item in value]
         if not has_nested:
             result_dict = apply_field_policies(result_dict, requirements)
 
         for key, value in list(result_dict.items()):
-            if _holds_items(key, value, requirements):
+            if _holds_items(key, value, requirements, result_dict):
                 result_dict[key] = [normalize_extracted_data(item, requirements) for item in value]
         result_dict = normalize_extracted_data(result_dict, requirements)
         return result_dict

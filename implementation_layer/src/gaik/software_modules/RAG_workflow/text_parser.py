@@ -13,6 +13,7 @@ import os
 import re
 from pathlib import Path
 
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits
 
 try:
@@ -65,11 +66,16 @@ class TextRagParser:
         Raises:
             ValueError: An unsupported file type, or a file without any text (a
                 scanned PDF needs ``parser="vision"``).
+            FileTypeMismatchError: The content is not what the extension says, such
+                as an image or an HTML page named ``.pdf`` (a ``ValueError``).
             InputLimitError: The file is over one of ``limits``.
         """
         path = Path(path)
         name = document_name or os.path.splitext(path.name)[0]
         if path.suffix.lower() in SUFFIXES:
+            # The size first: the content check reads the start of the file.
+            self.limits.check_file_size(path)
+            check_file_type(path)
             self.limits.check_document(path)
         pages = self._pages(path)
         if not any(text.strip() for _, text in pages):

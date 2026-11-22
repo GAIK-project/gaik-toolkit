@@ -186,3 +186,32 @@ def test_docling_structured_text_gives_a_table_caption_and_footnote_once():
     assert text.count("Table 1: Prices") == 1
     assert text.count("Source: shop") == 1
     assert text.endswith("After")
+
+
+def test_docling_rag_parser_takes_table_structure_off():
+    pytest.importorskip("docling")
+    from gaik.software_components.RAG.rag_parser_docling.parser import DoclingRagParser
+
+    parser = DoclingRagParser(
+        enable_ocr=False,
+        enable_table_structure=False,
+        enable_formula_enrichment=False,
+        verbose=False,
+    )
+
+    assert parser.pipeline_options.do_table_structure is False
+
+
+def test_vision_rag_parser_takes_table_structure_off():
+    pytest.importorskip("docling")
+    from gaik.software_components.RAG.rag_parser_vision.parser import VisionRagParser
+
+    parser = VisionRagParser(
+        vision_config={"model": "gpt-test", "use_azure": False, "api_key": "test"},
+        enable_ocr=False,
+        enable_table_structure=False,
+        enable_formula_enrichment=False,
+        verbose=False,
+    )
+
+    assert parser.pipeline_options.do_table_structure is False

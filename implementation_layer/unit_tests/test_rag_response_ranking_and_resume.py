@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 
 import pandas as pd
+import pytest
 from gaik.software_components.evaluators.rag_response_evaluator import (
     DEFAULT_PAIRWISE_SPEC,
     CorrectnessScore,
@@ -165,3 +166,73 @@ def test_pairwise_resume_takes_the_last_saved_row_and_judges_an_incomplete_one()
 
     assert comparisons["winner"].tolist()[0] == "A"
     assert pd.isna(comparisons["winner"].tolist()[1])  # judged again
+
+
+def _concatenated(first, second) -> pd.DataFrame:
+    """Two frames joined with pd.concat: their index labels repeat (0, 1, 0, 1)."""
+    return pd.concat([_questions(first), _questions(second)])
+
+
+@pytest.mark.parametrize("concurrency", [1, 3], ids=["sequential", "concurrent"])
+def test_a_frame_whose_index_repeats_a_label_is_scored_row_by_row(concurrency) -> None:
+    client = _Scores()
+    evaluator = RAGResponseEvaluator(client, max_concurrency=concurrency)
+
+    result = evaluator.evaluate(_concatenated([1, 2], [3, 0]))
+
+    assert client.calls == 4
+    assert result.scored_df.index.tolist() == [0, 1, 0, 1]  # the caller's index stays
+    assert result.scored_df["x_response_coverage_score"].astype(int).tolist() == [1, 2, 3, 0]
+    assert result.scored_df["x_response_reason"].str.contains("question 3").tolist() == [
+        False,
+        False,
+        True,
+        False,
+    ]
+    assert result.per_system[0].n == 4
+
+
+@pytest.mark.parametrize("concurrency", [1, 3], ids=["sequential", "concurrent"])
+def test_resuming_a_frame_whose_index_repeats_a_label_keeps_the_resumed_rows(
+    concurrency,
+) -> None:
+    client = _Scores()
+    evaluator = RAGResponseEvaluator(client, max_concurrency=concurrency)
+    saved = evaluator.evaluate(_questions([1, 2])).scored_df
+    calls_before = client.calls
+
+    # Rows 0 and 1 of the first frame are resumed; label 0 and 1 repeat for 3 and 0.
+    result = evaluator.evaluate(_concatenated([1, 2], [3, 0]), resume_from=saved)
+
+    assert client.calls - calls_before == 2  # only questions 3 and 0
+    assert result.scored_df["x_response_coverage_score"].astype(int).tolist() == [1, 2, 3, 0]
+
+
+def test_pairwise_resume_with_questions_that_match_after_a_csv_round_trip() -> None:
+    from gaik.software_components.evaluators.rag_response_evaluator import _init_pairwise_df
+
+    aspects = DEFAULT_PAIRWISE_SPEC.aspect_fields
+    done = {"system_a": "x_response", "system_b": "y_response"}
+    done |= {f"{aspect}_a": 3 for aspect in aspects} | {f"{aspect}_b": 3 for aspect in aspects}
+    # 101 and "101", "q\r\n2" and "q\n2" are one question each once read back from a CSV.
+    saved = pd.DataFrame(
+        [
+            {"question": 101, **done, "winner": "B"},
+            {"question": "101", **done, "winner": "A"},
+            {"question": "q\r\n2", **done, "winner": "B"},
+            {"question": "q\n2", **done, "winner": "tie"},
+        ]
+    )
+    frame = pd.DataFrame(
+        {
+            "question": ["101", "q\n2"],
+            "x_response": ["x " * 20] * 2,
+            "y_response": ["y " * 20] * 2,
+        }
+    )
+
+    comparisons = _init_pairwise_df(
+        frame, "question", [("x_response", "y_response")], DEFAULT_PAIRWISE_SPEC, saved
+    )
+
+    assert comparisons["winner"].tolist() == ["A", "tie"]  # the last saved row counts

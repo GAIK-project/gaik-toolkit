@@ -565,3 +565,99 @@ def test_utf16_text_with_a_surrogate_pair_at_the_end_of_the_sample_is_text(tmp_p
     data = text.encode("utf-16-le")
     assert data[8188:8192] == "\U0001f601".encode("utf-16-le")
     assert detect_file_type(_file(tmp_path, "notes.txt", data)) == "text"
+
+
+# -- the RAG parsers -----------------------------------------------------------
+
+
+def _docling_rag_parser(limits=None):
+    pytest.importorskip("docling")
+    from gaik.software_components.input_limits import InputLimits
+    from gaik.software_components.RAG.rag_parser_docling.parser import DoclingRagParser
+
+    parser = object.__new__(DoclingRagParser)
+    parser.limits = limits or InputLimits.local_parsing()
+    parser.converter = _Converter()
+    return parser
+
+
+def _vision_rag_parser(limits=None):
+    pytest.importorskip("docling")
+    from gaik.software_components.input_limits import InputLimits
+    from gaik.software_components.RAG.rag_parser_vision.parser import VisionRagParser
+
+    parser = object.__new__(VisionRagParser)
+    parser.limits = limits or InputLimits.local_parsing()
+    parser.verbose = False
+    parser.converter = _Converter()
+    return parser
+
+
+def _text_rag_parser(limits=None):
+    pytest.importorskip("langchain_core")
+    from gaik.software_modules.RAG_workflow.text_parser import TextRagParser
+
+    return TextRagParser(limits=limits)
+
+
+_RAG_BUILDERS = {
+    "docling_rag": (_docling_rag_parser, lambda parser, path: parser._convert(str(path))),
+    "vision_rag": (
+        _vision_rag_parser,
+        lambda parser, path: parser.convert_doc_to_chunks_with_vision(str(path)),
+    ),
+    "text_rag": (_text_rag_parser, lambda parser, path: parser.convert_doc_to_chunks(path)),
+}
+
+
+@pytest.mark.parametrize("kind", sorted(_RAG_BUILDERS))
+@pytest.mark.parametrize(
+    ("data", "detected"),
+    [(PNG, "a PNG image"), (DOCX, "a DOCX document"), (HTML, "plain text")],
+    ids=["png", "docx", "html"],
+)
+def test_the_rag_parsers_refuse_another_type_named_pdf(tmp_path, kind, data, detected):
+    pytest.importorskip("pymupdf")
+    build, parse = _RAG_BUILDERS[kind]
+    parser = build()
+    with pytest.raises(FileTypeMismatchError, match=rf"'report\.pdf' is {detected}"):
+        parse(parser, _file(tmp_path, "report.pdf", data))
+    if kind != "text_rag":
+        assert parser.converter.calls == []
+
+
+@pytest.mark.parametrize("kind", ["docling_rag", "vision_rag"])
+@pytest.mark.parametrize(
+    ("name", "data"), [("notes.docx", DOCX), ("scan.png", PNG)], ids=["docx", "png"]
+)
+def test_the_docling_rag_parsers_still_convert_what_docling_reads(tmp_path, kind, name, data):
+    # Docling converts DOCX and images too: content that matches its extension
+    # reaches the converter (the fake raises AssertionError once it runs).
+    build, parse = _RAG_BUILDERS[kind]
+    parser = build()
+    with pytest.raises(AssertionError, match="the converter ran"):
+        parse(parser, _file(tmp_path, name, data))
+    assert len(parser.converter.calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [("notes.docx", XLSX), ("notes.md", PNG), ("notes.txt", PDF)],
+    ids=["workbook-as-docx", "image-as-md", "pdf-as-txt"],
+)
+def test_the_text_rag_parser_refuses_a_document_of_another_type(tmp_path, name, data):
+    with pytest.raises(FileTypeMismatchError, match=rf"'{name}' is"):
+        _text_rag_parser().convert_doc_to_chunks(_file(tmp_path, name, data))
+
+
+@pytest.mark.parametrize("kind", sorted(_RAG_BUILDERS))
+def test_the_rag_parsers_check_the_size_first(tmp_path, monkeypatch, kind):
+    from gaik.software_components.input_limits import InputLimitError, InputLimits
+
+    build, parse = _RAG_BUILDERS[kind]
+    parser = build(InputLimits(max_file_bytes=1024))
+    path = _many_entries(tmp_path / "report.pdf", 50)
+    opened = _refuse_zipfile(monkeypatch)
+    with pytest.raises(InputLimitError, match="max_file_bytes"):
+        parse(parser, path)
+    assert opened == []

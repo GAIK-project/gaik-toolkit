@@ -684,7 +684,13 @@ class ParallelTranscriber:
         return create_openai_client(self._whisper_client_config())
 
     def _get_whisper_deployment(self) -> str:
-        return self._api_config.get("transcription_model", "whisper")
+        # As Transcriber: a key left out, None or "" (a config built from an unset
+        # variable) is Whisper. On Azure that is the conventional deployment name
+        # "whisper"; on OpenAI the model id is "whisper-1" ("whisper" is a 404).
+        configured = self._api_config.get("transcription_model")
+        if configured:
+            return configured
+        return "whisper" if self._whisper_client_config()["provider"] == "azure" else "whisper-1"
 
     def _asks_for_json(self, deployment: str) -> bool:
         """Whether the Whisper backend asks ``deployment`` for ``json`` rather than SRT:

@@ -828,10 +828,13 @@ class RAGResponseEvaluator:
         )
 
         sentinel_field = next(iter(spec.score_fields))
+        # Rows by position, not label: a frame joined with pd.concat repeats its labels,
+        # and a label would read and write every row that shares it.
         pending: list[tuple[str, int]] = [
-            (col, idx)
+            (col, place)
             for col in candidate_cols
-            for idx in scored_df.index[scored_df[f"{col}_{sentinel_field}"].isna()]
+            for place, missing in enumerate(scored_df[f"{col}_{sentinel_field}"].isna())
+            if missing
         ]
         total = len(pending)
         t0 = time.time()
@@ -841,18 +844,19 @@ class RAGResponseEvaluator:
             return RAGResponseEvalResult(scored_df=scored_df, per_system=aggregates, spec=spec)
 
         if self.max_concurrency == 1:
-            for i, (col, idx) in enumerate(pending):
+            for i, (col, place) in enumerate(pending):
                 verdict = self._judge_once(
                     _referenced_messages(
                         spec.system_prompt,
-                        df.at[idx, question_col],
-                        df.at[idx, col],
-                        df.at[idx, reference_col],
+                        df[question_col].iat[place],
+                        df[col].iat[place],
+                        df[reference_col].iat[place],
                     ),
                     spec.schema,
                 )
-                _write_referenced_row(scored_df, idx, col, verdict, spec)
-                _emit(on_progress, "referenced", i + 1, total, t0, col=col, row=idx)
+                _write_referenced_row(scored_df, place, col, verdict, spec)
+                row = scored_df.index[place]
+                _emit(on_progress, "referenced", i + 1, total, t0, col=col, row=row)
         else:
             _run_to_end(
                 self._evaluate_referenced_async(
@@ -889,25 +893,26 @@ class RAGResponseEvaluator:
         spec = self.scoring_spec
         semaphore = asyncio.Semaphore(self.max_concurrency)
 
-        async def _one(col: str, idx: int) -> tuple[str, int, BaseModel]:
+        async def _one(col: str, place: int) -> tuple[str, int, BaseModel]:
             verdict = await self._judge_once_async(
                 _referenced_messages(
                     spec.system_prompt,
-                    df.at[idx, question_col],
-                    df.at[idx, col],
-                    df.at[idx, reference_col],
+                    df[question_col].iat[place],
+                    df[col].iat[place],
+                    df[reference_col].iat[place],
                 ),
                 spec.schema,
                 semaphore,
             )
-            return col, idx, verdict
+            return col, place, verdict
 
         done = 0
-        for coro in asyncio.as_completed([_one(col, idx) for col, idx in pending]):
-            col, idx, verdict = await coro
-            _write_referenced_row(scored_df, idx, col, verdict, spec)
+        for coro in asyncio.as_completed([_one(col, place) for col, place in pending]):
+            col, place, verdict = await coro
+            _write_referenced_row(scored_df, place, col, verdict, spec)
             done += 1
-            _emit(on_progress, "referenced", done, total, t0, col=col, row=idx)
+            row = scored_df.index[place]
+            _emit(on_progress, "referenced", done, total, t0, col=col, row=row)
 
     # ================================================================ PAIRWISE
 
@@ -1368,18 +1373,23 @@ def _resume_key(value: Any) -> str:
 
 def _write_referenced_row(
     scored_df: pd.DataFrame,
-    idx: int,
+    place: int,
     col: str,
     verdict: BaseModel,
     spec: ScoringSpec,
 ) -> None:
+    """Write one verdict into the row at position ``place`` (labels can repeat)."""
+
+    def put(column: str, value: Any) -> None:
+        scored_df.iat[place, scored_df.columns.get_loc(column)] = value
+
     for field_name in spec.score_fields:
-        scored_df.at[idx, f"{col}_{field_name}"] = int(getattr(verdict, field_name))
+        put(f"{col}_{field_name}", int(getattr(verdict, field_name)))
     reason_parts = [f"[{f}] {getattr(verdict, f, '')}" for f in spec.reason_fields]
     reason_parts.append(
         f"[{spec.summary_reason_field}] {getattr(verdict, spec.summary_reason_field, '')}"
     )
-    scored_df.at[idx, f"{col}_reason"] = " | ".join(reason_parts)
+    put(f"{col}_reason", " | ".join(reason_parts))
 
 
 def _aggregate_referenced(
@@ -1429,21 +1439,22 @@ def _count_constraint_violations(sub: pd.DataFrame, col: str, spec: ScoringSpec)
     if not all(c in sub.columns for c in (rel_col, con_col, ov_col)):
         return 0
     violations = 0
-    for idx in sub.index[(sub[rel_col] == 0) & (sub[ov_col] > 1)]:
+    # items() gives each row its own value, also where the index repeats a label.
+    for idx, overall in sub.loc[(sub[rel_col] == 0) & (sub[ov_col] > 1), ov_col].items():
         violations += 1
         logger.warning(
             "Constraint violation [%s] row %s: relevance=0 but overall=%s",
             col,
             idx,
-            sub.at[idx, ov_col],
+            overall,
         )
-    for idx in sub.index[(sub[con_col] == 0) & (sub[ov_col] > 2)]:
+    for idx, overall in sub.loc[(sub[con_col] == 0) & (sub[ov_col] > 2), ov_col].items():
         violations += 1
         logger.warning(
             "Constraint violation [%s] row %s: contradiction=0 but overall=%s",
             col,
             idx,
-            sub.at[idx, ov_col],
+            overall,
         )
     return violations
 
@@ -1508,9 +1519,10 @@ def _init_pairwise_df(
         resume_from.columns
     ):
         keys = ["question", "system_a", "system_b"]
-        prior = resume_from.drop_duplicates(keys, keep="last").copy()
+        # Normalize before dropping duplicates: 101 and "101" are one key once read back.
+        prior = resume_from.copy()
         prior["question"] = prior["question"].map(_resume_key)
-        prior = prior.set_index(keys)
+        prior = prior.drop_duplicates(keys, keep="last").set_index(keys)
 
     base_cols = [
         "question",

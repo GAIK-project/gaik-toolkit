@@ -306,3 +306,40 @@ def test_an_unstyled_placeholder_is_compared_with_its_doc_part(tmp_path, shown, 
     _with_glossary(path, "DefaultPlaceholder_1", "Click or tap here to enter text.")
 
     assert DocxParser().parse_docx(str(path), keep_structure=True) == expected
+
+
+@pytest.mark.parametrize("styles", [(), ("PlaceholderText",)], ids=["unstyled", "styled"])
+@pytest.mark.parametrize("keep_structure", [True, False], ids=["keep_structure", "simple"])
+def test_an_inline_placeholder_in_a_paragraph_is_dropped(tmp_path, styles, keep_structure):
+    # A run-level content control: its runs are the control's direct children, not
+    # inside a paragraph of its own, so dropping them must also keep them out.
+    style = styles[0] if styles else None
+    text = _parse_body(
+        tmp_path,
+        _paragraph(
+            _run("Name: "),
+            _sdt(_run("Click here to enter text.", style), placeholder=True),
+            _run(" (customer)"),
+        ),
+        keep_structure=keep_structure,
+        styles=styles,
+    )
+
+    assert "Click here" not in text
+    assert [line for line in text.splitlines() if line] == ["Intro", "Name:  (customer)"]
+
+
+def test_an_inline_placeholder_keeps_the_text_a_tool_filled_in(tmp_path):
+    text = _parse_body(
+        tmp_path,
+        _paragraph(
+            _run("Name: "),
+            _sdt(
+                _run("Click here", "PlaceholderText") + _run("Acme Oy"),
+                placeholder=True,
+            ),
+        ),
+        styles=["PlaceholderText"],
+    )
+
+    assert text == "Intro\n\nName: Acme Oy"
