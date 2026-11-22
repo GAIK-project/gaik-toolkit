@@ -6,6 +6,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { ModelNameInput } from "@/components/demo/model-name-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -228,7 +229,8 @@ export function OptionsForm({ options, onChange, disabled }: OptionsFormProps) {
         </AccordionTrigger>
         <AccordionContent className="space-y-3 pb-3">
           <Row label="Model">
-            <Input
+            <ModelNameInput
+              kind="chat"
               placeholder="gpt-6-luna"
               value={options.writerModel}
               onChange={(e) => set({ writerModel: e.target.value })}
@@ -310,7 +312,8 @@ export function OptionsForm({ options, onChange, disabled }: OptionsFormProps) {
                 disabled={disabled}
               />
               <Row label="Reviewer model">
-                <Input
+                <ModelNameInput
+                  kind="chat"
                   placeholder="same as writer"
                   value={options.reviewModel}
                   onChange={(e) => set({ reviewModel: e.target.value })}
