@@ -1120,12 +1120,18 @@ def _run_to_end(coroutine: Any) -> None:
     ``asyncio.run`` cannot start inside a running event loop (a Jupyter notebook, an
     async web handler), so there the coroutine runs on a loop of its own in a worker
     thread, and this call waits for it; ``on_progress`` is then called from that thread.
+    The calling loop is blocked until the run ends, which a notebook does not mind and an
+    async server does: there, call the evaluator from a worker thread of its own.
     """
     try:
         asyncio.get_running_loop()
     except RuntimeError:
         asyncio.run(coroutine)
         return
+    logger.warning(
+        "RAGResponseEvaluator runs inside an event loop: the judge calls run on a worker "
+        "thread, and this call blocks the loop until they finish"
+    )
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         pool.submit(asyncio.run, coroutine).result()
 

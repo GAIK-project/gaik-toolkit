@@ -101,6 +101,7 @@ def test_failed_items_are_left_out_of_the_mean_and_counted() -> None:
 
     assert metrics.faithfulness == 1.0
     assert metrics.failed == {"faithfulness": 1, "answer_relevance": 0, "context_precision": 0}
+    assert "PARTIAL" in str(metrics) and "PARTIAL" not in str(_aggregate(items[:9]))
     assert metrics.context_recall is None
 
 

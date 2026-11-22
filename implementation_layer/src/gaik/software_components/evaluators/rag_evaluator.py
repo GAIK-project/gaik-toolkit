@@ -59,7 +59,10 @@ class RAGMetrics:
             if self.context_recall is not None
             else "context_recall=N/A (no ground truth)"
         )
-        failed = f", failed={self.failed}" if any(self.failed.values()) else ""
+        # A partial run says so: its means are over the items the judge scored.
+        failed = (
+            f", PARTIAL: unscored items left out={self.failed}" if any(self.failed.values()) else ""
+        )
         return (
             f"RAGMetrics(faithfulness={self.faithfulness:.3f}, "
             f"answer_relevance={self.answer_relevance:.3f}, "
