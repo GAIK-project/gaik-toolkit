@@ -69,6 +69,11 @@ def test_both_transcribers_cut_an_azure_endpoint_to_its_resource(endpoint):
         ("https://gw.example.com/openai-proxy", "https://gw.example.com/openai-proxy"),
         ("https://R.OPENAI.AZURE.COM/OpenAI/V1", "https://R.OPENAI.AZURE.COM"),
         ("https://r.cognitiveservices.azure.com/OPENAI", "https://r.cognitiveservices.azure.com"),
+        # Azure Government, Azure China and API Management are Azure hosts too.
+        ("https://x.openai.azure.us/openai", "https://x.openai.azure.us"),
+        ("https://x.openai.azure.cn/openai/", "https://x.openai.azure.cn"),
+        ("https://x.azure-api.net/openai", "https://x.azure-api.net"),
+        ("https://x.azure-api.net/team/openai", "https://x.azure-api.net/team"),
     ],
 )
 def test_both_transcribers_keep_a_gateway_path(endpoint, expected):
@@ -113,12 +118,11 @@ def test_the_whisper_client_falls_back_to_the_chat_endpoint_and_a_default_api_ve
     assert client_config["api_version"] == "2024-12-01-preview"
 
 
-def test_a_v1_base_url_gives_the_resource_unless_an_audio_endpoint_is_given():
+def test_a_v1_base_url_gives_the_resource_unless_another_endpoint_is_given():
     config = {
         "provider": "azure",
         "api_key": "test-key",
         "base_url": f"{_CHAT}/openai/v1",
-        "azure_endpoint": "https://leftover.example.test",
         "api_version": "2025-03-01-preview",
     }
 
@@ -127,9 +131,37 @@ def test_a_v1_base_url_gives_the_resource_unless_an_audio_endpoint_is_given():
         {**config, "azure_audio_endpoint": f"{_AUDIO}/openai/v1"}
     )._whisper_client_config()
 
-    # The base_url wins over a leftover azure_endpoint, as before, as its resource address.
     assert "base_url" not in from_base_url and from_base_url["azure_endpoint"] == _CHAT
     assert "base_url" not in audio and audio["azure_endpoint"] == _AUDIO
+
+
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [
+        ({}, _CHAT),
+        ({"azure_endpoint": _AUDIO}, _AUDIO),
+        ({"azure_endpoint": _CHAT, "azure_audio_endpoint": _AUDIO}, _AUDIO),
+    ],
+)
+def test_both_transcribers_pick_the_same_azure_address(extra, expected):
+    # Audio endpoint, then azure_endpoint, then base_url, in both.
+    from gaik.software_components.transcriber import transcriber as module
+
+    config = {
+        "provider": "azure",
+        "api_key": "test-key",
+        "base_url": f"{_CHAT}/openai/v1",
+        "api_version": "2025-03-01-preview",
+        **extra,
+    }
+
+    parallel = ParallelTranscriber(config)._make_whisper_client()
+    sequential = module._create_audio_client(config)
+    try:
+        assert str(parallel.base_url) == str(sequential.base_url) == f"{expected}/openai/"
+    finally:
+        parallel.close()
+        sequential.close()
 
 
 def _transcription_requests(respond):

@@ -70,13 +70,17 @@ _MAX_WORDS_PER_SECOND = 4
 
 # The path the SDK adds itself, at the end of an Azure endpoint's path.
 _AZURE_OPENAI_SUFFIX = re.compile(r"/openai(?:/v1|/deployments(?:/.*)?)?$", re.IGNORECASE)
+# Hosts whose bare /openai path is the SDK's: Azure, Azure Government, Azure China and
+# Azure API Management.
+_AZURE_HOST_SUFFIXES = (".azure.com", ".azure.us", ".azure.cn", ".azure-api.net")
 
 
 def _azure_resource_endpoint(endpoint: str) -> str:
     """The address the SDK puts ``/openai/...`` after, from an Azure endpoint.
 
     A trailing ``/openai/v1`` or ``/openai/deployments/...`` is cut, a trailing bare
-    ``/openai`` only on an Azure host (``*.azure.com``), with the query and a trailing
+    ``/openai`` only on an Azure host (``*.azure.com``, ``.azure.us``, ``.azure.cn``,
+    ``.azure-api.net``), with the query and a trailing
     slash: ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``.
     The rest of the path stays, so a gateway's ``https://gw.example.com/openai/prod``
     keeps its own path. The same cut as the Transcriber's, which this package cannot
@@ -88,7 +92,8 @@ def _azure_resource_endpoint(endpoint: str) -> str:
     path = parts.path.rstrip("/")
     suffix = _AZURE_OPENAI_SUFFIX.search(path)
     if suffix and (
-        suffix.group(0).lower() != "/openai" or (parts.hostname or "").endswith(".azure.com")
+        suffix.group(0).lower() != "/openai"
+        or (parts.hostname or "").endswith(_AZURE_HOST_SUFFIXES)
     ):
         path = path[: suffix.start()]
     return f"{parts.scheme}://{parts.netloc}{path}"
@@ -628,9 +633,9 @@ class ParallelTranscriber:
 
         The provider is resolved as in the constructor (``provider: "azure"`` works
         without the legacy ``use_azure`` flag). On Azure the audio goes to
-        ``azure_audio_endpoint``, else ``base_url`` (a leftover ``azure_endpoint`` beside
-        it does not count, as before), else ``azure_endpoint``, cut to the resource
-        address (:func:`_azure_resource_endpoint`) and passed as ``azure_endpoint``. The
+        ``azure_audio_endpoint``, else ``azure_endpoint``, else ``base_url``, in the
+        Transcriber's order, cut to the resource address (:func:`_azure_resource_endpoint`)
+        and passed as ``azure_endpoint``, so the endpoint check sees that address. The
         SDK then requests ``/openai/deployments/<model>/audio/...``; a ``/openai/v1``
         ``base_url`` kept as it is would have given ``/openai/v1/deployments/...``,
         which Azure does not serve.
@@ -642,8 +647,8 @@ class ParallelTranscriber:
         if provider == "azure":
             endpoint = (
                 config.get("azure_audio_endpoint")
-                or config.get("base_url")
                 or config.get("azure_endpoint")
+                or config.get("base_url")
             )
             if endpoint:
                 config["azure_endpoint"] = _azure_resource_endpoint(endpoint)

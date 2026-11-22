@@ -155,13 +155,17 @@ def _transcription_usage(response) -> dict[str, int]:
 
 # The path the SDK adds itself, at the end of an Azure endpoint's path.
 _AZURE_OPENAI_SUFFIX = re.compile(r"/openai(?:/v1|/deployments(?:/.*)?)?$", re.IGNORECASE)
+# Hosts whose bare /openai path is the SDK's: Azure, Azure Government, Azure China and
+# Azure API Management.
+_AZURE_HOST_SUFFIXES = (".azure.com", ".azure.us", ".azure.cn", ".azure-api.net")
 
 
 def _azure_resource_endpoint(endpoint: str) -> str:
     """The address the SDK puts ``/openai/...`` after, from an Azure endpoint.
 
     A trailing ``/openai/v1`` or ``/openai/deployments/...`` is cut, a trailing bare
-    ``/openai`` only on an Azure host (``*.azure.com``), with the query and a trailing
+    ``/openai`` only on an Azure host (``*.azure.com``, ``.azure.us``, ``.azure.cn``,
+    ``.azure-api.net``), with the query and a trailing
     slash: ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``.
     The rest of the path stays, so a gateway's ``https://gw.example.com/openai/prod``
     keeps its own path. ParallelTranscriber has the same cut.
@@ -172,7 +176,8 @@ def _azure_resource_endpoint(endpoint: str) -> str:
     path = parts.path.rstrip("/")
     suffix = _AZURE_OPENAI_SUFFIX.search(path)
     if suffix and (
-        suffix.group(0).lower() != "/openai" or (parts.hostname or "").endswith(".azure.com")
+        suffix.group(0).lower() != "/openai"
+        or (parts.hostname or "").endswith(_AZURE_HOST_SUFFIXES)
     ):
         path = path[: suffix.start()]
     return f"{parts.scheme}://{parts.netloc}{path}"

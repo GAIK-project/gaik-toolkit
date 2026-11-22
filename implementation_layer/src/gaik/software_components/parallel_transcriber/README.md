@@ -155,11 +155,13 @@ otherwise. For a deployment whose name says neither, set
 
 On Azure the Whisper backend resolves the provider as `Transcriber` does
 (`provider: "azure"` needs no `use_azure` flag) and sends to `azure_audio_endpoint` when it
-is set, else to `base_url`, else to `azure_endpoint`, as that resource's deployment route
-(`/openai/deployments/<model>/audio/transcriptions`). A trailing `/openai/v1` or
-`/openai/deployments/...` is cut from the endpoint, and a bare trailing `/openai` on an Azure
-host, so `https://<resource>.openai.azure.com/openai/v1` works for Whisper and GPT-4o Diarize
-alike, while a gateway such as `https://gw.example.com/openai/prod` keeps its own path.
+is set, else to `azure_endpoint`, else to `base_url`, in the same order, as that resource's
+deployment route (`/openai/deployments/<model>/audio/transcriptions`). A trailing `/openai/v1`
+or `/openai/deployments/...` is cut from the endpoint, and a bare trailing `/openai` on an
+Azure host (`*.azure.com`, Azure Government `*.azure.us`, Azure China `*.azure.cn`, API
+Management `*.azure-api.net`), so `https://<resource>.openai.azure.com/openai/v1` works for
+Whisper and GPT-4o Diarize alike, while a gateway such as `https://gw.example.com/openai/prod`
+keeps its own path.
 
 ### TranscriptionConfig
 
