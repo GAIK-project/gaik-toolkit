@@ -186,7 +186,7 @@ export function Footer({ githubPreview }: FooterProps) {
 }
 
 const DISCLAIMER =
-  " The demo website uses Microsoft Azure APIs for OpenAI's and Anthropic's models, and Google's Vertex AI for Gemini models. No user data is retained, and neither Azure nor Vertex AI uses any user data for model training.";
+  " The demo website uses Microsoft Azure APIs for OpenAI's and Anthropic's models, and Google's Vertex AI for Gemini models. Neither Azure nor Vertex AI uses your data for model training. The privacy notice says what the demo keeps and for how long.";
 
 function FooterColumn({
   title,
