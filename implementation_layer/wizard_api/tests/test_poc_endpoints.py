@@ -271,8 +271,9 @@ def test_generate_produces_the_v1_scaffolder_file_set(client, db_session) -> Non
     assert body["regenerated"] is False
 
     # The same set scaffold_poc writes — the endpoint adds nothing of its own
-    # beyond the manifest, which is hidden from the listing.
-    assert set(body["files"]) == {
+    # beyond the manifest, which is hidden from the listing. The model file is
+    # written only where gaik can describe the schema (gaik installed).
+    assert set(body["files"]) - {"schemas/output_schema_model.json"} == {
         ".env.example",
         "README.md",
         "app.py",

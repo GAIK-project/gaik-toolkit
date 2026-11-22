@@ -167,6 +167,12 @@ def _package(tmp_path: Path, transcription: dict, entrypoint=AUDIO_ENTRYPOINT, m
     poc = tmp_path / "poc"
     poc.mkdir()
     (poc / "run_poc.py").write_text(entrypoint, encoding="utf-8")
+    # Every scaffolded package has it; without it the import check (which runs
+    # when gaik is installed) reports provider_config as missing from the image.
+    (poc / "provider_config.py").write_text(
+        "def get_stage_config(config, stage):\n    return config['stages'][stage]\n",
+        encoding="utf-8",
+    )
     (poc / "requirements.txt").write_text("gaik[audio]\n", encoding="utf-8")
     (poc / "README.md").write_text("# PoC\n", encoding="utf-8")
     config = {
