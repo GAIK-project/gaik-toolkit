@@ -16,6 +16,7 @@ import {
   parseArtifacts,
   parseSpec,
   precedenceForSpec,
+  precedenceNotice,
   settingsForSpec,
   type SpecSettings,
   staleAfterEdit,
@@ -117,6 +118,8 @@ export function useReportWriter() {
   const [instructions, setInstructions] = useState("");
   /** Kept from a loaded spec and written back; the form has no control for it. */
   const [sourcePrecedence, setSourcePrecedence] = useState<SourceClass[]>([]);
+  /** Whether the API's gaik takes `source_precedence`; null until the API says. */
+  const [takesPrecedence, setTakesPrecedence] = useState<boolean | null>(null);
   const [models, setModels] = useState(NO_MODELS);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [sources, setSources] = useState<SourceRow[]>([]);
@@ -147,6 +150,8 @@ export function useReportWriter() {
         if (!Array.isArray(data?.examples))
           throw new Error("The examples response has no examples list.");
         setExamples(data.examples);
+        if (typeof data.supports?.source_precedence === "boolean")
+          setTakesPrecedence(data.supports.source_precedence);
         // ?example=<id> opens an example, e.g. from the Construction Report Writing use case.
         const id = new URLSearchParams(window.location.search).get("example");
         if (!id) return;
@@ -161,7 +166,15 @@ export function useReportWriter() {
 
   // -- Spec --
 
-  function buildSpec(): Omit<ReportSpec, "settings" | "source_precedence"> & {
+  /**
+   * The spec as the form holds it. For a run (`forRun`) on an API whose gaik has no
+   * `source_precedence`, the key is left out, as it refuses a spec with it; the
+   * exported spec keeps it.
+   */
+  function buildSpec(forRun = false): Omit<
+    ReportSpec,
+    "settings" | "source_precedence"
+  > & {
     source_precedence?: SourceClass[];
     settings: SpecSettings;
   } {
@@ -179,7 +192,10 @@ export function useReportWriter() {
         depends_on: s.depends_on,
       })),
       instructions,
-      ...precedenceForSpec(sourcePrecedence),
+      ...precedenceForSpec(
+        sourcePrecedence,
+        !(forRun && takesPrecedence === false),
+      ),
       sources: {
         primary: sources
           .filter((r) => r.sourceClass === "primary")
@@ -308,6 +324,9 @@ export function useReportWriter() {
       );
       applySpec(spec, have);
       toast.success("Spec loaded. Add any source files marked missing.");
+      // Before Run: on this API the spec's precedence does not decide conflicts.
+      const notice = precedenceNotice(spec.source_precedence, takesPrecedence);
+      if (notice) toast(notice, { duration: 10000 });
     } catch (e) {
       toast.error(message(e), { duration: 8000 });
     }
@@ -360,7 +379,7 @@ export function useReportWriter() {
     setProgress((p) => [...p, `Phase ${STAGE_LABELS[stage]}`]);
     const form = new FormData();
     form.append("stage", stage);
-    form.append("spec", JSON.stringify(buildSpec()));
+    form.append("spec", JSON.stringify(buildSpec(true)));
     form.append("artifacts", JSON.stringify(ws));
     if (stage === "normalize") {
       // Spec order, as in buildSpec: the backend pairs uploads with spec names by position.
@@ -494,6 +513,8 @@ export function useReportWriter() {
     setSections,
     instructions,
     setInstructions,
+    /** Why the spec's source precedence is not sent with a run, or null. */
+    precedenceNote: precedenceNotice(sourcePrecedence, takesPrecedence),
     models,
     setModels,
     settings,
