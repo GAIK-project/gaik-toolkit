@@ -335,6 +335,14 @@ class ChildRequirements(BaseModel):
     container_name: str
     container_description: str
     requirements: ExtractionRequirements
+    nullable: bool = Field(
+        default=False,
+        description=(
+            "The collection may be null instead of a list, as the task allowed for the "
+            "list field it was parsed from. Otherwise it is a list, empty when there are "
+            "no rows."
+        ),
+    )
 
 
 class CompositeExtractionRequirements(BaseModel):
@@ -595,10 +603,16 @@ def _create_parent_with_nested_list_model(
     }
     for child in children:
         ChildModel = create_extraction_model(child.requirements)  # noqa: N806
-        combined_fields[child.container_name] = (
-            list[ChildModel],
-            Field(description=child.container_description),
-        )
+        if child.nullable:
+            combined_fields[child.container_name] = (
+                list[ChildModel] | None,
+                Field(default=None, description=child.container_description),
+            )
+        else:
+            combined_fields[child.container_name] = (
+                list[ChildModel],
+                Field(description=child.container_description),
+            )
 
     suffix = "_Extraction"
     base_name = sanitize_model_name(parent_requirements.use_case_name, suffix=suffix)
@@ -717,20 +731,94 @@ def _reroute_leaked_collections(
     return stripped, recovered
 
 
-def _collection_as_list_str_field(spec: ChildContainerSpec) -> FieldSpec:
+def _collection_as_list_str_field(spec: ChildContainerSpec, *, nullable: bool = False) -> FieldSpec:
     """Represent an underspecified repeated collection as a ``list[str]`` field.
 
     Used when a child collection has no per-item fields defined (e.g. the task
     says "items purchased" or "services offered" without naming any sub-fields).
     A list of strings is a faithful, non-degenerate representation — better than
-    a ``list`` of empty objects, which would extract nothing.
+    a ``list`` of empty objects, which would extract nothing. ``nullable`` keeps
+    the null policy of the list field the collection was parsed from.
     """
     label = spec.container_name.replace("_", " ")
     return FieldSpec(
         field_name=spec.container_name,
         field_type="list[str]",
         description=spec.container_description or f"List of {label}",
+        nullable=nullable,
     )
+
+
+def _nullable_collections(requirements: ExtractionRequirements) -> set[str]:
+    """Container names of the ``list[dict]`` fields the task lets be null."""
+    return {
+        _sanitize_field_name(f.field_name, fallback="records")
+        for f in requirements.fields
+        if f.field_type == "list[dict]" and f.nullable
+    }
+
+
+def _parse_child_collections(
+    user_description: str,
+    container_specs: list[ChildContainerSpec],
+    parent_requirements: ExtractionRequirements,
+    *,
+    nullable_containers: set[str],
+    client,
+    model: str,
+    _usage_sink: list | None,
+    sampling: dict,
+) -> list[ChildRequirements]:
+    """Parse the row fields of each repeated collection.
+
+    A collection whose rows have no fields of their own is added to
+    ``parent_requirements`` as a ``list[str]`` field instead, and is not returned.
+    """
+    children: list[ChildRequirements] = []
+    for spec in container_specs:
+        cname = spec.container_name
+        cdesc = spec.container_description or f"Repeated {cname} records"
+        print(f"\nParsing child fields for '{cname}'...")
+        _child_task = (
+            f"From the requirements below, parse only the fields for each repeated "
+            f"{cname.replace('_', ' ')} record. "
+            "Treat every field as a scalar value. "
+            "Ignore any once-per-document, header, or summary fields. "
+            "Ignore any other repeated sections not related to this collection.\n\n"
+            + user_description
+        )
+        child_req = parse_user_requirements(
+            _child_task,
+            client=client,
+            model=model,
+            _usage_sink=_usage_sink,
+            parse_mode="repeated_item",
+            **sampling,
+        )
+        _ensure_no_list_dict_fields(child_req, context=f"Child requirements for '{cname}'")
+
+        if not child_req.fields:
+            # Underspecified collection — no per-item fields were described.
+            # Represent it as a list[str] on the parent instead of a list of
+            # empty objects (which would extract nothing).
+            print(f"  '{cname}' has no per-item fields -> representing as list[str] on parent")
+            existing_names = {f.field_name for f in parent_requirements.fields}
+            if cname not in existing_names:
+                parent_requirements.fields.append(
+                    _collection_as_list_str_field(spec, nullable=cname in nullable_containers)
+                )
+            continue
+
+        print(f"  Fields: {[f.field_name for f in child_req.fields]}")
+        children.append(
+            ChildRequirements(
+                container_name=cname,
+                container_description=cdesc,
+                requirements=child_req,
+                nullable=cname in nullable_containers,
+            )
+        )
+    return children
 
 
 def parse_nested_requirements(
@@ -785,8 +873,52 @@ def parse_nested_requirements(
         requirements = parse_user_requirements(
             user_description, client=client, model=model, _usage_sink=_usage_sink, **sampling
         )
-        extraction_model = create_extraction_model(requirements)
-        return extraction_model, requirements, analysis
+        if not any(f.field_type == "list[dict]" for f in requirements.fields):
+            extraction_model = create_extraction_model(requirements)
+            return extraction_model, requirements, analysis
+
+        # A list[dict] field would reach the provider as an object with open
+        # properties, which a strict schema rejects. Handle it as the parent
+        # branch handles a leaked collection: the flat fields stay as parsed and
+        # each list[dict] field is parsed into a child collection of its own.
+        nullable_containers = _nullable_collections(requirements)
+        container_specs: list[ChildContainerSpec] = []
+        parent_requirements, recovered = _reroute_leaked_collections(
+            requirements, container_specs, set()
+        )
+        for cname, original in recovered:
+            print(f"  Flat field '{original}' holds repeated records -> child container '{cname}'")
+        _ensure_no_list_dict_fields(parent_requirements, context="Flat requirements")
+        children = _parse_child_collections(
+            user_description,
+            container_specs,
+            parent_requirements,
+            nullable_containers=nullable_containers,
+            client=client,
+            model=model,
+            _usage_sink=_usage_sink,
+            sampling=sampling,
+        )
+        if not children:
+            # Every collection became a list[str] field: the record stays flat.
+            extraction_model = create_extraction_model(parent_requirements)
+            return extraction_model, parent_requirements, analysis
+        # The analysis describes the structure the schema now has.
+        analysis.structure_type = "parent_with_nested_list"
+        analysis.child_containers = [
+            ChildContainerSpec(
+                container_name=c.container_name, container_description=c.container_description
+            )
+            for c in children
+        ]
+        extraction_model = _create_parent_with_nested_list_model(
+            parent_requirements=parent_requirements, children=children
+        )
+        composite_requirements = CompositeExtractionRequirements(
+            parent_requirements=parent_requirements, children=children
+        )
+        print(f"Created combined model: {extraction_model.__name__}")
+        return extraction_model, composite_requirements, analysis
 
     if analysis.structure_type == "parent_with_nested_list":
         print("Using parent-with-nested-list structure")
@@ -814,7 +946,8 @@ def parse_nested_requirements(
         # each leaked field out of the parent and route it through the child
         # pipeline as its own container. This keeps the parser robust for any
         # number of repeated collections, whether or not the structure detector
-        # enumerated them up front.
+        # enumerated them up front. A null policy on the leaked field is kept.
+        nullable_containers = _nullable_collections(parent_requirements)
         parent_requirements, recovered = _reroute_leaked_collections(
             parent_requirements, container_specs, seen_container_names
         )
@@ -830,47 +963,16 @@ def parse_nested_requirements(
             context="Parent requirements for parent_with_nested_list",
         )
 
-        children: list[ChildRequirements] = []
-        for spec in container_specs:
-            cname = spec.container_name
-            cdesc = spec.container_description or f"Repeated {cname} records"
-            print(f"\nParsing child fields for '{cname}'...")
-            _child_task = (
-                f"From the requirements below, parse only the fields for each repeated "
-                f"{cname.replace('_', ' ')} record. "
-                "Treat every field as a scalar value. "
-                "Ignore any once-per-document, header, or summary fields. "
-                "Ignore any other repeated sections not related to this collection.\n\n"
-                + user_description
-            )
-            child_req = parse_user_requirements(
-                _child_task,
-                client=client,
-                model=model,
-                _usage_sink=_usage_sink,
-                parse_mode="repeated_item",
-                **sampling,
-            )
-            _ensure_no_list_dict_fields(child_req, context=f"Child requirements for '{cname}'")
-
-            if not child_req.fields:
-                # Underspecified collection — no per-item fields were described.
-                # Represent it as a list[str] on the parent instead of a list of
-                # empty objects (which would extract nothing).
-                print(f"  '{cname}' has no per-item fields -> representing as list[str] on parent")
-                existing_names = {f.field_name for f in parent_requirements.fields}
-                if cname not in existing_names:
-                    parent_requirements.fields.append(_collection_as_list_str_field(spec))
-                continue
-
-            print(f"  Fields: {[f.field_name for f in child_req.fields]}")
-            children.append(
-                ChildRequirements(
-                    container_name=cname,
-                    container_description=cdesc,
-                    requirements=child_req,
-                )
-            )
+        children = _parse_child_collections(
+            user_description,
+            container_specs,
+            parent_requirements,
+            nullable_containers=nullable_containers,
+            client=client,
+            model=model,
+            _usage_sink=_usage_sink,
+            sampling=sampling,
+        )
 
         print(f"Identified parent fields: {[f.field_name for f in parent_requirements.fields]}")
 
@@ -1429,11 +1531,46 @@ def _requests_text_representation(text: str) -> bool:
 # language, so they count there. A description is prose, where they count only as
 # its first word ("Data di consegna", "Dato for levering").
 _AMBIGUOUS_DATE_KEYWORDS = frozenset({"data", "dato", "jour"})
+# "data" is also an English word in field names ("raw_data", "master_data"); an
+# Italian, Portuguese or Polish date name starts with it ("data_di_consegna",
+# "data_urodzenia"), so in a name it counts only as the first word as well. A
+# known limit: a str field whose name starts with the English word ("data_source")
+# is still read as a date.
+_LEADING_ONLY_IN_NAME = frozenset({"data"})
 # Keywords that form compounds in their language ("Lieferdatum",
 # "toimituspäivämäärä", "teslimtarihi", "fechaentrega"), so they may be part of a
 # longer word.
 _COMPOUND_DATE_KEYWORDS = frozenset(
     {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih", "fecha"}
+)
+# Turkish "tarih" is also "history": "tarihsel" (historical), "tarihçe" (a
+# history) and "tarihçi" (historian) are not dates.
+_NOT_A_DATE_STEMS = ("tarihsel", "tarihç", "tarihc")
+# A date word in the description alone does not make a field a date when the
+# field's name says it holds another kind of value: "invoice_number" described as
+# "Number printed next to the invoice date" is a number. A date word in the name
+# itself still counts ("date_code").
+_OTHER_VALUE_NAME_WORDS = frozenset(
+    {
+        "amount",
+        "code",
+        "count",
+        "id",
+        "name",
+        "nimi",
+        "no",
+        "nr",
+        "nro",
+        "num",
+        "number",
+        "nummer",
+        "numero",
+        "price",
+        "ref",
+        "reference",
+        "total",
+        "tunnus",
+    }
 )
 # In a field name a word may also end in a keyword or start with "date":
 # "birthdate", "leveringsdato", and "duedate" and "dateofbirth", which is what
@@ -1479,11 +1616,19 @@ def _has_date_keyword(text: str, *, in_name: bool) -> bool:
         ):
             return True
         for keyword in DATE_KEYWORDS:
-            if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name and position:
+            if (
+                keyword in _AMBIGUOUS_DATE_KEYWORDS
+                and position
+                and (not in_name or keyword in _LEADING_ONLY_IN_NAME)
+            ):
                 continue
             if word == keyword:
                 return True
-            if keyword in _COMPOUND_DATE_KEYWORDS and keyword in word:
+            if (
+                keyword in _COMPOUND_DATE_KEYWORDS
+                and keyword in word
+                and not any(stem in word for stem in _NOT_A_DATE_STEMS)
+            ):
                 return True
     return False
 
@@ -1493,9 +1638,19 @@ def _is_date_field(name: str, description: str) -> bool:
 
     A keyword counts only as a whole word, so ``candidate_name``, ``update_notes``
     and ``metadata`` are not dates. This is the fallback for a field the model
-    did not type as a date; :func:`_apply_type_overrides` checks the type first.
+    typed as text; :func:`_apply_type_overrides` checks the type first.
+
+    A date word in the description alone does not count when the name names
+    another kind of value (``invoice_number`` described as "Number printed next
+    to the invoice date"). Known limit: a name without such a word whose
+    description only mentions a date ("Status, set on the approval date") is
+    still read as a date.
     """
-    return _has_date_keyword(name, in_name=True) or _has_date_keyword(description, in_name=False)
+    if _has_date_keyword(name, in_name=True):
+        return True
+    if not _has_date_keyword(description, in_name=False):
+        return False
+    return not set(_LETTER_WORD_RE.findall(name.lower())) & _OTHER_VALUE_NAME_WORDS
 
 
 def _apply_type_overrides(requirements: ExtractionRequirements, original_text: str = "") -> None:
@@ -1518,10 +1673,24 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
         if not _EXPLICIT_PATTERN_RE.search(field_context):
             field.pattern = None
 
+        is_integer_count = (
+            field.field_name == "quantity"
+            or field.field_name.endswith("_quantity")
+            or field.field_name == "count"
+            or field.field_name.endswith("_count")
+        )
+
         # The model's own type comes first: it read the task, and a date field need
         # not have a date word in its name ("deadline", "valid_until"). The keyword
-        # check catches a date the model typed as text.
-        if field.field_type == "date" or _is_date_field(field.field_name, field.description):
+        # check catches a date the model typed as text, and only that: a number,
+        # flag or list the model typed ("data_quality", "date_count",
+        # "date_entries") keeps its type (#106), and a count typed as text gets
+        # the count repair below.
+        if field.field_type == "date" or (
+            field.field_type == "str"
+            and not is_integer_count
+            and _is_date_field(field.field_name, field.description)
+        ):
             if _requests_text_representation(field_context):
                 field.field_type = "str"
                 field.format = None
@@ -1543,12 +1712,6 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
 
         # Match the documented type rule for plain quantities/counts, while
         # preserving an explicit request for text or a unit-bearing string.
-        is_integer_count = (
-            field.field_name == "quantity"
-            or field.field_name.endswith("_quantity")
-            or field.field_name == "count"
-            or field.field_name.endswith("_count")
-        )
         if (
             is_integer_count
             and field.field_type == "str"
@@ -1868,11 +2031,118 @@ def _normalize_explicit_default(
     return False, None
 
 
+def _enum_numbers(f: FieldSpec) -> list[int | float | Decimal] | None:
+    """A number field's choices as numbers of its own type, or None.
+
+    ``FieldSpec.enum`` holds text. On an ``int``, ``float`` or ``decimal`` field
+    whose every choice reads as such a number ("1".."5", "0.5"), the choices are
+    allowed numbers; ``""`` among them stands for no value, so an enum of only
+    ``""`` gives ``[]``: no choices, a plain number field. Any other choice
+    ("low", "N/A", "1.5" on an ``int`` field) means the choices are labels, and
+    None is returned.
+    """
+    if f.field_type not in NUMERIC_FIELD_TYPES or not f.enum:
+        return None
+    numbers: list[int | float | Decimal] = []
+    for choice in f.enum:
+        text = str(choice).strip()
+        if not text:
+            continue
+        try:
+            number = Decimal(text)
+        except ArithmeticError:
+            return None
+        if not number.is_finite():
+            return None
+        if f.field_type == "int":
+            if number != number.to_integral_value():
+                return None
+            value: int | float | Decimal = int(number)
+        elif f.field_type == "float":
+            value = float(number)
+        else:
+            value = number
+        if value not in numbers:
+            numbers.append(value)
+    return numbers
+
+
+def _as_field_number(value, field_type: str) -> int | float | Decimal | None:
+    """``value`` as a number of ``field_type``, or None when it is not one."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        try:
+            number = Decimal(str(value))
+        except ArithmeticError:
+            return None
+    elif isinstance(value, str):
+        cleaned = _clean_decimal_string(value)
+        if cleaned is None:
+            return None
+        number = Decimal(cleaned)
+    else:
+        return None
+    if not number.is_finite():
+        return None
+    if field_type == "int":
+        return int(number) if number == number.to_integral_value() else None
+    if field_type == "float":
+        return float(number)
+    return number
+
+
+def _within_enum(field: FieldSpec, value):
+    """``value`` kept to the field's choices, or the field's fallback.
+
+    A text field's value must be one of its choices. A ``list[str]`` field keeps
+    the items that are choices. A number field whose choices are numbers (see
+    :func:`_enum_numbers`) keeps a value equal to one of them: a number as a
+    number of its type, and a choice written as text (``"3"``) as that text,
+    since a model saved by gaik 0.11.1 has the choices as texts. Nothing here
+    turns text into a number the model in use does not take.
+    """
+    if field.field_type == "list[str]":
+        choices = {c for c in field.enum if c != ""}
+        if not choices:
+            return value
+        if isinstance(value, str):
+            # Split as normalize_extracted_data would, so each item is checked.
+            value = [part.strip() for part in re.split(r"[;,]", value) if part.strip()]
+        if not isinstance(value, list):
+            return value
+        return [item for item in (str(x).strip() for x in value) if item in choices]
+    numbers = _enum_numbers(field)
+    if numbers == []:
+        return value  # no choices: any number
+    if numbers is not None and isinstance(value, str) and value in field.enum:
+        # One of the choices as text: a model saved by gaik 0.11.1 or earlier
+        # has the choices as texts (Literal['', '1', ...]), so the value stays
+        # what the model in use gave. VisionExtractor matches it to its model.
+        return value
+    if numbers is not None:
+        has_default, default = _normalize_explicit_default(field)
+        allowed = numbers + ([default] if has_default else [])
+        number = _as_field_number(value, field.field_type)
+        if number is not None and number in allowed:
+            return number
+        return _resolve_fallback(field)
+    if value not in field.enum:
+        return _resolve_fallback(field)
+    return value
+
+
 def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseModel]:
     """
     Create a Pydantic model dynamically from field specifications (strict).
     - Forbid extra/unknown keys.
     - Apply enums, regex patterns, and formats where applicable.
+
+    An enum keeps the field's type where its choices fit it: a ``list[str]``
+    field becomes ``list[Literal[...]]``, and an ``int`` or ``float`` field whose
+    choices are numbers becomes a ``Literal`` of those numbers (a ``decimal``
+    field stays a Decimal, its value kept to the choices after extraction). Other
+    choices replace the type with a ``Literal`` of the texts, as for a ``str``.
     """
     # Map string type names to actual Python types
     # Note: dates use str to allow flexible input formats, then normalized in post-processing
@@ -1897,8 +2167,30 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
             annotated = Annotated[str, constr(pattern=f.pattern)]
 
         has_default, default = _normalize_explicit_default(f)
+        enum_numbers = _enum_numbers(f)
 
-        if f.enum:
+        if f.enum and f.field_type == "list[str]":
+            # Each item is one of the choices; an empty list means none.
+            choices = [c for c in f.enum if c != ""]
+            if choices:
+                annotated = list[Literal[tuple(choices)]]  # type: ignore[misc,valid-type]
+        elif enum_numbers is not None and f.field_type in ("int", "float"):
+            # The allowed numbers, as numbers: a missing value is None, as for
+            # any number field. No usable choice leaves a plain number field.
+            # A decimal keeps DecimalField (a Literal of Decimals would be sent
+            # as strings and then refuse them), and apply_field_policies keeps
+            # its value to the allowed numbers.
+            if enum_numbers:
+                choices = list(enum_numbers)
+                if has_default and default not in choices:
+                    choices.append(default)
+                annotated = Literal[tuple(choices)]  # type: ignore[misc,valid-type]
+        elif enum_numbers is not None:
+            pass
+        elif f.enum:
+            # Text choices, or choices that are not numbers of the field's type
+            # ("low"/"high" on a number field, "Kyllä"/"Ei" on a yes/no field):
+            # the choices win and the value is one of those texts.
             if has_default:
                 if default not in f.enum:
                     f.enum.append(default)
@@ -2005,6 +2297,11 @@ def parse_date(value: str | date | None, output_format: str = "%Y-%m-%d") -> str
     Handles common formats: ISO, European (DD/MM/YYYY), US (MM/DD/YYYY), etc.
     Also fixes common OCR/LLM year errors (e.g., 1004 -> 2004).
 
+    ``output_format`` is tried first: a value already written in the field's own
+    format is read in that format. ``03/07/2024`` with ``%m/%d/%Y`` is 7 March and
+    stays ``03/07/2024``; reading it day first would swap day and month whenever
+    the day is 12 or less. The other formats follow, day first before month first.
+
     Args:
         value: Date string, datetime.date object, or None
         output_format: strftime format for output (default: ISO format)
@@ -2038,6 +2335,9 @@ def parse_date(value: str | date | None, output_format: str = "%Y-%m-%d") -> str
         "%b %d, %Y",  # Short month: Apr 25, 2024
         "%d %b %Y",  # Day first short: 25 Apr 2024
     ]
+    if output_format in formats:
+        formats.remove(output_format)
+    formats.insert(0, output_format)
 
     for fmt in formats:
         try:
@@ -2120,6 +2420,21 @@ def normalize_extracted_data(
 # -----------------------------------------------------------------------------
 
 
+def _list_item_model(annotation) -> type[BaseModel] | None:
+    """The row model of a ``list[Model]`` or ``list[Model] | None`` annotation."""
+    if get_origin(annotation) in (Union, types.UnionType):
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) != 1:
+            return None
+        annotation = args[0]
+    if get_origin(annotation) is not list:
+        return None
+    args = get_args(annotation)
+    if len(args) == 1 and isinstance(args[0], type) and issubclass(args[0], BaseModel):
+        return args[0]
+    return None
+
+
 def print_pydantic_schema(model: type[BaseModel], title: str = "Generated Pydantic Schema") -> None:
     """
     Print the exact Pydantic model as Python class definition.
@@ -2134,19 +2449,12 @@ def print_pydantic_schema(model: type[BaseModel], title: str = "Generated Pydant
     # Collect all models to print (handle nested structures)
     models_to_print = []
 
-    # Check if this model has nested Pydantic models
+    # Check if this model has nested Pydantic models: List[SomeModel], or
+    # Optional[List[SomeModel]] for a collection the task lets be null.
     for field_name, field_info in model.model_fields.items():
-        annotation = field_info.annotation
-
-        # Check for List[SomeModel] pattern
-        origin = get_origin(annotation)
-        if origin is list:
-            args = get_args(annotation)
-            if args and len(args) > 0:
-                inner_type = args[0]
-                # Check if it's a Pydantic model
-                if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
-                    models_to_print.append(inner_type)
+        inner_type = _list_item_model(field_info.annotation)
+        if inspect.isclass(inner_type):
+            models_to_print.append(inner_type)
 
     # Print inner models first
     for inner_model in models_to_print:
@@ -2231,18 +2539,31 @@ def _resolve_fallback(field: FieldSpec):
     return None
 
 
+_LIST_FIELD_TYPES = ("list[str]", "list[dict]")
+
+
 def _holds_items(key: str, value: object, requirements: ExtractionRequirements) -> bool:
     """True when ``value`` is a nested-list schema's item list under ``key``.
 
-    The items are dicts. A list with no items is recognised by its key, which is
-    the container's name and not one of the item fields; reading the first item
-    alone took an empty collection for a flat record.
+    The items are dicts. ``key`` decides first: a key that is one of the record's
+    own list fields holds that field's value, so a flat record's ``line_items``
+    (``list[dict]``) is not read as the record's items (issue #141). A list of
+    dicts under any other key is the container, even when an item field has the
+    container's name (``event`` holding rows that each have an ``event``), since a
+    scalar field cannot hold a list. A list with no items is recognised by its key
+    alone; reading the first item alone took an empty collection for a flat
+    record.
     """
     if not isinstance(value, list):
         return False
+    spec = next((f for f in requirements.fields if f.field_name == key), None)
+    if spec is not None and spec.field_type in _LIST_FIELD_TYPES:
+        # The record's own list field, unless its values cannot be that field's:
+        # rows of dicts under a list[str] field name are the container's items.
+        return spec.field_type == "list[str]" and bool(value) and isinstance(value[0], dict)
     if value:
         return isinstance(value[0], dict)
-    return key not in {field.field_name for field in requirements.fields}
+    return True
 
 
 def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> dict:
@@ -2266,8 +2587,8 @@ def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> di
         if field.field_type in NUMERIC_FIELD_TYPES and isinstance(value, str) and not value.strip():
             value = _resolve_fallback(field)
 
-        if field.enum and value not in field.enum:
-            value = _resolve_fallback(field)
+        if field.enum:
+            value = _within_enum(field, value)
 
         output[name] = value
 
@@ -2527,9 +2848,9 @@ def _fields_by_name(requirements) -> dict[str, FieldSpec]:
     return {f.field_name: f for f in requirements.fields}
 
 
-def _containers(requirements) -> dict[str, str]:
+def _containers(requirements) -> dict[str, ChildRequirements]:
     if isinstance(requirements, CompositeExtractionRequirements):
-        return {f"{c.container_name}[]": c.container_description for c in requirements.children}
+        return {f"{c.container_name}[]": c for c in requirements.children}
     return {}
 
 
@@ -2587,13 +2908,13 @@ def compare_requirements(
                 )
             )
     for box in old_boxes.keys() & new_boxes.keys():
-        if old_boxes[box] != new_boxes[box]:
-            changed.append(
-                FieldChange(
-                    field_name=box,
-                    changes={"container_description": (old_boxes[box], new_boxes[box])},
-                )
-            )
+        box_changes = {
+            attr: (getattr(old_boxes[box], attr), getattr(new_boxes[box], attr))
+            for attr in ("container_description", "nullable")
+            if getattr(old_boxes[box], attr) != getattr(new_boxes[box], attr)
+        }
+        if box_changes:
+            changed.append(FieldChange(field_name=box, changes=box_changes))
     approved_structure = _coerce_structure(approved_structure, "approved_structure")
     new_structure = _coerce_structure(new_structure, "new_structure")
     old_key = _structure_key(approved_structure, approved)

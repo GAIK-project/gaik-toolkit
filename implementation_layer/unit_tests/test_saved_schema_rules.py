@@ -48,9 +48,13 @@ def test_a_refused_save_removes_the_previous_model_file(tmp_path, capsys):
     class Ticket(BaseModel):  # noqa: F811 - same name, a model the format refuses
         count: int = Field(ge=0)
 
-    assert save_model_file(Ticket, path) is False
+    # A warning reaches the caller; the notice used to be printed (#222).
+    with pytest.warns(UserWarning, match="not saved as data") as caught:
+        assert save_model_file(Ticket, path) is False
     assert not path.exists()
-    assert "not saved as data" in capsys.readouterr().out
+    assert capsys.readouterr().out == ""
+    # The refusal names the field it is about.
+    assert "Field 'count' of 'Ticket'" in str(caught[0].message)
 
 
 def test_a_saved_model_replaces_the_previous_file(tmp_path):
@@ -212,6 +216,57 @@ def test_decimal_fields_as_the_generator_writes_them_are_saved():
 
     rebuilt = build_model(describe_model(Invoice))
     assert rebuilt(total="12.40 EUR", fee=None).total == Decimal("12.40")
+
+
+def _no_negative_amounts(v):
+    if isinstance(v, str) and v.strip().startswith("-"):
+        raise ValueError("negative amount")
+    return v
+
+
+def test_a_decimal_field_with_another_cleaner_is_refused():
+    # #222: the rebuilt field used gaik's cleaner, so this check was lost.
+    from pydantic import BeforeValidator, WithJsonSchema
+
+    class Payment(BaseModel):
+        amount: Annotated[
+            Decimal, WithJsonSchema({"type": "string"}), BeforeValidator(_no_negative_amounts)
+        ] = Field(description="Amount")
+
+    with pytest.raises(ValidationError):
+        Payment(amount="-5.00")
+    with pytest.raises(SavedSchemaError, match="_no_negative_amounts") as refused:
+        describe_model(Payment)
+    assert "Field 'amount' of 'Payment'" in str(refused.value)
+
+
+def test_a_standalone_copy_of_gaiks_cleaner_is_saved():
+    # A saved schema.py defines its own _clean_decimal_string (no gaik import).
+    from gaik.software_components.extractor.schema import DECIMAL_PERSISTED_HELPER_SOURCE
+
+    namespace: dict = {}
+    exec(DECIMAL_PERSISTED_HELPER_SOURCE, namespace)
+
+    class Invoice(BaseModel):
+        total: namespace["DecimalField"] = Field(description="Total")
+
+    rebuilt = build_model(describe_model(Invoice))
+    assert rebuilt(total="1 234,50 EUR").total == Decimal("1234.50")
+
+
+def test_a_refusal_in_a_nested_model_names_that_models_field():
+    class Row(BaseModel):
+        qty: int = Field(ge=0)
+
+    class Order(BaseModel):
+        rows: list[Row]
+
+    with pytest.raises(SavedSchemaError) as refused:
+        describe_model(Order)
+
+    message = str(refused.value)
+    assert message.startswith("Field 'qty' of 'Row'")
+    assert "'rows'" not in message
 
 
 @pytest.mark.parametrize("raw", ["abc", "", "NaN", "Infinity"])
@@ -448,12 +503,14 @@ def test_a_rebuild_that_cannot_be_saved_does_not_say_it_was_saved(tmp_path, monk
         raise OSError("read-only folder")
 
     monkeypatch.setattr(saved_schema, "write_model_file", cannot_write)
-    model = load_saved_model(tmp_path / "m_model.json", model_name, requirements)
+    with pytest.warns(UserWarning, match="Rebuilt saved schema") as caught:
+        model = load_saved_model(tmp_path / "m_model.json", model_name, requirements)
 
     assert list(model.model_fields) == ["title"]
-    out = capsys.readouterr().out
-    assert "could not save it as m_model.json" in out
-    assert "and saved it" not in out
+    notice = str(caught[0].message)
+    assert "could not save it as m_model.json" in notice
+    assert "and saved it" not in notice
+    assert capsys.readouterr().out == ""
 
 
 _STATUS_ENUM = {

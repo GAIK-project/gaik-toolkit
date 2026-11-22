@@ -35,6 +35,7 @@ import argparse
 import json
 import keyword
 import sys
+import types
 from pathlib import Path
 from typing import Annotated, Literal, Union, get_args, get_origin
 
@@ -139,8 +140,14 @@ def _collect_models(model: type) -> list[type]:
             return
         seen.add(current)
         for field in current.model_fields.values():
-            if get_origin(field.annotation) is list:
-                args = get_args(field.annotation)
+            annotation = field.annotation
+            if get_origin(annotation) in (Union, types.UnionType):
+                # A collection the task lets be null: list[Row] | None.
+                inner = [arg for arg in get_args(annotation) if arg is not type(None)]
+                if len(inner) == 1:
+                    annotation = inner[0]
+            if get_origin(annotation) is list:
+                args = get_args(annotation)
                 if args and isinstance(args[0], type) and hasattr(args[0], "model_fields"):
                     collect(args[0])
         ordered.append(current)
