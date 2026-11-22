@@ -322,9 +322,14 @@ the quote exactly.
   first.
 - A date's parts must be written together: a quote that gives the year apart from the day and
   the month (`Report 2025, approved 11 April`), or labels them (`Day 11 Month 04 Year 2025`), is
-  `check`, and so is a day written with three digits (`011`). Two days joined only by a comma,
-  `&` or `/` (`11, 12.4.2025`) count as a list next to a month name or after a dot (`11., 12.4.`),
-  not otherwise: `Qty 1, 09.01.98` looks the same.
+  `check`, and so is a day written with three digits (`011`). Two days joined only by a comma
+  or `&` (`11, 12.4.2025`) count as a list after a dot (`11., 12.4.`) or with a word in the list
+  (`11, 12 and 15.4.2025`), not otherwise: `Qty 1, 09.01.98` and `Erä 3, 1. elokuuta` look the
+  same. A `/` lists days next to a month name (`11/12 April`).
+- With a month name, the day comes before the name, after it (`April 11, 2025`), or after the
+  year only with a comma and its suffix (`April 2025, 11th`); a name after both numbers makes no
+  date, so a count or an amount after a date (`1. maaliskuuta 2025 2 kpl`) is never its day.
+  Dates with dots are read year first only when the year has four digits (`2025.04.11`).
 - A text value with fewer numbers in its quote than in itself is `reworded`, not `check`: the
   quote may spell a number in words (`kerros kolme` for `floor 3`).
 - A number with one dot or comma and three digits after it, such as `4.200`, can be read as

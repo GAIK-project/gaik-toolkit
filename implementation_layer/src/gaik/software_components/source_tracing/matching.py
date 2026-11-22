@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -51,12 +52,15 @@ _FINNISH_MONTH = re.compile(rf"({'|'.join(_FINNISH_MONTHS)})kuu", re.IGNORECASE)
 _MINUS = "-\u2212\u2013"  # hyphen-minus, minus sign, en dash
 _LIGATURE = re.compile("[\ufb00-\ufb06]")  # the ones _ligatures expands
 # A minus set apart from the number after it, with a currency between them or not.
-_MINUS_APART = re.compile(rf"([{_MINUS}])\s+(?:[A-Za-z]{{3}}\s+|[\u20ac$\u00a3]\s*)?$")
+_MINUS_APART = re.compile(rf"([{_MINUS}])\s*(?:[A-Za-z]{{3}}\s*|[\u20ac$\u00a3]\s*)?$")
+# A minus written against the digits, or against a currency written against them.
+_MINUS_AGAINST = re.compile(rf"([{_MINUS}])(?:[\u20ac$\u00a3]\s*|[A-Z]{{3}}\s+)?$")
 # A minus right after a number (250,00-), not one that joins it to another (10-20), or CR.
 _TRAILING_MINUS = re.compile(rf"(?:[{_MINUS}](?![\d\w])|\s*CR\b)")
 # A clock time after "klo" or "kello": 10.00, 9:30.
-_CLOCK = re.compile(r"\b(?:klo|kello|kl)\.?\s*(\d{1,2})[.:](\d{2})\b", re.IGNORECASE)
-# The parts of a date in a text: runs of digits, and words, of which month names count.
+_CLOCK = re.compile(
+    r"\b(?:klo|kello|kl)\.?\s*(\d{1,2})[.:](\d{2})\b", re.IGNORECASE
+)  # The parts of a date in a text: runs of digits, and words, of which month names count.
 _DATE_ITEM = re.compile(r"\d+|[^\W\d_]+")
 _DASHES = "\\-\u2010\u2011\u2012\u2013\u2014"
 # What stands between the numbers of a date written in numbers: 11.04.2025, 11/4 2025,
@@ -68,9 +72,13 @@ _DAY_MONTH_GAP = re.compile(r"[\s./]*")
 _YEAR_GAP = re.compile(rf"[\s.,/'’{_DASHES}]*")
 # What stands between the parts of a date with a month name: 11th of April, April 11, 2025,
 # 11-Apr-2025, the 11th day of April, 11 April (2025).
+# Only a hyphen joins its parts (11-Apr-2025): an en dash joins a range, so in
+# "25. maaliskuuta – 25. huhtikuuta" the second 25 is no year.
 _NAMED_GAP = re.compile(
-    rf"(?:st|nd|rd|th)?(?:[\s.,/'’()\[\]{_DASHES}]|of|the|day|päivänä)*", re.IGNORECASE
+    r"(?:st|nd|rd|th)?(?:[\s.,/'’()\[\]\-‐‑]|of|the|day|päivänä)*", re.IGNORECASE
 )
+# An ordinal suffix right after a day's digits: 11th, 2nd.
+_ORDINAL = re.compile(r"(?:st|nd|rd|th)(?![^\W\d_])", re.IGNORECASE)
 # What joins the days of a range or a list: 11.–15.4.2025, 9., 11. ja 15.4.2025, 11 to 15
 # April, 11th–15th April, 11/12 April. A day's ordinal suffix may come first.
 _LINK = re.compile(
@@ -82,6 +90,7 @@ _LINK_MARK = re.compile(rf"[,&/{_DASHES}]|[^\W\d_]")
 # next to a month name, or after a day written with a dot.
 _RANGE_MARK = re.compile(rf"[{_DASHES}]|to|until|till|through|bis|and|ja|och|und|et", re.IGNORECASE)
 _DASH_ONLY = re.compile(rf"[\s.]*[{_DASHES}][\s.]*")
+_HYPHEN_ONLY = re.compile(r"\s*[-‐‑]\s*")
 _LINK_WORD = re.compile(r"[^\W\d_]")
 _ORDINAL_START = re.compile(r"^(?:st|nd|rd|th)", re.IGNORECASE)
 _DEFAULT_POLICY = TracePolicy()
@@ -168,8 +177,7 @@ def _negatives_in(text: str) -> list[float]:
         before, after = text[: match.start()], text[match.end() :]
         apart = _MINUS_APART.search(before)
         if (
-            # Not a dash between two words or numbers (Sivut 10 - 250).
-            (apart and not before[: apart.start(1)].rstrip()[-1:].isalnum())
+            (apart and _minus_stands_alone(before[: apart.start(1)]))
             or (before.endswith("(") and after.startswith(")"))
             or _TRAILING_MINUS.match(after)
         ):
@@ -178,11 +186,20 @@ def _negatives_in(text: str) -> list[float]:
 
 
 def _signed(text: str, start: int) -> bool:
-    """Whether the number starting at ``start`` has a minus sign written against it."""
-    if start == 0 or text[start - 1] not in _MINUS:
+    """Whether the number starting at ``start`` has a minus sign written against it, or
+    against its currency (-250, (−5), -€250.00, -EUR 250)."""
+    sign = _MINUS_AGAINST.search(text[:start])
+    if not sign:
         return False
-    before = text[start - 2] if start >= 2 else ""
-    return before == "" or before.isspace() or before in "([{:=;"
+    before = text[: sign.start(1)]
+    return _minus_stands_alone(before) and (before[-1:] in "([{:=;" or not before[-1:].strip())
+
+
+def _minus_stands_alone(before: str) -> bool:
+    """Whether a minus after ``before`` is a sign, not a dash joining two words or numbers:
+    not written against a letter or a digit (PO-2025, 10-20), and not after a number and a
+    space (Sivut 10 - 250, Ikä 10 -20 v)."""
+    return not before[-1:].isalnum() and not before.rstrip()[-1:].isdigit()
 
 
 def _readings_of(number: str) -> list[float]:
@@ -258,10 +275,12 @@ _Date = tuple[int, int, int, int]
 _Item = tuple[str | None, int | None]
 
 
-def _date_items(text: str) -> tuple[list[_Item], list[str]]:
-    """The numbers and month names of ``text`` in order, and the text between each two."""
+def _date_items(text: str) -> tuple[list[_Item], list[str], list[bool]]:
+    """The numbers and month names of ``text`` in order, the text between each two, and for
+    each part whether it is a number with an ordinal suffix (11th)."""
     items: list[_Item] = []
     gaps: list[str] = []
+    ordinals: list[bool] = []
     end: int | None = None
     for match in _DATE_ITEM.finditer(_nfc(text)):
         word = match.group()
@@ -277,8 +296,9 @@ def _date_items(text: str) -> tuple[list[_Item], list[str]]:
         if end is not None:
             gaps.append(match.string[end : match.start()])
         items.append(item)
+        ordinals.append(item[0] is not None and bool(_ORDINAL.match(match.string, match.end())))
         end = match.end()
-    return items, gaps
+    return items, gaps, ordinals
 
 
 def _year(digits: str) -> tuple[int, int] | None:
@@ -295,12 +315,18 @@ def _small(digits: str, highest: int) -> int | None:
     return None
 
 
-def _dates_of_three(items: list[_Item], gaps: list[str]) -> set[_Date]:
+def _dates_of_three(
+    items: list[_Item], gaps: list[str], ordinals: Sequence[bool] = (False, False, False)
+) -> set[_Date]:
     """The dates that three parts, in the order written, can be.
 
-    Numbers alone are read year-month-day, day-month-year or month-day-year, with dates
-    joined by dots only read day first (11.04.2025 is 11 April). With a month name, one of
-    the numbers is the day and the other the year.
+    Numbers alone are read year-month-day, day-month-year or month-day-year. Dates joined
+    by dots are read day first (11.04.2025 is 11 April), or year first when the year has
+    four digits (2025.04.11); 11.04.25 is not 2011-04-25. With a month name between the
+    numbers, they are the day and the year in either order (11 April 2025, 2025 April 11);
+    with the name first, the day comes next (April 11, 2025) or after the year and a comma
+    (April 2025, 11th). A name after both numbers is no date: in "1. maaliskuuta 2025 2
+    kpl" the count is no day.
     """
     named = [index for index, (_, month) in enumerate(items) if month is not None]
     dates: set[_Date] = set()
@@ -314,8 +340,11 @@ def _dates_of_three(items: list[_Item], gaps: list[str]) -> set[_Date]:
             )
         ):
             return dates
-        orders = [(first, second, third), (third, second, first)]
-        if not all(re.sub(r"[\s'’]", "", gap) == "." for gap in gaps):
+        dots = all(re.sub(r"[\s'’]", "", gap) == "." for gap in gaps)
+        orders = [(third, second, first)]
+        if not dots or len(first) == 4:
+            orders.append((first, second, third))
+        if not dots:
             orders.append((third, first, second))
         for year_digits, month_digits, day_digits in orders:
             year = _year(year_digits)
@@ -328,7 +357,16 @@ def _dates_of_three(items: list[_Item], gaps: list[str]) -> set[_Date]:
         return dates
     month = items[named[0]][1] or 0
     first, second = (items[index][0] or "" for index in range(3) if index != named[0])
-    for day_digits, year_digits in ((first, second), (second, first)):
+    if named[0] == 1:
+        pairs = [(first, second), (second, first)]
+    elif named[0] == 0:
+        # April 2025, 11th: the day after the year only with a comma and its suffix, not
+        # the count in "huhtikuuta 2019, 12 kpl".
+        late_day = "," in gaps[1] and ordinals[2]
+        pairs = [(first, second), *([(second, first)] if late_day else [])]
+    else:
+        pairs = []
+    for day_digits, year_digits in pairs:
         year = _year(year_digits)
         day = _small(day_digits, 31)
         if year and day:
@@ -360,8 +398,14 @@ def _range_part(items: list[_Item], gaps: list[str], start: int, size: int) -> b
         return False
     gap = gaps[start]
     if first_month is None and second_month is None:
-        # 11.4. or 11/4, not 11.–15.: a dash between two days is a range of its own.
-        return bool(_DAY_MONTH_GAP.fullmatch(gap))
+        # 11.4. or 11/4: a day and a month written with a dot or a slash. Not 11.–15. (a
+        # range of days), and not the number before a date (Vk 16 14.–18.4., Q2 11.–15.4.),
+        # which a space parts from it or whose next number is no month (Klo 9.30 10.–24.4.).
+        return (
+            bool(_DAY_MONTH_GAP.fullmatch(gap))
+            and ("." in gap or "/" in gap)
+            and _small(part[1][0] or "", 12) is not None
+        )
     return bool(_NAMED_GAP.fullmatch(gap))
 
 
@@ -372,6 +416,19 @@ def _mirrors(a: _Item, b: _Item) -> bool:
         return True
     digits = a[0] if b[1] is not None else b[0]
     return _small(digits or "", 12) is not None
+
+
+def _mixed_ends(items: list[_Item], start: int, after: int, link: str) -> bool:
+    """Whether two ends of two parts, one with a month name and one in numbers only, can be
+    one range: the name stands where the other end has its month (11 Apr – 15.4.2025, not
+    10.4. ja April 11), and an end in numbers before the name is closed by its dot
+    (11.04. – 15 April, not 1. 10–30 July)."""
+    first, second = items[start : start + 2], items[after : after + 2]
+    first_numbers = all(month is None for _, month in first)
+    named = second if first_numbers else first
+    if named[0][1] is not None or named[1][1] is None:
+        return False
+    return not first_numbers or link.lstrip().startswith(".")
 
 
 def _link_kind(gap: str, loose: bool) -> str | None:
@@ -424,6 +481,15 @@ def _chains(items: list[_Item], gaps: list[str], loose: bool) -> list[tuple[int,
                 _mirrors(a, b) for a, b in zip(items[start:after], items[after : after + size])
             ):
                 return None
+            if size == 2:
+                first = [month is None for _, month in items[start:after]]
+                second = [month is None for _, month in items[after : after + size]]
+                if all(first) and all(second) and gaps[start] != gaps[after]:
+                    return None  # 11.4.–15.4. is written alike at both ends; 1. 8.–10.10. not
+                if all(first) != all(second) and not _mixed_ends(
+                    items, start, after, gaps[after - 1]
+                ):
+                    return None
             return _link_kind(gaps[after - 1], loose)
 
         index = 0
@@ -451,12 +517,12 @@ def _chain_parts(
 ) -> list[list[int]]:
     """The ranges and lists in a run of joined ends.
 
-    A bare comma, ``&`` or ``/`` lists days only in a list that also has a word (11, 12 and
-    15.4.2025), next to a month name (9, 11, 15 April 2025; 11/12 April), or between dates
-    that have one (11 April, 15 May 2025): elsewhere it parts the run (``Qty 1, 09.01.98``
-    lists nothing). A dash joins days (11-15.4.2025, 11.–15.4.2025) unless the same dash
-    also stands just before or just after the run: in 2025-04-11 and 09-01-98 the dashes
-    part a date.
+    A bare comma or ``&`` lists days only in a list that also has a word (11, 12 and
+    15.4.2025; 9, 11 and 15 April), or between dates that have a month name (11 April, 15 May
+    2025): elsewhere it parts the run (``Qty 1, 09.01.98`` and ``Erä 3, 1. elokuuta`` list
+    nothing). A ``/`` lists days next to a month name (11/12 April). A dash joins days
+    (11-15.4.2025, 11.–15.4.2025) unless the same hyphen also stands just before or just
+    after the run: in 2025-04-11 and 09-01-98 the hyphens part a date.
     """
     count = len(items)
     if size == 1:
@@ -465,9 +531,17 @@ def _chain_parts(
         )
     else:
         named = any(month is not None for _, month in items[ends[0] : ends[0] + size])
-    listed = named or "word" in kinds
+    listed = "word" in kinds or (size == 2 and named)
     after = ends[-1] + size
-    edges = {gaps[ends[0] - 1] if ends[0] > 0 else None, gaps[after - 1] if after < count else None}
+    # Only a hyphen parts a date (2025-04-11, 09-01-98); an en dash joins a range.
+    edges = {
+        gap
+        for gap in (
+            gaps[ends[0] - 1] if ends[0] > 0 else "",
+            gaps[after - 1] if after < count else "",
+        )
+        if gap and _HYPHEN_ONLY.fullmatch(gap)
+    }
     parts: list[list[int]] = [[ends[0]]]
     for right, kind in zip(ends[1:], kinds):
         if (
@@ -482,7 +556,10 @@ def _chain_parts(
 
 
 def _dates_with_places(
-    items: list[_Item], gaps: list[str], loose: bool = False
+    items: list[_Item],
+    gaps: list[str],
+    loose: bool = False,
+    ordinals: Sequence[bool] | None = None,
 ) -> list[tuple[_Date, int, int]]:
     """Every date the parts can be read as, with the index of its first and last part.
 
@@ -491,8 +568,11 @@ def _dates_with_places(
     as well as the 15th.
     """
     found: list[tuple[_Date, int, int]] = []
+    flags = list(ordinals) if ordinals is not None else [False] * len(items)
     for index in range(len(items) - 2):
-        for date in _dates_of_three(items[index : index + 3], gaps[index : index + 2]):
+        for date in _dates_of_three(
+            items[index : index + 3], gaps[index : index + 2], flags[index : index + 3]
+        ):
             found.append((date, index, index + 2))
     for size, ends in _chains(items, gaps, loose):
         first = ends[0]
@@ -516,7 +596,9 @@ def _dates_with_places(
                 for offset in range(len(places) - 2):
                     three = places[offset : offset + 3]
                     for date in _dates_of_three(
-                        [items[place] for place in three], texts[offset : offset + 2]
+                        [items[place] for place in three],
+                        texts[offset : offset + 2],
+                        [flags[place] for place in three],
                     ):
                         found.append((date, three[0], three[-1]))
     return found
@@ -524,8 +606,8 @@ def _dates_with_places(
 
 def _value_dates(value: str) -> set[_Date]:
     """The dates a date value such as 2025-04-11, 11.04.2025 or 04/11/2025 can be."""
-    items, gaps = _date_items(value)
-    return _dates_of_three(items, gaps) if len(items) == 3 else set()
+    items, gaps, ordinals = _date_items(value)
+    return _dates_of_three(items, gaps, ordinals) if len(items) == 3 else set()
 
 
 def _date_in(value: str, quote: str) -> bool:
@@ -535,10 +617,10 @@ def _date_in(value: str, quote: str) -> bool:
     wanted = _value_dates(value)
     if not wanted:
         return False
-    items, gaps = _date_items(quote)
+    items, gaps, ordinals = _date_items(quote)
     return any(
         _same_date(date, other)
-        for date, _, _ in _dates_with_places(items, gaps)
+        for date, _, _ in _dates_with_places(items, gaps, ordinals=ordinals)
         for other in wanted
     )
 
@@ -632,10 +714,11 @@ def date_run(words: list[str], value: str | list[int]) -> tuple[int, int] | None
         return None
     items: list[_Item] = []
     gaps: list[str] = []
+    ordinals: list[bool] = []
     places: list[int] = []
     between: list[str] = []
     for index, word in enumerate(words):
-        inner, inner_gaps = _date_items(word)
+        inner, inner_gaps, inner_ordinals = _date_items(word)
         if not inner:
             between.append(word)  # a word such as "of" between two parts
             continue
@@ -644,9 +727,10 @@ def date_run(words: list[str], value: str | list[int]) -> tuple[int, int] | None
         between = []
         items += inner
         gaps += inner_gaps
+        ordinals += inner_ordinals
         places += [index] * len(inner)
     best: tuple[int, int] | None = None
-    for date, first, last in _dates_with_places(items, gaps, loose=True):
+    for date, first, last in _dates_with_places(items, gaps, loose=True, ordinals=ordinals):
         if any(_same_date(date, other) for other in wanted):
             run = (places[first], places[last] - places[first] + 1)
             if best is None or run[1] < best[1]:
@@ -831,19 +915,48 @@ def _other_numbers(value: str, quote: str, tolerance: float) -> bool:
             continue  # 11.4.2025 in the value, 2025-04-11 in the quote
         if all(_digits(run) in in_shared_date for run in _DATE_PARTS.findall(written)):
             continue  # a part of a date both write (the 2025 of 2025-04-11 and 11.4.2025)
+        if _short_form_of(written, quote, value[: match.start()].endswith("+")):
+            continue
         return True
+    return False
+
+
+def _short_form_of(written: str, quote: str, international: bool) -> bool:
+    """Whether a number of a text value is the quote's number written shorter or longer: a
+    two-digit year (04/26 for 04/2026), or a phone number with or without its country code
+    and leading zero (+358401234567 for 040 123 4567)."""
+    runs = _DATE_PARTS.findall(quote)
+    if len(written) == 2 and written.isdigit():
+        return any(
+            len(run) == 4 and run[:2] in ("19", "20") and run.endswith(written) for run in runs
+        )
+    mine = re.sub(r"\D", "", written)
+    for match in _NUMBER.finditer(quote):
+        theirs = re.sub(r"\D", "", match.group())
+        plus = quote[: match.start()].endswith("+")
+        # One side +358 40..., the other 040...: the same number without its country code.
+        for long, short in ((mine, theirs), (theirs, mine)):
+            if (
+                (international if long == mine else plus)
+                and short.startswith("0")
+                and len(short) >= 7
+                and long.endswith(short[1:])
+            ):
+                return True
     return False
 
 
 def _shared_date_parts(value: str, quote: str) -> set[str]:
     """The year, month and day digits of each date that both texts write."""
-    value_items, value_gaps = _date_items(value)
-    mine = {date for date, _, _ in _dates_with_places(value_items, value_gaps)}
+    value_items, value_gaps, value_ordinals = _date_items(value)
+    mine = {
+        date for date, _, _ in _dates_with_places(value_items, value_gaps, ordinals=value_ordinals)
+    }
     if not mine:
         return set()
-    quote_items, quote_gaps = _date_items(quote)
+    quote_items, quote_gaps, quote_ordinals = _date_items(quote)
     parts: set[str] = set()
-    for date, _, _ in _dates_with_places(quote_items, quote_gaps):
+    for date, _, _ in _dates_with_places(quote_items, quote_gaps, ordinals=quote_ordinals):
         for other in mine:
             if _same_date(date, other):
                 for found in (date, other):

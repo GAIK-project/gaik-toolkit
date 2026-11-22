@@ -103,6 +103,22 @@ VERIFIED_ON_MAIN = [
     (DATE, "11.–15.–17.4.2025"),
     (DATE, "11-15-17.4.2025"),
     ("2025-04-15", "2025-04-11 and 15"),
+    # A number just before a range of days is not one end of the range.
+    ("2025-04-14", "Vk 16 14.–18.4.2025 koulutus"),
+    (DATE, "1. 11.–15.4.2025"),
+    (DATE, "Q2 11.–15.4.2025"),
+    (DATE, "Week 15 11–15 April 2025"),
+    ("2023-10-03", "Rev 2 3–4 October 2023"),
+    ("2025-07-10", "1. 10–30 July 2025 vk 16"),
+    ("2025-04-10", "Klo 9.30 10.–24.4.2025 (3 kpl)"),
+    ("2021-10-08", "1. 8.–10.10.2021 – 30 pv"),
+    ("2020-03-02", "Sivu 2/5 2–11 March 2020"),
+    ("2024-07-06", "Vk 16 6–26 July 2024 klo 10.00"),
+    (DATE, "10.–11.4.–15.4.2025"),
+    (DATE, "10.4. ja April 11–15, 2025"),
+    (DATE, "10.4. ja Apr 11 – 15, 2025"),
+    (DATE, "3.2. 11–15 April 2025"),
+    (DATE, "31.3. 11–15 April 2025"),
     # Separators the first rule read past: an apostrophe, a comma before the year,
     # brackets, Korean.
     (DATE, "11/04/'25"),
@@ -183,6 +199,22 @@ WRONG_DATES = [
     ("2025-11-04", "2025年4月11日"),
     ("2025-04-15", "11.4.25–15.5.25"),
     ("2025-03-14", "14. marraskuuta 2025"),  # marraskuu is November, not March
+    # With a month name, a number after the year is no day, and a month name after both
+    # numbers makes no date.
+    ("2025-04-15", "Maksettu 11. huhtikuuta 2025 15 €"),
+    ("2025-03-02", "Toimitettu 1. maaliskuuta 2025 2 kpl"),
+    ("2016-09-16", "Vk 16 17. elokuuta – 16. syyskuuta 2022"),
+    ("2019-09-14", "1. 12.–15. syyskuuta 2019 14"),
+    ("2024-06-16", "Vk 16 6–26 July 2024"),
+    ("11.04.25", "Toimitettu 25.4.2011"),  # dots read year first only with four digits
+    # A batch number and a comma do not start a list of days.
+    ("2025-07-03", "Erä 3, 2.–15. heinäkuuta 2025 sivu 3"),
+    ("2021-08-03", "Erä 3, 1. elokuuta 2021 klo 10.00"),
+    # A number after the year and a comma is a day only with its suffix (April 2025, 11th).
+    ("2019-04-12", "Week 15 11. huhtikuuta 2019, 12 kpl"),
+    # Across a spaced en dash, the next day of a range is no two-digit year.
+    ("2025-03-25", "10-12 25. maaliskuuta – 25. huhtikuuta 2026 vk 16"),
+    ("2015-04-11", "April 11–15, 2025"),
 ]
 
 

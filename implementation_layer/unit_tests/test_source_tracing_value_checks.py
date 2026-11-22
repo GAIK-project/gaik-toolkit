@@ -40,6 +40,15 @@ def _check(value, quote: str, text: str | None = None) -> str:
         (-250, "Hyvitys (250,00)", "match"),
         (-250, "Saldo 250,00-", "match"),
         (-250, "Saldo 250.00 CR", "match"),
+        # A minus set apart after a word, or against a currency.
+        (-1014.5, "Discount - EUR 1,014.50", "match"),
+        (-250, "Alennus - 250,00 EUR", "match"),
+        (-50, "Hyvitys - 50,00", "match"),
+        (-250, "Credit: -€250.00", "match"),
+        (-1014.5, "Discount -$1,014.50", "match"),
+        (-250, "Hyvitys -EUR 250,00", "match"),
+        (250, "Credit: -€250.00", "mismatch"),
+        (20, "Ikä 10 -20 v", "match"),  # a range after a number, not a sign
     ],
 )
 def test_the_sign_of_a_number_counts(value, quote, expected) -> None:
@@ -66,6 +75,11 @@ def test_the_sign_of_a_number_counts(value, quote, expected) -> None:
         ("Delivered 11.4.2025", "Toimitettu 2025-04-11", "reworded"),
         ("Delivered 2025-04-11", "Toimitettu 11.4.2025", "reworded"),
         ("+358 40 1234567", "puh. 040 123 4567", "reworded"),
+        ("+358401234567", "puh. 040 123 4567", "reworded"),  # without the country code
+        ("+358401234568", "puh. 040 123 4567", "check"),
+        ("Valid until 04/26", "Voimassa 04/2026", "reworded"),  # a two-digit year
+        ("Valid until 04/26", "Voimassa 04/2027", "check"),
+        ("Order 1234567", "Tilaus 91234567", "check"),
         ("Minor bruise", "lievä ruhje", "reworded"),
     ],
 )
