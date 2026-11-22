@@ -54,13 +54,39 @@ def test_a_failing_pdf_parse_logs_no_file_name(tmp_path, caplog):
     assert raised.value is not None
 
 
+def _docx_with_a_corrupt_body() -> bytes:
+    """A real DOCX archive whose ``word/document.xml`` is not XML.
+
+    It passes the content check (a ZIP holding ``word/document.xml``), so python-docx
+    opens it and fails inside the parser's error handler, which logs the ERROR line.
+    """
+    import io
+    import zipfile
+
+    from docx import Document
+
+    blank = io.BytesIO()
+    Document().save(blank)
+    broken = io.BytesIO()
+    with zipfile.ZipFile(blank) as source, zipfile.ZipFile(broken, "w") as target:
+        for item in source.infolist():
+            data = source.read(item)
+            if item.filename == "word/document.xml":
+                data = b"<w:document broken"
+            target.writestr(item, data)
+    return broken.getvalue()
+
+
 def test_a_failing_docx_parse_logs_no_file_name(tmp_path, caplog):
     pytest.importorskip("docx")
     from gaik.software_components.parsers.docx_parser import DocxParser
 
-    path = _private_file(tmp_path, ".docx", b"PK\x03\x04" + b"\x00broken" * 50)
+    path = _private_file(tmp_path, ".docx", _docx_with_a_corrupt_body())
     with caplog.at_level(logging.DEBUG), pytest.raises(Exception):
         DocxParser().parse_document(str(path))
+    errors = [record.getMessage() for record in caplog.records if record.levelno == logging.ERROR]
+    assert errors, "the parse failed before the parser's error handler, so its line is unchecked"
+    assert all(file_tag(path) in message for message in errors), errors
     _assert_no_name_in_logs(caplog, path)
 
 

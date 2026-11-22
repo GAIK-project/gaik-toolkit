@@ -23,8 +23,8 @@ variables, where setup.bat saves the key. A ``.env`` file beside this script, wh
 older setups wrote, is read only when no key is found that way, with a warning.
 
 ``python server.py --check-folder PATH`` prints the folder as the server would approve
-it (absolute) and exits 1 when it would not, or when it holds this kit's own folder;
-setup.bat uses it.
+it (absolute) and exits 1 when it would not, or when it overlaps this kit's own folder
+(holds it or lies inside it); setup.bat uses it.
 """
 
 from __future__ import annotations
@@ -368,9 +368,9 @@ def main(argv: list[str] | None = None) -> None:
             approved_folders([args.check_folder], env_value="") if args.check_folder.strip() else []
         )
         kit = Path(__file__).resolve().parent.parent
-        # The folder Claude works in must not hold this kit: its tools could then change
-        # this server and its virtual environment.
-        if not checked or checked[0] == kit or checked[0] in kit.parents:
+        # The folder Claude works in must neither hold this kit nor lie inside it: its
+        # tools could then change this server and its virtual environment.
+        if not checked or kit.is_relative_to(checked[0]) or checked[0].is_relative_to(kit):
             sys.exit(1)
         print(checked[0])
         sys.exit(0)

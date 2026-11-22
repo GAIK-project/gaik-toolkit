@@ -179,6 +179,32 @@ jobs:
     - name: Run demo API tests
       run: uv run --python 3.11 --with pytest --with pytest-asyncio python -m pytest api/tests -o addopts="" -q
 
+  # The REST API's tests (implementation_layer/api), with this repository's gaik
+  # installed editable and the API's own requirements, on the Python of its image.
+  # Not in the release gate or the nightly run, like demo-api-tests.
+  api-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: github.event_name != 'schedule' && !inputs.release_gate
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ inputs.ref || github.ref }}
+        persist-credentials: false
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+    # From the repository root, `python -m pytest` puts it on sys.path so
+    # `import implementation_layer.api` works; `-o addopts=""` drops the library's options.
+    - name: Run API tests
+      run: >-
+        uv run --no-project --python 3.12 --with-editable .
+        --with-requirements implementation_layer/api/requirements.txt --with pytest --with httpx
+        python -m pytest implementation_layer/api/tests -o addopts="" -q
+
   # The demo front end's unit tests, type check and lint. Lint warnings do not
   # fail the job; lint errors do. Not in the release gate or the nightly run.
   demo-frontend-tests:
