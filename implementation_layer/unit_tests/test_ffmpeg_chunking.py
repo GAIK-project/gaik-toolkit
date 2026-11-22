@@ -378,3 +378,67 @@ def test_a_low_bitrate_split_keeps_every_chunk_of_the_recording(
 
     assert _indices(chunks) == [0, 1]
     assert all(Path(c["file"]).stat().st_size < 0.1 * 1024 * 1024 for c in chunks)
+
+
+# -- a real tail shorter than the tolerance is kept (#300 item 1) -------------------
+
+
+def test_a_tail_under_a_second_past_the_previous_chunk_is_kept(tmp_path: Path):
+    # The second chunk covers up to 120 s; the recording ends at 120.8 s, inside the
+    # third chunk (115-120.8 s): its last 0.8 s are in no other chunk.
+    chunks, _ = _split(tmp_path, {"chunk_02.mp3": [5.8]})
+
+    assert _indices(chunks) == [0, 1, 2]
+
+
+def _exact_encoder(cmd, **_kwargs):
+    """A fake FFmpeg that encodes exactly the -t seconds it is asked for."""
+    seconds = float(cmd[cmd.index("-t") + 1])
+    Path(cmd[-1]).write_bytes(b"\x00" * int(round(seconds * _BYTES_PER_SECOND)))
+    process = MagicMock()
+    process.returncode = 0
+    process.communicate.return_value = ("", "")
+    return process
+
+
+@pytest.mark.parametrize("recording_seconds", [1216.0, 1215.8])
+def test_the_default_split_keeps_the_end_of_the_recording(tmp_path: Path, recording_seconds: float):
+    # 20-minute chunks with 15 s overlaps: the first chunk covers 0-1215 s, so the
+    # second (1185 s to the end) holds the last 1.0 s or 0.8 s that no other chunk has.
+    defaults = TranscriptionConfig()
+    specs = compute_chunk_specs(
+        recording_seconds,
+        defaults.chunk_duration_minutes,
+        defaults.chunk_overlap_seconds,
+        tmp_path,
+        "rec",
+    )
+    assert [(s.actual_start, s.actual_start + s.duration) for s in specs] == [
+        (0, 1215.0),
+        (1185.0, recording_seconds),
+    ]
+
+    with _FFMPEG_AVAILABLE, patch("subprocess.Popen", side_effect=_exact_encoder):
+        chunks = split_into_chunks(str(tmp_path / "rec.mp3"), specs)
+
+    assert _indices(chunks) == [0, 1]
+
+
+@pytest.mark.skipif(not _HAS_FFMPEG, reason="needs ffmpeg and ffprobe on PATH")
+def test_a_real_tail_of_0_8_seconds_is_kept_with_real_ffmpeg(tmp_path: Path, real_ffprobe):
+    # 1-minute chunks with 5 s overlaps on 125.8 s: the second chunk covers 55-125 s and
+    # the third (115-125.8 s) holds the last 0.8 s.
+    source = tmp_path / "tone.wav"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=125.8"]
+        + ["-ar", "16000", "-ac", "1", "-y", str(source)],
+        check=True,
+        timeout=60,
+    )
+    chunk_dir = tmp_path / "chunks"
+    chunk_dir.mkdir()
+    specs = compute_chunk_specs(125.8, 1, 5.0, chunk_dir, "tone")
+
+    chunks = split_into_chunks(source, specs, config=TranscriptionConfig(audio_bitrate="8k"))
+
+    assert _indices(chunks) == [0, 1, 2]

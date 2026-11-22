@@ -34,10 +34,16 @@ FFPROBE_TIMEOUT_SECONDS = PROBE_TIMEOUT_SECONDS
 DECODE_TIMEOUT_SECONDS = 600
 
 
-# How far a chunk's encoded length may fall short of the length asked for, and the
-# least audio a chunk must hold to count: MP3 frames and seeking cost fractions of a
-# second. Lengths, not file sizes, so the check holds at every bitrate.
+# How far a chunk's encoded length may fall short of the length asked for before it is
+# retried (and, after the retry, counts as a gap when audio continues past it): MP3
+# frames and seeking cost fractions of a second. Lengths, not file sizes, so the check
+# holds at every bitrate.
 _CHUNK_LENGTH_TOLERANCE_SECONDS = 1.0
+# The least audio a chunk must hold, and must add past the chunks before it, to be
+# kept: about one MP3 frame. FFmpeg encodes a chunk that starts past the end of the
+# audio as empty, and one that starts 0.1 s before it as 0.1 s, so a real tail shorter
+# than the tolerance above is still kept.
+_FRAME_MARGIN_SECONDS = 0.1
 
 
 def _encoded_seconds(chunk_path: Path) -> float | None:
@@ -533,6 +539,7 @@ def split_into_chunks(
         results = list(executor.map(_encode_chunk, specs))
 
     tolerance = _CHUNK_LENGTH_TOLERANCE_SECONDS
+    margin = _FRAME_MARGIN_SECONDS
 
     def _is_short(result: dict) -> bool:
         # A chunk whose length could not be read is retried like a short one.
@@ -575,7 +582,7 @@ def split_into_chunks(
     audio_ends = [
         specs[r["metadata"]["index"]].actual_start + r["seconds"]
         for r in encoded
-        if r["seconds"] > tolerance
+        if r["seconds"] > margin
     ]
     if not audio_ends and not failed:
         raise RuntimeError(
@@ -599,8 +606,10 @@ def split_into_chunks(
                     "index": spec.index,
                 }
             )
-        elif r["seconds"] <= tolerance or chunk_end <= covered_until + tolerance:
-            # Nothing that the chunks before it do not already hold.
+        elif r["seconds"] <= margin or chunk_end <= covered_until + margin:
+            # Nothing that the chunks before it do not already hold. The margin, not
+            # the tolerance: a recording that ends 0.8 s past the previous chunk's
+            # end overlap has 0.8 s more to transcribe.
             logger.warning(
                 "Chunk %d holds no audio past the end of the recording, skipping",
                 spec.index + 1,

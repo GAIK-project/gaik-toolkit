@@ -128,6 +128,7 @@ chunk shorter than asked for is retried like a failed one; if it is still short 
 continues past it, it is a missing stretch and stops the run. Chunks past the real end of
 the audio, which a file whose header overstates its length produces, are skipped and
 logged, and a recording in which no chunk holds audio stops the run with a `RuntimeError`.
+A last chunk that adds even a fraction of a second past the chunks before it is kept.
 
 ### Models on the Whisper backend
 
