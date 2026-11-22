@@ -921,6 +921,9 @@ def test_a_summary_with_only_the_quotes_numbers_passes(summary, quote, time_qual
         # The source has no such date: the qualifier's numbers are the model's own.
         ("Site visit: the supply-air unit vibrates.", ["14", "3", "2026"]),
         ("Site visit in 2026: the supply-air unit vibrates.", ["14", "3"]),
+        # A word before the day does not hide the date, with or without a year.
+        ("Site visit 14 March: the supply-air unit vibrates.", ["2026"]),
+        ("Käynti 14. maaliskuuta: laite tärisee.", ["2026"]),
     ],
 )
 def test_a_time_qualifier_date_counts_where_the_source_has_it(source, unsupported):
@@ -1079,7 +1082,7 @@ def test_the_prompt_and_the_retry_explain_the_number_rule():
     retry = build_retry_prompt(["unit 1: the summary states ['3']"])
     for text in (" ".join(SYSTEM_PROMPT.split()), " ".join(retry.split())):
         assert "counts only where the cited source has the same digits" in text
-        assert "a month" in text.lower() and "word in a date counts as its number" in text
+        assert "may be written with numbers as the same date" in text
 
 
 def test_the_prompts_say_a_label_is_data_and_may_be_the_source_id():
@@ -1090,3 +1093,31 @@ def test_the_prompts_say_a_label_is_data_and_may_be_the_source_id():
     user = " ".join(build_user_prompt(SOURCES, SectionSpec(id="a", title="Alpha"), "").split())
     assert "the file name its owner gave" not in user
     assert "or its id when the file name is not a clean one-line label" in user
+
+
+@pytest.mark.parametrize(
+    ("summary", "quote", "unsupported"),
+    [
+        # The same date, its month a word in the quote: a word before the day included.
+        ("Seen on 14.3.", "Seen on 14 March", []),
+        ("Seen 14.3.", "Site visit 14 March: the unit vibrates.", []),
+        ("Nähty 14.3.", "Käynti 14. maaliskuuta: laite tärisee.", []),
+        ("Inspected 3.4.", "Inspected 3 April.", []),
+        ("Seen 14.3.2026.", "On March 14, 2026 the unit vibrated.", []),
+        ("Seen 2026-03-14.", "Seen 14 March 2026.", []),
+        ("Seen 14.5.2026.", "Seen 14 May 2026.", []),
+        # Another date, or the month's number used for something else.
+        ("Seen 15.3.2026.", "Seen 14 March 2026.", ["15", "3"]),
+        ("The house has 3 floors.", "Built 14 March 2026.", ["3"]),
+        # "may" and "mar" are words, not months.
+        ("5 units may fail.", "Unit 3: 2 may fail.", ["5"]),
+        ("It costs 5 times more.", "It may 2x the cost.", ["5"]),
+        ("5 people attend.", "Up to 4 may attend", ["5"]),
+        ("Seen 2.5.", "May 2 units fail.", ["5"]),
+        ("Damage 2.3.", "Rain may mar 2 walls.", ["3"]),
+    ],
+)
+def test_a_month_word_supports_only_the_same_date(summary, quote, unsupported):
+    unit = _summarised(summary, quote)
+
+    assert kc._unsupported_numbers(unit, source_text=quote) == unsupported
