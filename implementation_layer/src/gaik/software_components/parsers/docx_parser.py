@@ -125,11 +125,13 @@ def _unwrap_content(
             continue
         if element.tag == qn("w:sdt"):
             content = element.find(qn("w:sdtContent"))
-            children = [] if content is None else list(content)
             if content is not None and _shows_placeholder(element):
                 _drop_placeholder_text(
                     element, content, placeholder_styles, placeholder_texts or {}
                 )
+            # Read after the drop: in an inline control the dropped runs are direct
+            # children of w:sdtContent, and an earlier copy would put them back.
+            children = [] if content is None else list(content)
         else:
             children = [child for child in element if child.tag not in properties]
         index = parent.index(element)

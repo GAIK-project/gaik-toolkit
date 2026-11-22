@@ -2168,6 +2168,8 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
 
         has_default, default = _normalize_explicit_default(f)
         enum_numbers = _enum_numbers(f)
+        # Choices that are labels, not numbers of the field's type: they set the type.
+        text_choices = bool(f.enum) and f.field_type != "list[str]" and enum_numbers is None
 
         if f.enum and f.field_type == "list[str]":
             # Each item is one of the choices; an empty list means none.
@@ -2190,11 +2192,15 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
         elif f.enum:
             # Text choices, or choices that are not numbers of the field's type
             # ("low"/"high" on a number field, "Kyllä"/"Ei" on a yes/no field):
-            # the choices win and the value is one of those texts.
+            # the choices win and the value is one of those texts. A copy: the
+            # caller's FieldSpec keeps its own choices.
             if has_default:
-                if default not in f.enum:
-                    f.enum.append(default)
-                annotated = Literal[tuple(f.enum)]  # type: ignore[misc,call-arg]
+                if isinstance(default, Decimal):
+                    # The value is one of these texts, so a Decimal default is its
+                    # text: a Decimal in the Literal would refuse its own JSON.
+                    default = str(default)
+                values = f.enum if default in f.enum else [*f.enum, default]
+                annotated = Literal[tuple(values)]  # type: ignore[misc,call-arg]
             else:
                 values = [""] + f.enum if "" not in f.enum else f.enum
                 annotated = Literal[tuple(values)]  # type: ignore[misc,call-arg]
@@ -2229,7 +2235,9 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
             and not f.nullable
         )
 
-        if f.field_type == "decimal":
+        if f.field_type == "decimal" and not text_choices:
+            # A decimal whose choices are labels ("low"/"high") is a Literal of
+            # them, as an int or float one is, and is widened below.
             # See the "Decimal field safety" block above _normalize_explicit_default
             # for why Decimal needs its own JSON Schema override + cleaner.
             # Nullability is decided by the exact same condition as every
@@ -2542,7 +2550,12 @@ def _resolve_fallback(field: FieldSpec):
 _LIST_FIELD_TYPES = ("list[str]", "list[dict]")
 
 
-def _holds_items(key: str, value: object, requirements: ExtractionRequirements) -> bool:
+def _holds_items(
+    key: str,
+    value: object,
+    requirements: ExtractionRequirements,
+    record: dict | None = None,
+) -> bool:
     """True when ``value`` is a nested-list schema's item list under ``key``.
 
     The items are dicts. ``key`` decides first: a key that is one of the record's
@@ -2552,7 +2565,9 @@ def _holds_items(key: str, value: object, requirements: ExtractionRequirements) 
     container's name (``event`` holding rows that each have an ``event``), since a
     scalar field cannot hold a list. A list with no items is recognised by its key
     alone; reading the first item alone took an empty collection for a flat
-    record.
+    record. Under a scalar field's name, though, an empty list is that field's
+    value when ``record``, the answer the key is in, holds any of the other
+    fields: a flat record whose ``status`` came back as ``[]`` keeps its policies.
     """
     if not isinstance(value, list):
         return False
@@ -2563,6 +2578,9 @@ def _holds_items(key: str, value: object, requirements: ExtractionRequirements) 
         return spec.field_type == "list[str]" and bool(value) and isinstance(value[0], dict)
     if value:
         return isinstance(value[0], dict)
+    if spec is not None and record is not None:
+        # A nested-list answer is the container alone; a flat one has its fields.
+        return not any(f.field_name in record for f in requirements.fields if f.field_name != key)
     return True
 
 

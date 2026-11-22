@@ -13,6 +13,7 @@ Only two bracket forms are read as citations:
   ``[2019]``, or ``[7]`` with four chunks) is left as written and is not a citation,
   so a number the model invents stays in the text but never in ``citations``;
 - a document with a page (``[report.pdf, page 3]``, ``[Document: report.pdf, Page: 3]``).
+  A chunk without a page is ``page unknown``, in any case, as the context names it.
 
 A bracket is not read at all when it is code or looks like an index: inside a fenced
 code block, inside an inline code span on one line, directly after a letter, digit,
@@ -64,7 +65,7 @@ class Citation:
         """The text the answer shows for this citation."""
         if not self.document_name:
             return f"[{self.reference}]"
-        if self.page_number is None:
+        if self.page_number is None or not str(self.page_number).strip():
             return f"[{self.document_name}]"
         return f"[{self.document_name}, page {self.page_number}]"
 
@@ -96,6 +97,17 @@ def _name_keys(value: str) -> set[str]:
     return keys
 
 
+# The page of a chunk without one: the context names it "Page: unknown", and
+# TextRagParser writes "Unknown" for a file that has no pages.
+_NO_PAGE = "unknown"
+
+
+def _page_key(page: Any) -> str:
+    """A page as a citation is matched by it; any spelling of ``unknown`` is no page."""
+    text = "" if page is None else str(page).strip()
+    return _NO_PAGE if not text or text.lower() == _NO_PAGE else text
+
+
 def _pages(spec: str) -> list[str]:
     """The pages a page spec names: ``3`` or the range ``5-7``."""
     spec = spec.strip()
@@ -104,7 +116,7 @@ def _pages(spec: str) -> list[str]:
         start, end = int(found.group(1)), int(found.group(2))
         if 0 <= end - start <= 50:
             return [str(page) for page in range(start, end + 1)]
-    return [spec]
+    return [_page_key(spec)]
 
 
 class CitationResolver:
@@ -123,22 +135,26 @@ class CitationResolver:
         ]
         self._by_name_and_page: dict[tuple[str, str], Citation] = {}
         for citation in self._citations:
-            if not citation.document_name or citation.page_number is None:
+            if not citation.document_name:
                 continue
+            # A chunk without a page is cited as the context shows it, "page unknown".
+            page = _page_key(citation.page_number)
             for key in _name_keys(citation.document_name):
-                self._by_name_and_page.setdefault((key, str(citation.page_number)), citation)
+                self._by_name_and_page.setdefault((key, page), citation)
         self.citations: list[Citation] = []
         self.dropped: list[str] = []
         self._buffer = ""
         # Where the answer is: the kind of the current line (None at a line start,
         # "text", "code" or "fence"), the marker of an open fenced block, the last
-        # character shown, the label of a citation shown right before it, and
-        # whether space after a citation removed at a line start is dropped.
+        # character shown, the label of a citation shown right before it, whether
+        # space after a citation removed at a line start is dropped, and the space
+        # before a citation removed right before, which a bracket next to it takes.
         self._line: str | None = None
         self._fence: str | None = None
         self._last = "\n"
         self._last_label: str | None = None
         self._skip_space = False
+        self._held_space = ""
 
     def resolve(self, answer: str) -> str:
         """The whole answer with its citations resolved."""
@@ -213,6 +229,7 @@ class CitationResolver:
     def _show_code(self, text: str) -> str:
         if text:
             self._last, self._last_label, self._skip_space = text[-1], None, False
+            self._held_space = ""
         return text
 
     def _show_text(self, text: str) -> str:
@@ -289,8 +306,13 @@ class CitationResolver:
         return last != "="
 
     def _bracket(self, space: str, match: re.Match[str]) -> str:
+        # A bracket right after a removed citation stands where that one stood: in
+        # "report [fake.pdf, page 9][1]" the [1] follows a space, not the "t".
+        held, self._held_space = self._held_space, ""
         if self._skip_space:
             space = ""
+        elif not space:
+            space = held
         read = self._read(match.group("inner").strip()) if self._may_cite(space) else None
         if read is None:
             return self._show_text(space + match.group(0))
@@ -299,6 +321,7 @@ class CitationResolver:
         if not found:
             if not space and self._last == "\n":
                 self._skip_space = True
+            self._held_space = space
             return ""
         labels: list[str] = []
         for citation in found:
@@ -307,6 +330,7 @@ class CitationResolver:
             if citation.label not in labels and citation.label != self._last_label:
                 labels.append(citation.label)
         if not labels:
+            self._held_space = space
             return ""
         self._last, self._last_label, self._skip_space = "]", labels[-1], False
         return space + " ".join(labels)

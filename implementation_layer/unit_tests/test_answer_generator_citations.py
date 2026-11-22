@@ -340,3 +340,99 @@ def test_a_citation_removed_at_a_line_start_leaves_no_space(monkeypatch):
 
     assert result.answer == "Intro.\nRefill weekly."
     assert result.dropped_citations == ["[fake.pdf, page 9]"]
+
+
+AFTER_A_DROPPED_CITATION = [
+    (
+        "See the report [fake.pdf, page 9][1].",
+        "See the report [depot_manual.pdf, page 7].",
+        [1],
+        ["[fake.pdf, page 9]"],
+    ),
+    (
+        "See [fake.pdf, page 9][other.pdf, page 1][2] first.",
+        "See [visitor_rules.pdf, page 2] first.",
+        [2],
+        ["[fake.pdf, page 9]", "[other.pdf, page 1]"],
+    ),
+    (
+        "It runs [1][fake.pdf, page 9][1] long.",
+        "It runs [depot_manual.pdf, page 7] long.",
+        [1],
+        ["[fake.pdf, page 9]"],
+    ),
+    # Not a citation: the bracket stays, with the space the removed one had.
+    ("See [fake.pdf, page 9][x] now.", "See [x] now.", [], ["[fake.pdf, page 9]"]),
+    ("See the report [fake.pdf, page 9].", "See the report.", [], ["[fake.pdf, page 9]"]),
+]
+
+
+@pytest.mark.parametrize(("reply", "answer", "cited", "dropped"), AFTER_A_DROPPED_CITATION)
+def test_a_reference_right_after_a_removed_citation_still_resolves(
+    monkeypatch, reply, answer, cited, dropped
+):
+    result = _generator(monkeypatch, reply).generate_with_citations(QUESTION, CHUNKS)
+
+    assert result.answer == answer
+    assert [c.reference for c in result.citations] == cited
+    assert result.dropped_citations == dropped
+    for deltas in [*_splits(reply), list(reply)]:
+        streamed = _generator(monkeypatch, deltas).generate_with_citations(
+            QUESTION, CHUNKS, stream=True
+        )
+        assert "".join(streamed.answer) == answer, deltas
+
+
+PAGELESS_CHUNKS = [
+    Document(page_content="Refill weekly.", metadata={"document_name": "notes.md"}),
+    # TextRagParser writes "Unknown" for a Word or text file, which has no pages.
+    Document(
+        page_content="Sign in first.",
+        metadata={"document_name": "guide.docx", "page_number": "Unknown"},
+    ),
+    *CHUNKS,
+]
+
+
+@pytest.mark.parametrize(
+    "written",
+    ["[notes.md, page unknown]", "[Document: notes.md, Page: unknown]", "[notes, page Unknown]"],
+)
+def test_a_chunk_without_a_page_is_cited_as_its_context_header_names_it(monkeypatch, written):
+    generator = _generator(monkeypatch, f"Refill weekly {written}. Sign in [guide, page unknown].")
+
+    result = generator.generate_with_citations(QUESTION, PAGELESS_CHUNKS)
+
+    assert result.answer == "Refill weekly [notes.md]. Sign in [guide.docx, page Unknown]."
+    assert [c.reference for c in result.citations] == [1, 2]
+    assert result.dropped_citations == []
+
+
+def test_a_chunk_with_an_empty_page_is_cited_without_one(monkeypatch):
+    chunks = [
+        Document(
+            page_content="Refill weekly.", metadata={"document_name": "notes.md", "page_number": ""}
+        )
+    ]
+    generator = _generator(monkeypatch, "Refill weekly [notes.md, page unknown].")
+
+    result = generator.generate_with_citations(QUESTION, chunks)
+
+    assert result.answer == "Refill weekly [notes.md]."
+    assert result.dropped_citations == []
+
+
+def test_page_unknown_does_not_match_a_chunk_that_has_a_page(monkeypatch):
+    generator = _generator(monkeypatch, "It runs for 36 hours [depot_manual.pdf, page unknown].")
+
+    result = generator.generate_with_citations(QUESTION, PAGELESS_CHUNKS)
+
+    assert result.answer == "It runs for 36 hours."
+    assert result.dropped_citations == ["[depot_manual.pdf, page unknown]"]
+
+
+def test_the_context_header_of_a_pageless_chunk_says_page_unknown():
+    material = answer_generator_module.SourceMaterial()
+    context = AnswerGenerator._format_context(PAGELESS_CHUNKS[:1], material, references=True)
+
+    assert "[1] [Document: notes.md, Page: unknown]" in context

@@ -13,6 +13,7 @@ from gaik.software_components._tesseract import (
     installed_tesserocr_languages,
     with_installed_languages,
 )
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits
 
 # Patch transformers export for AutoProcessor before docling imports.
@@ -158,17 +159,18 @@ class DoclingRagParser:
             "generate_picture_images": False,
             "generate_page_images": False,
             "do_formula_enrichment": enable_formula_enrichment,
-            "table_structure_options": TableStructureOptions(
-                kind="docling_tableformer",
-                do_cell_matching=True,
-            )
-            if enable_table_structure
-            else None,
             "accelerator_options": AcceleratorOptions(
                 num_threads=num_threads,
                 device=device,
             ),
         }
+        # Without table structure the options keep Docling's default: it refuses
+        # table_structure_options=None.
+        if enable_table_structure:
+            pipeline_kwargs["table_structure_options"] = TableStructureOptions(
+                kind="docling_tableformer",
+                do_cell_matching=True,
+            )
         if enable_ocr:
             pipeline_kwargs["ocr_options"] = _build_ocr_options(ocr_engine)
 
@@ -181,7 +183,17 @@ class DoclingRagParser:
         self.supported_extensions = [".pdf"]
 
     def _convert(self, pdf_path: str):
-        """Check the PDF against ``limits``, then convert it with Docling."""
+        """Check the PDF against ``limits`` and its content, then convert it with Docling.
+
+        Raises:
+            InputLimitError: The file is over ``limits``.
+            FileTypeMismatchError: The content is not what the extension says (a ``ValueError``).
+        """
+        # The size first: the content check reads the start of the file.
+        self.limits.check_file_size(pdf_path)
+        # By the extension: Docling also converts DOCX, PPTX and images, so a
+        # .docx must hold a DOCX and a .pdf a PDF.
+        check_file_type(pdf_path)
         self.limits.check_pdf(pdf_path)
         return self.converter.convert(pdf_path, **docling_limits(self.limits))
 

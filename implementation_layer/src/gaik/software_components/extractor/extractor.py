@@ -202,7 +202,7 @@ class DataExtractor:
         if isinstance(result_dict, dict):
             has_nested = False
             for key, value in list(result_dict.items()):
-                if _holds_items(key, value, requirements):
+                if _holds_items(key, value, requirements, result_dict):
                     has_nested = True
                     result_dict[key] = [apply_field_policies(item, requirements) for item in value]
             if not has_nested:
@@ -212,7 +212,7 @@ class DataExtractor:
         # record's own list[dict] field are not records of this schema.
         if isinstance(result_dict, dict):
             for key, value in list(result_dict.items()):
-                if _holds_items(key, value, requirements):
+                if _holds_items(key, value, requirements, result_dict):
                     result_dict[key] = [
                         normalize_extracted_data(item, requirements) for item in value
                     ]

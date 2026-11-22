@@ -12,6 +12,7 @@ import pytest
 from gaik.software_components.extractor import (
     ExtractionRequirements,
     FieldSpec,
+    compare_requirements,
     create_extraction_model,
 )
 from gaik.software_components.extractor.saved_schema import build_model, describe_model
@@ -132,6 +133,79 @@ def test_choices_that_are_not_numbers_still_replace_a_number_type():
         "level": "high",
         "score": None,
     }
+
+
+def test_text_choices_on_a_decimal_field_replace_its_type_as_on_int():
+    requirements = _requirements(
+        FieldSpec(field_name="tier", field_type="decimal", description="t", enum=["low", "high"])
+    )
+    model = create_extraction_model(requirements)
+
+    # The choices are labels, as on an int or float field: not a DecimalField that
+    # refuses every label while the policies refuse every number.
+    assert _property(model, "tier")["anyOf"][0] == {
+        "enum": ["", "low", "high"],
+        "type": "string",
+    }
+    assert model.model_validate({"tier": "high"}).tier == "high"
+    assert model.model_validate({}).tier is None
+    with pytest.raises(ValidationError):
+        model.model_validate({"tier": "12.50"})
+    assert apply_field_policies({"tier": "high"}, requirements) == {"tier": "high"}
+    assert apply_field_policies({"tier": "medium"}, requirements) == {"tier": None}
+    rebuilt = build_model(describe_model(model))
+    assert rebuilt.model_json_schema() == model.model_json_schema()
+
+
+def test_a_number_default_on_a_decimal_field_with_labels_is_one_of_its_texts():
+    requirements = _requirements(
+        FieldSpec(
+            field_name="tier",
+            field_type="decimal",
+            description="t",
+            enum=["low", "high"],
+            default="1.5",
+            has_explicit_default=True,
+        )
+    )
+    model = create_extraction_model(requirements)
+
+    assert model.model_validate({"tier": "1.5"}).tier == "1.5"
+    assert model.model_validate({}).tier == "1.5"
+    # The model reads back what it writes.
+    written = model.model_validate({"tier": "low"}).model_dump_json()
+    assert model.model_validate_json(written).tier == "low"
+    assert model.model_validate_json(model.model_validate({}).model_dump_json()).tier == "1.5"
+
+
+def test_building_a_model_leaves_the_field_specs_as_they_were():
+    level = FieldSpec(
+        field_name="level",
+        field_type="int",
+        description="l",
+        enum=["low", "high"],
+        default="1",
+        has_explicit_default=True,
+    )
+    label = FieldSpec(
+        field_name="label",
+        field_type="str",
+        description="s",
+        enum=["a", "b"],
+        default="c",
+        has_explicit_default=True,
+    )
+    requirements = _requirements(level, label)
+
+    model = create_extraction_model(requirements)
+    create_extraction_model(requirements)
+
+    assert level.enum == ["low", "high"] and label.enum == ["a", "b"]
+    # The default is still one of the values the model takes.
+    assert model.model_validate({}).level == 1
+    assert model.model_validate({"label": "c"}).label == "c"
+    # A mixed list of a number and texts once broke the comparison's sorting.
+    assert compare_requirements(requirements, requirements).changed == []
 
 
 def test_a_number_field_whose_only_choice_is_empty_has_no_choices():
