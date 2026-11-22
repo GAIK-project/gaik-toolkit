@@ -1159,18 +1159,30 @@ def _component_import_lines(entry: dict) -> list[str]:
     entry such as ``Extractor`` is not one: its card imports ``SchemaGenerator``
     and ``DataExtractor``, and importing the family name would stop the run at
     its first line. A class that uses another class of its module, such as
-    ``LLMJudgePanel`` with ``LLMJudge``, keeps its own import. Without a card
+    ``LLMJudgePanel`` with ``LLMJudge``, keeps its own import, and the classes
+    it lists in ``uses_components`` that the same module exports are imported
+    beside it: the panel is built from ``LLMJudge`` instances. Without a card
     the entry's own name is imported, as before.
     """
-    from .registry import get_reference_cards
+    from .registry import get_reference_cards, get_registry
 
     card = get_reference_cards().get(entry["name"]) or {}
     match = _CARD_IMPORT_RE.fullmatch(str(card.get("import", "")).strip())
-    if match:
-        names = [name.strip() for name in match["names"].split(",") if name.strip()]
-        if names:
-            return [f"from {match['module']} import {name}" for name in names]
-    return [f"from {entry['import_path']} import {entry['name']}"]
+    names = [name.strip() for name in match["names"].split(",") if name.strip()] if match else []
+    lines = [f"from {match['module']} import {name}" for name in names] or [
+        f"from {entry['import_path']} import {entry['name']}"
+    ]
+    import_path = entry["import_path"]
+    registry = get_registry()
+    for member in entry.get("uses_components") or []:
+        if member == entry["name"]:
+            continue
+        if (registry.lookup_by_name(member) or {}).get("import_path") != import_path:
+            continue
+        line = f"from {import_path} import {member}"
+        if line not in lines:
+            lines.append(line)
+    return lines
 
 
 def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:

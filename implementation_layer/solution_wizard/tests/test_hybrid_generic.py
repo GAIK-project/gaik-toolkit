@@ -524,7 +524,30 @@ def test_a_class_that_uses_a_class_of_its_module_keeps_its_own_import():
     from solution_wizard.scaffolder import _component_import_lines
 
     lines = _component_import_lines(get_registry().lookup_by_name("LLMJudgePanel"))
-    assert "from gaik.software_components.validators.llm_judge import LLMJudgePanel" in lines
+    assert lines == [
+        "from gaik.software_components.validators.llm_judge import LLMJudgePanel",
+        "from gaik.software_components.validators.llm_judge import LLMJudge",
+    ]
+
+
+def test_every_same_module_class_an_entry_uses_is_imported_beside_it():
+    """A class an entry is built from, exported by the same module, gets its import too."""
+    from solution_wizard.registry import get_registry
+    from solution_wizard.scaffolder import _component_import_lines
+
+    registry = get_registry()
+    checked = 0
+    for entry in registry.all():
+        if not entry.get("import_path"):
+            continue
+        lines = _component_import_lines(entry)
+        for member in entry.get("uses_components") or []:
+            member_entry = registry.lookup_by_name(member) or {}
+            if member == entry["name"] or member_entry.get("import_path") != entry["import_path"]:
+                continue
+            assert f"from {entry['import_path']} import {member}" in lines, entry["name"]
+            checked += 1
+    assert checked, "no entry lists a class of its own module"
 
 
 def test_every_registry_entry_imports_only_what_gaik_exports():
