@@ -356,9 +356,18 @@ list read back from the knowledge files proves nothing.
 ### 7. Evidence checkpoint
 
 Show a short summary per section: required items no source covers, unresolved conflicts,
-dropped facts, and each resolved conflict with the side it follows and the side it drops
-(`resolved_conflicts` in the curation summary: source and quote of each). The code picks
-that side from the source each unit cites, so ask the user to check those quotes. Then:
+dropped facts, and each resolved conflict (`resolved_conflicts` in the curation summary):
+
+- `decided_by: "preferred_unit_ids"`: the code picked the side from the source each unit
+  cites. Show the side it follows and the side it drops (source and quote of each), and ask
+  the user to check those quotes.
+- `decided_by: "description"`: a gaik without `source_precedence` (0.11.1 and earlier). Its
+  curator model resolved the conflict from the report instructions, and the writer follows the
+  side the conflict's `description` gives; no fact is dropped in code, so `follows` and `drops`
+  are null. Show the description with the quotes under `units`, and ask the user to check that
+  the description reads them right.
+
+Then:
 
 - If nothing material is open and the user already agreed to proceed, continue.
 - If the user wants corrections, edit `workspace/knowledge/<section>.json` or the normalized

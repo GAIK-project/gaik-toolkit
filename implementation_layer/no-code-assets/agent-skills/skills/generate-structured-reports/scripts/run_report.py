@@ -417,10 +417,14 @@ def section_problems(spec) -> tuple[list[str], list[str]]:
 
 
 def _resolved(conflict, section) -> dict:
-    """A resolved conflict with the side the report follows and the side it drops.
+    """A resolved conflict and what the writer does with it.
 
-    The code picks the side from the source each unit cites, so the person checks the
-    quotes of both sides at the evidence checkpoint.
+    With `source_precedence` (gaik after 0.11.1) the code picks the side from the source each
+    unit cites and names it in `preferred_unit_ids`: the entry lists the side the report follows
+    and the side it drops, and the person checks the quotes of both. An older gaik has no
+    `preferred_unit_ids`: its curator model resolved the conflict from the report instructions,
+    and the writer follows the side the conflict's `description` gives. No code knows which unit
+    that is, so `follows` and `drops` are None and `units` lists every side with the description.
     """
     units = {u.id: u for u in section.units}
 
@@ -431,10 +435,22 @@ def _resolved(conflict, section) -> dict:
             if i in units
         ]
 
-    kept = set(getattr(conflict, "preferred_unit_ids", []) or [])
+    preferred = getattr(conflict, "preferred_unit_ids", None)
+    if preferred is None:
+        return {
+            "topic": conflict.topic,
+            "resolved_by": None,
+            "decided_by": "description",
+            "description": conflict.description,
+            "follows": None,
+            "drops": None,
+            "units": side(conflict.unit_ids),
+        }
+    kept = set(preferred)
     return {
         "topic": conflict.topic,
         "resolved_by": getattr(conflict, "resolved_by", None),
+        "decided_by": "preferred_unit_ids",
         "follows": side([i for i in conflict.unit_ids if i in kept]),
         "drops": side([i for i in conflict.unit_ids if i not in kept]),
     }

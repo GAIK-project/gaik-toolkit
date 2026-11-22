@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -363,6 +364,68 @@ def test_edited_knowledge_is_checked_before_writing(tmp_path, capsys, change, ex
     code, out = cli(capsys, "synthesize", spec, ws)
     assert code == rr.EXIT_EVIDENCE
     assert not [c for c in FakeWriter.calls if c[0] == "synthesize"]
+
+
+def _two_sides() -> SectionKnowledge:
+    def unit(uid: str, file: str, quote: str, source_class: str) -> FactUnit:
+        return FactUnit(
+            id=uid,
+            topic="ventilation age",
+            time_qualifier=None,
+            summary=quote,
+            quote=quote,
+            source=SourceRef(file=file, locator=None),
+            source_class=source_class,
+            confidence="high",
+        )
+
+    return SectionKnowledge(
+        section_id="building_services",
+        units=[
+            unit("u1", "site_notes.txt", "Installed in 1998.", "primary"),
+            unit("u2", "old_report.md", "Installed in 2001.", "secondary"),
+        ],
+        missing=[],
+        conflicts=[],
+    )
+
+
+def test_a_conflict_an_older_gaik_resolved_is_not_shown_as_dropping_both_sides():
+    # gaik 0.11.1's Conflict has no preferred_unit_ids: its curator model resolved the
+    # conflict from the instructions, and the writer follows the side the description gives.
+    older = SimpleNamespace(
+        topic="ventilation age",
+        description="The site notes outrank the old report: the system dates from 1998.",
+        status="resolved",
+        unit_ids=["u1", "u2"],
+    )
+    entry = rr._resolved(older, _two_sides())
+
+    assert entry["decided_by"] == "description"
+    assert entry["description"] == older.description
+    assert entry["follows"] is None
+    assert entry["drops"] is None
+    assert [(u["id"], u["source"]) for u in entry["units"]] == [
+        ("u1", "site_notes.txt"),
+        ("u2", "old_report.md"),
+    ]
+
+
+def test_a_conflict_decided_by_source_precedence_names_the_side_it_follows():
+    conflict = Conflict(
+        topic="ventilation age",
+        description="The sources give 1998 and 2001.",
+        status="resolved",
+        unit_ids=["u1", "u2"],
+        preferred_unit_ids=["u1"],
+        resolved_by="primary",
+    )
+    entry = rr._resolved(conflict, _two_sides())
+
+    assert entry["decided_by"] == "preferred_unit_ids"
+    assert entry["resolved_by"] == "primary"
+    assert [u["id"] for u in entry["follows"]] == ["u1"]
+    assert [u["id"] for u in entry["drops"]] == ["u2"]
 
 
 # ── Preflight ───────────────────────────────────────────────────────
