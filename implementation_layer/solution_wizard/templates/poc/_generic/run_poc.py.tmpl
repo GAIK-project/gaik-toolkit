@@ -33,7 +33,11 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent))
-from provider_config import external_model_forbidden, get_stage_config  # noqa: E402
+from provider_config import (  # noqa: E402
+    external_model_forbidden,
+    get_stage_config,
+    local_transcriber_options,
+)
 import poc_output  # noqa: E402
 
 # Component imports for this pipeline (uncomment / adjust as you wire each step):

@@ -364,23 +364,91 @@ DEFAULT_PROVIDER = "azure"
 # A models.local_endpoints entry: a bare host name, no scheme, port or path.
 _HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _HOST_RE = re.compile(rf"{_HOST_LABEL}(?:\.{_HOST_LABEL})*")
+# A last label that is a number: the entry is an IPv4 address in some notation.
+_NUMERIC_LABEL_RE = re.compile(r"\d+|0x[0-9a-f]*")
+
+#: The hosts of the cloud model APIs gaik calls, as in gaik's endpoint allow-list
+#: (gaik.software_components.endpoints.PROVIDER_HOSTS; a test keeps them in step).
+#: ``*`` matches any host ending in the rest of the pattern.
+CLOUD_MODEL_API_HOSTS = (
+    "api.openai.com",
+    "*.openai.azure.com",
+    "*.cognitiveservices.azure.com",
+    "*.services.ai.azure.com",
+    "aitta-api.csc.fi",
+    "api.anthropic.com",
+    "generativelanguage.googleapis.com",
+    "aiplatform.googleapis.com",
+    "*-aiplatform.googleapis.com",
+    "aiplatform.eu.rep.googleapis.com",
+    "aiplatform.us.rep.googleapis.com",
+    "api.typesafe.ai",
+    "gaik-decide.2.rahtiapp.fi",
+)
+
+
+def _cloud_model_api_host(host: str) -> bool:
+    for pattern in CLOUD_MODEL_API_HOSTS:
+        if pattern.startswith("*"):
+            if len(host) > len(pattern) - 1 and host.endswith(pattern[1:]):
+                return True
+        elif host == pattern:
+            return True
+    return False
+
+
+def _local_endpoint_problem(entry: object) -> str | None:
+    """Why a models.local_endpoints entry cannot count as local processing, if it cannot.
+
+    The PoC sends the stage's key to a listed host, over plain http too, and treats
+    a stage there as local. A public IP address or a cloud model API host is never a
+    server of the user's own; a public domain name cannot be checked here.
+    """
+    import ipaddress
+
+    text = str(entry).strip().lower()
+    if not isinstance(entry, str) or not _HOST_RE.fullmatch(text):
+        return (
+            f"models.local_endpoints entry {entry!r} must be a host name such as "
+            "'gpu.lan', without scheme, port or path"
+        )
+    if _NUMERIC_LABEL_RE.fullmatch(text.rsplit(".", 1)[-1]):
+        try:
+            address = ipaddress.IPv4Address(text)
+        except ValueError:
+            return (
+                f"models.local_endpoints entry {entry!r} reads as an IP address; write it "
+                "as four decimal numbers such as '192.168.1.20'"
+            )
+        if address.is_global:
+            return (
+                f"models.local_endpoints entry {entry!r} is a public IP address; list only "
+                "servers on your own network"
+            )
+    if _cloud_model_api_host(text):
+        return (
+            f"models.local_endpoints entry {entry!r} is a cloud model API host, not a "
+            "server of your own; it cannot count as local processing"
+        )
+    return None
 
 
 def _declared_local_hosts(blueprint: Blueprint) -> tuple[set[str], list[str]]:
-    """The host names in models.local_endpoints, and the entries that are not host names."""
+    """The hosts in models.local_endpoints, and why the others are refused.
+
+    An entry must be a host name; a public IP address and the host of a cloud model
+    API gaik calls are refused (see :func:`_local_endpoint_problem`).
+    """
     declared = (blueprint.models or {}).get("local_endpoints") or []
     if not isinstance(declared, list):
         return set(), ["models.local_endpoints must be a list of host names"]
     hosts, problems = set(), []
     for entry in declared:
-        text = str(entry).strip().lower()
-        if isinstance(entry, str) and _HOST_RE.fullmatch(text):
-            hosts.add(text)
+        problem = _local_endpoint_problem(entry)
+        if problem:
+            problems.append(problem)
         else:
-            problems.append(
-                f"models.local_endpoints entry {entry!r} must be a host name such as "
-                "'gpu.lan', without scheme, port or path"
-            )
+            hosts.add(str(entry).strip().lower())
     return hosts, problems
 
 
