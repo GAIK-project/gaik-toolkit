@@ -20,6 +20,7 @@ from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.source_material import with_source_material_instruction
 
+from .._cut_off import Reply, reply_cut_off
 from .config import (
     create_claude_client,
     create_openai_client,
@@ -35,7 +36,8 @@ from .usage import UsageRecord, build_usage_record
 logger = logging.getLogger(__name__)
 
 FENCED_BLOCK_RE = re.compile(r"^```[a-zA-Z0-9_-]*\s*\n(?P<body>.*?)(?:\n```\s*)?$", re.DOTALL)
-DIV_BLOCK_RE = re.compile(r"<div\b[^>]*>\s*(.*?)\s*</div>", re.DOTALL)
+# An opening or closing div tag: the layout wrappers the prompts ask for.
+DIV_TAG_RE = re.compile(r"<div\b[^>]*>|</div\s*>", re.IGNORECASE)
 MARKDOWN_RENDERER = MarkdownIt("commonmark", {"html": True}).enable("table")
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -151,6 +153,9 @@ class ParseResult:
     clean_markdown: str
     html: str | None
     usage: UsageRecord | None = None
+    truncated: bool = False
+    """True when the model's reply stopped at its output-token cap, so the end of the
+    document is missing (a warning is logged too); split the PDF and parse the parts."""
 
 
 ModelProvider = Literal["openai", "claude", "google"]
@@ -262,6 +267,14 @@ class MultimodalParser:
                 pdf_path, system_prompt, user_prompt
             )
         duration_s = time.perf_counter() - start
+        truncated = bool(getattr(raw_output, "cut_off", False))
+        if truncated:
+            logger.warning(
+                "%s: the %s reply stopped at its output-token cap, so the end of the "
+                "document is missing; split the PDF and parse the parts",
+                file_tag(pdf_path),
+                self.model_provider,
+            )
         raw_markdown = _unwrap_fenced_output(raw_output)
 
         if not raw_markdown.strip():
@@ -291,6 +304,7 @@ class MultimodalParser:
             clean_markdown=clean_md,
             html=html_output,
             usage=usage,
+            truncated=truncated,
         )
 
     # -- prompt helpers -------------------------------------------------------
@@ -341,7 +355,10 @@ class MultimodalParser:
                 ],
                 **options,
             )
-            return response.text, _extract_shared_usage(response.usage)
+            return (
+                Reply(response.text, reply_cut_off(response.raw)),
+                _extract_shared_usage(response.usage),
+            )
         finally:
             close = getattr(client.raw, "close", None)
             # Injected transports belong to the caller and may serve later stages.
@@ -367,7 +384,7 @@ class MultimodalParser:
         text = response.output_text.strip()
         if not text:
             raise ValueError("The OpenAI response did not contain any text output.")
-        return text + "\n", _extract_openai_usage(response)
+        return Reply(text + "\n", reply_cut_off(response)), _extract_openai_usage(response)
 
     def _call_claude(
         self, pdf_path: Path, system_prompt: str, user_prompt: str
@@ -392,7 +409,8 @@ class MultimodalParser:
         ]
         if not text_blocks:
             raise ValueError("The Claude response did not contain any text blocks.")
-        return "".join(text_blocks).strip() + "\n", _extract_claude_usage(response)
+        text = "".join(text_blocks).strip() + "\n"
+        return Reply(text, reply_cut_off(response)), _extract_claude_usage(response)
 
     def _call_google(
         self, pdf_path: Path, system_prompt: str, user_prompt: str
@@ -445,7 +463,8 @@ class MultimodalParser:
                 f"({_http.describe_empty_gemini_response(payload)})"
             )
 
-        return "".join(text_parts).strip() + "\n", _extract_google_usage(payload)
+        text = "".join(text_parts).strip() + "\n"
+        return Reply(text, reply_cut_off(payload)), _extract_google_usage(payload)
 
 
 # -- usage extraction (module-level helpers) ----------------------------------
@@ -588,13 +607,14 @@ def _unwrap_fenced_output(text: str) -> str:
 
 
 def _clean_markdown(text: str) -> str:
-    """Strip outer layout div wrappers while keeping inner markdown and HTML."""
+    """Strip the layout div wrappers while keeping all markdown and other HTML.
+
+    Every div tag is a block boundary: the text between two tags is one block, so a
+    div nested in another and text outside any div are kept, in their order.
+    """
     unwrapped = _unwrap_fenced_output(text)
-    blocks = DIV_BLOCK_RE.findall(unwrapped)
-    if not blocks:
-        return unwrapped.strip() + "\n"
-    cleaned = [b.strip() for b in blocks if b.strip()]
-    return "\n\n".join(cleaned).strip() + "\n"
+    blocks = (block.strip() for block in DIV_TAG_RE.split(unwrapped))
+    return "\n\n".join(block for block in blocks if block) + "\n"
 
 
 def _markdown_to_html(markdown_text: str, title: str = "Parsed Document") -> str:

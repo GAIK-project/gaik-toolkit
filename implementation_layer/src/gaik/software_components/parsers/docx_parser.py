@@ -1,5 +1,5 @@
 """
-Python-docx based parser for Word document (.docx, .doc) text extraction.
+Python-docx based parser for Word document (.docx) text extraction.
 
 This module uses python-docx to extract text from Word documents without
 requiring external APIs or heavy ML models.
@@ -10,11 +10,13 @@ import os
 from typing import Any
 
 from .._log_names import error_text, file_tag
-from ..file_type import check_file_type
+from ..file_type import FileTypeMismatchError, check_file_type
 from ..input_limits import InputLimits
 
 try:
     from docx import Document
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import qn
     from docx.table import Table
 
     DOCX_AVAILABLE = True
@@ -26,16 +28,126 @@ logger = logging.getLogger(__name__)
 
 _HEADING_LEVELS = {"Title": 1, **{f"Heading {n}": n for n in range(1, 7)}}
 
+# Elements that hold paragraphs, table rows, cells or runs that python-docx only reads
+# as direct children: content controls (w:sdt), tracked insertions and moves (w:ins,
+# w:moveTo), custom XML and smart tags, and simple fields such as a merge field.
+# Tracked deletions (w:del, w:moveFrom) stay out, as Word shows the document.
+_WRAPPERS = ("w:sdt", "w:ins", "w:moveTo", "w:customXml", "w:smartTag", "w:fldSimple")
+_WRAPPER_PROPERTIES = ("w:sdtPr", "w:sdtEndPr", "w:customXmlPr", "w:smartTagPr", "w:fldData")
+
+
+# Values of an OOXML on/off property that switch it off (CT_OnOff).
+_OFF = frozenset({"0", "false", "off"})
+
+
+def _placeholder_styles(doc) -> set[str]:
+    """The ids of the character style Word puts on placeholder text, if it has one.
+
+    Its name is "Placeholder Text" in every language; its id can be localized. Empty
+    when the document defines no such style (a writer other than Word, a style removed).
+    """
+    try:
+        return {
+            style.style_id
+            for style in doc.styles
+            if (style.name or "").lower() == "placeholder text" and style.style_id
+        }
+    except (AttributeError, KeyError, ValueError):
+        return set()
+
+
+def _placeholder_texts(doc) -> dict[str, str]:
+    """The text of each placeholder doc part in the document's glossary, by its name."""
+    texts: dict[str, str] = {}
+    try:
+        for part in doc.part.package.iter_parts():
+            if not str(part.partname).endswith("/glossary/document.xml"):
+                continue
+            for doc_part in parse_xml(part.blob).iter(qn("w:docPart")):
+                name = doc_part.find(f"{qn('w:docPartPr')}/{qn('w:name')}")
+                body = doc_part.find(qn("w:docPartBody"))
+                if name is not None and body is not None:
+                    texts[name.get(qn("w:val"))] = _text_of(body)
+    except Exception:  # A glossary that cannot be read leaves the old rule.
+        return {}
+    return texts
+
+
+def _text_of(element) -> str:
+    return "".join(node.text or "" for node in element.iter(qn("w:t"))).strip()
+
+
+def _shows_placeholder(sdt) -> bool:
+    flag = sdt.find(f"{qn('w:sdtPr')}/{qn('w:showingPlcHdr')}")
+    return flag is not None and (flag.get(qn("w:val")) or "1").lower() not in _OFF
+
+
+def _drop_placeholder_text(
+    sdt, content, placeholder_styles: set[str], placeholder_texts: dict[str, str]
+) -> None:
+    """Remove the runs of a content control that shows its placeholder.
+
+    With a placeholder text style in the document and styled runs in the control, the
+    runs in that style go and other text stays: a generator can fill a control and
+    leave its flag on. Otherwise the control's text goes, unless the placeholder doc
+    part it names has other text, which means the control was filled.
+    """
+    style = f"{qn('w:rPr')}/{qn('w:rStyle')}"
+    runs = list(content.iter(qn("w:r")))
+    if placeholder_styles and any(run.find(style) is not None for run in runs):
+        doomed = [
+            run
+            for run in runs
+            if run.find(style) is not None
+            and run.find(style).get(qn("w:val")) in placeholder_styles
+        ]
+    else:
+        doc_part = sdt.find(f"{qn('w:sdtPr')}/{qn('w:placeholder')}/{qn('w:docPart')}")
+        expected = None if doc_part is None else placeholder_texts.get(doc_part.get(qn("w:val")))
+        doomed = runs if expected is None or _text_of(content) == expected else []
+    for run in doomed:
+        run.getparent().remove(run)
+
+
+def _unwrap_content(
+    body, placeholder_styles: set[str], placeholder_texts: dict[str, str] | None = None
+) -> None:
+    """Put the content of each wrapper element (see ``_WRAPPERS``) in its place.
+
+    A content control showing its placeholder ("Click here to enter text") holds no
+    value: its placeholder text is dropped (see :func:`_drop_placeholder_text`), and
+    its paragraphs, rows and cells stay, so the table columns do not shift.
+    """
+    properties = {qn(tag) for tag in _WRAPPER_PROPERTIES}
+    for element in body.xpath(" | ".join(f".//{tag}" for tag in _WRAPPERS)):
+        parent = element.getparent()
+        if parent is None:
+            continue
+        if element.tag == qn("w:sdt"):
+            content = element.find(qn("w:sdtContent"))
+            children = [] if content is None else list(content)
+            if content is not None and _shows_placeholder(element):
+                _drop_placeholder_text(
+                    element, content, placeholder_styles, placeholder_texts or {}
+                )
+        else:
+            children = [child for child in element if child.tag not in properties]
+        index = parent.index(element)
+        parent[index : index + 1] = children
+
 
 class DocxParser:
     """
     A Word document parser using python-docx library for text extraction.
 
     Features:
-    - Fast local DOCX/DOC parsing without external APIs
-    - Extract text from paragraphs and tables
+    - Fast local DOCX parsing without external APIs
+    - Extract text from paragraphs and tables, including the text in content
+      controls and tracked insertions (not tracked deletions); ``keep_structure``
+      keeps document order, the other modes give the paragraphs, then the tables
     - Simple text extraction or structured output with formatting info
-    - Support for Word 2007+ documents (.docx)
+    - Support for Word 2007+ documents (.docx); a Word 97-2003 ``.doc`` file is
+      refused with the fix (save it as .docx)
     - Refuses a file over its input limits (size, unpacked size) with
       ``InputLimitError`` before reading it
     """
@@ -57,7 +169,8 @@ class DocxParser:
             )
 
         self.limits = limits or InputLimits()
-        self.supported_extensions = [".docx", ".doc"]
+        # A Word 97-2003 .doc is not read; a DOCX saved under that name still is.
+        self.supported_extensions = [".docx"]
 
     def parse_docx(
         self, file_path: str, use_markdown: bool = True, keep_structure: bool = False
@@ -80,7 +193,8 @@ class DocxParser:
             ValueError: If keep_structure is used with structured text, or the
                 file's content is not a DOCX
             FileTypeMismatchError: If the content is not a DOCX, or not the type
-                the file's extension says (a ``ValueError``)
+                the file's extension says (a ``ValueError``). For a Word 97-2003
+                document (.doc), the message says to save it as .docx.
             InputLimitError: If the file is over ``max_file_bytes``, or unpacks
                 to more than ten times that
             Exception: If DOCX parsing fails
@@ -93,11 +207,24 @@ class DocxParser:
         # the container with zipfile, and so does the content check.
         # The size comes first: the content check reads the archive's directory.
         self.limits.check_file_size(file_path)
-        check_file_type(file_path, {"docx"})
+        try:
+            check_file_type(file_path, {"docx"})
+        except FileTypeMismatchError as exc:
+            if exc.detected != "ole":
+                raise
+            raise FileTypeMismatchError(
+                f"{exc} DocxParser reads .docx only: open the file in Word or "
+                "LibreOffice and save it as .docx.",
+                file_name=exc.file_name,
+                extension=exc.extension,
+                detected=exc.detected,
+                expected=exc.expected,
+            ) from None
         self.limits.check_zip_container(file_path)
 
         try:
             doc = Document(file_path)
+            _unwrap_content(doc.element.body, _placeholder_styles(doc), _placeholder_texts(doc))
 
             if keep_structure:
                 text_content = self._extract_markdown_docx(doc)
@@ -141,7 +268,7 @@ class DocxParser:
             Dictionary containing:
                 - file_path: Original file path
                 - file_name: File name
-                - file_extension: File extension (.docx, .doc)
+                - file_extension: File extension (.docx)
                 - text_content: Parsed document content
                 - content_length: Length of parsed content
                 - word_count: Number of words in content
@@ -150,7 +277,8 @@ class DocxParser:
 
         Raises:
             FileNotFoundError: If file does not exist
-            ValueError: If file is not a DOCX/DOC
+            ValueError: If file is not a DOCX; a Word 97-2003 .doc is refused
+                with ``FileTypeMismatchError`` saying to save it as .docx
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -158,9 +286,11 @@ class DocxParser:
         file_extension = os.path.splitext(file_path)[1].lower()
         file_name = os.path.basename(file_path)
 
-        if file_extension not in self.supported_extensions:
+        # A .doc goes on to parse_docx, which reads a DOCX saved under that name and
+        # refuses a Word 97-2003 document with the fix.
+        if file_extension not in self.supported_extensions and file_extension != ".doc":
             raise ValueError(
-                f"Unsupported file type: {file_extension}. Only DOCX/DOC files are supported."
+                f"Unsupported file type: {file_extension}. Only DOCX files are supported."
             )
 
         format_type = "markdown" if use_markdown else "structured"
@@ -184,7 +314,7 @@ class DocxParser:
         }
 
     def is_supported_file(self, file_path: str) -> bool:
-        """Check if file format is supported (.docx or .doc)."""
+        """Check if file format is supported (.docx)."""
         extension = os.path.splitext(file_path)[1].lower()
         return extension in self.supported_extensions
 
@@ -250,11 +380,11 @@ def parse_docx(
     """
     Convenience function to parse a Word document with minimal setup.
 
-    This function provides a simple interface to parse DOCX/DOC files using python-docx.
+    This function provides a simple interface to parse DOCX files using python-docx.
     Fast local parsing without external APIs or ML models.
 
     Args:
-        file_path: Path to the DOCX/DOC file
+        file_path: Path to the DOCX file
         use_markdown: Return simple text (True) or structured text with formatting (False)
         output_path: Optional path to save the parsed content
 
@@ -264,7 +394,7 @@ def parse_docx(
     Raises:
         ImportError: If python-docx is not installed
         FileNotFoundError: If file does not exist
-        ValueError: If file is not a DOCX/DOC
+        ValueError: If file is not a DOCX
 
     Example:
         >>> from docx_parser import parse_docx
