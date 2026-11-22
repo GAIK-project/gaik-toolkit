@@ -118,6 +118,39 @@ def test_a_cleanup_cut_off_before_any_text_returns_the_pages(monkeypatch, tmp_pa
     assert parser.convert_pdf(str(_two_page_pdf(tmp_path / "a.pdf"))) == ["# Page 1", "# Page 2"]
 
 
+@pytest.mark.parametrize("content", ["", None])
+def test_a_page_cut_off_before_any_text_raises(monkeypatch, content):
+    # As before for an empty reply: a page must not come back empty without an error.
+    completions = SimpleNamespace(
+        create=lambda **kwargs: SimpleNamespace(
+            choices=[
+                SimpleNamespace(message=SimpleNamespace(content=content), finish_reason="length")
+            ],
+            usage=None,
+        )
+    )
+    parser = _vision_parser(monkeypatch, completions)
+
+    with pytest.raises(RuntimeError, match="empty content: the reply stopped at max_tokens"):
+        parser._parse_image(b"image", page=1, previous_context=None)
+
+
+def test_a_page_cut_off_after_some_text_keeps_it(monkeypatch, caplog):
+    completions = SimpleNamespace(
+        create=lambda **kwargs: SimpleNamespace(
+            choices=[
+                SimpleNamespace(message=SimpleNamespace(content="# Pa"), finish_reason="length")
+            ],
+            usage=None,
+        )
+    )
+    parser = _vision_parser(monkeypatch, completions)
+
+    with caplog.at_level("WARNING"):
+        assert parser._parse_image(b"image", page=2, previous_context=None) == "# Pa"
+    assert "Page 2: the reply stopped" in caplog.text
+
+
 def test_a_finished_cleanup_still_replaces_the_pages(monkeypatch, tmp_path):
     parser = _vision_parser(monkeypatch, _Completions("# Page 1\n\n# Page 2", "stop"))
 
@@ -174,6 +207,24 @@ def test_a_cut_off_cleanup_through_a_shared_client_returns_the_pages(monkeypatch
         ("```python\nprint(1)\n```\n\nText after", "```python\nprint(1)\n```\n\nText after"),
         ("# Title\n\n```json\n{}\n```", "# Title\n\n```json\n{}\n```"),
         ("No fence", "No fence"),
+        # A wrapper around a document that holds its own code blocks.
+        (
+            "```markdown\n# T\n\n```py\nx\n```\n\ntext\n```",
+            "# T\n\n```py\nx\n```\n\ntext",
+        ),
+        ("```\n# T\n```py\nx\n```\ntext\n```", "# T\n```py\nx\n```\ntext"),
+        # An untagged inner block: the markdown tag says the outer fence is a wrapper.
+        ("```markdown\n# T\n```\nx\n```\ntext\n```", "# T\n```\nx\n```\ntext"),
+        # A wrapper that never closes, around a closed inner block.
+        ("```markdown\n# T\n```py\nx\n```", "# T\n```py\nx\n```"),
+        # Two code blocks of the document, at its start and its end.
+        ("```py\na\n```\ntext\n```js\nb\n```", "```py\na\n```\ntext\n```js\nb\n```"),
+        # CRLF line ends.
+        (
+            "```python\r\nprint(1)\r\n```\r\n\r\nText after",
+            "```python\r\nprint(1)\r\n```\r\n\r\nText after",
+        ),
+        ("```markdown\r\n# Title\r\n```", "# Title"),
     ],
 )
 def test_the_cleanup_takes_off_a_wrapping_fence_with_its_language_tag(monkeypatch, reply, expected):

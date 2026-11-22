@@ -59,24 +59,44 @@ __all__ = ["OpenAIConfig", "VisionParser", "get_openai_config"]
 
 logger = logging.getLogger(__name__)
 
-# A fence around the whole reply: ``` with an optional language tag such as markdown.
-_FENCE_OPEN = re.compile(r"```[^`\n]*\Z")
-_FENCE_CLOSE = re.compile(r"```[ \t]*\Z")
+# A fence line: ``` with an optional language tag such as markdown or python.
+_FENCE = re.compile(r"```(?P<info>[^`]*)\Z")
+# Tags a model puts on a fence around the whole document.
+_DOCUMENT_TAGS = frozenset({"markdown", "md"})
 
 
 def _unwrap_fence(text: str) -> str:
     """The text without a code fence the model put around all of it.
 
-    A fence that closes before the end opens a code block of the document, which is
-    kept; one that never closes is taken off.
+    Fences are paired by nesting: one with a language tag opens a block, a bare one
+    closes the innermost. When the first fence closes on the last line, or the first
+    fence is tagged markdown and the last line is a bare fence, the pair wraps the
+    whole text and is taken off. A first fence that closes earlier opens a code block
+    of the document, which is kept; one that never closes is taken off.
     """
     lines = text.split("\n")
-    if not _FENCE_OPEN.match(lines[0]):
+    fences = [_FENCE.match(line.strip()) for line in lines]
+    if fences[0] is None:
         return text
-    closing = [n for n, line in enumerate(lines[1:], start=1) if _FENCE_CLOSE.match(line)]
-    if closing and closing[0] != len(lines) - 1:
+    depth, closed_at = 1, None
+    for number, fence in enumerate(fences[1:], start=1):
+        if fence is None:
+            continue
+        depth += 1 if fence["info"].strip() else -1
+        if depth == 0:
+            closed_at = number
+            break
+    last = len(lines) - 1
+    if closed_at is None:
+        body = lines[1:]
+    elif closed_at == last or (
+        fences[0]["info"].strip().lower() in _DOCUMENT_TAGS
+        and fences[last] is not None
+        and not fences[last]["info"].strip()
+    ):
+        body = lines[1:last]
+    else:
         return text
-    body = lines[1:-1] if closing else lines[1:]
     return "\n".join(body).strip()
 
 
@@ -519,9 +539,14 @@ class VisionParser:
         # message next to an image.
         payload[0]["text"] = f"{SOURCE_MATERIAL_INSTRUCTION}\n\n{payload[0]['text']}"
         content = self._chat_content([{"role": "user", "content": payload}])
-        if content is None:
-            raise RuntimeError("Vision model returned empty content")
-        if getattr(content, "cut_off", False):
+        cut_off = getattr(content, "cut_off", False)
+        if content is None or (cut_off and not content):
+            # A reasoning model can spend the whole budget before it writes anything.
+            raise RuntimeError(
+                "Vision model returned empty content"
+                + (f": the reply stopped at max_tokens={self.max_tokens}" if cut_off else "")
+            )
+        if cut_off:
             logger.warning("Page %s: the reply stopped at max_tokens=%s", page, self.max_tokens)
         return str(content)
 
