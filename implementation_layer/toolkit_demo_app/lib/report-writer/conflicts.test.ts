@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
+  conflictKeys,
   followedIds,
   type KnowledgeConflict,
   namesSides,
   resolveConflict,
   resolvedByText,
   sideProblem,
+  stillChosen,
   withoutFact,
 } from "./conflicts";
 
@@ -125,5 +127,49 @@ describe("followedIds and resolvedByText", () => {
     expect(followedIds(resolved({ preferred_unit_ids: ["wall-01"] }))).toEqual(
       [],
     );
+  });
+});
+
+describe("an open Settle it card", () => {
+  const conflicts = (): KnowledgeConflict[] => [
+    { ...current(), topic: "Roof age", unit_ids: ["roof-01", "roof-02"] },
+    {
+      ...current(),
+      topic: "Roof leaks",
+      description: "The inspector saw a leak, the seller says none.",
+      unit_ids: ["roof-03", "roof-04", "roof-05"],
+    },
+  ];
+
+  test("keeps its key when an earlier conflict is dropped or one of its facts removed", () => {
+    const [, leaks] = conflictKeys(conflicts());
+    // Removing roof-01 drops the first conflict; the second moves up a place.
+    const dropped = withoutFact(conflicts(), "roof-01");
+    expect(dropped.map((c) => c.topic)).toEqual(["Roof leaks"]);
+    expect(conflictKeys(dropped)).toEqual([leaks]);
+    // Removing one of its own facts leaves it the same card.
+    const fewer = withoutFact(conflicts(), "roof-05");
+    expect(conflictKeys(fewer)[1]).toBe(leaks);
+  });
+
+  test("tells conflicts apart that share a topic and description", () => {
+    const twin = conflicts()[0];
+    const keys = conflictKeys([
+      twin,
+      { ...twin, unit_ids: ["roof-06", "roof-07"] },
+    ]);
+    expect(new Set(keys).size).toBe(2);
+  });
+
+  test("forgets a chosen fact that was removed, so the choice can still be saved", () => {
+    const leaks = conflicts()[1];
+    const chosen = ["roof-03"];
+    const [after] = withoutFact([leaks], "roof-03");
+    expect(sideProblem(after, chosen)).toContain("only facts of this conflict");
+    expect(stillChosen(after, chosen)).toEqual([]);
+    expect(stillChosen(after, ["roof-03", "roof-04"])).toEqual(["roof-04"]);
+    expect(
+      sideProblem(after, stillChosen(after, ["roof-03", "roof-04"])),
+    ).toBeNull();
   });
 });

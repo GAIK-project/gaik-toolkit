@@ -40,6 +40,18 @@ export function sideProblem(
 }
 
 /**
+ * The chosen facts that are still facts of the conflict: one removed while the choice
+ * was open is no longer chosen.
+ */
+export function stillChosen(
+  conflict: KnowledgeConflict,
+  preferred: string[],
+): string[] {
+  const ids = conflict.unit_ids ?? [];
+  return preferred.filter((id) => ids.includes(id));
+}
+
+/**
  * The facts a resolved conflict follows: its `preferred_unit_ids` that are its own units.
  * Empty for an unresolved conflict, and for a file from a gaik that names no sides.
  */
@@ -47,6 +59,21 @@ export function followedIds(conflict: KnowledgeConflict): string[] {
   if (conflict.status !== "resolved") return [];
   const ids = conflict.unit_ids ?? [];
   return (conflict.preferred_unit_ids ?? []).filter((id) => ids.includes(id));
+}
+
+/**
+ * A key for each conflict that stays the same when facts are removed: its topic and
+ * description, which `withoutFact` leaves as they are, whatever else it drops. Conflicts
+ * alike in both are told apart by their order.
+ */
+export function conflictKeys(conflicts: KnowledgeConflict[]): string[] {
+  const seen = new Map<string, number>();
+  return conflicts.map((conflict) => {
+    const key = JSON.stringify([conflict.topic, conflict.description]);
+    const count = seen.get(key) ?? 0;
+    seen.set(key, count + 1);
+    return count === 0 ? key : `${key}#${count}`;
+  });
 }
 
 /**

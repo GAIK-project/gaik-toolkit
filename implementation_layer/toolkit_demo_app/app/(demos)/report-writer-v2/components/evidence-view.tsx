@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  conflictKeys,
   followedIds,
   type KnowledgeConflict,
   namesSides,
   resolveConflict,
   resolvedByText,
   sideProblem,
+  stillChosen,
   withoutFact,
 } from "@/lib/report-writer/conflicts";
 import { cn } from "@/lib/utils";
@@ -193,7 +195,9 @@ function ConflictCard({
   onResolve: (decision: string, preferred: string[]) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
-  const [preferred, setPreferred] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+  // A fact removed from the Evidence list while this is open is no longer chosen.
+  const preferred = stillChosen(conflict, picked);
   const sides = namesSides(conflict);
   const problem = sideProblem(conflict, preferred);
   const unresolved = conflict.status === "unresolved";
@@ -255,7 +259,7 @@ function ConflictCard({
             disabled={disabled}
             onClick={() => {
               setDraft(conflict.description);
-              setPreferred([]);
+              setPicked([]);
             }}
           >
             <Check />
@@ -278,10 +282,10 @@ function ConflictCard({
                       variant={chosen ? "default" : "outline"}
                       aria-pressed={chosen}
                       onClick={() =>
-                        setPreferred((ids) =>
+                        setPicked(
                           chosen
-                            ? ids.filter((id) => id !== fact.id)
-                            : [...ids, fact.id],
+                            ? preferred.filter((id) => id !== fact.id)
+                            : [...preferred, fact.id],
                         )
                       }
                     >
@@ -539,6 +543,9 @@ export function EvidenceView({
         const knowledgePath = `knowledge/${id}.json`;
         const knowledgeText = artifacts[knowledgePath];
         const knowledge = parseKnowledge(knowledgeText);
+        // Not the index: removing a fact can drop an earlier conflict, and an open
+        // card must keep its own draft and choice.
+        const conflictKey = conflictKeys(knowledge?.conflicts ?? []);
         const derived = section.depends_on.length > 0;
         const isOpen = open === id;
 
@@ -665,7 +672,7 @@ export function EvidenceView({
                     <ul className="space-y-2">
                       {knowledge.conflicts.map((conflict, index) => (
                         <ConflictCard
-                          key={index}
+                          key={conflictKey[index]}
                           conflict={conflict}
                           units={knowledge.units}
                           disabled={disabled}
