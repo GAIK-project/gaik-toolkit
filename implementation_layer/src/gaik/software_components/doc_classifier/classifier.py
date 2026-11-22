@@ -52,11 +52,11 @@ def _create_classification_model(classes: list[str]):
         document_class: ClassLiteral = Field(  # type: ignore
             ..., description="The classification category"
         )
-        confidence: float = Field(
+        # The classifier's own score and explanation: a strict Claude tool cannot
+        # carry their bounds, so an answer past one is fitted to it instead of failing.
+        confidence: Annotated[float, FIT_TO_BOUNDS] = Field(
             ..., ge=0.0, le=1.0, description="Confidence score between 0 and 1"
         )
-        # The classifier's own explanation: a strict Claude tool cannot carry the
-        # length limit, so a longer answer is cut to it instead of failing.
         reasoning: Annotated[str, FIT_TO_BOUNDS] = Field(
             ..., max_length=200, description="Brief explanation for the classification"
         )

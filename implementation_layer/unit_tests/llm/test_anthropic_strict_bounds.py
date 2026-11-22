@@ -233,14 +233,17 @@ def test_generated_sql_with_long_reasoning_keeps_its_sql():
     assert len(result.reasoning) == 500
 
 
-def test_the_document_classifier_keeps_its_class(tmp_path):
+@pytest.mark.parametrize(("confidence", "fitted"), [(0.9, 0.9), (1.2, 1.0), (95, 1.0), (-0.1, 0.0)])
+def test_the_document_classifier_keeps_its_class(confidence, fitted):
+    """Its own score and explanation opt in: a score past 0..1 or a long reasoning
+    no longer turns the answer into 'unknown'."""
     from gaik.software_components.doc_classifier.classifier import DocumentClassifier
 
-    answer = {"document_class": "invoice", "confidence": 0.9, "reasoning": "y" * 300}
+    answer = {"document_class": "invoice", "confidence": confidence, "reasoning": "y" * 300}
     classifier = DocumentClassifier(
         config=_config(STRICT, "ClassificationResult", answer, []), model=STRICT
     )
     result = classifier._classify_with_llm("Invoice 12", ["invoice", "receipt", "unknown"])
     assert result["class"] == "invoice"
-    assert result["confidence"] == 0.9
+    assert result["confidence"] == fitted
     assert len(result["reasoning"]) == 200
