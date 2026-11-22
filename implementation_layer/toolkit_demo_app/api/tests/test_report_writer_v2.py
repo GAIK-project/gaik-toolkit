@@ -222,7 +222,7 @@ def test_the_project_meeting_example_from_the_repository(client):
 # The top-level keys of ReportSpec in the gaik release api/requirements.txt pins. That
 # release forbids any other key, so a bundled example with one breaks /examples for every
 # example once deployed. Update both when the pin moves to a release with new keys.
-PINNED_GAIK = "0.11.1"
+PINNED_GAIK = "0.12.0"
 PINNED_SPEC_KEYS = {
     "title",
     "description",
@@ -230,6 +230,7 @@ PINNED_SPEC_KEYS = {
     "sections",
     "instructions",
     "sources",
+    "source_precedence",
     "sample_report",
     "models",
     "settings",
