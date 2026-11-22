@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -365,6 +366,68 @@ def test_edited_knowledge_is_checked_before_writing(tmp_path, capsys, change, ex
     assert not [c for c in FakeWriter.calls if c[0] == "synthesize"]
 
 
+def _two_sides() -> SectionKnowledge:
+    def unit(uid: str, file: str, quote: str, source_class: str) -> FactUnit:
+        return FactUnit(
+            id=uid,
+            topic="ventilation age",
+            time_qualifier=None,
+            summary=quote,
+            quote=quote,
+            source=SourceRef(file=file, locator=None),
+            source_class=source_class,
+            confidence="high",
+        )
+
+    return SectionKnowledge(
+        section_id="building_services",
+        units=[
+            unit("u1", "site_notes.txt", "Installed in 1998.", "primary"),
+            unit("u2", "old_report.md", "Installed in 2001.", "secondary"),
+        ],
+        missing=[],
+        conflicts=[],
+    )
+
+
+def test_a_conflict_an_older_gaik_resolved_is_not_shown_as_dropping_both_sides():
+    # gaik 0.11.1's Conflict has no preferred_unit_ids: its curator model resolved the
+    # conflict from the instructions, and the writer follows the side the description gives.
+    older = SimpleNamespace(
+        topic="ventilation age",
+        description="The site notes outrank the old report: the system dates from 1998.",
+        status="resolved",
+        unit_ids=["u1", "u2"],
+    )
+    entry = rr._resolved(older, _two_sides())
+
+    assert entry["decided_by"] == "description"
+    assert entry["description"] == older.description
+    assert entry["follows"] is None
+    assert entry["drops"] is None
+    assert [(u["id"], u["source"]) for u in entry["units"]] == [
+        ("u1", "site_notes.txt"),
+        ("u2", "old_report.md"),
+    ]
+
+
+def test_a_conflict_decided_by_source_precedence_names_the_side_it_follows():
+    conflict = Conflict(
+        topic="ventilation age",
+        description="The sources give 1998 and 2001.",
+        status="resolved",
+        unit_ids=["u1", "u2"],
+        preferred_unit_ids=["u1"],
+        resolved_by="primary",
+    )
+    entry = rr._resolved(conflict, _two_sides())
+
+    assert entry["decided_by"] == "preferred_unit_ids"
+    assert entry["resolved_by"] == "primary"
+    assert [u["id"] for u in entry["follows"]] == ["u1"]
+    assert [u["id"] for u in entry["drops"]] == ["u2"]
+
+
 # ── Preflight ───────────────────────────────────────────────────────
 
 
@@ -430,6 +493,39 @@ def test_preflight_checks_the_source_files(tmp_path, capsys, monkeypatch):
     assert "mixed.pdf: pages [2] have no text layer" in warnings
     assert "'info' is too vague" in warnings
     assert "report instructions are empty" in warnings
+
+
+def test_preflight_names_a_source_or_sample_over_the_input_limits(tmp_path, capsys, monkeypatch):
+    from gaik.software_components.input_limits import InputLimits
+
+    # The normalizer's limits, made small enough for a test file to exceed them.
+    monkeypatch.setattr(
+        InputLimits,
+        "local_parsing",
+        classmethod(lambda cls: cls(max_file_bytes=200, max_pages=None)),
+    )
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "big_notes.txt").write_text("x" * 500, encoding="utf-8")
+    (tmp_path / "sample.md").write_text("# Sample\n\n" + "y" * 500, encoding="utf-8")
+    spec_path = write_spec(
+        tmp_path,
+        sources={"primary": ["inputs/site_notes.txt", "inputs/big_notes.txt"]},
+        sample_report="sample.md",
+    )
+    code, out = cli(capsys, "preflight", spec_path, tmp_path / "ws")
+
+    assert code == rr.EXIT_INPUT
+    limit_errors = [e for e in out["errors"] if "InputLimits.max_file_bytes" in e]
+    assert len(limit_errors) == 2, out["errors"]
+    assert any(e.startswith("big_notes.txt is 500 bytes") for e in limit_errors)
+    assert any(e.startswith("sample.md is ") for e in limit_errors)
+    assert not any("site_notes.txt" in e for e in out["errors"])
+
+    # normalize stops in the same check, before the writer converts any file.
+    code, out = cli(capsys, "normalize", spec_path, tmp_path / "ws")
+    assert code == rr.EXIT_INPUT
+    assert not (tmp_path / "ws" / "normalized").exists()
 
 
 def test_preflight_rejects_a_sample_report_that_needs_a_model(tmp_path, capsys):

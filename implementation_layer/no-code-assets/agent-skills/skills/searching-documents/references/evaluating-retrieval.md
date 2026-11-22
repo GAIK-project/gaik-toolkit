@@ -94,8 +94,12 @@ On at least one corpus each — re-measure on yours before relying on it:
   at six times the latency.
 - **Translating into a keyword list** instead of a question (see `finnish.md`).
 - **Ordering documents by hit count** instead of fusing best-chunk rank with density.
-- **Raising `hnsw.ef_search` on a corpus of a few thousand rows** — the index already
-  returns exact neighbours.
+- **Raising `hnsw.ef_search` for recall on a corpus of a few thousand rows** — the index
+  already returned exact neighbours. It still caps the row count: an HNSW scan returns at
+  most `hnsw.ef_search` rows (40 by default), so on any corpus a vector search for more
+  rows than that comes back short, and so does the vector arm of a gaik hybrid search
+  above `top_k=13` (it reads `3 * top_k`). Set it to at least the largest number of rows a
+  vector search asks for before measuring.
 - **BM25 via a Postgres extension on a small corpus.** `ts_rank_cd` lacks IDF and
   term-frequency saturation, and both showed on a ~2,000-chunk corpus, but a deterministic
   fix already covered the visible symptom and the extension would have changed the database

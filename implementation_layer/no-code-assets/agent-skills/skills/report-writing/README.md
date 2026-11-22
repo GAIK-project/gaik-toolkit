@@ -68,7 +68,7 @@ The script will create a configuration file. You need to copy it to Claude Deskt
    - Press `Win + R`
    - Paste: `%APPDATA%\Claude\claude_desktop_config.json`
    - Press Enter
-3. If that file is missing or empty, paste the whole generated content. Otherwise add only the `"gaik-transcriber": {...}` entry to its existing `"mcpServers"` object, keep everything else, and save.
+3. If that file is missing or empty, paste the whole generated content. Otherwise copy both the `"gaik-transcriber": {...}` and the `"filesystem": {...}` entries into its existing `"mcpServers"` object, replacing any entry with the same name, keep everything else, and save. The new `filesystem` entry is the one that limits Claude's file access to the folder you chose; an older one may reach a whole drive.
 
 **Step 3: Restart Claude Desktop**
 

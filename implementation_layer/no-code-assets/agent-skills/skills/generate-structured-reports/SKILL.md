@@ -141,7 +141,8 @@ python <skill>/scripts/run_report.py preflight --spec SPEC --workspace WS --chec
 It costs nothing. It loads the spec with `ReportSpec.load()` and adds the checks the library
 makes only after money is spent, or never: PDF pages with no text layer (and pages with so
 little text they may be scans), duplicate file names, unsupported files, recordings with a
-provider that cannot transcribe them, a missing Pandoc (when it is reported and the user wants
+provider that cannot transcribe them, sources or a sample report over gaik's input limits
+(step 4), a missing Pandoc (when it is reported and the user wants
 Word, offer the install as in step 1; otherwise set `settings.docx` to `false`), and any input
 placed inside the workspace's stage folders, which the stages delete. Fix every error. Show the user each warning that changes the report, such as pages that
 will be missing.
@@ -159,6 +160,21 @@ speech model mishears some of them, especially names it has not seen. Never corr
 your own. Propose each correction to the user with the source that supports it and, once they
 agree, make it in the normalized text and keep a note of it
 (`references/review-and-resume.md`). What no other source settles stays as transcribed.
+
+**Input limits.** Since gaik 0.11.0 the normalizer refuses a file over its input limits with
+`InputLimitError`. Preflight checks the same limits first, so `normalize` usually stops there
+(exit 2, `preflight`); a limit preflight cannot check fails the stage (exit 5,
+`normalize-failed`). Either message names the file and the limit. The helper keeps gaik's defaults and cannot raise them: a document, spreadsheet,
+text or image file up to 100 MiB (a DOCX or XLSX may unpack to ten times that), an image up to
+89,478,485 pixels, a recording up to 6 hours, and up to 1,000,000 data rows per sheet or CSV
+file. A PDF's page count is not limited. Preflight reports every limit but the rows, at no
+cost (a recording's length only when `ffprobe` is installed; without it the normalizer
+checks the length when it decodes the audio); the normalizer checks the sources before it converts any of them, but counts a sheet's
+rows only while reading it, after the files listed before it were converted (recordings and
+images included, which are paid). Tell the user which file is over which limit, and let them
+choose: a smaller file (a document split in parts, part of a sheet exported, a recording
+shortened or split) or the file left out. Never cut a file or drop it from the spec without
+their yes.
 
 ### 5. The report spec, agreed in chat
 
@@ -342,9 +358,18 @@ list read back from the knowledge files proves nothing.
 ### 7. Evidence checkpoint
 
 Show a short summary per section: required items no source covers, unresolved conflicts,
-dropped facts, and each resolved conflict with the side it follows and the side it drops
-(`resolved_conflicts` in the curation summary: source and quote of each). The code picks
-that side from the source each unit cites, so ask the user to check those quotes. Then:
+dropped facts, and each resolved conflict (`resolved_conflicts` in the curation summary):
+
+- `decided_by: "preferred_unit_ids"`: the code picked the side from the source each unit
+  cites. Show the side it follows and the side it drops (source and quote of each), and ask
+  the user to check those quotes.
+- `decided_by: "description"`: a gaik without `source_precedence` (0.11.1 and earlier). Its
+  curator model resolved the conflict from the report instructions, and the writer follows the
+  side the conflict's `description` gives; no fact is dropped in code, so `follows` and `drops`
+  are null. Show the description with the quotes under `units`, and ask the user to check that
+  the description reads them right.
+
+Then:
 
 - If nothing material is open and the user already agreed to proceed, continue.
 - If the user wants corrections, edit `workspace/knowledge/<section>.json` or the normalized

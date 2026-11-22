@@ -34,7 +34,9 @@ ranker = Ranker(rrf_k=60)
 # and pgvector's default of 40 would cut top_k=50 to 40.
 with PgVectorStore(DATABASE_URL, hnsw_ef_search=100) as store:
     # threshold=0.0: search_semantic's default of 0.7 is a filter, and it
-    # would drop most relevant chunks before the fusion sees them.
+    # would drop most relevant chunks before the fusion sees them. 0.0 still
+    # drops rows with a negative cosine similarity (rare with text embeddings);
+    # pass -1.0 where recall is the point.
     semantic = store.search_semantic(query_embedding, top_k=50, threshold=0.0)
     keyword = store.search_keyword(query_text, top_k=50)
 

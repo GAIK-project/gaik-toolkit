@@ -247,7 +247,7 @@ if not exist "%WORK_FOLDER%\" mkdir "%WORK_FOLDER%"
 "%VENV_PYTHON%" "%SERVER_PATH%" --check-folder "%WORK_FOLDER%" >nul
 if %errorlevel% neq 0 (
     echo [ERROR] "!WORK_FOLDER!" is not a folder Claude can be limited to.
-    echo         It must not be your whole user folder or hold this setup folder.
+    echo         It must not be your whole user folder, hold this setup folder or lie inside it.
     echo         Choose a folder of its own, for example %USERPROFILE%\Documents\GAIK.
     pause
     exit /b 1

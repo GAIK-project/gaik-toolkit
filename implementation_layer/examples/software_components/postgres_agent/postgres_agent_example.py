@@ -33,8 +33,13 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 # Add src directory to path to import modules (works without pip install)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
+from gaik.software_components.env_file import load_env_file  # noqa: E402
 from gaik.software_components.postgres_agent import PostgresAgent  # noqa: E402
 from seed_demo_db import DEMO_SCHEMA, seed_demo_db  # noqa: E402
+
+# Settings kept only in the repository's .env are read below before any gaik config
+# helper runs, so load that file (found from the gaik package) first.
+load_env_file()
 
 # Connection string (override with the DATABASE_URL environment variable)
 DATABASE_URL = os.getenv(
