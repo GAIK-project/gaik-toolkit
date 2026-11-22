@@ -97,8 +97,14 @@ def test_float_and_decimal_choices_stay_numbers():
 
 def test_the_policies_keep_values_to_the_choices_with_their_types(report):
     assert apply_field_policies(
-        {"hazard_types": ["fire", "water", " chemical "], "rating": "3"}, report
+        {"hazard_types": ["fire", "water", " chemical "], "rating": 3}, report
     ) == {"hazard_types": ["fire", "chemical"], "rating": 3}
+    # A choice written as text stays text: a model saved by gaik 0.11.1 has the
+    # choices as texts (review of #317). VisionExtractor matches it to its model.
+    assert apply_field_policies({"hazard_types": [], "rating": "3"}, report) == {
+        "hazard_types": [],
+        "rating": "3",
+    }
     assert apply_field_policies({"hazard_types": "fire, water", "rating": 7}, report) == {
         "hazard_types": ["fire"],
         "rating": None,
@@ -211,6 +217,16 @@ def test_vision_extractor_validates_typed_choices(report, monkeypatch):
     assert result.data == {"hazard_types": ["fire"], "rating": None}
 
     canned.update(hazard_types=["chemical"], rating=4)
+    result = extractor.extract(
+        file_paths=["report.png"],
+        user_requirements="hazards and rating",
+        extraction_model=model,
+        requirements=report,
+    )
+    assert result.data == {"hazard_types": ["chemical"], "rating": 4}
+
+    # A provider that writes the number as text still gets a number here.
+    canned.update(rating="4")
     result = extractor.extract(
         file_paths=["report.png"],
         user_requirements="hazards and rating",

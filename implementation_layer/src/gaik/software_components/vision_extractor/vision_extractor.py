@@ -7,7 +7,9 @@ from __future__ import annotations
 import json
 import math
 import time
+import types
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Literal, Union, get_args, get_origin
 
@@ -222,6 +224,84 @@ def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
         __config__=model.model_config,
         **wrapped_fields,
     )
+
+
+def _as_decimal(value) -> Decimal | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = Decimal(value.strip() if isinstance(value, str) else str(value))
+    except (ArithmeticError, ValueError, TypeError):
+        return None
+    return number if number.is_finite() else None
+
+
+def _matched_choice(value, choices: tuple):
+    """``value`` as the choice it stands for, in the type the model gives it.
+
+    ``4`` for ``Literal['', '1', ..., '5']`` (a model saved by gaik 0.11.1) is
+    ``'4'``, and ``'4'`` for ``Literal[1, ..., 5]`` is ``4``. Such a model also
+    held a ``list[str]`` field with choices as one ``Literal``, so a list of one
+    choice is that choice and an empty list is ``''`` when that is a choice. A
+    value that stands for no choice is returned as it is, for validation to
+    refuse.
+    """
+    original = value
+    if isinstance(value, list):
+        if len(value) > 1:
+            return value
+        if not value:
+            return "" if "" in choices else value
+        value = value[0]
+    for choice in choices:
+        if type(choice) is type(value) and choice == value:
+            return value
+    number = _as_decimal(value)
+    if number is not None:
+        for choice in choices:
+            if isinstance(choice, bool) or type(choice) is type(value):
+                continue
+            if isinstance(choice, (int, float, str)) and _as_decimal(choice) == number:
+                return choice
+    return original
+
+
+def _matched_value(value, annotation):
+    union = get_args(annotation) if get_origin(annotation) in (Union, types.UnionType) else ()
+    if union:
+        inner = [arg for arg in union if arg is not type(None)]
+        if len(inner) != 1:
+            return value
+        annotation = inner[0]
+    origin = get_origin(annotation)
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return _matched_to_model(value, annotation)
+    if origin is list:
+        args = get_args(annotation)
+        if args and isinstance(value, list):
+            return [_matched_value(item, args[0]) for item in value]
+        return value
+    if origin is Literal:
+        return _matched_choice(value, get_args(annotation))
+    return value
+
+
+def _matched_to_model(data, model: type[BaseModel]):
+    """``data`` with each choice in the type ``model`` gives it, before validation.
+
+    A field's choices are numbers in a model gaik builds now and texts in one
+    saved by gaik 0.11.1 (``Literal['', '1', ...]``); the field policies keep a
+    choice as the provider wrote it, so it is matched to the model in use here.
+    Nothing else changes: a number never becomes text, or text a number, unless
+    it stands for one of that field's choices.
+    """
+    if not isinstance(data, dict):
+        return data
+    result = dict(data)
+    for name, info in model.model_fields.items():
+        if name in result:
+            result[name] = _matched_value(result[name], info.annotation)
+    return result
 
 
 def _within_schema_name_limit(model: type[BaseModel]) -> type[BaseModel]:
@@ -966,8 +1046,13 @@ class VisionExtractor:
 
     @staticmethod
     def _validate_result(result_dict: dict, model: type[BaseModel]) -> dict:
-        """Validate provider output against the expected Pydantic model."""
-        return model.model_validate(result_dict).model_dump()
+        """Validate provider output against the expected Pydantic model.
+
+        A choice is first matched to the type ``model`` gives it (see
+        :func:`_matched_to_model`), so a schema saved by gaik 0.11.1, whose number
+        choices are texts, still validates the answers it gets.
+        """
+        return model.model_validate(_matched_to_model(result_dict, model)).model_dump()
 
     @staticmethod
     def _normalize_numeric_placeholders(result_dict: dict, requirements: RequirementsSpec) -> dict:

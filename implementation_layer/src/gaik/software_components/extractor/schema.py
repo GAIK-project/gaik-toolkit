@@ -2362,8 +2362,10 @@ def _within_enum(field: FieldSpec, value):
 
     A text field's value must be one of its choices. A ``list[str]`` field keeps
     the items that are choices. A number field whose choices are numbers (see
-    :func:`_enum_numbers`) keeps a value equal to one of them, as a number of its
-    type, so ``"3"`` on an ``int`` field with choices 1 to 5 is ``3``.
+    :func:`_enum_numbers`) keeps a value equal to one of them: a number as a
+    number of its type, and a choice written as text (``"3"``) as that text,
+    since a model saved by gaik 0.11.1 has the choices as texts. Nothing here
+    turns text into a number the model in use does not take.
     """
     if field.field_type == "list[str]":
         choices = {c for c in field.enum if c != ""}
@@ -2378,6 +2380,11 @@ def _within_enum(field: FieldSpec, value):
     numbers = _enum_numbers(field)
     if numbers == []:
         return value  # no choices: any number
+    if numbers is not None and isinstance(value, str) and value in field.enum:
+        # One of the choices as text: a model saved by gaik 0.11.1 or earlier
+        # has the choices as texts (Literal['', '1', ...]), so the value stays
+        # what the model in use gave. VisionExtractor matches it to its model.
+        return value
     if numbers is not None:
         has_default, default = _normalize_explicit_default(field)
         allowed = numbers + ([default] if has_default else [])
