@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -28,16 +29,25 @@ logger = logging.getLogger(__name__)
 
 # What a default Vertex location was found not to serve, shared by every
 # provider in the process: components build a provider per request, and each
-# would otherwise wait for the same answer again.
-# (project, location, model) the location answered 404 for.
-_NOT_SERVED: set[tuple[str, str, str]] = set()
-# (project, location) -> monotonic time until which the fallback is used, after
-# the location failed with a server error, a timeout or a quota answer.
-_UNAVAILABLE_UNTIL: dict[tuple[str, str], float] = {}
+# would otherwise wait for the same answer again. Both are keyed on
+# (project, location, model), so one model's answer does not move the others.
+# -> monotonic time until which the fallback is used, after the location
+# answered 404 for the model.
+_NOT_SERVED: dict[tuple[str, str, str], float] = {}
+# -> monotonic time until which the fallback is used, after the location failed
+# with a server error, a timeout or a quota answer for the model.
+_UNAVAILABLE_UNTIL: dict[tuple[str, str, str], float] = {}
+# Guards both records; an entry is dropped once read after it expired.
+_STATE_LOCK = threading.Lock()
 # How long a failing location is left alone before it is tried again.
 LOCATION_RETRY_SECONDS = 600.0
+# How long a model the location does not serve goes to the fallback before the
+# location is asked again, so a model added to the location later is used there.
+NOT_SERVED_RETRY_SECONDS = 3600.0
 # The request timeout when the config sets none and the location has a fallback.
 PREFERRED_LOCATION_TIMEOUT_SECONDS = 120.0
+# The variable a warning tells the reader to set to choose the location.
+LOCATION_ENV = "GOOGLE_CLOUD_LOCATION"
 
 
 def _fallback_location(config: dict) -> str | None:
@@ -58,17 +68,37 @@ def _fallback_location(config: dict) -> str | None:
     return fallback if fallback and fallback != (config.get("location") or "eu") else None
 
 
+def _on_fallback(key: tuple[str, str, str]) -> bool:
+    """Whether the model's requests go to the fallback now; drops expired entries."""
+    now = time.monotonic()
+    on_fallback = False
+    with _STATE_LOCK:
+        for record in (_NOT_SERVED, _UNAVAILABLE_UNTIL):
+            until = record.get(key)
+            if until is None:
+                continue
+            if until > now:
+                on_fallback = True
+            else:
+                del record[key]
+    return on_fallback
+
+
 def _is_timeout(exc: BaseException) -> bool:
     return "Timeout" in type(exc).__name__ or isinstance(exc, TimeoutError)
 
 
 def _usage(response) -> dict[str, int]:
-    if not getattr(response, "usage_metadata", None):
+    meta = getattr(response, "usage_metadata", None)
+    if not meta:
         return {}
     return {
         # The SDK declares every count Optional; a missing count is 0 tokens.
-        "prompt_tokens": response.usage_metadata.prompt_token_count or 0,
-        "completion_tokens": response.usage_metadata.candidates_token_count or 0,
+        "prompt_tokens": meta.prompt_token_count or 0,
+        # Thinking tokens are billed as output but counted apart from the answer's
+        # (candidates) tokens; like OpenAI's completion tokens, the count holds both.
+        "completion_tokens": (meta.candidates_token_count or 0)
+        + (getattr(meta, "thoughts_token_count", None) or 0),
     }
 
 
@@ -79,6 +109,8 @@ class GoogleProvider:
         self.embedding_model = config.get("embedding_model", "gemini-embedding-001")
         self._config = config
         self.usage = UsageCounter()
+        # Threads that share the provider build each location's client once.
+        self._clients_lock = threading.Lock()
         options = {}
         http_options = {}
         timeout = config.get("timeout")
@@ -124,6 +156,10 @@ class GoogleProvider:
                     vertex_host(location)
 
             def vertex_client(location: str):
+                with self._clients_lock:
+                    return build(location)
+
+            def build(location: str):
                 if location not in self._clients:
                     log_endpoint("vertex", vertex_host(location))
                     client_options = options
@@ -155,57 +191,77 @@ class GoogleProvider:
             self._fallback_location = None
             log_endpoint("google", "generativelanguage.googleapis.com")
             self.raw = genai.Client(api_key=config["api_key"], **options)
+            self._clients = {"": self.raw}
+
+    def close(self) -> None:
+        """Close every SDK client this provider built: after a fallback that is two.
+
+        Closing ``raw`` alone would leave the other location's connections open.
+        """
+        with self._clients_lock:
+            clients, self._clients = list(self._clients.values()), {}
+        for client in clients:
+            close = getattr(client, "close", None)
+            if callable(close):
+                close()
 
     def _use(self, location: str) -> Any:
-        self.location = location
-        self.raw = self._vertex_client(location)
-        return self.raw
+        # Return the client itself: another thread may set ``raw`` in between.
+        client = self._vertex_client(location)
+        self.location, self.raw = location, client
+        return client
 
     def _in_location(self, call: Callable[[Any], Any], model: str) -> Any:
         """Run ``call(client)`` in the preferred location, else in the fallback.
 
         Only a default location has a fallback; one set by the caller or the
-        environment is used as given. The fallback takes the request when the
-        preferred location does not serve the model (404), and for
-        ``LOCATION_RETRY_SECONDS`` after it failed with a server error, a
-        timeout or a quota answer. After that the preferred location is tried
-        again. Each switch is logged, because the global endpoint is not tied
-        to a region.
+        environment is used as given. The fallback takes the model's requests
+        for ``NOT_SERVED_RETRY_SECONDS`` after the preferred location answered
+        that it does not serve the model (404), and for ``LOCATION_RETRY_SECONDS``
+        after it failed for the model with a server error, a timeout or a quota
+        answer. After that the preferred location is tried again. Other models
+        keep using the preferred location. Each switch is logged, because the
+        global endpoint is not tied to a region.
         """
         fallback = self._fallback_location
         if fallback is None:
             return call(self.raw)
         preferred = self._preferred_location
-        down_key = (self._project, preferred)
-        if (self._project, preferred, model) in _NOT_SERVED:
-            return call(self._use(fallback))
-        if _UNAVAILABLE_UNTIL.get(down_key, 0.0) > time.monotonic():
+        key = (self._project, preferred, model)
+        if _on_fallback(key):
             return call(self._use(fallback))
         try:
             return call(self._use(preferred))
         except Exception as exc:
             code = getattr(exc, "code", None)
             if isinstance(exc, genai_errors.ClientError) and code == 404:
-                _NOT_SERVED.add((self._project, preferred, model))
-                reason = f"does not serve {model}"
+                with _STATE_LOCK:
+                    _NOT_SERVED[key] = time.monotonic() + NOT_SERVED_RETRY_SECONDS
+                reason = (
+                    f"does not serve {model}; it is asked again in "
+                    f"{int(NOT_SERVED_RETRY_SECONDS / 60)} minutes"
+                )
             elif (
                 isinstance(exc, genai_errors.ServerError)
                 or (isinstance(exc, genai_errors.ClientError) and code == 429)
                 or _is_timeout(exc)
             ):
-                _UNAVAILABLE_UNTIL[down_key] = time.monotonic() + LOCATION_RETRY_SECONDS
+                with _STATE_LOCK:
+                    _UNAVAILABLE_UNTIL[key] = time.monotonic() + LOCATION_RETRY_SECONDS
                 reason = (
-                    f"did not answer ({type(exc).__name__}{f' {code}' if code else ''}); "
-                    f"it is tried again in {int(LOCATION_RETRY_SECONDS / 60)} minutes"
+                    f"did not answer for {model} ({type(exc).__name__}"
+                    f"{f' {code}' if code else ''}); it is tried again in "
+                    f"{int(LOCATION_RETRY_SECONDS / 60)} minutes"
                 )
             else:
                 raise
             logger.warning(
                 "Vertex AI location %r %s. Using %r, which is not tied to a region. "
-                "Set GOOGLE_CLOUD_LOCATION to choose the location.",
+                "Set %s to choose the location.",
                 preferred,
                 reason,
                 fallback,
+                self._config.get("_location_env") or LOCATION_ENV,
             )
             return call(self._use(fallback))
 

@@ -259,7 +259,7 @@
     "import": "from gaik.software_components.extractor import SchemaGenerator",
     "construct": "schema_gen = SchemaGenerator(config=get_stage_config(config, 'extraction'))",
     "call": "schema, requirements = _load_output_schema(schema_dir)\n    if schema is None:\n        schema = schema_gen.generate_schema(user_requirements=user_requirements)\n        requirements = schema_gen.item_requirements\n        schema_dir.mkdir(parents=True, exist_ok=True)\n        _save_output_schema(schema_gen, schema, requirements, schema_dir)",
-    "returns": "Pydantic model class; .item_requirements = ExtractionRequirements or CompositeExtractionRequirements for parent-with-repeated-record schemas",
+    "returns": "Pydantic model class; .item_requirements = ExtractionRequirements or CompositeExtractionRequirements for parent-with-repeated-record schemas. Since the gaik release after 0.11.1 each ChildRequirements has nullable (default False): a collection the task lets be null is list[Row] | None",
     "install_extra": "extract",
     "note": "Use _load_output_schema() first -- the wizard pre-generates the schema; only call generate_schema() when _load_output_schema() returns None. Schema files are always named output_schema.* regardless of the class name. When the user changes the requirements after approving a schema, keep the approved requirements and structure before regenerating (the template's _load_output_schema drops them once the requirements hash changes): read output_schema_requirements.json, call generate_schema_with_usage(user_requirements, approved_requirements=<its requirements dict>, approved_structure=<the approved StructureAnalysis or its model_dump() dict when kept, else 'flat' or 'nested_list'>), and show result.diff (structure, fields added, removed, changed; wording apart; notes) for approval before saving. With 'nested_list' the diff notes that a renamed list container cannot be seen, so result.diff.is_empty stays false. A wrong approved_structure raises ValueError before any model call.",
     "options": [
@@ -365,7 +365,7 @@
         "name": "include_verification",
         "type": "bool",
         "default": false,
-        "effect": "Per-field confidence_score + confidence_reason (the model's own rating, not proof) and found_in_text + page (the value checked against the PDF text layer; None without one). Use found_in_text, not the score, to flag values for human review.",
+        "effect": "Per-field confidence_score + confidence_reason (the model's own rating, not proof) and found_in_text + page (the value checked against the PDF text layer; None without one). Since the gaik release after 0.11.1 each entry also has file (the PDF the value was found in), and page counts within that file instead of across all files. Use found_in_text, not the score, to flag values for human review.",
         "selection_relevant": true,
         "infer_from": "human_review == yes OR target_output_spec.confidence_required"
       },
@@ -793,6 +793,14 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for each file, through its parsers: size (100 MiB) and image pixels; with parser='vision' only the first page of a PDF is rendered and sent. The error is not wrapped in the classification ValueError. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "temperature",
+        "type": "float | None",
+        "default": 0.0,
+        "effect": "Since the gaik release after 0.11.1: the sampling temperature of the classification call on the OpenAI and Azure client, 0.0 by default as before. None leaves it out, for a model that refuses an explicit temperature (its 400 would otherwise come back as class 'unknown' with confidence 0.0). Other providers' clients are not sent a temperature.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; pass None only for an OpenAI or Azure model that refuses an explicit temperature, and only with a gaik release that has this option"
       }
     ]
   },
@@ -2202,7 +2210,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when recordings can be longer than 6 hours or files over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Since gaik 0.10.0, load_report_config(path, root=None) requires the stored input paths, sample report and output folder (and every file in an input folder) to stay inside the config file's folder, or inside root when given; otherwise it raises SourcePathError before anything is read or written. save_report_config only warns when it stores an input outside the config's folder (as ../...), so such a config loads back only with root=. Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export. Provider stages: constructor api_config is the writer fallback; run(parser_options={'api_config': parser_cfg}, image_options={'api_config': parser_cfg}, transcriber_options={'ctor': {'api_config': audio_cfg}}, writer_options={'api_config': writer_cfg}, review_options={'api_config': judge_cfg}) selects separate clients. Do not serialize credential-bearing configs with save_report_config; supply them only at runtime. Audio must use native OpenAI/Azure."
+    "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Since gaik 0.10.0, load_report_config(path, root=None) requires the stored input paths, sample report and output folder (and every file in an input folder) to stay inside the config file's folder, or inside root when given; otherwise it raises SourcePathError before anything is read or written. From the gaik release after 0.11.1, save_report_config raises SourcePathError for such a path, so a config it writes loads back as saved; save_report_config(..., root=) writes one that needs the same root (0.11.1 and earlier only warn). Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export. Provider stages: constructor api_config is the writer fallback; run(parser_options={'api_config': parser_cfg}, image_options={'api_config': parser_cfg}, transcriber_options={'ctor': {'api_config': audio_cfg}}, writer_options={'api_config': writer_cfg}, review_options={'api_config': judge_cfg}) selects separate clients. Do not serialize credential-bearing configs with save_report_config; supply them only at runtime. Audio must use native OpenAI/Azure."
   },
   "ReportWriter": {
     "import": "from gaik.software_modules.report_writer import ReportWriter, ReportSpec, SectionSpec, RunSettings, ModelSettings",

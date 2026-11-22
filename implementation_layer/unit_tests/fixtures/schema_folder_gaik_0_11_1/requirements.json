@@ -1,0 +1,74 @@
+{
+  "model_name": "Site_survey_Extraction",
+  "requirements_type": "extraction",
+  "requirements": {
+    "use_case_name": "Site survey",
+    "fields": [
+      {
+        "field_name": "rating",
+        "field_type": "int",
+        "description": "Overall rating from 1 to 5",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "moisture_level",
+        "field_type": "float",
+        "description": "Moisture level: 0.5 or 1",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "0.5",
+          "1"
+        ],
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "hazard_types",
+        "field_type": "list[str]",
+        "description": "Hazards seen: fire, chemical or electrical",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "fire",
+          "chemical",
+          "electrical"
+        ],
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "inspector",
+        "field_type": "str",
+        "description": "Inspector's name",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  }
+}

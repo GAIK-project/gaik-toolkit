@@ -14,7 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gaik.software_components.knowledge_curator.models import SectionSpec, check_sections
-from gaik.software_components.source_normalizer.paths import path_inside
+from gaik.software_components.source_normalizer.paths import SourcePathError, path_inside
 
 
 class ModelSettings(BaseModel):
@@ -115,7 +115,7 @@ class ReportSpec(BaseModel):
             SourcePathError: A path is absolute or leads out of ``root``.
         """
         path = Path(path)
-        spec = cls.model_validate_json(path.read_text(encoding="utf-8"))
+        spec = cls.model_validate_json(path.read_text(encoding="utf-8-sig"))
         folder = path.resolve().parent
         spec.sources = {
             k: [path_inside(p, folder, root=root, what="source") for p in v]
@@ -132,6 +132,10 @@ class ReportSpec(BaseModel):
 
         A file outside that folder is written with ``..``; :meth:`load` then needs a
         ``root`` that holds it.
+
+        Raises:
+            SourcePathError: A source or the sample report is on another drive than the
+                spec file (Windows), so no relative path leads to it. Nothing is written.
         """
         path = Path(path)
         root = path.resolve().parent
@@ -140,7 +144,13 @@ class ReportSpec(BaseModel):
             # The folder is resolved, not the file: a source that is a link keeps its name
             # and its place, which is what load checks.
             p = Path(p)
-            return Path(os.path.relpath(p.parent.resolve() / p.name, root)).as_posix()
+            try:
+                return Path(os.path.relpath(p.parent.resolve() / p.name, root)).as_posix()
+            except ValueError:
+                raise SourcePathError(
+                    f"{p.name} is on another drive than the spec file {path.name}; a spec "
+                    "stores paths relative to its own folder, so keep the sources on its drive"
+                ) from None
 
         data = self.model_dump(mode="json")
         data["sources"] = {k: [rel(p) for p in v] for k, v in self.sources.items()}

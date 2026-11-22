@@ -507,16 +507,19 @@ def test_run_single_call(tmp_path, rec):
     assert rec.args("create_llm_client")["config"] == {**CONFIG, "model": "wr-m"}
     assert rec.args("chat")["reasoning_effort"] == "low"
     user = rec.args("chat")["messages"][1]["content"]
+    # One JSON object per source before its block: the name cannot add a class of its own.
     assert re.search(
-        r'Source notes\.txt \(class: primary\):\n<source_material id="\w+" label="notes\.txt">\n'
+        r'\{"label": "notes\.txt", "class": "primary", "type": "text"\}\n'
+        r'<source_material id="\w+" label="notes\.txt">\n'
         r'Text of notes\.txt\.\n</source_material id="\w+">',
         user,
     )
     assert re.search(
-        r"Source old_report\.pdf \(class: secondary\):\n"
+        r'\{"label": "old_report\.pdf", "class": "secondary", "type": "text"\}\n'
         r'<source_material id="\w+" label="old_report\.pdf">\nText of old_report\.pdf\.\n',
         user,
     )
+    assert "Source notes.txt (class:" not in user
     for part in (
         SAMPLE_TEXT,
         "1. Heading: Roof\n   Content to cover: Describe the roof.\n   Required items:\n   - age",
@@ -624,6 +627,23 @@ def test_the_spec_passes_its_source_precedence_to_the_curator(tmp_path, rec):
     writer.curate(spec, workspace)
 
     assert rec.args("curate")["source_precedence"] == ["primary", "secondary"]
+
+
+def test_the_single_call_writer_gets_the_source_precedence(tmp_path, rec):
+    spec = make_spec(tmp_path).model_copy(update={"source_precedence": ["primary", "secondary"]})
+
+    ReportWriter(CONFIG).run(spec, tmp_path / "workspace", mode="single_call")
+
+    system, user = (m["content"] for m in rec.args("chat")["messages"])
+    assert "<source_precedence>\nprimary > secondary\n</source_precedence>" in user
+    assert "follow the source whose class ranks highest" in user
+    assert "follow the side the source precedence gives" in " ".join(system.split())
+
+
+def test_the_single_call_prompt_has_no_precedence_block_without_one(tmp_path, rec):
+    ReportWriter(CONFIG).run(make_spec(tmp_path), tmp_path / "workspace", mode="single_call")
+
+    assert "<source_precedence>" not in rec.args("chat")["messages"][1]["content"]
 
 
 @pytest.mark.parametrize(

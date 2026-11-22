@@ -58,7 +58,7 @@ def world(monkeypatch):
         "Client",
         lambda **kwargs: SimpleNamespace(models=_Models(kwargs["location"], state)),
     )
-    monkeypatch.setattr(google_provider, "_NOT_SERVED", set())
+    monkeypatch.setattr(google_provider, "_NOT_SERVED", {})
     monkeypatch.setattr(google_provider, "_UNAVAILABLE_UNTIL", {})
     for name in ("GOOGLE_CLOUD_LOCATION", "GOOGLE_SERVICE_ACCOUNT_JSON"):
         monkeypatch.delenv(name, raising=False)
@@ -239,6 +239,9 @@ def test_the_judge_asks_the_eu_once_within_a_time_limit(monkeypatch):
         return SimpleNamespace(models=Models(kwargs["location"]))
 
     monkeypatch.setattr(genai, "Client", client)
+    # The judge shares the provider's record of what the EU did not answer.
+    monkeypatch.setattr(google_provider, "_NOT_SERVED", {})
+    monkeypatch.setattr(google_provider, "_UNAVAILABLE_UNTIL", {})
     monkeypatch.setenv("GOOGLE_VERTEXAI_PROJECT", "project")
     monkeypatch.delenv("GOOGLE_VERTEXAI_LOCATION", raising=False)
     judge = SimpleNamespace(use_vertexai=True, model="gemini-test", max_tokens=64)

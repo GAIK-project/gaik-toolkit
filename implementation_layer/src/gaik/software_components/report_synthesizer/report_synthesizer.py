@@ -47,6 +47,26 @@ class _State(TypedDict):
     reviews: Annotated[dict[str, ReviewEntry], _merge]
 
 
+def _heading_words(text: str) -> str:
+    """A heading's words for comparing: no numbering or punctuation, lower case."""
+    text = re.sub(r"^\d+([.)]\d*)*[.)]?\s+", "", text.strip())
+    return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
+
+
+def _without_echoed_title(draft: str, title: str) -> str:
+    """``draft`` without a first line that is a heading repeating the section ``title``.
+
+    The writer is told to leave the heading out; one it echoes anyway goes, also
+    numbered. Any other first heading, such as the ``### Roof`` of a section that
+    mirrors a sample report's subsections, is the section's own and stays.
+    """
+    first, _, rest = draft.partition("\n")
+    match = re.fullmatch(r"#{1,6}[ \t]+(.*?)[ \t#]*", first.strip())
+    if match and _heading_words(match.group(1)) == _heading_words(title):
+        return rest.strip()
+    return draft
+
+
 def _node(section_id: str) -> str:
     # The space keeps node names apart from the state keys and LangGraph's reserved names.
     return f"section {section_id}"
@@ -201,9 +221,9 @@ class ReportSynthesizer:
                     ],
                     **self.writer_options,
                 )
-                draft = blocks.strip_echo(response.text).strip()
-                if re.match(r"#{1,6}\s", draft):
-                    draft = draft.partition("\n")[2].strip()
+                draft = _without_echoed_title(
+                    blocks.strip_echo(response.text).strip(), section.title
+                )
                 if not draft:
                     raise RuntimeError(
                         f"Section {section.id!r}: the writer returned an empty answer"
