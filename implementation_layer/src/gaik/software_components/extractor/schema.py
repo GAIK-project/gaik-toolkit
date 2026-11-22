@@ -1456,20 +1456,7 @@ def _heads_own_line(line: str, start: int, end: int) -> bool:
     return not rest or rest[0] in _OWN_LINE_SEPARATORS
 
 
-def _label_re(field_name: str) -> re.Pattern[str]:
-    """How the task text names a field.
-
-    As prose ("delivery date"), as the identifier itself ("delivery_date", often
-    in backticks) or with a possessive ("Patient's date of birth" for
-    ``patient_date_of_birth``).
-    """
-    words = [re.escape(word) + r"(?:['’]s)?" for word in field_name.split("_")]
-    return re.compile(r"\b" + r"[ _]".join(words) + r"\b", re.IGNORECASE)
-
-
-def _field_specific_context(
-    field: FieldSpec, original_text: str, other_fields: list[FieldSpec] | tuple = ()
-) -> str:
+def _field_specific_context(field: FieldSpec, original_text: str) -> str:
     """Return task text scoped to ``field`` instead of the whole task.
 
     The requirements LLM is allowed to summarize field descriptions, so an
@@ -1477,43 +1464,20 @@ def _field_specific_context(
     task. Search the field's own clause/bullet and never borrow a neighboring
     field's format. This prevents ``Delivery Date (DD/MM/YYYY)`` from silently
     changing ``Order Date`` as well.
-
-    ``other_fields`` are the other fields of the same requirements. When the
-    field's first mention on a line lies inside a longer mention of another one,
-    the line is the other field's ("Date" in "Date of birth" for a field
-    ``date``, or in "Delivery date" for ``date`` next to ``delivery_date``).
-
-    Known limits (issue #97): only the field's first mention on a line is read,
-    so "Extract the invoice date. Write the invoice date as DD.MM.YYYY." gives no
-    format; a line the field heads counts whole, also a later sentence about
-    another field ("Keep `po_number` exactly as written" on ``order_date``'s
-    line); a paragraph under a field's heading counts whole until the next blank
-    line or list item, also a sentence about something else ("The log file prints
-    its timestamps as DD/MM/YYYY"); a format the field's own clause mentions for
-    another value ("not the delivery date (DD/MM/YYYY)") or rules out ("not
-    DD/MM/YYYY; write it as YYYY.MM.DD") counts; a parent field's mention inside
-    a child collection's field ("Delivery date (DD/MM/YYYY)" in a line-item
-    section, for a parent ``date``) counts, since only the fields of the same
-    part are known here; and the parsed description, the last fallback, cannot
-    tell an output format from one it only mentions.
     """
     pieces: list[str] = []
-    label_re = _label_re(field.field_name)
-    other_res = [_label_re(f.field_name) for f in other_fields if f.field_name != field.field_name]
+    label = field.field_name.replace("_", " ")
+    # The task may name the field as prose ("delivery date") or as the
+    # identifier itself ("delivery_date", often in backticks).
+    label_re = re.compile(
+        rf"\b(?:{re.escape(label)}|{re.escape(field.field_name)})\b", re.IGNORECASE
+    )
     lines = original_text.splitlines()
 
     for index, line in enumerate(lines):
         match = label_re.search(line)
         if not match:
             continue
-        if any(
-            other.start() <= match.start()
-            and match.end() <= other.end()
-            and other.end() - other.start() > match.end() - match.start()
-            for other_re in other_res
-            for other in other_re.finditer(line)
-        ):
-            continue  # another field's longer mention holds this one
 
         if _heads_own_line(line, match.start(), match.end()):
             # The field heads its own bullet, numbered item or heading
@@ -1524,18 +1488,15 @@ def _field_specific_context(
             # A prose line often lists several fields. Keep only this field's
             # comma/semicolon/period-delimited clause so one field's
             # parenthesized format cannot leak into another field on the same
-            # line. A period ends the clause only at a sentence end, not inside
-            # a format such as DD.MM.YYYY.
+            # line.
             clause_chars: list[str] = []
             depth = 0
-            rest = line[match.start() :]
-            for position, char in enumerate(rest):
+            for char in line[match.start() :]:
                 if char in "([":
                     depth += 1
                 elif char in ")]" and depth:
                     depth -= 1
-                ends_sentence = char == "." and rest[position + 1 : position + 2] in ("", " ", "\t")
-                if depth == 0 and (char in ",;" or ends_sentence) and clause_chars:
+                if depth == 0 and char in ",;." and clause_chars:
                     break
                 clause_chars.append(char)
             pieces.append("".join(clause_chars))
@@ -1921,7 +1882,7 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
     keep_dates_rule = _keep_dates_rule(original_text)
 
     for field in requirements.fields:
-        field_context = _field_specific_context(field, original_text, requirements.fields)
+        field_context = _field_specific_context(field, original_text)
 
         # ``pattern`` and ``format`` remain permissive strings in the
         # LLM-facing FieldSpec so a non-OpenAI provider cannot fail validation
