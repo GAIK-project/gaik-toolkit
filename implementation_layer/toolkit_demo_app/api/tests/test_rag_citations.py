@@ -146,3 +146,42 @@ def test_a_page_cited_twice_is_one_source() -> None:
     assert sources == [
         {"document_name": "halden_onboarding", "relevance_score": None, "page_number": 3}
     ]
+
+
+SOURCES = [
+    {"document_name": "halden_onboarding", "relevance_score": 0.9, "page_number": 3},
+    {"document_name": "halden_handbook", "relevance_score": 0.8, "page_number": 5},
+]
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Holidays go via the lead [halden_handbook, page 5].",
+        # The whole block label of a retrieved chunk, as gaik 0.11.1 writes it.
+        "Holidays go via the lead [halden_handbook, page 5, chunk 7].",
+        "Holidays go via the lead [Halden_Handbook, Page 5, Chunk 7].",
+    ],
+)
+def test_a_citation_with_or_without_its_chunk_names_its_source(answer) -> None:
+    assert rag._filter_sources_by_citations(answer, SOURCES) == [SOURCES[1]]
+
+
+def test_an_answer_that_cites_nothing_known_keeps_every_source() -> None:
+    assert rag._filter_sources_by_citations("No citation here.", SOURCES) == SOURCES
+    cited_elsewhere = "See [halden_handbook, page 9, chunk 2]."
+    assert rag._filter_sources_by_citations(cited_elsewhere, SOURCES) == SOURCES
+
+
+def test_a_generator_without_a_citation_list_reads_chunk_labels_too() -> None:
+    def generate(question, documents, *, stream):
+        return iter(["Holidays go via the lead ", "[halden_handbook, page 5, chunk 1]."])
+
+    rag.RAG_INSTANCES["c3"] = _workflow(SimpleNamespace(generate=generate))
+    remember_owner("c3", "")  # owned by the test client, which names no user
+
+    response = _client().post(
+        "/rag/query/stream", data={"question": "Holidays?", "collection_id": "c3"}
+    )
+
+    assert [s["page_number"] for s in _result(response)["sources"]] == [5]

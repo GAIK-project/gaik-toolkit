@@ -87,6 +87,11 @@ Run the preflight check to verify credentials before a full session:
     # Override the model:
     python run_wizard_interactive.py --model claude-sonnet-5-5
 
+    # Stop once the session's estimated model cost reaches $5 (default: no limit;
+    # the CLI counts the whole session, across your messages, and checks it
+    # between turns, so a session can end a little over):
+    python run_wizard_interactive.py --max-budget-usd 5
+
 See also: run_wizard_sdk.py for a headless smoke-test (no user interaction).
 """
 
@@ -94,6 +99,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import codecs
+import math
 import os
 import re
 import sys
@@ -287,7 +294,12 @@ def _print_tool_result(content: str) -> None:
 
 def _print_result(message: ResultMessage) -> None:
     print()  # blank line after the last streamed text
-    if message.is_error:
+    if message.subtype == "error_max_budget_usd":
+        cost = f" (${message.total_cost_usd:.4f})" if message.total_cost_usd else ""
+        print(
+            f"\n{YELLOW}--- Session stopped: the --max-budget-usd limit was reached{cost} ---{RESET}"
+        )
+    elif message.is_error:
         print(f"\n{RED}--- Session ended with error (stop: {message.stop_reason}) ---{RESET}")
         if message.result:
             print(message.result)
@@ -377,9 +389,20 @@ conversation, one or two questions at a time.
 
 
 def build_session_options(
-    output_dir: Path, env: dict[str, str], model: str, **extra: object
+    output_dir: Path,
+    env: dict[str, str],
+    model: str,
+    *,
+    max_budget_usd: float | None = None,
+    **extra: object,
 ) -> ClaudeAgentOptions:
-    """The agent's options: every tool call goes through the guard's hook."""
+    """The agent's options: every tool call goes through the guard's hook.
+
+    ``max_budget_usd`` ends the session once its estimated model cost reaches it.
+    With one streaming client the CLI counts the whole session, across messages,
+    not each message (the SDK's docs say "for the query"). It checks the total
+    between turns, so the session can end a little over the limit.
+    """
     # The repository is never written either: with an editable install the
     # scripts import gaik from it.
     guard = agent_tool_guard.ToolGuard(WIZARD_DIR, output_dir, protected=[REPO_ROOT])
@@ -398,7 +421,8 @@ def build_session_options(
         hooks={"PreToolUse": [HookMatcher(hooks=[guard.hook])]},
         setting_sources=[],  # no user or project settings, CLAUDE.md or hooks
         # Only the MCP servers given here, which is none: not the user's own.
-        extra_args={"strict-mcp-config": None},
+        strict_mcp_config=True,
+        max_budget_usd=max_budget_usd,
         **extra,
     )
 
@@ -481,12 +505,18 @@ async def run_interactive(
     env: dict[str, str],
     model: str,
     output_dir: Path,
+    max_budget_usd: float | None = None,
 ) -> int:
-    options = build_session_options(output_dir, env, model)
+    options = build_session_options(output_dir, env, model, max_budget_usd=max_budget_usd)
 
     print(f"{BOLD}GAIK Solution Configuration Wizard{RESET}")
     print(f"{DIM}Model: {model}  |  Wizard dir: {WIZARD_DIR}")
     print(f"Output dir: {output_dir}")
+    if max_budget_usd is not None:
+        print(
+            f"Budget: {_money(max_budget_usd)} for the whole session (checked between "
+            "turns, so it can end a little over)"
+        )
     print(f"Ctrl+C or Ctrl+D to exit{RESET}\n")
 
     async with ClaudeSDKClient(options=options) as client:
@@ -520,6 +550,54 @@ async def run_interactive(
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
+def _money(amount: float) -> str:
+    """US dollars as a price is written: $1,000,000.00, $2.50, or $0.125 for a fraction."""
+    whole, _, fraction = f"{amount:,.4f}".rstrip("0").partition(".")
+    return f"${whole}.{fraction.ljust(2, '0')}"
+
+
+def _dollars(value: str) -> float:
+    """A positive, finite number of US dollars."""
+    try:
+        amount = float(value)
+    except ValueError:
+        amount = math.nan
+    if not (math.isfinite(amount) and amount > 0):
+        raise argparse.ArgumentTypeError(f"expected an amount above 0, got {value!r}")
+    return amount
+
+
+def _is_utf8(encoding: str | None) -> bool:
+    try:
+        return bool(encoding) and codecs.lookup(encoding).name == "utf-8"
+    except LookupError:
+        return False
+
+
+def use_utf8_output() -> None:
+    """Print every character the agent sends, also to a file or a pipe.
+
+    On Windows, output that is not a console is written in the ANSI code page
+    (cp1252), which has no ≥ or →, so the first such character the agent quoted
+    ended the run with a UnicodeEncodeError. Output to a file or a pipe is now
+    written in UTF-8. A terminal keeps the encoding it shows: a UTF-8 one is left
+    as it is, and one in another encoding prints a character it has no sign for
+    as a replacement instead of stopping. A stream that is not a text stream
+    (none at all under pythonw) is left as it is.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            if not stream.isatty():
+                reconfigure(encoding="utf-8", errors="replace")
+            elif not _is_utf8(getattr(stream, "encoding", None)):
+                reconfigure(errors="replace")
+        except (OSError, ValueError):  # a closed stream: nothing is printed to it
+            continue
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Interactive CLI session for the GAIK Solution Configuration Wizard."
@@ -537,6 +615,15 @@ def parse_args() -> argparse.Namespace:
         "--model",
         default=None,
         help=f"Override the model (default: ANTHROPIC_MODEL or {DEFAULT_MODEL}).",
+    )
+    p.add_argument(
+        "--max-budget-usd",
+        type=_dollars,
+        default=None,
+        metavar="USD",
+        help="Stop the session once its estimated model cost reaches this many US dollars, "
+        "counted over the whole session, across your messages. The CLI checks the cost "
+        "between turns, so a session can end a little over it (default: no limit).",
     )
     p.add_argument(
         "--preflight",
@@ -561,6 +648,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    use_utf8_output()
     args = parse_args()
     try:
         env = load_environment(Path(args.env_file).expanduser().resolve(), args.pass_env)
@@ -582,7 +670,7 @@ def main() -> None:
                     allowed_tools=[],
                     permission_mode="bypassPermissions",
                     setting_sources=[],
-                    extra_args={"strict-mcp-config": None},
+                    strict_mcp_config=True,
                     max_turns=1,
                 )
                 async for msg in query(prompt="Reply with the single word: READY", options=opts):
@@ -609,7 +697,7 @@ def main() -> None:
         )
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        sys.exit(asyncio.run(run_interactive(env, model, output_dir)))
+        sys.exit(asyncio.run(run_interactive(env, model, output_dir, args.max_budget_usd)))
 
     except KeyboardInterrupt:
         print(f"\n{YELLOW}Interrupted.{RESET}", file=sys.stderr)
