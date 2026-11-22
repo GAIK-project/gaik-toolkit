@@ -119,6 +119,27 @@ def test_a_column_name_with_a_double_quote_is_loaded_and_profiled(con, tmp_path)
     assert con.execute('SELECT sum(price) FROM "pipes"').fetchone()[0] == 3.75
 
 
+def test_a_failed_profile_is_logged_without_the_table_names(con, caplog):
+    """A table is named after its file or sheet, which can carry personal data."""
+    import logging
+
+    from gaik.software_components.tabular_agent.profiling import profile_tables
+
+    # DuckDB's error names the missing table and suggests the existing one.
+    con.execute("CREATE TABLE matti_virtanen_lab_2 (a INTEGER)")
+    tables = {"matti_virtanen_lab": "Matti_Virtanen_lab.csv", "matti_virtanen_lab_2": "x.csv"}
+    with caplog.at_level(logging.WARNING, logger="gaik.software_components.tabular_agent"):
+        schema = profile_tables(con, tables)
+
+    [record] = [r for r in caplog.records if "Could not profile" in r.getMessage()]
+    message = record.getMessage().lower()
+    assert "virtanen" not in message
+    assert "CatalogException" in record.getMessage(), "the cause is kept"
+    # The caller still gets the table, with its name, and the profile of the other one.
+    assert [t.name for t in schema.tables] == list(tables)
+    assert schema.tables[1].row_count == 0
+
+
 def test_rejects_unsupported_extension(tmp_path):
     path = tmp_path / "notes.pdf"
     path.write_bytes(b"%PDF-1.4")
