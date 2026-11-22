@@ -667,7 +667,9 @@ If `review_options=None`, the reviewer and polish pass reuse the writer client/c
 ## Source material as data
 
 Each source reaches the writer, the curator and the reviewer in its own
-`<source_material>` block, labelled with its file name, the name the citations use; the
+`<source_material>` block, labelled with its file name, the name the citations use.
+Before each block, one JSON object gives the source's number, label and type, so a file
+name cannot add a type of its own, and the request says a label is data. The
 format reference, a curated brief and every already-written section a dependent section
 builds on get blocks of their own. The block id is random and new for every call, and a
 closing tag written in a source is escaped, so the source cannot end its block

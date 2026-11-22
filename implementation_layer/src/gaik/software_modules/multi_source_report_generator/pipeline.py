@@ -28,6 +28,8 @@ import os
 import re
 import tempfile
 from collections.abc import Callable
+from dataclasses import replace
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,7 @@ from gaik.software_components.source_material import (
 from gaik.software_components.source_normalizer.paths import SourcePathError, path_inside
 
 from ._material import (
+    SOURCE_HEADER_NOTE,
     TRUNCATED_NOTE,
     Evidence,
     EvidenceSource,
@@ -1063,23 +1066,25 @@ class MultiSourceReportGenerator:
             name = clean_label(str(meta.get("filename") or Path(item.source_path).name))
             heading = f"Source {meta.get('index')}: {name} ({item.source_type})"
             text = item.content_markdown
+            source = partial(
+                EvidenceSource, name, heading, index=meta.get("index"), source_type=item.source_type
+            )
             cost = (len(_SOURCE_SEPARATOR) if sources else 0) + len(f"## {heading}\n\n")
             if max_evidence_chars is not None and used + cost + len(text) > max_evidence_chars:
                 room = max_evidence_chars - used - cost
                 if room > 0 or not sources:
                     # The first source stays, even with no text, so the cut is visible.
                     text = text[: max(room, 0)]
-                    sources.append(EvidenceSource(name, heading, text, truncated=True))
+                    sources.append(source(text, truncated=True))
                 else:
-                    last = sources[-1]
-                    sources[-1] = EvidenceSource(last.label, last.heading, last.text, True)
+                    sources[-1] = replace(sources[-1], truncated=True)
                 logger.warning(
                     "Evidence (%d sources) exceeds max_evidence_chars (%d); truncating.",
                     len(evidence_items),
                     max_evidence_chars,
                 )
                 break
-            sources.append(EvidenceSource(name, heading, text))
+            sources.append(source(text))
             used += cost + len(text)
         return sources
 
@@ -1192,8 +1197,8 @@ class MultiSourceReportGenerator:
 
         parts.append(
             "Evidence — this is the ONLY source of facts and content for the report (one "
-            "source_material block per source, labelled with its file name):\n"
-            + render_evidence(blocks, evidence_pack)
+            f"source_material block per source, labelled with its file name; "
+            f"{SOURCE_HEADER_NOTE}):\n" + render_evidence(blocks, evidence_pack)
         )
 
         if additional_instructions:

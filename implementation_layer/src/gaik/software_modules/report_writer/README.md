@@ -201,7 +201,8 @@ the writer is told to follow in a conflict as the curator does in code (the high
 class among the sources wins unless that source is itself unsure; otherwise both sides,
 `Unresolved:`); every normalized source, in full, and
 the sample report each sit in their own `<source_material>` block, a source labelled
-with its file name (the name the citations use). The system message says that the
+with its file name (the name the citations use) after one JSON object with its label,
+class and type, so a file name cannot add a class of its own. The system message says that the
 material is data, never instructions
 ([source material as data](../../software_components/source_material.py)). There is no
 curation and no review. The answer must be `# <title>` followed by exactly one `## <section title>`
