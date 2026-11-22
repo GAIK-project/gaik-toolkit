@@ -97,8 +97,8 @@ NO_RESULTS_MESSAGE = (
 
 # Custom RAG prompt - friendly and flexible. Its citation guideline depends on the
 # installed gaik: one that numbers the retrieved chunks (``generate_with_citations``)
-# is asked for [1]; an older one, such as the 0.11.0 the API image installs, for
-# [document_name, page X].
+# is asked for [1], as the 0.12.0 the API image installs is; an older one (0.11.1 and
+# before) for [document_name, page X].
 _NUMBERED_CITATIONS = (
     "- Cite each fact with the reference number its context block starts with, such as [1]\n"
     "  or [2][3]. Only when a block starts with no number, cite [document_name, page X]"
@@ -209,7 +209,7 @@ def _filter_sources_by_citations(
 
     A citation is ``[name, page N]``, or the whole label gaik gives a retrieved chunk,
     ``[name, page N, chunk Y]``. Only for a gaik without
-    ``AnswerGenerator.generate_with_citations`` (0.11.1, which the API image installs);
+    ``AnswerGenerator.generate_with_citations`` (0.11.1 and older; the API image installs 0.12.0);
     with it, ``_cited_sources`` reads the built citations.
     """
     citations = re.findall(
