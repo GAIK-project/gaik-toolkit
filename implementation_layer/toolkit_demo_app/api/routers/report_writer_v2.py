@@ -73,6 +73,13 @@ def _gaik():
     return ReportWriter, ReportSpec
 
 
+def _takes_source_precedence(spec_class) -> bool:
+    """Whether the installed gaik's ReportSpec has ``source_precedence``. A release
+    before it (0.11.1) refuses a spec with the key and has the curator resolve a
+    conflict from the report instructions."""
+    return "source_precedence" in getattr(spec_class, "model_fields", {})
+
+
 def _examples_root() -> Path:
     """The repository's report_writer examples; the image copies them to the same path."""
     here = Path(__file__).resolve()
@@ -146,7 +153,8 @@ def _result(stage: str, workspace: Path, result) -> dict:
 
 @router.get("/examples")
 async def list_examples():
-    """Every example folder with a report_spec.json, with its files."""
+    """Every example folder with a report_spec.json, with its files, and which spec keys
+    of newer gaik releases the installed one takes (``supports``)."""
     examples = []
     for example_id in _example_ids():
         spec = _example(example_id)
@@ -166,7 +174,10 @@ async def list_examples():
                 ),
             }
         )
-    return {"examples": examples}
+    return {
+        "examples": examples,
+        "supports": {"source_precedence": _takes_source_precedence(_gaik()[1])},
+    }
 
 
 @router.get("/examples/{example_id}/spec")

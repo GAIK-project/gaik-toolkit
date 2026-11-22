@@ -12,13 +12,18 @@ import {
 import { type Account, initials, statusLine } from "@/lib/account";
 import { GAIK_CONTACT_URL } from "@/lib/onboarding/mailto";
 import { setModelSettings } from "@/lib/model-settings-store";
+import { forgetServerModels } from "@/lib/server-model-store";
 import { cn } from "@/lib/utils";
 import { CircleUser, LogOut, Mail } from "lucide-react";
 import Link from "next/link";
 
-/** Clears this browser's model settings, signs out and follows the API's redirect. */
+/**
+ * Clears this browser's model settings and the server's model list for this user,
+ * signs out and follows the API's redirect.
+ */
 export async function handleSignOut(): Promise<void> {
   setModelSettings(null);
+  forgetServerModels();
   const res = await fetch("/api/auth/sign-out", { method: "POST" });
   const data = await res.json();
   if (data.redirectTo) {

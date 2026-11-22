@@ -156,8 +156,30 @@ def test_examples_lists_each_folder_with_a_spec(client, examples):
                 ],
                 "sample_report": {"name": "sample.md", "size": 16},
             }
-        ]
+        ],
+        "supports": {"source_precedence": True},
     }
+
+
+def test_examples_say_whether_the_installed_gaik_takes_source_precedence(
+    client, examples, monkeypatch
+):
+    """The page leaves the key out of a run on a release without it (0.11.1)."""
+
+    class SpecWithoutPrecedence:
+        """ReportSpec as 0.11.1 has it: the same loading, no source_precedence field."""
+
+        model_fields = {
+            k: v for k, v in ReportSpec.model_fields.items() if k != "source_precedence"
+        }
+        load = PinnedReportSpec.load
+
+    monkeypatch.setattr(route, "_gaik", lambda: (FakeWriter, SpecWithoutPrecedence))
+
+    response = client.get("/report-writer-v2/examples")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["supports"] == {"source_precedence": False}
 
 
 def test_example_spec_names_files_only(client, examples):

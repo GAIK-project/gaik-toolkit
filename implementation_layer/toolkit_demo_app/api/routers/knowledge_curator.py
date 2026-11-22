@@ -199,9 +199,12 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
                 if "source_precedence" in inspect.signature(curator.curate).parameters:
                     precedence = {"source_precedence": parsed.source_precedence}
                 else:
+                    # Such a release (0.11.1) has the model decide a conflict from the
+                    # source hierarchy that the instructions describe.
                     messages.put(
-                        "This gaik release cannot rank sources: every conflict is left "
-                        "for you to settle"
+                        "This gaik release cannot rank sources by class, so the switch "
+                        "has no effect: the model resolves a conflict where the "
+                        "instructions rank the sources, and leaves the rest for you"
                     )
             knowledge = curator.curate(
                 sources,

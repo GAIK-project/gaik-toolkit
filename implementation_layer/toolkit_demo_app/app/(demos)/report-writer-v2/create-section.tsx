@@ -68,6 +68,7 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
     setSections,
     instructions,
     setInstructions,
+    precedenceNote,
     sources,
     setSources,
     sample,
@@ -246,6 +247,11 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
                 disabled={busy}
                 className="min-h-[80px] resize-y text-sm"
               />
+              {precedenceNote && (
+                <p className="text-muted-foreground mt-2 text-xs">
+                  {precedenceNote}
+                </p>
+              )}
             </CardContent>
           </Card>
 
