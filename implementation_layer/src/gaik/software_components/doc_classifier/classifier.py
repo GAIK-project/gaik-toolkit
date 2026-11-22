@@ -80,7 +80,12 @@ class DocumentClassifier:
     """
 
     def __init__(
-        self, config: dict, model: str | None = None, *, limits: InputLimits | None = None
+        self,
+        config: dict,
+        model: str | None = None,
+        *,
+        limits: InputLimits | None = None,
+        temperature: float | None = 0.0,
     ):
         """
         Initialize document classifier.
@@ -90,6 +95,11 @@ class DocumentClassifier:
             model: Optional model override. If not provided, uses config['model']
             limits: Input limits passed to the parsers; defaults to
                 :class:`~gaik.software_components.input_limits.InputLimits`.
+            temperature: Sampling temperature of the classification call on the
+                OpenAI and Azure client. Defaults to ``0.0``. Pass ``None`` to
+                leave it out, for a model that refuses an explicit temperature
+                (its 400 would otherwise become ``unknown``). Other providers'
+                clients are not sent a temperature, as before.
 
         Example:
             >>> from gaik.software_components.doc_classifier import (
@@ -102,6 +112,7 @@ class DocumentClassifier:
         self.model = model or config["model"]
         self.client = build_compat_client(config)
         self.limits = limits or InputLimits()
+        self.temperature = temperature
 
     def classify(self, file_or_dir: str, classes: list[str], parser: str | None = None) -> dict:
         """
@@ -377,11 +388,12 @@ Provide your classification with:
                     model=self.model,
                 )
             else:
+                sampling = {} if self.temperature is None else {"temperature": self.temperature}
                 response = self.client.beta.chat.completions.parse(
                     model=self.model,
                     messages=messages,
                     response_format=ClassificationModel,
-                    **normalize_chat_kwargs(self.model, {"temperature": 0}, config=self.config),
+                    **normalize_chat_kwargs(self.model, sampling, config=self.config),
                     timeout=30,
                 )
                 parsed = response.choices[0].message.parsed

@@ -60,7 +60,10 @@ from gaik.software_components.doc_classifier import DocumentClassifier
 
 classifier = DocumentClassifier(
     config: dict,              # get_llm_config() or get_openai_config()
-    model: str | None = None   # Optional model override
+    model: str | None = None,  # Optional model override
+    *,
+    limits: InputLimits | None = None,  # See "Input limits"
+    temperature: float | None = 0.0,    # None leaves it out (OpenAI and Azure client)
 )
 
 # Classify file(s)
@@ -123,6 +126,13 @@ file over the size limit (100 MiB) or an image over the pixel limit raises
 `parser="vision"` only the first page of a PDF is rendered and sent, so the page limit
 applies to that page; the text parsers use only the start of the text and read a PDF of
 any page count.
+
+## Temperature
+
+On the OpenAI and Azure client the classification call is sent `temperature=0.0`
+by default. A model that refuses an explicit temperature answers with an error,
+which the classifier reports as `unknown`; pass `temperature=None` to leave it
+out. Other providers' clients are not sent a temperature.
 
 ## Environment Variables
 
