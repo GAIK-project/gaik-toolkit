@@ -97,7 +97,11 @@ def introspect_schema(
     # position of the same constraint, so composite keys and constraints that
     # share a name on different tables pair correctly. Only references within the
     # schema are kept: the agent cannot query another schema, and "customers.id"
-    # would read as the table of that name in this one.
+    # would read as the table of that name in this one. A key into a partitioned
+    # table is stored once against the table and once more against each of its
+    # partitions; only the first names the table a query joins, so a key whose
+    # target is a partition is left out. Keys copied onto the partitions of a
+    # referencing table point at the table itself and stay.
     fk_rows = conn.execute(
         """
         SELECT
@@ -112,7 +116,7 @@ def introspect_schema(
         CROSS JOIN LATERAL unnest(con.conkey, con.confkey) AS k(attnum, fattnum)
         JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
         JOIN pg_catalog.pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = k.fattnum
-        WHERE n.nspname = %s AND con.contype = 'f'
+        WHERE n.nspname = %s AND con.contype = 'f' AND NOT fc.relispartition
         ORDER BY c.relname, con.conname
         """,
         (schema_name,),
