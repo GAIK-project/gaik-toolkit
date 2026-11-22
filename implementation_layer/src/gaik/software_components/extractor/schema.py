@@ -1970,11 +1970,111 @@ def _normalize_explicit_default(
     return False, None
 
 
+def _enum_numbers(f: FieldSpec) -> list[int | float | Decimal] | None:
+    """A number field's choices as numbers of its own type, or None.
+
+    ``FieldSpec.enum`` holds text. On an ``int``, ``float`` or ``decimal`` field
+    whose every choice reads as such a number ("1".."5", "0.5"), the choices are
+    allowed numbers; ``""`` among them stands for no value, so an enum of only
+    ``""`` gives ``[]``: no choices, a plain number field. Any other choice
+    ("low", "N/A", "1.5" on an ``int`` field) means the choices are labels, and
+    None is returned.
+    """
+    if f.field_type not in NUMERIC_FIELD_TYPES or not f.enum:
+        return None
+    numbers: list[int | float | Decimal] = []
+    for choice in f.enum:
+        text = str(choice).strip()
+        if not text:
+            continue
+        try:
+            number = Decimal(text)
+        except ArithmeticError:
+            return None
+        if not number.is_finite():
+            return None
+        if f.field_type == "int":
+            if number != number.to_integral_value():
+                return None
+            value: int | float | Decimal = int(number)
+        elif f.field_type == "float":
+            value = float(number)
+        else:
+            value = number
+        if value not in numbers:
+            numbers.append(value)
+    return numbers
+
+
+def _as_field_number(value, field_type: str) -> int | float | Decimal | None:
+    """``value`` as a number of ``field_type``, or None when it is not one."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        try:
+            number = Decimal(str(value))
+        except ArithmeticError:
+            return None
+    elif isinstance(value, str):
+        cleaned = _clean_decimal_string(value)
+        if cleaned is None:
+            return None
+        number = Decimal(cleaned)
+    else:
+        return None
+    if not number.is_finite():
+        return None
+    if field_type == "int":
+        return int(number) if number == number.to_integral_value() else None
+    if field_type == "float":
+        return float(number)
+    return number
+
+
+def _within_enum(field: FieldSpec, value):
+    """``value`` kept to the field's choices, or the field's fallback.
+
+    A text field's value must be one of its choices. A ``list[str]`` field keeps
+    the items that are choices. A number field whose choices are numbers (see
+    :func:`_enum_numbers`) keeps a value equal to one of them, as a number of its
+    type, so ``"3"`` on an ``int`` field with choices 1 to 5 is ``3``.
+    """
+    if field.field_type == "list[str]":
+        choices = {c for c in field.enum if c != ""}
+        if not choices:
+            return value
+        if isinstance(value, str):
+            # Split as normalize_extracted_data would, so each item is checked.
+            value = [part.strip() for part in re.split(r"[;,]", value) if part.strip()]
+        if not isinstance(value, list):
+            return value
+        return [item for item in (str(x).strip() for x in value) if item in choices]
+    numbers = _enum_numbers(field)
+    if numbers == []:
+        return value  # no choices: any number
+    if numbers is not None:
+        has_default, default = _normalize_explicit_default(field)
+        allowed = numbers + ([default] if has_default else [])
+        number = _as_field_number(value, field.field_type)
+        if number is not None and number in allowed:
+            return number
+        return _resolve_fallback(field)
+    if value not in field.enum:
+        return _resolve_fallback(field)
+    return value
+
+
 def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseModel]:
     """
     Create a Pydantic model dynamically from field specifications (strict).
     - Forbid extra/unknown keys.
     - Apply enums, regex patterns, and formats where applicable.
+
+    An enum keeps the field's type where its choices fit it: a ``list[str]``
+    field becomes ``list[Literal[...]]``, and an ``int`` or ``float`` field whose
+    choices are numbers becomes a ``Literal`` of those numbers (a ``decimal``
+    field stays a Decimal, its value kept to the choices after extraction). Other
+    choices replace the type with a ``Literal`` of the texts, as for a ``str``.
     """
     # Map string type names to actual Python types
     # Note: dates use str to allow flexible input formats, then normalized in post-processing
@@ -1999,8 +2099,30 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
             annotated = Annotated[str, constr(pattern=f.pattern)]
 
         has_default, default = _normalize_explicit_default(f)
+        enum_numbers = _enum_numbers(f)
 
-        if f.enum:
+        if f.enum and f.field_type == "list[str]":
+            # Each item is one of the choices; an empty list means none.
+            choices = [c for c in f.enum if c != ""]
+            if choices:
+                annotated = list[Literal[tuple(choices)]]  # type: ignore[misc,valid-type]
+        elif enum_numbers is not None and f.field_type in ("int", "float"):
+            # The allowed numbers, as numbers: a missing value is None, as for
+            # any number field. No usable choice leaves a plain number field.
+            # A decimal keeps DecimalField (a Literal of Decimals would be sent
+            # as strings and then refuse them), and apply_field_policies keeps
+            # its value to the allowed numbers.
+            if enum_numbers:
+                choices = list(enum_numbers)
+                if has_default and default not in choices:
+                    choices.append(default)
+                annotated = Literal[tuple(choices)]  # type: ignore[misc,valid-type]
+        elif enum_numbers is not None:
+            pass
+        elif f.enum:
+            # Text choices, or choices that are not numbers of the field's type
+            # ("low"/"high" on a number field, "Kyllä"/"Ei" on a yes/no field):
+            # the choices win and the value is one of those texts.
             if has_default:
                 if default not in f.enum:
                     f.enum.append(default)
@@ -2397,8 +2519,8 @@ def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> di
         if field.field_type in NUMERIC_FIELD_TYPES and isinstance(value, str) and not value.strip():
             value = _resolve_fallback(field)
 
-        if field.enum and value not in field.enum:
-            value = _resolve_fallback(field)
+        if field.enum:
+            value = _within_enum(field, value)
 
         output[name] = value
 

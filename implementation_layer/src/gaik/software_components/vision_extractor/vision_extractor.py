@@ -385,11 +385,16 @@ def _strip_gemini_unsupported(schema: dict) -> dict:
     for key, value in schema.items():
         if key in _GEMINI_UNSUPPORTED_KEYS:
             continue
-        if key == "enum" and isinstance(value, list) and "" in value:
-            # Gemini rejects empty strings in enum arrays. Drop the enum constraint
-            # entirely so the model can still output '' when a field is absent.
-            # apply_field_policies() will normalise any out-of-range values after
-            # the call.
+        if (
+            key == "enum"
+            and isinstance(value, list)
+            and ("" in value or not all(isinstance(entry, str) for entry in value))
+        ):
+            # Gemini rejects empty strings in enum arrays, and its Schema takes
+            # enum entries as strings only, so a number field's allowed numbers
+            # cannot be sent either. Drop the enum constraint (the type stays);
+            # apply_field_policies() keeps the value to the choices after the
+            # call.
             continue
         if key == "properties" and isinstance(value, dict):
             # The keys here are field names, not schema keywords: a field named
