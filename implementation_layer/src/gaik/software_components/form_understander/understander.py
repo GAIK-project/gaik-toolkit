@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import re
-import time
 import unicodedata
+from collections import Counter
 from typing import Literal
 
-from openai import APIError, APITimeoutError, RateLimitError
 from pydantic import BaseModel, Field
 
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.llm.retries import with_retries
 from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 LanguageHint = Literal["fi", "en"]
@@ -83,6 +83,14 @@ class CleanedLabel(BaseModel):
 
 MAX_LABEL_CHARS = 60
 _SENTENCE_PUNCTUATION = re.compile(r"[:;!?]|\.(?=\s|$)")
+_ZWNJ, _ZWJ = "\u200c", "\u200d"
+# A zero-width joiner shows only between letters, marks, digits or symbols (an
+# emoji is a symbol, its variation selector a mark); a non-joiner only between letters.
+_JOINS = {_ZWJ: ("L", "M", "N", "S"), _ZWNJ: ("L", "M")}
+# What a person can see: letters, digits, symbols and punctuation.
+_SEEN = ("L", "N", "S", "P")
+# The canonical combining class of a virama (Indic scripts' vowel killer).
+_VIRAMA = 9
 
 
 def _visible(text: str) -> str:
@@ -90,8 +98,36 @@ def _visible(text: str) -> str:
 
     They are taken out of every label gaik returns, so the label a person sees is the
     one that was compared: a bidi control could otherwise show words in another order.
+    Two of them change what is shown where they join two characters, and stay there:
+    a zero-width joiner between letters, marks, digits or symbols, which builds an
+    emoji sequence (a woman scientist) or a letter form in Indic scripts, and a
+    zero-width non-joiner between two letters, which keeps them apart (Persian,
+    Indic scripts). A zero-width joiner right after a virama also stays, at the end
+    of a word too: it writes a Malayalam chillu, which shows a visible virama
+    without it. Elsewhere at an edge, beside a space or alone they show nothing and go.
     """
-    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    kept = [ch for ch in text if unicodedata.category(ch) != "Cf" or ch in _JOINS]
+    return "".join(
+        ch
+        for i, ch in enumerate(kept)
+        if ch not in _JOINS
+        or (ch == _ZWJ and i > 0 and unicodedata.combining(kept[i - 1]) == _VIRAMA)
+        or (
+            0 < i < len(kept) - 1
+            and unicodedata.category(kept[i - 1])[0] in _JOINS[ch]
+            and unicodedata.category(kept[i + 1])[0] in _JOINS[ch]
+        )
+    )
+
+
+def _shows_something(text: str) -> bool:
+    """Whether ``text`` has a character a person can see, not only spacing or marks."""
+    return any(unicodedata.category(ch)[0] in _SEEN for ch in text)
+
+
+def _cut(text: str) -> str:
+    """``text`` cut to ``MAX_LABEL_CHARS``, without a joiner left at the cut."""
+    return _visible(text[:MAX_LABEL_CHARS])
 
 
 def _words(text: str) -> str:
@@ -108,16 +144,6 @@ def _words(text: str) -> str:
 def _same_words(a: str, b: str) -> bool:
     """The same words, case, spacing and sentence punctuation aside ("Name:", "name")."""
     return _words(a) == _words(b)
-
-
-def _with_retries(call, tries: int = 3):
-    for i in range(tries):
-        try:
-            return call()
-        except (RateLimitError, APITimeoutError, APIError):
-            if i == tries - 1:
-                raise
-            time.sleep(2**i)
 
 
 class FormUnderstander:
@@ -172,8 +198,8 @@ class FormUnderstander:
         keeps its page label (``changed`` false).
         """
         safe_fields = [f if isinstance(f, InputField) else InputField(**f) for f in fields]
-        ids = [f.id for f in safe_fields]
-        repeated = sorted({i for i in ids if ids.count(i) > 1})
+        # One pass, not a scan per field: a form can have thousands of fields.
+        repeated = sorted(i for i, n in Counter(f.id for f in safe_fields).items() if n > 1)
         if repeated:
             # The model answers per id, so two fields with one id would get one label.
             raise ValueError(f"field ids must be unique; repeated: {repeated}")
@@ -181,10 +207,8 @@ class FormUnderstander:
         described = []
         for f in safe_fields:
             original = _visible(f.raw).strip()
-            label = cleaned.get(f.id, original[:MAX_LABEL_CHARS])
-            truncated = len(original) > MAX_LABEL_CHARS and _same_words(
-                label, original[:MAX_LABEL_CHARS]
-            )
+            label = cleaned.get(f.id, _cut(original))
+            truncated = len(original) > MAX_LABEL_CHARS and _same_words(label, _cut(original))
             described.append(
                 CleanedLabel(
                     id=f.id,
@@ -250,7 +274,9 @@ class FormUnderstander:
             )
             return response.choices[0].message.parsed
 
-        parsed: LabelMapping | None = _with_retries(_call)
+        # A refused request (400, 401) is raised at once; rate limits, server errors
+        # and timeouts are tried three times in all.
+        parsed: LabelMapping | None = with_retries(_call, tries=3)
         if parsed is None:
             raise ValueError("The model did not return a structured label mapping")
 
@@ -260,7 +286,8 @@ class FormUnderstander:
             if entry.id not in known_ids:
                 continue
             label = _visible(entry.label).strip()
-            if not label:
+            # Only spacing or marks would show the person nothing: keep the page label.
+            if not _shows_something(label):
                 continue
-            result[entry.id] = label[:MAX_LABEL_CHARS]
+            result[entry.id] = _cut(label)
         return result

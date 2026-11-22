@@ -18,7 +18,7 @@ from gaik.software_components.source_material import (
 )
 
 from .._material import EvidenceSource
-from ..models import _slug
+from ..models import _slug, _strip_title_heading
 from .prompts import SECTION_WRITER_SYSTEM_PROMPT, build_curation_prompt, build_section_user_prompt
 from .reviewer import review_and_polish
 from .state import SectionWriterState
@@ -53,15 +53,6 @@ def _merge_usage(left: dict, right: dict) -> dict:
     return out
 
 
-def _strip_leading_heading(text: str) -> str:
-    """Drop a leading markdown heading line if the model emitted one anyway."""
-    stripped = text.lstrip()
-    if stripped.startswith("#"):
-        lines = stripped.splitlines()
-        return "\n".join(lines[1:]).lstrip()
-    return text
-
-
 def create_section_writer_graph(
     *,
     writer_client,
@@ -71,7 +62,10 @@ def create_section_writer_graph(
     curate_evidence: bool,
     polish: bool,
     reporter,
+    written_files: list[Path] | None = None,
 ):
+    """The per-section graph. Each curated brief saved under ``output_dir`` is added
+    to ``written_files``, so the caller knows which files this run wrote."""
     from langgraph.graph import END, StateGraph
 
     def evidence_loader(state: SectionWriterState) -> dict:
@@ -112,7 +106,10 @@ def create_section_writer_graph(
             curated_dir = Path(out_dir) / "evidence" / "curated_sections"
             curated_dir.mkdir(parents=True, exist_ok=True)
             name = _file_stem(state.get("section_id") or "") or _slug(title)
-            (curated_dir / f"{name}.md").write_text(brief, encoding="utf-8")
+            brief_path = curated_dir / f"{name}.md"
+            brief_path.write_text(brief, encoding="utf-8")
+            if written_files is not None:
+                written_files.append(brief_path)
 
         reporter.emit(f"[{title}] curated evidence -> drafting")
         # The brief repeats source text, so it reaches the writer and the reviewer
@@ -158,7 +155,8 @@ def create_section_writer_graph(
             ],
             **writer_kwargs,
         )
-        draft = _strip_leading_heading(blocks.strip_echo(response.text or "").strip())
+        # Only an echoed section title goes; a first sub-heading is the section's own.
+        draft = _strip_title_heading(blocks.strip_echo(response.text or "").strip(), title)
         usage = _merge_usage(state.get("usage", {}), _usage_of(response))
         reporter.emit(f"[{title}] draft written ({len(draft.split())} words) -> reviewer")
         return {"draft": draft, "usage": usage}

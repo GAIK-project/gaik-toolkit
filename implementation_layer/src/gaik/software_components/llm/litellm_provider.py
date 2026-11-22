@@ -63,6 +63,16 @@ class LiteLLMProvider:
                 options[target] = self._config[source]
         options.setdefault("timeout", DEFAULT_TIMEOUT_SECONDS)
         options.setdefault("num_retries", DEFAULT_MAX_RETRIES)
+        # An address passed with the call receives the key just as the configured
+        # base_url does, so it is checked the same way. LiteLLM takes either name.
+        for name in ("api_base", "base_url"):
+            if kwargs.get(name) is not None:
+                check_endpoint(
+                    kwargs[name],
+                    provider="litellm",
+                    allowed_hosts=self._config.get("allowed_endpoint_hosts"),
+                    what=name,
+                )
         options.update(kwargs)
         if chat:
             model = options.get("model", self.model)

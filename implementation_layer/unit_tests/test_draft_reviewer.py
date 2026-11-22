@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from gaik.software_components.draft_reviewer import DraftReviewer, Edit, ReviewResult
 from gaik.software_components.draft_reviewer import draft_reviewer as dr
@@ -167,7 +169,7 @@ def test_one_retried_deletion_answers_only_the_deletion_it_matches(make):
     assert "tol booth" not in third
 
 
-def _retry(edit: Edit, answers: str) -> dr.RetryEdit:
+def _retry(edit: Edit, answers: str | list[str]) -> dr.RetryEdit:
     return dr.RetryEdit(**edit.model_dump(), answers=answers)
 
 
@@ -179,6 +181,7 @@ def test_retry_request_lists_ids_and_asks_for_them(make):
     retry = client.calls[1][2]["content"]
     assert "id: F1" in retry
     assert "'answers'" in retry
+    assert '["F1", "F2"] when one edit makes both' in retry
 
 
 def test_retry_naming_the_failed_edit_resolves_it_whatever_its_wording(make):
@@ -246,6 +249,64 @@ def test_two_retry_edits_naming_one_id_answer_it_once(make):
     assert result.unresolved == [paint]
 
 
+def test_an_unrelated_retry_edit_with_the_same_reason_does_not_resolve_a_failed_one(make):
+    # A generic reason is shared by unrelated deletions. The retry answer says, with an
+    # empty 'answers', that its edit makes none of the failed ones: the failed paint
+    # edit must stay unresolved, so a strict review fails rather than passing.
+    draft = DRAFT + " It has a toll booth."
+    paint = Edit(search=" It was painted bleu.", replace="", reason="Not in the reference.")
+    toll = Edit(search=" It has a toll booth.", replace="", reason="Not in the reference.")
+    answer = dr.RetryEditList(edits=[_retry(toll, [])])
+    reviewer, client = make(_edits(paint), answer, _edits())
+    result = reviewer.review(draft, reference=REFERENCE)
+    assert result.applied == [toll]
+    assert result.unresolved == [paint]
+    assert "It was painted blue." in result.text
+
+
+def test_one_retry_edit_can_make_two_failed_edits(make):
+    year = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    traffic = Edit(search="carries 4000 vehicles", replace="carries 45,000", reason="Count.")
+    both = Edit(
+        search="opened in 1999. It carries 40,000",
+        replace="opened in 1998. It carries 45,000",
+        reason="The reference gives 1998 and 45,000.",
+    )
+    reviewer, client = make(
+        _edits(year, traffic), dr.RetryEditList(edits=[_retry(both, ["F1", "F2"])])
+    )
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.text == DRAFT.replace("1999", "1998").replace("40,000", "45,000")
+    assert result.unresolved == []
+    assert len(client.calls) == 2
+
+
+def test_a_retry_edit_naming_two_ids_that_fails_is_carried_once(make):
+    year = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    traffic = Edit(search="carries 4000 vehicles", replace="carries 45,000", reason="Count.")
+    both = Edit(search="opened in 1999! It", replace="opened in 1998. It", reason="Both.")
+    reviewer, client = make(
+        _edits(year, traffic), dr.RetryEditList(edits=[_retry(both, ["F1", "F2"])]), _edits()
+    )
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.unresolved == [both]
+    third = client.calls[2][2]["content"]
+    assert third.count("id: F") == 1 and "id: F1" in third
+
+
+def test_answers_written_as_a_string_still_name_the_failed_edits():
+    assert dr.RetryEdit(search="a", replace="b", reason="r", answers="F1").answers == ["F1"]
+    assert dr.RetryEdit(search="a", replace="b", reason="r", answers="f1, F2").answers == [
+        "F1",
+        "F2",
+    ]
+    assert dr.RetryEdit(search="a", replace="b", reason="r", answers="").answers == []
+    assert (
+        dr.RetryEditList.model_json_schema()["$defs"]["RetryEdit"]["properties"]["answers"]["type"]
+        == "array"
+    )
+
+
 def test_empty_replace_deletes_passage(make):
     delete = Edit(search=" It was painted blue.", replace="", reason="Not in the reference.")
     reviewer, _ = make(_edits(delete))
@@ -286,3 +347,61 @@ def test_client_exception_propagates(make):
     reviewer, _ = make(RuntimeError("provider down"))
     with pytest.raises(RuntimeError, match="provider down"):
         reviewer.review(DRAFT, reference=REFERENCE)
+
+
+@pytest.mark.parametrize("answers", [[], "", ["F7"]], ids=["empty-list", "empty", "unknown-id"])
+def test_a_retry_edit_that_carries_answers_makes_only_the_ids_it_names(make, answers):
+    # An explicit 'answers' says which failed edits the edit makes; an empty list or an
+    # unknown id makes none of them, so the failed edit stays unresolved.
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    fixed = Edit(search="opened in 1999", replace="opened in 1998", reason="Wrong year.")
+    reviewer, client = make(
+        _edits(typo), dr.RetryEditList(edits=[_retry(fixed, answers)]), _edits()
+    )
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.text == DRAFT.replace("1999", "1998")
+    assert result.unresolved == [typo]
+    assert len(client.calls) == 3
+
+
+def test_a_retry_edit_without_the_field_is_matched_by_its_text(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    fixed = Edit(search="opened in 1999", replace="opened in 1998", reason="Wrong year.")
+    reviewer, client = make(_edits(typo), _edits(fixed))
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.unresolved == []
+    assert len(client.calls) == 2
+
+
+def test_a_retried_deletion_with_another_number_does_not_stand_for_the_failed_one(make):
+    draft = DRAFT + " Built in 2021."
+    failed = Edit(search=" Built in 2020.", replace="", reason="Not in the reference.")
+    other = Edit(search=" Built in 2021.", replace="", reason="Not in the reference.")
+    reviewer, _ = make(_edits(failed), _edits(other), _edits())
+    result = reviewer.review(draft, reference=REFERENCE)
+    assert result.applied == [other]
+    assert result.unresolved == [failed]
+
+
+def test_a_named_and_an_unnamed_retry_edit_are_each_matched_their_way(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    count = Edit(search="carries 4000 vehicles", replace="carries 45,000", reason="Count.")
+    by_id = _retry(YEAR, ["F1"])
+    by_text = Edit(search="carries 40,000", replace="carries 45,000", reason="Count.")
+    answer = SimpleNamespace(edits=[by_id, by_text])  # a client that mixes both kinds
+    reviewer, client = make(_edits(typo, count), answer)
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.unresolved == []
+    assert len(client.calls) == 2
+
+
+@pytest.mark.parametrize("as_retry_edit", [True, False], ids=["answers-empty", "no-field"])
+def test_a_shared_generic_reason_alone_does_not_pair_two_deletions(make, as_retry_edit):
+    draft = DRAFT + " It has a toll booth."
+    paint = Edit(search=" It was painted bleu.", replace="", reason="Not in the reference.")
+    toll = Edit(search=" It has a toll booth.", replace="", reason="Not in the reference.")
+    answer = dr.RetryEditList(edits=[_retry(toll, [])]) if as_retry_edit else _edits(toll)
+    reviewer, _ = make(_edits(paint), answer, _edits())
+    result = reviewer.review(draft, reference=REFERENCE)
+    assert result.applied == [toll]
+    assert result.unresolved == [paint]

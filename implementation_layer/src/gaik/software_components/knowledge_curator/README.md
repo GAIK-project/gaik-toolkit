@@ -175,7 +175,16 @@ not occur verbatim in that source's text (only whitespace may differ, `quote_in_
 or when its `summary` states a number that neither the quote nor the `time_qualifier`
 (where the cited source has that number too) gives, such as an age computed from a year. Numbers are compared by their digits, so
 "1 200" supports "1200" and also "1" and "200", and a digit glued to letters (the 2 of
-m2) is not a figure; a number written in words is not checked, and the check does not
+m2) is not a figure. A grouped number keeps one thousands separator: "1,250.500" is 1250
+and 500, not 1250500. A date the summary writes with numbers (14.3.2026, 14.3. or
+2026-03-14) is also supported by the same date with its month as a word ("14 March
+2026", "the 14th of March", "March 14", "14. maaliskuuta", "14. päivänä maaliskuuta"),
+and a month and a year (3/2026) by the same month and year ("maaliskuussa 2026", "March
+2026"); a year counts only when that date has the same year. The month's number supports
+nothing else, so "14 March" does not support "3 floors". Month names count in any case,
+but "may" and "mar" only after a day or before a year, since they are also words. A
+number the summary
+writes in words is not checked, and the check does not
 confirm that the summary's wording matches the quote. It is a sanity check, not a
 verification of figures: digits are compared as a set, so their order (1,5 and 5,1) and
 a sign (-1,5) are not checked.

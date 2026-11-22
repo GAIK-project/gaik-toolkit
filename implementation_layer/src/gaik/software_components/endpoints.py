@@ -82,6 +82,7 @@ PROVIDER_ENDPOINT_ENVS: dict[str, tuple[str, ...]] = {
     "openai_compatible": ("OPENAI_BASE_URL",),
     "azure": ("AZURE_ENDPOINT", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_BASE", "TTS_ENDPOINT"),
     "aitta": ("AITTA_BASE_URL",),
+    "anthropic": ("ANTHROPIC_BASE_URL",),
     "vertex": ("GOOGLE_GENERATE_CONTENT_URL",),
     "litellm": ("LITELLM_BASE_URL",),
     "jev": ("GAIK_DECIDE_URL", "TYPESAFE_BASE_URL"),
@@ -236,6 +237,16 @@ def _env_hosts(provider: str) -> tuple[list[str], list[str]]:
     return hosts, http_hosts
 
 
+def _set_it_in(provider: str) -> str:
+    """``"set the address in AZURE_ENDPOINT (or ...), or "``: the provider's own
+    variables, whose host is trusted; empty for a provider without one."""
+    names = PROVIDER_ENDPOINT_ENVS.get(provider, ())
+    if not names:
+        return ""
+    others = f" (or {', '.join(names[1:])})" if len(names) > 1 else ""
+    return f"set the address in {names[0]}{others}, or "
+
+
 def check_endpoint(
     url: str,
     *,
@@ -266,8 +277,9 @@ def check_endpoint(
         ):
             return host
         raise EndpointNotAllowedError(
-            f"{what} points at this machine, which is not a {provider} host. List "
-            f"{host!r} in {ALLOWED_HOSTS_ENV} if a local server stands in for it."
+            f"{what} points at this machine, which is not a {provider} host. If a local "
+            f"server stands in for it, {_set_it_in(provider)}list {host!r} in "
+            f"{ALLOWED_HOSTS_ENV}."
         )
     if scheme == "http":
         if any(_host_matches(host, pattern) for pattern in http_names):
@@ -279,7 +291,8 @@ def check_endpoint(
             return host
         raise EndpointNotAllowedError(
             f"{what} must use https:// (got http:// for host {host!r}). For a server on a "
-            f"private network, list 'http://{host}' in {ALLOWED_HOSTS_ENV}."
+            f"private network, {_set_it_in(provider)}list 'http://{host}' in "
+            f"{ALLOWED_HOSTS_ENV}."
         )
     # LiteLLM routes to the provider its model ID names, so any known provider host fits.
     known = (
@@ -290,8 +303,9 @@ def check_endpoint(
     if any(_host_matches(host, pattern) for pattern in [*known, *deployment]):
         return host
     raise EndpointNotAllowedError(
-        f"{what} host {host!r} is not a known {provider} host. Add it to "
-        f"{ALLOWED_HOSTS_ENV} (or allowed_endpoint_hosts) if this deployment uses it."
+        f"{what} host {host!r} is not a known {provider} host. If this deployment uses "
+        f"it, {_set_it_in(provider)}add the host to {ALLOWED_HOSTS_ENV} (or "
+        "allowed_endpoint_hosts)."
     )
 
 
