@@ -1106,10 +1106,19 @@ def check(data: bytes) -> None:
 # <memory>``), a new process for each file, and reads its outcome.
 
 
+#: Starts each line the check's process writes to stderr about a limit it could
+#: not set; ``pdf_process`` logs those lines.
+LIMIT_NOTICE = "PDF check process: "
+
+
 def _limit_process(memory: int) -> None:
     """At most ``memory`` bytes of address space and a lower priority than the
-    API's, where the system sets them for a process (Linux); elsewhere the
-    budgets alone bound the check."""
+    API's, where the system sets them for a process (Linux). Windows has neither,
+    and macOS may refuse the memory cap; there nothing caps the memory of the
+    check's process. Its budgets bound most of its work but not every step, so a
+    hard file can take much memory before ``pdf_process`` stops the process at
+    its deadline. A limit the system refuses is said on stderr, as the process
+    then runs without it."""
     try:
         import resource
     except ImportError:
@@ -1119,12 +1128,18 @@ def _limit_process(memory: int) -> None:
             _, hard = resource.getrlimit(resource.RLIMIT_AS)
             soft = memory if hard == resource.RLIM_INFINITY else min(memory, hard)
             resource.setrlimit(resource.RLIMIT_AS, (soft, hard))
-        except (ValueError, OSError):
-            pass
+        except (ValueError, OSError) as exc:
+            _say(f"no memory cap ({type(exc).__name__}: {exc})")
     try:
         os.nice(10)
-    except OSError:
-        pass
+    except OSError as exc:
+        _say(f"no lower priority ({type(exc).__name__}: {exc})")
+
+
+def _say(problem: str) -> None:
+    """One line on stderr; stdout carries only the outcome."""
+    sys.stderr.write(f"{LIMIT_NOTICE}{problem}\n")
+    sys.stderr.flush()
 
 
 def _serve() -> None:

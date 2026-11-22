@@ -218,7 +218,8 @@ def test_run_passes_the_source_precedence_to_the_curator(client):
 
 
 def test_an_older_gaik_curates_without_the_precedence_and_says_so(client, monkeypatch):
-    """gaik 0.11.1 has no source_precedence: the run goes on, conflicts left to the user."""
+    """gaik 0.11.1 has no source_precedence: the run goes on, and the message says that
+    its model resolves conflicts from the instructions instead."""
 
     class OldCurator(FakeCurator):
         def curate(self, sources, sections, *, instructions, progress_callback):
@@ -234,9 +235,13 @@ def test_an_older_gaik_curates_without_the_precedence_and_says_so(client, monkey
 
     assert events[-1][0] == "result"
     assert CALLS[0]["source_precedence"] is None
-    assert any(
-        "cannot rank sources" in data["message"] for name, data in events if name == "progress"
-    )
+    (notice,) = [
+        data["message"]
+        for name, data in events
+        if name == "progress" and "cannot rank sources" in data["message"]
+    ]
+    assert "the model resolves a conflict where the instructions rank the sources" in notice
+    assert "every conflict is left" not in notice
 
 
 def test_a_curator_failure_is_an_error_event(client):
