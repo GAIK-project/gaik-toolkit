@@ -5,10 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  followedIds,
   type KnowledgeConflict,
   namesSides,
   resolveConflict,
+  resolvedByText,
   sideProblem,
+  withoutFact,
 } from "@/lib/report-writer/conflicts";
 import { cn } from "@/lib/utils";
 import {
@@ -173,9 +176,10 @@ function UnitCard({
 }
 
 /**
- * A disagreement between sources. A resolved one is settled by the source precedence.
- * An unresolved one is shown with both sides in the report; you can settle it here by
- * choosing the fact to follow and saying why, and the next Stage 3 run writes it that way.
+ * A disagreement between sources. A resolved one is settled by the source precedence or
+ * by hand, and its facts that the report follows are marked. An unresolved one is shown
+ * with both sides in the report; you can settle it here by choosing the fact to follow
+ * and saying why, and the next Stage 3 run writes it that way.
  */
 function ConflictCard({
   conflict,
@@ -194,6 +198,8 @@ function ConflictCard({
   const problem = sideProblem(conflict, preferred);
   const unresolved = conflict.status === "unresolved";
   const facts = units.filter((unit) => conflict.unit_ids?.includes(unit.id));
+  const followed = followedIds(conflict);
+  const by = resolvedByText(conflict);
   return (
     <li
       className={cn(
@@ -212,6 +218,7 @@ function ConflictCard({
         >
           {conflict.status}
         </Badge>
+        {by && <span className="text-muted-foreground text-xs">{by}</span>}
       </div>
       <p className="text-muted-foreground">{conflict.description}</p>
       {facts.length > 0 && (
@@ -223,6 +230,15 @@ function ConflictCard({
                 {fact.source.locator ? ` · ${fact.source.locator}` : ""}:
               </span>{" "}
               <span className="italic">{fact.quote}</span>
+              {followed.includes(fact.id) && (
+                <Badge
+                  variant="outline"
+                  className="ml-1.5 px-1.5 py-0 text-[10px] font-normal"
+                  title="The report follows this fact"
+                >
+                  followed
+                </Badge>
+              )}
             </li>
           ))}
         </ul>
@@ -395,6 +411,9 @@ function FactList({
             onRemove={() =>
               onSave((data) => {
                 data.units = data.units.filter((u) => u.id !== unit.id);
+                // No conflict may name, or tell the writer to follow, a removed fact.
+                if (Array.isArray(data.conflicts))
+                  data.conflicts = withoutFact(data.conflicts, unit.id);
               })
             }
           />

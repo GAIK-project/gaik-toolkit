@@ -40,6 +40,67 @@ export function sideProblem(
 }
 
 /**
+ * The facts a resolved conflict follows: its `preferred_unit_ids` that are its own units.
+ * Empty for an unresolved conflict, and for a file from a gaik that names no sides.
+ */
+export function followedIds(conflict: KnowledgeConflict): string[] {
+  if (conflict.status !== "resolved") return [];
+  const ids = conflict.unit_ids ?? [];
+  return (conflict.preferred_unit_ids ?? []).filter((id) => ids.includes(id));
+}
+
+/**
+ * Who settled a resolved conflict, in a few words: "by hand", or the source class that
+ * ranks first ("by primary sources"). Null when the file does not say.
+ */
+export function resolvedByText(conflict: KnowledgeConflict): string | null {
+  if (followedIds(conflict).length === 0 || !conflict.resolved_by) return null;
+  return conflict.resolved_by === "user"
+    ? "by hand"
+    : `by ${conflict.resolved_by} sources`;
+}
+
+/**
+ * The conflicts after the fact `unitId` was removed, so that none names a fact that is
+ * gone. Its id leaves `unit_ids` and `preferred_unit_ids`. A conflict with fewer than two
+ * facts left, or a resolved one left with only the facts it follows, has no other side
+ * and is dropped. A resolved conflict whose followed facts are all gone is unresolved
+ * again, as gaik reads it: the report gives the sides that are left until a person
+ * settles it again. A file from a gaik that names no sides only loses the id.
+ */
+export function withoutFact(
+  conflicts: KnowledgeConflict[],
+  unitId: string,
+): KnowledgeConflict[] {
+  const kept: KnowledgeConflict[] = [];
+  for (const conflict of conflicts) {
+    if (!conflict.unit_ids?.includes(unitId)) {
+      kept.push(conflict);
+      continue;
+    }
+    const unitIds = conflict.unit_ids.filter((id) => id !== unitId);
+    if (unitIds.length < 2) continue;
+    const next: KnowledgeConflict = { ...conflict, unit_ids: unitIds };
+    if (namesSides(conflict)) {
+      const preferred = (conflict.preferred_unit_ids ?? []).filter(
+        (id) => id !== unitId,
+      );
+      next.preferred_unit_ids = preferred;
+      if (conflict.status === "resolved") {
+        if (unitIds.every((id) => preferred.includes(id))) continue;
+        if (!preferred.some((id) => unitIds.includes(id))) {
+          next.status = "unresolved";
+          next.preferred_unit_ids = [];
+          next.resolved_by = null;
+        }
+      }
+    }
+    kept.push(next);
+  }
+  return kept;
+}
+
+/**
  * Mark the conflict resolved with the user's reason, and, where the knowledge names
  * sides, the facts to follow, so that the writer does not read it as unresolved.
  * Throws when the side cannot settle it (see `sideProblem`).

@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  followedIds,
   type KnowledgeConflict,
   namesSides,
   resolveConflict,
+  resolvedByText,
   sideProblem,
+  withoutFact,
 } from "./conflicts";
 
 const current = (): KnowledgeConflict => ({
@@ -50,5 +53,77 @@ describe("resolveConflict", () => {
       status: "resolved",
       unit_ids: ["roof-01", "roof-02"],
     });
+  });
+});
+
+const resolved = (
+  over: Partial<KnowledgeConflict> = {},
+): KnowledgeConflict => ({
+  ...current(),
+  description: "The recording says 1998, the document 2005.",
+  status: "resolved",
+  unit_ids: ["roof-01", "roof-02", "roof-03"],
+  preferred_unit_ids: ["roof-01"],
+  resolved_by: "primary",
+  ...over,
+});
+
+describe("withoutFact", () => {
+  test("removing the followed fact leaves no deleted id to follow: the conflict is open again", () => {
+    const [conflict] = withoutFact([resolved()], "roof-01");
+
+    expect(conflict).toEqual({
+      ...resolved(),
+      status: "unresolved",
+      unit_ids: ["roof-02", "roof-03"],
+      preferred_unit_ids: [],
+      resolved_by: null,
+    });
+    expect(followedIds(conflict)).toEqual([]);
+  });
+
+  test("removing a fact of the other side keeps the resolution while a side is left", () => {
+    const [conflict] = withoutFact([resolved()], "roof-03");
+
+    expect(conflict.status).toBe("resolved");
+    expect(conflict.unit_ids).toEqual(["roof-01", "roof-02"]);
+    expect(conflict.preferred_unit_ids).toEqual(["roof-01"]);
+    expect(conflict.resolved_by).toBe("primary");
+  });
+
+  test("a conflict left without another side is no conflict and is dropped", () => {
+    const two = resolved({ unit_ids: ["roof-01", "roof-02"] });
+    expect(withoutFact([two], "roof-02")).toEqual([]);
+    expect(withoutFact([current()], "roof-01")).toEqual([]);
+    const sameSide = resolved({ preferred_unit_ids: ["roof-01", "roof-02"] });
+    expect(withoutFact([sameSide], "roof-03")).toEqual([]);
+  });
+
+  test("conflicts without the fact, and older files, keep their sides", () => {
+    const other = { ...current(), unit_ids: ["wall-01", "wall-02"] };
+    expect(withoutFact([other], "roof-01")).toEqual([other]);
+    const { preferred_unit_ids: _p, resolved_by: _r, ...older } = resolved();
+    expect(withoutFact([older], "roof-01")).toEqual([
+      { ...older, unit_ids: ["roof-02", "roof-03"] },
+    ]);
+  });
+});
+
+describe("followedIds and resolvedByText", () => {
+  test("name the facts a resolved conflict follows and who settled it", () => {
+    expect(followedIds(resolved())).toEqual(["roof-01"]);
+    expect(resolvedByText(resolved())).toBe("by primary sources");
+    expect(resolvedByText(resolved({ resolved_by: "user" }))).toBe("by hand");
+  });
+
+  test("say nothing for an open conflict, an older file or ids of other facts", () => {
+    expect(followedIds(current())).toEqual([]);
+    expect(resolvedByText(current())).toBeNull();
+    const { preferred_unit_ids: _p, resolved_by: _r, ...older } = resolved();
+    expect(followedIds(older)).toEqual([]);
+    expect(resolvedByText(older)).toBeNull();
+    expect(followedIds(resolved({ preferred_unit_ids: ["wall-01"] }))).toEqual(
+      [],
+    );
   });
 });
