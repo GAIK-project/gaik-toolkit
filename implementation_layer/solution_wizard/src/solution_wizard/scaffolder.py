@@ -1124,6 +1124,32 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
     )
 
 
+#: A reference card's verified import line: ``from <module> import A, B``.
+_CARD_IMPORT_RE = re.compile(r"from (?P<module>[A-Za-z_][\w.]*) import (?P<names>[\w ,]+)")
+
+
+def _component_import_lines(entry: dict) -> list[str]:
+    """The import lines for a registry entry's classes, one name per line.
+
+    They come from the entry's reference card, whose import line the _generic
+    skeleton also shows. Most entries are named after their class, but a family
+    entry such as ``Extractor`` is not one: its card imports ``SchemaGenerator``
+    and ``DataExtractor``, and importing the family name would stop the run at
+    its first line. A class that uses another class of its module, such as
+    ``LLMJudgePanel`` with ``LLMJudge``, keeps its own import. Without a card
+    the entry's own name is imported, as before.
+    """
+    from .registry import get_reference_cards
+
+    card = get_reference_cards().get(entry["name"]) or {}
+    match = _CARD_IMPORT_RE.fullmatch(str(card.get("import", "")).strip())
+    if match:
+        names = [name.strip() for name in match["names"].split(",") if name.strip()]
+        if names:
+            return [f"from {match['module']} import {name}" for name in names]
+    return [f"from {entry['import_path']} import {entry['name']}"]
+
+
 def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     """Build the substitution variables dict from the blueprint."""
     bc = blueprint
@@ -1173,9 +1199,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         if step.component and step.component not in ("custom", "human_review"):
             entry = registry.lookup_by_name(step.component) or registry.lookup_by_id(step.component)
             if entry and entry.get("import_path"):
-                class_name = entry["name"]
-                import_path = entry["import_path"]
-                import_lines.append(f"from {import_path} import {class_name}")
+                for line in _component_import_lines(entry):
+                    if line not in import_lines:
+                        import_lines.append(line)
 
     language = (
         bc.technical_spec.get("language", "en")
@@ -1305,7 +1331,8 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         ),
         "sample_field_lines": sample_field_lines,
         "workflow_steps_summary": steps_summary,
-        "component_imports_placeholder": "\n".join(import_lines),
+        # Every line commented out: the agent uncomments each as it wires its step.
+        "component_imports_placeholder": "\n".join(f"# {line}" for line in import_lines),
         "input_instructions": _input_instructions(bc),
         "output_instructions": _output_instructions(bc),
         # _generic template extras

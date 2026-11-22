@@ -70,8 +70,10 @@ removed; style and order are left alone.
 The reference and the text under review reach the model as material, apart from the
 checks: the system message holds the reviewer's rules and the sentence in
 `SOURCE_MATERIAL_INSTRUCTION`, and each piece sits in its own `<source_material>` block
-with a random id that is new for every request
-([`gaik.software_components.source_material`](../source_material.py)). Your
+with a random id ([`gaik.software_components.source_material`](../source_material.py)).
+Each `review()` call draws a new id and keeps it for all of its requests, so the
+instruction stays the same across retries; it draws another only when an edit has
+written the current id into the text that is sent. Your
 `instructions` stay outside the blocks. `reference` may also be a mapping of names to
 texts (one entry per source or per earlier section); each entry gets its own block,
 labelled with its name. A sentence in the draft or the reference cannot close its block

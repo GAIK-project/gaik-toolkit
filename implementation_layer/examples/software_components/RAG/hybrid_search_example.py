@@ -38,11 +38,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 import psycopg
 from gaik.software_components.config import get_openai_config
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.pg_vector_store import PgVectorStore
 from gaik.software_components.RAG.ranker import Ranker
 from gaik.software_components.RAG.relevance_gate import RelevanceGate
 from langchain_core.documents import Document
+
+# Settings kept only in the repository's .env are read below before any gaik config
+# helper runs, so load that file (found from the gaik package) first.
+load_env_file()
 
 # Connection string (override with DATABASE_URL environment variable)
 DATABASE_URL = os.getenv(

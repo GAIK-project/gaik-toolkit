@@ -323,15 +323,17 @@ EXPECTED_B4 = {
 # Test runner
 # ===================================================================
 
+# One test per case, so each fails on its own. A2 and B4 were xfail while the cases
+# were one test (May 2026); both pass live on gaik 0.11 (#98), so no case is marked.
 FORMAT_CASES = [
-    ("A1: DD/MM/YYYY", TASK_FORMAT_DD_SLASH_MM_SLASH_YYYY, DOC_A1, EXPECTED_A1),
-    ("A2: DD.MM.YYYY", TASK_FORMAT_DD_DOT_MM_DOT_YYYY, DOC_A2, EXPECTED_A2),
-    ("A3: YYYY-MM-DD", TASK_FORMAT_YYYY_MM_DD, DOC_A3, EXPECTED_A3),
-    ("A4: MM/DD/YYYY", TASK_FORMAT_MM_SLASH_DD_SLASH_YYYY, DOC_A4, EXPECTED_A4),
-    ("B1: no format, EU dot to ISO", TASK_NO_FORMAT_EU_DOT, DOC_B1, EXPECTED_B1),
-    ("B2: no format, written to ISO", TASK_NO_FORMAT_WRITTEN, DOC_B2, EXPECTED_B2),
-    ("B3: no format, slash to ISO", TASK_NO_FORMAT_SLASH, DOC_B3, EXPECTED_B3),
-    ("B4: no format, missing date", TASK_NO_FORMAT_MISSING, DOC_B4, EXPECTED_B4),
+    pytest.param(TASK_FORMAT_DD_SLASH_MM_SLASH_YYYY, DOC_A1, EXPECTED_A1, id="A1-dd-mm-yyyy-slash"),
+    pytest.param(TASK_FORMAT_DD_DOT_MM_DOT_YYYY, DOC_A2, EXPECTED_A2, id="A2-dd-mm-yyyy-dot"),
+    pytest.param(TASK_FORMAT_YYYY_MM_DD, DOC_A3, EXPECTED_A3, id="A3-yyyy-mm-dd"),
+    pytest.param(TASK_FORMAT_MM_SLASH_DD_SLASH_YYYY, DOC_A4, EXPECTED_A4, id="A4-mm-dd-yyyy-slash"),
+    pytest.param(TASK_NO_FORMAT_EU_DOT, DOC_B1, EXPECTED_B1, id="B1-no-format-eu-dot-to-iso"),
+    pytest.param(TASK_NO_FORMAT_WRITTEN, DOC_B2, EXPECTED_B2, id="B2-no-format-written-to-iso"),
+    pytest.param(TASK_NO_FORMAT_SLASH, DOC_B3, EXPECTED_B3, id="B3-no-format-slash-to-iso"),
+    pytest.param(TASK_NO_FORMAT_MISSING, DOC_B4, EXPECTED_B4, id="B4-no-format-missing-date"),
 ]
 
 
@@ -371,74 +373,24 @@ def run_extraction(task: str, document: str, label: str):
     return results[0]
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Two deterministic edge-cases pending extractor fix: "
-        "A2 (DD.MM.YYYY) does not reformat ISO source date, and "
-        "B4 (no-format, missing date) returns empty for the chairperson "
-        "string field. 22 of 24 assertions pass; tracked separately. "
-        "Set strict=False so the test still surfaces in CI as XFAIL "
-        "without blocking releases."
-    ),
-    strict=False,
-)
-def test_date_format_handling():
-    """Test date extraction with and without user-specified output formats."""
-    passed = 0
-    failed = 0
-    errors = []
+@pytest.mark.parametrize(("task", "document", "expected"), FORMAT_CASES)
+def test_date_format_handling(task, document, expected, request):
+    """The date comes out in the task's format, or as ISO without one."""
+    label = request.node.callspec.id
+    result = run_extraction(task, document, label)
+    print("\n--- result ---")
+    print(json.dumps(result, indent=2, default=str, ensure_ascii=False))
 
-    for label, task, doc, expected in FORMAT_CASES:
-        result = run_extraction(task, doc, label)
+    date_key = expected["date_field"]
+    actual_date = result.get(date_key)
+    assert not (isinstance(actual_date, str) and "snake_case" in actual_date.lower()), (
+        f"{date_key} = {actual_date!r}: 'snake_case' leaked"
+    )
 
-        print(f"\n--- result ---")
-        print(json.dumps(result, indent=2, default=str, ensure_ascii=False))
-
-        print(f"\n--- assertions ---")
-
-        # Check date field
-        date_key = expected["date_field"]
-        expected_date = expected["date_value"]
-        actual_date = result.get(date_key)
-
-        if isinstance(actual_date, str) and "snake_case" in actual_date.lower():
-            print(f"  FAIL: {date_key} = {actual_date!r} — 'snake_case' leaked!")
-            failed += 1
-            errors.append(f"[{label}] {date_key}: 'snake_case' leaked")
-        else:
-            print(f"  PASS: {date_key} — no snake_case leak")
-            passed += 1
-
-        if actual_date == expected_date:
-            print(f"  PASS: {date_key} = {actual_date!r} (expected {expected_date!r})")
-            passed += 1
-        else:
-            print(f"  FAIL: {date_key} = {actual_date!r} (expected {expected_date!r})")
-            failed += 1
-            errors.append(f"[{label}] {date_key}: got {actual_date!r}, expected {expected_date!r}")
-
-        # Check other fields
-        for key, expected_val in expected.items():
-            if key in ("date_field", "date_value"):
-                continue
-            actual = result.get(key)
-            if actual == expected_val:
-                print(f"  PASS: {key} = {actual!r}")
-                passed += 1
-            else:
-                print(f"  FAIL: {key} = {actual!r} (expected {expected_val!r})")
-                failed += 1
-                errors.append(f"[{label}] {key}: got {actual!r}, expected {expected_val!r}")
-
-    print(f"\n{'=' * 80}")
-    print(f"SUMMARY: {passed} passed, {failed} failed out of {passed + failed} assertions")
-    print("=" * 80)
-    if errors:
-        for e in errors:
-            print(f"  FAIL: {e}")
-
-    assert failed == 0, f"{failed} assertion(s) failed:\n" + "\n".join(errors)
+    wanted = {date_key: expected["date_value"]}
+    wanted.update((k, v) for k, v in expected.items() if k not in ("date_field", "date_value"))
+    assert {key: result.get(key) for key in wanted} == wanted
 
 
 if __name__ == "__main__":
-    test_date_format_handling()
+    raise SystemExit(pytest.main([__file__, "-m", "llm", "-s"]))

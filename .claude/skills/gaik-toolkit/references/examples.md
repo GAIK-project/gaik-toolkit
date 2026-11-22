@@ -578,9 +578,9 @@ extraction_model = generator.generate_schema(TASK)
 requirements = generator.item_requirements
 
 SCHEMA_DIR = Path("./schema_generated")
-# The sample script writes schema.py + requirements.json, which
-# VisionExtractor(...).extract(..., schema_dir=SCHEMA_DIR) loads; pass
-# extraction_model and requirements to DataExtractor.extract directly.
+# The sample script writes schema_model.json + requirements.json (and schema.py
+# to read), which VisionExtractor(...).extract(..., schema_dir=SCHEMA_DIR) loads;
+# pass extraction_model and requirements to DataExtractor.extract directly.
 ```
 
 **When to do this separately:** batch pipelines where schema generation cost

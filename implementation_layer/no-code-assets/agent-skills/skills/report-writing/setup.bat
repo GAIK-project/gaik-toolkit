@@ -263,7 +263,7 @@ if not exist "%WORK_FOLDER%\" mkdir "%WORK_FOLDER%"
 "%VENV_PYTHON%" "%SERVER_PATH%" --check-folder "%WORK_FOLDER%" >nul
 if %errorlevel% neq 0 (
     echo [ERROR] "!WORK_FOLDER!" is not a folder Claude can be limited to.
-    echo         It must not be your whole user folder or hold this setup folder.
+    echo         It must not be your whole user folder, hold this setup folder or lie inside it.
     echo         Choose a folder of its own, for example %USERPROFILE%\Documents\GAIK.
     pause
     exit /b 1
@@ -347,8 +347,10 @@ echo.
 echo    2. If it is missing or empty, paste the ENTIRE content of:
 echo       %CONFIG_FILE%
 echo.
-echo    3. Otherwise add only the gaik-transcriber entry to its mcpServers section
-echo       and keep everything else. Then SAVE.
+echo    3. Otherwise copy both the gaik-transcriber and the filesystem entries into
+echo       its mcpServers section, replacing any entry with the same name, and keep
+echo       everything else. The new filesystem entry limits Claude's file access to
+echo       the folder you chose. Then SAVE.
 echo.
 echo    TIP: Press Win+R, paste the path above, and press Enter to open it.
 echo.
