@@ -89,6 +89,45 @@ def test_explicit_global_date_format_applies_to_every_date():
     assert [field.format for field in requirements.fields] == ["%d.%m.%Y", "%d.%m.%Y"]
 
 
+@pytest.mark.parametrize(
+    ("task_line", "value", "expected"),
+    [
+        # Issue #141 item 1: 7 March written month first stays as written.
+        ("- Invoice date (MM/DD/YYYY)", "03/07/2024", "03/07/2024"),
+        ("- Invoice date (MM/DD/YYYY)", "3/7/2024", "03/07/2024"),
+        ("- Invoice date (MM-DD-YYYY)", "03-07-2024", "03-07-2024"),
+        # A day above 12 was already read month first; it still is.
+        ("- Invoice date (MM/DD/YYYY)", "03/25/2024", "03/25/2024"),
+        # A value written day first is still converted to the field's format.
+        ("- Invoice date (MM/DD/YYYY)", "25/03/2024", "03/25/2024"),
+        ("- Invoice date (MM/DD/YYYY)", "2024-03-07", "03/07/2024"),
+        # Day-first fields keep reading a day-first value day first.
+        ("- Invoice date (DD/MM/YYYY)", "03/07/2024", "03/07/2024"),
+        ("- Invoice date (DD.MM.YYYY)", "2024-07-03", "03.07.2024"),
+    ],
+)
+def test_a_date_already_in_the_fields_own_format_is_read_in_that_format(task_line, value, expected):
+    requirements = _requirements(
+        FieldSpec(field_name="invoice_date", field_type="date", description="Invoice date")
+    )
+
+    _apply_type_overrides(requirements, original_text=task_line)
+
+    assert normalize_extracted_data({"invoice_date": value}, requirements) == {
+        "invoice_date": expected
+    }
+
+
+def test_parse_date_tries_the_output_format_first():
+    from gaik.software_components.extractor.schema import parse_date
+
+    assert parse_date("03/07/2024", "%m/%d/%Y") == "03/07/2024"
+    assert parse_date("03/07/2024", "%d/%m/%Y") == "03/07/2024"
+    # Without a format of its own, a slash date is still read day first, as before.
+    assert parse_date("03/07/2024") == "2024-07-03"
+    assert parse_date("not a date", "%m/%d/%Y") == "not a date"
+
+
 def test_date_preserve_instruction_keeps_string_representation():
     requirements = _requirements(
         FieldSpec(

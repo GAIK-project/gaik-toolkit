@@ -2005,6 +2005,11 @@ def parse_date(value: str | date | None, output_format: str = "%Y-%m-%d") -> str
     Handles common formats: ISO, European (DD/MM/YYYY), US (MM/DD/YYYY), etc.
     Also fixes common OCR/LLM year errors (e.g., 1004 -> 2004).
 
+    ``output_format`` is tried first: a value already written in the field's own
+    format is read in that format. ``03/07/2024`` with ``%m/%d/%Y`` is 7 March and
+    stays ``03/07/2024``; reading it day first would swap day and month whenever
+    the day is 12 or less. The other formats follow, day first before month first.
+
     Args:
         value: Date string, datetime.date object, or None
         output_format: strftime format for output (default: ISO format)
@@ -2038,6 +2043,9 @@ def parse_date(value: str | date | None, output_format: str = "%Y-%m-%d") -> str
         "%b %d, %Y",  # Short month: Apr 25, 2024
         "%d %b %Y",  # Day first short: 25 Apr 2024
     ]
+    if output_format in formats:
+        formats.remove(output_format)
+    formats.insert(0, output_format)
 
     for fmt in formats:
         try:
