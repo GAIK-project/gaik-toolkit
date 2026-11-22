@@ -32,6 +32,16 @@ DEFAULT_VOICE = "marin"
 DEFAULT_RESPONSE_FORMAT = "mp3"
 
 
+def _takes_instructions(model: str) -> bool:
+    """Whether a speech model or deployment takes ``instructions``.
+
+    ``gpt-4o-mini-tts`` does; ``tts-1`` and ``tts-1-hd`` do not (OpenAI's API
+    reference). On Azure the model is a deployment name, so a deployment counts as a
+    GPT model when its name contains ``gpt``.
+    """
+    return "gpt" in model.lower()
+
+
 @dataclass
 class SpeechSynthesisResult:
     audio_bytes: bytes
@@ -41,6 +51,9 @@ class SpeechSynthesisResult:
     language: str
     response_format: str = DEFAULT_RESPONSE_FORMAT
     content_type: str = SUPPORTED_RESPONSE_FORMATS[DEFAULT_RESPONSE_FORMAT]
+    # The instructions sent with the request (the language line first); None for a
+    # model that takes none (_takes_instructions), which speaks the text as written.
+    instructions: str | None = None
 
     @property
     def filename(self) -> str:
@@ -58,7 +71,13 @@ class SpeechSynthesisResult:
 
 
 class TextToSpeech:
-    """Generate speech audio from text using OpenAI or Azure OpenAI."""
+    """Generate speech audio from text using OpenAI or Azure OpenAI.
+
+    Every request carries the voice, ``response_format`` and ``speed``. The
+    instructions (the language line, ``default_instructions`` and a call's
+    ``instructions``) go only to a model that takes them (:func:`_takes_instructions`);
+    ``SpeechSynthesisResult.instructions`` says what was sent.
+    """
 
     def __init__(
         self,
@@ -128,27 +147,25 @@ class TextToSpeech:
                 f"Unsupported response format '{resolved_format}'. Supported formats: {supported}"
             )
 
-        resolved_instructions = self._build_instructions(
-            language=resolved_language, instructions=instructions
+        resolved_instructions = (
+            self._build_instructions(language=resolved_language, instructions=instructions)
+            if _takes_instructions(self.model)
+            else None
         )
+        request: dict = {
+            "model": self.model,
+            "input": text,
+            "voice": resolved_voice,
+            "response_format": resolved_format,
+            "speed": resolved_speed,
+        }
+        if resolved_instructions is not None:
+            request["instructions"] = resolved_instructions
 
         if self.api_config.get("use_azure", False):
-            audio_bytes = self._synthesize_with_azure_endpoint(
-                text=text,
-                voice=resolved_voice,
-                instructions=resolved_instructions,
-                response_format=resolved_format,
-                speed=resolved_speed,
-            )
+            audio_bytes = self._synthesize_with_azure_endpoint(request)
         else:
-            with self.client.audio.speech.with_streaming_response.create(
-                model=self.model,
-                voice=resolved_voice,
-                input=text,
-                instructions=resolved_instructions,
-                response_format=resolved_format,
-                speed=resolved_speed,
-            ) as response:
+            with self.client.audio.speech.with_streaming_response.create(**request) as response:
                 audio_bytes = b"".join(response.iter_bytes())
 
         return SpeechSynthesisResult(
@@ -159,6 +176,7 @@ class TextToSpeech:
             language=resolved_language,
             response_format=resolved_format,
             content_type=SUPPORTED_RESPONSE_FORMATS[resolved_format],
+            instructions=resolved_instructions,
         )
 
     def _resolve_default_model(self) -> str:
@@ -167,22 +185,13 @@ class TextToSpeech:
             return os.getenv("AZURE_TTS_MODEL", DEFAULT_MODEL)
         return os.getenv("OPENAI_TTS_MODEL", DEFAULT_MODEL)
 
-    def _synthesize_with_azure_endpoint(
-        self,
-        *,
-        text: str,
-        voice: str,
-        instructions: str,
-        response_format: str,
-        speed: float,
-    ) -> bytes:
-        tts_endpoint, api_key = self._azure_tts_target()
+    def _synthesize_with_azure_endpoint(self, payload: dict) -> bytes:
+        """POST ``payload`` (the same body the OpenAI branch sends) to the Azure speech URL.
 
-        payload = {
-            "model": self.model,
-            "input": text,
-            "voice": voice,
-        }
+        Azure's speech operation takes ``response_format`` and ``speed`` as OpenAI's
+        does, so the audio comes back in the format the result is labelled with.
+        """
+        tts_endpoint, api_key = self._azure_tts_target()
 
         response = requests.post(
             tts_endpoint,

@@ -751,6 +751,7 @@ saved_path = result.save("tts_outputs")
 | `language` | str | Language code |
 | `response_format` | str | Audio format |
 | `content_type` | str | MIME type |
+| `instructions` | str \| None | Instructions sent; `None` for a model that takes none (`tts-1`, `tts-hd`) |
 
 **Methods:**
 - `result.save(output_dir)` - Save audio file, returns path

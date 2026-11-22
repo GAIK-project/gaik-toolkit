@@ -78,9 +78,18 @@ The Azure request payload matches this shape:
 {
   "model": "tts-hd",
   "input": "Hello from GAIK.",
-  "voice": "alloy"
+  "voice": "alloy",
+  "response_format": "mp3",
+  "speed": 1.0
 }
 ```
+
+Both branches send the same body, so `response_format` and `speed` reach Azure too and the
+audio comes back in the format `result.response_format` names. The instructions (the
+language line, `default_instructions` and a call's `instructions`) are added only for a model
+that takes them: one whose model or deployment name contains `gpt` (`gpt-4o-mini-tts`).
+`tts-1`, `tts-1-hd` and a deployment such as `tts-hd` take none, so they read the text as
+written; `result.instructions` holds what was sent, or `None`.
 
 ## OpenAI Configuration
 
@@ -99,6 +108,7 @@ If you want to override the default OpenAI model name, set:
 - `language`
 - `response_format`
 - `content_type`
+- `instructions` (the instructions sent, or `None` for a model that takes none)
 
 Save the generated audio with:
 
