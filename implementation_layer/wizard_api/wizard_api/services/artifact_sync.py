@@ -50,6 +50,8 @@ UI_VIEW_BLUEPRINT_FILE = f"{UI_VIEW_DIR}/blueprint.json"
 #: agent's draft, so an unchanged draft is not adopted again over a newer user
 #: version (see sync_blueprint_from_draft).
 ADOPTED_DRAFT_KEY = "agent_draft_digest"
+#: The note of the version the chat sync adds for the agent's own draft.
+AGENT_DRAFT_NOTE = "Agentin luonnos"
 
 #: Session metadata key: steps the user made AI steps (``ai``) in the Blueprint
 #: form or the diagram that have no component yet. In the draft they are
@@ -638,7 +640,7 @@ def sync_blueprint_from_draft(
     session: WizardSession,
     draft: dict[str, Any] | None = None,
     *,
-    note: str = "Agentin luonnos",
+    note: str = AGENT_DRAFT_NOTE,
 ) -> bool:
     """Record the agent's current draft as the session's blueprint.
 

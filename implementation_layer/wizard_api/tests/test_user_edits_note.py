@@ -55,6 +55,26 @@ def _note_lines(message: str) -> list[str]:
 # --- the line ------------------------------------------------------------------
 
 
+def test_the_undo_of_the_agents_turn_reaches_the_agent_in_the_same_line() -> None:
+    from wizard_api.services import blueprint_edit_service
+
+    class _Version:
+        def __init__(self, version: int, note: str) -> None:
+            self.version = version
+            self.note = note
+
+    summary = blueprint_edit_service._undo_summary(
+        _Version(5, "Agentin luonnos"), _Version(4, "Workspace edit: x"), None
+    )
+
+    note = sessions_router._blueprint_edits_note([summary])
+
+    assert note is not None and note.startswith("[The user changed the solution in the workspace: ")
+    assert "Undid the agent's last change (version 5)" in note
+    assert "back to version 4" in note
+    assert "rebuild it" in note
+
+
 def test_the_note_names_each_change_in_the_briefs_words() -> None:
     note = sessions_router._blueprint_edits_note([RENAMED, 'Removed step "Archive"'])
 

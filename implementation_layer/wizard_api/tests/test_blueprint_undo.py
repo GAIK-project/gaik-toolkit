@@ -94,7 +94,7 @@ def test_undo_restores_the_previous_drafts_file_and_diagram(client, db_session, 
     # The next chat turn adopts nothing, and the agent hears of the undo.
     metadata = body["metadata"]
     assert metadata[artifact_sync.ADOPTED_DRAFT_KEY] == artifact_sync.content_digest(newest.content)
-    assert metadata["pending_user_edits"][-1].startswith("Undid the last workspace edit")
+    assert metadata["pending_user_edits"][-1].startswith("Undid the user's workspace edit")
 
 
 @requires_postgres
@@ -427,3 +427,92 @@ def test_undo_after_kept_agent_work_still_walks_back_one_step_at_a_time(
     assert _on_disk(created["output_dir"]) == after_first
     assert _undo(client, sid, _active(client, sid)).status_code == 200
     assert _on_disk(created["output_dir"]) == original
+
+
+def _last_edit_note(client, sid: str) -> str:
+    return client.get(f"/sessions/{sid}").json()["metadata"]["pending_user_edits"][-1]
+
+
+@requires_postgres
+def test_undo_names_the_users_edit_it_reverts(client, db_session, not_busy) -> None:
+    created = _create(client)
+    sid = created["id"]
+    edited = _rename(client, sid, "Read the invoice")
+
+    assert _undo(client, sid, edited["active_version"]).status_code == 200
+
+    note = _last_edit_note(client, sid)
+    assert note == (
+        f"Undid the user's workspace edit (version {edited['active_version']}): "
+        f"the blueprint is back to version {edited['active_version'] - 1}."
+    )
+    assert "package" not in note
+
+
+@requires_postgres
+def test_undo_right_after_the_agents_turn_says_the_agents_change_was_undone(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client)
+    sid = created["id"]
+    _rename(client, sid, "First name")
+    agent_draft = _on_disk(created["output_dir"])
+    agent_draft["workflow"]["steps"][1]["name"] = "Written by the agent"
+    _write_file(created["output_dir"], agent_draft)
+    session = _session(db_session, sid)
+    assert artifact_sync.sync_blueprint_from_draft(db_session, session)
+    agent_version = _active(client, sid)
+    assert _versions(db_session, sid)[-1].note == artifact_sync.AGENT_DRAFT_NOTE
+
+    assert _undo(client, sid, agent_version).status_code == 200
+
+    note = _last_edit_note(client, sid)
+    assert note.startswith(
+        f"Undid the agent's last change (version {agent_version}): "
+        f"the blueprint is back to version {agent_version - 1}."
+    )
+    assert "PoC package" in note and "rebuild" in note
+    assert "workspace edit" not in note
+
+
+@requires_postgres
+def test_undo_that_keeps_the_agents_unsaved_file_names_that_version(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client)
+    sid = created["id"]
+    _rename(client, sid, "First name")
+    _rename(client, sid, "Second name")
+    _agent_changes_a_hidden_field(client, db_session, created)
+    active = _active(client, sid)
+
+    assert _undo(client, sid, active).status_code == 200
+
+    note = _last_edit_note(client, sid)
+    assert note.startswith(f"Undid the user's workspace edit (version {active})")
+    assert f"kept as version {active + 1}" in note
+
+
+@requires_postgres
+def test_undo_of_a_version_nobody_is_known_to_have_written_claims_no_writer(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client)
+    sid = created["id"]
+    _rename(client, sid, "First name")
+    session = _session(db_session, sid)
+    blueprint_service.add_version(
+        db_session,
+        session,
+        note="Vaihe 5",
+        content=None,
+        draft={**_on_disk(created["output_dir"]), "marker": "x"},
+    )
+    db_session.commit()
+    active = _active(client, sid)
+
+    assert _undo(client, sid, active).status_code == 200
+
+    note = _last_edit_note(client, sid)
+    assert note.startswith(f"Undid version {active}: the blueprint is back to version")
+    assert not note.startswith(("Undid the user's", "Undid the agent's"))

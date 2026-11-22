@@ -236,8 +236,10 @@ AGENT_CHANGES_NOTE = "Agent changes kept"
 
 def _keep_unsaved_draft(
     db: Session, session, draft: dict[str, Any], marked: frozenset[str], *, note: str
-) -> bool:
-    """Keep the agent's file as a version of its own when no version holds it; True when added.
+):
+    """Keep the agent's file as a version of its own when no version holds it.
+
+    Returns the version added, or None when the file is already held.
 
     The agent can change its file in a field the reduced view has no place for
     (``parameters``, ``data_handling``): the chat sync then adds no version, so
@@ -249,9 +251,9 @@ def _keep_unsaved_draft(
     """
     active = blueprint_service.get_active_version(db, session)
     if active is None or active.draft is None or active.draft == draft:
-        return False
+        return None
     mapped = artifact_sync.blueprint_from_draft(draft, marked)
-    blueprint_service.add_version(
+    added = blueprint_service.add_version(
         db,
         session,
         note=note,
@@ -260,7 +262,7 @@ def _keep_unsaved_draft(
     )
     # So the write's own version is numbered after it.
     db.flush()
-    return True
+    return added
 
 
 def nothing_to_undo() -> HTTPException:
@@ -320,18 +322,73 @@ def undo(db: Session, session, *, base_version: int) -> None:
             raise cannot_undo() from exc
         # Newer than the version restored, the kept version is no step the walk
         # goes back to.
-        _keep_unsaved_draft(db, session, draft, marked, note=BEFORE_UNDO_NOTE)
+        kept = _keep_unsaved_draft(db, session, draft, marked, note=BEFORE_UNDO_NOTE)
+        # What the walk goes back from: the version restored by the last undo
+        # while it walks, else the active one.
+        reverted = active
+        if walking:
+            reverted = next(
+                (v for v in blueprint_service.list_versions(db, session.id) if v.version == cursor),
+                active,
+            )
         return _Write(
             blueprint=restored,
-            summaries=[
-                f"Undid the last workspace edit: the blueprint is back to version {target.version}"
-            ],
+            summaries=[_undo_summary(reverted, target, kept)],
             ai=ai,
             note=UNDO_NOTE,
             undo_cursor=target.version,
         )
 
     _write(db, session, base_version, change)
+
+
+#: Notes of the versions that hold the agent's own file.
+_AGENT_NOTES = frozenset({artifact_sync.AGENT_DRAFT_NOTE, AGENT_CHANGES_NOTE, BEFORE_UNDO_NOTE})
+#: Notes the server gives the versions a user's save or edit adds (a canvas save,
+#: an undo, an operation: "Workspace edit: ...").
+_USER_NOTES = frozenset({UNDO_NOTE, "BPMN canvas sync"})
+_USER_NOTE_PREFIX = "Workspace edit:"
+
+
+def _writer_of(version) -> str | None:
+    """``"agent"`` or ``"user"`` for a version whose note says who wrote it, else None.
+
+    Any other note (a form save with its own text, a gate step) says nothing
+    reliable, so the undo's message claims no writer for it.
+    """
+    note = version.note if version is not None else ""
+    if note in _AGENT_NOTES:
+        return "agent"
+    if note in _USER_NOTES or note.startswith(_USER_NOTE_PREFIX):
+        return "user"
+    return None
+
+
+def _undo_summary(reverted, target, kept) -> str:
+    """The sentence that tells the agent which version an undo went back from.
+
+    An undo can go back from the user's edit or from the agent's own turn; the
+    agent must know which, and when it is its own, that the package it built
+    may no longer match the blueprint. Only version numbers are named: no text
+    of the user or of a document enters it.
+    """
+    back = f"the blueprint is back to version {target.version}."
+    writer = _writer_of(reverted)
+    number = reverted.version if reverted is not None else None
+    if number is None:
+        text = f"Undid the last change: {back}"
+    elif writer == "agent":
+        text = (
+            f"Undid the agent's last change (version {number}): {back} The PoC package "
+            "built from it may not match the blueprint now; rebuild it if it is out of date."
+        )
+    elif writer == "user":
+        text = f"Undid the user's workspace edit (version {number}): {back}"
+    else:
+        text = f"Undid version {number}: {back}"
+    if kept is not None:
+        text += f" The agent's unsaved file changes were kept as version {kept.version}."
+    return text
 
 
 def _ai_steps_of(version, draft: dict[str, Any]) -> frozenset[str]:
