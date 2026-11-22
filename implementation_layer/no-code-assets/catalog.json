@@ -99,6 +99,19 @@
       "tryPrompt": "Use the ai-act-use-case-screening skill ({url}) to screen an AI use case against the EU AI Act. I will describe the use case next."
     },
     {
+      "id": "document-helpdesk-assistant",
+      "group": "no-code",
+      "path": "agent-skills/skills/document-helpdesk-assistant",
+      "title": "Document helpdesk assistant",
+      "tagline": "Turn your price lists, guides and terms into a helpdesk that answers from them, with sources.",
+      "input": "A folder of your documents (PDF, Word, Excel, CSV or text)",
+      "output": "Chat answers with sources, recommendations and a hand-off message",
+      "needs": [
+        "code execution (Python, standard library only)"
+      ],
+      "tryPrompt": "Use the document-helpdesk-assistant skill ({url}) to answer questions from the documents in my folder <folder path>. I will tell you the organisation and the topics next."
+    },
+    {
       "id": "parsing-documents",
       "group": "developer",
       "path": "agent-skills/skills/parsing-documents",
@@ -188,6 +201,21 @@
       "variants": [
         { "label": "PO only", "file": "prompt_single_document_PO.txt" },
         { "label": "PO with BOMs", "file": "prompt_multi_document_PO.txt" }
+      ]
+    },
+    {
+      "id": "document-helpdesk-assistant",
+      "path": "prompts/document-helpdesk-assistant",
+      "title": "Document helpdesk assistant",
+      "tagline": "Turn your price lists, guides and terms into a helpdesk that answers from them, with sources.",
+      "input": "Your documents (PDF, Word, Excel or CSV)",
+      "output": "Chat answers with sources and a hand-off message",
+      "then": "Attach your documents and ask your first question.",
+      "variants": [
+        {
+          "label": "Default",
+          "file": "prompt.txt"
+        }
       ]
     }
   ]
