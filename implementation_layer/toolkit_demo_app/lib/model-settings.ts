@@ -152,9 +152,57 @@ export function parseModelSettingsHeader(raw: string): ModelSettings {
 /** A server model the user picked: `provider:model`, run on the server's keys. */
 export const SERVER_MODEL_HEADER = "x-gaik-server-model";
 
+// A picked server model also runs these; an own key does not. The RAG index
+// stays on the server between requests, where a browser key must not, and the
+// transcriber takes a speech model, not the chat model of the key dialog.
+const SERVER_MODEL_PATHS = [
+  "/api/rag/index",
+  "/api/rag/load-example",
+  "/api/transcribe",
+];
+
+export function supportsServerModel(path: string, method = "POST"): boolean {
+  if (supportsModelSettings(path, method)) return true;
+  if (method.toUpperCase() !== "POST") return false;
+  return SERVER_MODEL_PATHS.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
 export function isServerModelId(value: unknown): value is string {
   return (
     typeof value === "string" &&
     /^[a-z_]{2,30}:[A-Za-z0-9._/-]{1,120}$/.test(value)
   );
+}
+
+/** The reasoning effort picked in the model menu; left out for Auto. */
+export const REASONING_EFFORT_HEADER = "x-gaik-reasoning-effort";
+export const REASONING_EFFORTS = ["low", "medium", "high"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+export function isReasoningEffort(value: unknown): value is ReasoningEffort {
+  return REASONING_EFFORTS.includes(value as ReasoningEffort);
+}
+
+/** GPT-6 models on OpenAI or Azure take an effort; the API sends it to no other. */
+export function takesReasoningEffort(provider: string, model: string): boolean {
+  return (
+    (provider === "openai" || provider === "azure") &&
+    model.toLowerCase().startsWith("gpt-6")
+  );
+}
+
+/**
+ * The effort a request carries: the picked one when the model in use takes it.
+ * Null is Auto. While the model list has not loaded the model is unknown, and
+ * the pick is sent for the API to decide.
+ */
+export function reasoningEffortFor(
+  picked: ReasoningEffort | null,
+  model: { provider: string; model: string } | null,
+): ReasoningEffort | null {
+  if (!picked || !isReasoningEffort(picked)) return null;
+  if (model && !takesReasoningEffort(model.provider, model.model)) return null;
+  return picked;
 }

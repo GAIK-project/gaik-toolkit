@@ -52,6 +52,42 @@ One-time setup, already done for namespace `gaik`: create the `gaik-demo-webhook
 `oc set triggers deployment/<name> --from-image=<name>:latest -c <name>`, and add each
 BuildConfig's GitHub webhook URL (`oc describe bc/<name>`) to the repository.
 
+## Upload malware check
+
+Every upload is checked before a route uses it (`api/utils/upload_check.py`):
+
+1. **Type:** its content must match its extension. The report writer, source normalizer and
+   knowledge synthesis routes keep their own type rules instead.
+2. **Content:** DOCX, XLSX and XLSM files with macros or ActiveX controls are refused. PDF files
+   are refused when they contain JavaScript, launch or import-data actions or rich media, also
+   inside compressed object streams (`api/utils/pdf_content.py`). Each PDF is checked in a
+   process of its own (`api/utils/pdf_process.py`): at most 20 s and 1 GiB, two at a time.
+3. **Malware:** a ClamAV scan (`api/utils/malware_scan.py`) when `DEMO_MALWARE_SCANNER` is set.
+
+A refused file gets 422. When the scanner is set but does not answer, the upload gets 503 and
+is not used. `GET /health` reports `uploads_scanned`. Without `DEMO_MALWARE_SCANNER`, steps 1
+and 2 still run and the scan is off.
+
+One-time setup in namespace `gaik`. Applying `scanner.yaml` creates only the scanner's own
+objects:
+
+```bash
+oc apply -f scanner.yaml -n gaik
+oc start-build gaik-demo-scanner-git -n gaik --follow
+oc rollout status deployment/gaik-demo-scanner -n gaik
+oc set env deployment/gaik-demo-api DEMO_MALWARE_SCANNER=gaik-demo-scanner:3310 -n gaik
+```
+
+Add the new BuildConfig's GitHub webhook URL (`oc describe bc/gaik-demo-scanner-git`) to the
+repository, so a push to `deploy/demo-app` rebuilds the scanner too. The staging API can use
+the same scanner. Notes:
+
+- **Signatures:** freshclam updates them from `database.clamav.net` twelve times a day, so
+  the pod needs outbound HTTPS. The image also carries the signatures from its build.
+- **Memory:** about 1 GiB at rest, up to 3 GiB while an update loads.
+- **Turn it off:** `oc set env deployment/gaik-demo-api DEMO_MALWARE_SCANNER-` or
+  `DEMO_MALWARE_SCAN=off`.
+
 ## Quick Deploy (first install only)
 
 The live deployments carry env vars set with `oc set env` that these manifests lack;
@@ -74,7 +110,71 @@ oc apply -f services.yaml
 oc apply -f deployment-api.yaml
 oc apply -f deployment-frontend.yaml
 oc apply -f route.yaml
+oc apply -f networkpolicy-api.yaml
 ```
+
+## Network policy and pod hardening
+
+`networkpolicy-api.yaml` states the intended rule: only the frontend pods reach the API
+on port 8000 (`gaik-demo` to `gaik-demo-api`, and `gaik-demo-staging` to
+`gaik-demo-api-staging`). `proxy.ts` is the only sign-in, approval and trial gate in
+front of the API, so no other pod in the project should reach the API directly. The
+kubelet's health probes are not affected, and the API has no route of its own. The
+selectors match the live pod labels.
+
+**The policy takes effect only when the shared namespace policy is changed.**
+NetworkPolicies add up, and the `gaik` project has `deny-other-namespaces-access`,
+which selects every pod (`podSelector: {}`) and admits every pod in the namespace
+(`from: [{podSelector: {}}]`), next to `allow-from-router` for the router. While that
+policy admits every pod, any pod in the project can still reach the API, with or
+without this file. Changing the shared policy is the project owner's decision; until
+then this file only states the rule.
+
+When that policy is narrowed, it would keep the other pods and leave the API pods out,
+for example:
+
+```yaml
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: NotIn
+        values: [gaik-demo-api, gaik-demo-api-staging]
+```
+
+Apply the policy file on its own. Never `oc apply` the deployment manifests to a
+running environment: the live deployments carry env vars these files lack.
+
+```bash
+oc get networkpolicy -n gaik -o yaml        # what is there now
+oc apply -f networkpolicy-api.yaml -n gaik
+
+# Check: each frontend still reaches its API ...
+oc exec -n gaik deployment/gaik-demo -- \
+  bun -e "fetch('http://gaik-demo-api:8000/health').then(r => console.log(r.status))"
+oc exec -n gaik deployment/gaik-demo-staging -- \
+  bun -e "fetch('http://gaik-demo-api-staging:8000/health').then(r => console.log(r.status))"
+# ... and, once the shared policy no longer admits every pod, another pod does not
+# (this times out then):
+oc run np-check -n gaik --rm -i --restart=Never --image=curlimages/curl:8.11.1 -- \
+  curl -s -m 5 -o /dev/null -w '%{http_code}\n' http://gaik-demo-api:8000/health
+```
+
+Roll back with `oc delete networkpolicy gaik-demo-api-from-frontend gaik-demo-api-staging-from-frontend -n gaik`.
+
+The deployment manifests state the container hardening: no privilege escalation, all
+Linux capabilities dropped and a non-root user. On Rahti the project's SCC already
+applies these to every pod, with Rahti's own seccomp profile, so nothing needs to be
+patched on the live deployments, and the manifests name no seccomp profile that could
+replace Rahti's. The settings are written down for other clusters. Check what a pod
+runs with:
+
+```bash
+oc get pods -n gaik -o custom-columns=NAME:.metadata.name,SCC:.metadata.annotations.openshift\.io/scc
+```
+
+The root filesystem stays writable: the API writes model caches, uploads and generated
+files, and Next.js writes its cache under `/app/.next/cache`.
 
 ## Build & Push Images
 
@@ -140,8 +240,20 @@ runs as before.
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
-| `WIZARD_ACCESS_SECRET`                 | Old wizard gate on `/api/wizard`; read until that gate is removed | Secret: `gaik-demo-admin` |
 | `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
+
+`WIZARD_ACCESS_SECRET` is no longer read: `/api/wizard` is gated by the per-user
+wizard grant from `/admin`, not by a shared key. Remove it from both frontend deployments first, then from the secret if it is there
+(the patch fails harmlessly when the key is absent):
+
+```bash
+for d in gaik-demo gaik-demo-staging; do
+  oc set env deployment/$d WIZARD_ACCESS_SECRET- -n gaik
+done
+oc get secret/gaik-demo-admin -n gaik -o jsonpath='{.data}' | grep -q WIZARD_ACCESS_SECRET &&
+  oc patch secret/gaik-demo-admin -n gaik --type=json \
+    -p '[{"op":"remove","path":"/data/WIZARD_ACCESS_SECRET"}]'
+```
 
 ### Backend (gaik-demo-api)
 
@@ -155,8 +267,10 @@ runs as before.
 | `REPORT_RUN_TOKEN`          | Optional. The same value as on the frontend: report runs (Report Writer, v2, Source Normalizer, Knowledge Curator, Knowledge Synthesis) are accepted only with it | Secret: `gaik-demo-report-run` |
 | `ANTHROPIC_FOUNDRY_API_KEY` | Claude server models and the Vision Extractor's Claude path: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
 | `ANTHROPIC_FOUNDRY_RESOURCE`| Claude server models and the Vision Extractor's Claude path: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
-| `CLAUDE_CODE_USE_FOUNDRY`   | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | No longer read (the old Solution Wizard) | Secret: `gaik-demo-api-keys` |
+| `CLAUDE_CODE_USE_FOUNDRY`   | The first Solution Wizard in the browser: `1` sends its agent to Azure Foundry. With the two Foundry variables above it turns the wizard on | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | The first wizard's model id (`ANTHROPIC_MODEL` wins when set) | Secret: `gaik-demo-api-keys` |
+| `WIZARD_MAX_SESSIONS`, `WIZARD_MAX_MESSAGES` | Optional. First-wizard sessions at once (3) and messages per session (60) | `oc set env` |
+| `WIZARD_AGENT_MAX_BUDGET_USD` | Optional, off unless set. The CLI's estimated USD one first-wizard session's agent may spend | `oc set env` |
 
 ## Route Annotations
 
@@ -200,6 +314,7 @@ cd implementation_layer/toolkit_demo_app/openshift
 | `deployment-api.yaml`      | Backend API deployment (FastAPI) |
 | `services.yaml`            | ClusterIP services for both      |
 | `route.yaml`               | Public HTTPS route for frontend  |
+| `networkpolicy-api.yaml`   | Only the frontend reaches the API (apply on its own) |
 | `secrets.yaml.example`     | Example secrets template         |
 
 ## Report Writer upload limits

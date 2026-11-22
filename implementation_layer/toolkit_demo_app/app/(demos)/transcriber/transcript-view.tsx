@@ -373,7 +373,7 @@ export function TranscriptView({
         )}
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Words" value={words.toLocaleString()} />
+          <Stat label="Words" value={words.toLocaleString("en-US")} />
           <Stat
             label="Recording"
             value={audioSeconds !== null ? formatTime(audioSeconds) : "–"}
@@ -835,7 +835,8 @@ export function TranscriptView({
                   <dd className="font-mono">
                     {Object.entries(result.usage)
                       .map(
-                        ([key, value]) => `${key}: ${value.toLocaleString()}`,
+                        ([key, value]) =>
+                          `${key}: ${value.toLocaleString("en-US")}`,
                       )
                       .join(" · ")}
                   </dd>

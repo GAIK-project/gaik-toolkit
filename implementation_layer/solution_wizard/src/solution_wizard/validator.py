@@ -12,6 +12,14 @@ from typing import List, Optional
 from .blueprint import ArtifactSource, AssumptionStatus, Blueprint
 from .registry import Registry, get_registry
 
+# Components whose job is to check an extracted result against its source (Rule 14).
+_VALIDATOR_COMPONENTS = {"LLMJudge", "LLMJudgePanel"}
+
+# The record a judge checks (Rule 14). Every other input type the registry lets a
+# judge take is a source it checks against: a text for LLMJudge.detect_hallucinations,
+# the pages of a PDF or image for validate(source_pages=...).
+_JUDGED_TYPES = {"structured_json"}
+
 
 @dataclass
 class Issue:
@@ -382,6 +390,89 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
                         f"Step '{other.id}' uses '{inner}', which is already provided internally by "
                         f"'{s.component}' (step '{s.id}'). Redundant -- {hint}.",
                         step_id=other.id,
+                    )
+                )
+
+    # ------------------------------------------------------------------
+    # Rule 13: the governance flags decide which providers the PoC may use.
+    # A blueprint that allows no external model API, or requires local processing,
+    # must name a local endpoint for every stage; it never gets the default cloud
+    # provider. Without that restriction, a missing models.provider is reported,
+    # since the PoC then uses the default.
+    from .scaffolder import (
+        DEFAULT_PROVIDER,
+        defaulted_stages,
+        external_model_forbidden,
+        governance_problems,
+    )
+
+    if steps:
+        for problem in governance_problems(blueprint):
+            errors.append(Issue(13, problem))
+        try:
+            defaulted = [] if external_model_forbidden(blueprint) else defaulted_stages(blueprint)
+        except ValueError:
+            defaulted = []
+        if defaulted:
+            warnings.append(
+                Issue(
+                    13,
+                    f"No provider is set for the {', '.join(defaulted)} stage(s), so the PoC "
+                    f"uses the default {DEFAULT_PROVIDER!r}. Set models.provider to the "
+                    "provider the user chose.",
+                )
+            )
+    # Any answer but "no" or "unknown" counts as personal data, as in the BPMN annotations.
+    personal = str(blueprint.governance.data_handling.contains_personal_data).strip().lower()
+    if steps and personal not in {"no", "unknown", ""} and not external_model_forbidden(blueprint):
+        warnings.append(
+            Issue(
+                13,
+                "The blueprint marks the inputs as personal data and allows an external model "
+                "API: confirm that the chosen provider's data processing terms cover them.",
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Rule 14: a declared hallucination check must actually receive grounding
+    # evidence. When the grounding artifact is dropped from the blueprint --
+    # e.g. a transcript removed because the producing component does not declare
+    # that output type -- the workflow still validates, `hallucination_check`
+    # still reads true, and nothing downstream notices that the check can no
+    # longer run. Catch that here instead of shipping a blueprint whose diagram
+    # and documentation describe a check the pipeline cannot perform.
+    if steps and blueprint.validation.get("hallucination_check"):
+        judges = {}
+        for s in steps:
+            entry = s.component and (
+                registry.lookup_by_id(s.component) or registry.lookup_by_name(s.component)
+            )
+            if entry and entry.get("name") in _VALIDATOR_COMPONENTS:
+                judges[s.id] = entry
+        validating_steps = [s for s in steps if s.id in judges]
+        if not validating_steps:
+            warnings.append(
+                Issue(
+                    14,
+                    "validation.hallucination_check is true but no step uses a validator "
+                    f"component ({', '.join(sorted(_VALIDATOR_COMPONENTS))}). Either add the "
+                    "validation step or set hallucination_check to false.",
+                )
+            )
+        for step in validating_steps:
+            input_types = {artifacts[a].type for a in step.inputs if a in artifacts}
+            sources = set(judges[step.id].get("input_artifact_types", [])) - _JUDGED_TYPES
+            if not (input_types & sources):
+                errors.append(
+                    Issue(
+                        14,
+                        f"Step '{step.id}' performs the declared hallucination check but "
+                        f"receives no grounding evidence: its inputs are of type(s) "
+                        f"{sorted(input_types) or '[]'}, none of which is a source "
+                        f"{judges[step.id]['name']} checks against "
+                        f"({', '.join(sorted(sources))}). Add the source artifact to this "
+                        "step's inputs, or set validation.hallucination_check to false.",
+                        step_id=step.id,
                     )
                 )
 

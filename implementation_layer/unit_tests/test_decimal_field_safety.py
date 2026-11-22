@@ -27,6 +27,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from gaik.software_components.extractor.saved_schema import load_saved_model, save_model_file
 from gaik.software_components.extractor.schema import (
     ChildRequirements,
     CompositeExtractionRequirements,
@@ -38,7 +39,6 @@ from gaik.software_components.extractor.schema import (
     create_extraction_model,
 )
 from gaik.software_components.vision_extractor.vision_extractor import (
-    _load_saved_schema,
     _save_schema_to_python,
     _wrap_model_for_verification,
 )
@@ -239,7 +239,7 @@ class TestCleanDecimalStringEdgeCases:
             ("", None),
             ("   ", None),
             (None, None),
-            ("1 234,56 EUR", None),  # European space+comma formatting -- ambiguous, rejected
+            ("1 234,56 EUR", "1234.56"),  # space grouping, decimal comma (test_decimal_comma.py)
             ("abc1def2", None),  # multiple embedded numbers -- ambiguous, rejected
             ("not a number", None),
             ("42 dollars", None),  # "dollars" is not a recognized currency token
@@ -291,10 +291,10 @@ class TestSavedSchemaReload:
 
     def test_vision_extractor_persistence_round_trip(self, requirements, tmp_path):
         model = create_extraction_model(requirements)
-        schema_path = tmp_path / "schema.py"
-        _save_schema_to_python(model, schema_path)
+        model_path = tmp_path / "schema_model.json"
+        save_model_file(model, model_path)
 
-        loaded = _load_saved_schema(schema_path, model.__name__)
+        loaded = load_saved_model(model_path, model.__name__, None)
         schema = loaded.model_json_schema()
         assert "pattern" not in json.dumps(schema)
 
@@ -326,7 +326,8 @@ class TestSavedSchemaReload:
         schema = loaded.model_json_schema()
         assert "pattern" not in json.dumps(schema)
         assert loaded(price="EUR 1,234.56", fee="9.99").price == Decimal("1234.56")
-        assert loaded(price="1 234,56 EUR", fee="9.99").price is None
+        assert loaded(price="1 234,56 EUR", fee="9.99").price == Decimal("1234.56")
+        assert loaded(price="1 23,45", fee="9.99").price is None
 
         fee_info = loaded.model_fields["fee"]
         assert fee_info.annotation is Decimal

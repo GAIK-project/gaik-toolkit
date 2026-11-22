@@ -12,6 +12,7 @@ release without the curator's drop-unverified support breaks only this router.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import queue
@@ -22,14 +23,21 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, field_validator
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_allow_list import chat_models, check_model
     from utils.report_runs import require_report_run_grant
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_allow_list import chat_models, check_model
     from api.utils.report_runs import require_report_run_grant
+
+try:
+    from utils.errors import component_error
+except ImportError:
+    from api.utils.errors import component_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -62,7 +70,16 @@ class _Request(BaseModel):
 
     sections: list[_Section] = Field(min_length=1, max_length=MAX_SECTIONS)
     instructions: str = Field(default="", max_length=10000)
+    source_precedence: list[Literal["primary", "secondary"]] = Field(default=[], max_length=2)
+    """Source classes, highest first: which side of a conflict the curator follows."""
     options: _Options = _Options()
+
+    @field_validator("source_precedence")
+    @classmethod
+    def _distinct(cls, value: list[str]) -> list[str]:
+        if len(set(value)) != len(value):
+            raise ValueError("names a class more than once")
+        return value
 
 
 def _errors(exc: ValidationError) -> str:
@@ -131,8 +148,9 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
     """Curate the sections. Returns a Server-Sent Events stream.
 
     ``request`` is JSON: ``{"sections": [{"id", "title", "instructions",
-    "required_items"}], "instructions", "options": {"model", "reasoning_effort",
-    "max_workers"}}``. ``artifacts`` is a JSON file of the ``normalized/`` files.
+    "required_items"}], "instructions", "source_precedence", "options": {"model",
+    "reasoning_effort", "max_workers"}}``. ``artifacts`` is a JSON file of the
+    ``normalized/`` files.
 
     Events:
         ``progress``  {"message": str}  — section starts and ends, dropped facts
@@ -148,6 +166,7 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
     ids = [s.id for s in sections]
     if len(set(ids)) != len(ids):
         raise HTTPException(400, f"Topic ids must be distinct: {ids}")
+    check_model(parsed.options.model, chat_models())
     sources = _normalized_sources(await _read_files(artifacts, _NORMALIZED))
     config = get_api_config()
     options = parsed.options
@@ -167,16 +186,29 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
 
     def work() -> None:
         try:
-            knowledge = gaik.KnowledgeCurator(
+            curator = gaik.KnowledgeCurator(
                 config,
                 options.model,
                 max_workers=options.max_workers,
                 chat_options=chat_options,
-            ).curate(
+            )
+            precedence = {}
+            if parsed.source_precedence:
+                # The image installs gaik from PyPI: a release before source_precedence
+                # refuses the keyword, so it is passed only where curate() takes it.
+                if "source_precedence" in inspect.signature(curator.curate).parameters:
+                    precedence = {"source_precedence": parsed.source_precedence}
+                else:
+                    messages.put(
+                        "This gaik release cannot rank sources: every conflict is left "
+                        "for you to settle"
+                    )
+            knowledge = curator.curate(
                 sources,
                 sections,
                 instructions=parsed.instructions,
                 progress_callback=progress,
+                **precedence,
             )
             outcome["result"] = {
                 "artifacts": {
@@ -188,8 +220,7 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
                 "dropped": [d.model_dump() for d in getattr(knowledge, "dropped", [])],
             }
         except Exception as exc:
-            logger.exception("Knowledge Curator failed")
-            outcome["error"] = f"{type(exc).__name__}: {exc}"
+            outcome["error"] = component_error(exc, "Curating the knowledge")
         finally:
             done.set()
 

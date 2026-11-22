@@ -208,7 +208,7 @@ flowchart LR
 
 ### 2. KnowledgeCurator (Stage 2)
 
-Works through the technical sections of the template one at a time and extracts the facts for each, with a topic, a time qualifier, a summary, a verbatim quote and its source. It also records the required items that no source covers and the conflicts between sources. Every quote is checked against its source; a quote that cannot be found is requested again once, and the run stops if it still cannot be found.
+Curates the technical sections of the template in parallel (four at a time by default, `settings.curator_workers`) and extracts the facts for each, with a topic, a time qualifier, a summary, a verbatim quote and its source. It also records the required items that no source covers and the conflicts between sources. Every quote is checked against its source; a section with a quote that cannot be found is requested again once, and a fact whose quote still cannot be found is dropped and listed, while the rest of the section is kept.
 
 ```mermaid
 flowchart LR
@@ -300,12 +300,12 @@ Electrical systems       – required: main distribution board, latest electrica
 Recommendations          – written from the technical sections; one line per action, classed as
                            Repair now / Within 1–2 years / Within 3–5 years / Further investigation / Maintenance
 
-Source hierarchy:
+Source hierarchy (source_precedence: primary, then secondary):
 - Site recordings are primary sources; customer documents are secondary.
 - Narrate observations directly; attribute document content to the document.
-- When a clear observation contradicts a document, follow the observation and mention the document.
-- When an uncertain observation contradicts a document, write "Unresolved: ..." and give both views.
-- When two documents disagree, follow the newer one.
+- A clear observation that contradicts a document wins; the report mentions the document.
+- An unsure observation does not win: the report writes "Unresolved: ..." and gives both views.
+- Two documents that disagree are settled by a person at the evidence checkpoint (here: the newer one).
 
 Missing data and scope:
 - If a required item is not covered by any source, write (missing: item).

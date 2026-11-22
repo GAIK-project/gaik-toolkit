@@ -30,6 +30,7 @@ from ._pg_agent_fake_client import FakeProviderClient  # noqa: E402
 
 
 def _make_agent(**kwargs) -> PostgresAgent:
+    kwargs.setdefault("table_allowlist", ["orders"])
     agent = PostgresAgent("postgresql://stub:stub@localhost:1/stub", **kwargs)
     agent._schema = SchemaInfo(
         schema_name=agent.schema_name,
@@ -109,14 +110,15 @@ def test_non_timeout_psycopg_error_still_retries_full_budget():
 
     conn = MagicMock()
     conn.closed = False
-    conn.execute.side_effect = psycopg.Error("syntax error at end of input")
+    conn.execute.side_effect = psycopg.errors.SyntaxError("syntax error at end of input")
     agent._conn = conn
 
     result = agent.query("Q")
 
     assert not result.succeeded
     assert result.attempts == 3
-    assert "syntax error" in (result.error or "").lower()
+    # The kind of error and its SQLSTATE, not the database's own text.
+    assert result.error == "PostgreSQL rejected the query: syntax error (SQLSTATE 42601)."
 
 
 def test_query_succeeds_after_timeout_rewrite():

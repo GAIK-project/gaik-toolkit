@@ -14,6 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 from api.routers import diary, pipeline, rag, transcriber
+from api.utils.result_owner import remember_owner
 from fastapi import UploadFile
 from langchain_core.documents import Document
 from pydantic import BaseModel
@@ -305,7 +306,7 @@ def test_rag_index(monkeypatch, threads, workflow) -> None:
         threads.mark("parse")
         return [Document(page_content="text", metadata={})] * 2, parser_choice
 
-    monkeypatch.setattr(rag, "get_api_config", lambda: CONFIG)
+    monkeypatch.setattr(rag, "get_rag_api_config", lambda: CONFIG)
     monkeypatch.setattr(rag, "_build_demo_workflow", lambda config, collection_id: workflow)
     monkeypatch.setattr(rag, "_parse_document_to_chunks", parse)
     pdf = (rag.EXAMPLE_DIR / rag.EXAMPLE_DOCUMENTS[0]["filename"]).read_bytes()
@@ -323,8 +324,9 @@ def test_rag_index(monkeypatch, threads, workflow) -> None:
 
 def test_rag_query(threads, workflow) -> None:
     rag.RAG_INSTANCES["c1"] = workflow
+    remember_owner("c1", "u1")
 
-    response = asyncio.run(rag.query_rag(question="What?", collection_id="c1", top_k=5))
+    response = asyncio.run(rag.query_rag(question="What?", collection_id="c1", top_k=5, user="u1"))
 
     assert response.answer == "An answer"
     threads.assert_off_the_loop("ask")
@@ -332,9 +334,12 @@ def test_rag_query(threads, workflow) -> None:
 
 def test_rag_query_stream(threads, workflow) -> None:
     rag.RAG_INSTANCES["c1"] = workflow
+    remember_owner("c1", "u1")
 
     async def run() -> str:
-        response = await rag.query_rag_stream(question="What?", collection_id="c1", top_k=5)
+        response = await rag.query_rag_stream(
+            question="What?", collection_id="c1", top_k=5, user="u1"
+        )
         return await _events(response)
 
     events = asyncio.run(run())

@@ -17,6 +17,7 @@ import concurrent.futures
 import logging
 import re
 import shutil
+import subprocess
 import tempfile
 import threading
 import time
@@ -24,6 +25,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from gaik.software_components.endpoints import check_endpoint
+from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -63,6 +66,11 @@ class ParallelTranscriber:
             ``transcription_model``, etc.
         config: Optional :class:`TranscriptionConfig`.  Defaults are used
             when omitted.
+        limits: Duration and size limits (``max_media_seconds``, default 6 hours;
+            ``max_media_bytes``, off by default). A file over one is refused with
+            :class:`~gaik.software_components.input_limits.InputLimitError` before
+            audio is extracted or any transcription call is made; one whose
+            duration cannot be read at all is refused before the first call.
 
     Example::
 
@@ -81,6 +89,8 @@ class ParallelTranscriber:
         self,
         api_config: dict,
         config: TranscriptionConfig | None = None,
+        *,
+        limits: InputLimits | None = None,
     ) -> None:
         cfg = config or TranscriptionConfig()
         # Whisper Local has its own on-prem auth (api_base + key) — skip the
@@ -89,15 +99,32 @@ class ParallelTranscriber:
             if not api_config.get("api_base"):
                 raise ValueError(
                     "WHISPER_LOCAL requires api_config['api_base'] "
-                    "(e.g. 'http://whisper.example.com:8080')"
+                    "(e.g. 'https://whisper.example.com:8080')"
                 )
+            check_endpoint(
+                api_config["api_base"],
+                provider="whisper_local",
+                allowed_hosts=api_config.get("allowed_endpoint_hosts"),
+                what="api_base",
+            )
         else:
             # Resolve like create_openai_client: a bare legacy config (neither
             # ``provider`` nor ``use_azure``) means standard OpenAI, whatever LLM_PROVIDER says.
             provider = resolve_provider(config={"use_azure": False, **api_config})
             assert_openai_or_azure({"provider": provider}, component="ParallelTranscriber")
+            # The GPT-4o diarize path posts the audio and key to this endpoint directly.
+            # Whisper goes through create_openai_client, which checks its own address.
+            endpoint = api_config.get("azure_audio_endpoint") or api_config.get("azure_endpoint")
+            if endpoint and cfg.model == TranscriptionModel.GPT4O_DIARIZE:
+                check_endpoint(
+                    endpoint,
+                    provider="azure",
+                    allowed_hosts=api_config.get("allowed_endpoint_hosts"),
+                    what="azure_audio_endpoint",
+                )
         self._api_config = dict(api_config)
         self._config = cfg
+        self._limits = limits or InputLimits()
 
     # ------------------------------------------------------------------
     # Public helpers
@@ -131,10 +158,16 @@ class ParallelTranscriber:
 
         Returns:
             :class:`TranscriptionResult` with the transcribed content.
+
+        Raises:
+            InputLimitError: If the file is over ``max_media_bytes`` or
+                ``max_media_seconds``.
         """
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
+        # Size and length first: a long recording becomes many paid calls.
+        probed_seconds = self._limits.check_media(file_path)
 
         cfg = self._config
         model = cfg.model
@@ -191,6 +224,17 @@ class ParallelTranscriber:
                 if duration_minutes > cfg.whisper_local_chunk_duration_minutes:
                     needs_chunking = True
 
+            if (
+                total_duration is None
+                and probed_seconds is None
+                and self._limits.max_media_seconds is not None
+            ):
+                # The first probe could not read the length: measure the audio
+                # that is about to be sent, so a single pass is checked as well.
+                total_duration = self._measured_seconds(audio_path, file_path.name)
+            if total_duration is not None:
+                self._limits.check_media_seconds(total_duration, file_path.name)
+
             if not needs_chunking:
                 # Single-pass transcription
                 logger.info("File %.1f MB within limits, single-pass transcription", file_size_mb)
@@ -202,6 +246,7 @@ class ParallelTranscriber:
             # ── Stage 3: measure duration ──────────────────────────────
             if total_duration is None:
                 total_duration = get_audio_duration(str(audio_path))
+                self._limits.check_media_seconds(total_duration, file_path.name)
             logger.info("Total duration: %.1f min", total_duration / 60)
 
             if check_cancelled:
@@ -299,6 +344,22 @@ class ParallelTranscriber:
     # ------------------------------------------------------------------
     # Single-pass transcription
     # ------------------------------------------------------------------
+
+    def _measured_seconds(self, audio_path: Path, name: str) -> float:
+        """The length of ``audio_path``, decoded when its header has none.
+
+        ``InputLimitError`` when neither ffprobe nor decoding can read it.
+        """
+        try:
+            return get_audio_duration(str(audio_path))
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            raise InputLimitError(
+                f"The length of {name} cannot be read, so it cannot be checked against "
+                "InputLimits.max_media_seconds.",
+                limit="max_media_seconds",
+                actual=float("inf"),
+                maximum=self._limits.max_media_seconds,
+            ) from exc
 
     def _transcribe_single(
         self,

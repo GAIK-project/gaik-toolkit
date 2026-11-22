@@ -13,7 +13,7 @@
       "needs": ["gaik-transcriber MCP server"],
       "setup": [
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
@@ -32,7 +32,7 @@
       "needs": ["gaik-transcriber MCP server"],
       "setup": [
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
@@ -47,13 +47,13 @@
       "title": "Purchase order processing",
       "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
       "input": "PO, BOM PDFs and a price list",
-      "output": "Word (.docx) and calculation breakdown",
+      "output": "A priced sales order (.txt, or .docx with a sample sales order) and its calculation",
       "needs": ["Filesystem MCP server"],
       "setup": [
         "Needs Node.js. Add the file access server to claude_desktop_config.json as shown in the setup guide, then restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
-      "tryPrompt": "Use the purchase-order-processing skill ({url}) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next."
+      "tryPrompt": "Use the purchase-order-processing skill ({url}) to turn the purchase order, its BOMs and the price list in my folder <folder path> into a priced sales order."
     },
     {
       "id": "report-writing",
@@ -67,7 +67,7 @@
       "needs": ["Filesystem MCP server", "gaik-transcriber MCP server"],
       "setup": [
         "Windows only. Needs Python 3.11+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber and the file access server, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment and the file access server from pinned, hash-checked packages, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
@@ -84,6 +84,19 @@
       "output": "PowerPoint (.pptx)",
       "needs": ["code execution (Python, bash)", "LibreOffice and poppler for previews"],
       "tryPrompt": "Use the brief-to-slides skill ({url}) to make a 20-minute slide deck with speaker notes. I will tell you the topic and the audience next."
+    },
+    {
+      "id": "ai-act-use-case-screening",
+      "group": "no-code",
+      "path": "agent-skills/skills/ai-act-use-case-screening",
+      "title": "EU AI Act screening",
+      "tagline": "Describe an AI use case and get a preliminary EU AI Act risk class, what you must do and by when.",
+      "input": "A description of the AI use case, then short answers to follow-up questions",
+      "output": "A plain-language report and the screening as data (JSON)",
+      "needs": [
+        "code execution (Python, standard library only)"
+      ],
+      "tryPrompt": "Use the ai-act-use-case-screening skill ({url}) to screen an AI use case against the EU AI Act. I will describe the use case next."
     },
     {
       "id": "parsing-documents",
@@ -160,7 +173,7 @@
       "output": "JSON (20 fields)",
       "then": "Paste your transcript in the next message.",
       "variants": [
-        { "label": "Työmaapäiväkirja", "file": "prompt.txt" },
+        { "label": "Finnish", "file": "prompt.txt" },
         { "label": "English", "file": "English-prompt.txt" }
       ]
     },

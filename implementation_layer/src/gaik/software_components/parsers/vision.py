@@ -22,15 +22,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components._log_names import file_tag
+from gaik.software_components.endpoints import check_openai_endpoint
+from gaik.software_components.env_file import load_env_file
+from gaik.software_components.file_type import IMAGE_TYPES, MIME_TYPES, check_file_type
+from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import Provider, resolve_provider
-
-try:  # Optional dependency, documented via extra: gaik[vision]
-    from dotenv import load_dotenv as _load_dotenv  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    _load_dotenv = None
+from gaik.software_components.source_material import (
+    SOURCE_MATERIAL_INSTRUCTION,
+    SourceMaterial,
+    source_material_messages,
+)
 
 try:
     from openai import AzureOpenAI, OpenAI
@@ -56,10 +61,9 @@ _IMAGE_MIME_TYPES = {".webp": "image/webp"}
 
 
 def _load_env() -> None:
-    """Load environment variables from ``.env`` if python-dotenv is available."""
+    """Load ``.env`` once, as the other configuration helpers do (``env_file``)."""
 
-    if _load_dotenv is not None:
-        _load_dotenv()
+    load_env_file()
 
 
 def _first_env(*keys: str) -> str | None:
@@ -86,6 +90,8 @@ class OpenAIConfig:
     timeout: float | None = None
     max_retries: int | None = None
     http_client: Any = None
+    # Hosts the application allows besides the provider's own (see the endpoints module).
+    allowed_endpoint_hosts: str | Sequence[str] | None = None
 
     def azure_base_endpoint(self) -> str | None:
         """Return the sanitized Azure endpoint without deployment path."""
@@ -142,7 +148,13 @@ def get_openai_config(use_azure: bool = True) -> OpenAIConfig:
 
 
 class VisionParser:
-    """Convert PDFs to Markdown using OpenAI vision models."""
+    """Convert PDFs to Markdown using OpenAI vision models.
+
+    Every PDF page becomes one model call, so a file over ``limits`` (size,
+    pages, pixels of a rendered page or image) is refused with
+    :class:`~gaik.software_components.input_limits.InputLimitError` before any
+    page is rendered or sent.
+    """
 
     def __init__(
         self,
@@ -153,7 +165,9 @@ class VisionParser:
         max_tokens: int = 16_000,
         temperature: float | None = 0.0,
         reasoning_effort: str | None = None,
+        limits: InputLimits | None = None,
     ) -> None:
+        self.limits = limits or InputLimits()
         self._request_config = dict(openai_config) if isinstance(openai_config, Mapping) else {}
         provider = (
             resolve_provider(config=self._request_config)
@@ -167,6 +181,7 @@ class VisionParser:
             Provider.AITTA.value,
         }
         self.config = self._coerce_config(openai_config)
+        self._provider = provider
         self.custom_prompt = custom_prompt or self._default_prompt()
         self.use_context = use_context
         self.max_tokens = max_tokens
@@ -179,7 +194,14 @@ class VisionParser:
     # ---------------------------------------------------------------------
     # Public API
     # ---------------------------------------------------------------------
-    def convert_pdf(self, pdf_path: str, *, dpi: int = 200, clean_output: bool = True) -> list[str]:
+    def convert_pdf(
+        self,
+        pdf_path: str,
+        *,
+        dpi: int = 200,
+        clean_output: bool = True,
+        first_pages: int | None = None,
+    ) -> list[str]:
         """Convert a PDF into Markdown pages.
 
         Parameters
@@ -191,9 +213,26 @@ class VisionParser:
         clean_output:
             When ``True`` merge and clean multi-page output via a post-processing
             LLM call.
+        first_pages:
+            Convert only this many pages from the start, e.g. ``1`` to read the
+            first page. The ``max_pages`` limit then applies to these pages, not
+            to the whole document. ``None`` (default) converts every page.
+
+        Raises
+        ------
+        InputLimitError
+            If the PDF is over ``max_file_bytes`` or ``max_pages``, or a page
+            rendered at ``dpi`` is over ``max_image_pixels``.
+        FileTypeMismatchError
+            If the content is another known type, or not the type the file's
+            extension says (a ``ValueError``).
         """
 
-        images = self._pdf_to_images(pdf_path, dpi=dpi)
+        if first_pages is not None and first_pages < 1:
+            raise ValueError("first_pages must be at least 1")
+        self.limits.check_file_size(pdf_path)
+        check_file_type(pdf_path, {"pdf"})
+        images = self._pdf_to_images(pdf_path, dpi=dpi, first_pages=first_pages)
         markdown_pages: list[str] = []
 
         for index, image in enumerate(images, start=1):
@@ -221,6 +260,14 @@ class VisionParser:
         -------
         str
             Markdown extracted from the image.
+
+        Raises
+        ------
+        InputLimitError
+            If the file is over ``max_file_bytes`` or ``max_image_pixels``.
+        FileTypeMismatchError
+            If the content is not a PNG, JPEG, GIF, WebP, TIFF or BMP image, or
+            not the type the file's extension says (a ``ValueError``).
         """
 
         image_path = Path(image_path)
@@ -228,12 +275,13 @@ class VisionParser:
             _IMAGE_MIME_TYPES.get(image_path.suffix.lower())
             or mimetypes.guess_type(image_path.name)[0]
         )
-        if mime_type is None:
-            # An unknown or missing suffix (e.g. a temporary upload) was sent as
-            # PNG before 0.8.0; keep that. Known non-image types still fail.
-            mime_type = "image/png"
-        if not mime_type.startswith("image/"):
+        if mime_type is not None and not mime_type.startswith("image/"):
             raise ValueError(f"Unsupported image type: {image_path.suffix}")
+        # The content decides the type sent to the model, also for an unknown or
+        # missing suffix (e.g. a temporary upload).
+        self.limits.check_file_size(image_path)
+        mime_type = MIME_TYPES[check_file_type(image_path, IMAGE_TYPES)]
+        self.limits.check_image_file(image_path)
         image_bytes = image_path.read_bytes()
         return self._parse_image(image_bytes, page=1, previous_context=None, mime_type=mime_type)
 
@@ -254,7 +302,7 @@ class VisionParser:
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as handle:
             handle.write(payload)
-        logger.info("Markdown saved to %s", output_path)
+        logger.info("Markdown saved to %s", file_tag(output_path))
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -262,6 +310,9 @@ class VisionParser:
     def _initialize_client(self) -> AzureOpenAI | OpenAI | ProviderClient:
         if self._use_shared_client:
             return create_llm_client(self._request_config)
+        # Without a base_url the endpoint check and the SDK read OPENAI_BASE_URL (and
+        # the Azure ones) from the environment, so a value kept in .env must be there.
+        _load_env()
         config = self.config
 
         if not config.api_key:
@@ -287,6 +338,14 @@ class VisionParser:
 
             if not config.api_version:
                 raise ValueError("Azure API version is required when use_azure=True.")
+            check_openai_endpoint(
+                {
+                    "base_url": config.base_url,
+                    "azure_endpoint": endpoint,
+                    "allowed_endpoint_hosts": config.allowed_endpoint_hosts,
+                },
+                Provider.AZURE.value,
+            )
 
             logger.debug(
                 "Initializing Azure OpenAI client for endpoint %s", config.base_url or endpoint
@@ -302,6 +361,12 @@ class VisionParser:
             )
 
         logger.debug("Initializing standard OpenAI client")
+        check_openai_endpoint(
+            {"base_url": config.base_url, "allowed_endpoint_hosts": config.allowed_endpoint_hosts},
+            self._provider
+            if self._provider in {Provider.OPENAI_COMPATIBLE.value, Provider.AITTA.value}
+            else Provider.OPENAI.value,
+        )
         kwargs: dict[str, Any] = {"api_key": config.api_key, **client_options}
         if config.base_url:
             kwargs["base_url"] = config.base_url
@@ -344,29 +409,44 @@ class VisionParser:
             timeout=timeout,
             max_retries=config.get("max_retries"),
             http_client=config.get("http_client"),
+            allowed_endpoint_hosts=config.get("allowed_endpoint_hosts"),
         )
 
-    def _pdf_to_images(self, pdf_path: str, *, dpi: int) -> list[bytes]:
+    def _pdf_to_images(
+        self, pdf_path: str, *, dpi: int, first_pages: int | None = None
+    ) -> list[bytes]:
         """Convert PDF pages to PNG image bytes using PyMuPDF.
 
         Returns a list of PNG image data as bytes objects.
         """
-        logger.info("Converting PDF %s to images at %s DPI", pdf_path, dpi)
+        logger.info("Converting PDF %s to images at %s DPI", file_tag(pdf_path), dpi)
         images: list[bytes] = []
-        doc = fitz.open(pdf_path)
+        name = Path(pdf_path).name
 
         # Calculate zoom factor from DPI (72 is the default DPI in PDFs)
         zoom = dpi / 72.0
         mat = fitz.Matrix(zoom, zoom)
 
-        for page_num in range(len(doc)):
-            # Render page to pixmap with specified DPI
-            pix = doc[page_num].get_pixmap(matrix=mat)
-            # Get PNG bytes directly
-            png_bytes = pix.tobytes("png")
-            images.append(png_bytes)
+        with fitz.open(pdf_path) as doc:
+            # PyMuPDF opens other formats too; ask what it opened.
+            if not doc.is_pdf:
+                raise ValueError(f"The content of '{name}' is not a PDF document.")
+            page_count = doc.page_count
+            if first_pages is not None:
+                page_count = min(page_count, first_pages)
+            self.limits.check_pages(page_count, name)
+            # Check every page's image size before rendering any of them.
+            for page_num in range(page_count):
+                self.limits.check_rendered_page(
+                    doc[page_num], zoom, f"{name}, page {page_num + 1} at {dpi} DPI"
+                )
+            for page_num in range(page_count):
+                # Render page to pixmap with specified DPI
+                pix = doc[page_num].get_pixmap(matrix=mat)
+                # Get PNG bytes directly
+                png_bytes = pix.tobytes("png")
+                images.append(png_bytes)
 
-        doc.close()
         logger.debug("Converted %s pages", len(images))
         return images
 
@@ -393,10 +473,11 @@ class VisionParser:
     ) -> str:
         logger.info("Parsing page %s", page)
 
+        material = SourceMaterial()
         payload = [
             {
                 "type": "text",
-                "text": self._build_prompt(previous_context),
+                "text": self._build_prompt(previous_context, material),
             },
             {
                 "type": "image_url",
@@ -406,6 +487,10 @@ class VisionParser:
             },
         ]
 
+        # The page image and the previous page's text are material. The rule goes
+        # in the user message: some served vision models refuse a system
+        # message next to an image.
+        payload[0]["text"] = f"{SOURCE_MATERIAL_INSTRUCTION}\n\n{payload[0]['text']}"
         content = self._chat_content([{"role": "user", "content": payload}])
         if content is None:
             raise RuntimeError("Vision model returned empty content")
@@ -415,13 +500,16 @@ class VisionParser:
         logger.info("Cleaning and merging markdown output")
 
         combined = "\n\n---PAGE_BREAK---\n\n".join(markdown_pages)
-        cleanup_prompt = self._cleanup_prompt().format(markdown=combined)
-
-        content = self._chat_content([{"role": "user", "content": cleanup_prompt}])
+        material = SourceMaterial()
+        content = self._chat_content(
+            source_material_messages(
+                self._cleanup_prompt(), material.wrap(combined, label="markdown pages")
+            )
+        )
         if not content:
             raise RuntimeError("Cleanup LLM returned empty output")
 
-        trimmed = content.strip()
+        trimmed = material.strip_echo(content).strip()
         if trimmed.startswith("```"):
             trimmed = trimmed.strip("`").strip()
         return trimmed
@@ -450,7 +538,7 @@ class VisionParser:
             )
         return response.choices[0].message.content
 
-    def _build_prompt(self, previous_context: str | None) -> str:
+    def _build_prompt(self, previous_context: str | None, material: SourceMaterial) -> str:
         if not (previous_context and self.use_context):
             return self.custom_prompt
 
@@ -459,9 +547,7 @@ class VisionParser:
             f"{self.custom_prompt}\n\n"
             "CONTEXT FROM PREVIOUS PAGE:\n"
             "The previous page ended with the following content (last 500 characters):\n"
-            "```\n"
-            f"{tail}\n"
-            "```\n\n"
+            f"{material.wrap(tail, label='end of previous page')}\n\n"
             "If this page continues a table or section from the previous page, "
             "continue it seamlessly without repeating headers."
         )
@@ -513,10 +599,7 @@ class VisionParser:
             "4. **Preserve all real content**: Keep all actual data, headers, footers, and text\n"
             "5. **Clean up formatting**: Ensure proper markdown syntax throughout\n"
             "6. **Do NOT hallucinate**: Only output what you see in the input\n\n"
-            "INPUT MARKDOWN:\n"
-            "```markdown\n"
-            "{markdown}\n"
-            "```\n\n"
+            "INPUT MARKDOWN: the source_material block in the user message.\n\n"
             "OUTPUT: Return ONLY the cleaned, merged markdown. No explanations, no code block "
             "wrappers."
         )

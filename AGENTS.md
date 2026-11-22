@@ -17,20 +17,39 @@ This repo is public: never commit machine-local paths, usernames or secret-store
 
 ## checks
 
-- Library: `uv run pytest -m "not llm"`. Tests marked `llm` make real provider calls
-  and need keys.
+- Library: `uv sync --all-extras` once, then `uv run pytest -m "not llm"`; a plain
+  `uv run` installs neither pytest (the `dev` extra) nor the extras whose tests then skip.
+  Tests marked `llm` make real provider calls and need keys.
 - Demo API, from `implementation_layer/toolkit_demo_app/`:
   `uv run --python 3.11 --with pytest --with pytest-asyncio python -m pytest api/tests -o addopts="" -q`
   (`python -m` puts the demo folder on `sys.path`, so `import api` works).
 - Demo API live smoke, from the same folder with the provider keys set:
-  `python -m api.smoke`. One small real request per use case (`api/smoke.py`); add a
+  `uv run python -m api.smoke`. One small real request per use case (`api/smoke.py`); add a
   check there when the demo gets a new use case.
 - Demo front end, from the same folder: `bun test`, `bunx tsc --noEmit` and
   `bun run lint`. CI runs them in the `demo-frontend-tests` job; run them locally
   before pushing a front-end change.
+- Solution Wizard, after the same `uv sync --all-extras`:
+  `uv run pytest implementation_layer/solution_wizard/tests -q`.
+- Components with real providers: the `component-check` skill
+  (`.claude/skills/component-check/`) runs the schema generator, extractor and vision
+  extractor on synthetic invoices with each provider whose keys it gets, and can have
+  Claude Code, Codex or Antigravity judge the outputs on their own subscription login.
+  Before a tag, `gh workflow run live-smoke.yml -f providers=azure` runs it with the
+  release smoke checks on a branch; it is not the release gate.
 - Workflows: actions are pinned to commit SHAs with a version comment, checkouts set
   `persist-credentials: false`, and token permissions are granted per job. The
   `Workflow security` job (zizmor) fails on medium or higher findings.
+
+## Claude Agent SDK
+
+The Solution Wizard's interactive runner (`run_wizard_interactive.py`, with its tool guard
+`agent_tool_guard.py`) and the demo's `api/routers/solution_wizard.py` drive Claude Code
+through `claude-agent-sdk`. Before changing their options, hooks or permissions, read the
+current docs (index: https://code.claude.com/docs/llms.txt) and the installed SDK's
+`ClaudeAgentOptions`: defaults change between versions. For example, `setting_sources`
+left unset loads the user's, project and local settings, and `env` is merged over the
+parent's environment.
 
 ## who owns a change
 
@@ -121,14 +140,36 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   env vars (Allas, `DATABASE_URL`, TTS, report-writer limits) set with `oc set env` that
   the manifests lack, and applying them drops those.
 - The API image installs gaik from PyPI, not from this repository, so a gaik fix reaches
-  the demo app only after a release.
+  the demo app only after a release and a bump of the gaik pin in `api/requirements.txt`;
+  then rewrite `api/requirements.lock` with `scripts/lock_api_requirements.sh` and commit
+  both files.
   The demo's local uv environment uses this repository's gaik as an editable install
   (`[tool.uv.sources]` in its `pyproject.toml`), so a local run can pass on a fix that
   the deployed demo lacks.
-- `proxy.ts` is the only auth layer in front of the FastAPI backend; every
-  state-changing method needs a signed-in, approved user (`lib/api-access.ts`), or a
-  pending one within the daily trial allowance (`lib/trial.ts`, counted in Upstash
-  Redis, off without it); the wizard routes have their own gate.
+- `proxy.ts` gates every request to the FastAPI backend except the report runs
+  (`app/api/*/run/route.ts`), which forward it themselves after `lib/report-writer/gate.ts`
+  (sign-in, approval or trial, report quota); a path added to its `isNextApiRoute` list
+  skips the proxy's gate. Every state-changing method needs a signed-in, approved user
+  (`lib/api-access.ts`), or a pending one within the daily trial allowance
+  (`lib/trial.ts`, counted in Upstash Redis, off without it). The first Solution
+  Wizard's API, `/api/wizard`, also needs the per-user `wizard_access` grant from
+  `/admin`, for reads too: its agent has shell tools in the API pod. A write to data
+  that every visitor shares needs a signed-in user with the `/admin` session
+  (`writesSharedData`), and the API serves no route that writes the shared
+  video-search index. A video's playback and thumbnail links go to signed-in users
+  only (`handsOutStorageLink`, checked again in `api/routers/video_search.py`).
+  A generated result (PDF, subtitles, tabular session) belongs to the user whose run
+  made it: the proxy sends the signed-in user in `X-GAIK-User`, and the API serves the
+  result by id only to that user (`api/utils/result_owner.py`). A RAG collection belongs
+  to the user who indexed it the same way; the shared example collections serve everyone.
+  Each run, and each result download, leaves one `gaik.audit` log line with the user id,
+  the route template and the status, never content or file names (`api/utils/audit.py`).
+  The Postgres agent's model-written SQL runs on its own read-only role
+  (`POSTGRES_AGENT_DATABASE_URL`, created with `api/scripts/postgres_agent_role.sql`);
+  the API refuses a role that can write, create, replicate, call a SECURITY DEFINER
+  function or one that reads server files, is a member of another role or can read
+  outside the demo schema, and falls back to
+  `DATABASE_URL` with a warning while the variable is unset.
 
 ## docs site (GitHub Pages)
 
@@ -148,8 +189,9 @@ expected.
 ## release certification (required before every tag and PyPI release)
 
 - Every version tag/release requires real authenticated component tests, not only
-  imports, mocked calls, or the presence of API keys. Before tagging, commit the
-  intended release, set the wizard validated pin to the planned version, then run
+  imports, mocked calls, or the presence of API keys. Before tagging, set
+  `implementation_layer/solution_wizard/gaik_validated_version.txt` to the planned
+  version and commit it with the intended release, then run
   `uv run python scripts/release_check.py --live --version X.Y.Z`. The command runs
   all-extras sync, offline tests, wizard tests/audit, package validation, and bounded
   live component checks. A passing sanitized `results/release-check.json` must name
@@ -171,5 +213,9 @@ expected.
   on that complete workflow succeeding. Do not tag, upload to PyPI, or deploy the
   demo until the applicable certification passes. Keep credentials, raw provider
   errors, and personal documents out of reports; use the synthetic fixtures.
+- The same release job then runs the `component-check` skill on Azure (schema generator,
+  extractor and vision extractor on its synthetic invoices); a failed case blocks the
+  publish like the certification does. Run it, or `gh workflow run live-smoke.yml`, before
+  tagging so that the tag does not find a failure first.
 - Once a release is on PyPI, offer to take it into the Solution Wizard v2 fork with the
   `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`.

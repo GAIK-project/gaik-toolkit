@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { AI_NOTICE_TEXT } from "./ai-notice";
 
 test("the notice says the results are AI-generated", () => {
@@ -9,4 +9,15 @@ test("the notice says the results are AI-generated", () => {
 test("every demo page gets the notice from the demos layout", () => {
   const layout = readFileSync("app/(demos)/layout.tsx", "utf8");
   expect(layout).toMatch(/<MainLayout[^>]*\baiNotice\b/);
+});
+
+test("the first wizard runs a model, so its page is under the demos layout", () => {
+  expect(existsSync("app/(demos)/solution-wizard/first/page.tsx")).toBe(true);
+  expect(existsSync("app/(wizard)/solution-wizard/first")).toBe(false);
+});
+
+test("the page that offers the two wizards runs no model, so it has no AI notice", () => {
+  const layout = readFileSync("app/(wizard)/layout.tsx", "utf8");
+  expect(layout).toMatch(/<MainLayout\b/);
+  expect(layout).not.toMatch(/\baiNotice\b/);
 });

@@ -52,7 +52,7 @@ The configured parsing model must support image input. Text extraction can use a
 - `file_path`: Path to the document to parse (PDF/image/DOCX).
 - `user_requirements`: Natural-language description of fields to extract.
 - `parser_choice`: `vision_parser`, `docling`, `pymupdf`, or `docx`.
-- `parser_ctor`: Dict passed to the chosen parser constructor (e.g., `clean_output` for VisionParser).
+- `parser_ctor`: Dict passed to the chosen parser constructor; each name must be one of its parameters.
 - `parse_options`: Dict passed to the parser call (if applicable).
 - `extractor_ctor`: Dict passed to `DataExtractor(...)` (e.g., `model` override, applied to schema gen and extraction).
 - `extract_options`: Dict passed to `DataExtractor.extract(...)` (e.g., `save_json`, `json_path`). The example also uses:
@@ -68,5 +68,5 @@ The configured parsing model must support image input. Text extraction can use a
 - `requirements`: Corresponding `ExtractionRequirements`.
 
 ## Schema Persistence (example pattern)
-- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure the schema and `<name>_requirements.json` exist under `schema/`.
-- To generate and save a schema, set `generate_schema=True`; the example uses `pipeline.save_schema(...)` to write both artifacts to `schema/`.
+- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure `<name>_model.json` and `<name>_requirements.json` exist under `schema/`. The model is rebuilt from `<name>_model.json` as data; `<name>.py` is only there to read and is never imported.
+- To generate and save a schema, set `generate_schema=True`; the example uses `pipeline.save_schema(...)` to write the model file, the requirements and a readable `<name>.py` to `schema/`.

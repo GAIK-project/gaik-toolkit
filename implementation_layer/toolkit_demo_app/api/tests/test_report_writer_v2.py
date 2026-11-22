@@ -10,6 +10,7 @@ import asyncio
 import base64
 import io
 import json
+import re
 import threading
 import time
 from pathlib import Path
@@ -20,6 +21,7 @@ from api.routers import report_writer_v2 as route
 from fastapi import FastAPI, UploadFile
 from fastapi.testclient import TestClient
 from gaik.software_modules.report_writer import ReportSpec
+from pydantic import model_validator
 
 CONFIG = {"provider": "fake", "model": "fake-model"}
 SPEC = {
@@ -195,6 +197,51 @@ def test_the_project_meeting_example_from_the_repository(client):
     assert response.status_code == 200
 
 
+# The top-level keys of ReportSpec in the gaik release api/requirements.txt pins. That
+# release forbids any other key, so a bundled example with one breaks /examples for every
+# example once deployed. Update both when the pin moves to a release with new keys.
+PINNED_GAIK = "0.11.1"
+PINNED_SPEC_KEYS = {
+    "title",
+    "description",
+    "language",
+    "sections",
+    "instructions",
+    "sources",
+    "sample_report",
+    "models",
+    "settings",
+}
+
+
+class PinnedReportSpec(ReportSpec):
+    """ReportSpec as the pinned PyPI release reads it: no key it does not know."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _released_keys_only(cls, data):
+        if isinstance(data, dict) and (unknown := set(data) - PINNED_SPEC_KEYS):
+            raise ValueError(f"gaik {PINNED_GAIK} has no spec keys {sorted(unknown)}")
+        return data
+
+
+def test_every_bundled_example_loads_with_the_pinned_gaik(client, monkeypatch):
+    requirements = (Path(route.__file__).parents[1] / "requirements.txt").read_text()
+    assert re.search(rf"^gaik\[[^\]]*\]=={re.escape(PINNED_GAIK)}$", requirements, re.M), (
+        "the gaik pin moved: update PINNED_GAIK and PINNED_SPEC_KEYS"
+    )
+    monkeypatch.setattr(route, "_gaik", lambda: (FakeWriter, PinnedReportSpec))
+
+    response = client.get("/report-writer-v2/examples")
+
+    assert response.status_code == 200, response.text
+    ids = [e["id"] for e in response.json()["examples"]]
+    assert "house_condition_assessment" in ids and "project_meeting" in ids
+    for example_id in ids:
+        spec = json.loads((route._examples_root() / example_id / "report_spec.json").read_text())
+        assert set(spec) <= PINNED_SPEC_KEYS, example_id
+
+
 # ---------------------------------------------------------------------------
 # /run validation
 # ---------------------------------------------------------------------------
@@ -299,7 +346,7 @@ def test_a_name_the_server_cannot_store_is_a_400(client):
     response = _run(client, spec=spec, files=SOURCES[:1])
 
     assert response.status_code == 400
-    assert "The server cannot store the file name" in response.json()["detail"]
+    assert "cannot store a file named" in response.json()["detail"]
     assert RUNS == []
 
 
@@ -354,7 +401,7 @@ def test_a_failing_stage_streams_an_error_and_removes_the_temp_dir(client):
 
     assert events == [
         ("progress", {"message": "Curating Summary"}),
-        ("error", {"message": "ValueError: The curator answer failed validation"}),
+        ("error", {"message": "The curator answer failed validation"}),
     ]
     [(_, workspace)] = RUNS
     assert not workspace.parent.exists()

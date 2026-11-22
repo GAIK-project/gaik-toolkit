@@ -28,6 +28,10 @@ from gaik.software_components.knowledge_curator.models import (
 )
 from gaik.software_components.llm import create_llm_client
 from gaik.software_components.llm.base import add_usage
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    with_source_material_instruction,
+)
 
 from .models import Report, ReportSection, ReviewEntry
 from .prompts import build_review_checks, build_writer_prompt, writer_system_prompt
@@ -81,7 +85,7 @@ class ReportSynthesizer:
         model: str | None = None,
         *,
         reviewer_model: str | None = None,
-        strict_review: bool = False,
+        strict_review: bool = True,
         review_attempts: int = 5,
         writer_options: dict | None = None,
         reviewer_options: dict | None = None,
@@ -92,8 +96,9 @@ class ReportSynthesizer:
             config: LLM config from `get_llm_config()`.
             model: Optional writer model override. Defaults to the config's model.
             reviewer_model: Optional reviewer model override. Defaults to the config's model.
-            strict_review: Raise when a reviewer edit cannot be applied, instead of
-                logging it in the review log.
+            strict_review: Raise when a reviewer edit cannot be applied (the
+                default), so a report is never returned as reviewed with a
+                correction left out. ``False`` logs it in the review log instead.
             review_attempts: Most reviewer requests per section, the first one included.
             writer_options: Extra options for every writer call, such as
                 `reasoning_effort` or `temperature`.
@@ -129,8 +134,10 @@ class ReportSynthesizer:
             sections: The report sections in report order.
             title: The report title.
             language: The language the sections are written in.
-            instructions: Report-level rules: source hierarchy, missing data, citation
-                style. They go to every writer and to the reviewer checks.
+            instructions: Report-level rules: wording per kind of source, missing data,
+                citation style. They go to every writer and to the reviewer checks.
+                Which side of a conflict a section follows comes from the knowledge
+                (the curator's ``source_precedence``), not from these rules.
             sample_report: A Markdown sample report, given to the writers as a format
                 reference for structure, length and tone only. The reviewer never sees it.
             progress_callback: Called with a status line as each section is written,
@@ -161,15 +168,18 @@ class ReportSynthesizer:
 
         def write(section: SectionSpec) -> Callable[[_State], dict]:
             def run(state: _State) -> dict:
+                material: str | dict[str, str]
                 if section.derived:
-                    material = "\n\n".join(
-                        f'<section id="{d}" title="{titles[d]}">\n'
-                        f"{state['sections'][d].text}\n</section>"
+                    # Each reviewed prerequisite goes in its own block, labelled with its
+                    # id and title.
+                    material = {
+                        f"section {d}: {titles[d]}": state["sections"][d].text
                         for d in section.depends_on
-                    )
+                    }
                 else:
                     material = knowledge.get(section.id).model_dump_json(indent=2)
                 notify(f"Writing {section.title}")
+                blocks = SourceMaterial()
                 prompt = build_writer_prompt(
                     section,
                     material,
@@ -177,15 +187,21 @@ class ReportSynthesizer:
                     language=language,
                     instructions=instructions,
                     sample_report=sample_report,
+                    blocks=blocks,
                 )
                 response = client.chat(
                     [
-                        {"role": "system", "content": writer_system_prompt(self.citations)},
+                        {
+                            "role": "system",
+                            "content": with_source_material_instruction(
+                                writer_system_prompt(self.citations)
+                            ),
+                        },
                         {"role": "user", "content": prompt},
                     ],
                     **self.writer_options,
                 )
-                draft = response.text.strip()
+                draft = blocks.strip_echo(response.text).strip()
                 if re.match(r"#{1,6}\s", draft):
                     draft = draft.partition("\n")[2].strip()
                 if not draft:
@@ -202,8 +218,10 @@ class ReportSynthesizer:
                     raise RuntimeError(f"Section {section.id!r} is empty after review")
                 if self.strict_review and result.unresolved:
                     raise RuntimeError(
-                        f"Section {section.id!r}: {len(result.unresolved)} reviewer edits could "
-                        f"not be applied (strict_review): {[e.search for e in result.unresolved]}"
+                        f"Section {section.id!r} ({section.title!r}): "
+                        f"{len(result.unresolved)} reviewer edit(s) could not be applied "
+                        "(strict_review=True). Run the report again, or pass "
+                        "strict_review=False and read review_log for the unresolved edits."
                     )
                 notify(
                     f"Finished {section.title}: {len(result.applied)} edits applied, "

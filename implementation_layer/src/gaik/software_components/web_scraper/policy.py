@@ -5,20 +5,25 @@ domains (when a list is given) and resolves to public addresses only. The addres
 check stops a page, a redirect or a typed URL from reaching a cloud metadata
 endpoint or a service inside the cluster the scraper runs in.
 
-The address check resolves the host once per scraper and caches the answer. The
-HTTP client resolves the host again when it connects, so a domain whose DNS answer
-changes between the two lookups (DNS rebinding) is not covered: list the domains
-you trust in ``allowed_domains`` when the URLs come from users.
+The address check resolves the host and keeps the addresses it checked for
+``ADDRESS_TTL_SECONDS``. With its default transport and no proxy, ``WebScraper``
+connects to those same addresses (see ``connect.py``), so the name is not looked up
+a second time between the check and the connection; once the time is up, the next
+check or connection looks the name up again and checks the new answer. With
+``render_js``, a proxy or a custom transport, the name is looked up again there.
 """
 
 from __future__ import annotations
 
 import ipaddress
 import socket
+import time
 from collections.abc import Iterable
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 _DEFAULT_PORTS = {"http": 80, "https": 443}
+# How long a host's checked addresses are kept before the name is looked up again.
+ADDRESS_TTL_SECONDS = 300.0
 
 
 class ScrapeError(Exception):
@@ -101,9 +106,15 @@ class UrlPolicy:
             else tuple(d for d in (_clean_domain(d) for d in allowed_domains) if d)
         )
         if self.allowed_domains == ():
-            raise ValueError("allowed_domains is empty: pass None to allow every public host")
+            raise ValueError(
+                "allowed_domains is empty: list at least one domain "
+                "(WebScraper takes allow_any_domain=True to allow every public host)"
+            )
         self.allow_private_networks = allow_private_networks
-        self._public: dict[str, bool] = {}
+        # host -> (the addresses it resolved to, all public, or () when it did not
+        # resolve or resolved to at least one private or local address; the
+        # time.monotonic() at which the answer expires).
+        self._public: dict[str, tuple[tuple[str, ...], float]] = {}
 
     def in_allowed_domains(self, url: str) -> bool:
         """Whether the URL's host is inside the allowed domains (no DNS lookup)."""
@@ -136,12 +147,38 @@ class UrlPolicy:
             return f"{host} resolves to a private or local address, or does not resolve"
         return None
 
+    def public_addresses(self, host: str) -> tuple[str, ...]:
+        """The addresses ``host`` resolves to, when every one of them is public.
+
+        Empty when the host does not resolve or any of its addresses is private,
+        loopback, link-local or otherwise not global. The answer is kept for
+        ``ADDRESS_TTL_SECONDS``: calls in that time return the addresses that were
+        checked, which are the ones the scraper connects to. After it, the host is
+        looked up and checked again.
+        """
+        key = _lookup_key(host)
+        cached = self._public.get(key)
+        now = time.monotonic()
+        if cached is not None and now < cached[1]:
+            return cached[0]
+        try:
+            infos = socket.getaddrinfo(key, None, proto=socket.IPPROTO_TCP)
+            addresses = tuple(dict.fromkeys(str(info[4][0]) for info in infos))
+            public = bool(addresses) and all(map(_is_public, addresses))
+            checked = addresses if public else ()
+        except (OSError, ValueError, UnicodeError):
+            checked = ()
+        self._public[key] = (checked, now + ADDRESS_TTL_SECONDS)
+        return checked
+
     def _resolves_public(self, host: str) -> bool:
-        if host not in self._public:
-            try:
-                infos = socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
-                addresses = {info[4][0] for info in infos}
-                self._public[host] = bool(addresses) and all(map(_is_public, addresses))
-            except (OSError, ValueError, UnicodeError):
-                self._public[host] = False
-        return self._public[host]
+        return bool(self.public_addresses(host))
+
+
+def _lookup_key(host: str) -> str:
+    """The host in the ASCII form a resolver sees, so both spellings share one lookup."""
+    host = host.strip("[]").lower()
+    try:
+        return host.encode("idna").decode("ascii")
+    except UnicodeError:
+        return host

@@ -1,5 +1,14 @@
 # Solution Wizard — Claude Code Notes
 
+## Schema corrections reach the PoC through the model file
+
+The PoC's `load_schema()` reads `schemas/output_schema_model.json` and never imports
+`output_schema.py`. After editing `output_schema.py` (SKILL.md Step 4.5), run
+`python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas`: it says at
+once whether the edit can be saved. The audio and document PoCs also write the model file
+again themselves when `output_schema.py` is newer, and stop when it does not import or
+cannot be saved.
+
 ## Schema generation constraints
 
 Two constraints must be checked every time a GAIK extraction schema is generated or manually edited. Both caused runtime failures during a hospital admissions PoC (2026-06-06) and are now enforced in SKILL.md Phase 4.
@@ -64,6 +73,8 @@ reasoning. GPT-6 Astra does not support `reasoning_effort='none'`; Sol/Luna do.
 Custom Azure deployment names need `model_family` for family normalization.
 PostgresAgent/TabularAgent drop their `0.0` temperature default for GPT-6/GPT-5.6
 automatically; pass `temperature=None` only for other reasoning deployments that
-reject it (o-series, older gpt-5.x reasoning tiers). Follow SKILL.md Phase 6 and
+reject it (o-series, older gpt-5.x reasoning tiers). Keep SchemaGenerator's defaults:
+with no effort its requirements parses send GPT-6 Sol/Luna and GPT-5.6
+`reasoning_effort='none'`, so their `temperature=0` applies. Follow SKILL.md Phase 6 and
 the card's current options instead of the obsolete blanket restriction against every
 model newer than GPT-5.4.

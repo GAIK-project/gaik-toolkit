@@ -81,7 +81,15 @@ schema = generator.generate_schema(user_requirements: str)
 generator.extraction_model      # Generated Pydantic model
 generator.item_requirements     # Field specifications
 generator.structure_analysis    # Structure type analysis
+
+# Regenerate over an approved schema and see what changed before saving it
+result = generator.generate_schema_with_usage(
+    user_requirements, approved_requirements=approved, approved_structure="flat"
+)
+print(result.diff)              # SchemaDiff; also compare_requirements(approved, new)
 ```
+
+See the [schema generator README](../schema_generator/README.md#review-a-new-schema-against-the-approved-one).
 
 ### DataExtractor
 
@@ -195,7 +203,28 @@ Do not combine an active reasoning effort (`low`, `medium`, or `high`) with
 a custom temperature. Supported reasoning-effort values are model-specific;
 check the selected model's OpenAI documentation.
 
+With its defaults (`temperature=0.0`, no `reasoning_effort`), `SchemaGenerator`
+sends GPT-6 Sol/Luna and GPT-5.6 `reasoning_effort="none"` in its requirements
+parses, so their temperature applies; with reasoning and free sampling these
+models sometimes kept only the first field of a task. Its structure detection and
+`DataExtractor` send no effort unless you set one.
+
 ---
+
+### Source material as data
+
+`DataExtractor` sends each document as material, apart from the task: the
+system message holds the extraction rules and the sentence in
+`SOURCE_MATERIAL_INSTRUCTION`, and the user message holds your
+`user_requirements` and the document inside a `<source_material>` block with a
+random id for each call ([`gaik.software_components.source_material`](../source_material.py)). A sentence in the document cannot close
+the block or change the task, the schema or the rules. The call, the schema and
+the return value are unchanged.
+
+To check that the values are written in the document, run the extraction
+through [Source Tracing](../source_tracing/README.md) (`augment`, then
+`check_text`): it compares each value with a quote from the source and needs no
+model call.
 
 ## Environment Variables
 
@@ -223,10 +252,10 @@ See [implementation_layer/examples/software_components/extractor/](../../../../e
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **Examples**: [implementation_layer/examples/software_components/extractor/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/extractor)
-- **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
+- **Contributing**: [CONTRIBUTING.md](../../../../../guidance_layer/CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
-MIT - see [LICENSE](../LICENSE)
+MIT - see [LICENSE](../../../../../LICENSE)
 

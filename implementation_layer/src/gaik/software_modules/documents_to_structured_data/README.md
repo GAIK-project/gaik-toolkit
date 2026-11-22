@@ -52,14 +52,15 @@ The configured parsing model must support image input. Text extraction can use a
 - `file_path`: Path to the document to parse (PDF/image/DOCX).
 - `user_requirements`: Natural-language description of fields to extract.
 - `parser_choice`: `vision_parser`, `docling`, `pymupdf`, or `docx`.
-- `parser_ctor`: Dict passed to the chosen parser constructor (e.g., `clean_output` for VisionParser).
-- `parse_options`: Dict passed to the parser call (if applicable).
+- `parser_ctor`: Dict passed to the chosen parser constructor (e.g., `custom_prompt` for VisionParser, `enable_ocr` for Docling).
+- `parse_options`: Dict passed to the parser's read call (e.g., `dpi` or `clean_output` for VisionParser's `convert_pdf`, `use_markdown` for the others).
 - `extractor_ctor`: Dict passed to `DataExtractor(...)` (e.g., `model` override, applied to schema gen and extraction).
 - `extract_options`: Dict passed to `DataExtractor.extract(...)` (e.g., `save_json`, `json_path`). The example also uses:
   - `generate_schema` (bool): If `True`, generate a new schema; if `False`, try to load from disk via `load_schema`.
   - `schema_name` (str): Base filename (no `.py`) for saving/loading schema; defaults to `schema`.
 - `schema`: Optional pre-generated schema model to reuse.
 - `requirements`: Optional `ExtractionRequirements` matching the schema.
+- Every name in these dicts must be a parameter of the component it goes to, and stage configs (`config`, `api_config`, `openai_config`) are refused: pass them to the constructor (`api_config`, `parser_config`, `extraction_config`). A `ValueError` names the option before anything is parsed.
 
 ### Returns (`PipelineResult`)
 - `parsed_documents`: List of parsed text strings.
@@ -68,5 +69,5 @@ The configured parsing model must support image input. Text extraction can use a
 - `requirements`: Corresponding `ExtractionRequirements`.
 
 ## Schema Persistence (example pattern)
-- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure the schema and `<name>_requirements.json` exist under `schema/`.
+- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure `<name>_model.json` and `<name>_requirements.json` exist under `schema/`. `load_schema` rebuilds the model from `<name>_model.json` as data and never imports `<name>.py`, which is written only for reading. A folder from an older gaik without `<name>_model.json` is rebuilt from the requirements for a flat or parent-with-children schema; for a nested-list schema `load_schema` raises `SavedSchemaError`, naming the folder and how to convert it, instead of generating a new schema over the saved one. When a model cannot be saved as data, `save_schema` removes an older `<name>_model.json`, so the load rebuilds from the new requirements.
 - To generate and save a schema, set `generate_schema=True`; the example uses `pipeline.save_schema(...)` to write both artifacts to `schema/`.

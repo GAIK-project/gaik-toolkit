@@ -3,8 +3,10 @@
 # For Node.js/pnpm alternative, use Dockerfile.pnpm
 # -----------------------------------------------------------------------------
 
-# Use Bun's official image for build stages
-FROM oven/bun:1 AS base
+# Use Bun's official image for build stages. Base images are pinned by digest
+# (oven/bun:1 was 1.4.4 when pinned); README "Pinned images and the API lock"
+# says how to move them.
+FROM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS base
 
 WORKDIR /app
 
@@ -50,7 +52,8 @@ RUN bun run build || echo "next build exited non-zero - verifying build output b
 # Runner stage (CSC Rahti 2 / OpenShift optimized)
 # Uses slim image for smaller footprint (~45MB vs ~520MB)
 # ----------------------------
-FROM oven/bun:1-slim AS runner
+# oven/bun:1-slim, pinned by digest like the build stages.
+FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS runner
 
 # Metadata
 LABEL maintainer="GAIK Project"

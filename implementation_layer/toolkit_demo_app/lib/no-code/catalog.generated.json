@@ -1,7 +1,7 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.6.12",
+    "version": "0.6.28",
     "marketplace": "GAIK-project/gaik-toolkit",
     "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
   },
@@ -19,20 +19,20 @@
       ],
       "setup": [
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/incident-report-writing-setup-kit.zip",
-        "zipBytes": 39671
+        "zipBytes": 57837
       },
       "tryPrompt": "Use the incident-report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing) to turn my audio recording into an incident report. I will attach the file next.",
       "files": [
         "SKILL.md"
       ],
       "zip": "/downloads/skills/incident-report-writing.zip",
-      "zipBytes": 14214,
+      "zipBytes": 14539,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing"
     },
@@ -49,20 +49,20 @@
       ],
       "setup": [
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/construction-diary-creation-setup-kit.zip",
-        "zipBytes": 37843
+        "zipBytes": 55894
       },
       "tryPrompt": "Use the construction-diary-creation skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
       "files": [
         "SKILL.md"
       ],
       "zip": "/downloads/skills/construction-diary-creation.zip",
-      "zipBytes": 15258,
+      "zipBytes": 15464,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation"
     },
@@ -71,9 +71,9 @@
       "group": "no-code",
       "title": "Purchase order processing",
       "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
-      "description": "Process Purchase Orders and Bills of Material to generate priced Sales Orders",
+      "description": "Matches a purchase order and its bills of material (PDFs) against a price list (.xlsx or .csv) and writes a priced sales order and a calculation breakdown, in Claude Desktop with the filesystem MCP server. Use when the user wants to process a purchase order or PO, generate or price a sales order, match BOMs with a PO, or calculate order pricing from a price list.",
       "input": "PO, BOM PDFs and a price list",
-      "output": "Word (.docx) and calculation breakdown",
+      "output": "A priced sales order (.txt, or .docx with a sample sales order) and its calculation",
       "needs": [
         "Filesystem MCP server"
       ],
@@ -82,7 +82,7 @@
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": null,
-      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
+      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing) to turn the purchase order, its BOMs and the price list in my folder <folder path> into a priced sales order.",
       "files": [
         "EVALUATION.md",
         "SKILL.md",
@@ -93,7 +93,7 @@
         "reference/PRICING_RULES.md"
       ],
       "zip": "/downloads/skills/purchase-order-processing.zip",
-      "zipBytes": 107093,
+      "zipBytes": 108494,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing"
     },
@@ -111,13 +111,13 @@
       ],
       "setup": [
         "Windows only. Needs Python 3.11+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
-        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber and the file access server, saves your key and writes the Claude Desktop config.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment and the file access server from pinned, hash-checked packages, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/report-writing-setup-kit.zip",
-        "zipBytes": 74320
+        "zipBytes": 141146
       },
       "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing) to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [
@@ -127,7 +127,7 @@
         "reference/OUTPUT_SECTIONS.md"
       ],
       "zip": "/downloads/skills/report-writing.zip",
-      "zipBytes": 46962,
+      "zipBytes": 47157,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing"
     },
@@ -173,8 +173,36 @@
         "scripts/setup_env.sh"
       ],
       "zip": "/downloads/skills/brief-to-slides.zip",
-      "zipBytes": 538323,
+      "zipBytes": 538322,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/brief-to-slides",
+      "guideUrl": null
+    },
+    {
+      "id": "ai-act-use-case-screening",
+      "group": "no-code",
+      "title": "EU AI Act screening",
+      "tagline": "Describe an AI use case and get a preliminary EU AI Act risk class, what you must do and by when.",
+      "description": "Preliminary EU AI Act screening of any AI use case, planned or already in use, from the user's own description, documents and answers. Asks questions in short batches, then writes a structured report with the risk classification in one of the four AI Act tiers (unacceptable risk, high-risk, limited risk with transparency obligations, minimal or no risk), what the user must do and by when, optional recommendations, the dates that affect them, what would change the classification, and open questions. For a system already in use, every required action gets a status (in place, partly, missing, unknown). Every finding carries evidence from the user's words or documents, an AI Act citation and the reasoning. Use when someone wants to know whether and how the EU AI Act applies to an AI system or idea, asks for its risk class, or wants an AI Act gap check. For a GAIK Solution Configuration Wizard pack, use ai-act-screening instead.",
+      "input": "A description of the AI use case, then short answers to follow-up questions",
+      "output": "A plain-language report and the screening as data (JSON)",
+      "needs": [
+        "code execution (Python, standard library only)"
+      ],
+      "setup": [],
+      "kit": null,
+      "tryPrompt": "Use the ai-act-use-case-screening skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/ai-act-use-case-screening) to screen an AI use case against the EU AI Act. I will describe the use case next.",
+      "files": [
+        "README.md",
+        "SKILL.md",
+        "references/ai-act-reference.md",
+        "references/output-format.md",
+        "references/question-bank.md",
+        "references/report-guide.md",
+        "scripts/check_screening.py"
+      ],
+      "zip": "/downloads/skills/ai-act-use-case-screening.zip",
+      "zipBytes": 97930,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/ai-act-use-case-screening",
       "guideUrl": null
     },
     {
@@ -197,7 +225,7 @@
         "references/parser-selection.md"
       ],
       "zip": "/downloads/skills/parsing-documents.zip",
-      "zipBytes": 19058,
+      "zipBytes": 20803,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/parsing-documents",
       "guideUrl": null
     },
@@ -221,7 +249,7 @@
         "references/measuring-extraction.md"
       ],
       "zip": "/downloads/skills/extracting-structured-data.zip",
-      "zipBytes": 22939,
+      "zipBytes": 24072,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/extracting-structured-data",
       "guideUrl": null
     },
@@ -247,7 +275,7 @@
         "references/postgres-without-gaik.md"
       ],
       "zip": "/downloads/skills/searching-documents.zip",
-      "zipBytes": 42379,
+      "zipBytes": 42415,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents",
       "guideUrl": null
     },
@@ -278,7 +306,7 @@
         "scripts/template_to_spec.py"
       ],
       "zip": "/downloads/skills/generate-structured-reports.zip",
-      "zipBytes": 174123,
+      "zipBytes": 182947,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports",
       "guideUrl": null
     }
@@ -325,7 +353,7 @@
       "then": "Paste your transcript in the next message.",
       "variants": [
         {
-          "label": "Työmaapäiväkirja",
+          "label": "Finnish",
           "file": "prompt.txt",
           "text": "You are an information-extraction assistant for an official Työmaapäiväkirja (daily construction site diary) used in construction projects.\nINPUT:\nYou will be given a transcript of an audio recording made by a construction site supervisor who verbally describes the day's events on the worksite.\nTASK:\nExtract ONLY the fields needed to fill the construction site diary below. Use ONLY information explicitly stated in the transcript. Do NOT infer, assume, guess, or add details.\nCRITICAL ANTI-HALLUCINATION RULES (mandatory):\n•\tUse ONLY information explicitly present in the transcript.\n•\tIf a field is not mentioned, output an empty string \"\".\n•\tKeep every extracted value as brief as possible (a few keywords). No long sentences.\n•\tDo NOT rewrite numbers into words. Keep numbers as digits.\n•\tIf the transcript contains conflicting details, choose the most explicit/latest mention. If still uncertain, output \"\".\n•\tFor fixed-option fields, output ONLY one of the allowed options exactly as written. If not explicitly matchable, output \"\".\n•\tOutput MUST be valid JSON and MUST contain ONLY the JSON (no explanations, no extra text).\nNORMALIZATION RULES:\n•\tDate: output \"dd.mm.yyyy\". If year is not mentioned, output \"dd.mm\" (zero-pad day/month: 5.4 → 05.04).\n•\tPersonnel format: Työnjohtajat: N hlö, Työntekijät: N hlö, Alihankkijat: N hlö, Yhteensä: N hlö. Output 0 for those with no information.\n•\tWeek number: integer only. If not mentioned, output \"\".\n•\tKeep all free-text values extremely short — tight keywords only.\nFIELDS TO EXTRACT (with fixed options where applicable):\n1. Kohde [Address or subject of the diary. Do not write numbers in words. Example format: 12345-00 Streetname 6, 00100 City]\n2. Laatija [Name of the author recording the diary]\n3. Sää [Weather: e.g., 3 °C, 2 m/s, 78 % suht. kosteus, Kp: -1.4 C]\n4. Päivämäärä [Format: dd.mm.yyyy. If no year, return dd.mm, e.g., 20.5 → 20.05]\n5. Resurssit - Henkilöstö [Format: Työnjohtajat: N hlö, Työntekijät: N hlö, Alihankkijat: N hlö, Yhteensä: N hlö. Output 0 for those with no information.]\n6. Työviikko [Week number as integer, e.g., 12. If not mentioned, return \"\"]\n7. Päivän työt [List all tasks of today, including completed, partially completed, ongoing, and newly started work.]\n8. Päivän tapahtumat [Any explicitly mentioned unusual or unplanned event (ONLY tight keywords). If none, return \"Ei tapahtumia\"]\n9. Liitteet [Number and type of attachments, e.g., 4 photos, 1 email attachment. If none, return \"\"]\n10. Valvojan huomiot [Supervisor's general notes about the day (ONLY tight keywords); only if explicitly mentioned]\n11. Päivän poikkeamat [Any issues or deviations in work (ONLY tight keywords), e.g., delay, damage, unplanned finding; only if mentioned]\n12. Aloitetut työvaiheet [CHOOSE FROM this list or return \"\" if no match: Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus, pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi, timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus]\n13. Käynnissä olevat työvai [CHOOSE FROM this list or return \"\" if no match: Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus, pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi, timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus]\n14. Päättyneet työvai [CHOOSE FROM this list or return \"\" if no match: Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus, pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi, timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus]\n15. Keskeytyneet työvai [CHOOSE FROM this list or return \"\" if no match: Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus, pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi, timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus]\n16. Pyydetyt lisäajat [Requested additional time or extension (ONLY tight keywords); only if mentioned]\n17. Tehdyt katselmukset [Inspections carried out (ONLY tight keywords); only if mentioned]\n18. Valvojan huomautukset [Supervisor remarks (ONLY tight keywords); only if mentioned]\n19. Valvojan allekirjoitus [If explicitly stated; otherwise \"\"]\n20. Vastaavan allekirjoitus [If explicitly stated; otherwise \"\"]\nOUTPUT (STRICT JSON):\nReturn ONLY this JSON object with keys in this exact order:\n{\n\"kohde\": \"\",\n\"laatija\": \"\",\n\"saa\": \"\",\n\"paivamaara\": \"\",\n\"resurssit_henkilosto\": \"\",\n\"tyoviikko\": \"\",\n\"paivan_tyot\": \"\",\n\"paivan_tapahtumat\": \"\",\n\"liitteet\": \"\",\n\"valvojan_huomiot\": \"\",\n\"paivan_poikkeamat\": \"\",\n\"aloitetut_tyovaiheet\": \"\",\n\"kaynnissa_olevat_tyovaiheet\": \"\",\n\"paattyneet_tyovaiheet\": \"\",\n\"keskeytyneet_tyovaiheet\": \"\",\n\"pyydetyt_lisaajat\": \"\",\n\"tehdyt_katselmukset\": \"\",\n\"valvojan_huomautukset\": \"\",\n\"valvojan_allekirjoitus\": \"\",\n\"vastaavan_allekirjoitus\": \"\"\n}\nEXTRACTION GUIDANCE (what counts as explicit):\n•\tOnly set a fixed-option work phase field if the transcript explicitly mentions that phase (or unambiguously describes it). Otherwise \"\".\n•\tIf the speaker does not mention the week number, do not guess it from the date.\n•\tIf the speaker does not mention weather, leave the saa field blank.\n•\tPersonnel totals must be stated or directly calculable from mentioned numbers — do not estimate.\nOUTPUT FORMAT (MANDATORY):\n1.\tFirst, produce a valid JSON object exactly as specified above.\n2.\tThen, present the same JSON content as a 2-column table where:\no\tColumn 1 = JSON key\no\tColumn 2 = extracted value\n3.\tDo not add, remove, rename, or reorder any fields.\n4.\tDo not include explanations or any extra text outside the table.\n5.\tThe table must be a direct visual representation of the JSON values.\nFINAL CHECK BEFORE ANSWERING:\n•\tEnsure JSON is valid and contains all 20 keys in the exact order.\n•\tEnsure every value is either a short extracted string, an allowed fixed-option value, or \"\".\n•\tEnsure work phase fields contain only values from the allowed list or \"\"."
         },

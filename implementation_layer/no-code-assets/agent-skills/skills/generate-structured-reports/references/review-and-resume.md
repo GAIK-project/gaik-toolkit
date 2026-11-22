@@ -17,9 +17,9 @@ report-runs/<name>/
 
 Never put an input in the workspace's stage folders (`normalized/`, `knowledge/`,
 `report/`, `diagnostics/`) or at `workspace/sample_report.md`: the stages delete or overwrite
-them. Every command that writes refuses a source, sample report or spec found there, and a
-stage folder that is a link or junction to somewhere else: the stage would delete what it
-points to.
+them. Every stage command, and `apply-spec`, `rebuild` and `update-sample`, refuses a source,
+sample report or spec found there, and a stage folder that is a link or junction to somewhere
+else: the stage would delete what it points to.
 
 Diagnostics stay out of `workspace/knowledge/`: `KnowledgeBase.load()` reads every JSON file
 in that folder as a section's knowledge. The workspace holds the user's content; it never goes
@@ -34,7 +34,7 @@ and use it only when the user's request covers that.
 | File | Holds | Why the helper keeps it |
 |---|---|---|
 | `normalization.json` | Each source's converter, class and text length; usage of transcription and vision; every `update-sample` | Usage is not saved by gaik |
-| `curation.json` | Per section: fact count, missing items, resolved and unresolved conflicts; the **dropped** facts and why; usage | `dropped` and usage are lost once the knowledge is saved |
+| `curation.json` | Per section: fact count, missing items, unresolved conflicts, and resolved ones with the units they follow and drop; the **dropped** facts and why; usage | `dropped` and usage are lost once the knowledge is saved |
 | `synthesis.json` | Usage; `(missing: …)` count; applied and unresolved reviewer edits; the Word export as `ok`, `off` or `failed` | Usage is lost if export fails inside synthesis |
 | `run_record.json` | What each stage was built from (below) | To tell a current report from a stale one |
 
@@ -74,8 +74,10 @@ A section's knowledge file looks like this:
 
 - To fix a fact, edit its `summary`, or delete the unit. A `quote` must stay a verbatim passage
   of the cited source.
-- To resolve a conflict, set its `status` to `resolved` and say why in `description`, or delete
-  one of its units.
+- To resolve a conflict, set its `status` to `resolved`, list the units the report follows in
+  `preferred_unit_ids` and put who decided in `resolved_by` (for example `"user"`), or delete one
+  of its units. A `resolved` conflict whose `preferred_unit_ids` is empty, or names a unit that is
+  not in its `unit_ids`, is read as unresolved and the report gives both sides.
 - A new fact the user supplies goes into a **new source file** (for example
   `inputs/clarifications_by_user.txt`) added to the spec; then normalize and curate again. Do not
   type it into a knowledge file: it would have no source to verify.

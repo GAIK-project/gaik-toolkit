@@ -8,7 +8,14 @@ from typing import Any
 import litellm
 from pydantic import BaseModel
 
-from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
+from gaik.software_components.endpoints import check_endpoint, log_endpoint
+from gaik.software_components.llm.base import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_TIMEOUT_SECONDS,
+    ChatMessage,
+    ChatResponse,
+    UsageCounter,
+)
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 
@@ -26,6 +33,16 @@ class LiteLLMProvider:
         if not self.model or "/" not in self.model:
             raise ValueError("LiteLLM requires a provider-prefixed model, e.g. azure/gpt-6-luna")
         self.embedding_model = config.get("embedding_model", "")
+        if config.get("base_url"):
+            host = check_endpoint(
+                config["base_url"],
+                provider="litellm",
+                allowed_hosts=config.get("allowed_endpoint_hosts"),
+                what="base_url",
+            )
+        else:
+            host = f"default for {self.model.split('/', 1)[0]}"
+        log_endpoint("litellm", host)
         self._config = dict(config)
         self.raw = litellm
         self.usage = UsageCounter()
@@ -44,6 +61,8 @@ class LiteLLMProvider:
         ):
             if self._config.get(source) is not None:
                 options[target] = self._config[source]
+        options.setdefault("timeout", DEFAULT_TIMEOUT_SECONDS)
+        options.setdefault("num_retries", DEFAULT_MAX_RETRIES)
         options.update(kwargs)
         if chat:
             model = options.get("model", self.model)

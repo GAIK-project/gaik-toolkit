@@ -4,6 +4,7 @@ import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import { useVisionModels } from "@/components/demo/vision-settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
   CardContent,
@@ -16,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { BookOpen, Loader2, Users } from "lucide-react";
+import { BookOpen, Users } from "lucide-react";
 import posthog from "posthog-js";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -79,7 +80,8 @@ export function PanelTab() {
   const [expected, setExpected] = useState("");
   const [extracted, setExtracted] = useState("");
   const [fieldName, setFieldName] = useState("");
-  const { isLoading, result, setResult, run } = useJudgeSubmit<PanelResult>();
+  const { isLoading, result, setResult, run, stop } =
+    useJudgeSubmit<PanelResult>();
 
   const example = PAIR_EXAMPLES.find((entry) => entry.id === exampleId) ?? null;
 
@@ -240,29 +242,18 @@ export function PanelTab() {
                 disabled={isLoading}
               />
             </div>
-            <Button
-              onClick={handleSubmit}
+            <RunButton
+              running={isLoading}
+              onRun={handleSubmit}
+              onStop={stop}
+              icon={Users}
               disabled={
-                isLoading ||
-                judges.length < 2 ||
-                !expected.trim() ||
-                !extracted.trim()
+                judges.length < 2 || !expected.trim() || !extracted.trim()
               }
               className="w-full"
-              size="lg"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running the panel…
-                </>
-              ) : (
-                <>
-                  <Users className="mr-2 h-4 w-4" />
-                  Run the judge panel
-                </>
-              )}
-            </Button>
+              Run the judge panel
+            </RunButton>
           </CardContent>
         </Card>
 

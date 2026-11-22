@@ -8,6 +8,7 @@ by copying the Markdown, except in the one test that needs the real binary.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from types import SimpleNamespace
@@ -29,6 +30,7 @@ from gaik.software_modules.report_writer import (
     ReportWriter,
     RunSettings,
     SectionSpec,
+    SourcePathError,
     StepOptions,
 )
 
@@ -112,8 +114,22 @@ def rec(monkeypatch):
         def __init__(self, config, model=None, **kwargs):
             log("KnowledgeCurator", config=config, model=model, **kwargs)
 
-        def curate(self, sources, sections, *, instructions="", progress_callback=None):
-            log("curate", sources=sources, sections=sections, instructions=instructions)
+        def curate(
+            self,
+            sources,
+            sections,
+            *,
+            instructions="",
+            source_precedence=None,
+            progress_callback=None,
+        ):
+            log(
+                "curate",
+                sources=sources,
+                sections=sections,
+                instructions=instructions,
+                source_precedence=source_precedence,
+            )
             return KnowledgeBase(
                 sections=[
                     SectionKnowledge(
@@ -188,6 +204,80 @@ def test_spec_round_trip(tmp_path):
         ReportSpec.load(path)
 
 
+def _write_spec(folder: Path, sources: list[str], sample: str | None = None) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    data = json.loads(make_spec(folder).model_dump_json())
+    data["sources"] = {"primary": sources}
+    data["sample_report"] = sample
+    path = folder / "report_spec.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def test_spec_load_reads_sources_in_nested_folders(tmp_path):
+    path = _write_spec(tmp_path, ["inputs/site/day1/notes.txt"], "templates/old/sample.docx")
+
+    spec = ReportSpec.load(path)
+
+    root = tmp_path.resolve()
+    assert spec.sources == {"primary": [root / "inputs" / "site" / "day1" / "notes.txt"]}
+    assert spec.sample_report == root / "templates" / "old" / "sample.docx"
+
+
+@pytest.mark.parametrize(
+    ("sources", "sample", "message"),
+    [
+        (["/etc/hosts"], None, "absolute path"),
+        (["inputs/notes.txt"], "/etc/hosts", "absolute path"),
+        (["../secret.txt"], None, "outside the folder"),
+        (["inputs/../../secret.txt"], None, "outside the folder"),
+        (["inputs/notes.txt"], "../secret.docx", "outside the folder"),
+    ],
+)
+def test_spec_load_refuses_a_path_outside_the_spec_folder(tmp_path, sources, sample, message):
+    path = _write_spec(tmp_path / "project", sources, sample)
+
+    with pytest.raises(SourcePathError, match=message):
+        ReportSpec.load(path)
+
+
+def test_spec_load_refuses_a_source_linked_out_of_the_spec_folder(tmp_path, symlink):
+    (tmp_path / "secret.txt").write_text("Outside the folder.", encoding="utf-8")
+    path = _write_spec(tmp_path / "project", ["inputs/notes.txt"])
+    (tmp_path / "project" / "inputs").mkdir()
+    symlink(tmp_path / "project" / "inputs" / "notes.txt", tmp_path / "secret.txt")
+
+    with pytest.raises(SourcePathError, match="outside the folder"):
+        ReportSpec.load(path)
+
+
+def test_spec_load_with_a_wider_root_reads_files_beside_the_spec_folder(tmp_path):
+    path = _write_spec(tmp_path / "runs" / "one", ["../../inputs/notes.txt"])
+
+    with pytest.raises(SourcePathError):
+        ReportSpec.load(path)
+    spec = ReportSpec.load(path, root=tmp_path)
+
+    assert spec.sources["primary"][0].resolve() == (tmp_path / "inputs" / "notes.txt").resolve()
+    with pytest.raises(SourcePathError):
+        ReportSpec.load(path, root=tmp_path / "runs")
+
+
+def test_spec_save_keeps_a_linked_source_by_its_own_name(tmp_path, symlink):
+    (tmp_path / "shared").mkdir()
+    (tmp_path / "shared" / "budget.csv").write_text("a,b\n", encoding="utf-8")
+    path = _write_spec(tmp_path / "project", ["inputs/budget.csv"])
+    (tmp_path / "project" / "inputs").mkdir()
+    symlink(tmp_path / "project" / "inputs" / "budget.csv", tmp_path / "shared" / "budget.csv")
+
+    spec = ReportSpec.load(path, root=tmp_path)
+    spec.save(path)
+
+    assert json.loads(path.read_text(encoding="utf-8"))["sources"] == {
+        "primary": ["inputs/budget.csv"]
+    }
+
+
 def test_spec_without_sources_raises(tmp_path):
     data = make_spec(tmp_path).model_dump()
     data["sources"] = {"primary": []}
@@ -213,6 +303,7 @@ def test_normalize(tmp_path, rec):
         "vision_model": "vision-m",
         "transcription_model": "stt-m",
         "language": "auto",
+        "limits": None,  # the normalizer's own defaults
     }
     assert sources.usage == {"prompt_tokens": 5}  # the sources and the sample report
     assert rec.args("normalize")["sources"] == spec.sources
@@ -251,6 +342,7 @@ def test_curate(tmp_path, rec):
     assert args["sources"] == NormalizedSources.load(workspace / "normalized")
     assert args["sections"] == spec.sections
     assert args["instructions"] == "Site notes outrank documents."
+    assert args["source_precedence"] == []
     assert [p.name for p in (workspace / "knowledge").iterdir()] == ["roof.json"]
     assert KnowledgeBase.load(workspace / "knowledge") == knowledge
 
@@ -415,9 +507,17 @@ def test_run_single_call(tmp_path, rec):
     assert rec.args("create_llm_client")["config"] == {**CONFIG, "model": "wr-m"}
     assert rec.args("chat")["reasoning_effort"] == "low"
     user = rec.args("chat")["messages"][1]["content"]
+    assert re.search(
+        r'Source notes\.txt \(class: primary\):\n<source_material id="\w+" label="notes\.txt">\n'
+        r'Text of notes\.txt\.\n</source_material id="\w+">',
+        user,
+    )
+    assert re.search(
+        r"Source old_report\.pdf \(class: secondary\):\n"
+        r'<source_material id="\w+" label="old_report\.pdf">\nText of old_report\.pdf\.\n',
+        user,
+    )
     for part in (
-        '<source file="notes.txt" class="primary">\nText of notes.txt.\n</source>',
-        '<source file="old_report.pdf" class="secondary">\nText of old_report.pdf.\n</source>',
         SAMPLE_TEXT,
         "1. Heading: Roof\n   Content to cover: Describe the roof.\n   Required items:\n   - age",
         "Site notes outrank documents.",
@@ -513,3 +613,54 @@ def test_single_call_prompt_follows_the_citations_setting(tmp_path, rec):
         system = rec.args("chat")["messages"][0]["content"]
         assert ("cite the file and the place" in system) is citations
         assert ("do not cite sources" in system) is (not citations)
+
+
+def test_the_spec_passes_its_source_precedence_to_the_curator(tmp_path, rec):
+    spec = make_spec(tmp_path).model_copy(update={"source_precedence": ["primary", "secondary"]})
+    workspace = tmp_path / "workspace"
+    writer = ReportWriter(CONFIG)
+    writer.normalize(spec, workspace)
+
+    writer.curate(spec, workspace)
+
+    assert rec.args("curate")["source_precedence"] == ["primary", "secondary"]
+
+
+@pytest.mark.parametrize(
+    ("precedence", "message"),
+    [(["primary", "notes"], "cannot have: \\['notes'\\]"), (["primary"] * 2, "more than once")],
+)
+def test_the_spec_refuses_a_source_precedence_it_cannot_use(tmp_path, precedence, message):
+    data = make_spec(tmp_path).model_dump()
+    data["source_precedence"] = precedence
+
+    with pytest.raises(ValueError, match=message):
+        ReportSpec.model_validate(data)
+
+
+def test_the_docs_name_a_release_after_0_11_1_for_source_precedence():
+    """gaik 0.11.1 is released without source_precedence and refuses it: a text that says
+    "newer than 0.11.0" sends an agent on 0.11.1 into a ValidationError or TypeError."""
+    root = Path(__file__).resolve().parents[1]
+    cards = json.loads(
+        (root / "solution_wizard" / "registries" / "component_reference_cards.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    reference = (
+        root
+        / "no-code-assets/agent-skills/skills/generate-structured-reports/references/report-spec.md"
+    ).read_text(encoding="utf-8")
+    texts = [reference] + [
+        json.dumps(cards[name], ensure_ascii=False) for name in ("ReportWriter", "KnowledgeCurator")
+    ]
+
+    for text in texts:
+        assert "source_precedence" in text
+        assert "newer than 0.11.0" not in text and "on 0.11.0 leave" not in text
+        assert "a release after 0.11.1" in text
+
+
+def test_run_settings_review_strictly_by_default():
+    assert RunSettings().strict_review is True
+    assert RunSettings(strict_review=False).strict_review is False

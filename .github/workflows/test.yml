@@ -9,6 +9,8 @@ on:
       - 'src/**'
       - 'implementation_layer/**'
       - '.claude-plugin/**'
+      - '.claude/skills/gaik-sync/**'
+      - '.claude/skills/component-check/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
       - '.github/workflows/test.yml'
@@ -23,6 +25,8 @@ on:
       - 'src/**'
       - 'implementation_layer/**'
       - '.claude-plugin/**'
+      - '.claude/skills/gaik-sync/**'
+      - '.claude/skills/component-check/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
       - '.github/workflows/test.yml'
@@ -68,13 +72,15 @@ on:
       ANTHROPIC_FOUNDRY_API_KEY:
         required: false
 
-# No job writes to the repository.
-permissions:
-  contents: read
+# Nothing is granted by default; each job asks for what it needs, and no job
+# writes to the repository.
+permissions: {}
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         # PRs: only Python 3.11 for fast feedback
@@ -112,7 +118,7 @@ jobs:
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
     - name: Install package
-      run: uv pip install --system ".[all,dev,llm-all]"
+      run: uv pip install --system ".[all,dev,llm-all,wizard]"
 
     # The Word export tests (test_report_writer.py, test_report_synthesizer.py) skip without Pandoc.
     - name: Install Pandoc
@@ -136,11 +142,24 @@ jobs:
         GAIK_TEST_PG_URL: postgresql://postgres:postgres@localhost:5432/postgres
       run: pytest -m "not llm" --strict-markers
 
+    # The Solution Wizard's tests are outside `testpaths` and share a file name with
+    # unit_tests/ (test_source_tracing.py), so they run in a pytest session of their own.
+    # ReportLab is what a generated PoC installs for its PDF report (scaffolder.py); no
+    # gaik extra brings it, and without it test_pdf_report.py skips as a whole. The wizard
+    # extra (claude-agent-sdk) above lets the interactive runner's tool guard and its SDK
+    # contract tests run here too.
+    - name: Run Solution Wizard tests
+      run: |
+        uv pip install --system "reportlab>=4.0"
+        pytest implementation_layer/solution_wizard/tests -m "not llm" --strict-markers -q
+
   # The demo app's API tests, in the demo's own environment with this
   # repository's gaik installed editable. Not in the release gate or the
   # nightly run: the deployed demo installs gaik from PyPI.
   demo-api-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event_name != 'schedule' && !inputs.release_gate
     defaults:
       run:
@@ -164,6 +183,8 @@ jobs:
   # fail the job; lint errors do. Not in the release gate or the nightly run.
   demo-frontend-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event_name != 'schedule' && !inputs.release_gate
     defaults:
       run:
@@ -198,6 +219,8 @@ jobs:
   # (`gh workflow run test.yml`), so a failure here points at the deployment.
   llm-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
     - name: Checkout code
@@ -245,6 +268,8 @@ jobs:
   release-validation:
     if: inputs.release_gate == true
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     environment: release
     timeout-minutes: 60
     steps:
@@ -308,11 +333,36 @@ jobs:
         case "$RELEASE_REF" in refs/tags/v*) ;; *) echo 'Release certification requires a version tag'; exit 1;; esac
         uv run python scripts/release_check.py --live --require-provider azure --version "${RELEASE_VERSION#v}"
 
+    # The tag must also pass the component check (.claude/skills/component-check): the
+    # schema generator, extractor, vision extractor, RAG, tabular agent and vision parser
+    # on synthetic invoices, on Azure.
+    # --public keeps provider error text out of the published summary.
+    - name: Component check on Azure
+      timeout-minutes: 20
+      env:
+        RUN_DIR: ${{ runner.temp }}/component-check
+        RELEASE_AZURE_MODEL: ${{ vars.RELEASE_AZURE_MODEL || 'gpt-6-luna' }}
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+        AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
+      run: |
+        set -uo pipefail
+        status=0
+        uv run python .claude/skills/component-check/run_checks.py \
+          --providers azure --require-all --public --provider-timeout 600 --attempts 2 \
+          --out "$RUN_DIR" || status=1
+        if [ -f "$RUN_DIR/summary.md" ]; then
+          cat "$RUN_DIR/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        fi
+        exit "$status"
+
     - name: Upload sanitized certification report
       if: always()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: release-certification-${{ github.sha }}
-        path: results/release-check.json
+        path: |
+          results/release-check.json
+          ${{ runner.temp }}/component-check/
         if-no-files-found: error
         retention-days: 90

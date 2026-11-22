@@ -93,6 +93,7 @@ def test_explicit_non_azure_provider_uses_configured_endpoint(monkeypatch, provi
             "model": "vision-model",
             "api_key": "test",
             "base_url": "https://inference.example.test/v1",
+            "allowed_endpoint_hosts": "inference.example.test",
             "timeout": 300.0,
             "max_retries": 0,
             "http_client": http_client,
@@ -190,7 +191,7 @@ def test_native_provider_uses_shared_client_for_image_and_cleanup(monkeypatch, p
     assert parser._clean_markdown(["first", "second"]) == "parsed"
     assert configs == [config]
     assert client.calls[0][0][0]["content"][1]["type"] == "image_url"
-    assert "first" in client.calls[1][0][0]["content"]
+    assert "first" in client.calls[1][0][-1]["content"]
     assert client.calls[0][1]["max_tokens"] == 16000
     assert parser.usage.snapshot() == {"prompt_tokens": 6}
 
@@ -207,7 +208,7 @@ def test_gpt6_raw_vision_omits_default_sampling(monkeypatch):
 def test_jpeg_image_uses_matching_media_type(monkeypatch, tmp_path):
     parser, completions = _parser(monkeypatch, temperature=None, reasoning_effort=None)
     path = tmp_path / "picture.jpg"
-    path.write_bytes(b"synthetic-jpeg")
+    path.write_bytes(b"\xff\xd8\xffsynthetic")
     assert parser.convert_image(path) == "parsed markdown"
     image = completions.kwargs["messages"][0]["content"][1]["image_url"]["url"]
     assert image.startswith("data:image/jpeg;base64,")
@@ -220,7 +221,7 @@ def test_webp_image_is_accepted_without_platform_mapping(monkeypatch, tmp_path):
     monkeypatch.setattr(mimetypes, "guess_type", lambda *args, **kwargs: (None, None))
     parser, completions = _parser(monkeypatch, temperature=None, reasoning_effort=None)
     path = tmp_path / "picture.webp"
-    path.write_bytes(b"synthetic-webp")
+    path.write_bytes(b"RIFF\x10\x00\x00\x00WEBPsynthetic")
     assert parser.convert_image(path) == "parsed markdown"
     image = completions.kwargs["messages"][0]["content"][1]["image_url"]["url"]
     assert image.startswith("data:image/webp;base64,")
@@ -229,7 +230,7 @@ def test_webp_image_is_accepted_without_platform_mapping(monkeypatch, tmp_path):
 def test_image_without_suffix_is_sent_as_png_and_non_images_fail(monkeypatch, tmp_path):
     parser, completions = _parser(monkeypatch, temperature=None, reasoning_effort=None)
     upload = tmp_path / "upload"
-    upload.write_bytes(b"synthetic-png")
+    upload.write_bytes(b"\x89PNG\r\n\x1a\nsynthetic")
     assert parser.convert_image(upload) == "parsed markdown"
     image = completions.kwargs["messages"][0]["content"][1]["image_url"]["url"]
     assert image.startswith("data:image/png;base64,")

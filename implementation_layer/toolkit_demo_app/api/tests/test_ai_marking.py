@@ -47,6 +47,7 @@ def test_the_marked_routes():
         "/dental-transcribe/srt/j1",
         "/dental-transcribe/vtt/j1",
         "/wizard/download/s1",
+        "/wizard/files/s1/poc/run_poc.py",
         "/text-to-speech",
     ]
     assert all(ai_marking.is_generated_download(p) for p in marked)

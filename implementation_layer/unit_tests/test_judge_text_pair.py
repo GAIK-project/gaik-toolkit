@@ -71,15 +71,15 @@ def test_build_text_pair_prompt_includes_field_name_when_given():
         field_name="MyField",
     )
     assert "Field: MyField" in prompt
-    assert "'foo'" in prompt
-    assert "'bar'" in prompt
+    assert 'label="answer">\nfoo\n' in prompt
+    assert 'label="reference">\nbar\n' in prompt
 
 
 def test_build_text_pair_prompt_omits_field_when_none():
     prompt = build_text_pair_prompt(extracted_text="a", expected_text="b")
     assert "Field:" not in prompt
-    assert "'a'" in prompt
-    assert "'b'" in prompt
+    assert 'label="answer">\na\n' in prompt
+    assert 'label="reference">\nb\n' in prompt
 
 
 def test_text_pair_system_prompt_mentions_severity_levels():

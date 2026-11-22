@@ -4,7 +4,7 @@ Reusable pipeline to parse documents (PDF/images/DOCX) and extract structured da
 
 from __future__ import annotations
 
-import importlib.util
+import inspect
 import io
 import json
 from contextlib import redirect_stdout
@@ -19,7 +19,12 @@ from gaik.software_components.extractor import (
     ExtractionRequirements,
     SchemaGenerator,
 )
+from gaik.software_components.extractor.saved_schema import (
+    load_saved_model,
+    save_model_file,
+)
 from gaik.software_components.extractor.schema import print_pydantic_schema
+from gaik.software_modules._options import EXTRACT_SET_BY_MODULE, checked_options
 
 # Optional parsers
 try:
@@ -31,6 +36,16 @@ try:
     )
 except ImportError:  # pragma: no cover - optional deps
     VisionParser = DoclingParser = PyMuPDFParser = DocxParser = None  # type: ignore
+
+
+# The method each parser_choice reads the document with: the option check validates
+# parse_options against it and _parse_document calls it, so the two cannot differ.
+_PARSE_METHOD = {
+    "vision_parser": "convert_pdf",
+    "docling": "parse_document",
+    "pymupdf": "parse_pdf",
+    "docx": "parse_document",
+}
 
 
 @dataclass
@@ -117,15 +132,41 @@ class DocumentsToStructuredData:
             extractor_ctor: Constructor kwargs for DataExtractor (e.g., model override).
             extract_options: Call-time kwargs for DataExtractor.extract().
             schema/requirements: Optional prebuilt schema and requirements to reuse.
+
+        Every option name must be a parameter of the component it goes to.
+        Stage configs (``config``, ``api_config``, ``openai_config``) come from
+        the constructor and are refused here; a :class:`ValueError` is raised
+        before anything is parsed.
         """
-        parser_ctor = parser_ctor or {}
-        parse_options = parse_options or {}
+        parser_class = self._parser_class(parser_choice)
+        parser_ctor = checked_options(parser_ctor, parser_class, what="parser_ctor")
+        parse_method = getattr(parser_class, _PARSE_METHOD[parser_choice.lower()], None)
+        path_parameter = (
+            next(
+                (name for name in inspect.signature(parse_method).parameters if name != "self"),
+                None,
+            )
+            if parse_method is not None
+            else None
+        )
+        parse_options = checked_options(
+            parse_options,
+            parse_method,
+            what="parse_options",
+            set_by_module=(path_parameter,) if path_parameter else (),
+        )
+        extractor_ctor = checked_options(extractor_ctor, DataExtractor, what="extractor_ctor")
+        extract_options = checked_options(
+            extract_options,
+            getattr(DataExtractor, "extract", None),
+            what="extract_options",
+            set_by_module=EXTRACT_SET_BY_MODULE,
+        )
 
         parser = self._build_parser(parser_choice, parser_ctor)
         parsed_documents = self._parse_document(parser_choice, parser, file_path, parse_options)
 
-        extractor_ctor = dict(extractor_ctor or {})
-        extractor_cfg = dict(extractor_ctor.pop("config", self.extraction_config))
+        extractor_cfg = dict(self.extraction_config)
         model_override = extractor_ctor.get("model")
         if model_override:
             extractor_cfg["model"] = model_override
@@ -162,13 +203,27 @@ class DocumentsToStructuredData:
     # ------------------------------------------------------------------
     # Parser helpers
     # ------------------------------------------------------------------
+    @staticmethod
+    def _parser_class(parser_choice: str):
+        choice = parser_choice.lower()
+        if choice not in _PARSE_METHOD:
+            raise ValueError(f"Unsupported parser_choice: {parser_choice}")
+        parser_class = {
+            "vision_parser": VisionParser,
+            "docling": DoclingParser,
+            "pymupdf": PyMuPDFParser,
+            "docx": DocxParser,
+        }[choice]
+        if parser_class is None:
+            raise ImportError(f"{choice} is not available. Install its parser extras.")
+        return parser_class
+
     def _build_parser(self, parser_choice: str, ctor: dict):
         choice = parser_choice.lower()
         if choice == "vision_parser":
             if VisionParser is None:
                 raise ImportError("VisionParser not available. Install vision parser extras.")
-            options = {"openai_config": self.parser_config, **ctor}
-            return VisionParser(**options)
+            return VisionParser(openai_config=self.parser_config, **ctor)
         if choice == "docling":
             if DoclingParser is None:
                 raise ImportError("DoclingParser not available. Install docling extras.")
@@ -187,19 +242,14 @@ class DocumentsToStructuredData:
         self, parser_choice: str, parser, file_path: str | Path, parse_options: dict
     ) -> list[str]:
         choice = parser_choice.lower()
+        if choice not in _PARSE_METHOD:
+            raise ValueError(f"Unsupported parser_choice: {parser_choice}")
+        result = getattr(parser, _PARSE_METHOD[choice])(str(file_path), **parse_options)
         if choice == "vision_parser":
-            pages = parser.convert_pdf(str(file_path), **parse_options)
-            return pages if isinstance(pages, list) else [pages]
-        if choice == "docling":
-            parsed = parser.parse_document(str(file_path), **parse_options)
-            return [_text_of(parsed)]
+            return result if isinstance(result, list) else [result]
         if choice == "pymupdf":
-            text = parser.parse_pdf(str(file_path), **parse_options)
-            return [text]
-        if choice == "docx":
-            parsed = parser.parse_document(str(file_path), **parse_options)
-            return [_text_of(parsed)]
-        raise ValueError(f"Unsupported parser_choice: {parser_choice}")
+            return [result]
+        return [_text_of(result)]
 
     # ------------------------------------------------------------------
     # Schema save/load helpers
@@ -246,7 +296,11 @@ from pydantic import BaseModel, Field, ConfigDict
 
 {schema_code}
 '''
+        # The .py file is for people to read; load_schema reads the model file.
         schema_path.write_text(template, encoding="utf-8")
+        # A model that cannot be saved as data removes an older model file, so
+        # load_schema rebuilds from the requirements written below instead.
+        save_model_file(schema, schema_dir / f"{stem}_model.json")
 
         payload = {
             "model_name": schema.__name__,
@@ -258,9 +312,12 @@ from pydantic import BaseModel, Field, ConfigDict
         self, schema_dir: Path, schema_name: str
     ) -> tuple[type, ExtractionRequirements | CompositeExtractionRequirements] | None:
         stem = _schema_file_stem(schema_name)
-        schema_path = schema_dir / f"{stem}.py"
+        model_path = schema_dir / f"{stem}_model.json"
         req_path = schema_dir / f"{stem}_requirements.json"
-        if not (schema_path.exists() and req_path.exists()):
+        # A folder from an older gaik has <stem>.py but no model file; it is
+        # rebuilt from the requirements where they determine the model.
+        has_model = model_path.exists() or (schema_dir / f"{stem}.py").exists()
+        if not (has_model and req_path.exists()):
             return None
 
         data = json.loads(req_path.read_text(encoding="utf-8"))
@@ -275,9 +332,5 @@ from pydantic import BaseModel, Field, ConfigDict
         )
         requirements = requirements_class.model_validate(requirements_data)
 
-        spec = importlib.util.spec_from_file_location(model_name, schema_path)
-        module = importlib.util.module_from_spec(spec)
-        assert spec.loader is not None
-        spec.loader.exec_module(module)  # type: ignore[attr-defined]
-        schema = getattr(module, model_name)
+        schema = load_saved_model(model_path, model_name, requirements)
         return schema, requirements

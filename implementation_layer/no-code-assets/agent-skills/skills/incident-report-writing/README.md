@@ -8,7 +8,7 @@ Transform workplace incident and safety observation audio recordings into struct
 
 This skill extracts structured information from employee or supervisor audio recordings describing incidents, near misses, safety observations, or safety initiatives. Simply provide an audio file, and Claude will:
 
-- **Transcribe** the audio recording using Whisper AI
+- **Transcribe** the audio recording with OpenAI or Azure OpenAI (`gpt-4o-transcribe` by default)
 - **Extract** 17 standardized fields for incident reporting
 - **Generate** a formatted Word document with a professional 2-column table
 - **Validate** data against predefined fixed-option lists
@@ -26,7 +26,7 @@ The skill extracts essential incident report information including:
 
 ### Supported Audio Formats
 
-`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`, `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`
+`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`, `.mp4`, `.webm` (convert `.mov`, `.avi` or `.mkv` to one of these first)
 
 ---
 
@@ -37,7 +37,7 @@ Before setting up, please install:
 1. **Claude Desktop** — Download from [claude.ai/download](https://claude.ai/download)
 2. **Python 3.11+** — Download from [python.org](https://www.python.org/downloads/)
    - During installation, check **"Add Python to PATH"**
-3. **OpenAI API Key** (REQUIRED for transcription) — Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+3. **OpenAI API key or Azure OpenAI credentials** (required for transcription) — an OpenAI key comes from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
 ---
 
@@ -50,14 +50,14 @@ Before setting up, please install:
 1. Double-click `setup.bat` in this folder
 2. Follow the prompts:
    - Choose your API provider (OpenAI or Azure OpenAI)
-   - Enter your API key
+   - Enter your API key (it is saved as your user environment variable, not in a file)
+   - Choose the folder Claude may work on, and keep your recordings there
 
 **Step 2: Configure Claude Desktop**
 
 1. The script creates `claude_desktop_config.json` — open it when prompted
-2. Copy all the content
-3. Press `Win + R`, paste: `%APPDATA%\Claude\claude_desktop_config.json`, press Enter
-4. Paste the content and save
+2. Press `Win + R`, paste: `%APPDATA%\Claude\claude_desktop_config.json`, press Enter
+3. If that file is missing or empty, paste the whole generated content. Otherwise add only the `"gaik-transcriber": {...}` entry to its existing `"mcpServers"` object, keep everything else, and save.
 
 **Step 3: Restart Claude Desktop**
 
@@ -213,7 +213,14 @@ The following fields only accept specific predefined values:
 - Restart Claude Desktop
 
 ### Audio transcription not working
-- Check your API key in `transcription-MCP\.env`
+- Check that the key is saved without showing it: in a new Command Prompt run
+  `powershell -c "[bool][Environment]::GetEnvironmentVariable('OPENAI_API_KEY','User')"`
+  (or `AZURE_API_KEY`); `False` means it is missing, so run `setup.bat` again
+- The transcriber only takes audio and video files inside the folder you chose in setup
+  (`--folder` in `claude_desktop_config.json`); move the recording there
+- The key is a user environment variable, so other programs you run can read it too; use a
+  key made for this skill, and remove it when you stop using it:
+  `reg delete HKCU\Environment /v OPENAI_API_KEY /f`
 - Verify you have OpenAI credits available
 - Test with a smaller audio file first
 
@@ -235,16 +242,21 @@ If you prefer manual configuration:
 
 **Install Dependencies:**
 ```bash
-pip install mcp==1.30.0 "gaik[transcriber]==0.9.0" python-dotenv==1.2.4
+python -m venv transcription-MCP\.venv
+transcription-MCP\.venv\Scripts\python.exe -m pip install mcp==1.30.0 "gaik[transcriber]==0.11.1" python-dotenv==1.2.4
 ```
 
 **Configure API Key:**
 
-Create `transcription-MCP\.env`:
+Save the key as a user environment variable, not in a file. Open Command Prompt and run
+(for **OpenAI**):
 ```
-OPENAI_API_KEY=your_api_key_here
-OPENAI_API_TYPE=openai
+setx OPENAI_API_KEY "your_api_key_here"
 ```
+For **Azure OpenAI**, save `AZURE_API_KEY` the same way and put the endpoint and deployment
+in the server's `env` settings below. On Windows the transcriber reads a key that is missing
+from its own environment from your user environment variables, so the key need not be in
+`claude_desktop_config.json`.
 
 **Configure Claude Desktop:**
 
@@ -253,13 +265,20 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 {
   "mcpServers": {
     "gaik-transcriber": {
-      "command": "python",
-      "args": ["C:\\path\\to\\incident-report-writing\\transcription-MCP\\server.py"],
+      "command": "C:\\path\\to\\incident-report-writing\\transcription-MCP\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\path\\to\\incident-report-writing\\transcription-MCP\\server.py",
+               "--folder", "C:\\Users\\you\\Documents\\GAIK"],
+      "env": {"OPENAI_API_TYPE": "openai"},
       "timeout": 600000
     }
   }
 }
 ```
+
+Replace `C:\\path\\to\\` with where you saved this folder, and `C:\\Users\\you\\Documents\\GAIK` with the folder that holds your recordings.
+
+For Azure OpenAI, `env` holds `"OPENAI_API_TYPE": "azure"`, `AZURE_ENDPOINT` and `AZURE_TRANSCRIPTION_MODEL` instead.
+The folder must not be a whole drive, your whole user folder or a folder that holds this one.
 
 **Install Skill:**
 1. Zip `SKILL.md`
@@ -277,14 +296,14 @@ incident-report-writing/
 ├── SKILL.md                       # Skill definition: extraction workflow & field specifications
 ├── transcription-MCP/             # Audio transcription MCP server
 │   ├── server.py                  # FastMCP server implementation
-│   └── .env                       # API credentials (created by setup.bat, never committed)
+│   └── .venv/                     # the transcriber's own Python (created by setup.bat)
 ```
 
 ### How It Works
 
 1. **MCP Server Launch** — Claude Desktop starts `transcription-MCP/server.py` as a background process
 2. **Skill Invocation** — User provides audio file path
-3. **Transcription** — MCP server calls OpenAI Whisper API to transcribe audio
+3. **Transcription** — the MCP server sends the audio to the OpenAI or Azure OpenAI transcription API (`gpt-4o-transcribe` unless `OPENAI_TRANSCRIPTION_MODEL` or `AZURE_TRANSCRIPTION_MODEL` names another)
 4. **Extraction** — Claude analyzes transcript and extracts 17 structured fields
 5. **Validation** — Fixed-option fields validated against predefined lists
 6. **Document Generation** — Word document created with 2-column table
@@ -292,8 +311,8 @@ incident-report-writing/
 
 ### Dependencies
 
-- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.9.0`, `python-dotenv==1.2.4`
-- **External APIs:** OpenAI Whisper API (for audio transcription)
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.11.1`, `python-dotenv==1.2.4`
+- **External APIs:** OpenAI or Azure OpenAI transcription (`gpt-4o-transcribe` by default)
 
 ### Anti-Hallucination Design
 
@@ -328,4 +347,4 @@ This skill is designed for:
 This skill is part of the GAIK toolkit. Built using:
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) - MCP server framework (its `FastMCP` API, `mcp` 1.x)
 - [GAIK](https://github.com/GAIK-project/gaik-toolkit) - Audio transcription library (`gaik` on PyPI)
-- OpenAI Whisper API - Speech-to-text transcription
+- OpenAI or Azure OpenAI transcription API (`gpt-4o-transcribe` by default) - Speech-to-text

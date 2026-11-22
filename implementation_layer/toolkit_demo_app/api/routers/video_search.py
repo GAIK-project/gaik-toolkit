@@ -1,16 +1,28 @@
-"""Semantic video search router - Hybrid search over transcribed video segments."""
+"""Semantic video search router - Hybrid search over transcribed video segments.
+
+Every visitor searches the same index, so the API only reads it. The index is
+seeded with ``api/scripts/seed_dental_demo.py``, which writes to the database
+directly.
+
+A video's playback and thumbnail routes hand out signed storage links. The
+proxy (``proxy.ts``) forwards them for a signed-in user only and then sets
+``x-gaik-signed-in``; a request without it gets no link.
+"""
 
 import logging
 import os
-from collections.abc import AsyncGenerator
 
 try:
-    from utils import generate_presigned_url, sse_error_response, sse_event
+    from utils import generate_presigned_url
 except ImportError:
-    from api.utils import generate_presigned_url, sse_error_response, sse_event
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+    from api.utils import generate_presigned_url
+from fastapi import APIRouter, Form, Header, HTTPException
 from pydantic import BaseModel
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +36,14 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 1536
 TABLE_NAME = "video_segments"
 FTS_LANGUAGE = "simple"
+
+# Set by the proxy, never by the browser, once it has found the user signed in.
+SIGNED_IN_HEADER = "x-gaik-signed-in"
+
+
+def _require_signed_in(signed_in: str | None) -> None:
+    if signed_in != "1":
+        raise HTTPException(status_code=401, detail="Sign in to use this feature.")
 
 
 def _get_store():
@@ -172,25 +192,33 @@ async def list_videos():
             for row in rows
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
 
 
 @router.get("/videos/{video_id}/play")
-async def get_playback_url(video_id: str):
-    """Generate a presigned Allas S3 URL for video playback."""
+async def get_playback_url(
+    video_id: str,
+    signed_in: str | None = Header(None, alias=SIGNED_IN_HEADER),
+):
+    """Generate a presigned Allas S3 URL for video playback (signed-in users)."""
+    _require_signed_in(signed_in)
     return generate_presigned_url(video_id, "video.mp4", label="video")
 
 
 @router.get("/videos/{video_id}/thumbnail")
-async def get_thumbnail_url(video_id: str):
-    """Generate a presigned Allas S3 URL for video thumbnail."""
+async def get_thumbnail_url(
+    video_id: str,
+    signed_in: str | None = Header(None, alias=SIGNED_IN_HEADER),
+):
+    """Generate a presigned Allas S3 URL for video thumbnail (signed-in users)."""
+    _require_signed_in(signed_in)
     return generate_presigned_url(video_id, "thumbnail.jpg", label="thumbnail")
 
 
 @router.post("/search", response_model=SearchResponse)
 async def search_videos(
     query: str = Form(...),
-    top_k: int = Form(10),
+    top_k: int = Form(10, ge=1, le=100),
     video_id: str = Form(None),
     search_type: str = Form("hybrid"),
 ):
@@ -198,7 +226,7 @@ async def search_videos(
     Search indexed video segments.
 
     - **query**: Natural language search query
-    - **top_k**: Maximum results (default 10)
+    - **top_k**: Maximum results, 1 to 100 (default 10)
     - **video_id**: Optional filter to search within a specific video
     - **search_type**: hybrid, semantic, or keyword
     """
@@ -252,134 +280,4 @@ async def search_videos(
             total_results=len(formatted),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.post("/ingest/stream")
-async def ingest_srt_stream(
-    file: UploadFile = File(...),
-    video_title: str = Form(...),
-    video_id: str = Form(None),
-):
-    """
-    Ingest an SRT subtitle file: parse, chunk, embed, and store segments.
-    Returns SSE progress events.
-    """
-    store = _get_store()
-    embedder = _get_embedder()
-
-    if store is None:
-        return sse_error_response("Database not configured (DATABASE_URL missing)")
-
-    if embedder is None:
-        return sse_error_response("Embedder not configured (API key missing)")
-
-    if not file.filename:
-        return sse_error_response("No filename provided")
-
-    srt_content = (await file.read()).decode("utf-8", errors="replace")
-
-    import uuid as uuid_mod
-
-    vid = video_id or uuid_mod.uuid4().hex[:12]
-
-    async def event_generator() -> AsyncGenerator[str, None]:
-        steps = [
-            {"step": 1, "name": "Parse SRT", "status": "pending"},
-            {"step": 2, "name": "Chunk Segments", "status": "pending"},
-            {"step": 3, "name": "Generate Embeddings", "status": "pending"},
-            {"step": 4, "name": "Store in Database", "status": "pending"},
-        ]
-
-        yield sse_event("steps", {"steps": steps})
-
-        try:
-            import asyncio
-
-            from gaik.software_components.transcriber.srt_utils import chunk_segments, parse_srt
-
-            # Step 1: Parse SRT
-            steps[0]["status"] = "in_progress"
-            steps[0]["message"] = "Parsing subtitle file..."
-            yield sse_event("step_update", steps[0])
-
-            segments = parse_srt(srt_content)
-
-            steps[0]["status"] = "completed"
-            steps[0]["message"] = f"Parsed {len(segments)} subtitle cues"
-            yield sse_event("step_update", steps[0])
-
-            # Step 2: Chunk
-            steps[1]["status"] = "in_progress"
-            steps[1]["message"] = "Grouping into search chunks..."
-            yield sse_event("step_update", steps[1])
-
-            chunks = chunk_segments(segments, target_seconds=45)
-
-            steps[1]["status"] = "completed"
-            steps[1]["message"] = f"Created {len(chunks)} search chunks"
-            yield sse_event("step_update", steps[1])
-
-            # Step 3: Embed
-            steps[2]["status"] = "in_progress"
-            steps[2]["message"] = f"Generating embeddings for {len(chunks)} chunks..."
-            yield sse_event("step_update", steps[2])
-
-            from gaik.software_components.RAG.pg_vector_store.video_search_helpers import (
-                ingest_video_segments,
-            )
-
-            ids = await asyncio.to_thread(
-                ingest_video_segments,
-                store,
-                embedder,
-                video_title=video_title,
-                video_id=vid,
-                segments=chunks,
-            )
-
-            steps[2]["status"] = "completed"
-            steps[2]["message"] = f"Generated {len(ids)} embeddings"
-            yield sse_event("step_update", steps[2])
-
-            # Step 4: Done (storage happened in ingest_video_segments)
-            steps[3]["status"] = "completed"
-            steps[3]["message"] = f"Stored {len(ids)} segments in database"
-            yield sse_event("step_update", steps[3])
-
-            yield sse_event(
-                "result",
-                {
-                    "video_id": vid,
-                    "video_title": video_title,
-                    "segments_stored": len(ids),
-                    "total_segments_in_db": store.count(),
-                },
-            )
-
-        except Exception as e:
-            for step in steps:
-                if step["status"] == "in_progress":
-                    step["status"] = "error"
-                    step["message"] = str(e)
-                    yield sse_event("step_update", step)
-                    break
-            yield sse_event("error", {"message": str(e)})
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-@router.delete("/clear")
-async def clear_all_segments():
-    """Clear all indexed video segments from the database."""
-    store = _get_store()
-    if store is None:
-        raise HTTPException(status_code=503, detail="Database not configured")
-
-    try:
-        conn = store._get_conn()
-        result = conn.execute(f"DELETE FROM {TABLE_NAME}")
-        conn.commit()
-        return {"deleted": result.rowcount, "message": "All segments cleared"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e

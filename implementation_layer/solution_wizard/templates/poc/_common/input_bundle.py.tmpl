@@ -1,0 +1,203 @@
+"""Find a PoC's input files the same way every time, through the case's bundle if it has one.
+
+A use case often ships its inputs as a bundle: a JSON file (``poc_input_bundle.json``)
+whose values name the input files, relative to the bundle, in subfolders
+(``input/meeting.wav``, ``poc_input/documents/``). A package that looked for its inputs
+only at the top level of ``sample_input/`` did not start at all on the customer's layout
+(UC05, 6 Oct 2026: "No input file with extensions ('.wav', ...) found"). Use this module
+instead of listing ``sample_input/`` yourself:
+
+    bundle = load_bundle(sample_dir)           # None when the case has no bundle file
+    audio = find_input(sample_dir, ".wav", ".mp3", hints=("audio", "meeting"))
+    agenda = find_input(sample_dir, ".pdf", hints=("agenda",))
+    people = find_input(sample_dir, ".json", hints=("participant",))
+    docs_dir = bundle.dir("documents") if bundle else sample_dir
+
+``find_input`` prefers a file the user added themselves (``uploaded_names``), then the file
+the bundle names, then searches ``sample_input/`` and its subfolders, and never returns the
+bundle file itself. Every path it returns is inside
+``sample_input/`` once links are resolved: a bundle entry or a link that points
+elsewhere is ignored. Standard library only.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+#: File names tried, in order, when looking for the bundle.
+BUNDLE_NAMES = ("poc_input_bundle.json", "input_bundle.json", "bundle.json")
+
+#: Written by the wizard beside the inputs when the user adds a file of their own
+#: to the package: the names of those files, one a line.
+UPLOADED_NAMES_FILE = ".uploaded"
+
+
+class InputNotFound(FileNotFoundError):
+    """No input file matches; the message says what was looked for and what is there."""
+
+
+def _walk(node, prefix=""):
+    """Yield (dotted key, string value) for every string in a JSON value."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield from _walk(value, f"{prefix}.{key}" if prefix else str(key))
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            yield from _walk(value, f"{prefix}[{i}]")
+    elif isinstance(node, str):
+        yield prefix, node
+
+
+class InputBundle:
+    """A bundle file, with every path it names resolved to a file or folder on disk.
+
+    A path is kept only when it resolves inside ``within`` (the sample folder; by
+    default the last of ``roots``).
+    """
+
+    def __init__(self, path: Path, data, roots: list[Path], within: Path | None = None):
+        within = (within or roots[-1]).resolve()
+        self.path = path
+        self.data = data
+        self.files: dict[str, Path] = {}
+        self.dirs: dict[str, Path] = {}
+        for key, value in _walk(data):
+            text = value.strip().replace("\\", "/")
+            if not text or "\n" in text or len(text) > 400:
+                continue
+            for root in roots:
+                candidate = (root / text).resolve()
+                if not candidate.is_relative_to(within):
+                    continue
+                if candidate.is_file() and candidate != path.resolve():
+                    self.files[key] = candidate
+                    break
+                if candidate.is_dir():
+                    self.dirs[key] = candidate
+                    break
+
+    def file(self, *suffixes: str, hints: tuple[str, ...] = ()) -> Path | None:
+        """The named file with one of ``suffixes``; ``hints`` pick between several."""
+        wanted = tuple(s.lower() for s in suffixes)
+        matches = [
+            (k, p) for k, p in self.files.items() if not wanted or p.suffix.lower() in wanted
+        ]
+        if hints and len(matches) > 1:
+            matches = [
+                (k, p)
+                for k, p in matches
+                if any(h.lower() in k.lower() or h.lower() in p.name.lower() for h in hints)
+            ]
+        paths = {p for _, p in matches}
+        return paths.pop() if len(paths) == 1 else None
+
+    def dir(self, *hints: str) -> Path | None:
+        """A folder the bundle names (e.g. ``documents_directory``), chosen by hint."""
+        for key, path in self.dirs.items():
+            if not hints or any(h.lower() in key.lower() for h in hints):
+                return path
+        return None
+
+
+def load_bundle(sample_dir) -> InputBundle | None:
+    """The case's bundle under ``sample_dir`` (searched in subfolders too), or None.
+
+    Paths in it resolve against the bundle's folder first, then ``sample_dir``. A file
+    with a bundle's name that is not JSON is an input like any other, not a bundle, and so
+    is one of the shorter names (``bundle.json``) that names no file or folder there.
+    """
+    sample_dir = Path(sample_dir)
+    root = sample_dir.resolve()
+    for name in BUNDLE_NAMES:
+        found = sorted(
+            (p for p in sample_dir.rglob(name) if p.is_file() and p.resolve().is_relative_to(root)),
+            key=lambda p: len(p.parts),
+        )
+        for path in found:
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            bundle = InputBundle(path, data, [path.parent.resolve(), root], within=root)
+            if bundle.files or bundle.dirs or name == BUNDLE_NAMES[0]:
+                return bundle
+    return None
+
+
+def uploaded_names(sample_dir) -> set[str]:
+    """The files in ``sample_dir`` that the user added themselves, by name.
+
+    The package holds the wizard's example input as well. A run that takes the
+    first file in sorted order reads ``delivery_note_sample.txt`` and never
+    ``lahete.txt``, and its result is for a document nobody asked about.
+    """
+    path = Path(sample_dir) / UPLOADED_NAMES_FILE
+    try:
+        if not path.resolve().is_relative_to(Path(sample_dir).resolve()):
+            return set()
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    return {line.strip() for line in text.splitlines() if line.strip()}
+
+
+def find_input(
+    sample_dir, *suffixes: str, hints: tuple[str, ...] = (), pick_first: bool = False
+) -> Path:
+    """One input file with one of ``suffixes``: the user's own, else the bundle's, else the only match.
+
+    A file the user added themselves (``uploaded_names``) comes before the bundle's
+    and before the package's examples. Otherwise looks in the bundle, then in
+    ``sample_dir`` and its subfolders. Several candidates are narrowed by ``hints``
+    (words in the file name); still several, or none, is an ``InputNotFound`` that
+    lists what is there. With ``pick_first`` several candidates give the first in
+    sorted order, with a printed warning, instead.
+    """
+    sample_dir = Path(sample_dir)
+    wanted = tuple(s.lower() for s in suffixes)
+    bundle = load_bundle(sample_dir)
+    skip = {bundle.path.resolve()} if bundle is not None else set()
+    root = sample_dir.resolve()
+    candidates = sorted(
+        p
+        for p in sample_dir.rglob("*")
+        if p.is_file()
+        and p.suffix.lower() in wanted
+        and p.resolve() not in skip
+        and p.resolve().is_relative_to(root)
+    )
+    # Uploads land at the top of the folder, so a same-named file deeper down is not one.
+    own = uploaded_names(sample_dir)
+    mine = [p for p in candidates if p.name in own and p.parent.resolve() == root]
+    if mine:
+        candidates = mine
+    elif bundle is not None:
+        named = bundle.file(*suffixes, hints=hints)
+        if named is not None:
+            return named
+    if len(candidates) > 1 and hints:
+        hinted = [p for p in candidates if any(h.lower() in p.name.lower() for h in hints)]
+        candidates = hinted or candidates
+    if len(candidates) == 1:
+        return candidates[0]
+    if candidates and pick_first:
+        print(
+            f"WARNING: {len(candidates)} inputs with {list(suffixes)}; using "
+            f"{candidates[0].relative_to(sample_dir)}. Name the file in the bundle or pass hints."
+        )
+        return candidates[0]
+    present = sorted(
+        str(p.relative_to(sample_dir))
+        for p in sample_dir.rglob("*")
+        if p.is_file() and p.name != UPLOADED_NAMES_FILE
+    )
+    if not candidates:
+        raise InputNotFound(
+            f"no input with {list(suffixes)} under {sample_dir} (subfolders included); "
+            f"files there: {present}"
+        )
+    raise InputNotFound(
+        f"{len(candidates)} inputs with {list(suffixes)} under {sample_dir} and no hint "
+        f"picks one: {[str(p.relative_to(sample_dir)) for p in candidates]}"
+    )

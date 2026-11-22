@@ -229,7 +229,34 @@
       transform: rotate(360deg);
     }
   }
-}
+  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+  --animate-gradient: gradient 8s linear infinite
+;
+  @keyframes shimmer-slide {
+  to {
+    transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+  @keyframes spin-around {
+  0% {
+    transform: translateZ(0) rotate(0);
+    }
+  15%, 35% {
+    transform: translateZ(0) rotate(90deg);
+    }
+  65%, 85% {
+    transform: translateZ(0) rotate(270deg);
+    }
+  100% {
+    transform: translateZ(0) rotate(360deg);
+    }
+  }
+  @keyframes gradient {
+  to {
+    background-position: var(--bg-size, 300%) 0;
+    }
+  }}
 
 @layer base {
   * {
@@ -460,6 +487,38 @@
 .driver-popover.gaik-tour
   .driver-popover-arrow-side-bottom.driver-popover-arrow {
   border-bottom-color: var(--popover);
+}
+
+/* /skills <-> /prompts (no-code-header.tsx): the active tab's background
+   glides to the other tab. Only the group moves; the old and new snapshots are
+   the same solid shape, so they do not cross-fade. Nothing else on the page is
+   inside a view transition, so the rest swaps at once. */
+::view-transition-group(.tab-glide) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+::view-transition-old(.tab-glide) {
+  display: none;
+}
+::view-transition-new(.tab-glide) {
+  animation: none;
+  height: 100%;
+}
+/* The tab labels stay in place and only change colour. */
+::view-transition-group(.tab-label) {
+  animation-duration: 160ms;
+}
+::view-transition-old(.tab-label),
+::view-transition-new(.tab-label) {
+  animation-duration: 160ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
 }
 
 /* Marker classes: no styles of their own. PostHog reads ph-*; ai-elements

@@ -1,33 +1,18 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Check, ChevronDown, Play, Wand2 } from "lucide-react";
-import { useRef, useState, type ComponentType } from "react";
+import { ChevronDown, Play, Wand2 } from "lucide-react";
+import { useId, useRef, useState, type ComponentType } from "react";
 
 export type Choice = "example" | "create";
-
-function Points({ items }: { items: string[] }) {
-  return (
-    <span className="mt-3 block space-y-1.5">
-      {items.map((item) => (
-        <span key={item} className="flex items-start gap-2 text-sm">
-          <Check className="text-primary mt-0.5 size-4 shrink-0" />
-          <span>{item}</span>
-        </span>
-      ))}
-    </span>
-  );
-}
 
 export interface UseCaseChooserProps {
   /** Which section is open at first. Neither, by default. */
   initialChoice?: Choice | null;
   exampleTitle?: string;
   exampleDescription: string;
-  examplePoints: string[];
   createTitle: string;
   createDescription: string;
-  createPoints: string[];
   /** Shown when the example is open. `onCreate` switches to the other section. */
   ExampleSection: ComponentType<{ onCreate: () => void }>;
   CreateSection: ComponentType;
@@ -40,16 +25,15 @@ export interface UseCaseChooserProps {
  */
 export function UseCaseChooser({
   initialChoice = null,
-  exampleTitle = "See it work on an example",
+  exampleTitle = "Try a built-in example",
   exampleDescription,
-  examplePoints,
   createTitle,
   createDescription,
-  createPoints,
   ExampleSection,
   CreateSection,
 }: UseCaseChooserProps) {
   const [open, setOpen] = useState<Choice | null>(initialChoice);
+  const contentId = useId();
   const contentRef = useRef<HTMLDivElement>(null);
 
   const choose = (choice: Choice) => {
@@ -68,17 +52,17 @@ export function UseCaseChooser({
   return (
     <div className="space-y-6">
       <div
-        role="tablist"
+        role="group"
         aria-label="What would you like to do?"
         className="grid items-stretch gap-4 lg:grid-cols-2"
       >
         <button
           type="button"
-          role="tab"
-          aria-selected={open === "example"}
+          aria-controls={contentId}
+          aria-expanded={open === "example"}
           onClick={() => choose("example")}
           className={cn(
-            "bg-card flex items-start gap-4 rounded-2xl border-2 p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0",
+            "bg-card flex items-start gap-3 rounded-2xl border-2 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 sm:gap-4 sm:p-6",
             open === "example" ? "border-primary" : "border-border",
           )}
         >
@@ -90,7 +74,6 @@ export function UseCaseChooser({
             <span className="text-muted-foreground block text-sm">
               {exampleDescription}
             </span>
-            <Points items={examplePoints} />
           </span>
           <ChevronDown
             className={cn(
@@ -102,16 +85,16 @@ export function UseCaseChooser({
 
         <button
           type="button"
-          role="tab"
-          aria-selected={open === "create"}
+          aria-controls={contentId}
+          aria-expanded={open === "create"}
           onClick={() => choose("create")}
           className={cn(
-            "border-primary/50 from-primary/15 via-card to-card ring-primary/20 flex items-start gap-5 rounded-2xl border-2 bg-gradient-to-br p-8 text-left shadow-lg ring-4 transition-all hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0",
+            "border-primary/50 from-primary/15 via-card to-card ring-primary/20 flex items-start gap-3 rounded-2xl border-2 bg-gradient-to-br p-5 text-left shadow-lg ring-4 transition-all hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0 sm:gap-5 sm:p-8",
             open === "create" && "border-primary",
           )}
         >
-          <span className="bg-primary text-primary-foreground flex size-14 shrink-0 items-center justify-center rounded-xl shadow-sm">
-            <Wand2 className="size-7" />
+          <span className="bg-primary text-primary-foreground flex size-11 shrink-0 items-center justify-center rounded-xl shadow-sm sm:size-14">
+            <Wand2 className="size-6 sm:size-7" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-serif text-xl font-semibold md:text-2xl">
@@ -120,7 +103,6 @@ export function UseCaseChooser({
             <span className="text-muted-foreground block text-sm">
               {createDescription}
             </span>
-            <Points items={createPoints} />
           </span>
           <ChevronDown
             className={cn(
@@ -131,7 +113,7 @@ export function UseCaseChooser({
         </button>
       </div>
 
-      <div ref={contentRef} className="scroll-mt-24">
+      <div id={contentId} ref={contentRef} className="scroll-mt-24">
         {open === "example" && (
           <ExampleSection onCreate={() => choose("create")} />
         )}

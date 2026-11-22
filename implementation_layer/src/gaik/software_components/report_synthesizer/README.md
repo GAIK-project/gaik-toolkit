@@ -71,7 +71,7 @@ knowledge = KnowledgeBase(
 )
 
 synthesizer = ReportSynthesizer(get_llm_config())
-# optional: model="...", reviewer_model="...", strict_review=True, review_attempts=5,
+# optional: model="...", reviewer_model="...", strict_review=False, review_attempts=5,
 #           writer_options={"reasoning_effort": "medium"}, reviewer_options={...},
 #           citations=False (no source citations in the report)
 report = synthesizer.synthesize(
@@ -141,17 +141,32 @@ starts once all of its prerequisites are reviewed.
   technical sections and `summary` on everything.
 - The writer uses only the facts in its material, writes `(missing: <item>)` for each
   `missing` entry and each required item the material does not cover, and states both
-  sides of an unresolved conflict, marked `Unresolved:`.
+  sides of an unresolved conflict, marked `Unresolved:`. For a resolved conflict it follows
+  the units in `preferred_unit_ids`, which KnowledgeCurator sets in code or a person sets in
+  the knowledge file; the conflict's description does not choose a side.
 - The section heading is added by the code; a heading the writer emits anyway is
   stripped. An empty writer answer raises `RuntimeError` naming the section.
 - Sections are returned in the order of the `sections` list, not the writing order, so a
   summary can come first.
 
+## Source material as data
+
+Every writer call puts the curated knowledge (or, for a derived section, each reviewed
+prerequisite section) and the sample report in their own `<source_material>` blocks,
+with a random id for the call and labels such as `knowledge roof` or
+`section roof: Roof` ([`gaik.software_components.source_material`](../source_material.py)).
+The system message adds the sentence in `SOURCE_MATERIAL_INSTRUCTION`; the report
+instructions and the section to write stay outside the blocks. A quote in the knowledge
+or a sentence in an earlier section cannot close its block or change the task, so text
+from the sources is not carried into the summary sections as instructions. Citations,
+the call and the `Report` are unchanged.
+
 ## Review and strict_review
 
 Each draft goes to a `DraftReviewer` with `reviewer_model`. The `reference` is the
-section's knowledge JSON, or the prerequisite texts for a derived section. The checks
-replace the reviewer's defaults and cover unsupported claims; numbers, dates and
+section's knowledge JSON, or the prerequisite texts for a derived section, one block
+each. The checks stay outside the blocks. They replace the reviewer's defaults and
+cover unsupported claims; numbers, dates and
 attributions; a `(missing: …)` marker for every uncovered required item; hierarchy
 phrasing and citation format per the report instructions; and the section's
 instructions. They tell the reviewer not to rewrite the style.
@@ -167,9 +182,11 @@ instructions. `(missing: …)` markers are kept. Derived sections are written fr
 prerequisite texts, so they follow the same setting.
 
 The reviewed text is the section text, and it is what derived sections are written from.
-Each section's applied and unresolved edits go into `report.review_log`. With
-`strict_review=True`, a section with unresolved edits raises `RuntimeError` naming the
-section, which stops the run.
+Each section's applied and unresolved edits go into `report.review_log`. By default
+(`strict_review=True`) a section with unresolved edits raises `RuntimeError` naming the
+section, which stops the run, so a report never comes back as reviewed with a correction
+left out. `strict_review=False` returns the report and keeps the unresolved edits in the
+review log only.
 
 ## Saving and editing
 

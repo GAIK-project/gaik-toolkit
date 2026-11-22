@@ -30,6 +30,11 @@ export interface ReportSpec {
   language: string;
   sections: SpecSection[];
   instructions: string;
+  /**
+   * Source classes, highest first: which side of a conflict the curator follows. Empty
+   * leaves every conflict for a person to settle. A spec may omit it, which means empty.
+   */
+  source_precedence: SourceClass[];
   sources: Record<SourceClass, string[]>;
   sample_report: string | null;
   models: Record<ModelKey, string | null>;
@@ -54,7 +59,10 @@ export interface RunSettings extends Record<StepKey, StepOptions> {
   citations: boolean;
 }
 
-/** The defaults of gaik's RunSettings. */
+/**
+ * The demo's default run settings. gaik's RunSettings defaults to strict review; the demo
+ * keeps a lenient default (strict_review: false).
+ */
 export const DEFAULT_SETTINGS: RunSettings = {
   transcription_language: "auto",
   curator_workers: 4,
@@ -160,18 +168,46 @@ export function settingsForSpec(settings: RunSettings): SpecSettings {
   return citations ? rest : { ...rest, citations: false };
 }
 
+/**
+ * The precedence as a spec carries it: written only when it names a class, since gaik
+ * releases before `source_precedence` reject the key.
+ */
+export function precedenceForSpec(
+  precedence: SourceClass[],
+): { source_precedence?: SourceClass[] } {
+  return precedence.length ? { source_precedence: [...precedence] } : {};
+}
+
+function parsePrecedence(v: unknown): SourceClass[] {
+  if (v === undefined) return [];
+  const classes = strs(v, "source_precedence");
+  const unknown = classes.filter((c) => c !== "primary" && c !== "secondary");
+  if (unknown.length)
+    fail(`source_precedence names unknown classes ${unknown.join(", ")}`);
+  if (new Set(classes).size !== classes.length)
+    fail("source_precedence names a class more than once");
+  return classes as SourceClass[];
+}
+
 export function parseSpec(value: unknown): ReportSpec {
-  const o = exactObject(value, "spec", [
-    "title",
-    "description",
-    "language",
-    "sections",
-    "instructions",
-    "sources",
-    "sample_report",
-    "models",
-    "settings",
-  ]);
+  const o = exactObject(
+    value,
+    "spec",
+    [
+      "title",
+      "description",
+      "language",
+      "sections",
+      "instructions",
+      "source_precedence",
+      "sources",
+      "sample_report",
+      "models",
+      "settings",
+    ],
+    // Older specs, and specs for a gaik without the key, have no source_precedence.
+    ["source_precedence"],
+  );
   if (!Array.isArray(o.sections)) fail("sections must be an array");
   const sections = o.sections.map((s, i) => {
     const w = `sections[${i}]`;
@@ -204,6 +240,7 @@ export function parseSpec(value: unknown): ReportSpec {
     language: str(o.language, "language"),
     sections,
     instructions: str(o.instructions, "instructions"),
+    source_precedence: parsePrecedence(o.source_precedence),
     sources: {
       primary: strs(src.primary, "sources.primary"),
       secondary: strs(src.secondary, "sources.secondary"),
@@ -347,6 +384,26 @@ export function staleHint(s: Staleness, path: string): string | null {
   if (s.report) return "Rerun Stage 3";
   const assembled = path === "report/report.md" || path === DOCX_PATH;
   return s.assembled && assembled ? "Rebuild report" : null;
+}
+
+/**
+ * Whether to tell the user that the facts changed after the report was written.
+ *
+ * `report` alone does not say that: every Curate sets it, also the first one, when no
+ * section has been written yet. So there must be a written report to be out of date. And
+ * nothing is said while a stage runs: the report is then either being rewritten or about
+ * to be, and "Run Stage 3 again" would point at a button that is disabled.
+ */
+export function reportOutOfDate(
+  s: Staleness,
+  artifacts: Record<string, string>,
+  running: Stage | null,
+): boolean {
+  return (
+    s.report &&
+    running === null &&
+    Object.keys(artifacts).some((path) => path.startsWith("report/sections/"))
+  );
 }
 
 // ---------------------------------------------------------------------------

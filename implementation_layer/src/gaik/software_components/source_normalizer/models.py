@@ -13,6 +13,10 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .paths import SourcePathError, path_inside
+
+_ID_PATTERN = r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$"
+
 
 def source_id(index: int, name: str) -> str:
     """``01_floor_plan_1`` for ``floor_plan (1).png``: the order number and an ASCII slug of
@@ -26,7 +30,7 @@ class NormalizedSource(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(pattern=r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+    id: str = Field(pattern=_ID_PATTERN)
     """Order number and ASCII slug of the file stem, e.g. ``01_rec1_exterior_attic``; names
     the Markdown file."""
     file: str
@@ -101,14 +105,28 @@ class NormalizedSources(BaseModel):
 
     @classmethod
     def load(cls, directory: str | Path) -> NormalizedSources:
-        """Read a folder written by :meth:`save`."""
+        """Read a folder written by :meth:`save`.
+
+        Each id in ``sources.json`` is checked before its ``<id>.md`` is read: it must be a
+        plain file name, and the file must stay inside ``directory`` (a symbolic link
+        that leads out of it is refused).
+
+        Raises:
+            SourcePathError: An id is not a plain file name, or its file leads out of
+                ``directory``.
+        """
         root = Path(directory)
         manifest = json.loads((root / "sources.json").read_text(encoding="utf-8"))
-        return cls(
-            sources=[
-                NormalizedSource(
-                    **entry, text=(root / f"{entry['id']}.md").read_text(encoding="utf-8")
+        if not isinstance(manifest, list) or not all(isinstance(e, dict) for e in manifest):
+            raise ValueError("sources.json must be a list of source objects")
+        sources = []
+        for entry in manifest:
+            sid = entry.get("id")
+            if not isinstance(sid, str) or not re.fullmatch(_ID_PATTERN, sid):
+                raise SourcePathError(
+                    f"sources.json: the source id {sid!r} is not a plain file name "
+                    "(letters, digits, '_', '.' and '-', not starting with '.' or '-')"
                 )
-                for entry in manifest
-            ]
-        )
+            path = path_inside(f"{sid}.md", root, what="normalized source")
+            sources.append(NormalizedSource(**entry, text=path.read_text(encoding="utf-8")))
+        return cls(sources=sources)

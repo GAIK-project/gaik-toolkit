@@ -18,7 +18,12 @@ from gaik.observability import (
     measure_duration,
     openai_usage_to_dict,
 )
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    source_material_messages,
+)
 
 from .schema import (
     SYSTEM_PARSER,
@@ -65,7 +70,7 @@ def save_to_json(results: list[dict], json_path: str) -> None:
     """
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, default=str)
-    print(f"OK Results saved to: {json_path}")
+    print(f"OK Results saved to: {file_tag(json_path)}")
 
 
 class DataExtractor:
@@ -151,15 +156,14 @@ class DataExtractor:
         LLM call's token / latency / cost — or ``None`` when the response
         carried no usage payload.
         """
-        messages = [
-            {"role": "system", "content": SYSTEM_PARSER},
-            {
-                "role": "user",
-                "content": (
-                    f"EXTRACTION TASK:\n{user_requirements}\n\nDocument:\n```txt\n{doc}\n```"
-                ),
-            },
-        ]
+        # The document is material, apart from the task: it cannot change the
+        # task, the schema or the rules.
+        material = SourceMaterial()
+        messages = source_material_messages(
+            SYSTEM_PARSER,
+            f"EXTRACTION TASK:\n{user_requirements}\n\nDocument:\n"
+            + material.wrap(doc, label="document"),
+        )
 
         with measure_duration() as elapsed:
             resp = _parse_with(

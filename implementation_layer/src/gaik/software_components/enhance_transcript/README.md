@@ -128,7 +128,7 @@ for chunk in result.diff_chunks:
 Possible output:
 
 ```python
-DiffChunk(kind="substitute", original="tama", corrected="tama")
+DiffChunk(kind="substitute", original="tama", corrected="tämä")
 DiffChunk(kind="substitute", original="hammas laakari", corrected="hammaslääkäri")
 ```
 
@@ -190,15 +190,54 @@ print(result.diff_chunks)
       "original": "hammas laakari",
       "corrected": "hammaslääkäri"
     }
-  ]
+  ],
+  "refused_passes": []
 }
 ```
+
+## What the code checks
+
+The prompts tell the model not to change digits and not to rewrite the text. The code
+holds each pass to that:
+
+- A pass whose answer changes, adds, removes or reorders any digit is refused.
+- A pass that changes more than `max_change_ratio` of its input's letters (default
+  `0.25`) is refused. Case, punctuation, spacing (a merged or split compound) and accents
+  (a/ä, o/ö) do not count, so `tama on hammas laakari` -> `tämä on hammaslääkäri` passes.
+  The result as a whole is held to the same limit against the original, so the two
+  passes cannot add up past it.
+
+What this does and does not protect: the ratio stops a wholesale rewrite, such as a
+translation or a summary in place of the transcript. It does not stop a small, targeted
+change: on a transcript of any length, a dropped negation ("ei vaihdettu" ->
+"vaihdettu"), a changed name, a deleted short sentence or a number word changed
+(`yhdeksän` -> `kahdeksan`) are well under 25% and pass. The digit check also covers
+superscripts, full-width digits and number characters such as ½ and Ⅸ.
+
+A refused pass keeps its input, so the next pass works on it, and it is listed in
+`refused_passes` with its reason. `original_text` always keeps the raw transcript and
+`correction_summary` is always computed (`generate_summary` is kept for older callers).
+`Transcriber(enhanced_transcript=True)` passes `enhancement_max_change_ratio` on and
+returns the refusals in `TranscriptionResult.enhancement_refused_passes`.
+
+`TranscriptEnhancer(..., max_change_ratio=None)` turns the ratio check off; the digit
+check always applies. What the checks do not catch: a changed decimal separator, sign or
+unit next to the same digits (`2,5 mg` -> `2.5 g`), a magnitude word (`miljoonaa` ->
+`tuhatta`), a number written as words (`kolme` -> `neljä`) and a changed name
+(`Matti` -> `Mikko`). Where figures and names matter, compare `diff_chunks` with the raw
+transcript, or keep the raw transcript as the record.
+
+The transcript reaches the model in its own `<source_material>` block, apart from the
+rules, which lowers the chance that a sentence spoken in the recording is taken as an
+instruction; it does not remove it, and the checks above catch only large or numeric
+changes.
 
 ## Environment Variables
 
 Azure mode:
 - `AZURE_API_KEY`
-- `AZURE_ENDPOINT` (optional override)
+- `AZURE_ENDPOINT`
+- `AZURE_DEPLOYMENT` (optional, default `gpt-6-luna`)
 - `AZURE_API_VERSION` (optional override)
 
 OpenAI mode:

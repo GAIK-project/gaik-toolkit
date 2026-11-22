@@ -145,10 +145,13 @@ export function PrivacyContent() {
       <Section icon={ScrollText} title="Logs and usage limits">
         <p>
           The server logs each request: its time, path and outcome, and for some
-          requests a file name or an error message. The usage limits count admin
-          sign-in attempts and requests per IP address, and runs per account, in
-          Upstash Redis; each count expires when its window ends, at the latest
-          after a day.
+          requests a file name or an error message. Each demo run also leaves
+          one line with your account id, the feature, the time and whether it
+          succeeded, never what you uploaded or asked; it is used to look into
+          misuse and to answer your requests about your data. The usage limits
+          count admin sign-in attempts and requests per IP address, and runs per
+          account, in Upstash Redis; each count expires when its window ends, at
+          the latest after a day.
         </p>
         <p className="mt-2">
           Where Upstash Redis is hosted:{" "}
@@ -180,11 +183,16 @@ export function PrivacyContent() {
 
       <Section icon={Database} title="Solution Wizard">
         <p>
+          The first Solution Wizard in the browser keeps your conversation and
+          the files it generates only while the session runs: they are removed
+          when you leave the page or restart, or after about 30 minutes without
+          activity. It no longer records sessions: the optional diagnostics
+          pilot was switched off on 4 November 2026, and the sessions it stored
+          are being deleted. Contact the project team below with any questions
+          about them.
+        </p>
+        <p className="mt-2">
           Solution Wizard V2, which this demo links to, is a separate service.
-          The Solution Wizard in this demo no longer records sessions: the
-          optional diagnostics pilot was switched off on 4 November 2026, and
-          the sessions it stored are being deleted. Contact the project team
-          below with any questions about them.
         </p>
       </Section>
 

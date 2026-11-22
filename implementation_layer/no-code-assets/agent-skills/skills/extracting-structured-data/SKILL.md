@@ -16,8 +16,8 @@ description: >-
 # Extracting structured data with gaik
 
 ```bash
-pip install "gaik[extract]==0.9.0"
-pip install "gaik[vision-extract]==0.9.0"   # PDF/image extraction
+pip install "gaik[extract]==0.11.1"
+pip install "gaik[vision-extract]==0.11.1"   # PDF/image extraction
 # Add llm-google for shared Google/Vertex configs, or llm-litellm for LiteLLM.
 ```
 
@@ -70,7 +70,7 @@ The modules accept stage configs so transcription can stay on a supported audio 
 while text extraction uses Aitta or another chat provider:
 
 ```bash
-pip install "gaik[audio-to-structured-data,documents-to-structured-data]==0.9.0"
+pip install "gaik[audio-to-structured-data,documents-to-structured-data]==0.11.1"
 ```
 
 ```python
@@ -230,6 +230,20 @@ comparing two runs.
   before calling anything unstable.
 - A failed document must score zero and stay in the sample. Dropping it lets a pipeline
   improve its own average by crashing on the hardest inputs.
+- Since gaik 0.11.0, `VisionExtractor` checks its files against `limits=InputLimits(...)`
+  before any model call, schema generation included: 100 MiB per file, about 89
+  megapixels per image, and 500 pages for all files of one call together. A PDF whose
+  pages cannot be counted is refused too. The refusal is `InputLimitError`, a `ValueError` naming the
+  limit; score that document as refused, not as a model failure.
+- A `decimal` field reads an amount written with a decimal point (`1,234.56`) or a
+  decimal comma (`150,00`, `1 234,56`, `1.234,56`); gaik 0.11.0 and earlier turned
+  every decimal comma into `null`. A value it cannot read for certain, such as
+  `1 23,45` or two amounts in one field (`2€ 550,00`), is dropped: an optional field
+  becomes `null` with no error, so a null amount that the page shows is a format to
+  look at, not a missing value; a field that cannot be `null` (one with an explicit
+  default) fails validation instead. One comma
+  before exactly three digits reads as a thousands separator: `1,234` is 1234, where a
+  Finnish document means 1.234. Check such amounts against their quote.
 - Stability alone rewards silence: a branch that leaves deep fields empty is perfectly
   repeatable, because empty is always the same empty. Read a stability metric next to a
   completeness metric or it will point the wrong way.

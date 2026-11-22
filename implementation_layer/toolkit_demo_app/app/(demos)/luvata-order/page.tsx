@@ -8,11 +8,11 @@ import { UseCaseChooser } from "./use-case-chooser";
 
 export default function LuvataOrderPage() {
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <DemoPageHeader
         icon={Package}
-        title="Purchase Order Processing"
-        description="Process purchase orders with BOM matching and automated pricing calculations"
+        title="Purchase order processing"
+        description="Draft a sales order from a purchase order, bills of materials and a price list."
       >
         <div className="mt-2 flex justify-end">
           <FeedbackButton demoType="luvata-order" />

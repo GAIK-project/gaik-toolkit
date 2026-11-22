@@ -13,19 +13,47 @@ from pathlib import Path
 from typing import Any, Literal
 
 try:
-    from utils import get_api_config, sse_event
+    from utils import get_rag_api_config, require_vision, sse_event
+    from utils.model_settings import request_server_model
 except ImportError:
-    from api.utils import get_api_config, sse_event
+    from api.utils import get_rag_api_config, require_vision, sse_event
+    from api.utils.model_settings import request_server_model
+try:
+    from utils.log_names import file_tag
+except ImportError:
+    from api.utils.log_names import file_tag
 import requests
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from langchain_core.documents import Document
 from pydantic import BaseModel
 
 try:
-    from utils.file_content import content_mismatch
+    from utils.result_owner import (
+        current_user,
+        forget_owner,
+        owned_by,
+        remember_owner,
+        touch_owner,
+    )
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.result_owner import (
+        current_user,
+        forget_owner,
+        owned_by,
+        remember_owner,
+        touch_owner,
+    )
+
+try:
+    from utils.upload_check import upload_problem
+except ImportError:
+    from api.utils.upload_check import upload_problem
+
+try:
+    from utils.errors import error_detail
+except ImportError:
+    from api.utils.errors import error_detail
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -67,8 +95,17 @@ NO_RESULTS_MESSAGE = (
     "documents have been indexed."
 )
 
-# Custom RAG prompt - friendly and flexible
-CUSTOM_RAG_PROMPT = """You are a friendly document assistant 📚
+# Custom RAG prompt - friendly and flexible. Its citation guideline depends on the
+# installed gaik: one that numbers the retrieved chunks (``generate_with_citations``)
+# is asked for [1]; an older one, such as the 0.11.0 the API image installs, for
+# [document_name, page X].
+_NUMBERED_CITATIONS = (
+    "- Cite each fact with the reference number its context block starts with, such as [1]\n"
+    "  or [2][3]. Only when a block starts with no number, cite [document_name, page X]"
+)
+_NAMED_CITATIONS = "- Include citations [document_name, page X] when answering questions"
+
+_RAG_PROMPT_TEMPLATE = """You are a friendly document assistant 📚
 
 Your job is to help users find information from the indexed documents.
 
@@ -80,7 +117,7 @@ Guidelines:
   they'd like to know. 
 - Do not summarize or list document contents unless the user asks.
 - Only share specific information when the user asks for it
-- Include citations [document_name, page X] when answering questions
+{citation_guideline}
 - If you can't find an answer, say so briefly and suggest they rephrase
 
 Answer style:
@@ -95,6 +132,24 @@ Context:
 {context}
 
 Question: {query}"""
+
+
+def rag_prompt(answer_generator_class: type) -> str:
+    """The demo prompt with the citation guideline the installed gaik supports."""
+    numbered = hasattr(answer_generator_class, "generate_with_citations")
+    guideline = _NUMBERED_CITATIONS if numbered else _NAMED_CITATIONS
+    return _RAG_PROMPT_TEMPLATE.replace("{citation_guideline}", guideline)
+
+
+def _installed_rag_prompt() -> str:
+    try:
+        from gaik.software_components.RAG.answer_generator import AnswerGenerator
+    except ImportError:
+        return rag_prompt(object)
+    return rag_prompt(AnswerGenerator)
+
+
+CUSTOM_RAG_PROMPT = _installed_rag_prompt()
 
 # Example document configuration
 # In Docker: /app/routers/rag.py -> parent.parent = /app/
@@ -135,6 +190,14 @@ def extract_page_filter(query: str) -> dict | None:
     return None
 
 
+def _source(meta: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "document_name": meta.get("document_name", "unknown"),
+        "relevance_score": meta.get("relevance_score"),
+        "page_number": meta.get("page_number", "unknown"),
+    }
+
+
 def _normalize_source_name(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().lower())
 
@@ -142,6 +205,11 @@ def _normalize_source_name(value: str) -> str:
 def _filter_sources_by_citations(
     answer: str, sources: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
+    """The sources whose document and page the answer text names.
+
+    Only for a gaik without ``AnswerGenerator.generate_with_citations`` (0.11.0, which
+    the API image installs); with it, ``_cited_sources`` reads the built citations.
+    """
     citations = re.findall(r"\[([^\]]+?),\s*page\s+(\d+)\]", answer, flags=re.IGNORECASE)
     if not citations:
         return sources
@@ -160,6 +228,22 @@ def _filter_sources_by_citations(
         in cited_pairs
     ]
     return filtered or sources
+
+
+def _cited_sources(citations: list, sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The sources of the retrieved chunks the answer cites, or all when it cites none.
+
+    gaik builds the citations from the retrieved chunks, so a document or page the
+    model wrote that no chunk has is never among them.
+    """
+    if not citations:
+        return sources
+    cited: list[dict[str, Any]] = []
+    for citation in citations:
+        source = _source(citation.document.metadata or {})
+        if source not in cited:
+            cited.append(source)
+    return cited
 
 
 async def _get_collection_lock(collection_id: str) -> asyncio.Lock:
@@ -195,6 +279,21 @@ def _drop_collection(collection_id: str) -> None:
     RAG_INSTANCES.pop(collection_id, None)
     _USAGE.pop(collection_id, None)
     _collection_locks.pop(collection_id, None)
+    forget_owner(collection_id)
+
+
+def _reachable(collection_id: str, user: str) -> bool:
+    """A shared example, or a collection the user made (api/utils/result_owner.py).
+
+    Another user's collection is treated as one that does not exist, so its id tells
+    nothing; the user is the one the proxy names in X-GAIK-User.
+    """
+    if _is_shared_example(collection_id):
+        return True
+    if owned_by(collection_id, user):
+        touch_owner(collection_id)  # a collection in use keeps its owner
+        return True
+    return False
 
 
 def _is_shared_example(collection_id: str) -> bool:
@@ -285,20 +384,61 @@ class DoclingRagApiClient:
         }
 
 
+# E5 reads 512 tokens, and Aitta answers a longer input with HTTP 500 instead of
+# truncating it. Dense text (tables, numbers) reached that at about 1000
+# characters, so a passage is cut to the first limit and, if Aitta still refuses
+# the batch, to the next. The stored chunk keeps its full text; only its vector
+# covers the start.
+E5_CHAR_LIMITS = (700, 350)
+
+
+def _demo_embedder(config: dict):
+    """The embedder of a collection: E5 models get their query and passage prefixes."""
+    from gaik.software_components.RAG.embedder import Embedder
+
+    model = EXAMPLE_EMBEDDING_MODEL if config.get("provider") in {"openai", "azure"} else None
+    if "e5" not in str(model or config.get("embedding_model") or "").lower():
+        return Embedder(config=config, model=model)
+
+    class E5Embedder(Embedder):
+        """E5 is trained on "query: " and "passage: " prefixes and retrieves worse without."""
+
+        def embed(self, documents, *, batch_size=None):
+            if not documents:
+                return [], []
+            docs = [
+                d if isinstance(d, Document) else Document(page_content=d, metadata={})
+                for d in documents
+            ]
+            for limit in E5_CHAR_LIMITS:
+                try:
+                    vectors, _ = super().embed(
+                        [f"passage: {d.page_content[:limit]}" for d in docs],
+                        batch_size=batch_size,
+                    )
+                    return vectors, docs
+                except Exception:
+                    if limit == E5_CHAR_LIMITS[-1]:
+                        raise
+            return [], docs
+
+        def embed_query(self, query: str) -> list[float]:
+            vectors, _ = Embedder.embed(
+                self, [f"query: {query[: E5_CHAR_LIMITS[0]]}"], batch_size=1
+            )
+            return vectors[0] if vectors else []
+
+    return E5Embedder(config=config, model=model)
+
+
 class DemoRagWorkflow:
     def __init__(self, *, config: dict, collection_name: str) -> None:
         from gaik.software_components.RAG.answer_generator import AnswerGenerator
-        from gaik.software_components.RAG.embedder import Embedder
         from gaik.software_components.RAG.retriever import Retriever
         from gaik.software_components.RAG.vector_store import VectorStore
 
         self.api_config = config
-        self.embedder = Embedder(
-            config=config,
-            model=(
-                EXAMPLE_EMBEDDING_MODEL if config.get("provider") in {"openai", "azure"} else None
-            ),
-        )
+        self.embedder = _demo_embedder(config)
         self.vector_store = VectorStore(
             persist=False,
             collection_name=collection_name,
@@ -312,7 +452,7 @@ class DemoRagWorkflow:
             config=config,
             citations=True,
             stream=True,
-            prompt=CUSTOM_RAG_PROMPT,
+            prompt=rag_prompt(AnswerGenerator),
             conversation_history=True,
             last_n=3,
         )
@@ -443,6 +583,18 @@ class IndexResponse(BaseModel):
     documents: list[IndexedDocument]
     status: Literal["success", "error"]
     error: str | None = None
+    # The models this collection was built with; its questions run on them too.
+    embedding_model: str | None = None
+    answer_model: str | None = None
+
+
+def _collection_models(workflow: object) -> dict[str, str | None]:
+    api_config = getattr(workflow, "api_config", None)
+    models = {
+        "embedding_model": getattr(getattr(workflow, "embedder", None), "model", None),
+        "answer_model": api_config.get("model") if isinstance(api_config, dict) else None,
+    }
+    return {name: value if isinstance(value, str) else None for name, value in models.items()}
 
 
 class QueryResponse(BaseModel):
@@ -491,7 +643,7 @@ def _index_file(workflow, tmp_path: str, filename: str, parser_choice: str) -> i
             ),
         )
 
-    print(f"[RAG] Starting {filename} ({page_count} pages, parser={parser_choice})")
+    print(f"[RAG] Starting {file_tag(filename)} ({page_count} pages, parser={parser_choice})")
 
     parse_start = time.perf_counter()
     chunks, parser_used = _parse_document_to_chunks(
@@ -502,14 +654,14 @@ def _index_file(workflow, tmp_path: str, filename: str, parser_choice: str) -> i
     )
     parse_duration = time.perf_counter() - parse_start
     print(
-        f"[RAG] Parsed {filename}: {len(chunks)} chunks"
+        f"[RAG] Parsed {file_tag(filename)}: {len(chunks)} chunks"
         f" in {parse_duration:.1f}s (parser={parser_used})"
     )
 
     embed_start = time.perf_counter()
     num_chunks = workflow.index_chunk_documents(chunks)
     embed_duration = time.perf_counter() - embed_start
-    print(f"[RAG] Embedded {filename}: {num_chunks} chunks in {embed_duration:.1f}s")
+    print(f"[RAG] Embedded {file_tag(filename)}: {num_chunks} chunks in {embed_duration:.1f}s")
     return num_chunks
 
 
@@ -518,6 +670,7 @@ async def index_documents(
     files: list[UploadFile] = File(...),
     collection_id: str | None = Form(None),
     parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("docling_rag"),
+    user: str = Depends(current_user),
 ):
     """
     Index PDF documents into the RAG vector store.
@@ -549,9 +702,14 @@ async def index_documents(
             )
 
     # An id the server does not know (a cleared or evicted collection, or one the client
-    # made up) starts a new collection under an id made here. The shared example
-    # collections take no uploads.
-    if collection_id and collection_id in RAG_INSTANCES and not _is_shared_example(collection_id):
+    # made up), or another user's collection, starts a new collection under an id made
+    # here. The shared example collections take no uploads.
+    if (
+        collection_id
+        and collection_id in RAG_INSTANCES
+        and not _is_shared_example(collection_id)
+        and owned_by(collection_id, user)
+    ):
         coll_id = collection_id
     else:
         evict_collections(make_room=True)
@@ -562,6 +720,7 @@ async def index_documents(
                 "Try again in a few minutes.",
             )
         coll_id = uuid.uuid4().hex
+        remember_owner(coll_id, user)
 
     # Acquire lock for this collection to prevent concurrent modifications
     lock = await _get_collection_lock(coll_id)
@@ -572,8 +731,15 @@ async def index_documents(
                 request_start = time.perf_counter()
                 workflow = RAG_INSTANCES.get(coll_id)
                 if workflow is None:
-                    workflow = _build_demo_workflow(get_api_config(), coll_id)
+                    workflow = _build_demo_workflow(get_rag_api_config(), coll_id)
                     RAG_INSTANCES[coll_id] = workflow
+                    # Also when a clear or an eviction dropped it while this upload
+                    # waited for the lock: the collection is made again for its user.
+                    remember_owner(coll_id, user)
+                else:
+                    touch_owner(coll_id)
+                if parser_choice == "vision_plus":
+                    require_vision(workflow.api_config)
                 indexed_docs: list[IndexedDocument] = []
                 total_chunks = 0
 
@@ -581,8 +747,8 @@ async def index_documents(
                     # Save uploaded file temporarily
                     suffix = Path(file.filename).suffix.lower()
                     content = await file.read()
-                    if (mismatch := content_mismatch(suffix, content)) is not None:
-                        raise HTTPException(status_code=415, detail=mismatch)
+                    if (problem := await upload_problem(suffix, content)) is not None:
+                        raise HTTPException(status_code=problem.status, detail=problem.message)
                     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                         tmp.write(content)
                         tmp_path = tmp.name
@@ -602,7 +768,7 @@ async def index_documents(
                     except HTTPException:
                         raise
                     except Exception as e:
-                        error_msg = str(e)
+                        error_msg = error_detail(e, "Indexing this file")
                         indexed_docs.append(
                             IndexedDocument(
                                 filename=file.filename,
@@ -611,7 +777,7 @@ async def index_documents(
                                 error=error_msg,
                             )
                         )
-                        print(f"[RAG] Error indexing {file.filename}: {e}")
+                        print(f"[RAG] Error indexing {file_tag(file.filename)}: {type(e).__name__}")
                     finally:
                         Path(tmp_path).unlink(missing_ok=True)
 
@@ -622,6 +788,7 @@ async def index_documents(
                 )
 
                 return IndexResponse(
+                    **_collection_models(workflow),
                     collection_id=coll_id,
                     document_count=len(files),
                     chunk_count=total_chunks,
@@ -633,10 +800,10 @@ async def index_documents(
         raise
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -644,6 +811,7 @@ async def query_rag(
     question: str = Form(...),
     collection_id: str = Form(...),
     top_k: int = Form(5),
+    user: str = Depends(current_user),
 ):
     """
     Query the RAG system with a question.
@@ -655,7 +823,7 @@ async def query_rag(
     if not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    workflow = RAG_INSTANCES.get(collection_id)
+    workflow = RAG_INSTANCES.get(collection_id) if _reachable(collection_id, user) else None
     if workflow is None:
         raise HTTPException(
             status_code=404, detail="Collection not found. Please index documents first."
@@ -690,10 +858,10 @@ async def query_rag(
 
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=error_detail(e)) from e
 
 
 @router.post("/query/stream")
@@ -701,6 +869,7 @@ async def query_rag_stream(
     question: str = Form(...),
     collection_id: str = Form(...),
     top_k: int = Form(5),
+    user: str = Depends(current_user),
 ):
     """
     Query the RAG system with SSE streaming response.
@@ -710,7 +879,7 @@ async def query_rag_stream(
     if not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    workflow = RAG_INSTANCES.get(collection_id)
+    workflow = RAG_INSTANCES.get(collection_id) if _reachable(collection_id, user) else None
     if workflow is None:
         raise HTTPException(
             status_code=404, detail="Collection not found. Please index documents first."
@@ -759,16 +928,7 @@ async def query_rag_stream(
                 return
 
             # Extract sources
-            sources = []
-            for doc in documents:
-                meta = doc.metadata
-                sources.append(
-                    {
-                        "document_name": meta.get("document_name", "unknown"),
-                        "relevance_score": meta.get("relevance_score"),
-                        "page_number": meta.get("page_number", "unknown"),
-                    }
-                )
+            sources = [_source(doc.metadata) for doc in documents]
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = f"Found {len(documents)} relevant chunks"
@@ -779,12 +939,21 @@ async def query_rag_stream(
             steps[1]["status"] = "in_progress"
             yield sse_event("step_update", steps[1])
 
-            # Stream the answer
-            answer_gen = iter(
-                await asyncio.to_thread(
-                    workflow.answer_generator.generate, question, documents, stream=True
+            # Stream the answer; its citations are built from the retrieved chunks
+            # and complete once the stream has ended.
+            generator = workflow.answer_generator
+            generate_with_citations = getattr(generator, "generate_with_citations", None)
+            if generate_with_citations is not None:
+                cited = await asyncio.to_thread(
+                    generate_with_citations, question, documents, stream=True
                 )
-            )
+                answer = cited.answer
+            else:
+                cited = None
+                answer = await asyncio.to_thread(
+                    generator.generate, question, documents, stream=True
+                )
+            answer_gen = iter(answer)
 
             collected_answer = []
             while (chunk := await asyncio.to_thread(next, answer_gen, _END)) is not _END:
@@ -797,7 +966,10 @@ async def query_rag_stream(
             yield sse_event("step_update", steps[1])
 
             # Send final result with sources limited to the pages actually cited.
-            cited_sources = _filter_sources_by_citations(full_answer, sources)
+            if cited is not None:
+                cited_sources = _cited_sources(cited.citations, sources)
+            else:
+                cited_sources = _filter_sources_by_citations(full_answer, sources)
             yield sse_event(
                 "result",
                 {
@@ -807,15 +979,16 @@ async def query_rag_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
         finally:
             in_use.close()
 
@@ -831,13 +1004,13 @@ async def query_rag_stream(
 
 
 @router.get("/status/{collection_id}", response_model=StatusResponse)
-async def get_status(collection_id: str):
+async def get_status(collection_id: str, user: str = Depends(current_user)):
     """
     Get the status of a RAG collection.
 
     - **collection_id**: The collection to check
     """
-    if collection_id not in RAG_INSTANCES:
+    if collection_id not in RAG_INSTANCES or not _reachable(collection_id, user):
         return StatusResponse(
             collection_id=None,
             document_count=0,
@@ -859,7 +1032,7 @@ async def get_status(collection_id: str):
 
 
 @router.delete("/clear/{collection_id}")
-async def clear_collection(collection_id: str):
+async def clear_collection(collection_id: str, user: str = Depends(current_user)):
     """
     Clear a RAG collection and free resources.
 
@@ -870,27 +1043,36 @@ async def clear_collection(collection_id: str):
 
     - **collection_id**: The collection to clear
     """
-    if not _is_shared_example(collection_id):
+    if not _is_shared_example(collection_id) and owned_by(collection_id, user):
         _drop_collection(collection_id)
 
     return {"status": "success", "message": f"Collection {collection_id} cleared"}
 
 
 @router.delete("/clear")
-async def clear_collections(collection_ids: list[str] = Query(..., min_length=1)):
-    """Clear the collections the caller names; nobody else's are touched."""
+async def clear_collections(
+    collection_ids: list[str] = Query(..., min_length=1), user: str = Depends(current_user)
+):
+    """Clear the collections the caller names and owns; nobody else's are touched."""
     cleared = 0
     for collection_id in set(collection_ids):
-        if collection_id in RAG_INSTANCES and not _is_shared_example(collection_id):
+        if (
+            collection_id in RAG_INSTANCES
+            and not _is_shared_example(collection_id)
+            and owned_by(collection_id, user)
+        ):
             _drop_collection(collection_id)
             cleared += 1
 
     return {"status": "success", "message": f"Cleared {cleared} collections"}
 
 
-def _example_index_response(collection_id: str, chunk_counts: dict[str, int]) -> IndexResponse:
+def _example_index_response(
+    collection_id: str, chunk_counts: dict[str, int], workflow: object = None
+) -> IndexResponse:
     """Build a standard IndexResponse for the example documents (chunks per file name)."""
     return IndexResponse(
+        **_collection_models(workflow),
         collection_id=collection_id,
         document_count=len(chunk_counts),
         chunk_count=sum(chunk_counts.values()),
@@ -923,13 +1105,24 @@ async def load_example_document(
     Both documents are parsed with the chosen parser and indexed into one collection, which is
     kept in memory, so the next request for the same parser returns at once.
     """
+    config = get_rag_api_config()
+    if parser_choice == "vision_plus":
+        require_vision(config)
+    # One shared example collection per parser and per model pair: vectors of one
+    # embedding model cannot be searched with another.
     example_collection_id = f"{EXAMPLE_COLLECTION_PREFIX}-{parser_choice}"
+    chosen = request_server_model()
+    if chosen is not None and config.get("model") == chosen.model:
+        slug = re.sub(r"[^a-z0-9]+", "-", chosen.id.lower()).strip("-")
+        example_collection_id += f"-{slug}"
 
     # If already loaded, return existing collection
     if example_collection_id in RAG_INSTANCES:
         workflow = RAG_INSTANCES[example_collection_id]
         _usage(example_collection_id)[0] = time.monotonic()
-        return _example_index_response(example_collection_id, _loaded_example_counts(workflow))
+        return _example_index_response(
+            example_collection_id, _loaded_example_counts(workflow), workflow
+        )
 
     # Acquire lock
     lock = await _get_collection_lock(example_collection_id)
@@ -938,7 +1131,9 @@ async def load_example_document(
         # Double-check after acquiring lock
         if example_collection_id in RAG_INSTANCES:
             workflow = RAG_INSTANCES[example_collection_id]
-            return _example_index_response(example_collection_id, _loaded_example_counts(workflow))
+            return _example_index_response(
+                example_collection_id, _loaded_example_counts(workflow), workflow
+            )
 
         try:
             missing = [
@@ -953,7 +1148,6 @@ async def load_example_document(
                 )
 
             evict_collections(make_room=True)
-            config = get_api_config()
             workflow = _build_demo_workflow(config, example_collection_id)
 
             chunk_counts: dict[str, int] = {}
@@ -973,15 +1167,15 @@ async def load_example_document(
             RAG_INSTANCES[example_collection_id] = workflow
             _usage(example_collection_id)[0] = time.monotonic()
 
-            return _example_index_response(example_collection_id, chunk_counts)
+            return _example_index_response(example_collection_id, chunk_counts, workflow)
 
         except HTTPException:
             raise
         except ImportError as e:
             raise HTTPException(
-                status_code=500, detail=f"Required components not installed: {e}"
+                status_code=500, detail=error_detail(e, "Loading the components")
             ) from e
         except Exception as e:
             raise HTTPException(
-                status_code=500, detail=f"Failed to load example document: {e}"
+                status_code=500, detail=error_detail(e, "Loading the example document")
             ) from e

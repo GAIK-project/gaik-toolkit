@@ -308,7 +308,7 @@ result = generator.run(
     agentic=False,
     review_options=None,
     polish=False,
-    strict_review=False,
+    strict_review=True,
     curate_evidence=False,
     verbose=False,
     progress_callback=None,
@@ -345,7 +345,7 @@ for section in result.sections:
 | `agentic` | `False` | If `False`, writes the whole report in one LLM call. If `True`, uses per-section agentic drafting and review. |
 | `review_options` | `None` | Optional separate LLM options for the agentic reviewer. If `None`, reviewer reuses the writer client/config. |
 | `polish` | `False` | Agentic only. Runs a final style/proofreading pass after mandatory review repair. |
-| `strict_review` | `False` | Agentic only. If unresolved reviewer edits remain, raise before final report outputs are written. |
+| `strict_review` | `True` | Agentic only. If unresolved reviewer edits remain, raise before final report outputs are written; `False` returns them as revision warnings. |
 | `curate_evidence` | `False` | Agentic only. Creates one section-specific evidence brief before drafting each section. |
 | `verbose` | `False` | Agentic only. Prints workflow progress events. |
 | `progress_callback` | `None` | Agentic only. Callable receiving progress strings. Overrides default printing behavior. |
@@ -470,9 +470,9 @@ The reviewer:
 - applies corrections locally with exact and fuzzy matching
 - retries failed corrections up to the configured retry limit
 
-Unresolved reviewer edits become `section.revision_warnings` by default.
+With `strict_review=False`, unresolved reviewer edits become `section.revision_warnings` and the report is written.
 
-With `strict_review=True`, unresolved reviewer edits raise before final report files such as `report.md` and `sections/` are written. Intermediate curation artifacts may already exist if `curate_evidence=True`.
+By default (`strict_review=True`), unresolved reviewer edits raise before final report files such as `report.md` and `sections/` are written. Intermediate curation artifacts may already exist if `curate_evidence=True`.
 
 ### Agentic Curation
 
@@ -661,6 +661,20 @@ review_options={
 
 If `review_options=None`, the reviewer and polish pass reuse the writer client/config.
 
+## Source material as data
+
+Each source reaches the writer, the curator and the reviewer in its own
+`<source_material>` block, labelled with its file name, the name the citations use; the
+format reference, a curated brief and every already-written section a dependent section
+builds on get blocks of their own. The block id is random and new for every call, and a
+closing tag written in a source is escaped, so the source cannot end its block
+([`gaik.software_components.source_material`](../../software_components/source_material.py)).
+The system messages add the sentence in `SOURCE_MATERIAL_INSTRUCTION`; the report title,
+the section instructions, `additional_instructions` and the review goals stay outside the
+blocks. The prompts name a source by its file name only, never by its path; the path
+stays in `evidence_index.json`. Reviewer edits are applied without a person's approval,
+as before.
+
 ## Output Files
 
 When `output_dir` is set:
@@ -719,6 +733,9 @@ from gaik.software_modules.multi_source_report_generator import (
 # Save the current use-case configuration to a file.
 # Paths (input_paths, output_dir, sample_report_path) are stored relative to
 # the config file so it is portable. All option dicts are stored as-is.
+# load_report_config refuses a path that is absolute or leads out of the config's
+# folder (through ".." or a symbolic link) with SourcePathError; pass
+# root="<a folder that holds both>" for a config that names files beside its folder.
 save_report_config(
     "my_report_config.json",
     input_paths=["materials/"],

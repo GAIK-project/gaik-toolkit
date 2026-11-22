@@ -44,8 +44,14 @@ print(result.answer)
 - **Text Parsing** - `parser="text"` reads the text layer without Docling or a vision model
 - **Persistent Vector Store** - Chroma-backed storage
 - **Re-ranked Retrieval** - Optional cross-encoder reranking
-- **Citations** - Optional citation formatting
+- **Citations** - Optional; numbered references are resolved to the retrieved chunks,
+  and `RAGWorkflowResult.citations` holds only retrieved chunks. A source written in
+  another form is left as written (see the
+  [Answer Generator README](../../software_components/RAG/answer_generator/README.md#citations))
 - **Conversation History** - Last-n Q/A memory
+- **Retrieved Text as Data** - Each chunk reaches the answer model in its own
+  labelled block, apart from the instructions and the question (see the
+  [Answer Generator README](../../software_components/RAG/answer_generator/README.md))
 
 ---
 
@@ -64,6 +70,7 @@ workflow = RAGWorkflow(
     persist: bool = True,
     persist_path: str = "chroma_store",
     collection_name: str = "gaik_rag",
+    owner: str | None = None,
     embedding_model: str | None = None,
     retriever_top_k: int = 5,
     retriever_threshold: float | None = None,
@@ -80,8 +87,22 @@ workflow = RAGWorkflow(
 
 ```python
 index_result = workflow.index_documents(
-    file_paths: list[str | Path]
+    file_paths: list[str | Path],
+    filenames: list[str] | None = None,
+    document_ids: list[str] | None = None,
 )
+# Each file is one document, identified by its entry in document_ids or else its
+# path as given, with forward slashes (Path(path).as_posix()); filenames are display
+# names only, so two files with the same name are two documents. Indexing a document
+# again replaces its chunks. Files saved under a new temporary path each time need
+# document_ids to be replaced.
+# The path is not resolved: "data/a.pdf" and its absolute path are two documents,
+# and one relative path indexed from two working directories is one. Pass paths
+# spelled the same way each time, or document_ids.
+
+deleted = workflow.delete_document(document_id: str)  # chunks deleted
+# A persisted collection from an earlier gaik release still answers, but its
+# chunks are not replaced or deleted this way: index into a new collection_name.
 
 result = workflow.ask(
     query: str,
@@ -92,6 +113,16 @@ result = workflow.ask(
     stream: bool | None = None,
 )
 ```
+
+### Several users
+
+- `owner` (a user or session id) records the indexed documents for that owner, and
+  `ask()` retrieves only that owner's documents, also from a collection and folder that
+  other owners share. Without it, every workflow on the same collection reads every
+  document in it.
+- The conversation history (`conversation_history`, `last_n`) is kept on the workflow
+  object. A service with several users creates one workflow per user or session; a shared
+  one would put one user's earlier questions in another user's prompt.
 
 ---
 

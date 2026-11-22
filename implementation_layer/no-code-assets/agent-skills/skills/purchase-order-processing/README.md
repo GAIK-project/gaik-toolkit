@@ -69,13 +69,16 @@ Before setting up, please install:
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\Users\\you\\Documents\\GAIK"]
     }
   }
 }
 ```
 
-3. Save and close the file
+3. Replace `C:\\Users\\you\\Documents\\GAIK` with the folder that holds your purchase orders,
+   BOMs and price lists. The server can read and write only there; never give a whole drive
+   such as `C:\\`.
+4. Save and close the file
 
 **Step 2: Restart Claude Desktop**
 
@@ -123,13 +126,7 @@ My-Order/
 
 ### Step 2: Ask Claude to Process the Order
 
-In Claude Desktop, upload the .zip file of the documents (same structure) and say:
-
-```
-Process these documents using purchase-order-processing skill
-```
-
-Or provide the local path of the documents:
+Give Claude the local path of the folder:
 
 ```
 Generate sales order from C:\Orders\NewCustomer using purchase-order-processing skill
@@ -329,7 +326,7 @@ Special instructions from the Purchase Order are copied **verbatim** to the Sale
 
 The skill generates two files:
 
-1. **Sales Order** (`SO-{number}_{Customer}_{Date}.docx`) — Complete order with header, customer info, line items, pricing breakdown
+1. **Sales Order** (`SO-{number}_{Customer}_{Date}.docx` when a sample sales order is given, otherwise `.txt` in the default text format) — Complete order with header, customer info, line items, pricing breakdown
 2. **Calculation Breakdown** (`Calculation_Breakdown.txt`) — Step-by-step audit trail of all extractions, matches, lookups, and calculations
 
 ---

@@ -1,10 +1,12 @@
 "use client";
 
 import { MessageResponse } from "@/components/ai-elements/message";
+import { RunButton } from "@/components/demo/run-button";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
+import { useConfirm } from "@/components/demo/use-confirm";
 import { FeedbackButton } from "@/components/feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -197,6 +199,7 @@ export default function SourceNormalizerPage() {
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -270,10 +273,14 @@ export default function SourceNormalizerPage() {
     setTab("rendered");
   }
 
-  function clearAll() {
+  async function clearAll() {
     if (
       hasResult &&
-      !window.confirm("Clearing removes the current result. Continue?")
+      !(await confirm({
+        title: "Clear the sources?",
+        description: "This also removes the current result.",
+        action: "Clear",
+      }))
     )
       return;
     setRows([]);
@@ -286,9 +293,11 @@ export default function SourceNormalizerPage() {
     if (busy) return;
     if (
       hasResult &&
-      !window.confirm(
-        "Loading an example replaces the current result. Continue?",
-      )
+      !(await confirm({
+        title: "Load the example?",
+        description: "It replaces the current result.",
+        action: "Load example",
+      }))
     )
       return;
     setLoadingExample(true);
@@ -387,12 +396,23 @@ export default function SourceNormalizerPage() {
       if (!result) throw new Error("Normalize ended without a result.");
       toast.success("Sources normalized");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(false);
+      if (abortRef.current === controller) setRunning(false);
     }
+  }
+
+  /** Cancels the run in the browser; the files and options stay. */
+  function stopRun() {
+    abortRef.current?.abort();
+    setRunning(false);
+    setProgress([]);
   }
 
   /** Pass the (edited) texts to the Knowledge Curator page within this tab. */
@@ -444,10 +464,11 @@ export default function SourceNormalizerPage() {
 
   return (
     <PageTransition>
+      {confirmDialog}
       <DemoPageHeader
         icon={FileStack}
         title="Source Normalizer"
-        description="Transform data (PDFs, Word files, spreadsheets, text, recordings and images) in a uniform Markdown format."
+        description="Turn PDFs, Word files, spreadsheets, recordings and images into Markdown that keeps each file's name"
         className="mb-6"
       />
 
@@ -792,29 +813,16 @@ export default function SourceNormalizerPage() {
               </div>
 
               <div className="mt-auto flex gap-2 pt-2">
-                <Button
-                  size="lg"
+                <RunButton
+                  running={running}
+                  onRun={normalize}
+                  onStop={stopRun}
+                  icon={Sparkles}
                   className="flex-1"
-                  onClick={normalize}
                   disabled={busy || rows.length === 0 || uploadTooLarge}
                 >
-                  {running ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  {running ? "Normalizing…" : "Normalize"}
-                </Button>
-                {running && (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => abortRef.current?.abort()}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                )}
+                  Normalize
+                </RunButton>
               </div>
             </CardContent>
           </Card>
@@ -896,10 +904,10 @@ export default function SourceNormalizerPage() {
                     {mdPaths.length} {mdPaths.length === 1 ? "text" : "texts"}
                   </Badge>
                   <Badge variant="outline" className="font-normal">
-                    {totals.words.toLocaleString()} words
+                    {totals.words.toLocaleString("en-US")} words
                   </Badge>
                   <Badge variant="outline" className="font-normal">
-                    {totals.chars.toLocaleString()} characters
+                    {totals.chars.toLocaleString("en-US")} characters
                   </Badge>
                   {Object.entries(classCounts).map(([name, count]) => (
                     <Badge key={name} variant="outline" className="font-normal">
@@ -909,7 +917,7 @@ export default function SourceNormalizerPage() {
                   <Badge variant="outline" className="font-normal">
                     {usage && Object.keys(usage).length > 0
                       ? Object.entries(usage)
-                          .map(([k, v]) => `${k} ${v.toLocaleString()}`)
+                          .map(([k, v]) => `${k} ${v.toLocaleString("en-US")}`)
                           .join(" · ")
                       : "no model calls"}
                   </Badge>
@@ -983,7 +991,8 @@ export default function SourceNormalizerPage() {
                                 </>
                               )}
                               <span>
-                                {artifacts[path].length.toLocaleString()} chars
+                                {artifacts[path].length.toLocaleString("en-US")}{" "}
+                                chars
                               </span>
                               {entry?.source_class && (
                                 <Badge
@@ -1124,10 +1133,11 @@ export default function SourceNormalizerPage() {
                             <dd>{selectedKind?.text}</dd>
                             <dt className="text-muted-foreground">Size</dt>
                             <dd>
-                              {describeText(text).words.toLocaleString()} words
-                              · {describeText(text).lines.toLocaleString()}{" "}
+                              {describeText(text).words.toLocaleString("en-US")}{" "}
+                              words ·{" "}
+                              {describeText(text).lines.toLocaleString("en-US")}{" "}
                               lines ·{" "}
-                              {describeText(text).chars.toLocaleString()}{" "}
+                              {describeText(text).chars.toLocaleString("en-US")}{" "}
                               characters
                             </dd>
                             <dt className="text-muted-foreground">Saved as</dt>

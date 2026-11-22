@@ -38,9 +38,11 @@ def test_website_wrapper_preserves_core_decimal_policy():
     model, _ = _decimal_model()
     wrapped = wrap_schema_with_numeric_normalizers(model)
 
-    assert model.model_validate({"price": "1 234,56 EUR"}).price is None
-    assert wrapped.model_validate({"price": "1 234,56 EUR"}).price is None
+    assert model.model_validate({"price": "1 234,56 EUR"}).price == Decimal("1234.56")
+    assert wrapped.model_validate({"price": "1 234,56 EUR"}).price == Decimal("1234.56")
     assert wrapped.model_validate({"price": "EUR 1,234.56"}).price == Decimal("1234.56")
+    # Malformed grouping is still rejected, not guessed at.
+    assert wrapped.model_validate({"price": "1 23,45 EUR"}).price is None
 
 
 def test_decimal_schema_round_trip_is_provider_safe(tmp_path: Path):
@@ -57,7 +59,7 @@ def test_decimal_schema_round_trip_is_provider_safe(tmp_path: Path):
 
     assert '"pattern"' not in json.dumps(loaded.model_json_schema())
     assert loaded.model_validate({"price": "12.40 EUR"}).price == Decimal("12.40")
-    assert loaded.model_validate({"price": "1 234,56 EUR"}).price is None
+    assert loaded.model_validate({"price": "1 234,56 EUR"}).price == Decimal("1234.56")
 
 
 def test_nullable_enum_schema_imports_required_typing_names(tmp_path: Path):
@@ -170,3 +172,13 @@ def test_a_saved_prompt_matches_the_same_prompt_sent_with_crlf_line_breaks(tmp_p
         is not None
     )
     assert load_saved_requirements(path, expected_user_requirements="Other") is None
+
+
+def test_a_schema_key_keeps_only_safe_characters_for_files_and_log_lines():
+    from api.utils.schema import safe_schema_key, schema_paths
+
+    key = "invoice\nsecond line/../x"
+    assert safe_schema_key(key) == "invoice_second_line____x"
+    assert "\n" not in safe_schema_key(key)
+    assert schema_paths(key)[0].name == "invoice_second_line____x_schema.py"
+    assert safe_schema_key("\n/") == "schema"

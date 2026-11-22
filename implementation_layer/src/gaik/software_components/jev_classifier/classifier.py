@@ -8,14 +8,21 @@ fallback when the model is not confident.
 """
 
 import logging
+import os
 from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components.endpoints import check_endpoint, log_endpoint
+
+from .._log_names import error_text, file_tag
+from ..input_limits import InputLimits
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "jev-1.13.0"
+DEFAULT_BASE_URL = "https://api.typesafe.ai"
 DEFAULT_INSTRUCTIONS = "Which label best describes the text?"
 UNKNOWN = "unknown"
 _QUESTION_ID = "label"
@@ -61,6 +68,9 @@ class JevClassifier:
         timeout: float = 30.0,
         max_retries: int = 3,
         client: Any = None,
+        allowed_endpoint_hosts: str | Sequence[str] | None = None,
+        *,
+        limits: InputLimits | None = None,
     ):
         """
         Initialize the classifier.
@@ -78,9 +88,17 @@ class JevClassifier:
             client: A ready-made ``TypeSafeClient`` (or a compatible object with a
                 ``system_one`` method). When given, ``api_key`` and ``base_url`` are
                 not used to build a client. Meant for tests and custom transports.
+            allowed_endpoint_hosts: Hosts this application allows for ``base_url``
+                besides TypeSafe, gaik-decide and the addresses set in ``GAIK_DECIDE_URL``
+                and ``TYPESAFE_BASE_URL`` (plain http works for those); also read from
+                ``GAIK_ALLOWED_ENDPOINT_HOSTS``. Other addresses must be https.
+            limits: Input limits for the PDF and Word files ``classify_files`` reads,
+                passed to their parsers; ``None`` keeps the parsers' defaults (size,
+                no page limit). A file over one raises ``InputLimitError``.
 
         Raises:
             ValueError: If ``api_key`` is empty and no ``client`` is given.
+            EndpointNotAllowedError: If ``base_url`` is not https or not an allowed host.
             ImportError: If ``typesafe-sdk`` is not installed.
 
         Example:
@@ -91,11 +109,20 @@ class JevClassifier:
             ... )
         """
         self.model = model
+        self.limits = limits
         if client is not None:
             self.client = client
             return
         if not api_key or not api_key.strip():
             raise ValueError("api_key is required (pass your gaik-decide or TypeSafe key)")
+        # Without a base_url the SDK itself reads TYPESAFE_BASE_URL.
+        host = check_endpoint(
+            base_url or os.getenv("TYPESAFE_BASE_URL") or DEFAULT_BASE_URL,
+            provider="jev",
+            allowed_hosts=allowed_endpoint_hosts,
+            what="base_url",
+        )
+        log_endpoint("jev", host)
         try:
             from typesafe_sdk import RetryPolicy, TypeSafeClient
         except ImportError as e:
@@ -300,7 +327,7 @@ class JevClassifier:
             except Exception as e:
                 if path.is_file():
                     raise
-                logger.error("Skipping %s: %s", file.name, e)
+                logger.error("Skipping %s: %s", file_tag(file), error_text(e, file))
                 results[file.name] = {
                     "class": UNKNOWN,
                     "confidence": 0.0,
@@ -311,13 +338,12 @@ class JevClassifier:
                 }
         return results
 
-    @staticmethod
-    def _extract_text(file: Path) -> str:
-        """Extract the text of a PDF or Word document."""
+    def _extract_text(self, file: Path) -> str:
+        """Extract the text of a PDF or Word document, within ``limits``."""
         if file.suffix.lower() == ".pdf":
             from ..parsers.pymypdf import PyMuPDFParser
 
-            return PyMuPDFParser().parse_document(str(file))["text_content"]
+            return PyMuPDFParser(limits=self.limits).parse_document(str(file))["text_content"]
         from ..parsers.docx_parser import DocxParser
 
-        return DocxParser().parse_document(str(file))["text_content"]
+        return DocxParser(limits=self.limits).parse_document(str(file))["text_content"]

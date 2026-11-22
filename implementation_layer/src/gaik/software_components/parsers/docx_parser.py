@@ -7,8 +7,11 @@ requiring external APIs or heavy ML models.
 
 import logging
 import os
-import zipfile
 from typing import Any
+
+from .._log_names import error_text, file_tag
+from ..file_type import check_file_type
+from ..input_limits import InputLimits
 
 try:
     from docx import Document
@@ -19,7 +22,6 @@ except ImportError:
     DOCX_AVAILABLE = False
     print("Warning: python-docx not available. Please install: pip install python-docx")
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 _HEADING_LEVELS = {"Title": 1, **{f"Heading {n}": n for n in range(1, 7)}}
@@ -34,11 +36,17 @@ class DocxParser:
     - Extract text from paragraphs and tables
     - Simple text extraction or structured output with formatting info
     - Support for Word 2007+ documents (.docx)
+    - Refuses a file over its input limits (size, unpacked size) with
+      ``InputLimitError`` before reading it
     """
 
-    def __init__(self):
+    def __init__(self, *, limits: InputLimits | None = None):
         """
         Initialize the DocxParser.
+
+        Args:
+            limits: Size limits checked before parsing; defaults to
+                :class:`~gaik.software_components.input_limits.InputLimits`.
 
         Raises:
             ImportError: If python-docx is not installed
@@ -48,6 +56,7 @@ class DocxParser:
                 "python-docx is not available. Install it with: pip install python-docx"
             )
 
+        self.limits = limits or InputLimits()
         self.supported_extensions = [".docx", ".doc"]
 
     def parse_docx(
@@ -70,16 +79,22 @@ class DocxParser:
             FileNotFoundError: If file does not exist
             ValueError: If keep_structure is used with structured text, or the
                 file's content is not a DOCX
+            FileTypeMismatchError: If the content is not a DOCX, or not the type
+                the file's extension says (a ``ValueError``)
+            InputLimitError: If the file is over ``max_file_bytes``, or unpacks
+                to more than ten times that
             Exception: If DOCX parsing fails
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         if keep_structure and not use_markdown:
             raise ValueError("keep_structure needs use_markdown=True")
-        # A DOCX is a ZIP container; python-docx reads it with zipfile, so the
-        # same test decides here whether the content can be one at all.
-        if not zipfile.is_zipfile(file_path):
-            raise ValueError(f"The content of '{file_path}' is not a DOCX document.")
+        # A DOCX is a ZIP container holding word/document.xml; python-docx finds
+        # the container with zipfile, and so does the content check.
+        # The size comes first: the content check reads the archive's directory.
+        self.limits.check_file_size(file_path)
+        check_file_type(file_path, {"docx"})
+        self.limits.check_zip_container(file_path)
 
         try:
             doc = Document(file_path)
@@ -111,7 +126,7 @@ class DocxParser:
             return text_content.strip()
 
         except Exception as e:
-            logger.error(f"Error parsing DOCX {file_path}: {e}")
+            logger.error("Error parsing DOCX %s: %s", file_tag(file_path), error_text(e, file_path))
             raise
 
     def parse_document(self, file_path: str, use_markdown: bool = True) -> dict[str, Any]:
@@ -149,13 +164,13 @@ class DocxParser:
             )
 
         format_type = "markdown" if use_markdown else "structured"
-        logger.info(f"Parsing document: {file_name} (format: {format_type})")
+        logger.info("Parsing document: %s (format: %s)", file_tag(file_path), format_type)
 
         # Extract text
         text_content = self.parse_docx(file_path, use_markdown)
 
         if not text_content:
-            logger.warning(f"No text content extracted from {file_name}")
+            logger.warning("No text content extracted from %s", file_tag(file_path))
 
         return {
             "file_path": file_path,
@@ -272,6 +287,6 @@ def parse_docx(
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result["text_content"])
-        logger.info(f"Parsed content saved to: {output_path}")
+        logger.info("Parsed content saved to %s", file_tag(output_path))
 
     return result

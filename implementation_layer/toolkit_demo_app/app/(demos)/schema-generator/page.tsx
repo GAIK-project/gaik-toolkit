@@ -4,6 +4,7 @@ import { CodeBlock } from "@/components/code-block";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
+import { RunButton } from "@/components/demo/run-button";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,6 @@ import {
   Download,
   Eye,
   FileCode2,
-  Loader2,
   PenLine,
   Sparkles,
   Table2,
@@ -252,7 +252,8 @@ export default function SchemaGeneratorPage() {
     }
 
     abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsLoading(true);
     const before = result?.fields ?? null;
 
@@ -261,7 +262,7 @@ export default function SchemaGeneratorPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_requirements: effectiveTask }),
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
       if (!response.ok) {
         const error = await response.json().catch(() => null);
@@ -279,14 +280,25 @@ export default function SchemaGeneratorPage() {
       });
       toast.success("Schema generated");
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(
         error instanceof Error ? error.message : "Failed to generate schema",
       );
     } finally {
-      setIsLoading(false);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortControllerRef.current === controller) setIsLoading(false);
     }
+  }
+
+  /** Cancels the run in the browser; the page is ready again with its task. */
+  function stopRun(): void {
+    abortControllerRef.current?.abort();
+    setIsLoading(false);
   }
 
   const fields = result?.fields ?? [];
@@ -296,7 +308,7 @@ export default function SchemaGeneratorPage() {
       <DemoPageHeader
         icon={Braces}
         title="Schema Generator"
-        description="Turn plain-language extraction requirements into a reusable, type-safe data contract for GAIK workflows."
+        description="Turn extraction requirements written in plain language into a reusable Pydantic model"
         className="mb-6"
       />
 
@@ -425,24 +437,17 @@ export default function SchemaGeneratorPage() {
                 </TabsContent>
               </Tabs>
 
-              <Button
-                onClick={generateSchema}
-                disabled={isLoading || !effectiveTask}
+              <RunButton
+                running={isLoading}
+                onRun={generateSchema}
+                onStop={stopRun}
+                icon={Sparkles}
+                disabled={!effectiveTask}
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating schema…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    {result ? "Generate again" : "Generate schema"}
-                  </>
-                )}
-              </Button>
+                {result ? "Generate again" : "Generate schema"}
+              </RunButton>
               {ownModel && (
                 <p className="text-muted-foreground text-center text-xs">
                   Model: your own ({ownModel.model})
@@ -499,7 +504,8 @@ export default function SchemaGeneratorPage() {
                       </Badge>
                       {result.usage?.total_tokens != null && (
                         <Badge variant="outline">
-                          {result.usage.total_tokens.toLocaleString()} tokens
+                          {result.usage.total_tokens.toLocaleString("en-US")}{" "}
+                          tokens
                         </Badge>
                       )}
                       {outOfDate && (

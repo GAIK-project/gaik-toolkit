@@ -20,7 +20,10 @@ try:
         get_api_config,
         get_model_options,
         get_transcription_api_config,
+        on_aitta,
+        require_vision,
         load_schema,
+        safe_schema_key,
         save_schema,
         sse_event,
         validate_audio_file_size,
@@ -49,7 +52,10 @@ except ImportError:
         get_api_config,
         get_model_options,
         get_transcription_api_config,
+        on_aitta,
+        require_vision,
         load_schema,
+        safe_schema_key,
         save_schema,
         sse_event,
         validate_audio_file_size,
@@ -85,15 +91,27 @@ except ImportError:
         _categorize_fallback_reason,
         _summarize_corrections,
     )
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+try:
+    from utils.result_owner import current_user, remember_owner, require_owner
+except ImportError:
+    from api.utils.result_owner import current_user, remember_owner, require_owner
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
+try:
+    from utils.errors import error_detail
+    from utils.model_settings import provider_error_detail
+except ImportError:
+    from api.utils.errors import error_detail
+    from api.utils.model_settings import provider_error_detail
+
 logger = logging.getLogger(__name__)
 try:
-    from utils.file_content import content_mismatch
+    from utils.upload_check import upload_problem
 except ImportError:
-    from api.utils.file_content import content_mismatch
+    from api.utils.upload_check import upload_problem
 
 router = APIRouter()
 
@@ -120,6 +138,8 @@ def _pdf_path(job_id: str) -> Path:
 def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config: dict):
     validate_vision_page_limit(tmp_path, suffix, parser_type)
 
+    if parser_type in {"vision", "vision_plus"}:
+        require_vision(config)
     if parser_type == "vision":
         from gaik.software_components.parsers import VisionParser
 
@@ -192,7 +212,7 @@ def _get_or_create_schema(
     if schema_key:
         loaded = load_schema(schema_key, user_requirements)
         if loaded is not None and not regenerate_schema:
-            logger.info("Loaded existing schema for key %s", schema_key)
+            logger.info("Loaded existing schema for key %s", safe_schema_key(schema_key))
             schema, requirements = loaded
             return schema, requirements, False
 
@@ -202,7 +222,7 @@ def _get_or_create_schema(
 
     if schema_key and loaded is None and not regenerate_schema:
         save_schema(schema, requirements, schema_key, user_requirements)
-        logger.info("Saved schema for key %s", schema_key)
+        logger.info("Saved schema for key %s", safe_schema_key(schema_key))
 
     return wrap_schema_with_numeric_normalizers(schema), requirements, True
 
@@ -305,6 +325,7 @@ async def audio_pipeline(
     compress_audio: bool = Form(True),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    user: str = Depends(current_user),
 ):
     """
     Run the complete audio pipeline: Transcribe -> Extract -> (PDF).
@@ -317,6 +338,7 @@ async def audio_pipeline(
     - **compress_audio**: Whether to compress audio before sending
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Initialize steps
     steps = [
@@ -340,8 +362,8 @@ async def audio_pipeline(
 
     # Validate file size and save temporarily
     content = await validate_audio_file_size(file)
-    if (mismatch := content_mismatch(suffix, content)) is not None:
-        raise HTTPException(status_code=415, detail=mismatch)
+    if (problem := await upload_problem(suffix, content)) is not None:
+        raise HTTPException(status_code=problem.status, detail=problem.message)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -451,26 +473,27 @@ def _run_audio_pipeline(
                 steps[3].message = "PDF generated"
             except Exception as e:
                 steps[3].status = "error"
-                steps[3].message = f"PDF generation failed: {e}"
+                steps[3].message = error_detail(e, "PDF generation")
 
         return response
 
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
+        message = provider_error_detail(e)
         # Mark current step as error
         for step in steps:
             if step.status == "in_progress":
                 step.status = "error"
-                step.message = str(e)
+                step.message = message
                 break
 
         return AudioPipelineResponse(
             job_id=job_id,
             steps=steps,
-            error=str(e),
+            error=message,
         )
     finally:
         Path(tmp_path).unlink(missing_ok=True)
@@ -487,6 +510,7 @@ async def document_pipeline(
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    user: str = Depends(current_user),
 ):
     """
     Run the complete document pipeline: Parse -> Extract -> (PDF).
@@ -498,6 +522,7 @@ async def document_pipeline(
     - **pdf_title**: Title for the generated PDF report
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Initialize steps
     steps = [
@@ -535,8 +560,8 @@ async def document_pipeline(
 
     # Validate file size and save temporarily
     content = await validate_file_size(file)
-    if (mismatch := content_mismatch(suffix, content)) is not None:
-        raise HTTPException(status_code=415, detail=mismatch)
+    if (problem := await upload_problem(suffix, content)) is not None:
+        raise HTTPException(status_code=problem.status, detail=problem.message)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -640,26 +665,27 @@ def _run_document_pipeline(
                 steps[3].message = "PDF generated"
             except Exception as e:
                 steps[3].status = "error"
-                steps[3].message = f"PDF generation failed: {e}"
+                steps[3].message = error_detail(e, "PDF generation")
 
         return response
 
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
+        message = provider_error_detail(e)
         # Mark current step as error
         for step in steps:
             if step.status == "in_progress":
                 step.status = "error"
-                step.message = str(e)
+                step.message = message
                 break
 
         return DocumentPipelineResponse(
             job_id=job_id,
             steps=steps,
-            error=str(e),
+            error=message,
         )
     finally:
         Path(tmp_path).unlink(missing_ok=True)
@@ -673,6 +699,7 @@ async def text_pipeline(
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    user: str = Depends(current_user),
 ):
     """
     Run the text extraction pipeline: Extract structured data from text.
@@ -683,6 +710,7 @@ async def text_pipeline(
     - **pdf_title**: Title for the generated PDF report
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Initialize steps
     steps = [
@@ -784,26 +812,27 @@ def _run_text_pipeline(
                 steps[pdf_step_idx].message = "PDF generated"
             except Exception as e:
                 steps[pdf_step_idx].status = "error"
-                steps[pdf_step_idx].message = f"PDF generation failed: {e}"
+                steps[pdf_step_idx].message = error_detail(e, "PDF generation")
 
         return response
 
     except ImportError as e:
         raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
+            status_code=500, detail=error_detail(e, "Loading the components")
         ) from e
     except Exception as e:
+        message = provider_error_detail(e)
         # Mark current step as error
         for step in steps:
             if step.status == "in_progress":
                 step.status = "error"
-                step.message = str(e)
+                step.message = message
                 break
 
         return TextPipelineResponse(
             job_id=job_id,
             steps=steps,
-            error=str(e),
+            error=message,
         )
 
 
@@ -828,6 +857,7 @@ async def audio_pipeline_stream(
     custom_context: str = Form(""),
     fix_transcription_errors: bool = Form(False),
     prefer_local_first: bool = Form(True),
+    user: str = Depends(current_user),
 ):
     """
     Run the audio pipeline with SSE streaming progress updates.
@@ -836,6 +866,7 @@ async def audio_pipeline_stream(
     """
     enhanced = enhanced or fix_transcription_errors
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Validate file first
     if not file.filename:
@@ -863,10 +894,10 @@ async def audio_pipeline_stream(
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
-    if (mismatch := content_mismatch(suffix, content)) is not None:
+    if (problem := await upload_problem(suffix, content)) is not None:
 
         async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": mismatch})
+            yield sse_event("error", {"message": problem.message})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
@@ -930,7 +961,8 @@ async def audio_pipeline_stream(
             cloud_model = transcription_config.get("transcription_model", "whisper")
             model_used = cloud_model
             transcribe_started = time.monotonic()
-            if prefer_local_first and local_api_base and local_api_key:
+            # An Aitta run stays on Aitta: its Whisper, not the local server first.
+            if prefer_local_first and local_api_base and local_api_key and not on_aitta(config):
                 try:
                     transcription = await asyncio.to_thread(
                         transcribe_with, transcription_model="whisper_local"
@@ -1072,7 +1104,7 @@ async def audio_pipeline_stream(
                     yield sse_event("step_update", steps[3])
                 except Exception as e:
                     steps[3]["status"] = "error"
-                    steps[3]["message"] = f"PDF generation failed: {e}"
+                    steps[3]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[3])
 
             # Send final result
@@ -1114,15 +1146,16 @@ async def audio_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = provider_error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 
@@ -1146,6 +1179,7 @@ async def text_pipeline_stream(
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
     schema_id: str | None = Form(None),
+    user: str = Depends(current_user),
 ):
     """
     Run the text extraction pipeline with SSE streaming progress updates.
@@ -1153,6 +1187,7 @@ async def text_pipeline_stream(
     Returns Server-Sent Events with progress updates and final result.
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         steps = [
@@ -1246,7 +1281,7 @@ async def text_pipeline_stream(
                     yield sse_event("step_update", steps[pdf_step_idx])
                 except Exception as e:
                     steps[pdf_step_idx]["status"] = "error"
-                    steps[pdf_step_idx]["message"] = f"PDF generation failed: {e}"
+                    steps[pdf_step_idx]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[pdf_step_idx])
 
             # Send final result
@@ -1264,16 +1299,17 @@ async def text_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
+            message = provider_error_detail(e)
             # Mark current step as error
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
 
     return StreamingResponse(
         event_generator(),
@@ -1298,6 +1334,7 @@ async def document_pipeline_stream(
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
     schema_id: str | None = Form(None),
+    user: str = Depends(current_user),
 ):
     """
     Run the document pipeline with SSE streaming progress updates.
@@ -1305,6 +1342,7 @@ async def document_pipeline_stream(
     Returns Server-Sent Events with progress updates and final result.
     """
     job_id = str(uuid.uuid4())
+    remember_owner(job_id, user)
 
     # Validate file first
     if not file.filename:
@@ -1346,10 +1384,10 @@ async def document_pipeline_stream(
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
-    if (mismatch := content_mismatch(suffix, content)) is not None:
+    if (problem := await upload_problem(suffix, content)) is not None:
 
         async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": mismatch})
+            yield sse_event("error", {"message": problem.message})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
@@ -1380,8 +1418,8 @@ async def document_pipeline_stream(
             steps[0]["message"] = "Parsing document content..."
             yield sse_event("step_update", steps[0])
 
-            # The same parsers, run the same way, as in the Parser demo. A model or a remote
-            # service reads the file in a worker thread, so that it cannot stall the event loop.
+            # The same parsers, run the same way, as in the Parser demo. Every parser, local or
+            # remote, reads the file in a worker thread, so that it cannot stall the event loop.
             parse_started = time.monotonic()
             parsed = await run_parser(tmp_path, suffix, actual_parser_type)
             parse_seconds = time.monotonic() - parse_started
@@ -1499,7 +1537,7 @@ async def document_pipeline_stream(
                     yield sse_event("step_update", steps[3])
                 except Exception as e:
                     steps[3]["status"] = "error"
-                    steps[3]["message"] = f"PDF generation failed: {e}"
+                    steps[3]["message"] = error_detail(e, "PDF generation")
                     yield sse_event("step_update", steps[3])
 
             # Send final result
@@ -1531,10 +1569,10 @@ async def document_pipeline_stream(
             )
 
         except ImportError as e:
-            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+            yield sse_event("error", {"message": error_detail(e, "Loading the components")})
         except Exception as e:
             # A parser reports its problems as HTTP errors: show the reason, not the status.
-            message = str(e.detail) if isinstance(e, HTTPException) else str(e)
+            message = provider_error_detail(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
@@ -1574,7 +1612,7 @@ async def generate_session_schema(user_requirements: str = Form(...)):
     try:
         from gaik.software_components.extractor.schema import SchemaGenerator
     except ImportError as e:
-        raise HTTPException(503, f"Required components not installed: {e}") from e
+        raise HTTPException(503, error_detail(e, "Loading the components")) from e
 
     try:
         from routers.luvata_order import describe_schema
@@ -1606,8 +1644,11 @@ async def generate_session_schema(user_requirements: str = Form(...)):
 
 
 @router.get("/pdf/{job_id}")
-async def download_pdf(job_id: str, inline: bool = False):
-    """Download a generated PDF by job ID, or show it in the page with ?inline=true."""
+async def download_pdf(job_id: str, inline: bool = False, user: str = Depends(current_user)):
+    """Download a generated PDF by job ID, or show it in the page with ?inline=true.
+
+    Only for the user whose run made it (api/utils/result_owner.py)."""
+    require_owner(job_id, user, "PDF not found")
     if job_id not in PDF_STORAGE:
         raise HTTPException(status_code=404, detail="PDF not found")
 

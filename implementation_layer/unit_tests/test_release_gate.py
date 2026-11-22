@@ -240,9 +240,8 @@ def _fake_audio_provider(monkeypatch, replies):
 
     raw = SimpleNamespace(audio=SimpleNamespace(transcriptions=SimpleNamespace(create=create)))
     monkeypatch.setattr(transcriber_module, "_create_audio_client", lambda config: raw)
-    monkeypatch.setattr(
-        transcriber_module.AudioSegment, "from_file", lambda *args, **kwargs: _FakeAudioSegment()
-    )
+    # The Transcriber decodes through _decode_audio, which runs ffmpeg itself.
+    monkeypatch.setattr(transcriber_module, "_decode_audio", lambda path: _FakeAudioSegment())
     monkeypatch.setattr(transcriber_module.time, "sleep", lambda seconds: None)
     return received
 
@@ -276,7 +275,7 @@ def test_transcription_check_certifies_both_requests_without_keeping_transcripts
         ([_SENTENCES[1], *_SENTENCES], "lost a sentence"),
         # The second chunk comes back in English.
         ([_BOTH_SENTENCES, _SENTENCES[0], "The leak was found on Monday."], "lost a sentence"),
-        # The second chunk request fails; the Transcriber only marks it in the text.
+        # The second chunk request fails; the Transcriber raises, naming its time range.
         ([_BOTH_SENTENCES, _SENTENCES[0], RuntimeError("chunk failed")], "request failed"),
     ],
 )
@@ -315,8 +314,8 @@ def test_transcription_check_fails_on_a_changed_fixture(monkeypatch, tmp_path):
 def test_transcription_requests_count_against_the_shared_budget(monkeypatch, tmp_path):
     received = _fake_audio_provider(monkeypatch, [_BOTH_SENTENCES, *_SENTENCES])
     # Two calls left: the single request and the first chunk; the budget refuses the
-    # second chunk before it reaches the provider.
-    with pytest.raises(AssertionError, match="request failed"):
+    # second chunk before it reaches the provider, and the check stops on the budget.
+    with pytest.raises(RuntimeError, match="Live release request budget exceeded"):
         _transcription_check(tmp_path, max_calls=2)
     assert len(received) == 2
 

@@ -14,7 +14,14 @@ dependencies = [
     "boto3>=1.35.0",              # S3 presigned URLs for the video-search demo
     "yt-dlp>=2026.8.19",          # video download in api/scripts/seed_dental_demo.py — YouTube changes break older releases
     "gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]>=0.8.0",
+    "claude-agent-sdk>=0.2.97",   # the first Solution Wizard's agent session; the wheel carries the claude CLI
 ]
 
 [tool.uv.sources]
 gaik = { path = "../..", editable = true }
+
+[tool.uv]
+# CI resolves the demo afresh on Linux x86_64 (no lock file): take only versions that have
+# a wheel or sdist for it. A release whose Windows wheels reach PyPI before its Linux ones
+# is then skipped instead of failing the install (opencv-python-headless 5.1.0.95, 17 Nov 2026).
+required-environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]

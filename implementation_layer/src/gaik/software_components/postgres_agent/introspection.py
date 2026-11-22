@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 try:
@@ -14,6 +15,8 @@ except ImportError as exc:
     ) from exc
 
 from .models import ColumnInfo, SchemaInfo, TableInfo
+
+logger = logging.getLogger(__name__)
 
 _SAMPLE_ROW_COUNT = 3
 _PRIMITIVE = (str, int, float, bool)
@@ -38,14 +41,16 @@ def introspect_schema(
     Args:
         conn: An open psycopg connection.
         schema_name: The schema to introspect.
-        allowlist: When given, only these tables are included.
+        allowlist: When given, only these tables are included; an empty list
+            includes none, as in ``validate_read_only``. ``None`` includes
+            every table in the schema.
         include_samples: When True, attach up to three sample rows per table.
 
     Returns:
         A ``SchemaInfo`` describing every (allowed) base table and view.
     """
     # Exact names, as the SQL validator compares them: "Users" is not "users".
-    allowed = set(allowlist) if allowlist else None
+    allowed = set(allowlist) if allowlist is not None else None
 
     table_rows = conn.execute(
         """
@@ -56,9 +61,10 @@ def introspect_schema(
         """,
         (schema_name,),
     ).fetchall()
-    table_names = [
-        r["table_name"] for r in table_rows if allowed is None or r["table_name"] in allowed
-    ]
+    all_names = [r["table_name"] for r in table_rows]
+    table_names = [name for name in all_names if allowed is None or name in allowed]
+    if allowed is not None:
+        _warn_unmatched_allowlist(allowed, all_names, schema_name)
 
     column_rows = conn.execute(
         """
@@ -70,40 +76,53 @@ def introspect_schema(
         (schema_name,),
     ).fetchall()
 
+    # Keys come from pg_catalog, which every role can read. information_schema
+    # shows a constraint only to a role with more than SELECT on its table, so
+    # a read-only role would see no keys at all there.
     pk_rows = conn.execute(
         """
-        SELECT kcu.table_name, kcu.column_name
-        FROM information_schema.table_constraints tc
-        JOIN information_schema.key_column_usage kcu
-          ON tc.constraint_name = kcu.constraint_name
-         AND tc.table_schema = kcu.table_schema
-        WHERE tc.table_schema = %s AND tc.constraint_type = 'PRIMARY KEY'
+        SELECT c.relname AS table_name, a.attname AS column_name
+        FROM pg_catalog.pg_constraint con
+        JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+        CROSS JOIN LATERAL unnest(con.conkey) AS k(attnum)
+        JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+        WHERE n.nspname = %s AND con.contype = 'p'
         """,
         (schema_name,),
     ).fetchall()
     primary_keys = {(r["table_name"], r["column_name"]) for r in pk_rows}
 
+    # Each referencing column is paired with the referenced column at the same
+    # position of the same constraint, so composite keys and constraints that
+    # share a name on different tables pair correctly. Only references within the
+    # schema are kept: the agent cannot query another schema, and "customers.id"
+    # would read as the table of that name in this one.
     fk_rows = conn.execute(
         """
         SELECT
-            kcu.table_name AS table_name,
-            kcu.column_name AS column_name,
-            ccu.table_name AS foreign_table,
-            ccu.column_name AS foreign_column
-        FROM information_schema.table_constraints tc
-        JOIN information_schema.key_column_usage kcu
-          ON tc.constraint_name = kcu.constraint_name
-         AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.constraint_column_usage ccu
-          ON tc.constraint_name = ccu.constraint_name
-         AND tc.table_schema = ccu.table_schema
-        WHERE tc.table_schema = %s AND tc.constraint_type = 'FOREIGN KEY'
+            c.relname AS table_name,
+            a.attname AS column_name,
+            fc.relname AS foreign_table,
+            fa.attname AS foreign_column
+        FROM pg_catalog.pg_constraint con
+        JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_catalog.pg_class fc ON fc.oid = con.confrelid AND fc.relnamespace = n.oid
+        CROSS JOIN LATERAL unnest(con.conkey, con.confkey) AS k(attnum, fattnum)
+        JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
+        JOIN pg_catalog.pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = k.fattnum
+        WHERE n.nspname = %s AND con.contype = 'f'
+        ORDER BY c.relname, con.conname
         """,
         (schema_name,),
     ).fetchall()
+    # A reference to a table the agent may not read is left out, so the prompt
+    # names only tables a query can use.
     foreign_keys = {
         (r["table_name"], r["column_name"]): f"{r['foreign_table']}.{r['foreign_column']}"
         for r in fk_rows
+        if allowed is None or r["foreign_table"] in allowed
     }
 
     columns_by_table: dict[str, list[ColumnInfo]] = {}
@@ -129,6 +148,23 @@ def introspect_schema(
         tables.append(table)
 
     return SchemaInfo(schema_name=schema_name, tables=tables)
+
+
+def _warn_unmatched_allowlist(allowed: set[str], names: list[str], schema_name: str) -> None:
+    """Log each allowlist entry that names no table, with a case-insensitive hint."""
+    by_lower: dict[str, list[str]] = {}
+    for name in names:
+        by_lower.setdefault(name.lower(), []).append(name)
+    for entry in sorted(allowed - set(names)):
+        candidates = by_lower.get(entry.lower())
+        hint = (
+            f"; names are case-sensitive, did you mean {', '.join(repr(c) for c in candidates)}?"
+            if candidates
+            else ""
+        )
+        logger.warning(
+            "table_allowlist entry %r matches no table in schema %r%s", entry, schema_name, hint
+        )
 
 
 def _fetch_sample_rows(

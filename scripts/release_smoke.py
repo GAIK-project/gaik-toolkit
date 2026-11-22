@@ -226,11 +226,23 @@ def transcription_check(config, transcription_model, budget, work_dir) -> dict:
             return clients[-1]
 
         with mock.patch.object(transcriber_module, "_create_audio_client", bounded_audio_client):
-            result = Transcriber(
-                api_config=audio_config, output_dir=Path(work_dir) / name, **options
-            ).transcribe(TRANSCRIPTION_FIXTURE, **(call or {}))
+            try:
+                result = Transcriber(
+                    api_config=audio_config, output_dir=Path(work_dir) / name, **options
+                ).transcribe(TRANSCRIPTION_FIXTURE, **(call or {}))
+            except RuntimeError as exc:
+                # The budget stop keeps its own message, also when the Transcriber
+                # wraps it as the failure of a chunk ("Segment N of M ..."); that error
+                # keeps the provider's exception as its suppressed context.
+                for stop in (exc, exc.__cause__, exc.__context__):
+                    if isinstance(stop, RuntimeError) and str(stop).startswith(
+                        "Live release request budget"
+                    ):
+                        raise stop from None
+                # A chunk that fails raises, naming its time range.
+                raise AssertionError(f"A {name} transcription request failed") from exc
         requests = [request for client in clients for request in client.requests]
-        # The chunked path records a failed request in the transcript instead of raising.
+        # A transcript with a failed segment marked in it fails the check as well.
         if "[Transcription failed" in result.raw_transcript or any(
             "text" not in request for request in requests
         ):
@@ -284,15 +296,35 @@ def transcription_check(config, transcription_model, budget, work_dir) -> dict:
     }
 
 
-def run_smoke(args) -> dict:
-    from gaik.software_components.llm import create_llm_client, get_llm_config
+def smoke_config(provider: str, model: str, timeout: float, backend: str = "native") -> dict:
+    """The config the smoke test runs with.
 
-    config = get_llm_config(
-        args.provider,
-        model=args.model,
-        timeout=args.timeout,
-        max_retries=0,
-    )
+    Every provider gets the run's timeout and no retries, except Vertex AI with
+    no location set: it runs with the defaults a user gets, so the run certifies
+    the EU request's own limit, its single attempt and the global fallback.
+    """
+    from gaik.software_components.llm import get_llm_config
+
+    config = get_llm_config(provider, model=model)
+    if provider == "vertex" and backend == "native" and config.get("location_fallback"):
+        return config
+    return get_llm_config(provider, model=model, timeout=timeout, max_retries=0)
+
+
+def vertex_locations(clients) -> list[str]:
+    """The Vertex AI locations the run's clients last answered from."""
+    found = set()
+    for client in clients:
+        client = getattr(client, "_client", client)
+        if getattr(client, "provider", None) == "vertex" and getattr(client, "location", None):
+            found.add(client.location)
+    return sorted(found)
+
+
+def run_smoke(args) -> dict:
+    from gaik.software_components.llm import create_llm_client
+
+    config = smoke_config(args.provider, args.model, args.timeout, args.backend)
     if args.provider == "aitta":
         if str(config["base_url"]).rstrip("/") != "https://aitta-api.csc.fi/openai/v1":
             raise ValueError("Aitta release checks require CSC's documented endpoint")
@@ -312,6 +344,11 @@ def run_smoke(args) -> dict:
         "model": args.model,
         "backend": args.backend,
         "routed_model": config["model"],
+        "vertex_default_location": bool(
+            args.provider == "vertex"
+            and args.backend == "native"
+            and native_config.get("location_fallback")
+        ),
         "checks": {},
         "authenticated_live": False,
         "ok": False,
@@ -493,7 +530,8 @@ def run_smoke(args) -> dict:
                 mock.patch.object(writer_module, "create_llm_client", budgeted_client),
                 mock.patch.object(reviewer_module, "create_llm_client", budgeted_client),
             ):
-                report = ReportSynthesizer(config).synthesize(
+                # Strict review, the default users get, is what the release checks.
+                report = ReportSynthesizer(config, strict_review=True).synthesize(
                     knowledge, sections, title="Synthetic heating check"
                 )
             text = report.sections[0].text
@@ -540,6 +578,9 @@ def run_smoke(args) -> dict:
         result["requests"] = client.calls
         result["max_requests"] = args.max_calls
         result["max_output_tokens_per_request"] = args.output_tokens
+        if args.provider == "vertex":
+            # Which endpoint answered: "eu", or "global" after a fallback.
+            result["vertex_locations"] = vertex_locations(created_clients)
         for original in created_clients:
             with contextlib.suppress(Exception):
                 _close(original)

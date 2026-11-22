@@ -7,7 +7,7 @@ import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { FeedbackButton } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
   CardContent,
@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { useAittaSpeech } from "@/components/model-settings";
 import { cn } from "@/lib/utils";
 import {
   AudioLines,
@@ -118,7 +119,11 @@ export default function TranscriberPage() {
     setOptions((previous) => ({ ...previous, ...patch }));
   const language =
     LANGUAGES.find((entry) => entry.id === options.language) ?? LANGUAGES[0];
-  const speakersNeedServer = options.diarization && !options.preferLocalFirst;
+  // With an Aitta model picked, Aitta's Whisper transcribes: the HH server and
+  // what only it does (a set language, timed text, speakers) are out.
+  const aittaSpeech = useAittaSpeech();
+  const speakersNeedServer =
+    options.diarization && !options.preferLocalFirst && !aittaSpeech;
 
   useEffect(() => {
     return () => abortControllerRef.current?.abort();
@@ -180,7 +185,8 @@ export default function TranscriberPage() {
     }
 
     abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setIsLoading(true);
     clearResult();
@@ -213,7 +219,7 @@ export default function TranscriberPage() {
       const response = await apiFetch("/api/transcribe", {
         method: "POST",
         body: formData,
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -254,12 +260,23 @@ export default function TranscriberPage() {
           : "Transcription complete!",
       );
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
-      setIsLoading(false);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortControllerRef.current === controller) setIsLoading(false);
     }
+  }
+
+  /** Cancels the run in the browser; the page is ready again with its input. */
+  function stopRun(): void {
+    abortControllerRef.current?.abort();
+    setIsLoading(false);
   }
 
   return (
@@ -267,7 +284,7 @@ export default function TranscriberPage() {
       <DemoPageHeader
         icon={Mic}
         title="Transcriber"
-        description="Convert voice recordings and videos into clear, written text"
+        description="Turn recordings and videos into text"
         className="mb-6"
       />
 
@@ -476,7 +493,7 @@ export default function TranscriberPage() {
                       type="button"
                       role="radio"
                       aria-checked={options.language === entry.id}
-                      disabled={busy}
+                      disabled={busy || !!aittaSpeech}
                       onClick={() => set({ language: entry.id })}
                       className={cn(
                         "rounded-lg border px-3 py-2 text-sm transition-colors",
@@ -489,21 +506,30 @@ export default function TranscriberPage() {
                     </button>
                   ))}
                 </div>
-                <p className="text-muted-foreground text-xs">{language.hint}</p>
+                <p className="text-muted-foreground text-xs">
+                  {aittaSpeech
+                    ? `Not used: ${aittaSpeech} recognises the language from the speech.`
+                    : language.hint}
+                </p>
               </div>
 
               <Option
                 title="Finnish transcriber (HH server)"
                 htmlFor="prefer-local-first"
-                description="Try the Whisper server of Haaga-Helia first. It is the more accurate for Finnish, and it times the text and can tell speakers apart. If it cannot be reached, the cloud model is used instead."
+                description={
+                  aittaSpeech
+                    ? `Off while a CSC Aitta model is picked: ${aittaSpeech} transcribes, and it returns the text without timestamps or speakers.`
+                    : "Try the Whisper server of Haaga-Helia first. It is the more accurate for Finnish, and it times the text and can tell speakers apart. If it cannot be reached, the cloud model is used instead."
+                }
+                disabled={!!aittaSpeech}
                 control={
                   <Switch
                     id="prefer-local-first"
-                    checked={options.preferLocalFirst}
+                    checked={options.preferLocalFirst && !aittaSpeech}
                     onCheckedChange={(value) =>
                       set({ preferLocalFirst: value })
                     }
-                    disabled={busy}
+                    disabled={busy || !!aittaSpeech}
                   />
                 }
               />
@@ -513,13 +539,13 @@ export default function TranscriberPage() {
                   title="Speaker detection"
                   htmlFor="diarization"
                   description="Tells who speaks when, and shows each speaker's share of the talk. Works with the HH server only."
-                  disabled={!options.preferLocalFirst}
+                  disabled={!options.preferLocalFirst || !!aittaSpeech}
                   control={
                     <Switch
                       id="diarization"
-                      checked={options.diarization}
+                      checked={options.diarization && !aittaSpeech}
                       onCheckedChange={(value) => set({ diarization: value })}
-                      disabled={busy}
+                      disabled={busy || !!aittaSpeech}
                     />
                   }
                 />
@@ -529,7 +555,7 @@ export default function TranscriberPage() {
                     the cloud model will return the text without speakers.
                   </p>
                 )}
-                {options.diarization && (
+                {options.diarization && !aittaSpeech && (
                   <div className="grid gap-3 sm:grid-cols-3">
                     {(
                       [
@@ -576,24 +602,17 @@ export default function TranscriberPage() {
                 }
               />
 
-              <Button
-                onClick={() => void handleSubmit()}
-                disabled={!file || busy}
+              <RunButton
+                running={isLoading}
+                onRun={() => void handleSubmit()}
+                onStop={stopRun}
+                icon={Sparkles}
+                disabled={!file || isLoadingExample}
                 className="mt-auto w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Transcribing…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Transcribe
-                  </>
-                )}
-              </Button>
+                Transcribe
+              </RunButton>
             </CardContent>
           </Card>
         </div>

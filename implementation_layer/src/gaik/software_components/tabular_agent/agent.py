@@ -34,7 +34,12 @@ from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    source_material_messages,
+)
 
+from ..input_limits import InputLimits
 from .loader import load_sources, lock_down, normalize_sources
 from .models import (
     AnswerResult,
@@ -165,6 +170,12 @@ class TabularAgent:
         max_rows: Hard cap on rows returned by :meth:`run_sql`.
         query_timeout_s: Wall-clock limit for a single query (0 disables it).
         memory_limit: DuckDB memory cap, e.g. ``"1GB"``.
+        limits: Input limits for the source files: ``max_file_bytes`` (checked
+            here, before anything is read) and ``max_table_rows`` per sheet or
+            file (checked while loading). A file over one raises
+            :class:`~gaik.software_components.input_limits.InputLimitError`.
+            Defaults to ``InputLimits()``. Not to be confused with ``max_rows``,
+            which caps the rows a query returns.
         layout_inference: When the LLM may be asked to locate the real table
             inside a messy spreadsheet. ``"auto"`` (default) asks only when the
             deterministic heuristics flag a sheet as messy, so clean files cost
@@ -199,13 +210,15 @@ class TabularAgent:
         extra_instructions: str | None = None,
         answer_language: str = "en",
         temperature: float | None = 0.0,
+        limits: InputLimits | None = None,
     ) -> None:
         if layout_inference not in ("auto", "always", "never"):
             raise ValueError(
                 f"Invalid layout_inference '{layout_inference}': "
                 "must be 'auto', 'always', or 'never'."
             )
-        self.sources = normalize_sources(source)
+        self.limits = limits or InputLimits()
+        self.sources = normalize_sources(source, limits=self.limits)
         self.max_retries = max(1, max_retries)
         self.max_rows = max(1, max_rows)
         self.query_timeout_s = max(0.0, query_timeout_s)
@@ -243,6 +256,7 @@ class TabularAgent:
                     self.sources,
                     layout_inference=self.layout_inference,
                     infer_layout=self._infer_layout,
+                    limits=self.limits,
                 )
                 lock_down(conn)
             except Exception:
@@ -312,10 +326,15 @@ class TabularAgent:
 
     def _infer_layout(self, sheet_label: str, grid: str) -> SheetLayout:
         """Ask the LLM where the real table sits inside a messy sheet."""
-        messages = [
-            {"role": "system", "content": _LAYOUT_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Sheet: {sheet_label}\n\n{grid}"},
-        ]
+        # The grid is the file's own content: it goes in a data block, apart from the rules.
+        material = SourceMaterial()
+        messages = source_material_messages(
+            _LAYOUT_SYSTEM_PROMPT,
+            # The sheet's name comes from the workbook too: it goes in the block, not in
+            # the block's label.
+            "The sheet, its name on the first line:\n\n"
+            + material.wrap(f"Sheet: {sheet_label}\n\n{grid}", label="sheet"),
+        )
         parsed = self._parse_structured(messages, SheetLayout)
         if not isinstance(parsed, SheetLayout):
             raise RuntimeError("LLM did not return a sheet layout.")
@@ -345,30 +364,44 @@ class TabularAgent:
         self._get_conn()
         return list(self._tables)
 
-    def generate_sql(self, question: str, *, error_context: str | None = None) -> GeneratedSQL:
+    def generate_sql(
+        self, question: str, *, error_context: str | None = None, advice: str | None = None
+    ) -> GeneratedSQL:
         """Generate a read-only SQL query for ``question`` (no execution).
 
         Args:
             question: The natural-language question.
             error_context: Feedback from a previous failed attempt, fed back to
-                the LLM so it can correct the query.
+                the LLM so it can correct the query. It can quote the data, so it
+                goes in a data block.
+            advice: The caller's own guidance for the retry, such as how to make a
+                timed-out query cheaper. It is an instruction, so it stays outside
+                the data blocks.
 
         Returns:
             A :class:`~gaik.software_components.tabular_agent.models.GeneratedSQL`.
         """
         schema = self.get_schema()
-        user_prompt = f"Loaded tables:\n{schema.to_prompt_text()}\n\nQuestion: {question}"
+        # Table and column names and the example values come from the files, and a
+        # database error can quote them: each goes in a data block. The question and the
+        # caller's extra instructions stay outside the blocks.
+        material = SourceMaterial()
+        user_prompt = (
+            "Loaded tables:\n"
+            + material.wrap(schema.to_prompt_text(), label="loaded tables")
+            + f"\n\nQuestion: {question}"
+        )
         if self.extra_instructions:
             user_prompt += f"\n\nAdditional context:\n{self.extra_instructions}"
         if error_context:
-            user_prompt += f"\n\nThe previous attempt failed -- fix it.\n{error_context}"
+            user_prompt += "\n\nThe previous attempt failed -- fix it.\n" + material.wrap(
+                error_context, label="previous attempt"
+            )
+        if advice:
+            user_prompt += f"\n\n{advice}"
 
         parsed = self._parse_structured(
-            [
-                {"role": "system", "content": _SQL_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            GeneratedSQL,
+            source_material_messages(_SQL_SYSTEM_PROMPT, user_prompt), GeneratedSQL
         )
         if not isinstance(parsed, GeneratedSQL):
             raise RuntimeError("LLM did not return a SQL query.")
@@ -421,11 +454,13 @@ class TabularAgent:
         result = QueryResult(question=question)
         self.get_schema()
         error_context: str | None = None
+        advice: str | None = None
 
         for attempt in range(1, self.max_retries + 1):
             result.attempts = attempt
             try:
-                generated = self.generate_sql(question, error_context=error_context)
+                generated = self.generate_sql(question, error_context=error_context, advice=advice)
+                advice = None
                 result.sql = generated.sql
                 result.reasoning = generated.reasoning
                 rows = self.run_sql(generated.sql)
@@ -441,8 +476,8 @@ class TabularAgent:
                 msg = f"Query exceeded the {self.query_timeout_s}s time limit."
                 result.error = msg
                 if attempt == 1:
-                    error_context = (
-                        f"{msg} Failed SQL:\n{result.sql}\n\n"
+                    error_context = f"{msg} Failed SQL:\n{result.sql}"
+                    advice = (
                         "Rewrite the query to do less work: drop unused JOINs, "
                         "narrow the filters, aggregate earlier, or remove ORDER BY "
                         "over the full table. Do NOT resubmit the same query."
@@ -497,16 +532,16 @@ class TabularAgent:
         if self.answer_language != "en":
             language = _LANGUAGE_NAMES.get(self.answer_language, self.answer_language)
             system_prompt += f" Reply in {language}."
+        # The rows are the files' content: a cell cannot add to the rules for the answer.
+        material = SourceMaterial()
         user_prompt = (
             f"Question: {question}\n\n"
-            f"SQL query used:\n{query_result.sql}\n\n"
-            f"Query result ({query_result.row_count} row(s)):\n"
-            f"{_format_rows_for_prompt(query_result.rows)}"
+            "SQL query used:\n"
+            + material.wrap(query_result.sql or "", label="SQL query used")
+            + f"\n\nQuery result ({query_result.row_count} row(s)):\n"
+            + material.wrap(_format_rows_for_prompt(query_result.rows), label="query result")
         )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        messages = source_material_messages(system_prompt, user_prompt)
 
         if isinstance(client, ProviderClient):
             response = _with_retries(

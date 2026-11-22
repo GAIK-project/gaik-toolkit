@@ -60,6 +60,7 @@ Google, Anthropic and optional LiteLLM text models can be selected through the s
   - `schema_name` (str): Base filename (no `.py`) for saving/loading schema; defaults to `schema`.
 - `schema`: Optional pre-generated schema model to reuse.
 - `requirements`: Optional `ExtractionRequirements` matching the schema.
+- Every name in these dicts must be a parameter of the component it goes to, and stage configs (`config`, `api_config`, `openai_config`) are refused: pass them to the constructor (`api_config`, `transcription_config`, `extraction_config`). A `ValueError` names the option before anything is transcribed.
 
 ### Returns (`PipelineResult`)
 - `transcription`: `TranscriptionResult` with `raw_transcript`, `enhanced_transcript`, `job_id`.
@@ -68,5 +69,5 @@ Google, Anthropic and optional LiteLLM text models can be selected through the s
 - `requirements`: Corresponding `ExtractionRequirements`.
 
 ## Schema Persistence (example pattern)
-- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure the schema and `<name>_requirements.json` exist under `schema/`.
+- To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure `<name>_model.json` and `<name>_requirements.json` exist under `schema/`. `load_schema` rebuilds the model from `<name>_model.json` as data and never imports `<name>.py`, which is written only for reading. A folder from an older gaik without `<name>_model.json` is rebuilt from the requirements for a flat or parent-with-children schema; for a nested-list schema `load_schema` raises `SavedSchemaError`, naming the folder and how to convert it, instead of generating a new schema over the saved one. When a model cannot be saved as data, `save_schema` removes an older `<name>_model.json`, so the load rebuilds from the new requirements.
 - To generate and save a schema, set `generate_schema=True`; the example uses `pipeline.save_schema(...)` to write both artifacts to `schema/`.

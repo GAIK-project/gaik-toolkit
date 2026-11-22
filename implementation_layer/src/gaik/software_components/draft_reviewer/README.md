@@ -53,14 +53,36 @@ removed; style and order are left alone.
   edits, their errors and the current text go back to the LLM for new edits, which are
   applied the same way. A retry answer with no edits ends the review and leaves the
   failed edits unresolved.
+- Each failed edit gets an id (`F1`, `F2`, ...) that the retry request shows, and each
+  retry edit names the id of the failed edit it makes, so a retry may word its edit and
+  its reason differently. A failed edit that no retry edit names is asked for again in
+  the next request under the same id, and is returned in `unresolved` if it is still
+  missing when the review ends; one whose retry edit fails too is carried once, as that
+  retry edit. Only when a retry answer names no id at all is each retry edit paired with
+  at most one failed edit by its text: the same reason, the same correction or, for a
+  deletion, a deletion of like text.
 - This repeats until nothing fails or `max_attempts` requests (the first one included)
   have been made. Edits that still fail are returned in `unresolved`, not raised: the
   caller decides whether they are fatal.
 
+## Source material as data
+
+The reference and the text under review reach the model as material, apart from the
+checks: the system message holds the reviewer's rules and the sentence in
+`SOURCE_MATERIAL_INSTRUCTION`, and each piece sits in its own `<source_material>` block
+with a random id that is new for every request
+([`gaik.software_components.source_material`](../source_material.py)). Your
+`instructions` stay outside the blocks. `reference` may also be a mapping of names to
+texts (one entry per source or per earlier section); each entry gets its own block,
+labelled with its name. A sentence in the draft or the reference cannot close its block
+or change the checks. The edits are still applied without a person's approval; check the
+`applied` list where that matters.
+
 ## Use in ReportSynthesizer
 
 `ReportSynthesizer` reviews each drafted section with a `DraftReviewer`, passing the
-section's curated knowledge as `reference` and its own section checks as `instructions`.
+section's curated knowledge as `reference` (for a derived section, a mapping of its
+prerequisite sections) and its own section checks as `instructions`.
 Each section's `applied` and `unresolved` edits go into the report's `review_log`, and
 its `strict_review` flag decides whether an unresolved edit stops the run.
 

@@ -84,7 +84,7 @@ passed without environment variables. A missing required field raises `ValueErro
 # google: {"provider": "google", "api_key": str, "model": "gemini-2.5-flash",
 #          "embedding_model": "gemini-embedding-001"}
 # anthropic: {"provider": "anthropic", "api_key": str, "model": "claude-sonnet-5-5",
-#             "max_tokens": 4096}
+#             "max_tokens": 16000}
 # azure: {"provider": "azure", "use_azure": True, "api_key": str,
 #         "azure_endpoint": str, "api_version": str, "model": "gpt-6-luna",
 #         "embedding_model": "text-embedding-3-small", ...}
@@ -246,7 +246,7 @@ Individual field specification.
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `field_name` | str | Field name (snake_case) |
-| `field_type` | str | `str`, `int`, `float`, `bool`, `list`, `date` |
+| `field_type` | str | `str`, `int`, `float`, `bool`, `list[str]`, `date`, `decimal`, `list[dict]` |
 | `description` | str | Field description |
 | `required` | bool | Whether field is required |
 | `enum` | list | Optional allowed values |
@@ -279,7 +279,7 @@ extractor = VisionExtractor(
     api_config=None,                  # Optional explicit provider config
     model_provider="openai",          # "openai" | "claude" | "google"
     model=None,                       # Optional model override
-    reasoning_effort="medium",        # "minimal" | "low" | "medium" | "high"
+    reasoning_effort="medium",        # "low" | "medium" | "high"
     merge_table=False,                # Merge multi-page tables into one record
     use_azure=True,                   # OpenAI provider: use Azure deployment
     vertex_ai=True,                   # Google provider: use Vertex AI
@@ -311,7 +311,7 @@ result = extractor.extract(
 result.data            # dict[str, Any] — extracted fields (or VerifiableField-wrapped dict)
 result.verification    # Optional verification metadata (include_verification=True)
 result.usage           # UsageRecord — token counts, duration, cost (observability)
-result.model_dump()    # Serialize to dict
+dataclasses.asdict(result)  # it is a dataclass
 ```
 
 ### VerifiableField (opt-in per-field metadata)
@@ -321,8 +321,10 @@ When `include_verification=True`, each leaf field is wrapped:
 ```python
 {
     "value": <extracted value>,
-    "confidence_score": 0.0..1.0,
-    "reasoning": "short why-this-value note",
+    "confidence_score": 0.01..1.0,
+    "confidence_reason": "short note",
+    "found_in_text": bool,          # checked against the PDF's text layer;
+    "page": int,                    # both None when there is none
 }
 ```
 
@@ -343,15 +345,16 @@ LLM/vision-based PDF to markdown conversion.
 from gaik.software_components.parsers import VisionParser, get_openai_config
 
 config = get_openai_config(use_azure=True)
-parser = VisionParser(openai_config=config, clean_output=True)
+parser = VisionParser(openai_config=config)
 
-pages = parser.convert_pdf("document.pdf")
-# pages is a list of markdown strings, one per page
+pages = parser.convert_pdf("document.pdf", clean_output=True)
+# one merged string with clean_output=True (the default); one string per page with clean_output=False
 ```
 
 `openai_config` also accepts `get_llm_config(...)` for any provider; the model must accept images.
 
-**Returns:** `List[str]` - Markdown content per page
+**Returns:** `List[str]` - one Markdown string per page, or, with `clean_output=True` and more
+than one page, a single string merged by an extra model call
 
 ### PyMuPDFParser
 
@@ -364,7 +367,7 @@ parser = PyMuPDFParser()
 text = parser.parse_pdf("document.pdf")
 
 # Or convenience function
-text = parse_pdf("document.pdf")
+result = parse_pdf("document.pdf")      # -> dict; text under result["text_content"]
 ```
 
 **Returns:** `str` - Extracted text content
@@ -380,7 +383,7 @@ parser = DocxParser()
 text = parser.parse_docx("document.docx")
 
 # Or convenience function
-text = parse_docx("document.docx")
+result = parse_docx("document.docx")  # -> dict; text under result["text_content"]
 ```
 
 **Returns:** `str` - Extracted text content
@@ -411,10 +414,10 @@ Requires `gaik[parser]` + OpenAI-compatible credentials.
 ```python
 from gaik.software_components.parsers import VisionPlusParser, parse_document_with_vision_plus
 
-parser = VisionPlusParser()
+parser = VisionPlusParser(vision_config=config)
 result = parser.parse_document("document.pdf")           # -> dict
 # or the module-level convenience wrapper:
-result = parse_document_with_vision_plus("document.pdf")
+result = parse_document_with_vision_plus("document.pdf", vision_config=config)
 ```
 
 **Returns:** `dict` — markdown plus per-element metadata for downstream RAG pipelines.
@@ -427,13 +430,13 @@ Use when you want Docling-quality parsing without the local install overhead.
 ```python
 from gaik.software_components.parsers import DoclingApiClientParser, parse_document_via_api
 
-parser = DoclingApiClientParser()
+parser = DoclingApiClientParser(api_base="https://docling.example", password="...")
 result = parser.parse_document("document.pdf")           # -> dict
 # or the module-level convenience wrapper:
-result = parse_document_via_api("document.pdf")
+result = parse_document_via_api("document.pdf", api_base=..., password=...)
 ```
 
-**Returns:** `dict`. Needs `API_BASE` + `PASSWORD` for the remote service.
+**Returns:** `dict`. `api_base` and `password` are required keyword arguments.
 
 ### MultimodalParser
 
@@ -518,7 +521,7 @@ The `language` parameter selects the ASR model on the remote server:
 - `language="fi"` — Finnish fine-tuned model (`Finnish-NLP/whisper-large-finnish-v3-ct2`)
 - `language="en"` or `language="auto"` — `whisper-large-v3`
 
-Local-only parameters (`diarization`, `speaker_count`, etc.) are silently ignored when not using `whisper_local`.
+Local-only parameters (`diarization`, `speaker_count`, etc.) are ignored, with a printed notice, when not using `whisper_local`.
 
 ### Transcript Error Correction
 
@@ -568,7 +571,7 @@ enhancer = TranscriptEnhancer(
 # From string
 result = enhancer.enhance_text(
     transcript_text="...",
-    generate_summary=False,           # Include change count summary
+    generate_summary=False,           # Kept for older callers: the summary is always set
     diff_chunks=False,                # Include list of changed spans
     additional_instructions=None,     # Extra instructions for Pass 2
     progress_callback=None,           # Optional: Callable[[str, dict], None]
@@ -595,8 +598,10 @@ result = enhancer.enhance_file(
 result.enhanced_text           # Corrected transcript
 result.original_text           # Input transcript
 result.source_file             # File path (if enhance_file was used)
-result.correction_summary      # CorrectionSummary (if generate_summary=True)
+result.correction_summary      # CorrectionSummary (always set)
 result.diff_chunks             # List[DiffChunk] (if diff_chunks=True)
+result.refused_passes          # List[RefusedPass]: passes refused in code (digits changed,
+                               #   or more than max_change_ratio of the letters); input kept
 result.model_dump()            # Serialize to dict
 ```
 
@@ -650,7 +655,7 @@ All tuneable parameters with sensible defaults.
 | `chunk_duration_minutes` | int | 20 | Chunk duration for splitting |
 | `chunk_overlap_seconds` | float | 15.0 | Overlap between chunks |
 | `max_single_file_mb` | float | 24.0 | Max file size for single-pass |
-| `gpt4o_chunk_duration_minutes` | int | 23 | Chunk duration for GPT-4o (25 min API limit) |
+| `gpt4o_chunk_duration_minutes` | int | 22 | Chunk duration for GPT-4o (the API takes at most 1400 s per request) |
 | `transcription_workers` | int | 3 | Parallel transcription threads |
 | `ffmpeg_split_workers` | int | 3 | Parallel FFmpeg split threads |
 | `api_timeout_seconds` | int | 600 | API call timeout (keep ≥ ~25s × `gpt4o_chunk_duration_minutes`) |
@@ -660,7 +665,7 @@ All tuneable parameters with sensible defaults.
 | `audio_sample_rate` | int | 16000 | Audio sample rate |
 | `response_format` | str | `"srt"` | Output: `text`, `srt`, `vtt`, `json`, `verbose_json` |
 | `language` | str\|None | None | Language (None for auto-detect) |
-| `model` | TranscriptionModel | WHISPER | WHISPER or GPT4O_DIARIZE |
+| `model` | TranscriptionModel | WHISPER | `WHISPER`, `GPT4O_DIARIZE` or `WHISPER_LOCAL` |
 
 **Class method:** `TranscriptionConfig.from_env()` - Build config from environment variables.
 
@@ -670,6 +675,7 @@ All tuneable parameters with sensible defaults.
 class TranscriptionModel(StrEnum):
     WHISPER = "whisper"
     GPT4O_DIARIZE = "gpt-4o-transcribe-diarize"
+    WHISPER_LOCAL = "whisper_local"
 ```
 
 ### TranscriptionResult
@@ -770,7 +776,7 @@ classifier = DocumentClassifier(config=config)
 results = classifier.classify(
     file_or_dir: str,              # Single file or directory
     classes: List[str],            # Predefined class labels
-    parser="auto",                 # Parser choice for text extraction
+    parser=None,                   # None picks by file type; or "pymupdf" | "docx" | "vision"
 )
 ```
 
@@ -785,7 +791,7 @@ results = classifier.classify(
 }
 ```
 
-**Parser options:** `auto`, `pymupdf`, `docx`, `vision`
+**Parser options:** `None` (by file type), `pymupdf`, `docx`, `vision`
 
 ---
 

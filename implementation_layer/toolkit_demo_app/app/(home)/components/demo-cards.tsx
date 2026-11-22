@@ -13,6 +13,7 @@ import {
   Lock,
   type LucideIcon,
   MessageSquare,
+  MonitorDown,
   Wand2,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -20,9 +21,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import {
-  type ComingSoon,
-  comingSoonComponents,
-  comingSoonUseCases,
   components,
   type Demo,
   featuredUseCases,
@@ -69,6 +67,7 @@ const cardClassName =
 
 interface DemoCardsProps {
   isUnlocked: boolean;
+  isAuthenticated: boolean;
 }
 
 /**
@@ -105,7 +104,7 @@ function Reveal({
   );
 }
 
-function IconTile({ icon: Icon, tile }: { icon: LucideIcon; tile: string }) {
+function IconTile({ icon: Icon, tile }: { icon: Demo["icon"]; tile: string }) {
   return (
     <span
       className={cn(
@@ -182,7 +181,7 @@ function ImageCard({ demo, isUnlocked }: { demo: Demo; isUnlocked: boolean }) {
         <div className="bg-muted relative h-40 shrink-0 overflow-hidden sm:h-auto sm:w-[42%]">
           <Image
             src={demo.image}
-            alt={`${demo.title} demo`}
+            alt=""
             fill
             sizes="(min-width: 1024px) 240px, (min-width: 640px) 40vw, 100vw"
             className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
@@ -206,22 +205,13 @@ function ImageCard({ demo, isUnlocked }: { demo: Demo; isUnlocked: boolean }) {
   );
 }
 
-function ComingSoonLine({ items }: { items: ComingSoon[] }) {
-  return (
-    <p className="text-muted-foreground text-sm">
-      <span className="text-foreground font-medium">Coming soon:</span>{" "}
-      {items.map(({ title }) => title).join(" · ")}
-    </p>
-  );
-}
-
-function SectionHeading({ title, intro }: { title: string; intro: string }) {
+function SectionHeading({ title, intro }: { title: string; intro?: string }) {
   return (
     <div className="space-y-1 border-b pb-3">
       <h2 className="font-serif text-2xl font-semibold tracking-tight">
         {title}
       </h2>
-      <p className="text-muted-foreground text-sm">{intro}</p>
+      {intro && <p className="text-muted-foreground text-sm">{intro}</p>}
     </div>
   );
 }
@@ -241,9 +231,6 @@ function ProcessHeading({
     >
       <style.icon className={cn("size-4", style.accent)} />
       <h3 className={cn("font-semibold", style.accent)}>{style.name}</h3>
-      <span className="text-muted-foreground hidden md:inline">
-        · {style.summary}
-      </span>
     </div>
   );
 }
@@ -268,27 +255,36 @@ const noCodeLinks: {
     href: "/prompts",
     icon: MessageSquare,
   },
+  {
+    title: "Desktop app",
+    description:
+      "Run extraction, parsing and classification on files on your own computer, with your own model key.",
+    href: "/desktop-app",
+    icon: MonitorDown,
+  },
 ];
 
 function Sections({
   isUnlocked,
+  isAuthenticated,
   animated,
 }: DemoCardsProps & { animated: boolean }) {
   return (
     <>
-      {!isUnlocked && (
+      {/* Signed-out visitors get the sign-in line in the hero. */}
+      {isAuthenticated && !isUnlocked && (
         <Reveal
           animated={animated}
           className="bg-muted/50 border-primary/20 flex items-center gap-3 rounded-lg border px-4 py-3"
         >
           <Lock className="text-primary size-4 shrink-0" />
           <p className="text-muted-foreground text-sm">
-            <Link href="/sign-in" className="text-primary hover:underline">
-              Sign in
-            </Link>{" "}
-            to access the interactive demos. Don&apos;t have an account?{" "}
-            <Link href="/sign-up" className="text-primary hover:underline">
-              Sign up
+            Your account doesn&apos;t have demo access yet.{" "}
+            <Link
+              href="/access-pending"
+              className="text-primary hover:underline"
+            >
+              See your access status
             </Link>
             .
           </p>
@@ -302,8 +298,7 @@ function Sections({
         tour="use-cases"
       >
         <SectionHeading
-          title="Use Cases"
-          intro="End-to-end applications for real business tasks, built from the modules and components below."
+          title="Use cases"
         />
         <div className="grid gap-4 lg:grid-cols-2">
           {featuredUseCases.map((demo) => (
@@ -312,14 +307,13 @@ function Sections({
             </Reveal>
           ))}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {useCases.map((demo) => (
             <Reveal key={demo.href} animated={animated}>
               <DemoCard demo={demo} isUnlocked={isUnlocked} />
             </Reveal>
           ))}
         </div>
-        <ComingSoonLine items={comingSoonUseCases} />
       </Reveal>
 
       <Reveal
@@ -328,7 +322,7 @@ function Sections({
         className="scroll-mt-24 space-y-5"
       >
         <SectionHeading
-          title="Software Modules"
+          title="Software modules"
           intro="Ready-made pipelines that combine several components into one workflow."
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -347,7 +341,7 @@ function Sections({
         tour="components"
       >
         <SectionHeading
-          title="Software Components"
+          title="Software components"
           intro="Single building blocks, each usable on its own from the gaik Python package."
         />
         {PROCESSES.map(({ name }) => {
@@ -366,7 +360,6 @@ function Sections({
             </div>
           );
         })}
-        <ComingSoonLine items={comingSoonComponents} />
       </Reveal>
 
       <Reveal
@@ -375,10 +368,10 @@ function Sections({
         className="scroll-mt-24 space-y-5"
       >
         <SectionHeading
-          title="No-code Assets"
+          title="No-code assets"
           intro="Use GAIK's extraction know-how without writing code."
         />
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {noCodeLinks.map(({ title, description, href, icon: Icon }) => (
             <Link
               key={href}
@@ -406,7 +399,7 @@ function Sections({
   );
 }
 
-export function DemoCards({ isUnlocked }: DemoCardsProps) {
+export function DemoCards({ isUnlocked, isAuthenticated }: DemoCardsProps) {
   const mounted = useHasMounted();
 
   // Links from other pages (the footer's /#modules) arrive before this page has
@@ -427,7 +420,11 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
   if (!mounted) {
     return (
       <section id="demos" className="scroll-mt-24 space-y-14">
-        <Sections isUnlocked={isUnlocked} animated={false} />
+        <Sections
+          isUnlocked={isUnlocked}
+          isAuthenticated={isAuthenticated}
+          animated={false}
+        />
       </section>
     );
   }
@@ -440,7 +437,11 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
       variants={containerVariants}
       className="scroll-mt-24 space-y-14"
     >
-      <Sections isUnlocked={isUnlocked} animated />
+      <Sections
+        isUnlocked={isUnlocked}
+        isAuthenticated={isAuthenticated}
+        animated
+      />
     </motion.section>
   );
 }

@@ -101,6 +101,29 @@ result = transcriber.transcribe(
 ) -> TranscriptionResult
 ```
 
+### Input limits
+
+`ParallelTranscriber(api_cfg, config, limits=InputLimits(...))` refuses a file over
+`max_media_seconds` (6 hours) with `InputLimitError` before audio is extracted or any
+transcription call is made, on every backend; `whisper_local_max_audio_minutes` is a
+second cap for Whisper Local only. `max_media_bytes` is off by default: the size of a
+video says little about its audio. The length is read with ffprobe; when that fails, it
+is measured again from the extracted audio before the first call. A file whose header
+holds no length (a WebM a browser wrote while recording) is measured by decoding its
+audio, and a recording whose length cannot be read at all is refused. Every ffprobe
+call has a 60-second timeout, decoding a 10-minute one.
+
+A chunk that FFmpeg cannot create, even on its sequential retry, stops the run with a
+`RuntimeError` that names the missing time ranges, and a chunk whose transcription fails
+after its retries stops the run too. A chunk the provider transcribes as empty text is not
+an error, so a stretch of speech the provider returns nothing for looks like silence;
+compare the transcript's timestamps with the recording where a gap matters. Each chunk's
+encoded length is read back with ffprobe, so the check holds at every `audio_bitrate`. A
+chunk shorter than asked for is retried like a failed one; if it is still short while audio
+continues past it, it is a missing stretch and stops the run. Chunks past the real end of
+the audio, which a file whose header overstates its length produces, are skipped and
+logged, and a recording in which no chunk holds audio stops the run with a `RuntimeError`.
+
 ### TranscriptionConfig
 
 All parameters with sensible defaults. Key fields:

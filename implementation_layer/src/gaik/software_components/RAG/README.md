@@ -24,6 +24,8 @@ contract based on `langchain_core.documents.Document`.
   nearest neighbours", and calibrate the threshold that separates them. A vector
   index returns results for every query, so counting them proves nothing.
 - **answer_generator**: Generate answers from retrieved context with optional
-  citations and conversation history.
+  citations and conversation history. The model cites by each retrieved chunk's
+  reference number, and the citations list holds only retrieved chunks. Each retrieved chunk goes to the model as
+  data, in its own labelled block apart from the instructions.
 
 See each subfolder for a full README and usage examples.

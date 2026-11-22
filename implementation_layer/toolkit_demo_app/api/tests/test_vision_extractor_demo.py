@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 from api.routers import vision_extractor as route
+from api.utils import model_allow_list
 from fastapi import HTTPException, UploadFile
 from gaik.software_components.extractor import ExtractionRequirements, FieldSpec
 from gaik.software_components.extractor.schema import create_extraction_model
@@ -84,7 +85,7 @@ def test_provider_model_allowlists(monkeypatch) -> None:
             "gpt-5.6-terra",
         ),
         "claude": ("claude-sonnet-5-5", "claude-haiku-5-5"),
-        "google": ("gemini-3.8-flash",),
+        "google": ("gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon"),
     }
 
     monkeypatch.setenv("AZURE_API_KEY", "test-key")
@@ -108,12 +109,53 @@ def test_google_is_offered_only_with_credentials(monkeypatch) -> None:
         route._provider_settings("google", "gemini-3.8-flash")
 
     monkeypatch.setenv("GOOGLE_PROJECT_ID", "test-project")
-    assert route._offered_models("google") == ("gemini-3.8-flash",)
+    assert route._offered_models("google") == (
+        "gemini-3.8-flash",
+        "gemini-4-argon",
+        "gemini-4-carbon",
+    )
+
+
+def test_gemini_4_models_are_offered_to_the_team_only(monkeypatch) -> None:
+    monkeypatch.setenv("GOOGLE_PROJECT_ID", "test-project")
+    monkeypatch.delenv("DEMO_SERVER_MODELS", raising=False)
+    monkeypatch.setattr(model_allow_list, "request_is_staff", lambda: False)
+    assert model_allow_list.offered_to(route._offered_models("google")) == ["gemini-3.8-flash"]
+    with pytest.raises(HTTPException, match="GAIK project team"):
+        model_allow_list.check_team_tier("gemini-4-carbon")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["google/gemma-4-31b-it", "openai/gpt-oss-120b"])
+async def test_an_aitta_model_is_refused_before_any_upload_or_call(monkeypatch, model) -> None:
+    monkeypatch.setattr(
+        route, "get_request_api_config", lambda: {"provider": "aitta", "model": model}
+    )
+    task, _schema, _requirements = route._load_example_schema()
+    upload = UploadFile(filename="sample.pdf", file=io.BytesIO(b"%PDF-test"))
+
+    with pytest.raises(HTTPException) as refused:
+        await route.extract_vision(
+            files=[upload],
+            user_requirements=task,
+            schema_id=route.EXAMPLE_SCHEMA_ID,
+            model_provider="openai",
+            model=None,
+            reasoning_effort="medium",
+            merge_table=False,
+            additional_instructions=None,
+            include_verification=False,
+            include_sources=False,
+        )
+    assert refused.value.status_code == 400
+    assert refused.value.detail == route.AITTA_REFUSAL
 
 
 @pytest.mark.asyncio
 async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> None:
     captured: dict = {}
+    # Claude Sonnet is a team-only model: run as the team.
+    monkeypatch.setattr(model_allow_list, "request_is_staff", lambda: True)
 
     class FakeVisionExtractor:
         def __init__(self, **kwargs):

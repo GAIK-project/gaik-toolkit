@@ -45,6 +45,7 @@ function FileLine({
       {row.file && (
         <button
           type="button"
+          aria-label={`Download ${row.name}`}
           title="Download"
           onClick={() => downloadBlob(row.file!, row.name)}
           className="text-muted-foreground hover:text-foreground"
@@ -55,6 +56,7 @@ function FileLine({
       {!disabled && (
         <button
           type="button"
+          aria-label={`Remove ${row.name}`}
           title="Remove"
           onClick={onRemove}
           className="text-muted-foreground hover:text-foreground"

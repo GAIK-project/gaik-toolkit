@@ -42,10 +42,18 @@ MODE = "full"  # "full", "resume" or "single_call"
 HERE = Path(__file__).parent
 SPEC_FILE = HERE / EXAMPLE / "report_spec.json"
 WORKSPACE = HERE / "output" / EXAMPLE
+# Site recordings outrank customer documents in a conflict. The bundled specs leave
+# source_precedence out, because the demo app loads them with gaik from PyPI, whose
+# releases up to 0.11.1 refuse the key; the example adds it where the gaik has it.
+SOURCE_PRECEDENCE = ["primary", "secondary"]
 
 
 def main() -> None:
-    spec = ReportSpec.load(SPEC_FILE)
+    # project_meeting reads its sources from ../../multi_source_report_generator/, so the
+    # spec's paths may reach anywhere under software_modules/.
+    spec = ReportSpec.load(SPEC_FILE, root=HERE.parent)
+    if "source_precedence" in ReportSpec.model_fields and not spec.source_precedence:
+        spec = spec.model_copy(update={"source_precedence": SOURCE_PRECEDENCE})
     writer = ReportWriter(get_llm_config())
     print(f"Spec: {SPEC_FILE}\nWorkspace: {WORKSPACE}\nMode: {MODE}")
 

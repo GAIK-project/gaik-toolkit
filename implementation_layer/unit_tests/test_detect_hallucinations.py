@@ -11,6 +11,7 @@ from gaik.software_components.validators.llm_judge import (
     HallucinationReport,
     LLMJudge,
     build_hallucination_prompt,
+    build_hallucination_system_prompt,
     parse_hallucination_flags,
 )
 
@@ -93,11 +94,19 @@ def test_build_hallucination_prompt_includes_field_descriptions_when_given():
     )
     assert "Field rules" in prompt
     assert "field a description" in prompt
+    # The rules stay outside the blocks.
+    assert prompt.index("field a description") < prompt.index("<source_material")
 
 
 def test_build_hallucination_prompt_no_field_rules_block_when_omitted():
     prompt = build_hallucination_prompt(source_text="x", extracted={"a": "b"})
     assert "Field rules" not in prompt
+
+
+def test_the_system_prompt_carries_the_field_rules_when_given():
+    system = build_hallucination_system_prompt({"a": "field a description"})
+    assert "Field rules" in system and "field a description" in system
+    assert build_hallucination_system_prompt(None) == HALLUCINATION_SYSTEM_PROMPT
 
 
 def test_hallucination_system_prompt_describes_severity_classes():
@@ -171,6 +180,7 @@ def test_detect_hallucinations_passes_field_descriptions_through():
 
     def fake_dispatch(user_prompt, system_prompt):
         captured["user"] = user_prompt
+        captured["system"] = system_prompt
         return ('{"flags": []}', 60, 5)
 
     with patch.object(judge, "_dispatch_text", side_effect=fake_dispatch):
@@ -179,4 +189,5 @@ def test_detect_hallucinations_passes_field_descriptions_through():
             extracted={"a": "v"},
             field_descriptions={"a": "rule for a"},
         )
-    assert "rule for a" in captured["user"]
+    assert "rule for a" in captured["system"]
+    assert "rule for a" not in captured["user"]

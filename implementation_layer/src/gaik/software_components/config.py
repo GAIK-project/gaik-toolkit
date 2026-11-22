@@ -7,11 +7,10 @@ OpenAI/Azure OpenAI clients across different extraction modules.
 
 import os
 
-from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
-# Load environment variables
-load_dotenv()
+from gaik.software_components.endpoints import AITTA_BASE_URL, check_openai_endpoint
+from gaik.software_components.env_file import load_env_file
 
 
 def get_openai_config(use_azure: bool = True) -> dict:
@@ -30,6 +29,7 @@ def get_openai_config(use_azure: bool = True) -> dict:
         >>> config = get_openai_config(use_azure=False)
         >>> # Returns OpenAI config with model name
     """
+    load_env_file()
     if use_azure:
         azure_endpoint = os.getenv("AZURE_ENDPOINT")
         return {
@@ -66,6 +66,7 @@ def create_openai_client(config: dict):
         >>> client = create_openai_client(config)
     """
     # Import lazily: llm.factory also imports this legacy helper.
+    from gaik.software_components.llm.base import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_SECONDS
     from gaik.software_components.llm.providers import Provider, resolve_provider
 
     # A bare legacy client config has always meant standard OpenAI. Provider-aware
@@ -76,7 +77,11 @@ def create_openai_client(config: dict):
         for key in ("timeout", "max_retries", "http_client")
         if config.get(key) is not None
     }
+    # Aitta's cold start needs its 600 s too; the same value as the default.
+    options.setdefault("timeout", DEFAULT_TIMEOUT_SECONDS)
+    options.setdefault("max_retries", DEFAULT_MAX_RETRIES)
     if name == Provider.AZURE.value:
+        check_openai_endpoint(config, name)
         options["api_version"] = config["api_version"]
         if config.get("base_url"):
             options["base_url"] = config["base_url"]
@@ -93,10 +98,9 @@ def create_openai_client(config: dict):
         for field in ("base_url", "model"):
             if not config.get(field):
                 raise ValueError(f"openai_compatible requires an explicit {field!r}")
+    check_openai_endpoint(config, name)
     if config.get("base_url"):
         options["base_url"] = config["base_url"]
     elif name == Provider.AITTA.value:
-        options["base_url"] = "https://aitta-api.csc.fi/openai/v1"
-    if name == Provider.AITTA.value:
-        options.setdefault("timeout", 600.0)
+        options["base_url"] = AITTA_BASE_URL
     return OpenAI(api_key=config["api_key"], **options)

@@ -1,0 +1,138 @@
+# The malware scanner the demo API checks every upload with: ClamAV (clamd) on
+# 3310, with freshclam updating the signatures in the same container. The image
+# is built in Rahti from scanner/ on the deploy/demo-app branch, like the other
+# two images, and the Deployment rolls out when a build lands.
+#
+# Applying this file creates only the scanner's own objects; it touches neither
+# gaik-demo-api nor gaik-demo. Then point the API at it (README.md, "Upload
+# malware check"):
+#   oc set env deployment/gaik-demo-api DEMO_MALWARE_SCANNER=gaik-demo-scanner:3310 -n gaik
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: gaik-demo-scanner
+  labels:
+    app: gaik-demo-scanner
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: gaik-demo-scanner-git
+  labels:
+    app: gaik-demo-scanner
+spec:
+  runPolicy: SerialLatestOnly
+  source:
+    type: Git
+    git:
+      uri: https://github.com/GAIK-project/gaik-toolkit.git
+      ref: deploy/demo-app
+    contextDir: implementation_layer/toolkit_demo_app/scanner
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: gaik-demo-scanner:latest
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  triggers:
+    - type: GitHub
+      github:
+        secretReference:
+          name: gaik-demo-webhook
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gaik-demo-scanner
+  labels:
+    app: gaik-demo-scanner
+    app.kubernetes.io/part-of: gaik-toolkit
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"gaik-demo-scanner:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"clamd\")].image"}]
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gaik-demo-scanner
+  template:
+    metadata:
+      labels:
+        app: gaik-demo-scanner
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: clamd
+          image: image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-scanner:latest
+          ports:
+            - containerPort: 3310
+          # clamd holds the signatures in memory (about 1 GiB) and, while it
+          # loads an update, the new set beside the old one. The project's
+          # LimitRange allows a CPU limit at most 8 times the request.
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1280Mi
+            limits:
+              cpu: "1"
+              memory: 3Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: signatures
+              mountPath: /var/lib/clamav
+            - name: tmp
+              mountPath: /tmp
+          # clamd opens its port only after the signatures are loaded.
+          startupProbe:
+            tcpSocket:
+              port: 3310
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: 3310
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket:
+              port: 3310
+            periodSeconds: 30
+            failureThreshold: 4
+      volumes:
+        - name: signatures
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gaik-demo-scanner
+  labels:
+    app: gaik-demo-scanner
+spec:
+  selector:
+    app: gaik-demo-scanner
+  ports:
+    - port: 3310
+      targetPort: 3310
+      protocol: TCP

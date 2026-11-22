@@ -19,7 +19,7 @@ you which fields look broken before you act on them downstream.
   (each is one atomic criterion the judge should consider separately).
 - **Bias-mitigation guidance** in the system prompt: anti-verbosity,
   anti-formatting-bias, evaluation-before-judgement order.
-- **Panel/jury aggregation** via `LLMJudgePanel` (3+ judges, majority vote,
+- **Panel/jury aggregation** via `LLMJudgePanel` (two or more judges, three or more recommended; majority vote,
   agreement metric — mitigates single-model self-preference bias).
 - **Calibration utility** `calibrate_against_human_labels` returning Pearson
   r vs. human raters and severity-agreement rate.
@@ -95,7 +95,7 @@ a human reviewer would. The same code path works for any source
 document — PDF, scanned image, screenshot — as long as you can render
 it to PNG bytes.
 
-See the [examples folder](../../../../examples/software_components/validators/)
+See the [examples folder](../../../../../examples/software_components/validators/)
 for working scripts:
 
 - `demo_llm_judge.py` — single-judge basic usage with Likert scoring.
@@ -103,6 +103,36 @@ for working scripts:
 - `demo_panel_jury.py` — three-judge majority vote with `LLMJudgePanel`.
 - `demo_pairwise.py` — A/B comparison with `compare_pairwise(swap_and_average=True)`.
 - `demo_calibration.py` — Pearson-r calibration vs. a human-labeled dataset.
+
+## Judged content as data
+
+The content a judge assesses is in its input, so a sentence in it could try to
+steer its own verdict. Every judge call keeps the two apart with
+[`gaik.software_components.source_material`](../../source_material.py):
+
+- The system message holds the judge's rules, the scale, the output format,
+  the sentence in `SOURCE_MATERIAL_INSTRUCTION` and your rubric
+  (`ValidationRubric`: vendor, aspects, checks, `custom_system_suffix`, few-shot
+  examples). `detect_hallucinations` puts its `field_descriptions` there too.
+- The user message holds the task and the judged content, each piece in its
+  own `<source_material>` block with a random id for each call: the extractor
+  output (`answer`), the source text (`source`), the expected value
+  (`reference`), surrounding text (`context`). `compare_pairwise` labels the two
+  outputs `answer a` and `answer b` by the position shown, so the swap pass
+  shows `extracted_b` as `answer a`. A closing tag written in the content is
+  escaped and cannot end its block.
+- Page images go as before; the sentence covers them.
+- Verdict parsing is unchanged: a reply that cannot be read is still reported in
+  `judge_error`, never as a pass.
+
+To build the messages yourself, use `build_system_prompt(scoring_mode,
+rubric=...)` with `build_user_prompt(extracted)`, or
+`build_hallucination_system_prompt(field_descriptions)` with
+`build_hallucination_prompt(source_text, extracted)`. Passed a rubric or field
+rules, the user-prompt builders still render them, before the blocks. The
+instruction lowers
+the chance that judged content steers the verdict; it does not remove it, so
+check high-stakes verdicts by other means as well.
 
 ## Picking a model
 
@@ -203,17 +233,18 @@ def calibrate_against_human_labels(
 ) -> CalibrationReport: ...
 ```
 
-The judge reuses provider configuration helpers from
+The OpenAI/Azure and Anthropic routes reuse the helpers in
 `gaik.software_components.parsers.multimodal_parser.config`, so the same
-env-vars work for both:
+variables work for both; the Google route reads its own:
 
 | Variable | Used by |
 |---|---|
-| `AZURE_API_KEY`, `AZURE_RESOURCE_NAME`, `AZURE_API_VERSION`, `AZURE_DEPLOYMENT` | Azure OpenAI |
+| `AZURE_API_KEY`, `AZURE_ENDPOINT`, `AZURE_API_VERSION`, `AZURE_DEPLOYMENT` | Azure OpenAI (`use_azure=True`) |
 | `OPENAI_API_KEY` | OpenAI |
 | `ANTHROPIC_API_KEY` | Anthropic direct |
-| `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE` | Anthropic on Azure AI Foundry (auto-detected) |
+| `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` | Anthropic on Microsoft Foundry (`use_azure=True`) |
 | `GOOGLE_VERTEXAI_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS` | Vertex AI (preferred) |
+| `GOOGLE_VERTEXAI_LOCATION` | Vertex AI location; used as given when set. Unset, the judge asks the EU multi-region and falls back to `global` when the EU does not serve the model or does not answer |
 | `GOOGLE_GEMINI_API_KEY` | Generative Language API (alternative) |
 
 ## Research references

@@ -110,13 +110,28 @@ def test_custom_prompt_replaces_repeated_placeholders() -> None:
     assert prompt == "Question / Question\nEvidence / Evidence"
 
 
-@pytest.mark.parametrize(
-    ("citations", "template"),
-    [(False, DEFAULT_PROMPT), (True, DEFAULT_PROMPT_WITH_CITATIONS)],
-)
-def test_default_prompts_are_unchanged(citations: bool, template: str) -> None:
+def test_default_prompt_templates_match_the_pinned_text() -> None:
+    instructions = (
+        "You are a helpful assistant that answers questions using only the provided context.\n"
+        "If the context does not contain the answer, say you do not have enough information.\n"
+    )
+    tail = "\n\nContext:\n{context}\n\nQuestion: {query}"
+    assert DEFAULT_PROMPT == instructions + "Be concise and factual." + tail
+    assert DEFAULT_PROMPT_WITH_CITATIONS == (
+        instructions
+        + "Be concise and factual. Cite the context with the reference number its block"
+        + " starts with, such as [1] or [2][3]. Do not write document names or page"
+        + " numbers in a citation."
+        + tail
+    )
+
+
+@pytest.mark.parametrize("citations", [False, True])
+def test_default_user_message_holds_the_context_and_the_question(citations: bool) -> None:
     generator = _generator(citations=citations)
 
     prompt = generator._build_prompt("Question", "Evidence")
 
-    assert prompt == template.format(query="Question", context="Evidence")
+    assert prompt == "Context:\nEvidence\n\nQuestion: Question"
+    assert "Be concise" in generator._system_prompt()
+    assert ("such as [1] or [2][3]" in generator._system_prompt()) is citations

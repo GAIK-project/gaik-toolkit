@@ -67,10 +67,10 @@ For developers who want to drive the wizard programmatically or from a terminal,
 ```bash
 cd implementation_layer/solution_wizard
 
-# Wizard asks for the output directory interactively:
+# The runner asks for the output folder before the session starts:
 python run_wizard_interactive.py
 
-# Pre-supply the output directory (skips that question):
+# Or give it (outside the repository):
 python run_wizard_interactive.py --output-dir ~/projects/my-use-case
 
 # Verify credentials before a full session:
@@ -79,13 +79,11 @@ python run_wizard_interactive.py --preflight
 
 Requires `pip install "gaik[wizard]"` (Claude Agent SDK + python-dotenv), the `claude` CLI on `PATH`, and Azure Foundry credentials (`CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE`) in `implementation_layer/.env` (one level above the wizard directory) or the shell environment. Use `--env-file` to read another file; the script's docstring lists the optional variables.
 
-**Web interface — [Demo site](https://gaik-demo.2.rahtiapp.fi/):**
+A hook decides every tool call before it runs, including the calls the CLI would approve by itself. The agent reads only the output folder and the wizard's own files, writes only the output folder, never reads or writes a `.env` file, and runs only the wizard's scripts. Your own MCP servers and Claude Code settings are not loaded, and the agent gets the system basics plus the names the `.env` file sets, or without one the provider names the PoC template lists, and nothing else from your shell (`--pass-env NAME` hands on another).
 
-The wizard is in private beta on the demo site: it appears as a locked "Beta" item until an administrator grants your signed-in account wizard access (the team can also use a shared access key). Once unlocked, the wizard streams responses live; generated files appear in the sidebar and can be downloaded individually or as a `.zip`.
+**Web interface — Wizard V2:**
 
-![Solution Configuration Wizard web interface — streaming chat with generated files sidebar](/images/wizard_screenshot.png)
-
-[↓ Download screenshot](/images/wizard_screenshot.png)
+Wizard V2 runs the wizard as its own web service: a chat beside the steps, the blueprint, the workflow diagram and the PoC, with four gates where you approve the result. It needs an account from the GAIK team. The demo site's [Solution Configuration Wizard page](https://gaik-demo.2.rahtiapp.fi/solution-wizard) links to it and to an access request. The demo site no longer runs the wizard itself.
 
 ---
 
@@ -117,7 +115,7 @@ V2 is aimed at making the wizard production-grade and accessible through a dedic
 |---|---|
 | Improved BPMN generation (complex workflows, parallel branches, exception paths) | Planned |
 | Diverse use-case coverage (at least 10 tested use cases) | Planned |
-| Dedicated Solution Wizard web UI — structured multi-pane workspace for the full workflow | Planned |
+| Dedicated Solution Wizard web UI — structured multi-pane workspace for the full workflow | In use (Wizard V2, accounts from the GAIK team) |
 | Interactive BPMN editing — canvas editable with changes propagated back to the JSON | Planned |
 | Full installable use-case package | Planned |
 | Gate 4: runtime validation of the full package | Planned |

@@ -95,6 +95,16 @@ the locator of a fact from a recording is null downstream.
 
 ---
 
+## Input limits
+
+`SourceNormalizer(limits=InputLimits(...))` checks every file before the first
+conversion: documents and images for size (100 MiB) and image pixels, and recordings
+for length (6 hours). PDFs are read locally, so the default
+(`InputLimits.local_parsing()`) has no page limit; set `max_pages` to add one. The
+parsers and the Transcriber get the same limits, so a spreadsheet is also held to
+1,000,000 rows per sheet. A file over a limit raises `InputLimitError` and nothing is
+converted.
+
 ## Save and Load
 
 ```python
@@ -106,7 +116,10 @@ sources = NormalizedSources.load("output/sources")
 text = sources.get("maintenance_log.xlsx").text
 ```
 
-The saved Markdown files can be read and edited before curation. Texts that are already
+The saved Markdown files can be read and edited before curation. `load` checks each id in
+`sources.json` before it reads the file: an id must be a plain file name, and its `<id>.md`
+must stay inside the folder (a symbolic link that leads out of it is refused), else
+`SourcePathError` (a `ValueError`) is raised. Texts that are already
 available can be wrapped with `NormalizedSources.from_texts({"notes.txt": text})`.
 
 See the [example](../../../../examples/software_components/source_normalizer/source_normalizer_example.py)

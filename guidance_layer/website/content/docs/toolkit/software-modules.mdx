@@ -309,13 +309,13 @@ flowchart TD
 | Single-Call Baseline (`single_call/`) | Only with `mode="single_call"`: the same layout as `report/`, with an empty review log |
 
 **Key features:**
-- **One report spec** (`ReportSpec.load("report_spec.json")`) with an optional model per role: vision, transcription, curator, writer and reviewer, and optional `settings`: transcription language, parallel curation, review attempts, strict review, DOCX output, and reasoning effort and temperature per step. The spec holds no credentials; an unknown key such as `api_key` raises
+- **One report spec** (`ReportSpec.load("report_spec.json")`) with an optional model per role: vision, transcription, curator, writer and reviewer, and optional `settings`: transcription language, parallel curation, review attempts, strict review, DOCX output, and reasoning effort and temperature per step. The spec holds no credentials; an unknown key such as `api_key` raises. Its paths must stay inside the spec's folder (or the `root` passed to `load`): an absolute path, or one that leads out through `..` or a symbolic link, raises `SourcePathError` before any file is read
 - **Inspectable stages**: `run()` executes all three stages, and `normalize()`, `curate()` and `synthesize()` each run one, so a run can resume from edited knowledge files
 - **No-model rebuild**: `rebuild()` reassembles `report.md` and `report.docx` from edited section files without an LLM call
-- **Verified quotes**: every quote must appear in its cited source, ignoring only whitespace; a section that still fails after one retry stops the run
+- **Verified quotes**: every quote must appear in its cited source, ignoring only whitespace; a fact whose quote still fails after one retry is dropped and listed in `KnowledgeBase.dropped`, and the rest of the section is kept
 - **Role separation**: the curator, the writer and the reviewer are separate calls, each with its own model setting
 - **Explicit gaps**: a required item that no source covers becomes `(missing: <item>)`, and an unresolved conflict is stated with both views
-- **Fails loudly**: an unsupported, unreadable or empty source stops the run; with `settings.strict_review`, so does a reviewer edit that cannot be applied
+- **Fails loudly**: an unsupported, unreadable or empty source stops the run, and so does a reviewer edit that cannot be applied, unless `settings.strict_review` is turned off
 - **Install**: `pip install "gaik[report-writer]"`. The stages save `report.docx` unless `settings.docx` is off, which needs the Pandoc binary. Recordings go to the Transcriber, which needs OpenAI or Azure OpenAI
 - **Token usage**: each stage result has `usage`: transcription and vision for `normalize()`, the curator for `curate()`, the writer and reviewer for `synthesize()`
 
@@ -408,7 +408,7 @@ flowchart TD
 - **Dependency-ordered sections** (agentic mode) — `depends_on` lets summary or recommendation sections synthesize from finalized earlier sections rather than re-deriving from raw evidence
 - **Mixed input normalization** — PDF, Word, Excel/CSV, audio/video, images, and plain text all processed in a single pipeline
 - **Optional sample report** — provide an existing report to enforce a specific format, tone, and length; the writer mirrors its structure without copying content
-- **Config persistence** — save the full use-case definition (sections, options, paths) to JSON with `save_report_config`; reload with `load_report_config` for repeat runs on new evidence
+- **Config persistence** — save the full use-case definition (sections, options, paths) to JSON with `save_report_config`; reload with `load_report_config` for repeat runs on new evidence. Paths are stored relative to the config's folder and must stay inside it (or the `root` passed to `load_report_config`); a symbolic link in an input folder that leads out of it raises `SourcePathError`
 - **Dual output** — Markdown always produced; Word document optional
 
 **Potential applications:**

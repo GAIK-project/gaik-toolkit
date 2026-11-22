@@ -11,14 +11,12 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from dotenv import load_dotenv
-
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm.providers import Provider, resolve_provider
-
-load_dotenv()
 
 
 def _env(*names: str, default: str | None = None) -> str | None:
+    load_env_file()
     for name in names:
         value = os.getenv(name, "").strip()
         if value:
@@ -48,7 +46,14 @@ _REQUIRED_FIELDS = {
 }
 
 
+# Vertex AI: the EU multi-region first, the global endpoint for a model the EU
+# does not serve. The global endpoint is not tied to a region.
+VERTEX_DEFAULT_LOCATION = "eu"
+VERTEX_FALLBACK_LOCATION = "global"
+
+
 def _embedding_model_default(provider: str) -> str:
+    load_env_file()
     if provider in (Provider.OPENAI.value, Provider.AZURE.value):
         return os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
     if provider in (Provider.GOOGLE.value, Provider.VERTEX.value):
@@ -100,6 +105,12 @@ def get_llm_config(
     else:
         raise ValueError(f"Unsupported provider: {name}")
     config.update(overrides)
+    if "location" in overrides and "location_fallback" not in overrides:
+        # A location the caller chose is used as given, never swapped for another.
+        config.pop("location_fallback", None)
+    if "location_fallback" in overrides:
+        # The caller named the fallback: it applies with any location.
+        config.pop("_default_location_fallback", None)
     config["provider"] = name
     config["use_azure"] = name == Provider.AZURE.value
     if name == Provider.AZURE.value and "azure_audio_endpoint" not in overrides:
@@ -117,6 +128,7 @@ def get_llm_config(
 
 
 def _openai_config() -> dict:
+    load_env_file()
     return {
         "provider": Provider.OPENAI.value,
         "use_azure": False,
@@ -150,6 +162,7 @@ def _aitta_config() -> dict:
 
 
 def _azure_config() -> dict:
+    load_env_file()
     endpoint = _env("AZURE_ENDPOINT")
     return {
         "provider": Provider.AZURE.value,
@@ -165,6 +178,7 @@ def _azure_config() -> dict:
 
 
 def _anthropic_config() -> dict:
+    load_env_file()
     return {
         "provider": Provider.ANTHROPIC.value,
         "api_key": _env("ANTHROPIC_API_KEY"),
@@ -174,6 +188,7 @@ def _anthropic_config() -> dict:
 
 
 def _anthropic_foundry_config() -> dict:
+    load_env_file()
     return {
         "provider": Provider.ANTHROPIC_FOUNDRY.value,
         "api_key": _env("ANTHROPIC_FOUNDRY_API_KEY", "AZURE_API_KEY"),
@@ -184,6 +199,7 @@ def _anthropic_foundry_config() -> dict:
 
 
 def _google_config() -> dict:
+    load_env_file()
     return {
         "provider": Provider.GOOGLE.value,
         "api_key": _env("GOOGLE_API_KEY", "GEMINI_API_KEY"),
@@ -193,10 +209,19 @@ def _google_config() -> dict:
 
 
 def _vertex_config() -> dict:
+    load_env_file()
+    location = _env("GOOGLE_CLOUD_LOCATION")
     return {
         "provider": Provider.VERTEX.value,
         "project_id": _env("GOOGLE_PROJECT_ID", "GOOGLE_CLOUD_PROJECT"),
-        "location": _env("GOOGLE_CLOUD_LOCATION", default="global"),
+        # The EU multi-region keeps requests in the EU. A model it does not serve
+        # falls back to the global endpoint, with a warning; a location set in the
+        # environment or by the caller is used as given.
+        "location": location or VERTEX_DEFAULT_LOCATION,
+        "location_fallback": None if location else VERTEX_FALLBACK_LOCATION,
+        # Marks the fallback as the default's, so a location set on this dict
+        # later does not inherit it.
+        "_default_location_fallback": not location,
         # Standard ADC can be a user, service account, or workload identity file.
         # Let google-auth resolve GOOGLE_APPLICATION_CREDENTIALS itself instead
         # of interpreting every ADC file as a service account private key.

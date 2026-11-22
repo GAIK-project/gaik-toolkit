@@ -7,13 +7,16 @@ The parser is ``"vision"`` (default: Docling layout plus a vision model for imag
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
 from gaik.software_components.config import get_openai_config
-from gaik.software_components.RAG.answer_generator import AnswerGenerator
+from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.RAG._chunk_ids import check_document_id
+from gaik.software_components.RAG.answer_generator import AnswerGenerator, Citation
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.retriever import Retriever
 from gaik.software_components.RAG.vector_store import VectorStore
@@ -43,8 +46,18 @@ class IndexResult:
 
 @dataclass
 class RAGWorkflowResult:
+    """The answer and the retrieved chunks.
+
+    With ``citations=True``, ``citations`` lists the retrieved chunks the answer cites
+    and ``dropped_citations`` the ``[name, page X]`` citations it wrote that match
+    none of them (removed from the answer). When the answer streams, both are filled
+    in once it has been read to the end.
+    """
+
     answer: str | Iterable[str]
     documents: list[Document]
+    citations: list[Citation] = field(default_factory=list)
+    dropped_citations: list[str] = field(default_factory=list)
 
 
 class RAGWorkflow:
@@ -62,6 +75,7 @@ class RAGWorkflow:
         persist: bool = True,
         persist_path: str = "chroma_store",
         collection_name: str = "gaik_rag",
+        owner: str | None = None,
         embedding_model: str | None = None,
         retriever_top_k: int = 5,
         retriever_threshold: float | None = None,
@@ -71,6 +85,7 @@ class RAGWorkflow:
         stream: bool = True,
         conversation_history: bool = True,
         last_n: int = 3,
+        limits: InputLimits | None = None,
     ) -> None:
         """
         Initialize the workflow.
@@ -91,6 +106,10 @@ class RAGWorkflow:
             persist: If True, use persistent Chroma vector store.
             persist_path: Directory for Chroma persistence.
             collection_name: Chroma collection name.
+            owner: A user or session id. Documents this workflow indexes are recorded
+                for it, and its questions retrieve only its own documents, also from a
+                collection that other owners share. Without it, every workflow on the
+                same collection and folder reads every document in it.
             embedding_model: Optional embedding model override.
             retriever_top_k: Number of chunks to retrieve.
             retriever_threshold: Optional score threshold.
@@ -98,8 +117,17 @@ class RAGWorkflow:
             retriever_rerank: Enable reranker for final ordering.
             citations: Include citations in generated answers.
             stream: Stream responses by default.
-            conversation_history: Maintain last n Q/A pairs.
+            conversation_history: Maintain last n Q/A pairs. The history is kept on
+                this object, so a service with several users needs one workflow per
+                user or session; a shared one answers each user with the others'
+                earlier questions in its prompt.
             last_n: Number of Q/A pairs to keep if conversation_history is True.
+            limits: Input limits for the parser (file size, PDF pages, images
+                described); a document over one raises ``InputLimitError`` before it
+                is parsed. ``None`` (default) leaves the parser's own defaults
+                (:meth:`~gaik.software_components.input_limits.InputLimits.local_parsing`:
+                no page limit) and passes nothing, so a parser class without a
+                ``limits`` argument still works.
         """
         if parser not in ("vision", "text"):
             raise ValueError(f"parser must be 'vision' or 'text', not {parser!r}")
@@ -116,22 +144,25 @@ class RAGWorkflow:
         )
         self.answer_config = answer_config if answer_config is not None else self.api_config
 
+        # Only set limits are passed: a replacement parser class may not take them.
+        parser_kwargs = {} if limits is None else {"limits": limits}
         if parser == "text":
             from .text_parser import TextRagParser
 
-            self.parser = TextRagParser()
+            self.parser = TextRagParser(**parser_kwargs)
         else:
             if VisionRagParser is None:
                 raise ImportError(
                     "parser='vision' needs pip install 'gaik[rag-workflow]'; "
                     "parser='text' needs only 'gaik[rag-workflow-text]'"
                 ) from _vision_import_error
-            self.parser = VisionRagParser(vision_config=self.parser_config)
+            self.parser = VisionRagParser(vision_config=self.parser_config, **parser_kwargs)
         self.embedder = Embedder(config=self.embedding_config, model=embedding_model)
         self.vector_store = VectorStore(
             persist=persist,
             persist_path=persist_path,
             collection_name=collection_name,
+            owner=owner,
         )
         self.retriever = Retriever(
             embedder=self.embedder,
@@ -154,16 +185,34 @@ class RAGWorkflow:
         file_paths: list[str | Path],
         *,
         filenames: list[str] | None = None,
+        document_ids: list[str] | None = None,
     ) -> IndexResult:
         """Parse and index documents into the vector store.
+
+        Each file is one document, with ``document_id`` its entry in
+        ``document_ids`` or else its path with forward slashes
+        (``Path(path).as_posix()``). The path is not resolved: ``data/a.pdf``
+        and its absolute path are two documents, and one relative path indexed
+        from two working directories is one. The display name in
+        ``filenames`` does not identify it, so two files with the same name are
+        two documents. Indexing a document again replaces its chunks: the ones
+        it no longer has are deleted, and unchanged ones are not stored twice.
+        Files saved under a new temporary path each time are new documents;
+        pass ``document_ids`` to replace them.
 
         Args:
             file_paths: Paths to the files to index: PDFs, or with ``parser="text"``
                 also Word (.docx), text and Markdown files.
             filenames: Optional list of original filenames (same order as file_paths).
                        If provided, these names are used instead of extracting from paths.
+            document_ids: Optional stable id for each file (same order as
+                file_paths), such as a database key; indexing the same id again
+                replaces that document's chunks.
         """
+        if document_ids is not None and len(document_ids) != len(file_paths):
+            raise ValueError("document_ids must have one entry for each file path")
         all_chunks: list[Document] = []
+        ids: list[str] = []
 
         for i, file_path in enumerate(file_paths):
             doc_name = filenames[i] if filenames and i < len(filenames) else None
@@ -173,16 +222,64 @@ class RAGWorkflow:
                 chunks = self.parser.convert_doc_to_chunks_with_vision(
                     str(file_path), document_name=doc_name
                 )
+            # The path in one spelling, so "docs/a.pdf" and Path("docs/a.pdf") (with
+            # backslashes on Windows) are the same document.
+            document_id = check_document_id(
+                document_ids[i] if document_ids is not None else Path(file_path).as_posix()
+            )
+            ids.append(document_id)
+            for chunk in chunks:
+                chunk.metadata = {**(chunk.metadata or {}), "document_id": document_id}
             all_chunks.extend(chunks)
 
         embeddings, documents = self.embedder.embed(all_chunks)
-        self.vector_store.add(documents, embeddings)
+        self._replace_documents(list(dict.fromkeys(ids)), documents, embeddings)
 
         return IndexResult(
             num_documents=len(file_paths),
             num_chunks=len(all_chunks),
             vector_store_path=self.vector_store.persist_path if self.vector_store.persist else None,
         )
+
+    def _replace_documents(
+        self, document_ids: list[str], documents: list[Document], embeddings: list[list[float]]
+    ) -> None:
+        """Store ``documents`` in place of the stored chunks of ``document_ids``.
+
+        Runs after the embedding succeeds, so a failed call leaves the old chunks.
+        A store whose ``add()`` takes ``replace`` deletes the old chunks only once
+        the new ones are stored; otherwise they are deleted first. Both act on
+        the store's owner, when it has one.
+        """
+        store = self.vector_store
+        delete_document = getattr(store, "delete_document", None)
+        with_chunks = {(doc.metadata or {}).get("document_id") for doc in documents}
+        if _takes_replace(store.add):
+            store.add(documents, embeddings, replace=True)
+            # A file that now has no chunks keeps none of its old ones.
+            if delete_document is not None:
+                for document_id in document_ids:
+                    if document_id not in with_chunks:
+                        delete_document(document_id)
+            return
+        # A replacement store without replace: delete first, then add.
+        if delete_document is not None:
+            for document_id in document_ids:
+                delete_document(document_id)
+        store.add(documents, embeddings)
+
+    def delete_document(self, document_id: str) -> int:
+        """Delete one document's chunks from the vector store.
+
+        Args:
+            document_id: The id the document was indexed under: its entry in
+                ``document_ids``, or else its path with forward slashes
+                (``Path(path).as_posix()``).
+
+        Returns:
+            The number of chunks deleted.
+        """
+        return self.vector_store.delete_document(document_id)
 
     def ask(
         self,
@@ -202,5 +299,19 @@ class RAGWorkflow:
             filters=filters,
             include_scores=include_scores,
         )
-        answer = self.answer_generator.generate(query, documents, stream=stream)
-        return RAGWorkflowResult(answer=answer, documents=documents)
+        cited = self.answer_generator.generate_with_citations(query, documents, stream=stream)
+        return RAGWorkflowResult(
+            answer=cited.answer,
+            documents=documents,
+            citations=cited.citations,
+            dropped_citations=cited.dropped_citations,
+        )
+
+
+def _takes_replace(add) -> bool:
+    """Whether a store's ``add`` accepts ``replace=``."""
+    try:
+        parameters = inspect.signature(add).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(p.name == "replace" or p.kind is p.VAR_KEYWORD for p in parameters)

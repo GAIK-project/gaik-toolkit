@@ -258,7 +258,7 @@ export default function VideoSearchPage() {
         throw new Error(
           res.status === 404
             ? "This video's media is missing from storage."
-            : detail.detail || "Failed to get playback URL",
+            : detail.error || detail.detail || "Failed to get playback URL",
         );
       }
 
@@ -303,7 +303,7 @@ export default function VideoSearchPage() {
           icon={Video}
           iconClassName="text-primary h-8 w-8"
           title="Semantic Video Search"
-          description="Search your indexed videos with normal language and jump straight to the relevant moment."
+          description="Search indexed videos in plain language and jump to the moment that answers"
         />
 
         {statusLoading ? (

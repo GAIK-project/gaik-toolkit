@@ -23,11 +23,28 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import os
 import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components._log_names import file_tag
+from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.source_material import (
+    SourceMaterial,
+    clean_label,
+    with_source_material_instruction,
+)
+from gaik.software_components.source_normalizer.paths import SourcePathError, path_inside
+
+from ._material import (
+    TRUNCATED_NOTE,
+    Evidence,
+    EvidenceSource,
+    render_evidence,
+    source_list,
+)
 from .models import (
     EvidenceItem,
     GeneratedSection,
@@ -72,6 +89,8 @@ _EXT_TO_TYPE: dict[str, str] = {
 }
 
 SUPPORTED_EXTENSIONS = frozenset(_EXT_TO_TYPE)
+
+_SOURCE_SEPARATOR = "\n\n---\n\n"
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +256,7 @@ def _xlsx_to_markdown(path: Path) -> str:
         logger.warning(
             "Cannot parse %s: 'openpyxl' is not installed. Install gaik extras "
             "for spreadsheet support. Skipping spreadsheet content.",
-            path.name,
+            file_tag(path),
         )
         return f"_([.xlsx not parsed: openpyxl not installed] {path.name})_"
 
@@ -447,12 +466,34 @@ class MultiSourceReportGenerator:
     >>> print(result.markdown_path)
     """
 
-    def __init__(self, *, api_config: dict | None = None, use_azure: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        api_config: dict | None = None,
+        use_azure: bool = True,
+        limits: InputLimits | None = None,
+    ) -> None:
+        """
+        Args:
+            api_config: Shared LLM config; read from the environment when omitted.
+            use_azure: With no ``api_config``, read the Azure OpenAI config.
+            limits: Input limits for every parser, transcriber and image extractor
+                this module builds; a ``ctor`` option that sets its own ``limits``
+                wins. ``None`` keeps each component's defaults. A file over one
+                raises ``InputLimitError``.
+        """
         if api_config is None:
             from gaik.software_components.config import get_openai_config
 
             api_config = get_openai_config(use_azure=use_azure)
         self.api_config = api_config
+        self.limits = limits
+
+    def _limited(self, ctor: dict) -> dict:
+        """A copy of ``ctor`` with this generator's ``limits``, unless it sets its own."""
+        if self.limits is None:
+            return dict(ctor)
+        return {"limits": self.limits, **ctor}
 
     # -- public API -------------------------------------------------------
 
@@ -479,7 +520,7 @@ class MultiSourceReportGenerator:
         agentic: bool = False,
         review_options: dict | None = None,
         polish: bool = False,
-        strict_review: bool = False,
+        strict_review: bool = True,
         curate_evidence: bool = False,
         verbose: bool = False,
         progress_callback: Callable[[str], None] | None = None,
@@ -500,7 +541,7 @@ class MultiSourceReportGenerator:
         writer_options = writer_options or {}
 
         # 1. Build evidence (shared by both paths).
-        evidence_items, evidence_pack, sample_markdown = self._build_evidence(
+        evidence_items, evidence_sources, evidence_pack, sample_markdown = self._build_evidence(
             input_paths=input_paths,
             parser_choice=parser_choice,
             parser_options=parser_options,
@@ -522,7 +563,7 @@ class MultiSourceReportGenerator:
         if agentic:
             markdown, generated, usage_total = self._run_agentic(
                 specs=specs,
-                evidence_pack=evidence_pack,
+                evidence_pack=evidence_sources,
                 sample_markdown=sample_markdown,
                 output_dir=output_dir,
                 report_title=report_title,
@@ -552,7 +593,7 @@ class MultiSourceReportGenerator:
             response = self._write_report(
                 client,
                 specs=specs,
-                evidence_pack=evidence_pack,
+                evidence_pack=evidence_sources,
                 report_title=report_title,
                 report_description=report_description,
                 additional_instructions=additional_instructions,
@@ -610,8 +651,11 @@ class MultiSourceReportGenerator:
         sample_report_path: str | Path | None,
         max_evidence_chars: int | None,
         progress_callback: Callable[[str], None] | None = None,
-    ) -> tuple[list[EvidenceItem], str, str | None]:
-        """Normalize all inputs to an evidence pack (+ optional sample markdown).
+    ) -> tuple[list[EvidenceItem], list[EvidenceSource], str, str | None]:
+        """Normalize all inputs to evidence sources and a pack (+ optional sample markdown).
+
+        Each source reaches a model in its own block, labelled with its file name;
+        the pack is the same text as plain Markdown, for ``normalized_sources.md``.
 
         Shared by the single-call and agentic paths. When ``progress_callback``
         is provided, normalization progress is routed through it instead of
@@ -642,9 +686,10 @@ class MultiSourceReportGenerator:
                 )
             )
 
-        evidence_pack = self._assemble_evidence_pack(
+        evidence_sources = self._evidence_sources(
             evidence_items, max_evidence_chars=max_evidence_chars
         )
+        evidence_pack = self._render_evidence_pack(evidence_sources)
         _emit(f"Evidence pack assembled: {total} source(s), {len(evidence_pack):,} chars")
 
         sample_markdown: str | None = None
@@ -659,7 +704,7 @@ class MultiSourceReportGenerator:
                     sample_markdown[:max_evidence_chars] + "\n\n[... sample report truncated ...]"
                 )
 
-        return evidence_items, evidence_pack, sample_markdown
+        return evidence_items, evidence_sources, evidence_pack, sample_markdown
 
     # -- agentic path -----------------------------------------------------
 
@@ -667,7 +712,7 @@ class MultiSourceReportGenerator:
         self,
         *,
         specs: list[ReportSectionSpec],
-        evidence_pack: str,
+        evidence_pack: Evidence,
         sample_markdown: str | None,
         output_dir: str | Path | None,
         report_title: str,
@@ -837,7 +882,7 @@ class MultiSourceReportGenerator:
         if choice == "pymupdf":
             from gaik.software_components.parsers import PyMuPDFParser
 
-            return PyMuPDFParser().parse_pdf(str(path), use_markdown=True)
+            return PyMuPDFParser(limits=self.limits).parse_pdf(str(path), use_markdown=True)
         if choice in ("vision", "vision_parser"):
             from gaik.software_components.parsers import VisionParser
 
@@ -846,18 +891,20 @@ class MultiSourceReportGenerator:
                 or parser_options.get("openai_config")
                 or self.api_config
             )
-            pages = VisionParser(cfg, **parser_options.get("ctor", {})).convert_pdf(str(path))
+            ctor = self._limited(parser_options.get("ctor", {}))
+            pages = VisionParser(cfg, **ctor).convert_pdf(str(path))
             return "\n\n".join(pages)
         if choice == "multimodal":
             from gaik.software_components.parsers import MultimodalParser
 
-            ctor = self._shared_ctor(parser_options)
+            ctor = self._limited(self._shared_ctor(parser_options))
             result = MultimodalParser(**ctor).parse(str(path))
             return result.clean_markdown or result.raw_markdown
         if choice == "docling":
             from gaik.software_components.parsers import DoclingParser
 
-            result = DoclingParser(**parser_options.get("ctor", {})).parse_document(str(path))
+            ctor = self._limited(parser_options.get("ctor", {}))
+            result = DoclingParser(**ctor).parse_document(str(path))
             return _coerce_markdown(result)
         raise ValueError(
             f"Unknown parser_choice '{parser_choice}'. "
@@ -867,12 +914,12 @@ class MultiSourceReportGenerator:
     def _parse_docx(self, path: Path) -> str:
         from gaik.software_components.parsers import DocxParser
 
-        return DocxParser().parse_docx(str(path), use_markdown=True)
+        return DocxParser(limits=self.limits).parse_docx(str(path), use_markdown=True)
 
     def _transcribe(self, path: Path, *, transcriber_options: dict) -> str:
         from gaik.software_components.transcriber import Transcriber
 
-        ctor = dict(transcriber_options.get("ctor", {}))
+        ctor = self._limited(transcriber_options.get("ctor", {}))
         ctor.setdefault("api_config", self.api_config)
         transcriber = Transcriber(**ctor)
         result = transcriber.transcribe(str(path), **transcriber_options.get("call", {}))
@@ -901,7 +948,7 @@ class MultiSourceReportGenerator:
         if mode == "structured":
             from gaik.software_components.vision_extractor import VisionExtractor
 
-            extractor = VisionExtractor(**self._shared_ctor(image_options))
+            extractor = VisionExtractor(**self._limited(self._shared_ctor(image_options)))
             user_requirements = image_options.get(
                 "user_requirements",
                 "Extract all visible text, tables, figures, and structured content from the image.",
@@ -915,28 +962,62 @@ class MultiSourceReportGenerator:
         cfg = (
             image_options.get("api_config") or image_options.get("openai_config") or self.api_config
         )
-        return VisionParser(cfg, **image_options.get("ctor", {})).convert_image(str(path))
+        ctor = self._limited(image_options.get("ctor", {}))
+        return VisionParser(cfg, **ctor).convert_image(str(path))
+
+    def _evidence_sources(
+        self, evidence_items: list[EvidenceItem], *, max_evidence_chars: int | None
+    ) -> list[EvidenceSource]:
+        """The sources as the writer receives them, cut to ``max_evidence_chars``.
+
+        The budget counts the headings and texts as ``_render_evidence_pack``
+        writes them; the source that crosses it is cut and the later ones are left out.
+        Labels are file names, never paths.
+        """
+        sources: list[EvidenceSource] = []
+        used = 0
+        for item in evidence_items:
+            meta = item.metadata
+            name = clean_label(str(meta.get("filename") or Path(item.source_path).name))
+            heading = f"Source {meta.get('index')}: {name} ({item.source_type})"
+            text = item.content_markdown
+            cost = (len(_SOURCE_SEPARATOR) if sources else 0) + len(f"## {heading}\n\n")
+            if max_evidence_chars is not None and used + cost + len(text) > max_evidence_chars:
+                room = max_evidence_chars - used - cost
+                if room > 0 or not sources:
+                    # The first source stays, even with no text, so the cut is visible.
+                    text = text[: max(room, 0)]
+                    sources.append(EvidenceSource(name, heading, text, truncated=True))
+                else:
+                    last = sources[-1]
+                    sources[-1] = EvidenceSource(last.label, last.heading, last.text, True)
+                logger.warning(
+                    "Evidence (%d sources) exceeds max_evidence_chars (%d); truncating.",
+                    len(evidence_items),
+                    max_evidence_chars,
+                )
+                break
+            sources.append(EvidenceSource(name, heading, text))
+            used += cost + len(text)
+        return sources
 
     def _assemble_evidence_pack(
         self, evidence_items: list[EvidenceItem], *, max_evidence_chars: int | None
     ) -> str:
-        blocks: list[str] = []
-        for item in evidence_items:
-            meta = item.metadata
-            header = (
-                f"## Source {meta.get('index')}: {meta.get('filename')}\n"
-                f"Type: {item.source_type}\n"
-                f"Path: {item.source_path}\n"
-            )
-            blocks.append(f"{header}\n{item.content_markdown}")
-        pack = "\n\n---\n\n".join(blocks)
-        if max_evidence_chars is not None and len(pack) > max_evidence_chars:
-            logger.warning(
-                "Evidence pack (%d chars) exceeds max_evidence_chars (%d); truncating.",
-                len(pack),
-                max_evidence_chars,
-            )
-            pack = pack[:max_evidence_chars] + "\n\n[... evidence truncated ...]"
+        """The evidence as plain Markdown, for ``evidence/normalized_sources.md``.
+
+        It names each source by its file name and type; the source path stays in
+        ``evidence_index.json``.
+        """
+        return self._render_evidence_pack(
+            self._evidence_sources(evidence_items, max_evidence_chars=max_evidence_chars)
+        )
+
+    @staticmethod
+    def _render_evidence_pack(sources: list[EvidenceSource]) -> str:
+        pack = _SOURCE_SEPARATOR.join(f"## {s.heading}\n\n{s.text}" for s in sources)
+        if any(s.truncated for s in sources):
+            pack += f"\n\n{TRUNCATED_NOTE}"
         return pack
 
     # -- writing ----------------------------------------------------------
@@ -969,7 +1050,7 @@ class MultiSourceReportGenerator:
         client,
         *,
         specs: list[ReportSectionSpec],
-        evidence_pack: str,
+        evidence_pack: Evidence,
         report_title: str,
         report_description: str | None,
         additional_instructions: str | None,
@@ -979,7 +1060,12 @@ class MultiSourceReportGenerator:
         sample_markdown: str | None,
         chat_kwargs: dict,
     ):
-        """Write the entire report in one LLM call and return the raw response."""
+        """Write the entire report in one LLM call and return the raw response.
+
+        Each source and the format reference go in their own block; the task, the
+        sections and the additional instructions stay outside them.
+        """
+        blocks = SourceMaterial()
         parts = [f"Report title: {report_title}"]
         if report_description:
             parts.append(f"Report context and purpose: {report_description}")
@@ -989,7 +1075,7 @@ class MultiSourceReportGenerator:
             parts.append(
                 "Where useful, cite the source that supports a claim using its exact filename "
                 "in parentheses, e.g. (notes.txt) or (meeting_recording.mp3). "
-                f"Available sources: {', '.join(source_filenames)}."
+                f"Available sources: {source_list(source_filenames)}."
             )
         else:
             parts.append("Do not add inline source citations or filename references in the text.")
@@ -1010,8 +1096,8 @@ class MultiSourceReportGenerator:
                 "Do not add extra content to be thorough; do not pad.\n"
                 "  • Content: take NONE of its facts, names, numbers, or wording. Every "
                 "fact must come from the EVIDENCE below. Section titles come from the "
-                "required list.\n\n"
-                f"{sample_markdown}"
+                "required list. The reference is in the source_material block labelled "
+                "format_reference.\n\n" + blocks.wrap(sample_markdown, label="format_reference")
             )
 
         # Section definitions: use a numbered, titled format so the model never
@@ -1023,8 +1109,9 @@ class MultiSourceReportGenerator:
         parts.append("\n".join(section_lines))
 
         parts.append(
-            "Evidence — this is the ONLY source of facts and content for the report:\n"
-            f"{evidence_pack}"
+            "Evidence — this is the ONLY source of facts and content for the report (one "
+            "source_material block per source, labelled with its file name):\n"
+            + render_evidence(blocks, evidence_pack)
         )
 
         if additional_instructions:
@@ -1046,13 +1133,16 @@ class MultiSourceReportGenerator:
         parts.append(" ".join(closing))
         user_prompt = "\n\n".join(parts)
 
-        return client.chat(
+        response = client.chat(
             [
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": with_source_material_instruction(_SYSTEM_PROMPT)},
                 {"role": "user", "content": user_prompt},
             ],
             **chat_kwargs,
         )
+        if isinstance(getattr(response, "text", None), str):
+            response.text = blocks.strip_echo(response.text)
+        return response
 
     # -- outputs ----------------------------------------------------------
 
@@ -1155,13 +1245,15 @@ def save_report_config(
     agentic: bool = False,
     review_options: dict | None = None,
     polish: bool = False,
-    strict_review: bool = False,
+    strict_review: bool = True,
     curate_evidence: bool = False,
 ) -> Path:
     """Persist all ``run()`` parameters to a JSON config file for later reuse.
 
     Paths (``input_paths``, ``output_dir``, ``sample_report_path``) are stored
-    relative to the config file's directory so the config is portable. All keys
+    relative to the config file's directory so the config is portable; one outside
+    that directory is stored with ``..``, and ``load_report_config`` then needs a
+    ``root`` that holds it. A path on another drive raises ``SourcePathError``. All keys
     inside option dicts (``transcriber_options``, ``parser_options``, etc.) are
     stored as-is, except credential-bearing configs are rejected. Keep credentials
     in the environment and persist the provider/model selection instead.
@@ -1206,9 +1298,19 @@ def save_report_config(
         # here, while load_report_config reads it relative to the config file.
         absolute = Path(p).resolve()
         try:
-            return str(absolute.relative_to(base.resolve()))
+            rel = Path(os.path.relpath(absolute, base.resolve())).as_posix()
         except ValueError:
-            return str(absolute)  # outside the config's folder or on a different drive
+            raise SourcePathError(
+                f"{Path(p).name} is on another drive than the config file; a config stores "
+                "paths relative to its own folder"
+            ) from None
+        if rel == ".." or rel.startswith("../"):
+            logger.warning(
+                "%s is outside the config's folder; load_report_config needs a root that "
+                "holds both to read it back",
+                file_tag(p),
+            )
+        return rel
 
     # Normalise sections: dataclasses → plain dicts, preserve all fields.
     section_dicts: list[dict[str, Any]] = []
@@ -1257,33 +1359,53 @@ def save_report_config(
     return config_path
 
 
-def load_report_config(path: str | Path) -> dict[str, Any]:
+def load_report_config(path: str | Path, *, root: str | Path | None = None) -> dict[str, Any]:
     """Load a config file saved by ``save_report_config`` and return a dict
     that can be unpacked directly into ``MultiSourceReportGenerator.run()``.
 
-    Relative paths stored in the config are resolved relative to the config
-    file's directory. ``None`` is returned for any key that was not present.
+    The input paths, the sample report and the output folder stored in the config are
+    relative to the config file's directory and must stay inside ``root``, that
+    directory by default. They are checked before anything is read or written, and so
+    is every supported file in an input folder: an absolute path, or one that leads out
+    of ``root`` through ``..`` or a symbolic link, raises ``SourcePathError``. Pass a
+    wider ``root`` for a config that names files beside its own folder; with ``root``,
+    an absolute path inside it is taken too. Paths inside the option dicts (such as a
+    transcriber's ``output_dir``) are returned as stored. ``None`` is returned for any
+    key that was not present.
     """
     config_path = Path(path)
     base = config_path.parent
 
     raw: dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
 
-    def _to_abs(p: str | None) -> Path | None:
+    def _to_abs(p: str | None, what: str) -> Path | None:
         if p is None:
             return None
-        resolved = Path(p)
-        return resolved if resolved.is_absolute() else (base / resolved).resolve()
+        return path_inside(p, base, root=root, what=what).resolve()
+
+    def _input(p: str) -> Path:
+        joined = path_inside(p, base, root=root, what="input path")
+        if joined.is_dir():
+            # A file in the folder may be a link; it must stay inside ``root`` too.
+            for found in sorted(joined.rglob("*")):
+                if found.suffix.lower() in SUPPORTED_EXTENSIONS and found.is_file():
+                    path_inside(
+                        found.relative_to(joined),
+                        joined,
+                        root=root if root is not None else base,
+                        what="input file",
+                    )
+        return joined.resolve()
 
     return {
-        "input_paths": [_to_abs(p) for p in raw.get("input_paths") or []],
+        "input_paths": [_input(p) for p in raw.get("input_paths") or []],
         "sections": raw.get("sections", []),
         "report_title": raw.get("report_title", "Generated Report"),
         "report_description": raw.get("report_description"),
         "additional_instructions": raw.get("additional_instructions"),
         "report_language": raw.get("report_language"),
-        "sample_report_path": _to_abs(raw.get("sample_report_path")),
-        "output_dir": _to_abs(raw.get("output_dir")),
+        "sample_report_path": _to_abs(raw.get("sample_report_path"), "sample report"),
+        "output_dir": _to_abs(raw.get("output_dir"), "output folder"),
         "output_docx": raw.get("output_docx", False),
         "include_evidence_index": raw.get("include_evidence_index", True),
         "include_source_references": raw.get("include_source_references", True),
@@ -1296,7 +1418,7 @@ def load_report_config(path: str | Path) -> dict[str, Any]:
         "agentic": raw.get("agentic", False),
         "review_options": raw.get("review_options"),
         "polish": raw.get("polish", False),
-        "strict_review": raw.get("strict_review", False),
+        "strict_review": raw.get("strict_review", True),
         "curate_evidence": raw.get("curate_evidence", False),
     }
 

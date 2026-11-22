@@ -1,12 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isEmailConfirmed } from "@/lib/api-access";
 
 // Demo pages are open to look at. Running a demo needs a signed-in, approved
 // account, or a pending one within the trial allowance in lib/trial.ts or on the
 // user's own model key, and that is enforced on the API requests
 // in proxy.ts (see lib/api-access.ts), not by redirecting here. The demo layout
-// shows a "View only" notice to visitors who cannot run yet. The Solution Wizard
-// has its own finer gate in proxy.ts.
+// shows a "View only" notice to visitors who cannot run yet.
 
 // Default route for authenticated users
 const DEFAULT_DEMO_ROUTE = "/";
@@ -37,9 +37,12 @@ export interface AccessState {
   approved: boolean;
   /** Signed up and waiting for approval: may run demos on a trial allowance (lib/trial.ts). */
   pending: boolean;
+  /** The sign-in e-mail address is confirmed; a pending user's runs need it. */
+  emailConfirmed: boolean;
   userId: string | null;
   /** Lowercased sign-in email, for the model tier (lib/model-tier.ts). */
   email: string | null;
+  /** The per-user grant for the first Solution Wizard (`wizard_access`). */
   wizardAccess: boolean;
   /**
    * Session cookies Supabase rewrote while reading the user: a refreshed token,
@@ -52,6 +55,7 @@ const NO_ACCESS: AccessState = {
   loggedIn: false,
   approved: false,
   pending: false,
+  emailConfirmed: false,
   userId: null,
   email: null,
   wizardAccess: false,
@@ -59,10 +63,10 @@ const NO_ACCESS: AccessState = {
 };
 
 /**
- * Read the requesting user's access state in one shot: logged in, approved
- * (general `status`), and Solution Wizard beta grant (`wizard_access`). Used by
- * the proxy's API auth gate and the wizard gate. Independent of the team `?key=`
- * shortcut. `BYPASS_AUTH` opens everything in dev.
+ * Read the requesting user's access state in one shot: logged in, approved or
+ * pending (general `status`), and the first Solution Wizard's grant
+ * (`wizard_access`). Used by the proxy's API auth gate and its wizard gate.
+ * `BYPASS_AUTH` opens everything in dev.
  *
  * An API request skips updateSession, so an expired access token is refreshed
  * here. The refresh spends the refresh token: unless the caller saves the new
@@ -77,6 +81,7 @@ export async function getAccessState(
       loggedIn: true,
       approved: true,
       pending: false,
+      emailConfirmed: true,
       userId: null,
       email: null,
       wizardAccess: true,
@@ -114,6 +119,7 @@ export async function getAccessState(
     loggedIn: true,
     approved: data?.status === "approved",
     pending: data?.status === "pending",
+    emailConfirmed: isEmailConfirmed(user),
     userId: user.id,
     email: user.email?.toLowerCase() ?? null,
     wizardAccess: data?.wizard_access === true,

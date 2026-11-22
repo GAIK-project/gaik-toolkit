@@ -28,10 +28,10 @@ const PYPI_URL = "https://pypi.org/project/gaik/" as const;
 
 // Sections of the home page.
 const DEMO_LINKS = [
-  { href: "/#use-cases", label: "Use Cases" },
-  { href: "/#modules", label: "Software Modules" },
-  { href: "/#components", label: "Software Components" },
-  { href: "/#no-code", label: "No-code Assets" },
+  { href: "/#use-cases", label: "Use cases" },
+  { href: "/#modules", label: "Software modules" },
+  { href: "/#components", label: "Software components" },
+  { href: "/#no-code", label: "No-code assets" },
 ] as const;
 
 export interface FooterProps {
@@ -76,10 +76,6 @@ export function Footer({ githubPreview }: FooterProps) {
               />
               <span className="font-semibold">GAIK Toolkit</span>
             </Link>
-            <p className="text-muted-foreground max-w-xs text-sm">
-              Generative AI building blocks for knowledge capture, access and
-              synthesis.
-            </p>
             <Image
               src="/co-funded_EN/horizontal/RGB/PNG/EN_Co-fundedbytheEU_RGB_POS.png"
               alt="Co-funded by the European Union"
@@ -127,7 +123,7 @@ export function Footer({ githubPreview }: FooterProps) {
               className={linkClassName}
             >
               <BookOpen className="h-3.5 w-3.5" />
-              Docs
+              Documentation
             </a>
             <a
               href={PYPI_URL}

@@ -7,6 +7,14 @@ import re
 from collections import OrderedDict
 from typing import TYPE_CHECKING
 
+from gaik.software_components._log_names import file_tag
+from gaik.software_components._tesseract import (
+    installed_tesseract_cli_languages,
+    installed_tesserocr_languages,
+    with_installed_languages,
+)
+from gaik.software_components.input_limits import InputLimits, docling_limits
+
 # Patch transformers export for AutoProcessor before docling imports.
 try:
     import transformers as _tf
@@ -121,7 +129,12 @@ def pick_accelerator(verbose: bool = True) -> AcceleratorDevice:
 
 
 class DoclingRagParser:
-    """Docling-based parser for RAG pipelines."""
+    """Docling-based parser for RAG pipelines.
+
+    A PDF over ``limits`` (size, pages) is refused with
+    :class:`~gaik.software_components.input_limits.InputLimitError` before
+    Docling reads it.
+    """
 
     def __init__(
         self,
@@ -132,7 +145,9 @@ class DoclingRagParser:
         enable_formula_enrichment: bool = True,
         num_threads: int = 4,
         verbose: bool = True,
+        limits: InputLimits | None = None,
     ) -> None:
+        self.limits = limits or InputLimits.local_parsing()
         self.summaries = summaries.copy()
 
         device = pick_accelerator(verbose=verbose)
@@ -165,6 +180,11 @@ class DoclingRagParser:
         self.converter = DocumentConverter(format_options=self.format_options)
         self.supported_extensions = [".pdf"]
 
+    def _convert(self, pdf_path: str):
+        """Check the PDF against ``limits``, then convert it with Docling."""
+        self.limits.check_pdf(pdf_path)
+        return self.converter.convert(pdf_path, **docling_limits(self.limits))
+
     def replace_base64_images(self, md_text: str, summary_dict: OrderedDict) -> str:
         pattern = r"!\[.*?\]\(data:image\/png;base64,[A-Za-z0-9+/=\n]+\)"
 
@@ -181,7 +201,7 @@ class DoclingRagParser:
             pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
             output_path = os.path.join(os.path.dirname(pdf_path), f"{pdf_name}.md")
 
-        result = self.converter.convert(pdf_path)
+        result = self._convert(pdf_path)
         markdown_text = result.document.export_to_markdown(image_mode="embedded")
         markdown_text = self.replace_base64_images(markdown_text, self.summaries.copy())
 
@@ -199,9 +219,9 @@ class DoclingRagParser:
         structure (headings, sections, paragraphs) rather than by fixed size. Chunk
         boundaries are determined by the document's semantic structure.
         """
-        print(f"Processing document with metadata extraction: {pdf_path}")
+        print(f"Processing document with metadata extraction: {file_tag(pdf_path)}")
         print("Parsing document(s)...")
-        result = self.converter.convert(pdf_path)
+        result = self._convert(pdf_path)
         doc = result.document
         print(f"Document parsing complete. Pages: {len(getattr(doc, 'pages', [])) or 'unknown'}")
 
@@ -288,7 +308,7 @@ class DoclingRagParser:
                 )
                 chunk_id += 1
 
-        print(f"Created {len(langchain_docs)} chunks with metadata from {document_name}")
+        print(f"Created {len(langchain_docs)} chunks with metadata")
         return langchain_docs
 
 
@@ -310,10 +330,11 @@ def parse_pdf_to_chunks_with_metadata(pdf_path: str) -> list[Document]:
 
 def _build_ocr_options(ocr_engine: str):
     engine = (ocr_engine or "").lower()
+    # Tesseract gets only the default languages it has traineddata for (see _tesseract).
     if engine == "tesseract":
-        return TesseractOcrOptions()
+        return with_installed_languages(TesseractOcrOptions, installed_tesserocr_languages())
     if engine == "tesseract_cli":
-        return TesseractCliOcrOptions()
+        return with_installed_languages(TesseractCliOcrOptions, installed_tesseract_cli_languages())
     if engine == "easyocr":
         return EasyOcrOptions()
     if engine == "rapidocr":

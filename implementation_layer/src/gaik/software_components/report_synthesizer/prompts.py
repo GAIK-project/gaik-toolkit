@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from gaik.software_components.knowledge_curator.models import SectionSpec
+from gaik.software_components.source_material import SourceMaterial, clean_label
 
 WRITER_SYSTEM_PROMPT = """\
 You are a professional report writer. You write ONE section of a larger report from the \
@@ -24,9 +27,12 @@ heading is added automatically.
 - Follow the section instructions and cover every required item.
 - Missing data: for each item in the knowledge's "missing" list, and for each required \
 item the material does not cover, write the marker (missing: <item>) in the text, e.g. \
-(missing: latest sewer camera inspection). Never fill a gap with a guess.
+(missing: latest sewer camera inspection). Put the marker inside a sentence that names \
+the item, e.g. "The base floor condition is not documented (missing: base floor \
+condition).", not alone after a label. Never fill a gap with a guess.
 - Conflicts: for a conflict with status "unresolved", state both sides and mark it with \
-"Unresolved:". For a "resolved" conflict, follow the side its description gives.
+"Unresolved:". For a "resolved" conflict, follow the units listed in its \
+preferred_unit_ids; the description only says what each source says.
 - Sources: cite and attribute sources as the report instructions say. Each fact unit \
 gives source.file, source.locator, source_class and time_qualifier for this. If the \
 report instructions say nothing about citations, cite the file and locator in \
@@ -78,40 +84,52 @@ def _report_instructions(instructions: str) -> str:
 
 def build_writer_prompt(
     section: SectionSpec,
-    material: str,
+    material: str | Mapping[str, str],
     *,
     title: str,
     language: str,
     instructions: str,
     sample_report: str | None,
+    blocks: SourceMaterial | None = None,
 ) -> str:
     """Return the writer request for one section.
 
-    ``material`` is the section's knowledge JSON, or for a derived section the texts of
-    its prerequisite sections.
+    ``material`` is the section's knowledge JSON, or for a derived section a mapping of
+    block labels (``section <id>: <title>``) to the texts of its prerequisite sections.
+    Each piece of material and the format reference go in their own ``<source_material>``
+    block of ``blocks`` (a new :class:`SourceMaterial` for this call when left out); the
+    task stays outside them.
     """
+    blocks = blocks or SourceMaterial()
     parts = [
         f"Report: {title}\nWrite the section in: {language}",
         _report_instructions(instructions),
     ]
     if sample_report is not None:
         parts.append(
-            "FORMAT REFERENCE (inside <format_reference>): a sample report, most likely "
-            "about a DIFFERENT subject. It governs structure, length and tone and "
-            "contributes ZERO content: take none of its facts, names, numbers or wording.\n"
-            f"<format_reference>\n{sample_report}\n</format_reference>"
+            "FORMAT REFERENCE (in the source_material block labelled format_reference): a "
+            "sample report, most likely about a DIFFERENT subject. It governs structure, "
+            "length and tone and contributes ZERO content: take none of its facts, names, "
+            "numbers or wording.\n" + blocks.wrap(sample_report, label="format_reference")
         )
     if section.derived:
+        if isinstance(material, str):
+            raise TypeError("a derived section takes a mapping of labels to section texts")
+        prerequisites = "\n\n".join(
+            blocks.wrap(text, label=label) for label, text in material.items()
+        )
         parts.append(
-            "The finished sections this section is written from (inside "
-            "<prerequisite_sections>) are the ONLY source of facts. Summarize or build on "
-            "them; do not contradict them.\n"
-            f"<prerequisite_sections>\n{material}\n</prerequisite_sections>"
+            "The finished sections this section is written from (one source_material "
+            "block each, labelled with the section id and title) are the ONLY source of facts. "
+            "Summarize or build on them; do not contradict them.\n" + prerequisites
         )
     else:
+        if not isinstance(material, str):
+            raise TypeError("a section with knowledge takes the knowledge JSON as a string")
         parts.append(
-            "The curated knowledge of this section (inside <knowledge>) is the ONLY source "
-            f"of facts.\n<knowledge>\n{material}\n</knowledge>"
+            "The curated knowledge of this section (in the source_material block labelled "
+            f"knowledge {clean_label(section.id)}) is the ONLY source of facts.\n"
+            + blocks.wrap(material, label=f"knowledge {section.id}")
         )
     parts.append(
         f'<section_to_write id="{section.id}">\nTitle: {section.title}\n'
@@ -147,7 +165,8 @@ def build_review_checks(section: SectionSpec, instructions: str, citations: bool
         if section.derived
         else '- Every item in the knowledge\'s "missing" list must carry a (missing: <item>) '
         'marker. A conflict with status "unresolved" must give both sides and be marked '
-        '"Unresolved:".\n'
+        '"Unresolved:". A conflict with status "resolved" must state the side of the units '
+        "in its preferred_unit_ids, not the other side.\n"
     )
     return f"""\
 - Every factual claim must be supported by the reference material. Correct or remove \
@@ -155,8 +174,8 @@ claims it does not support.
 - Correct numbers, years, dates, names and attributions (which source says what) that \
 contradict the reference.
 - Each required item of the section that the reference does not cover must carry a \
-(missing: <item>) marker in the text. Add a marker that is absent, and never remove one \
-for an item the reference does not cover.
+(missing: <item>) marker in the text. Add a marker that is absent, inside a sentence that \
+names the item, and never remove one for an item the reference does not cover.
 {knowledge_checks}\
 {hierarchy_check}
 - The text must follow the section instructions below.

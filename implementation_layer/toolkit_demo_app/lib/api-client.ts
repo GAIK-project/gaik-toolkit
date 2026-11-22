@@ -1,11 +1,18 @@
 import toast from "react-hot-toast";
 import { getModelSettings } from "./model-settings-store";
-import { getServerModel } from "./server-model-store";
+import {
+  getActiveServerModel,
+  getReasoningEffort,
+  getServerModel,
+} from "./server-model-store";
 import {
   MODEL_SETTINGS_HEADER,
+  REASONING_EFFORT_HEADER,
   SERVER_MODEL_HEADER,
   encodeModelSettings,
+  reasoningEffortFor,
   supportsModelSettings,
+  supportsServerModel,
 } from "./model-settings";
 
 export class RateLimitError extends Error {
@@ -40,17 +47,39 @@ export async function apiFetch(
   } else if (!supported) {
     headers.delete(MODEL_SETTINGS_HEADER);
   }
-  // No own key: run on the server model the user picked, if any.
+  // No own key: run on the server model the user picked, if any. A few routes
+  // take that pick but no own key (supportsServerModel).
   const serverModel = getServerModel();
+  const serverModelRoute =
+    typeof window !== "undefined" &&
+    target?.origin === window.location.origin &&
+    supportsServerModel(target.pathname, options?.method ?? "GET");
   if (
-    supported &&
+    serverModelRoute &&
+    // An own key replaces the server pick everywhere: where the key does not
+    // reach (RAG, the Transcriber), the request runs on the server default,
+    // never on an earlier pick the menu no longer shows.
+    !settings &&
     !headers.has(MODEL_SETTINGS_HEADER) &&
     serverModel &&
     !headers.has(SERVER_MODEL_HEADER)
   ) {
     headers.set(SERVER_MODEL_HEADER, serverModel);
-  } else if (!supported) {
+  } else if (!serverModelRoute) {
     headers.delete(SERVER_MODEL_HEADER);
+  }
+  // The reasoning effort picked in the model menu travels with the model, on
+  // an own key too. Auto sends nothing.
+  const effort = serverModelRoute
+    ? reasoningEffortFor(
+        getReasoningEffort(),
+        settings ?? getActiveServerModel(),
+      )
+    : null;
+  if (effort && !headers.has(REASONING_EFFORT_HEADER)) {
+    headers.set(REASONING_EFFORT_HEADER, effort);
+  } else if (!serverModelRoute) {
+    headers.delete(REASONING_EFFORT_HEADER);
   }
   const response = await fetch(url, {
     ...options,
