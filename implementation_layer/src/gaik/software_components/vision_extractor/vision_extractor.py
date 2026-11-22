@@ -5,12 +5,15 @@ Single-pass vision extraction: PDF/image → structured data in one LLM call.
 from __future__ import annotations
 
 import json
+import math
 import time
+import types
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, Union, get_args, get_origin
 
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, BeforeValidator, Field, create_model
 from pydantic_core import PydanticUndefined
 
 from gaik.observability import UsageRecord, build_usage_record
@@ -29,6 +32,7 @@ from gaik.software_components.extractor.schema import (
     DECIMAL_PERSISTED_HELPER_SOURCE,
     NUMERIC_FIELD_TYPES,
     _holds_items,
+    _list_item_model,
     apply_field_policies,
     decimal_field_repr,
     normalize_extracted_data,
@@ -104,16 +108,73 @@ def _is_pdf(path: Path) -> bool:
 # ---------------------------------------------------------------------------
 
 
+_MIN_CONFIDENCE = 0.01
+_MAX_CONFIDENCE = 1.0
+_MAX_REASON_LENGTH = 400
+
+
+def _clamped_confidence_score(value):
+    """A provider's confidence score moved into 0.01..1.0 before validation.
+
+    Not every provider enforces the schema's bounds (Gemini's schema drops them),
+    and one score of 0.0 or 1.2 used to fail the whole extraction. A score written
+    with a percent sign, or above 10, is a percentage: "85%" and 85 are 0.85. Any
+    other score is moved into the bounds, so 1.2 and 4 are 1.0. A decimal comma is
+    read ("0,9" is 0.9). A score that is not a number, or is missing, becomes the
+    lowest one, 0.01.
+    """
+    percent = False
+    if isinstance(value, str):
+        text = value.strip()
+        percent = text.endswith("%")
+        text = text.removesuffix("%").strip()
+        if "," in text and "." not in text:
+            text = text.replace(",", ".")
+        try:
+            value = float(text)
+        except ValueError:
+            return _MIN_CONFIDENCE
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return _MIN_CONFIDENCE
+    value = float(value)
+    if math.isnan(value):
+        return _MIN_CONFIDENCE
+    if percent or value > 10:
+        value /= 100
+    return min(max(value, _MIN_CONFIDENCE), _MAX_CONFIDENCE)
+
+
+def _shortened_confidence_reason(value):
+    """A provider's reason cut to 400 characters before validation; None is ``""``."""
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else str(value)
+    if len(text) <= _MAX_REASON_LENGTH:
+        return text
+    return text[: _MAX_REASON_LENGTH - 1] + "…"
+
+
 class VerifiableField(BaseModel):
     """Base model for a field wrapped with verification metadata.
 
     Each field in a wrapped extraction model is represented as a subclass of
     VerifiableField with a typed ``value`` attribute. Use ``include_verification=True``
     on VisionExtractor to enable wrapping automatically at runtime.
+
+    The schema sent to the provider asks for a score from 0.01 to 1.0 and a reason
+    of at most 400 characters. A value outside them is moved inside before
+    validation, so it cannot fail the extraction: a score below 0.01 (or missing,
+    or not a number) becomes 0.01, one written with a percent sign or above 10 is
+    read as a percentage, any other above 1.0 becomes 1.0, and a longer reason is
+    cut to 400 characters.
     """
 
-    confidence_score: float = Field(ge=0.01, le=1.0)
-    confidence_reason: str = Field(max_length=400)
+    confidence_score: Annotated[float, BeforeValidator(_clamped_confidence_score)] = Field(
+        ge=_MIN_CONFIDENCE, le=_MAX_CONFIDENCE
+    )
+    confidence_reason: Annotated[str, BeforeValidator(_shortened_confidence_reason)] = Field(
+        max_length=_MAX_REASON_LENGTH
+    )
 
 
 def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
@@ -129,7 +190,15 @@ def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
         # example the safe Decimal schema/cleaner) survive verification wrapping.
         annotation = finfo.rebuild_annotation()
         outer_field = Field(description=finfo.description)
-        if get_origin(annotation) is list:
+        item_model = _list_item_model(annotation)
+        if item_model is not None and get_origin(annotation) is not list:
+            # A child collection the task lets be null: list[ItemModel] | None.
+            # Its rows are wrapped like those of any other collection.
+            wrapped_fields[fname] = (
+                list[_wrap_model_for_verification(item_model)] | None,
+                Field(default=None, description=finfo.description),
+            )
+        elif get_origin(annotation) is list:
             args = get_args(annotation)
             if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
                 # list[ItemModel] — recursively wrap the item model
@@ -174,6 +243,84 @@ def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
         __config__=model.model_config,
         **wrapped_fields,
     )
+
+
+def _as_decimal(value) -> Decimal | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = Decimal(value.strip() if isinstance(value, str) else str(value))
+    except (ArithmeticError, ValueError, TypeError):
+        return None
+    return number if number.is_finite() else None
+
+
+def _matched_choice(value, choices: tuple):
+    """``value`` as the choice it stands for, in the type the model gives it.
+
+    ``4`` for ``Literal['', '1', ..., '5']`` (a model saved by gaik 0.11.1) is
+    ``'4'``, and ``'4'`` for ``Literal[1, ..., 5]`` is ``4``. Such a model also
+    held a ``list[str]`` field with choices as one ``Literal``, so a list of one
+    choice is that choice and an empty list is ``''`` when that is a choice. A
+    value that stands for no choice is returned as it is, for validation to
+    refuse.
+    """
+    original = value
+    if isinstance(value, list):
+        if len(value) > 1:
+            return value
+        if not value:
+            return "" if "" in choices else value
+        value = value[0]
+    for choice in choices:
+        if type(choice) is type(value) and choice == value:
+            return value
+    number = _as_decimal(value)
+    if number is not None:
+        for choice in choices:
+            if isinstance(choice, bool) or type(choice) is type(value):
+                continue
+            if isinstance(choice, (int, float, str)) and _as_decimal(choice) == number:
+                return choice
+    return original
+
+
+def _matched_value(value, annotation):
+    union = get_args(annotation) if get_origin(annotation) in (Union, types.UnionType) else ()
+    if union:
+        inner = [arg for arg in union if arg is not type(None)]
+        if len(inner) != 1:
+            return value
+        annotation = inner[0]
+    origin = get_origin(annotation)
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return _matched_to_model(value, annotation)
+    if origin is list:
+        args = get_args(annotation)
+        if args and isinstance(value, list):
+            return [_matched_value(item, args[0]) for item in value]
+        return value
+    if origin is Literal:
+        return _matched_choice(value, get_args(annotation))
+    return value
+
+
+def _matched_to_model(data, model: type[BaseModel]):
+    """``data`` with each choice in the type ``model`` gives it, before validation.
+
+    A field's choices are numbers in a model gaik builds now and texts in one
+    saved by gaik 0.11.1 (``Literal['', '1', ...]``); the field policies keep a
+    choice as the provider wrote it, so it is matched to the model in use here.
+    Nothing else changes: a number never becomes text, or text a number, unless
+    it stands for one of that field's choices.
+    """
+    if not isinstance(data, dict):
+        return data
+    result = dict(data)
+    for name, info in model.model_fields.items():
+        if name in result:
+            result[name] = _matched_value(result[name], info.annotation)
+    return result
 
 
 def _within_schema_name_limit(model: type[BaseModel]) -> type[BaseModel]:
@@ -422,11 +569,16 @@ def _strip_gemini_unsupported(schema: dict) -> dict:
     for key, value in schema.items():
         if key in _GEMINI_UNSUPPORTED_KEYS:
             continue
-        if key == "enum" and isinstance(value, list) and "" in value:
-            # Gemini rejects empty strings in enum arrays. Drop the enum constraint
-            # entirely so the model can still output '' when a field is absent.
-            # apply_field_policies() will normalise any out-of-range values after
-            # the call.
+        if (
+            key == "enum"
+            and isinstance(value, list)
+            and ("" in value or not all(isinstance(entry, str) for entry in value))
+        ):
+            # Gemini rejects empty strings in enum arrays, and its Schema takes
+            # enum entries as strings only, so a number field's allowed numbers
+            # cannot be sent either. Drop the enum constraint (the type stays);
+            # apply_field_policies() keeps the value to the choices after the
+            # call.
             continue
         if key == "properties" and isinstance(value, dict):
             # The keys here are field names, not schema keywords: a field named
@@ -537,10 +689,9 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
             return
         seen.add(m)
         for finfo in m.model_fields.values():
-            if get_origin(finfo.annotation) is list:
-                args = get_args(finfo.annotation)
-                if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
-                    collect(args[0])
+            item_model = _list_item_model(finfo.annotation)
+            if item_model is not None:
+                collect(item_model)
         ordered.append(m)
 
     collect(model)
@@ -646,8 +797,9 @@ class VisionExtractionResult:
 
     With ``include_verification=True`` every checked field carries
     ``confidence_score`` and ``confidence_reason`` (the model's own rating, from
-    the same call that extracted the value) and ``found_in_text`` and ``page``
-    (whether the value is written in a PDF's text layer, and where). See
+    the same call that extracted the value) and ``found_in_text``, ``file`` and
+    ``page`` (whether the value is written in a PDF's text layer, in which file,
+    and on which page of that file). See
     :mod:`gaik.software_components.vision_extractor.text_layer`.
     """
 
@@ -857,7 +1009,7 @@ class VisionExtractor:
             # confidence_score is the model's own rating; the text layer is an
             # independent check of whether the value is written in the PDF.
             verification = text_layer.annotate(
-                result_dict, verification, text_layer.read_pdf_pages(file_path_list)
+                result_dict, verification, text_layer.read_pdf_page_texts(file_path_list)
             )
             result_dict = _combine_with_verification(result_dict, verification)
 
@@ -948,8 +1100,13 @@ class VisionExtractor:
 
     @staticmethod
     def _validate_result(result_dict: dict, model: type[BaseModel]) -> dict:
-        """Validate provider output against the expected Pydantic model."""
-        return model.model_validate(result_dict).model_dump()
+        """Validate provider output against the expected Pydantic model.
+
+        A choice is first matched to the type ``model`` gives it (see
+        :func:`_matched_to_model`), so a schema saved by gaik 0.11.1, whose number
+        choices are texts, still validates the answers it gets.
+        """
+        return model.model_validate(_matched_to_model(result_dict, model)).model_dump()
 
     @staticmethod
     def _normalize_numeric_placeholders(result_dict: dict, requirements: RequirementsSpec) -> dict:
@@ -969,16 +1126,19 @@ class VisionExtractor:
 
         if isinstance(requirements, CompositeExtractionRequirements):
             coerce_fields(result_dict, requirements.parent_requirements)
-            child_rows = result_dict.get(requirements.child_container_name)
-            if isinstance(child_rows, list):
-                for row in child_rows:
-                    if isinstance(row, dict):
-                        coerce_fields(row, requirements.child_requirements)
+            # Every child collection, each with its own fields.
+            for child in requirements.children:
+                child_rows = result_dict.get(child.container_name)
+                if isinstance(child_rows, list):
+                    for row in child_rows:
+                        if isinstance(row, dict):
+                            coerce_fields(row, child.requirements)
             return result_dict
 
         coerce_fields(result_dict, requirements)
-        for value in result_dict.values():
-            if isinstance(value, list):
+        for key, value in result_dict.items():
+            # The rows of a flat record's own list[dict] field are not its records.
+            if _holds_items(key, value, requirements, result_dict):
                 for row in value:
                     if isinstance(row, dict):
                         coerce_fields(row, requirements)
@@ -1056,7 +1216,9 @@ class VisionExtractor:
             # model; don't fabricate usage counts when the adapter doesn't expose them.
             return result.model_dump(), None
         finally:
-            close = getattr(client.raw, "close", None)
+            # A provider's own close() closes every client it built: Vertex AI has two
+            # after a fallback, and ``raw`` is only the last one used.
+            close = getattr(client, "close", None) or getattr(client.raw, "close", None)
             # Injected transports belong to the caller and may serve later stages.
             if self.config.get("http_client") is None and callable(close):
                 close()
@@ -1319,14 +1481,14 @@ class VisionExtractor:
 
         has_nested = False
         for key, value in list(result_dict.items()):
-            if _holds_items(key, value, requirements):
+            if _holds_items(key, value, requirements, result_dict):
                 has_nested = True
                 result_dict[key] = [apply_field_policies(item, requirements) for item in value]
         if not has_nested:
             result_dict = apply_field_policies(result_dict, requirements)
 
         for key, value in list(result_dict.items()):
-            if isinstance(value, list) and value and isinstance(value[0], dict):
+            if _holds_items(key, value, requirements, result_dict):
                 result_dict[key] = [normalize_extracted_data(item, requirements) for item in value]
         result_dict = normalize_extracted_data(result_dict, requirements)
         return result_dict

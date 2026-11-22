@@ -19,11 +19,12 @@ source material block, so text in them is assessed as data, not followed.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import math
 import random
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -823,14 +824,17 @@ class RAGResponseEvaluator:
             candidate_cols,
             list(spec.score_fields),
             resume_from,
-            text_cols=[question_col, reference_col, *candidate_cols],
+            question_col=question_col,
         )
 
         sentinel_field = next(iter(spec.score_fields))
+        # Rows by position, not label: a frame joined with pd.concat repeats its labels,
+        # and a label would read and write every row that shares it.
         pending: list[tuple[str, int]] = [
-            (col, idx)
+            (col, place)
             for col in candidate_cols
-            for idx in scored_df.index[scored_df[f"{col}_{sentinel_field}"].isna()]
+            for place, missing in enumerate(scored_df[f"{col}_{sentinel_field}"].isna())
+            if missing
         ]
         total = len(pending)
         t0 = time.time()
@@ -840,20 +844,21 @@ class RAGResponseEvaluator:
             return RAGResponseEvalResult(scored_df=scored_df, per_system=aggregates, spec=spec)
 
         if self.max_concurrency == 1:
-            for i, (col, idx) in enumerate(pending):
+            for i, (col, place) in enumerate(pending):
                 verdict = self._judge_once(
                     _referenced_messages(
                         spec.system_prompt,
-                        df.at[idx, question_col],
-                        df.at[idx, col],
-                        df.at[idx, reference_col],
+                        df[question_col].iat[place],
+                        df[col].iat[place],
+                        df[reference_col].iat[place],
                     ),
                     spec.schema,
                 )
-                _write_referenced_row(scored_df, idx, col, verdict, spec)
-                _emit(on_progress, "referenced", i + 1, total, t0, col=col, row=idx)
+                _write_referenced_row(scored_df, place, col, verdict, spec)
+                row = scored_df.index[place]
+                _emit(on_progress, "referenced", i + 1, total, t0, col=col, row=row)
         else:
-            asyncio.run(
+            _run_to_end(
                 self._evaluate_referenced_async(
                     df,
                     scored_df,
@@ -888,25 +893,26 @@ class RAGResponseEvaluator:
         spec = self.scoring_spec
         semaphore = asyncio.Semaphore(self.max_concurrency)
 
-        async def _one(col: str, idx: int) -> tuple[str, int, BaseModel]:
+        async def _one(col: str, place: int) -> tuple[str, int, BaseModel]:
             verdict = await self._judge_once_async(
                 _referenced_messages(
                     spec.system_prompt,
-                    df.at[idx, question_col],
-                    df.at[idx, col],
-                    df.at[idx, reference_col],
+                    df[question_col].iat[place],
+                    df[col].iat[place],
+                    df[reference_col].iat[place],
                 ),
                 spec.schema,
                 semaphore,
             )
-            return col, idx, verdict
+            return col, place, verdict
 
         done = 0
-        for coro in asyncio.as_completed([_one(col, idx) for col, idx in pending]):
-            col, idx, verdict = await coro
-            _write_referenced_row(scored_df, idx, col, verdict, spec)
+        for coro in asyncio.as_completed([_one(col, place) for col, place in pending]):
+            col, place, verdict = await coro
+            _write_referenced_row(scored_df, place, col, verdict, spec)
             done += 1
-            _emit(on_progress, "referenced", done, total, t0, col=col, row=idx)
+            row = scored_df.index[place]
+            _emit(on_progress, "referenced", done, total, t0, col=col, row=row)
 
     # ================================================================ PAIRWISE
 
@@ -967,7 +973,7 @@ class RAGResponseEvaluator:
                     _write_pairwise_row(comp_df, idx, outcome, spec)
                     _emit(on_progress, "pairwise", i + 1, total, t0, row=idx)
             else:
-                asyncio.run(
+                _run_to_end(
                     self._evaluate_pairwise_async(
                         comp_df,
                         pending,
@@ -1111,6 +1117,28 @@ class RAGResponseEvaluator:
 # ============================================================================
 # INTERNAL HELPERS
 # ============================================================================
+
+
+def _run_to_end(coroutine: Any) -> None:
+    """Run ``coroutine`` to its end from synchronous code.
+
+    ``asyncio.run`` cannot start inside a running event loop (a Jupyter notebook, an
+    async web handler), so there the coroutine runs on a loop of its own in a worker
+    thread, and this call waits for it; ``on_progress`` is then called from that thread.
+    The calling loop is blocked until the run ends, which a notebook does not mind and an
+    async server does: there, call the evaluator from a worker thread of its own.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(coroutine)
+        return
+    logger.warning(
+        "RAGResponseEvaluator runs inside an event loop: the judge calls run on a worker "
+        "thread, and this call blocks the loop until they finish"
+    )
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        pool.submit(asyncio.run, coroutine).result()
 
 
 @dataclass
@@ -1285,41 +1313,83 @@ def _init_scored_df(
     candidate_cols: list[str],
     score_fields: list[str],
     resume_from: pd.DataFrame | None,
-    text_cols: Sequence[str] = (),
+    question_col: str = "question",
 ) -> pd.DataFrame:
-    if resume_from is not None and len(resume_from) == len(df):
-        scored = resume_from.copy()
-        # A table read back from a saved CSV carries _write_csv's leading
-        # apostrophe on text that starts like a formula; the input text is df's.
-        for column in text_cols:
-            if column in scored.columns:
-                scored[column] = df[column].to_numpy()
-    else:
-        scored = df.copy()
-    for col in candidate_cols:
-        for field_name in score_fields:
-            colname = f"{col}_{field_name}"
-            if colname not in scored.columns:
-                scored[colname] = pd.NA
-        if f"{col}_reason" not in scored.columns:
-            scored[f"{col}_reason"] = pd.NA
+    """``df`` with a score and a reason column per candidate, filled from ``resume_from``.
+
+    A row takes the earlier scores of the row with the same question (questions are
+    unique), wherever it is in ``resume_from``: a filtered, reordered or extended frame
+    resumes correctly, and a row ``resume_from`` does not have is judged. A table read
+    back from a saved CSV is matched in the form ``_write_csv`` gave it (see
+    :func:`_resume_key`).
+    """
+    scored = df.copy()
+    columns = [f"{col}_{field_name}" for col in candidate_cols for field_name in score_fields]
+    columns += [f"{col}_reason" for col in candidate_cols]
+    for column in columns:
+        scored[column] = pd.NA
+    if resume_from is None:
+        return scored
+    if question_col not in resume_from.columns:
+        logger.warning(
+            "resume_from has no '%s' column to match rows by; every row is judged again",
+            question_col,
+        )
+        return scored
+    prior = resume_from.reset_index(drop=True)
+    places = {_resume_key(question): place for place, question in enumerate(prior[question_col])}
+    for row, question in enumerate(df[question_col]):
+        place = next(
+            (
+                places[key]
+                for key in (_resume_key(question), _resume_key(_csv_cell(question)))
+                if key in places
+            ),
+            None,
+        )
+        if place is None:
+            continue
+        for col in candidate_cols:
+            fields = [f"{col}_{field_name}" for field_name in score_fields]
+            if not all(field in prior.columns for field in fields):
+                continue
+            values = [prior.at[place, field] for field in fields]
+            if not all(pd.notna(value) for value in values):
+                continue  # a row with some scores missing is judged again, whole
+            reason = f"{col}_reason"
+            if reason in prior.columns and pd.notna(prior.at[place, reason]):
+                fields, values = [*fields, reason], [*values, prior.at[place, reason]]
+            for field, value in zip(fields, values):
+                # By position: a frame whose index repeats a label still gets each row's own.
+                scored.iloc[row, scored.columns.get_loc(field)] = value
     return scored
+
+
+def _resume_key(value: Any) -> str:
+    """A cell as text that survives a CSV round trip: ``read_csv`` gives back ``101`` as a
+    number and a CR LF line break as LF."""
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _write_referenced_row(
     scored_df: pd.DataFrame,
-    idx: int,
+    place: int,
     col: str,
     verdict: BaseModel,
     spec: ScoringSpec,
 ) -> None:
+    """Write one verdict into the row at position ``place`` (labels can repeat)."""
+
+    def put(column: str, value: Any) -> None:
+        scored_df.iat[place, scored_df.columns.get_loc(column)] = value
+
     for field_name in spec.score_fields:
-        scored_df.at[idx, f"{col}_{field_name}"] = int(getattr(verdict, field_name))
+        put(f"{col}_{field_name}", int(getattr(verdict, field_name)))
     reason_parts = [f"[{f}] {getattr(verdict, f, '')}" for f in spec.reason_fields]
     reason_parts.append(
         f"[{spec.summary_reason_field}] {getattr(verdict, spec.summary_reason_field, '')}"
     )
-    scored_df.at[idx, f"{col}_reason"] = " | ".join(reason_parts)
+    put(f"{col}_reason", " | ".join(reason_parts))
 
 
 def _aggregate_referenced(
@@ -1369,21 +1439,22 @@ def _count_constraint_violations(sub: pd.DataFrame, col: str, spec: ScoringSpec)
     if not all(c in sub.columns for c in (rel_col, con_col, ov_col)):
         return 0
     violations = 0
-    for idx in sub.index[(sub[rel_col] == 0) & (sub[ov_col] > 1)]:
+    # items() gives each row its own value, also where the index repeats a label.
+    for idx, overall in sub.loc[(sub[rel_col] == 0) & (sub[ov_col] > 1), ov_col].items():
         violations += 1
         logger.warning(
             "Constraint violation [%s] row %s: relevance=0 but overall=%s",
             col,
             idx,
-            sub.at[idx, ov_col],
+            overall,
         )
-    for idx in sub.index[(sub[con_col] == 0) & (sub[ov_col] > 2)]:
+    for idx, overall in sub.loc[(sub[con_col] == 0) & (sub[ov_col] > 2), ov_col].items():
         violations += 1
         logger.warning(
             "Constraint violation [%s] row %s: contradiction=0 but overall=%s",
             col,
             idx,
-            sub.at[idx, ov_col],
+            overall,
         )
     return violations
 
@@ -1447,7 +1518,11 @@ def _init_pairwise_df(
     if resume_from is not None and {"question", "system_a", "system_b", "winner"} <= set(
         resume_from.columns
     ):
-        prior = resume_from.set_index(["question", "system_a", "system_b"]).copy()
+        keys = ["question", "system_a", "system_b"]
+        # Normalize before dropping duplicates: 101 and "101" are one key once read back.
+        prior = resume_from.copy()
+        prior["question"] = prior["question"].map(_resume_key)
+        prior = prior.drop_duplicates(keys, keep="last").set_index(keys)
 
     base_cols = [
         "question",
@@ -1482,14 +1557,20 @@ def _init_pairwise_df(
             key = next(
                 (
                     k
-                    for k in ((q, a, b), (_csv_cell(q), _csv_cell(a), _csv_cell(b)))
+                    for k in (
+                        (_resume_key(q), a, b),
+                        (_resume_key(_csv_cell(q)), _csv_cell(a), _csv_cell(b)),
+                    )
                     if prior is not None and k in prior.index
                 ),
                 None,
             )
             if key is not None:
                 pr = prior.loc[key]
-                if pd.notna(pr.get("winner", pd.NA)):
+                # A comparison with an aspect score missing is judged again, whole.
+                if pd.notna(pr.get("winner", pd.NA)) and all(
+                    ac in pr and pd.notna(pr[ac]) for ac in aspect_cols
+                ):
                     entry.update(
                         {
                             "winner": pr["winner"],
@@ -1574,9 +1655,18 @@ def _aggregate_pairwise(
         vals = [v for v in r.aspect_means.values() if not math.isnan(v)]
         return sum(vals) / len(vals) if vals else 0.0
 
+    # A system without a decisive comparison (only ties) neither won nor lost: it sorts
+    # as a win rate of one half, among the systems that won as often as they lost, and its
+    # aspect scores place it there. Its reported win_rate stays NaN. A system with no
+    # comparison at all (a partial table) has nothing to rank it by and sorts last.
+    def _sorted_win_rate(r: PairwiseRanking) -> float:
+        if not math.isnan(r.win_rate):
+            return r.win_rate
+        return 0.5 if r.ties else -1.0
+
     rankings.sort(
         key=lambda r: (
-            -(r.win_rate if not math.isnan(r.win_rate) else -1),
+            -_sorted_win_rate(r),
             -_aspect_avg(r),
             -(r.avg_score if not math.isnan(r.avg_score) else -1),
         )

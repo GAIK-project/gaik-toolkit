@@ -11,8 +11,8 @@ export default function LuvataOrderPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <DemoPageHeader
         icon={Package}
-        title="Purchase Order Processing"
-        description="Match a purchase order with its BOMs, price it from a price list and draft the sales order"
+        title="Purchase order processing"
+        description="Draft a sales order from a purchase order, bills of materials and a price list."
       >
         <div className="mt-2 flex justify-end">
           <FeedbackButton demoType="luvata-order" />

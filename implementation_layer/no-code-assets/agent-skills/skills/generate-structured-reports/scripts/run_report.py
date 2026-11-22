@@ -33,6 +33,7 @@ import os
 import re
 import sys
 import uuid
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path, PurePath
 from typing import Any
@@ -225,7 +226,10 @@ def install_provider_extra(provider: str, module: str, extra: str) -> None:
     commands = [[sys.executable, "-m", "pip", "install", requirement]]
     if shutil.which("uv"):
         commands.append(["uv", "pip", "install", "--python", sys.executable, requirement])
-    print(f"The {provider} provider needs the {module} package; installing {requirement}", file=sys.stderr)
+    print(
+        f"The {provider} provider needs the {module} package; installing {requirement}",
+        file=sys.stderr,
+    )
     for command in commands:
         code = subprocess.call(command, stdout=sys.stderr, stderr=sys.stderr)
         if code == 0:
@@ -242,10 +246,25 @@ def install_provider_extra(provider: str, module: str, extra: str) -> None:
     )
 
 
+def load_env_file() -> None:
+    """Load the ``.env`` file the way gaik does, before this script reads the environment.
+
+    gaik 0.12.0 and later read ``.env`` on its first configuration call, not on
+    import, so ``LLM_PROVIDER`` read here would miss it; an older gaik loaded it on
+    import already.
+    """
+    try:
+        from gaik.software_components.env_file import load_env_file as load
+    except ImportError:
+        return
+    load()
+
+
 def load_config(provider: str | None) -> dict:
     """The runtime LLM config. Credentials come from the environment, never from the spec."""
     from gaik.software_components.llm import get_llm_config
 
+    load_env_file()
     name = provider or os.environ.get("LLM_PROVIDER", "").strip() or DEFAULT_PROVIDER
     try:
         config = get_llm_config(name)
@@ -295,6 +314,38 @@ def load_spec(path: Path):
 
 def source_files(spec) -> list[tuple[str, Path]]:
     return [(cls, Path(p)) for cls, paths in spec.sources.items() for p in paths]
+
+
+LIMIT_ADVICE = (
+    "gaik's normalizer refuses it, and the helper cannot raise its limits: ask the user for a "
+    "smaller file (split, compressed or shortened) or whether to leave it out"
+)
+
+
+def limit_problem(path: Path, kind: str) -> str | None:
+    """Why gaik's normalizer would refuse this file over an input limit, or None.
+
+    The helper builds ReportWriter without `limits=`, so from gaik 0.11.0 the normalizer checks
+    every file against `InputLimits.local_parsing()`: file size, unpacked size of a DOCX or
+    XLSX, image pixels and recording length (the page count of a PDF is not limited). A sheet's
+    rows are counted only while it is read, so they are not checked here. A gaik without input
+    limits refuses nothing.
+    """
+    try:
+        from gaik.software_components.input_limits import InputLimits
+    except ImportError:
+        return None
+    limits = InputLimits.local_parsing()
+    try:
+        if kind == "audio":
+            limits.check_media(path)
+        else:
+            limits.check_document(path)
+    except ValueError as exc:  # InputLimitError, or a playlist given as a recording
+        return str(exc)
+    except (OSError, zipfile.BadZipFile):
+        return None  # the normalizer reports a file it cannot read
+    return None
 
 
 def pdf_page_text(path: Path) -> tuple[int, list[int], list[int]]:
@@ -359,10 +410,50 @@ def section_problems(spec) -> tuple[list[str], list[str]]:
                 )
     if not spec.instructions.strip():
         warnings.append(
-            "The report instructions are empty: state the source hierarchy, or that there is none, "
-            "so conflicts are not decided by the curator's own examples"
+            "The report instructions are empty: state the scope and how each kind of source is "
+            "worded; which class outranks which goes in source_precedence"
         )
     return errors, warnings
+
+
+def _resolved(conflict, section) -> dict:
+    """A resolved conflict and what the writer does with it.
+
+    With `source_precedence` (gaik 0.12.0 or later) the code picks the side from the source each
+    unit cites and names it in `preferred_unit_ids`: the entry lists the side the report follows
+    and the side it drops, and the person checks the quotes of both. An older gaik has no
+    `preferred_unit_ids`: its curator model resolved the conflict from the report instructions,
+    and the writer follows the side the conflict's `description` gives. No code knows which unit
+    that is, so `follows` and `drops` are None and `units` lists every side with the description.
+    """
+    units = {u.id: u for u in section.units}
+
+    def side(ids):
+        return [
+            {"id": i, "source": units[i].source.file, "quote": units[i].quote}
+            for i in ids
+            if i in units
+        ]
+
+    preferred = getattr(conflict, "preferred_unit_ids", None)
+    if preferred is None:
+        return {
+            "topic": conflict.topic,
+            "resolved_by": None,
+            "decided_by": "description",
+            "description": conflict.description,
+            "follows": None,
+            "drops": None,
+            "units": side(conflict.unit_ids),
+        }
+    kept = set(preferred)
+    return {
+        "topic": conflict.topic,
+        "resolved_by": getattr(conflict, "resolved_by", None),
+        "decided_by": "preferred_unit_ids",
+        "follows": side([i for i in conflict.unit_ids if i in kept]),
+        "drops": side([i for i in conflict.unit_ids if i not in kept]),
+    }
 
 
 def pandoc_problem() -> str | None:
@@ -461,6 +552,10 @@ def preflight_checks(
         seen[path.name] = path
         if kind in has:
             has[kind] = True
+        problem = limit_problem(path, kind)
+        if problem:
+            errors.append(f"{problem} {LIMIT_ADVICE}")
+            continue
         if kind == "pdf":
             pages, empty, sparse = pdf_page_text(path)
             entry["pages"] = pages
@@ -506,6 +601,8 @@ def preflight_checks(
                 f"{sample.name}: a sample report must be DOCX, Markdown, text or a text-based PDF "
                 "so it converts without a model call"
             )
+        elif problem := limit_problem(sample, "sample"):
+            errors.append(f"{problem} {LIMIT_ADVICE}")
         elif sample.suffix.lower() == ".pdf":
             pages, empty, _ = pdf_page_text(sample)
             if pages and len(empty) == pages:
@@ -565,15 +662,16 @@ def stage_inputs(spec, stage: str) -> dict:
             ),
         }
     if stage == "curate":
-        return {
-            "spec": sha256_json(
-                {
-                    "sections": dump["sections"],
-                    "instructions": dump["instructions"],
-                    "options": dump["settings"]["curator"],
-                }
-            )
+        curate = {
+            "sections": dump["sections"],
+            "instructions": dump["instructions"],
+            "options": dump["settings"]["curator"],
         }
+        # The precedence decides the conflicts. Hashed only when set, so a run curated
+        # before the key existed stays current while the spec leaves it out.
+        if dump.get("source_precedence"):
+            curate["source_precedence"] = dump["source_precedence"]
+        return {"spec": sha256_json(curate)}
     settings = dump["settings"]
     return {
         "spec": sha256_json(
@@ -771,7 +869,7 @@ def knowledge_problems(ws: Path) -> tuple[list[str], dict]:
             "units": len(s.units),
             "missing": s.missing,
             "unresolved_conflicts": [c.topic for c in s.conflicts if c.status == "unresolved"],
-            "resolved_conflicts": [c.topic for c in s.conflicts if c.status == "resolved"],
+            "resolved_conflicts": [_resolved(c, s) for c in s.conflicts if c.status == "resolved"],
         }
         for s in knowledge.sections
     }
@@ -910,7 +1008,9 @@ def cmd_curate(args) -> dict:
                     for c in s.conflicts
                     if c.status == "unresolved"
                 ],
-                "resolved_conflicts": [c.topic for c in s.conflicts if c.status == "resolved"],
+                "resolved_conflicts": [
+                    _resolved(c, s) for c in s.conflicts if c.status == "resolved"
+                ],
             }
             for s in knowledge.sections
         },
@@ -1266,13 +1366,14 @@ DEFAULT_TRANSCRIPTION = {"openai": "gpt-4o-transcribe", "azure": "gpt-4o-transcr
 MODEL_STEPS = ("vision", "transcription", "curator", "writer", "reviewer")
 SPEC_KEYS = (
     "title", "description", "language", "sections", "instructions", "sources",
-    "sample_report", "models", "settings",
+    "source_precedence", "sample_report", "models", "settings",
 )  # fmt: skip
 SECTION_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def provider_name(provider: str | None) -> str:
     """The provider a proposal is for. Only its name is used: no config, no credentials."""
+    load_env_file()
     return (provider or os.environ.get("LLM_PROVIDER", "").strip() or DEFAULT_PROVIDER).lower()
 
 
@@ -1399,7 +1500,9 @@ def proposal_problems(raw: dict) -> tuple[list[str], list[str]]:
             if dep == s.get("id"):
                 errors.append(f"sections[{n}] ({s.get('title')!r}) cannot depend on itself")
             elif dep not in ids:
-                errors.append(f"sections[{n}] ({s.get('title')!r}) depends on {dep!r}, not a section")
+                errors.append(
+                    f"sections[{n}] ({s.get('title')!r}) depends on {dep!r}, not a section"
+                )
     names = [Path(p).name for paths in (raw.get("sources") or {}).values() for p in paths or []]
     sample = raw.get("sample_report")
     if sample and Path(sample).name in names:
@@ -1410,7 +1513,10 @@ def proposal_problems(raw: dict) -> tuple[list[str], list[str]]:
     if all(isinstance(s, dict) and s.get("id") == "draft" for s in sections):
         return errors, warnings  # step 2: the instructions are written with the sections
     settings = raw.get("settings") or {}
-    if settings.get("citations") is False and "cite each fact" in str(raw.get("instructions", "")).lower():
+    if (
+        settings.get("citations") is False
+        and "cite each fact" in str(raw.get("instructions", "")).lower()
+    ):
         warnings.append(
             "Citations are off but the instructions still ask to cite each fact; remove that sentence"
         )
@@ -1433,13 +1539,13 @@ def changed_stages(old: dict, new: dict, ws: Path) -> list[str]:
             value: Any = d
             for part in key.split("."):
                 value = value.get(part) if isinstance(value, dict) else None
-            out[key] = value
+            out[key] = value or None if key == "source_precedence" else value
         return sha256_json(out)
 
     normalize = (
         "sources", "models.vision", "models.transcription", "settings.transcription_language",
     )  # fmt: skip
-    curate = ("sections", "instructions", "models.curator", "settings.curator")
+    curate = ("sections", "instructions", "source_precedence", "models.curator", "settings.curator")
     synthesize = (
         "title", "language", "sections", "instructions", "sample_report", "models.writer",
         "models.reviewer", "settings.review_attempts", "settings.strict_review",
@@ -1470,6 +1576,20 @@ def review_lines(spec: dict, provider: str) -> list[str]:
     for cls in ("primary", "secondary"):
         files = spec["sources"].get(cls) or []
         lines.append(f"  sources.{cls}: {', '.join(files) if files else '(none)'}")
+    precedence = spec.get("source_precedence") or []
+    if not isinstance(precedence, list):
+        # A wrong shape has its own schema error; the list shows the value as it is.
+        shown = show(precedence)
+    else:
+        shown = " > ".join(c if isinstance(c, str) else show(c) for c in precedence)
+    lines.append(
+        "  source_precedence: "
+        + (
+            shown + " (decides conflicts between these classes)"
+            if precedence
+            else "(none: every conflict is left for the user to settle)"
+        )
+    )
     lines.append(f"  sample_report: {spec.get('sample_report') or '(none)'}")
     lines.append("SECTIONS")
     titles = {s.get("id"): s.get("title") for s in spec["sections"] if isinstance(s, dict)}
@@ -1553,7 +1673,9 @@ def cmd_apply_spec(args) -> dict:
     try:
         new = json.loads(proposal_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise HelperError(EXIT_INPUT, "proposal", f"{proposal_path.name}: not valid JSON ({exc})") from exc
+        raise HelperError(
+            EXIT_INPUT, "proposal", f"{proposal_path.name}: not valid JSON ({exc})"
+        ) from exc
     provider = provider_name(args.provider)
     old = read_json(path, {}) if path.is_file() else {}
     errors, warnings = proposal_problems(new)

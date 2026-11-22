@@ -79,6 +79,9 @@ text layer. It roughly triples the output tokens of an extraction.
     and another user's session answers 404.
   - At most `WIZARD_MAX_SESSIONS` (3) sessions run at once, one per user, each with at
     most `WIZARD_MAX_MESSAGES` (60) messages. A session idle for 30 minutes is ended.
+  - `WIZARD_AGENT_MAX_BUDGET_USD`, off unless set, stops a session's agent when the CLI's
+    estimated cost reaches it; the session then takes no more messages, and its files
+    stay to download.
   - Attachments (5 per message, 10 MB each) are checked for type, size and content
     before a parser or a model reads them, and reach the agent marked as data.
   - A session's workspace and download archives are removed when it ends or goes idle.
@@ -111,7 +114,7 @@ can switch among the server's own models without a key. `GET /api/model-settings
 lists them, and the API checks the `x-gaik-server-model` header against that list.
 By default these are GPT-6 Sol (the server default, set with `DEMO_LLM_MODEL`), GPT-6 Luna,
 Claude Haiku 5.5, Claude Sonnet 5.5 and Gemini 3.8 Flash for everyone, and GPT-6.2 Sol, GPT-6.1 Sol,
-GPT-6 Astra, Claude Opus 5.5 and Gemini 4 Argon for the GAIK team only: the admin, the `DEMO_USER_NAME`
+GPT-6 Astra, Claude Opus 5.5, Gemini 4 Argon and Gemini 4 Carbon for the GAIK team only: the admin, the `DEMO_USER_NAME`
 account, `haaga-helia.fi` addresses and anyone in `MODEL_STAFF_EMAILS`. The proxy
 decides this from the session and tells the API in `x-gaik-model-tier`; a browser cannot
 set it. A provider without credentials on the server is left out, and
@@ -192,7 +195,11 @@ Server defaults accept `DEMO_LLM_PROVIDER` and `DEMO_LLM_MODEL`; otherwise the t
 provider environment model is preserved. The library default for OpenAI/Azure is `gpt-6-luna`; the demo server runs `gpt-6-sol` through `DEMO_LLM_MODEL`.
 Azure model values are deployment names. `gpt-6-sol`, `gpt-6-astra`, and the `gpt-5.6`
 family can be selected where available. Vision Extractor's server-side menu can be set
-with comma-separated `DEMO_OPENAI_MODELS`, `DEMO_CLAUDE_MODELS`, and `DEMO_GOOGLE_MODELS`.
+with comma-separated `DEMO_OPENAI_MODELS`, `DEMO_CLAUDE_MODELS`, and `DEMO_GOOGLE_MODELS`
+(default `gemini-3.8-flash,gemini-4-argon,gemini-4-carbon`, the Gemini 4 models for the team
+only). With a CSC Aitta model picked, the Vision Extractor refuses to run: on 2026-11-19 Gemma 4
+31B took 5 to 15 minutes per receipt and Aitta refused a scanned page as too large
+(`docs/MODEL_REQUIREMENTS.md`).
 Aitta defaults to `google/gemma-4-31b-it`, which passed the integration's text, schema,
 extraction and vision checks. Cold starts can take several minutes.
 

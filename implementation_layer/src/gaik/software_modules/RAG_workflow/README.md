@@ -44,7 +44,10 @@ print(result.answer)
 - **Text Parsing** - `parser="text"` reads the text layer without Docling or a vision model
 - **Persistent Vector Store** - Chroma-backed storage
 - **Re-ranked Retrieval** - Optional cross-encoder reranking
-- **Citations** - Optional citation formatting
+- **Citations** - Optional; numbered references are resolved to the retrieved chunks,
+  and `RAGWorkflowResult.citations` holds only retrieved chunks. A source written in
+  another form is left as written (see the
+  [Answer Generator README](../../software_components/RAG/answer_generator/README.md#citations))
 - **Conversation History** - Last-n Q/A memory
 - **Retrieved Text as Data** - Each chunk reaches the answer model in its own
   labelled block, apart from the instructions and the question (see the
@@ -84,8 +87,23 @@ workflow = RAGWorkflow(
 
 ```python
 index_result = workflow.index_documents(
-    file_paths: list[str | Path]
+    file_paths: Iterable[str | Path],
+    filenames: list[str] | None = None,
+    document_ids: list[str | int] | None = None,
 )
+# Each file is one document, identified by its entry in document_ids or else its
+# path as given, with forward slashes (Path(path).as_posix()); filenames are display
+# names only, so two files with the same name are two documents. Indexing a document
+# again replaces its chunks. Files saved under a new temporary path each time need
+# document_ids to be replaced.
+# The path is not resolved: "data/a.pdf" and its absolute path are two documents,
+# and one relative path indexed from two working directories is one. Pass paths
+# spelled the same way each time, or document_ids. Every id is checked before the
+# first file is parsed.
+
+deleted = workflow.delete_document(document_id: str | int)  # chunks deleted
+# A persisted collection from an earlier gaik release still answers, but its
+# chunks are not replaced or deleted this way: index into a new collection_name.
 
 result = workflow.ask(
     query: str,

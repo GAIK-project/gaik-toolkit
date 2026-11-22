@@ -81,7 +81,15 @@ schema = generator.generate_schema(user_requirements: str)
 generator.extraction_model      # Generated Pydantic model
 generator.item_requirements     # Field specifications
 generator.structure_analysis    # Structure type analysis
+
+# Regenerate over an approved schema and see what changed before saving it
+result = generator.generate_schema_with_usage(
+    user_requirements, approved_requirements=approved, approved_structure="flat"
+)
+print(result.diff)              # SchemaDiff; also compare_requirements(approved, new)
 ```
+
+See the [schema generator README](../schema_generator/README.md#review-a-new-schema-against-the-approved-one).
 
 ### DataExtractor
 

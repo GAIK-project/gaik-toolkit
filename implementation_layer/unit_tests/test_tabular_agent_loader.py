@@ -103,6 +103,103 @@ def test_free_text_with_commas_is_not_converted_to_numbers(con, tmp_path):
     assert types["comment"].startswith("VARCHAR")
 
 
+def _column(con, table, column):
+    """``(type, values in row order)`` of one column."""
+    types = {r[0]: r[1] for r in con.execute(f'DESCRIBE "{table}"').fetchall()}
+    values = [r[0] for r in con.execute(f'SELECT "{column}" FROM "{table}" ORDER BY id').fetchall()]
+    return types[column], values
+
+
+def test_us_thousands_commas_are_not_read_as_decimals(con, tmp_path, caplog):
+    """1,200 is as likely to be twelve hundred as one point two: the column stays text."""
+    import logging
+
+    path = tmp_path / "orders.csv"
+    path.write_text('id,Matti Virtanen\n1,"1,200"\n2,"3,450"\n3,"12,000"\n', encoding="utf-8")
+    with caplog.at_level(logging.INFO, logger="gaik.software_components.tabular_agent"):
+        _load(con, path)
+    data_type, values = _column(con, "orders", "Matti Virtanen")
+    assert data_type == "VARCHAR"
+    assert values == ["1,200", "3,450", "12,000"]
+    # The log line says how many columns, not which: a header can name a person.
+    assert "Left 1 column(s) as text" in caplog.text
+    assert "Virtanen" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "space",
+    [" ", " ", " "],
+    ids=["space", "no-break space", "narrow no-break space"],
+)
+def test_space_grouped_comma_decimals_are_converted(con, tmp_path, space):
+    path = tmp_path / "myynti.csv"
+    rows = ["1 234,56", "987,5", "12 345 678,90", "-1 000,25"]
+    path.write_text(
+        "id;summa\n" + "".join(f"{i};{v.replace(' ', space)}\n" for i, v in enumerate(rows)),
+        encoding="utf-8",
+    )
+    _load(con, path)
+    data_type, values = _column(con, "myynti", "summa")
+    assert data_type == "DOUBLE"
+    assert values == pytest.approx([1234.56, 987.5, 12345678.9, -1000.25])
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # One value that cannot be thousands grouping decides the whole column.
+        (["1,200", "3,5"], [1.2, 3.5]),
+        (["1,200", "1.234,56"], [1.2, 1234.56]),
+        (["1,200", "0,250"], [1.2, 0.25]),
+        (["1,200", "1234,567"], [1.2, 1234.567]),
+        (["1,200", "1 234,5"], [1.2, 1234.5]),
+        ([" 12,5 ", "3,25"], [12.5, 3.25]),
+        (["+1,5", "-0,25", "+1 234,5"], [1.5, -0.25, 1234.5]),
+        # Every value could be thousands grouping, or one can only be: text.
+        (["1,200", "-3,450"], None),
+        (["1,200", "1,234,567"], None),
+        (["1,200", "1,200.50"], None),
+        # Not every value is a number: text.
+        (["1,5", "n/a"], None),
+        # A unit stays with the value rather than being dropped from it.
+        (["12,5 %", "3,25 %"], None),
+        (["1 234,56 €", "987,50 €"], None),
+    ],
+)
+def test_a_column_is_read_as_comma_decimals_only_when_it_cannot_be_thousands(
+    con, tmp_path, raw, expected
+):
+    path = tmp_path / "mixed.csv"
+    path.write_text(
+        "id;value\n" + "".join(f'{i};"{v}"\n' for i, v in enumerate(raw)), encoding="utf-8"
+    )
+    _load(con, path)
+    data_type, values = _column(con, "mixed", "value")
+    if expected is None:
+        assert data_type == "VARCHAR"
+        assert values == raw
+    else:
+        assert data_type == "DOUBLE"
+        assert values == pytest.approx(expected)
+
+
+def test_excel_text_cells_get_the_same_number_handling(con, tmp_path):
+    path = tmp_path / "book.xlsx"
+    _write_clean_xlsx(
+        path,
+        {
+            "Sheet1": [
+                ("id", "summa", "us_amount"),
+                (1, "1 234,56", "1,200"),
+                (2, "987,5", "12,000"),
+            ]
+        },
+    )
+    _load(con, path)
+    assert _column(con, "book", "summa") == ("DOUBLE", pytest.approx([1234.56, 987.5]))
+    assert _column(con, "book", "us_amount") == ("VARCHAR", ["1,200", "12,000"])
+
+
 def test_a_column_name_with_a_double_quote_is_loaded_and_profiled(con, tmp_path):
     from gaik.software_components.tabular_agent.profiling import profile_tables
 
@@ -117,6 +214,27 @@ def test_a_column_name_with_a_double_quote_is_loaded_and_profiled(con, tmp_path)
     assert [column.name for column in table.columns] == ["id", '5" pipe', "price"]
     # The comma decimals are still repaired next to the oddly named column.
     assert con.execute('SELECT sum(price) FROM "pipes"').fetchone()[0] == 3.75
+
+
+def test_a_failed_profile_is_logged_without_the_table_names(con, caplog):
+    """A table is named after its file or sheet, which can carry personal data."""
+    import logging
+
+    from gaik.software_components.tabular_agent.profiling import profile_tables
+
+    # DuckDB's error names the missing table and suggests the existing one.
+    con.execute("CREATE TABLE matti_virtanen_lab_2 (a INTEGER)")
+    tables = {"matti_virtanen_lab": "Matti_Virtanen_lab.csv", "matti_virtanen_lab_2": "x.csv"}
+    with caplog.at_level(logging.WARNING, logger="gaik.software_components.tabular_agent"):
+        schema = profile_tables(con, tables)
+
+    [record] = [r for r in caplog.records if "Could not profile" in r.getMessage()]
+    message = record.getMessage().lower()
+    assert "virtanen" not in message
+    assert "CatalogException" in record.getMessage(), "the cause is kept"
+    # The caller still gets the table, with its name, and the profile of the other one.
+    assert [t.name for t in schema.tables] == list(tables)
+    assert schema.tables[1].row_count == 0
 
 
 def test_rejects_unsupported_extension(tmp_path):
@@ -209,6 +327,142 @@ def test_unnamed_columns_get_generated_names(con, tmp_path):
     columns = [r[0] for r in con.execute("DESCRIBE partial").fetchall()]
     assert columns[0] == "region"
     assert columns[1].startswith("column_")
+
+
+_HEADER = ["Määrä", "Hinta (€)", "Région", '5" pipe']
+
+
+def test_excel_headers_are_named_as_the_same_csv_header_is(con, tmp_path):
+    """Non-ASCII letters, signs and case survive the Excel path, as they do for a CSV."""
+    xlsx, csv_path = tmp_path / "kirja.xlsx", tmp_path / "kirja_csv.csv"
+    _write_clean_xlsx(xlsx, {"Sheet1": [_HEADER, (3, 2.5, "Nord", 1), (4, 1.5, "Sud", 2)]})
+    csv_path.write_text(
+        ",".join('"' + h.replace('"', '""') + '"' for h in _HEADER) + "\n3,2.5,Nord,1\n",
+        encoding="utf-8",
+    )
+    _load(con, xlsx)
+    _load(con, csv_path)
+
+    def names(table):
+        return [r[0] for r in con.execute(f'DESCRIBE "{table}"').fetchall()]
+
+    assert names("kirja") == _HEADER
+    assert names("kirja") == names("kirja_csv")
+
+
+def test_excel_header_repeats_line_breaks_and_numbers_get_usable_names(con, tmp_path):
+    path = tmp_path / "report.xlsx"
+    rows = [("Region", "region", "Sales\nEUR", 2024, None), ("North", "N", 10, 11, 12)]
+    _write_clean_xlsx(path, {"Sheet1": rows + [("South", "S", 20, 21, 22)]})
+    _load(con, path)
+    columns = [r[0] for r in con.execute("DESCRIBE report").fetchall()]
+    # DuckDB's names are case-insensitive, so the repeat needs a suffix.
+    assert columns == ["Region", "region_2", "Sales EUR", "2024", "column_5"]
+    assert con.execute("SELECT count(*) FROM report").fetchone()[0] == 2
+
+
+def test_excel_headers_differing_in_a_non_ascii_letter_case_are_two_columns(con, tmp_path):
+    """DuckDB folds the case of ASCII letters only, so Å and å are two names, as in a CSV."""
+    path = tmp_path / "letters.xlsx"
+    _write_clean_xlsx(path, {"Sheet1": [("Å", "å", "Ä", "a", "A"), (1, 2, 3, 4, 5)]})
+    _load(con, path)
+    assert [r[0] for r in con.execute("DESCRIBE letters").fetchall()] == ["Å", "å", "Ä", "a", "A_2"]
+
+
+def test_semicolons_in_excel_headers_and_cells_do_not_split_columns(con, tmp_path):
+    path = tmp_path / "notes.xlsx"
+    rows = [("Notes;A", "Notes;B"), ("x;y", "z;w"), ("a;b", "c;d")]
+    _write_clean_xlsx(path, {"Sheet1": rows})
+    _load(con, path)
+    assert [r[0] for r in con.execute("DESCRIBE notes").fetchall()] == ["Notes;A", "Notes;B"]
+    assert con.execute("SELECT * FROM notes").fetchall() == [("x;y", "z;w"), ("a;b", "c;d")]
+
+
+def test_an_excel_header_of_years_is_not_read_back_as_a_data_row(con, tmp_path):
+    path = tmp_path / "years.xlsx"
+    _write_clean_xlsx(path, {"Sheet1": [(2024, 2025), (1, 2), (3, 4)]})
+    _load(con, path)
+    assert [r[0] for r in con.execute("DESCRIBE years").fetchall()] == ["2024", "2025"]
+    assert con.execute('SELECT sum("2025") FROM years').fetchone()[0] == 6
+
+
+def test_non_ascii_excel_columns_pass_the_validator_and_run(con, tmp_path):
+    from gaik.software_components.tabular_agent.sql_safety import validate_read_only
+
+    path = tmp_path / "kirja.xlsx"
+    _write_clean_xlsx(path, {"Sheet1": [_HEADER, (3, 2.5, "Nord", 1), (4, 1.5, "Sud", 2)]})
+    _load(con, path)
+    for sql, expected in (
+        ('SELECT sum(Määrä), sum("Hinta (€)") FROM kirja', (7, 4.0)),
+        ('SELECT sum("Määrä"), sum("hinta (€)") FROM kirja WHERE Région <> \'x\'', (7, 4.0)),
+        ('SELECT sum(k."5"" pipe") FROM kirja AS k', (3,)),
+    ):
+        checked = validate_read_only(sql, allowed_tables=["kirja"])
+        assert con.execute(checked).fetchone() == expected
+
+
+def test_the_schema_text_quotes_the_names_sql_cannot_read_bare(con, tmp_path):
+    from gaik.software_components.tabular_agent.profiling import profile_tables
+
+    path = tmp_path / "kirja.xlsx"
+    rows = [_HEADER + ["unit_price", "2024"], (3, 2.5, "Nord", 1, 9, 1), (4, 1.5, "Sud", 2, 8, 2)]
+    _write_clean_xlsx(path, {"Sheet1": rows})
+    text = profile_tables(con, _load(con, path)).to_prompt_text()
+    for quoted in ('"Määrä" BIGINT', '"Hinta (€)" DOUBLE', '"Région" VARCHAR', '"5"" pipe"'):
+        assert f"\n  {quoted}" in text
+    assert '"2024" BIGINT' in text
+    assert "\n  unit_price BIGINT" in text
+
+
+# Header words DuckDB reserves, or that the validator's parser reads as syntax.
+_KEYWORD_HEADER = ["select", "From", "order", "limit", "Group", "if", "drop", "where"]
+
+
+def test_the_schema_text_quotes_keywords_and_the_quoted_names_run(con, tmp_path):
+    from gaik.software_components.tabular_agent.profiling import profile_tables
+    from gaik.software_components.tabular_agent.sql_safety import validate_read_only
+
+    path = tmp_path / "order.csv"
+    path.write_text(
+        ",".join(_KEYWORD_HEADER + ["name", "year"]) + "\n" + ",".join(["1"] * 10) + "\n",
+        encoding="utf-8",
+    )
+    tables = _load(con, path)
+    text = profile_tables(con, tables).to_prompt_text()
+    # The table is named after the file, and "order" is a keyword too.
+    assert text.startswith('TABLE "order"  -- from order.csv')
+    for name in _KEYWORD_HEADER:
+        assert f'\n  "{name}" BIGINT' in text
+        # Written the way the schema shows it, the name passes the validator and runs.
+        sql = f'SELECT sum("{name}") FROM "order" WHERE "{name}" > 0 GROUP BY "{name}"'
+        assert con.execute(validate_read_only(sql, allowed_tables=list(tables))).fetchone() == (1,)
+    # Ordinary words that are not reserved stay bare.
+    assert "\n  name BIGINT" in text
+    assert "\n  year BIGINT" in text
+
+
+@pytest.mark.parametrize("name", ["from", "limit", "select", "where", "if", "drop"])
+def test_these_keywords_fail_bare_so_the_quotes_are_needed(con, name):
+    """Guards the test above: each name in it does break a query written bare."""
+    from gaik.software_components.tabular_agent.sql_safety import (
+        UnsafeSQLError,
+        validate_read_only,
+    )
+
+    con.execute(f'CREATE TABLE t ("{name}" INTEGER, other INTEGER)')
+    con.execute("INSERT INTO t VALUES (1, 1)")
+    failures = 0
+    for sql in (
+        f"SELECT {name} FROM t",
+        f"SELECT sum({name}) FROM t WHERE {name} > 0",
+        f"SELECT {name} FROM t GROUP BY {name}, other",
+    ):
+        try:
+            if con.execute(validate_read_only(sql)).fetchall() != [(1,)]:
+                failures += 1
+        except (UnsafeSQLError, duckdb.Error):
+            failures += 1
+    assert failures
 
 
 def test_empty_sheets_are_skipped(con, tmp_path):

@@ -29,11 +29,13 @@ from __future__ import annotations
 import csv
 import logging
 import re
+import string
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from .._log_names import file_tag
 from ..input_limits import InputLimits, count_table_rows
 from .models import SheetLayout
 
@@ -227,9 +229,20 @@ def _load_flat_file(
         repair_european_decimals(con, table_name)
 
 
-# "1234,56" or "1.234.567,89" -- a decimal comma, optionally with dot as the
-# thousands separator. Anchored, so free text containing a comma never matches.
-_EURO_DECIMAL = r"^-?[0-9]{1,3}(\.[0-9]{3})*,[0-9]+$|^-?[0-9]+,[0-9]+$"
+# A number with a decimal comma: "1234,56", or with its thousands grouped by dots
+# ("1.234.567,89") or by spaces ("1 234,56"; also the no-break and the narrow
+# no-break space that spreadsheets and locale formatting write), with an optional
+# sign. Anchored, so free text containing a comma never matches, and a value with
+# a unit ("12,5 %", "1 234,56 €") stays text rather than losing its unit.
+_GROUP_SPACES = r" \x{00A0}\x{202F}"
+_DECIMAL_COMMA = (
+    r"^[-+]?[0-9]+,[0-9]+$"
+    r"|^[-+]?[0-9]{1,3}(\.[0-9]{3})+,[0-9]+$"
+    rf"|^[-+]?[0-9]{{1,3}}([{_GROUP_SPACES}][0-9]{{3}})+,[0-9]+$"
+)
+# A decimal-comma value that reads just as well as a whole number with a thousands
+# comma: "1,200" or "12,000". "3,5", "0,250" and "1234,567" cannot be thousands.
+_THOUSANDS_COMMA = r"^[-+]?[1-9][0-9]{0,2},[0-9]{3}$"
 
 
 def repair_european_decimals(con: Any, table_name: str) -> list[str]:
@@ -238,7 +251,10 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
     DuckDB's type inference reads ``1234,56`` as text, so a Finnish or Swedish
     export silently loses every numeric column and no amount of prompting makes
     ``SUM()`` work on it. A column is converted only when *every* non-null value
-    is a comma-decimal number, which leaves genuine free text untouched.
+    is a comma-decimal number, which leaves genuine free text untouched, and at
+    least one of them cannot be a thousands separator: a column of ``1,200``,
+    ``3,450`` and ``12,000`` is as likely to be 1200, 3450 and 12000, so it is
+    left as text rather than read as 1.2, 3.45 and 12.0.
 
     Returns:
         The names of the columns that were converted.
@@ -249,34 +265,45 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
         return []
 
     converted: list[str] = []
+    ambiguous: list[str] = []
     for row in described:
         column, data_type = row[0], str(row[1]).upper()
         if not data_type.startswith("VARCHAR"):
             continue
         quoted = quote_identifier(column)
+        value = f"trim({quoted})"
         try:
-            total, matching = con.execute(
+            total, decimal, thousands = con.execute(
                 f"SELECT count({quoted}), "
-                f"count(*) FILTER (WHERE regexp_matches({quoted}, ?)) "
+                f"count(*) FILTER (WHERE regexp_matches({value}, ?)), "
+                f"count(*) FILTER (WHERE regexp_matches({value}, ?)) "
                 f'FROM "{table_name}"',
-                [_EURO_DECIMAL],
+                [_DECIMAL_COMMA, _THOUSANDS_COMMA],
             ).fetchone()
         except Exception as exc:  # pragma: no cover - defensive
-            logger.debug("Decimal probe failed for %s.%s: %s", table_name, column, exc)
+            logger.debug("Decimal probe failed for a column: %s", type(exc).__name__)
             continue
-        if not total or matching != total:
+        if not total or decimal != total:
+            continue
+        if thousands == total:
+            ambiguous.append(column)
             continue
         try:
+            # Every value matched, so a dot or a space in it groups thousands.
             con.execute(
-                f'ALTER TABLE "{table_name}" ALTER {quoted} TYPE DOUBLE '
-                f"USING CAST(replace(replace({quoted}, '.', ''), ',', '.') AS DOUBLE)"
+                f'ALTER TABLE "{table_name}" ALTER {quoted} TYPE DOUBLE USING CAST(replace('
+                f"regexp_replace({value}, '[.{_GROUP_SPACES}]', '', 'g'), ',', '.') AS DOUBLE)"
             )
             converted.append(column)
         except Exception as exc:
-            logger.debug("Could not retype %s.%s as DOUBLE: %s", table_name, column, exc)
+            logger.debug("Could not retype a column as DOUBLE: %s", type(exc).__name__)
+    # Counts only: a column name is the file's content (a header row of people's
+    # names, say); the caller gets the converted names back.
     if converted:
+        logger.info("Converted %d comma-decimal column(s) to numbers", len(converted))
+    if ambiguous:
         logger.info(
-            "Converted comma-decimal column(s) in '%s': %s", table_name, ", ".join(converted)
+            "Left %d column(s) as text, as their commas may separate thousands", len(ambiguous)
         )
     return converted
 
@@ -319,18 +346,19 @@ def _load_excel(
             grid = _read_grid(worksheet, limits, f"{path.name} / {sheet_name}")
             grid = _trim_grid(grid)
             if len(grid) < 2:
-                logger.info("Skipping empty sheet '%s' in %s", sheet_name, path.name)
+                logger.info("Skipping an empty sheet in %s", file_tag(path))
                 continue
 
             layout, messy = _resolve_layout(
                 grid,
                 sheet_label=f"{path.name} / {sheet_name}",
+                log_label=f"a sheet in {file_tag(path)}",
                 layout_inference=layout_inference,
                 infer_layout=infer_layout,
             )
             header, rows = _apply_layout(grid, layout, drop_outliers=messy)
             if not header or not rows:
-                logger.info("Sheet '%s' in %s has no data rows", sheet_name, path.name)
+                logger.info("A sheet in %s has no data rows", file_tag(path))
                 continue
 
             # One sheet keeps the caller's name; extra sheets get suffixed.
@@ -485,6 +513,7 @@ def _resolve_layout(
     sheet_label: str,
     layout_inference: str,
     infer_layout: LayoutInferrer | None,
+    log_label: str = "a sheet",
 ) -> tuple[SheetLayout, bool]:
     """Pick the layout for a sheet, asking the LLM only when it is worth it.
 
@@ -510,13 +539,16 @@ def _resolve_layout(
     try:
         inferred = infer_layout(sheet_label, render_grid(grid))
     except Exception as exc:
-        logger.warning("Layout inference failed for %s, using heuristic: %s", sheet_label, exc)
+        # The file and sheet names go to the model, not to the log.
+        logger.warning(
+            "Layout inference failed for %s, using heuristic: %s", log_label, type(exc).__name__
+        )
         return heuristic, messy
 
     if not _layout_is_sane(inferred, grid):
-        logger.warning("Layout inference returned an unusable result for %s", sheet_label)
+        logger.warning("Layout inference returned an unusable result for %s", log_label)
         return heuristic, messy
-    logger.info("Layout inferred for %s: %s", sheet_label, inferred.reasoning)
+    logger.info("Layout inferred for %s", log_label)
     return inferred, messy
 
 
@@ -691,15 +723,28 @@ def _drop_shape_outliers(rows: list[list[Any]]) -> list[list[Any]]:
     return kept if kept else rows
 
 
+_ASCII_LOWER = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
+
+
 def _name_columns(cells: list[Any]) -> list[str]:
-    """Give every column a unique, non-empty, SQL-safe name."""
+    """Give every column a unique, non-empty name, as DuckDB names a CSV's columns.
+
+    The header text is kept, so ``Määrä`` and ``Hinta (€)`` stay as written, as they
+    do when the same table arrives as a CSV; line breaks and runs of spaces inside a
+    cell become one space. A blank header cell is named ``column_<n>``, and a repeat
+    gets a numeric suffix. DuckDB compares names ignoring the case of ASCII letters
+    only, so ``Region`` repeats ``region`` but ``Å`` and ``å`` are two names.
+    The schema shown to the model quotes a name that needs it.
+    """
     names: list[str] = []
     taken: set[str] = set()
     for i, cell in enumerate(cells):
-        fallback = f"column_{i + 1}"
-        base = fallback if _is_blank(cell) else sanitize_identifier(str(cell), fallback=fallback)
-        name = _unique(base, taken)
-        taken.add(name)
+        base = "" if _is_blank(cell) else " ".join(str(cell).split())
+        base = base or f"column_{i + 1}"
+        name, suffix = base, 2
+        while name.translate(_ASCII_LOWER) in taken:
+            name, suffix = f"{base}_{suffix}", suffix + 1
+        taken.add(name.translate(_ASCII_LOWER))
         names.append(name)
     return names
 
@@ -721,9 +766,13 @@ def _create_from_rows(con: Any, table_name: str, header: list[str], rows: list[l
                 writer.writerow(header)
                 for row in rows:
                     writer.writerow(["" if _is_blank(c) else c for c in row])
+            # The file is in the writer's own dialect, so only the types are left to
+            # guess: DuckDB would otherwise read a header of numbers, such as years,
+            # as a data row, or split cells at a ";" a header holds.
             con.execute(
                 f'CREATE TABLE "{table_name}" AS SELECT * FROM '
-                f"read_csv('{_escape(csv_path.as_posix())}', auto_detect=true, sample_size=-1)"
+                f"read_csv('{_escape(csv_path.as_posix())}', auto_detect=true, "
+                "sample_size=-1, header=true, delim=',', quote='\"', escape='\"')"
             )
     except Exception as exc:
         raise TableLoadError(f"Could not build table '{table_name}': {exc}") from exc

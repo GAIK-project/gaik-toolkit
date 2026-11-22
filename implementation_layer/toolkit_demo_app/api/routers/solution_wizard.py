@@ -40,6 +40,7 @@ import asyncio
 import base64
 import csv
 import logging
+import math
 import os
 import re
 import shutil
@@ -154,6 +155,43 @@ def _max_sessions() -> int:
 
 def _max_messages() -> int:
     return _count_env("WIZARD_MAX_MESSAGES", 60)
+
+
+# The CLI reads a message that starts with "/" as one of its commands: /clear would
+# reset the conversation, and with it the cost limit's count. A user's text never
+# runs one: a zero-width space in front keeps it plain text for the CLI and
+# changes nothing the model reads. Only the server's own bootstrap starts with "/".
+_NOT_A_COMMAND = "​"
+
+
+def _as_user_text(text: str) -> str:
+    """The user's text as it goes to the agent: never one of the CLI's commands."""
+    return _NOT_A_COMMAND + text if text.lstrip().startswith("/") else text
+
+
+BUDGET_STOP = "This session reached its cost limit. Download its files, then start a new session."
+
+
+def _agent_budget_usd() -> float | None:
+    """Estimated USD one session's agent may spend; None means no limit.
+
+    The agent SDK's ``max_budget_usd``: its CLI counts the spend of the whole
+    agent process, across messages, from its own price table, so this is the
+    CLI's estimate and not the provider's bill. A session keeps one agent for all
+    its messages and is never resumed, so the limit bounds the whole session,
+    unlike Wizard V2, where a resumed agent counts from zero again.
+
+    Off by default, as in Wizard V2: only users an admin has granted run the first
+    wizard here. ``WIZARD_AGENT_MAX_BUDGET_USD`` turns it on as a ceiling for a
+    runaway agent, a few times what a session costs (a Wizard V2 session: median
+    about 1 USD, the most about 3.4 USD, 11.11.2026). Unset, 0, a negative, an
+    unreadable or an infinite value is off.
+    """
+    try:
+        value = float(os.getenv("WIZARD_AGENT_MAX_BUDGET_USD", "").strip() or 0)
+    except ValueError:
+        return None
+    return value if 0 < value < math.inf else None
 
 
 MAX_MESSAGE_CHARS = 20_000
@@ -422,6 +460,7 @@ def _build_options(output_dir: Path, cli_home: Path) -> ClaudeAgentOptions:
         allowed_tools=["Read", "Grep", "Glob", "Write", "Edit", "Bash"],
         permission_mode="bypassPermissions",
         setting_sources=[],
+        max_budget_usd=_agent_budget_usd(),
         include_partial_messages=True,  # token-level streaming
     )
 
@@ -598,6 +637,13 @@ async def _stream_turn(session: dict, *, _silent_retries: int = 0) -> AsyncGener
                             {"name": block.name, "summary": _tool_summary(block)},
                         )
             elif isinstance(message, ResultMessage):
+                if message.is_error and message.subtype == "error_max_budget_usd":
+                    # The CLI stopped the agent at its cost limit. The session
+                    # takes no more messages; its files stay to download.
+                    session["over_budget"] = True
+                    logger.warning("A first-wizard session stopped at its cost limit")
+                    yield sse_event("error", {"message": BUDGET_STOP})
+                    break
                 if message.is_error:
                     # The result can quote the provider's response: log it, show an id.
                     stopped = RuntimeError(message.result or f"stopped: {message.stop_reason}")
@@ -747,6 +793,8 @@ def _ready_session(session_id: str, owner: str) -> dict:
     session = _owned_session(session_id, owner)
     if session["lock"].locked():
         raise HTTPException(status_code=409, detail="The wizard is still responding.")
+    if session.get("over_budget"):
+        raise HTTPException(status_code=409, detail=BUDGET_STOP)
     if session.get("messages", 0) >= _max_messages():
         raise HTTPException(
             status_code=409,
@@ -773,7 +821,7 @@ async def send_message(
 
     async def gen() -> AsyncGenerator[str, None]:
         async with session["lock"]:
-            message_text = body.text
+            message_text = _as_user_text(body.text)
             # First message of the session carries the wizard instructions.
             # The user only ever sees their own text; this rides underneath it.
             bootstrap = session.pop("pending_bootstrap", None)

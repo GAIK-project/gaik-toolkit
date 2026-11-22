@@ -1,10 +1,12 @@
 // What the Knowledge Curator demo works with: ready-made source sets with the topics to
 // collect, and how a set of facts is searched, filtered, counted and found in its source.
 
-import type {
-  FactUnit,
-  SectionInput,
-  SectionKnowledge,
+import {
+  PRIMARY_FIRST,
+  type FactUnit,
+  type SectionInput,
+  type SectionKnowledge,
+  type SourceClass,
 } from "@/lib/knowledge-curator/workspace";
 
 export interface CuratorExample {
@@ -16,6 +18,8 @@ export interface CuratorExample {
   url: string;
   sections: SectionInput[];
   instructions: string;
+  /** Which source class a conflict follows, highest first; empty leaves it to a person. */
+  source_precedence: SourceClass[];
 }
 
 export const EXAMPLES: CuratorExample[] = [
@@ -53,13 +57,14 @@ export const EXAMPLES: CuratorExample[] = [
       },
     ],
     instructions:
-      "The meeting minutes and the site notes are primary sources. The maintenance log is secondary. When sources disagree, prefer the primary source. Write the summaries in English.",
+      "The meeting minutes and the site notes are primary sources. The maintenance log is secondary. Write the summaries in English.",
+    source_precedence: PRIMARY_FIRST,
   },
   {
     id: "sale",
     title: "A pre-sale inspection where sources disagree",
     summary:
-      "An inspector's notes and readings against the seller's disclosure. They disagree about the roof and the bathroom, and the instructions say which to trust.",
+      "An inspector's notes and readings, the primary sources, against the seller's disclosure. They disagree about the roof and the bathroom. A gaik release that cannot rank sources by class may leave the conflicts open for you to settle.",
     tags: ["3 sources", "3 topics", "conflicts"],
     url: "/knowledge-curator-examples/sale-inspection.json",
     sections: [
@@ -91,7 +96,8 @@ export const EXAMPLES: CuratorExample[] = [
       },
     ],
     instructions:
-      "The inspector's notes and the moisture readings are primary sources. The seller's disclosure is secondary. When they disagree, prefer the primary source, and keep the seller's claim as a resolved conflict. Write the summaries in English.",
+      "The inspector's notes and the moisture readings are primary sources. The seller's disclosure is secondary. Write the summaries in English.",
+    source_precedence: PRIMARY_FIRST,
   },
 ];
 

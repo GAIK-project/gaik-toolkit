@@ -210,3 +210,67 @@ def test_the_checks_process_is_capped_in_memory_and_runs_at_a_lower_priority():
         timeout=30,
     ).stdout.split()
     assert out == [b"True", b"10"]
+
+
+def test_a_limit_the_checks_process_cannot_set_is_said_not_passed_over(monkeypatch, capsys):
+    """A refused memory cap or priority leaves the process running without it."""
+
+    class Resource:
+        RLIMIT_AS = 9
+        RLIM_INFINITY = -1
+
+        @staticmethod
+        def getrlimit(kind):
+            return (-1, -1)
+
+        @staticmethod
+        def setrlimit(kind, limits):
+            raise ValueError("current limit exceeds maximum limit")
+
+    def no_nice(increment):
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setitem(sys.modules, "resource", Resource)
+    monkeypatch.setattr(pdf_content.os, "nice", no_nice, raising=False)
+    pdf_content._limit_process(256 * 1024 * 1024)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""  # stdout carries only the outcome
+    lines = captured.err.splitlines()
+    assert len(lines) == 2
+    assert all(line.startswith(pdf_content.LIMIT_NOTICE) for line in lines)
+    assert "no memory cap" in lines[0] and "no lower priority" in lines[1]
+
+
+def _refuses_the_memory_cap(stand_in, detail: str = "x") -> None:
+    """Each check's process says it could not cap its memory, and passes the file."""
+    stand_in(
+        "import sys; sys.stdin.buffer.read(); "
+        f"sys.stderr.write({pdf_content.LIMIT_NOTICE + f'no memory cap (ValueError: {detail})'!r}); "
+        "sys.stderr.write(chr(10) + 'something else' + chr(10)); "
+        'print(\'{"outcome": "pass", "message": ""}\')'
+    )
+
+
+def _limit_warnings(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.name == pdf_process.__name__]
+
+
+def test_the_api_logs_a_limit_the_checks_process_could_not_set(stand_in, caplog, monkeypatch):
+    monkeypatch.setattr(pdf_process, "_limits_logged", set())
+    _refuses_the_memory_cap(stand_in)
+    with caplog.at_level("WARNING", logger=pdf_process.__name__):
+        assert _outcome(pdf_process.check, PLAIN) == "pass"
+    assert _limit_warnings(caplog) == [f"{pdf_content.LIMIT_NOTICE}no memory cap (ValueError: x)"]
+
+
+def test_a_limit_every_checks_process_misses_is_logged_once(stand_in, caplog, monkeypatch):
+    """macOS refuses the memory cap to every process: one warning, not one per file."""
+    monkeypatch.setattr(pdf_process, "_limits_logged", set())
+    with caplog.at_level("WARNING", logger=pdf_process.__name__):
+        _refuses_the_memory_cap(stand_in, "x")
+        assert _outcome(pdf_process.check, PLAIN) == "pass"
+        _refuses_the_memory_cap(stand_in, "y")
+        assert _outcome(pdf_process.check, PLAIN) == "pass"
+        assert _outcome(pdf_process.check, PLAIN) == "pass"
+    assert _limit_warnings(caplog) == [f"{pdf_content.LIMIT_NOTICE}no memory cap (ValueError: x)"]

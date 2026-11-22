@@ -57,7 +57,7 @@ The same configuration shape works with `VisionPlusParser(vision_config=...)` an
 - Speed > Quality
 
 **Use DocxParser when:**
-- Processing Word documents (.docx, .doc)
+- Processing Word documents (.docx; a Word 97-2003 .doc is refused: save it as .docx)
 - Fast local processing needed
 - Simple or structured text extraction
 

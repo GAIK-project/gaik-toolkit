@@ -30,6 +30,11 @@ export interface ReportSpec {
   language: string;
   sections: SpecSection[];
   instructions: string;
+  /**
+   * Source classes, highest first: which side of a conflict the curator follows. Empty
+   * leaves every conflict for a person to settle. A spec may omit it, which means empty.
+   */
+  source_precedence: SourceClass[];
   sources: Record<SourceClass, string[]>;
   sample_report: string | null;
   models: Record<ModelKey, string | null>;
@@ -54,7 +59,10 @@ export interface RunSettings extends Record<StepKey, StepOptions> {
   citations: boolean;
 }
 
-/** The defaults of gaik's RunSettings. */
+/**
+ * The demo's default run settings. gaik's RunSettings defaults to strict review; the demo
+ * keeps a lenient default (strict_review: false).
+ */
 export const DEFAULT_SETTINGS: RunSettings = {
   transcription_language: "auto",
   curator_workers: 4,
@@ -160,18 +168,68 @@ export function settingsForSpec(settings: RunSettings): SpecSettings {
   return citations ? rest : { ...rest, citations: false };
 }
 
+/**
+ * The precedence as a spec carries it: written only when it names a class, since gaik
+ * releases before `source_precedence` reject the key. With `backendTakesIt` false (the
+ * demo's API says its gaik has no such key) it is left out as well, for a run's spec.
+ */
+export function precedenceForSpec(
+  precedence: SourceClass[],
+  backendTakesIt = true,
+): { source_precedence?: SourceClass[] } {
+  return precedence.length && backendTakesIt
+    ? { source_precedence: [...precedence] }
+    : {};
+}
+
+/**
+ * What the page says when the spec ranks source classes but the demo's API runs a gaik
+ * without `source_precedence` (0.11.1): a run leaves the key out, and that release has
+ * the curator resolve a conflict from the report instructions. Null when there is
+ * nothing to say, also while the API has not said (`backendTakesIt` null).
+ */
+export function precedenceNotice(
+  precedence: SourceClass[],
+  backendTakesIt: boolean | null,
+): string | null {
+  if (backendTakesIt !== false || precedence.length === 0) return null;
+  return (
+    `This demo's gaik release has no source precedence, so a run leaves out the spec's ` +
+    `(${precedence.join(" over ")}): conflicts are resolved where the report ` +
+    `instructions rank the sources. The exported spec keeps it.`
+  );
+}
+
+function parsePrecedence(v: unknown): SourceClass[] {
+  if (v === undefined) return [];
+  const classes = strs(v, "source_precedence");
+  const unknown = classes.filter((c) => c !== "primary" && c !== "secondary");
+  if (unknown.length)
+    fail(`source_precedence names unknown classes ${unknown.join(", ")}`);
+  if (new Set(classes).size !== classes.length)
+    fail("source_precedence names a class more than once");
+  return classes as SourceClass[];
+}
+
 export function parseSpec(value: unknown): ReportSpec {
-  const o = exactObject(value, "spec", [
-    "title",
-    "description",
-    "language",
-    "sections",
-    "instructions",
-    "sources",
-    "sample_report",
-    "models",
-    "settings",
-  ]);
+  const o = exactObject(
+    value,
+    "spec",
+    [
+      "title",
+      "description",
+      "language",
+      "sections",
+      "instructions",
+      "source_precedence",
+      "sources",
+      "sample_report",
+      "models",
+      "settings",
+    ],
+    // Older specs, and specs for a gaik without the key, have no source_precedence.
+    ["source_precedence"],
+  );
   if (!Array.isArray(o.sections)) fail("sections must be an array");
   const sections = o.sections.map((s, i) => {
     const w = `sections[${i}]`;
@@ -204,6 +262,7 @@ export function parseSpec(value: unknown): ReportSpec {
     language: str(o.language, "language"),
     sections,
     instructions: str(o.instructions, "instructions"),
+    source_precedence: parsePrecedence(o.source_precedence),
     sources: {
       primary: strs(src.primary, "sources.primary"),
       secondary: strs(src.secondary, "sources.secondary"),

@@ -1,6 +1,5 @@
 "use client";
 
-import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,16 +28,11 @@ import {
 import {
   Download,
   FileArchive,
-  FileText,
-  ListChecks,
   Loader2,
-  Play,
   RotateCcw,
   Sparkles,
   Upload,
   Zap,
-  FilePlus2,
-  ScrollText,
 } from "lucide-react";
 import Link from "next/link";
 import { SectionEditor } from "../report-writer/components/section-editor";
@@ -50,38 +44,6 @@ import { StageStepper } from "./components/stage-stepper";
 import type { useReportWriter } from "./use-report-writer";
 
 type ReportWriter = ReturnType<typeof useReportWriter>;
-
-const GUIDE_STEPS: GuideStep[] = [
-  {
-    icon: ScrollText,
-    title: "Define the report",
-    text: "Give it a title, a language and the sections it should have. Or load the example and change it.",
-  },
-  {
-    icon: FilePlus2,
-    title: "Add your sources",
-    text: "Add documents, spreadsheets, images or recordings. Mark each as primary (your own evidence) or secondary (background).",
-  },
-  {
-    icon: ListChecks,
-    title: "Set the rules",
-    text: "Write the report instructions: which sources win a disagreement, how to cite, the tone. A sample report can set the layout.",
-  },
-  {
-    icon: Play,
-    title: "Run the stages",
-    text: "Run all three, or one at a time. Between stages you can read and correct the files that were produced.",
-  },
-  {
-    icon: FileText,
-    title: "Review and download",
-    text: "Read the report with the evidence behind every section, then download it as Word or Markdown.",
-  },
-];
-const GUIDE_NOTES = [
-  "Your files and the workspace live in this browser tab only. Reloading or closing it loses them, so download the .zip first. Files are 100 MB together at most.",
-  "Each stage is also available on its own: Source Normalizer, Knowledge Curator and Knowledge Synthesis.",
-];
 
 /** Build a report from your own sources and template, with every stage open to editing. */
 export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
@@ -106,6 +68,7 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
     setSections,
     instructions,
     setInstructions,
+    precedenceNote,
     sources,
     setSources,
     sample,
@@ -119,18 +82,17 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
 
   return (
     <div className="space-y-6">
-      <SectionGuide
-        heading="How to test your own report"
-        steps={GUIDE_STEPS}
-        notes={GUIDE_NOTES}
-      />
+      <p className="text-muted-foreground text-sm">
+        Files can total up to 100 MB. Download the workspace ZIP and your
+        report spec before reloading or closing this tab.
+      </p>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* The report you define */}
         <div className="space-y-5">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Use Case</CardTitle>
+              <CardTitle className="text-base">Report setup</CardTitle>
               <CardDescription>
                 Start from an example or your own spec
               </CardDescription>
@@ -142,7 +104,10 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
                   onValueChange={setExampleId}
                   disabled={busy}
                 >
-                  <SelectTrigger className="h-8 flex-1 text-sm">
+                  <SelectTrigger
+                    aria-label="Report example"
+                    className="h-8 min-w-0 flex-1 text-sm"
+                  >
                     <SelectValue placeholder="Choose an example" />
                   </SelectTrigger>
                   <SelectContent>
@@ -282,11 +247,16 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
                 disabled={busy}
                 className="min-h-[80px] resize-y text-sm"
               />
+              {precedenceNote && (
+                <p className="text-muted-foreground mt-2 text-xs">
+                  {precedenceNote}
+                </p>
+              )}
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0 pb-3">
               <div>
                 <CardTitle className="text-base">Sources</CardTitle>
                 <CardDescription>
@@ -377,7 +347,6 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
               recordings are transcribed and images are described by a vision
               model. A file that cannot be read fully, such as a scanned PDF or
               an unsupported type, stops the stage and is named in the error.
-              Files are 100 MB together at most: compress long recordings first.
             </p>
             <p>
               <strong>Stage 2: Curate.</strong> For every section that is not
@@ -447,11 +416,7 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
             </ul>
 
             <p>
-              <strong>Keeping your work.</strong> The workspace lives in this
-              browser tab. Before you close it, download the workspace .zip (all
-              stage files, in the Workspace card) and, if you changed the
-              template, the spec. Each stage is also available on its own, to
-              try in isolation:{" "}
+              <strong>Try a stage on its own.</strong>{" "}
               <Link href="/source-normalizer" className="underline">
                 Source Normalizer
               </Link>
@@ -498,7 +463,7 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
             progress={rw.progress}
             error={rw.error}
             onRun={rw.run}
-            onCancel={() => rw.abortRef.current?.abort()}
+            onStop={rw.stop}
             stacked
             runAllHint="Add at least one source file, and a file for every source listed, to run the stages."
           />

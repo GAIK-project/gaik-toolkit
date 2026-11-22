@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,8 +12,11 @@ import requests
 
 from gaik.software_components.config import create_openai_client, get_openai_config
 from gaik.software_components.endpoints import check_endpoint, log_endpoint
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED_LANGUAGES = {
     "fi": "Finnish",
@@ -31,6 +36,28 @@ DEFAULT_VOICE = "marin"
 DEFAULT_RESPONSE_FORMAT = "mp3"
 
 
+# tts-1 and tts-1-hd (with a dated suffix such as tts-1-hd-1106) and the usual Azure
+# deployment names for them: tts, tts-hd.
+_TTS_1_FAMILY = re.compile(r"tts(?:-1)?(?:-hd)?(?:-\d+)?", re.IGNORECASE)
+
+
+def _takes_instructions(model: str, chosen: bool | None = None) -> bool:
+    """Whether to send ``instructions`` to a speech model or deployment.
+
+    ``tts-1`` and ``tts-1-hd`` take none (OpenAI's API reference; Azure answers 400), and
+    their names (``tts``, ``tts-1``, ``tts-hd``, ``tts-1-hd``, with an optional dated
+    suffix) never get them. Otherwise ``chosen`` decides when the caller set it
+    (``TextToSpeech(send_instructions=...)`` or ``api_config["tts_instructions"]``), and
+    the name when not: a name with ``gpt`` (``gpt-4o-mini-tts``) gets them. An Azure
+    ``gpt-4o-mini-tts`` deployment named otherwise needs ``send_instructions=True``.
+    """
+    if _TTS_1_FAMILY.fullmatch(model.strip()):
+        return False
+    if chosen is not None:
+        return bool(chosen)
+    return "gpt" in model.lower()
+
+
 @dataclass
 class SpeechSynthesisResult:
     audio_bytes: bytes
@@ -40,6 +67,9 @@ class SpeechSynthesisResult:
     language: str
     response_format: str = DEFAULT_RESPONSE_FORMAT
     content_type: str = SUPPORTED_RESPONSE_FORMATS[DEFAULT_RESPONSE_FORMAT]
+    # The instructions sent with the request (the language line first); None for a
+    # model that takes none (_takes_instructions), which speaks the text as written.
+    instructions: str | None = None
 
     @property
     def filename(self) -> str:
@@ -57,7 +87,17 @@ class SpeechSynthesisResult:
 
 
 class TextToSpeech:
-    """Generate speech audio from text using OpenAI or Azure OpenAI."""
+    """Generate speech audio from text using OpenAI or Azure OpenAI.
+
+    Every request carries the voice and ``response_format``. The instructions (the
+    language line, ``default_instructions`` and a call's ``instructions``) go to a model
+    whose name contains ``gpt``, never to the ``tts-1`` family, and to any other name
+    only with ``send_instructions=True`` (or ``api_config["tts_instructions"]``), for
+    an Azure ``gpt-4o-mini-tts`` deployment named otherwise (:func:`_takes_instructions`).
+    ``SpeechSynthesisResult.instructions`` says what was sent. ``speed`` goes to a model
+    without instructions always, and to one with them only when it is not 1.0, the
+    default.
+    """
 
     def __init__(
         self,
@@ -72,8 +112,15 @@ class TextToSpeech:
         ] = DEFAULT_RESPONSE_FORMAT,
         speed: float = 1.0,
         default_instructions: str | None = None,
+        send_instructions: bool | None = None,
     ) -> None:
         self.api_config = api_config or get_openai_config(use_azure=use_azure)
+        # None decides by the model name; api_config["tts_instructions"] is the same switch.
+        self.send_instructions = (
+            send_instructions
+            if send_instructions is not None
+            else self.api_config.get("tts_instructions")
+        )
         # Resolve like create_openai_client: a bare legacy config (neither
         # ``provider`` nor ``use_azure``) means standard OpenAI, whatever LLM_PROVIDER says.
         provider = resolve_provider(config={"use_azure": False, **self.api_config})
@@ -89,6 +136,18 @@ class TextToSpeech:
             # Refuse a wrong address when the speaker is built, not at the first request.
             self._check_azure_tts_endpoint(self._azure_tts_endpoint())
         self.model = model or self._resolve_default_model()
+        if (
+            self.send_instructions is None
+            and not _TTS_1_FAMILY.fullmatch(self.model.strip())
+            and "gpt" not in self.model.lower()
+        ):
+            # The name says neither tts-1 nor gpt: say once, here, what is not sent.
+            logger.warning(
+                "TextToSpeech: the model %r is not known to take instructions, so the language "
+                "line and any instructions are not sent; pass send_instructions=True for a "
+                "gpt-4o-mini-tts deployment.",
+                self.model,
+            )
         if language not in SUPPORTED_LANGUAGES:
             supported = ", ".join(SUPPORTED_LANGUAGES)
             raise ValueError(f"Unsupported language '{language}'. Supported languages: {supported}")
@@ -127,27 +186,28 @@ class TextToSpeech:
                 f"Unsupported response format '{resolved_format}'. Supported formats: {supported}"
             )
 
-        resolved_instructions = self._build_instructions(
-            language=resolved_language, instructions=instructions
+        resolved_instructions = (
+            self._build_instructions(language=resolved_language, instructions=instructions)
+            if _takes_instructions(self.model, self.send_instructions)
+            else None
         )
+        request: dict = {
+            "model": self.model,
+            "input": text,
+            "voice": resolved_voice,
+            "response_format": resolved_format,
+        }
+        # The tts-1 family takes speed; a GPT speech model gets it only when it was asked
+        # for, since 1.0 is the default anyway.
+        if resolved_instructions is None or resolved_speed != 1.0:
+            request["speed"] = resolved_speed
+        if resolved_instructions is not None:
+            request["instructions"] = resolved_instructions
 
         if self.api_config.get("use_azure", False):
-            audio_bytes = self._synthesize_with_azure_endpoint(
-                text=text,
-                voice=resolved_voice,
-                instructions=resolved_instructions,
-                response_format=resolved_format,
-                speed=resolved_speed,
-            )
+            audio_bytes = self._synthesize_with_azure_endpoint(request)
         else:
-            with self.client.audio.speech.with_streaming_response.create(
-                model=self.model,
-                voice=resolved_voice,
-                input=text,
-                instructions=resolved_instructions,
-                response_format=resolved_format,
-                speed=resolved_speed,
-            ) as response:
+            with self.client.audio.speech.with_streaming_response.create(**request) as response:
                 audio_bytes = b"".join(response.iter_bytes())
 
         return SpeechSynthesisResult(
@@ -158,29 +218,22 @@ class TextToSpeech:
             language=resolved_language,
             response_format=resolved_format,
             content_type=SUPPORTED_RESPONSE_FORMATS[resolved_format],
+            instructions=resolved_instructions,
         )
 
     def _resolve_default_model(self) -> str:
+        load_env_file()
         if self.api_config.get("use_azure", False):
             return os.getenv("AZURE_TTS_MODEL", DEFAULT_MODEL)
         return os.getenv("OPENAI_TTS_MODEL", DEFAULT_MODEL)
 
-    def _synthesize_with_azure_endpoint(
-        self,
-        *,
-        text: str,
-        voice: str,
-        instructions: str,
-        response_format: str,
-        speed: float,
-    ) -> bytes:
-        tts_endpoint, api_key = self._azure_tts_target()
+    def _synthesize_with_azure_endpoint(self, payload: dict) -> bytes:
+        """POST ``payload`` (the same body the OpenAI branch sends) to the Azure speech URL.
 
-        payload = {
-            "model": self.model,
-            "input": text,
-            "voice": voice,
-        }
+        Azure's speech operation takes ``response_format`` and ``speed`` as OpenAI's
+        does, so the audio comes back in the format the result is labelled with.
+        """
+        tts_endpoint, api_key = self._azure_tts_target()
 
         response = requests.post(
             tts_endpoint,
@@ -195,6 +248,7 @@ class TextToSpeech:
         return response.content
 
     def _azure_tts_endpoint(self) -> str | None:
+        load_env_file()
         return self.api_config.get("tts_endpoint") or os.getenv("TTS_ENDPOINT")
 
     def _azure_tts_target(self) -> tuple[str, str]:
@@ -204,6 +258,7 @@ class TextToSpeech:
         goes with ``AZURE_API_KEY``, as before, so a speech resource with its own key keeps
         working. Either falls back to the other key when its own is missing.
         """
+        load_env_file()
         tts_endpoint = self._azure_tts_endpoint()
         if self.api_config.get("tts_endpoint"):
             api_key = self.api_config.get("api_key") or os.getenv("AZURE_API_KEY")

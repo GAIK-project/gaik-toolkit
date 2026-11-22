@@ -116,6 +116,154 @@ def test_a_listed_host_may_use_plain_http_and_a_malformed_entry_is_named(tmp_pat
     assert any("must be a host name" in p for p in problems)
 
 
+@pytest.mark.parametrize(
+    "entry",
+    [
+        "8.8.8.8",  # a public IP address
+        "134744072",  # the same address as one number
+        "0x08080808",  # and in hex
+        "8.8.8",  # a short form the resolver reads as 8.8.0.8
+        "0.0.0.0",  # where a server listens, not a server
+        "api.openai.com",
+        "my-resource.openai.azure.com",
+        "aitta-api.csc.fi",
+        "europe-west4-aiplatform.googleapis.com",
+    ],
+)
+@pytest.mark.parametrize("external", [True, False])
+def test_local_endpoints_refuse_public_addresses_and_cloud_model_hosts(tmp_path, entry, external):
+    """A listed host gets the stage's key over plain http and counts as local processing,
+    so neither a public IP address nor a cloud model API host may be listed."""
+    models = {**LOCAL, "local_endpoints": [entry]}
+    problems = _rule13(validate(_document(models=models, external=external)))
+    assert any(repr(entry) in p for p in problems), problems
+    with pytest.raises(ValueError, match="local_endpoints entry"):
+        scaffold_poc(_document(models=models, external=external), tmp_path)
+
+
+def test_a_public_ip_address_refusal_says_to_list_the_servers_dns_name():
+    models = {**LOCAL, "local_endpoints": ["8.8.8.8"]}
+    problems = _rule13(validate(_document(models=models, external=False)))
+    assert any("public IP address" in p and "DNS name" in p for p in problems), problems
+
+
+def test_local_endpoints_keep_private_addresses_and_own_host_names(tmp_path):
+    models = {
+        **LOCAL,
+        "base_url": "http://192.168.1.20:8000/v1",
+        "local_endpoints": ["192.168.1.20", "10.0.0.5", "gpu.lan", "llm.example.org"],
+    }
+    blueprint = _document(models=models, external=False)
+    assert _rule13(validate(blueprint)) == []
+    poc = scaffold_poc(blueprint, tmp_path)["poc_dir"]
+    config = yaml.safe_load((poc / "config.yaml").read_text(encoding="utf-8"))
+    assert config["governance"]["local_endpoints"] == [
+        "10.0.0.5",
+        "192.168.1.20",
+        "gpu.lan",
+        "llm.example.org",
+    ]
+
+
+def test_the_refused_cloud_hosts_are_the_ones_gaik_sends_keys_to():
+    endpoints = pytest.importorskip("gaik.software_components.endpoints")
+    from solution_wizard.scaffolder import CLOUD_MODEL_API_HOSTS
+
+    gaik_hosts = {host for hosts in endpoints.PROVIDER_HOSTS.values() for host in hosts}
+    assert set(CLOUD_MODEL_API_HOSTS) == gaik_hosts
+
+
+@pytest.mark.parametrize("external", [True, False])
+def test_rule_12_suggests_transcript_enhancement_only_when_external_models_are_allowed(external):
+    blueprint = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
+    assert {"Transcriber", "TranscriptEnhancer"} <= {s.component for s in blueprint.workflow.steps}
+    blueprint.governance.data_handling.external_model_api_allowed = external
+    hints = [i.message for i in validate(blueprint).warnings if i.rule == 12]
+    assert len(hints) == 1
+    assert ("enhanced_transcript=True" in hints[0]) is external
+    if not external:
+        assert "stays off" in hints[0]
+
+
+@pytest.mark.parametrize("external", [True, False])
+def test_rule_12_suggests_no_enhancement_on_any_parent_when_external_models_are_forbidden(
+    external,
+):
+    """AudioToStructuredData uses TranscriptEnhancer too, and the audio PoC keeps its
+    enhancement off as well when the blueprint allows no external model API."""
+    blueprint = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
+    [step] = [s for s in blueprint.workflow.steps if s.component == "Transcriber"]
+    step.component = "AudioToStructuredData"
+    blueprint.governance.data_handling.external_model_api_allowed = external
+    hints = [
+        i.message
+        for i in validate(blueprint).warnings
+        if i.rule == 12 and "'TranscriptEnhancer'" in i.message
+    ]
+    assert len(hints) == 1 and "'AudioToStructuredData'" in hints[0]
+    assert ("enable it via an option" in hints[0]) is external
+    assert ("stays off" in hints[0]) is not external
+
+
+def test_every_function_the_transcriber_cards_call_is_imported_by_the_generic_poc():
+    """The cards are what an agent wires into the _generic skeleton; a helper it calls
+    and the skeleton does not import stops the PoC at that line."""
+    import json
+
+    card = json.loads(
+        (Path(__file__).parent.parent / "registries" / "component_reference_cards.json").read_text(
+            encoding="utf-8"
+        )
+    )["Transcriber"]
+    import re
+
+    text = (TEMPLATES / "_generic" / "run_poc.py.tmpl").read_text(encoding="utf-8")
+    statement = re.search(r"^from provider_config import (\([^)]*\)|.*)$", text, re.MULTILINE)
+    assert statement, "the _generic template imports nothing from provider_config"
+    (node,) = ast.parse(statement.group(0)).body
+    imported = {alias.name for alias in node.names}
+    constructs = {key: value for key, value in card.items() if key.startswith("construct")}
+    assert "construct_whisper_local" in constructs
+    for key, snippet in constructs.items():
+        assert "os.environ" not in snippet, key
+        for helper in ("get_stage_config", "external_model_forbidden", "local_transcriber_options"):
+            if f"{helper}(" in snippet:
+                assert helper in imported, (key, helper)
+    assert "not external_model_forbidden(config)" in constructs["construct_finnish"]
+    assert "enhanced_transcript=True" not in constructs["construct_finnish"]
+    assert (
+        "**local_transcriber_options(config, audio_config" in constructs["construct_whisper_local"]
+    )
+
+
+def test_every_text_that_has_the_agent_call_local_transcriber_options_passes_the_enhancement():
+    """Left out, enhanced_transcript defaults to on when external model APIs are allowed,
+    so a non-Finnish whisper_local Transcriber (enhancement off) without OpenAI/Azure keys
+    stopped at local_transcriber_options with a missing-credentials error."""
+    import json
+    import re
+
+    card = json.loads(
+        (Path(__file__).parent.parent / "registries" / "component_reference_cards.json").read_text(
+            encoding="utf-8"
+        )
+    )["Transcriber"]
+    texts = {key: value for key, value in card.items() if isinstance(value, str)}
+    for option in card["options"]:
+        texts.update({f"{option['name']}.{k}": v for k, v in option.items() if isinstance(v, str)})
+    texts["SKILL.md"] = (Path(__file__).parent.parent / "SKILL.md").read_text(encoding="utf-8")
+    calls = {
+        where: re.findall(r"local_transcriber_options\(([^)]*)\)", text)
+        for where, text in texts.items()
+    }
+    calls = {where: found for where, found in calls.items() if found}
+    assert {"construct_whisper_local", "local_api_base.infer_from", "SKILL.md"} <= set(calls)
+    assert "local_api_key.infer_from" in calls
+    for where, found in calls.items():
+        for arguments in found:
+            assert "enhanced_transcript=" in arguments, (where, arguments)
+
+
 def test_every_component_that_calls_a_model_has_its_stages_checked():
     """A component missing from the stage map was never checked against the flags."""
     import json
@@ -383,7 +531,10 @@ def test_the_local_audio_poc_gives_the_transcriber_its_local_endpoint(tmp_path, 
 
     monkeypatch.setenv("LOCAL_TRANSCRIBER_API_KEY", "test-key")
     monkeypatch.setenv("LOCAL_TRANSCRIBER_API_BASE", "https://whisper.example.com")
-    with pytest.raises(ValueError, match="neither localhost nor listed"):
+    # The refusal names the setting the PoC reads, not the blueprint's.
+    with pytest.raises(
+        ValueError, match="neither localhost nor listed in governance.local_endpoints in config"
+    ):
         module.local_transcriber_options(config, audio_config)
 
     monkeypatch.setenv("LOCAL_TRANSCRIBER_API_BASE", "http://localhost:8080")
@@ -405,3 +556,28 @@ def test_the_local_audio_poc_gives_the_transcriber_its_local_endpoint(tmp_path, 
     assert transcriber._resolve_transcription_model() == "whisper_local"
     assert transcriber._transcribe_input_local(tmp_path / "a.wav")[0] == "ok"
     assert calls[0]["api_base"] == "http://localhost:8080"
+
+
+def test_without_credentials_only_an_unenhanced_local_whisper_run_goes_on(tmp_path, monkeypatch):
+    """External model APIs allowed and no Azure key: enhancement could not run, so the
+    helper stops before the upload unless the caller has turned enhancement off."""
+    poc = scaffold_poc(_local_audio("azure", external=True), tmp_path)["poc_dir"]
+    module = _load(poc / "provider_config.py", "provider_config_no_credentials", tmp_path)
+    config = yaml.safe_load((poc / "config.yaml").read_text(encoding="utf-8"))
+
+    def no_credentials(provider, **settings):
+        raise ValueError("AZURE_API_KEY not found in environment")
+
+    monkeypatch.setattr(module, "get_llm_config", no_credentials)
+    monkeypatch.setenv("LOCAL_TRANSCRIBER_API_BASE", "http://localhost:8080")
+    monkeypatch.setenv("LOCAL_TRANSCRIBER_API_KEY", "test-key")
+    audio_config = module.get_stage_config(config, "transcription")
+
+    with pytest.raises(ValueError, match="No audio has been sent"):
+        module.local_transcriber_options(config, audio_config)
+    with pytest.raises(ValueError, match="AZURE_API_KEY"):
+        module.local_transcriber_options(config, audio_config, enhanced_transcript=True)
+    assert module.local_transcriber_options(config, audio_config, enhanced_transcript=False) == {
+        "local_api_base": "http://localhost:8080",
+        "local_api_key": "test-key",
+    }

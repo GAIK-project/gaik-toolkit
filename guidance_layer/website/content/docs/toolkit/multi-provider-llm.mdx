@@ -95,6 +95,10 @@ The Google SDK adapter supports the direct Gemini API and Vertex AI. Vertex acce
 
 LiteLLM is opt-in: `get_llm_config("litellm", model="azure/gpt-6-luna", api_key=key, base_url=endpoint, api_version=version)`. It uses the same component interface and passes credentials per request. `LITELLM_API_KEY`, `LITELLM_BASE_URL`, `LITELLM_API_VERSION`, and `LITELLM_EMBEDDING_MODEL` are optional environment defaults. Select a provider-prefixed embedding model separately when needed.
 
+### Environment variables and `.env`
+
+The configuration helpers (`get_llm_config`, `get_openai_config` and the parsers' own) read keys and endpoints from environment variables, and also take them from a `.env` file. Importing gaik reads no file: the file is loaded once, the first time a helper runs, and never overrides a variable that is already set. Importing gaik also leaves your application's logging as it is. To pass every setting explicitly and have gaik ignore any `.env` file, set `GAIK_NO_DOTENV=1`. Where the file is looked up: from the directory gaik is installed in and every directory above it; in a notebook, `python -c`, a debugger or a coverage run, from the working directory at that first call and every directory above it. A `.env` found there can set provider keys and endpoints, so set `GAIK_NO_DOTENV=1` in a service, and in a notebook do not change into a folder you do not trust before the first configuration call. The endpoint checks, the JEV classifier and the web scraper read only the environment they are given and never load a `.env` file themselves.
+
 ### Timeouts and retries
 
 When a config sets no `timeout` or `max_retries`, every provider stops a request that gets no answer after 600 seconds and retries a failed one twice, the OpenAI and Anthropic SDKs' own defaults. Gemini, Vertex AI and LiteLLM use the same values instead of waiting without a limit or far longer. A Vertex AI request in the default EU location is asked once for at most 120 seconds before the global endpoint takes over. Pass `timeout` and `max_retries` in the config to choose other values.
@@ -149,14 +153,14 @@ For embeddings, also set `embedding_model` or `EMBEDDING_MODEL` to a model serve
 
 ### Allowed endpoints
 
-Since gaik 0.11.0, a client that sends a key, token or password checks its address when it is built, before any request, so the key cannot be sent to a host the deployment did not choose. This covers the OpenAI, Azure, Aitta and compatible clients, LiteLLM's `base_url`, Vertex's `generate_content_url`, the Docling client, local Whisper, Azure speech and the Jev classifier. The address is accepted when it is:
+Since gaik 0.11.0, a client that sends a key, token or password checks its address when it is built, before any request, so the key cannot be sent to a host the deployment did not choose. This covers the OpenAI, Azure, Aitta and compatible clients, Anthropic's and LiteLLM's `base_url` (for LiteLLM also an `api_base` or `base_url` passed with a call), Vertex's `generate_content_url`, the Docling client, local Whisper, Azure speech and the Jev classifier. The address is accepted when it is:
 
 - https on the provider's own host, for example `api.openai.com`, `*.openai.azure.com`, `*.cognitiveservices.azure.com`, `aitta-api.csc.fi` or the Vertex AI hosts;
-- the address set in that provider's environment variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `LITELLM_BASE_URL`, `GOOGLE_GENERATE_CONTENT_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`, ...). An `http://` address set there is used as set, with a warning once per host outside a private network;
+- the address set in that provider's environment variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `ANTHROPIC_BASE_URL`, `LITELLM_BASE_URL`, `GOOGLE_GENERATE_CONTENT_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`, ...). An `http://` address set there is used as set, with a warning once per host outside a private network;
 - on a host listed in `GAIK_ALLOWED_ENDPOINT_HOSTS` (comma-separated), or in the `allowed_endpoint_hosts` setting the application passes in code. An entry is a host (`llm.example.org`), a suffix pattern (`*.example.org`), or `http://` with the host to allow plain http (`http://docling.internal`);
 - on this machine (`localhost`, `127.0.0.1`), over http too, for compatible model servers, LiteLLM, Docling and local Whisper.
 
-Anything else raises `EndpointNotAllowedError` (a `ValueError`), whose message names `GAIK_ALLOWED_ENDPOINT_HOSTS`. Do not fill `allowed_endpoint_hosts` from user input: the list is the deployment's decision. The Azure patterns accept every Azure resource, not only the deployment's own, so do not take an Azure endpoint from user input for the deployment's key. Sovereign Azure clouds, API Management gateways (`*.azure-api.net`) and local servers reached by a service name need an entry, as described for compatible servers above.
+Anything else raises `EndpointNotAllowedError` (a `ValueError`), whose message names the provider's own variable, when it has one, and `GAIK_ALLOWED_ENDPOINT_HOSTS`. Do not fill `allowed_endpoint_hosts` from user input: the list is the deployment's decision. The Azure patterns accept every Azure resource, not only the deployment's own, so do not take an Azure endpoint from user input for the deployment's key. Sovereign Azure clouds, API Management gateways (`*.azure-api.net`) and local servers reached by a service name need an entry, as described for compatible servers above.
 
 ## ProviderClient interface
 

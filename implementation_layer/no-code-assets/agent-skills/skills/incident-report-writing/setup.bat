@@ -67,7 +67,7 @@ set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 echo The transcriber gets its own virtual environment:
 echo   %VENV_DIR%
 echo Your own Python installation is not changed.
-echo Installing into it: mcp==1.30.0, gaik[transcriber]==0.11.1, python-dotenv==1.2.4
+echo Installing into it: mcp==1.30.0, gaik[transcriber]==0.12.0, python-dotenv==1.2.4
 echo This may take a few minutes...
 echo.
 
@@ -78,11 +78,11 @@ if not exist "%VENV_PYTHON%" (
     exit /b 1
 )
 
-"%VENV_PYTHON%" -m pip install mcp==1.30.0 "gaik[transcriber]==0.11.1" python-dotenv==1.2.4 --quiet
+"%VENV_PYTHON%" -m pip install mcp==1.30.0 "gaik[transcriber]==0.12.0" python-dotenv==1.2.4 --quiet
 
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
-    echo Please try running: "!VENV_PYTHON!" -m pip install mcp==1.30.0 "gaik[transcriber]==0.11.1" python-dotenv==1.2.4
+    echo Please try running: "!VENV_PYTHON!" -m pip install mcp==1.30.0 "gaik[transcriber]==0.12.0" python-dotenv==1.2.4
     pause
     exit /b 1
 )
@@ -247,7 +247,7 @@ if not exist "%WORK_FOLDER%\" mkdir "%WORK_FOLDER%"
 "%VENV_PYTHON%" "%SERVER_PATH%" --check-folder "%WORK_FOLDER%" >nul
 if %errorlevel% neq 0 (
     echo [ERROR] "!WORK_FOLDER!" is not a folder Claude can be limited to.
-    echo         It must not be your whole user folder or hold this setup folder.
+    echo         It must not be your whole user folder, hold this setup folder or lie inside it.
     echo         Choose a folder of its own, for example %USERPROFILE%\Documents\GAIK.
     pause
     exit /b 1

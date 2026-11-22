@@ -1,6 +1,7 @@
 "use client";
 
 import { FileUpload } from "@/components/demo/file-upload";
+import { RunButton } from "@/components/demo/run-button";
 import { SectionGuide } from "@/components/demo/section-guide";
 import { RunBlockedButton, useRunAccess } from "@/components/run-access";
 import { Button } from "@/components/ui/button";
@@ -525,18 +526,15 @@ export function ExtractionCreateSection({ demo }: { demo: ExtractionConfig }) {
             {runBlocked ? (
               <RunBlockedButton />
             ) : (
-              <Button
-                size="lg"
-                onClick={extract}
+              <RunButton
+                running={busy}
+                onRun={extract}
+                onStop={pipeline.stop}
+                icon={Sparkles}
                 disabled={working || !canExtract}
               >
-                {busy ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Sparkles className="size-4" />
-                )}
-                {busy ? "Processing..." : "Extract"}
-              </Button>
+                Extract
+              </RunButton>
             )}
             <Button
               variant="outline"

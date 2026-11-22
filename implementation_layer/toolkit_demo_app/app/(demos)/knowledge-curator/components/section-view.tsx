@@ -5,6 +5,7 @@ import type {
   QuoteFailure,
   SectionKnowledge,
 } from "@/lib/knowledge-curator/workspace";
+import { followedIds, resolvedByText } from "@/lib/report-writer/conflicts";
 import { cn } from "@/lib/utils";
 
 /**
@@ -43,9 +44,19 @@ export function SectionView({
                 <Badge variant="outline" className="text-[10px]">
                   {c.status}
                 </Badge>
+                {resolvedByText(c) && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    {resolvedByText(c)}
+                  </span>
+                )}
                 <p className="text-muted-foreground">{c.description}</p>
                 <p className="text-muted-foreground font-mono">
-                  {c.unit_ids.join(", ")}
+                  {c.unit_ids
+                    .map((id) =>
+                      followedIds(c).includes(id) ? `${id} (followed)` : id,
+                    )
+                    .join(", ")}
                 </p>
               </li>
             ))}

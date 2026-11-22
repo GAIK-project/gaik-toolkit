@@ -11,7 +11,7 @@ export default function HelpdeskChatbotPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <DemoPageHeader
         icon={Headset}
-        title="Helpdesk Chatbot"
+        title="Helpdesk chatbot"
         description="A customer service assistant that answers from an organisation's own services and FAQ, shows its sources, and passes the question to a person when needed."
       >
         <div className="mt-3 flex justify-end">

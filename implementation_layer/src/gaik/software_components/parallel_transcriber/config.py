@@ -11,6 +11,8 @@ import os
 from dataclasses import dataclass
 from typing import Literal
 
+from gaik.software_components.env_file import load_env_file
+
 from .models import TranscriptionModel
 
 
@@ -74,6 +76,11 @@ class TranscriptionConfig:
 
     # --- Model selection ---
     model: TranscriptionModel = TranscriptionModel.WHISPER
+    # What the WHISPER backend asks api_config["transcription_model"] for: "srt" (a
+    # Whisper model: subtitle timestamps) or "json" (a GPT-4o transcription model, which
+    # takes json or text only). None decides by the name: "json" when it contains
+    # "gpt" and not "whisper". Set it for a deployment whose name says neither.
+    whisper_request_format: Literal["srt", "json"] | None = None
 
     @classmethod
     def from_env(cls) -> TranscriptionConfig:
@@ -106,6 +113,7 @@ class TranscriptionConfig:
         - ``WHISPER_PROMPT``
         - ``TRANSCRIPTION_MODEL``
         """
+        load_env_file()
 
         def _int(name: str, *alt_names: str, default: int | None = None) -> int | None:
             for n in (name, *alt_names):
@@ -225,5 +233,9 @@ class TranscriptionConfig:
         v_s = _str("TRANSCRIPTION_MODEL")
         if v_s is not None:
             kwargs["model"] = TranscriptionModel(v_s)
+
+        v_s = _str("WHISPER_REQUEST_FORMAT")
+        if v_s is not None:
+            kwargs["whisper_request_format"] = v_s  # type: ignore[assignment]
 
         return cls(**kwargs)

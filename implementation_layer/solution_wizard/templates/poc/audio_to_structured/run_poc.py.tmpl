@@ -33,6 +33,9 @@ import poc_output  # noqa: E402
 
 #: For the transcript enhancement: dates, month names, numbers, identifiers and
 #: names are what the extracted record is built from, so they stay as spoken.
+#: The Transcriber gives it to the enhancement's second pass; the first pass
+#: (spelling) takes no extra instructions, so the raw transcript is saved beside
+#: the enhanced one and a changed fact can be traced to either.
 KEEP_SPOKEN_FACTS = (
     "Keep every date, month name, time, number, unit, identifier (such as P-17 "
     "or B2) and personal name exactly as it was spoken. Do not convert a spoken "
@@ -332,15 +335,21 @@ ${source_tracing_section}${llm_judge_section}
         raw = getattr(result.transcription, "raw_transcript", None)
         enhanced = getattr(result.transcription, "enhanced_transcript", None)
         transcript_text = enhanced or raw or ""
+        changed = bool(raw and enhanced and raw.strip() != enhanced.strip())
         if transcript_text:
             transcript_path.write_text(transcript_text, encoding="utf-8")
-            print(f"Transcript saved to: {transcript_path}")
-        if raw and enhanced and raw != enhanced:
-            # Kept beside it, so a changed date or name can be traced to the
-            # transcription or to the enhancement.
-            raw_path = output_dir / f"{input_file.stem}_transcript_raw.txt"
+            label = "Enhanced transcript" if changed else "Transcript"
+            print(f"{label} saved to: {transcript_path}")
+        # The raw transcript stays beside the enhanced one when the enhancement
+        # changed more than whitespace, so a changed date or name can be traced to
+        # the transcription or to the enhancement. A raw file from an earlier run
+        # of the same input goes, so it never stands beside a later transcript.
+        raw_path = output_dir / f"{input_file.stem}_transcript_raw.txt"
+        if changed:
             raw_path.write_text(raw, encoding="utf-8")
             print(f"Raw transcript saved to: {raw_path}")
+        else:
+            raw_path.unlink(missing_ok=True)
 
     _pdf_source = result.extracted_fields
 ${pdf_report_section}

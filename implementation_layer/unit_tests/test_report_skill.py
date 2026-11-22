@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -365,6 +366,68 @@ def test_edited_knowledge_is_checked_before_writing(tmp_path, capsys, change, ex
     assert not [c for c in FakeWriter.calls if c[0] == "synthesize"]
 
 
+def _two_sides() -> SectionKnowledge:
+    def unit(uid: str, file: str, quote: str, source_class: str) -> FactUnit:
+        return FactUnit(
+            id=uid,
+            topic="ventilation age",
+            time_qualifier=None,
+            summary=quote,
+            quote=quote,
+            source=SourceRef(file=file, locator=None),
+            source_class=source_class,
+            confidence="high",
+        )
+
+    return SectionKnowledge(
+        section_id="building_services",
+        units=[
+            unit("u1", "site_notes.txt", "Installed in 1998.", "primary"),
+            unit("u2", "old_report.md", "Installed in 2001.", "secondary"),
+        ],
+        missing=[],
+        conflicts=[],
+    )
+
+
+def test_a_conflict_an_older_gaik_resolved_is_not_shown_as_dropping_both_sides():
+    # gaik 0.11.1's Conflict has no preferred_unit_ids: its curator model resolved the
+    # conflict from the instructions, and the writer follows the side the description gives.
+    older = SimpleNamespace(
+        topic="ventilation age",
+        description="The site notes outrank the old report: the system dates from 1998.",
+        status="resolved",
+        unit_ids=["u1", "u2"],
+    )
+    entry = rr._resolved(older, _two_sides())
+
+    assert entry["decided_by"] == "description"
+    assert entry["description"] == older.description
+    assert entry["follows"] is None
+    assert entry["drops"] is None
+    assert [(u["id"], u["source"]) for u in entry["units"]] == [
+        ("u1", "site_notes.txt"),
+        ("u2", "old_report.md"),
+    ]
+
+
+def test_a_conflict_decided_by_source_precedence_names_the_side_it_follows():
+    conflict = Conflict(
+        topic="ventilation age",
+        description="The sources give 1998 and 2001.",
+        status="resolved",
+        unit_ids=["u1", "u2"],
+        preferred_unit_ids=["u1"],
+        resolved_by="primary",
+    )
+    entry = rr._resolved(conflict, _two_sides())
+
+    assert entry["decided_by"] == "preferred_unit_ids"
+    assert entry["resolved_by"] == "primary"
+    assert [u["id"] for u in entry["follows"]] == ["u1"]
+    assert [u["id"] for u in entry["drops"]] == ["u2"]
+
+
 # ── Preflight ───────────────────────────────────────────────────────
 
 
@@ -432,6 +495,39 @@ def test_preflight_checks_the_source_files(tmp_path, capsys, monkeypatch):
     assert "report instructions are empty" in warnings
 
 
+def test_preflight_names_a_source_or_sample_over_the_input_limits(tmp_path, capsys, monkeypatch):
+    from gaik.software_components.input_limits import InputLimits
+
+    # The normalizer's limits, made small enough for a test file to exceed them.
+    monkeypatch.setattr(
+        InputLimits,
+        "local_parsing",
+        classmethod(lambda cls: cls(max_file_bytes=200, max_pages=None)),
+    )
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    (inputs / "big_notes.txt").write_text("x" * 500, encoding="utf-8")
+    (tmp_path / "sample.md").write_text("# Sample\n\n" + "y" * 500, encoding="utf-8")
+    spec_path = write_spec(
+        tmp_path,
+        sources={"primary": ["inputs/site_notes.txt", "inputs/big_notes.txt"]},
+        sample_report="sample.md",
+    )
+    code, out = cli(capsys, "preflight", spec_path, tmp_path / "ws")
+
+    assert code == rr.EXIT_INPUT
+    limit_errors = [e for e in out["errors"] if "InputLimits.max_file_bytes" in e]
+    assert len(limit_errors) == 2, out["errors"]
+    assert any(e.startswith("big_notes.txt is 500 bytes") for e in limit_errors)
+    assert any(e.startswith("sample.md is ") for e in limit_errors)
+    assert not any("site_notes.txt" in e for e in out["errors"])
+
+    # normalize stops in the same check, before the writer converts any file.
+    code, out = cli(capsys, "normalize", spec_path, tmp_path / "ws")
+    assert code == rr.EXIT_INPUT
+    assert not (tmp_path / "ws" / "normalized").exists()
+
+
 def test_preflight_rejects_a_sample_report_that_needs_a_model(tmp_path, capsys):
     (tmp_path / "sample.mp3").write_bytes(b"x")
     spec_path = write_spec(tmp_path, sample_report="sample.mp3")
@@ -474,6 +570,18 @@ def test_a_writing_setting_flags_only_synthesis(tmp_path, capsys):
 
     stale = cli(capsys, "preflight", spec, ws)[1]["stale"]
     assert stale and all(s.startswith("synthesize:") for s in stale)
+
+
+def test_a_source_precedence_set_after_curation_flags_curation(tmp_path, capsys):
+    spec, ws = write_spec(tmp_path), tmp_path / "ws"
+    full_run(capsys, spec, ws)
+    assert cli(capsys, "preflight", spec, ws)[1]["stale"] == []
+    data = json.loads(spec.read_text(encoding="utf-8"))
+    data["source_precedence"] = ["primary", "secondary"]
+    spec.write_text(json.dumps(data), encoding="utf-8")
+
+    stale = cli(capsys, "preflight", spec, ws)[1]["stale"]
+    assert {s.split(":")[0] for s in stale} == {"curate", "synthesize"}
 
 
 def test_a_changed_runtime_model_flags_the_stages_that_used_it(tmp_path, capsys, monkeypatch):
@@ -1303,7 +1411,11 @@ def test_propose_spec_spells_out_every_key_and_leaves_the_spec_alone(
     code, out = propose(capsys, spec, tmp_path, "--provider", "openai")
     assert code == 0 and out["errors"] == []
     proposal = json.loads((tmp_path / "proposal.json").read_text(encoding="utf-8"))
-    assert list(proposal)[: len(rr.SPEC_KEYS)] == list(rr.SPEC_KEYS)
+    # source_precedence stays out unless the user states a priority: gaik 0.11.1 and earlier
+    # refuse it.
+    keys = [k for k in rr.SPEC_KEYS if k != "source_precedence"]
+    assert list(proposal)[: len(keys)] == keys
+    assert "source_precedence" not in proposal
     assert proposal["models"] == {
         "vision": None,
         "transcription": "gpt-4o-transcribe",
@@ -1440,6 +1552,50 @@ def test_apply_spec_names_the_stages_a_change_makes_stale(capsys, tmp_path, clea
     assert "synthesize must run again" in out["warnings"]
     assert "normalize must run again" not in out["warnings"]
     assert any("no gap-marker sentence" in w for w in out["warnings"])
+
+
+def test_apply_spec_shows_and_tracks_the_source_precedence(capsys, tmp_path, clean_model_env):
+    spec, ws = agreed_spec(tmp_path), tmp_path / "ws"
+    propose(capsys, spec, tmp_path, "--provider", "azure")
+    path = tmp_path / "proposal.json"
+    assert "source_precedence" in rr.SPEC_KEYS
+    code, out = apply_spec(capsys, spec, tmp_path, "--provider", "azure")
+    assert code == 0
+    assert any(line.startswith("  source_precedence: (none") for line in out["review"])
+    full_run(capsys, spec, ws)
+    changed = json.loads(path.read_text(encoding="utf-8"))
+    changed["source_precedence"] = ["primary", "secondary"]
+    path.write_text(json.dumps(changed), encoding="utf-8")
+
+    code, out = apply_spec(capsys, spec, tmp_path, "--provider", "azure", "--check")
+    assert code == 0
+    assert "  source_precedence: primary > secondary" in " ".join(out["review"])
+    assert "curate must run again" in out["warnings"]
+    assert "synthesize must run again" in out["warnings"]
+    assert "normalize must run again" not in out["warnings"]
+
+
+@pytest.mark.parametrize(
+    ("precedence", "shown"),
+    [
+        (["primary", 123], "primary > 123"),
+        ("primary", '"primary"'),
+        ({"top": "primary"}, '{"top": "primary"}'),
+    ],
+)
+def test_the_review_list_shows_a_malformed_source_precedence_without_failing(precedence, shown):
+    # Called on a spec whose schema check already failed: it must not raise as well.
+    spec = {
+        "sources": {"primary": ["a.txt"]},
+        "sections": [],
+        "source_precedence": precedence,
+        "models": {},
+        "settings": {},
+    }
+
+    lines = rr.review_lines(spec, "azure")
+
+    assert f"  source_precedence: {shown} (decides conflicts between these classes)" in lines
 
 
 # ── Pandoc: check, and install only when asked ──────────────────────

@@ -32,7 +32,8 @@ spec = ReportSpec.load("report-runs/koivukuja/report_spec.json")
       "depends_on": ["building_services"]
     }
   ],
-  "instructions": "Site recordings are primary sources and outrank the documents. Cite each fact by its source file, and add the page, sheet or heading only when the source has one; recordings and photos have none, so cite them by file name alone. Use the (missing: ...) marker only for the items listed as missing and for a section's required items, never for other information the sources do not give.",
+  "instructions": "Cite each fact by its source file, and add the page, sheet or heading only when the source has one; recordings and photos have none, so cite them by file name alone. Use the (missing: ...) marker only for the items listed as missing and for a section's required items, never for other information the sources do not give.",
+  "source_precedence": ["primary", "secondary"],
   "sources": {
     "primary": ["inputs/site_visit.m4a", "inputs/inspection_notes.txt"],
     "secondary": ["inputs/renovation_report_1998.pdf", "inputs/maintenance_log.xlsx"]
@@ -50,7 +51,8 @@ spec = ReportSpec.load("report-runs/koivukuja/report_spec.json")
 | `description` | For people only. **Not sent to any model**: purpose, audience and tone that must shape the text go into `instructions` |
 | `language` | The language the report is written in (default English); not the transcription language |
 | `sections` | The report structure, in report order (below). Proposed with every other key by `run_report.py propose-spec`, agreed with the user after normalization and written by `apply-spec` |
-| `instructions` | Rules for every section: source hierarchy, scope, tone, citation style |
+| `instructions` | Rules for every section: scope, tone, citation style, how each kind of source is worded. They do not decide conflicts |
+| `source_precedence` | Optional `["primary", "secondary"]` or `["secondary", "primary"]`: which class outranks the other in a conflict. Leave it out when the user states no priority. Needs gaik 0.12.0 or later, the release that ships `source_precedence`; gaik 0.11.1 and earlier refuse the key, so leave it out there and the conflicts stay for the user to settle |
 | `sources` | Files grouped as `primary` and/or `secondary`; at least one file; every file name unique. Paths are relative to the spec's folder and stay inside it: an absolute path, or one that leads out through `..` or a link, is refused |
 | `sample_report` | Optional report whose structure, length and tone the new one follows; never its facts. Like the sources, it must be inside the spec's folder |
 | `models` | Optional model or deployment name per step: `vision`, `transcription`, `curator`, `writer`, `reviewer`. A `null` curator, writer or reviewer takes `GAIK_REPORT_<STEP>_MODEL`, else the default for the provider (README, "Changing the provider and the models"), else the provider's configured model; the helper fills these in at run time and never rewrites the spec |
@@ -81,15 +83,14 @@ writer or reviewer default. `null` leaves the step to the provider's configured 
 
 ### Settings
 
-`propose-spec` proposes `strict_review` `true`; the other settings start at the library
-defaults below. The user accepts or changes each one.
+`propose-spec` proposes the library defaults below. The user accepts or changes each one.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `transcription_language` | `auto` | Language of the recordings as a two-letter ISO-639-1 code, e.g. `fi`, sent with every transcription request; `auto` lets the model detect it |
 | `curator_workers` | 4 | Sections curated in parallel |
 | `review_attempts` | 5 | Most reviewer requests per section |
-| `strict_review` | `false` | `true` fails synthesis when a reviewer edit cannot be applied. It does not mean every unsupported statement is found |
+| `strict_review` | `true` | Fails synthesis when a reviewer edit cannot be applied; `false` keeps it in the review log and returns the report. It does not mean every unsupported statement is found |
 | `docx` | `true` | Word output. Needs Pandoc; set `false` for Markdown only |
 | `citations` | `true` | Cite the source file and place of each fact. `false` removes visible provenance: tell the user |
 | `curator`, `writer`, `reviewer` | unset | `reasoning_effort` and `temperature` for every call of that step. Set `reasoning_effort` only for models that support it; the skill passes none by default |
@@ -119,12 +120,15 @@ fact the curator filed under the section; the added wording stops that.
 
 ## Source classes and priority
 
-`sources` accepts only `primary` and `secondary`. The curator copies the class onto every fact,
-and its prompt gives "a clear primary field observation over an older document" and "a newer
-document over an older one" as examples of a hierarchy. So the class is not neutral, and file
-type alone never decides it: a recording is not automatically primary.
+`sources` accepts only `primary` and `secondary`. The curator copies the class onto every fact.
+Conflicts are decided in code from the model's citations, not by the model's own verdict: a conflict is resolved only when
+`source_precedence` ranks the class of one side above the other's, and the report then follows
+that side. Without `source_precedence`, when both sides have the same class, or when the
+higher-ranked side is itself unsure (a fact of `low` confidence), the conflict stays
+unresolved and the report states both sides, marked `Unresolved:`, for the user to settle in the
+knowledge file. File type alone never decides the class: a recording is not automatically primary.
 
-**When the user states no priority**, put every source in `primary` and write this into
+**When the user states no priority**, leave `source_precedence` out and write this into
 `instructions`:
 
 > No source has automatic priority, by class or by date. Preserve unresolved contradictions
@@ -135,8 +139,10 @@ The second sentence matters: two sources describing different dates or versions 
 inspection in 2019 and another in 2024) are not a conflict. Facts carry a `time_qualifier` for
 that difference.
 
-**When the user states a priority**, map it to the two classes and also write it into
-`instructions` in words, because the curator decides conflicts from the instructions.
+**When the user states a priority by kind of source**, map it to the two classes and set
+`source_precedence` in that order. A priority the classes cannot express, such as a newer
+document over an older one, is not decided automatically: the conflicts stay unresolved and the
+user settles them in the knowledge files (see review-and-resume.md).
 
 ## Files the pipeline reads
 

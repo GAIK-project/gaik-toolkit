@@ -16,8 +16,8 @@ description: >-
 # Extracting structured data with gaik
 
 ```bash
-pip install "gaik[extract]==0.11.1"
-pip install "gaik[vision-extract]==0.11.1"   # PDF/image extraction
+pip install "gaik[extract]==0.12.0"
+pip install "gaik[vision-extract]==0.12.0"   # PDF/image extraction
 # Add llm-google for shared Google/Vertex configs, or llm-litellm for LiteLLM.
 ```
 
@@ -60,7 +60,10 @@ and `OPENAI_MODEL`, or equivalent explicit config overrides.
 images, and generates schemas with that provider. Its model must support both images and
 structured output. `SchemaGenerator(config=config)` supports the shared provider path;
 use a hand-built Pydantic schema and `ExtractionRequirements` when you already know the
-schema. `LLMJudge(config=config)` also accepts the shared config; visual judging requires
+schema. A repeated collection is a `ChildRequirements` in `CompositeExtractionRequirements`;
+since gaik 0.12.0 it has `nullable` (default `False`), and a collection
+the task lets be null is `list[Row] | None` instead of a list that is empty when there
+are no rows. `LLMJudge(config=config)` also accepts the shared config; visual judging requires
 images, while `judge_text_pair(...)` only needs a chat model. Keep credentials in runtime
 configuration or environment variables, not generated source code.
 
@@ -70,7 +73,7 @@ The modules accept stage configs so transcription can stay on a supported audio 
 while text extraction uses Aitta or another chat provider:
 
 ```bash
-pip install "gaik[audio-to-structured-data,documents-to-structured-data]==0.11.1"
+pip install "gaik[audio-to-structured-data,documents-to-structured-data]==0.12.0"
 ```
 
 ```python
@@ -187,7 +190,10 @@ gaik ships the wrapping form of this: `VisionExtractor(include_verification=True
 each scalar in `{value, confidence_score, confidence_reason, found_in_text, page}`, and
 results land in `result.verification`. The score is the model rating itself and can be
 1.0 for a misread value; `found_in_text` is gaik's own lookup of the value in the PDF
-text layer (`None` when there is no text layer), so flag on that, not on the score. Wrapping buys paths that cannot drift onto the wrong field, because
+text layer (`None` when there is no text layer), so flag on that, not on the score. Since
+gaik 0.12.0 each entry also has `file`, the PDF the value was found in,
+and `page` counts from that file's own first page (before, the pages of all files were
+numbered as one list). Wrapping buys paths that cannot drift onto the wrong field, because
 the path is a fact about the response tree rather than a string the model wrote. It costs
 roughly **four times the property count** — and property count is the limit that decides
 whether the request is accepted at all. A separate citation table costs a flat +5

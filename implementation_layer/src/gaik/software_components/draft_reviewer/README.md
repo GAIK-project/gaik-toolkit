@@ -53,6 +53,18 @@ removed; style and order are left alone.
   edits, their errors and the current text go back to the LLM for new edits, which are
   applied the same way. A retry answer with no edits ends the review and leaves the
   failed edits unresolved.
+- Each failed edit gets an id (`F1`, `F2`, ...) that the retry request shows, and each
+  retry edit names the ids of the failed edits it makes in `answers`, such as `["F1"]`,
+  or `["F1", "F2"]` when one edit makes two of them, so a retry may word its edit and its
+  reason differently. A failed edit that no retry edit names is asked for again in the
+  next request under the same id, and is returned in `unresolved` if it is still missing
+  when the review ends; one whose retry edit fails too is carried once, as that retry
+  edit. A retry edit that carries `answers` makes exactly the ids it names: an empty list,
+  or an id that does not exist, makes none of them. Only a retry edit without the field
+  (a model or client that leaves it out) is paired with at most one remaining failed edit
+  by its text: the same correction (one replacement containing the other) or, for a
+  deletion, a deletion of nearly the same text with the same numbers. A shared reason
+  alone, such as "Not in the reference.", never pairs two edits.
 - This repeats until nothing fails or `max_attempts` requests (the first one included)
   have been made. Edits that still fail are returned in `unresolved`, not raised: the
   caller decides whether they are fatal.
@@ -62,8 +74,10 @@ removed; style and order are left alone.
 The reference and the text under review reach the model as material, apart from the
 checks: the system message holds the reviewer's rules and the sentence in
 `SOURCE_MATERIAL_INSTRUCTION`, and each piece sits in its own `<source_material>` block
-with a random id that is new for every request
-([`gaik.software_components.source_material`](../source_material.py)). Your
+with a random id ([`gaik.software_components.source_material`](../source_material.py)).
+Each `review()` call draws a new id and keeps it for all of its requests, so the
+instruction stays the same across retries; it draws another only when an edit has
+written the current id into the text that is sent. Your
 `instructions` stay outside the blocks. `reference` may also be a mapping of names to
 texts (one entry per source or per earlier section); each entry gets its own block,
 labelled with its name. A sentence in the draft or the reference cannot close its block

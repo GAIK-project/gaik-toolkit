@@ -54,7 +54,7 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|logos/|data/|downloads/).*)",
+    "/((?!_next/static|_next/image|favicon.ico|logos/|avatars/|data/|downloads/).*)",
   ],
 };
 

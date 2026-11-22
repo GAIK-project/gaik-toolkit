@@ -11,14 +11,12 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from dotenv import load_dotenv
-
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm.providers import Provider, resolve_provider
-
-load_dotenv()
 
 
 def _env(*names: str, default: str | None = None) -> str | None:
+    load_env_file()
     for name in names:
         value = os.getenv(name, "").strip()
         if value:
@@ -55,6 +53,7 @@ VERTEX_FALLBACK_LOCATION = "global"
 
 
 def _embedding_model_default(provider: str) -> str:
+    load_env_file()
     if provider in (Provider.OPENAI.value, Provider.AZURE.value):
         return os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
     if provider in (Provider.GOOGLE.value, Provider.VERTEX.value):
@@ -129,6 +128,7 @@ def get_llm_config(
 
 
 def _openai_config() -> dict:
+    load_env_file()
     return {
         "provider": Provider.OPENAI.value,
         "use_azure": False,
@@ -162,6 +162,7 @@ def _aitta_config() -> dict:
 
 
 def _azure_config() -> dict:
+    load_env_file()
     endpoint = _env("AZURE_ENDPOINT")
     return {
         "provider": Provider.AZURE.value,
@@ -177,6 +178,7 @@ def _azure_config() -> dict:
 
 
 def _anthropic_config() -> dict:
+    load_env_file()
     return {
         "provider": Provider.ANTHROPIC.value,
         "api_key": _env("ANTHROPIC_API_KEY"),
@@ -186,6 +188,7 @@ def _anthropic_config() -> dict:
 
 
 def _anthropic_foundry_config() -> dict:
+    load_env_file()
     return {
         "provider": Provider.ANTHROPIC_FOUNDRY.value,
         "api_key": _env("ANTHROPIC_FOUNDRY_API_KEY", "AZURE_API_KEY"),
@@ -196,6 +199,7 @@ def _anthropic_foundry_config() -> dict:
 
 
 def _google_config() -> dict:
+    load_env_file()
     return {
         "provider": Provider.GOOGLE.value,
         "api_key": _env("GOOGLE_API_KEY", "GEMINI_API_KEY"),
@@ -205,6 +209,7 @@ def _google_config() -> dict:
 
 
 def _vertex_config() -> dict:
+    load_env_file()
     location = _env("GOOGLE_CLOUD_LOCATION")
     return {
         "provider": Provider.VERTEX.value,

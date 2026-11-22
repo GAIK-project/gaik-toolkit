@@ -21,6 +21,8 @@ try:
 except Exception:
     pass
 
+from gaik.software_components._log_names import file_tag
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
 from gaik.software_components.parsers.vision import OpenAIConfig, VisionParser
 
@@ -81,17 +83,18 @@ class VisionPlusParser:
             "generate_picture_images": True,
             "generate_page_images": False,
             "do_formula_enrichment": enable_formula_enrichment,
-            "table_structure_options": TableStructureOptions(
-                kind="docling_tableformer",
-                do_cell_matching=True,
-            )
-            if enable_table_structure
-            else None,
             "accelerator_options": AcceleratorOptions(
                 num_threads=num_threads,
                 device=device,
             ),
         }
+        # Without table structure the options keep Docling's default: it refuses
+        # table_structure_options=None.
+        if enable_table_structure:
+            pipeline_kwargs["table_structure_options"] = TableStructureOptions(
+                kind="docling_tableformer",
+                do_cell_matching=True,
+            )
 
         if enable_ocr:
             pipeline_kwargs["ocr_options"] = _build_ocr_options(ocr_engine)
@@ -115,8 +118,10 @@ class VisionPlusParser:
     def parse_document(self, file_path: str) -> dict[str, Any]:
         """Parse PDF and return markdown + metadata with image descriptions injected."""
         if self.verbose:
-            print(f"Processing PDF with vision enhancement: {file_path}")
+            print(f"Processing PDF with vision enhancement: {file_tag(file_path)}")
 
+        self.limits.check_file_size(file_path)
+        check_file_type(file_path, {"pdf"})
         self.limits.check_pdf(file_path)
         result = self.converter.convert(file_path, **docling_limits(self.limits))
         doc = result.document

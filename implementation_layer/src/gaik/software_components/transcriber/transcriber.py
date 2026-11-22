@@ -3,24 +3,37 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import math
 import os
 import re
 import shutil
+import struct
+import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from openai import AzureOpenAI
 from pydub import AudioSegment
+from pydub.audio_segment import fix_wav_headers
+from pydub.exceptions import CouldntDecodeError
 
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.endpoints import check_endpoint
-from gaik.software_components.enhance_transcript import TranscriptEnhancer
-from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.enhance_transcript import (
+    DEFAULT_MAX_CHANGE_RATIO,
+    TranscriptEnhancer,
+)
+from gaik.software_components.input_limits import (
+    InputLimits,
+    check_not_media_list,
+    media_input_args,
+)
 from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
@@ -44,6 +57,73 @@ REMOTE_MAX_DURATION_SECONDS = 1400
 
 # Default chunking threshold, with margin below the API ceiling.
 DEFAULT_MAX_DURATION_SECONDS = 1200
+
+
+# Decoding a long recording to WAV takes a while; this only stops one that hangs.
+DECODE_TIMEOUT_SECONDS = 30 * 60
+
+
+def _read_pcm_wav(path: Path) -> AudioSegment | None:
+    """Read a PCM WAV with pydub's own Python reader; ``None`` for any other file.
+
+    No ffmpeg runs, so a WAV's duration and chunks hold where ffmpeg is not
+    installed, as they did when pydub read a ``.wav`` itself.
+    """
+    with path.open("rb") as handle:
+        head = handle.read(12)
+        if head[:4] != b"RIFF" or head[8:12] != b"WAVE":
+            return None
+        handle.seek(0)
+        data = handle.read()
+    try:
+        return AudioSegment(data=data)
+    except (CouldntDecodeError, struct.error, ValueError):
+        return None  # not plain PCM; ffmpeg decodes it
+
+
+def _decode_audio(path: str | Path) -> AudioSegment:
+    """Decode the local file at ``path`` into a pydub segment.
+
+    A PCM WAV is read in Python (:func:`_read_pcm_wav`). Anything else goes
+    through ffmpeg, which runs here, not inside pydub, with the arguments every
+    other media call uses
+    (:func:`~gaik.software_components.input_limits.media_input_args`): the path
+    is absolute, so a name such as ``http:...`` or ``concat:...`` is a file, and only
+    the ``file`` protocol is allowed, so nothing the file's content names (a stream
+    address, another file in a manifest) is opened over the network. pydub then reads
+    the WAV ffmpeg wrote with its own Python code, without starting ffmpeg again.
+
+    Raises:
+        OSError: If ``path`` is not a file that can be opened, or ffmpeg is missing.
+        subprocess.CalledProcessError: If ffmpeg cannot decode the file.
+    """
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"No such file: {path.name}")
+    wav_segment = _read_pcm_wav(path)
+    if wav_segment is not None:
+        return wav_segment
+    decoded = subprocess.run(
+        [
+            AudioSegment.converter,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            *media_input_args(path),
+            "-vn",
+            "-f",
+            "wav",
+            "-",
+        ],
+        capture_output=True,
+        check=True,
+        timeout=DECODE_TIMEOUT_SECONDS,
+    ).stdout
+    wav = bytearray(decoded)
+    del decoded  # one copy of the decoded audio at a time
+    fix_wav_headers(wav)  # a WAV written to a pipe carries no final sizes
+    return AudioSegment.from_file(io.BytesIO(bytes(wav)), format="wav")
 
 
 def _audio_provider(api_config: dict) -> str:
@@ -73,16 +153,58 @@ def _transcription_usage(response) -> dict[str, int]:
     raise ValueError(f"Unknown transcription usage type {usage.type!r}")
 
 
+# The path the SDK adds itself, at the end of an Azure endpoint's path.
+_AZURE_OPENAI_SUFFIX = re.compile(r"/openai(?:/v1|/deployments(?:/.*)?)?$", re.IGNORECASE)
+# Hosts whose bare /openai path is the SDK's: Azure, Azure Government, Azure China and
+# Azure API Management.
+_AZURE_HOST_SUFFIXES = (".azure.com", ".azure.us", ".azure.cn", ".azure-api.net")
+
+
+def _azure_resource_endpoint(endpoint: str) -> str:
+    """The address the SDK puts ``/openai/...`` after, from an Azure endpoint.
+
+    A trailing ``/openai/v1`` or ``/openai/deployments/...`` is cut, a trailing bare
+    ``/openai`` only on an Azure host (``*.azure.com``, ``.azure.us``, ``.azure.cn``,
+    ``.azure-api.net``), with the query and a trailing
+    slash: ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``.
+    The rest of the path stays, so a gateway's ``https://gw.example.com/openai/prod``
+    keeps its own path. ParallelTranscriber has the same cut.
+    """
+    parts = urlsplit(endpoint.strip())
+    if not parts.scheme or not parts.netloc:
+        return endpoint.strip().rstrip("/")
+    path = parts.path.rstrip("/")
+    suffix = _AZURE_OPENAI_SUFFIX.search(path)
+    if suffix and (
+        suffix.group(0).lower() != "/openai"
+        or (parts.hostname or "").endswith(_AZURE_HOST_SUFFIXES)
+    ):
+        path = path[: suffix.start()]
+    return f"{parts.scheme}://{parts.netloc}{path}"
+
+
 def _create_audio_client(api_config: dict):
-    """Create an isolated SDK client, preserving the caller's HTTP transport."""
+    """Create an isolated SDK client, preserving the caller's HTTP transport.
+
+    On Azure the audio goes to ``azure_audio_endpoint``, else ``azure_endpoint``, else
+    ``base_url``, cut to the resource address and passed as ``azure_endpoint``, so the
+    SDK requests ``/openai/deployments/<model>/audio/...`` (a ``/openai/v1``
+    ``base_url`` kept as it is gives ``/openai/v1/deployments/...``, which Azure does
+    not serve).
+    """
     provider = _audio_provider(api_config)
     audio_config = {**api_config, "provider": provider, "use_azure": provider == "azure"}
     if provider == "azure":
-        endpoint = api_config.get("azure_audio_endpoint") or api_config.get("azure_endpoint")
+        endpoint = (
+            api_config.get("azure_audio_endpoint")
+            or api_config.get("azure_endpoint")
+            or api_config.get("base_url")
+        )
         if endpoint:
-            audio_config["azure_endpoint"] = endpoint.split("/openai/")[0]
+            audio_config["azure_endpoint"] = _azure_resource_endpoint(endpoint)
             audio_config.pop("base_url", None)
-        audio_config.setdefault("api_version", "2024-12-01-preview")
+        if not audio_config.get("api_version"):
+            audio_config["api_version"] = "2024-12-01-preview"
     return create_openai_client(audio_config)
 
 
@@ -115,6 +237,13 @@ class TranscriptionResult:
     # Usage of the transcription requests (not of transcript enhancement): token counts,
     # or ``audio_seconds`` for duration-billed models; empty for local Whisper.
     usage: dict[str, int] = field(default_factory=dict)
+    # Enhancement passes refused because they changed digits or too much of the text
+    # (TranscriptEnhancer.refused_passes, as dicts); the raw transcript was kept for them.
+    enhancement_refused_passes: list[dict] | None = None
+    # Segments of a split recording that could not be transcribed (only with
+    # allow_partial=True), one dict each: "segment" (1-based), "start_seconds" and
+    # "end_seconds". Empty when every segment was transcribed.
+    failed_segments: list[dict] = field(default_factory=list)
 
     def save(
         self,
@@ -158,6 +287,13 @@ class Transcriber:
     first call. The duration is read with ffprobe (with a timeout) or, when
     ffprobe cannot read it, from the decoded audio. ``max_size_mb`` and
     ``max_duration_seconds`` only decide when a file is split into chunks.
+
+    When a chunk of a split recording cannot be transcribed, ``transcribe``
+    raises a :class:`RuntimeError` naming its time range, and the remaining
+    chunks are not sent. With ``allow_partial=True`` the transcript comes back
+    with a ``[Transcription failed for segment N]`` line under that chunk's
+    timestamp instead, and :attr:`TranscriptionResult.failed_segments` lists the
+    failed chunks; a run in which every chunk failed still raises.
     """
 
     def __init__(
@@ -172,6 +308,7 @@ class Transcriber:
         default_prompt: str | None = None,
         transcription_model: str | None = None,
         enhanced_transcript_instructions: str | None = None,
+        enhancement_max_change_ratio: float | None = DEFAULT_MAX_CHANGE_RATIO,
         language: str = "auto",
         diarization: bool = False,
         speaker_count: int | None = None,
@@ -181,8 +318,13 @@ class Transcriber:
         local_api_base: str | None = None,
         local_api_key: str | None = None,
         limits: InputLimits | None = None,
+        allow_partial: bool = False,
     ) -> None:
         _audio_provider(api_config)
+        # Checked here as TranscriptEnhancer checks it, so a wrong value fails before a
+        # paid transcription rather than when the enhancer is built after it.
+        if enhancement_max_change_ratio is not None and not 0 < enhancement_max_change_ratio <= 1:
+            raise ValueError("enhancement_max_change_ratio must be between 0 and 1, or None")
         if transcription_model == "whisper_local" and local_api_base:
             check_endpoint(
                 local_api_base,
@@ -191,6 +333,7 @@ class Transcriber:
                 what="local_api_base",
             )
         self.limits = limits or InputLimits()
+        self.allow_partial = allow_partial
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
@@ -200,6 +343,7 @@ class Transcriber:
         self.default_prompt = default_prompt
         self.transcription_model = transcription_model
         self.enhanced_transcript_instructions = enhanced_transcript_instructions
+        self.enhancement_max_change_ratio = enhancement_max_change_ratio
         self.language = language
         self.diarization = diarization
         self.speaker_count = speaker_count
@@ -249,7 +393,7 @@ class Transcriber:
         # we fall back to None rather than blocking transcription.
         audio_duration_s: float | None = None
         try:
-            audio_duration_s = round(len(AudioSegment.from_file(str(input_path))) / 1000.0, 3)
+            audio_duration_s = round(len(_decode_audio(input_path)) / 1000.0, 3)
         except Exception as exc:
             print(f"Could not read audio duration: {exc}")
         if audio_duration_s is not None:
@@ -259,6 +403,7 @@ class Transcriber:
         srt_content: str | None = None
         vtt_content: str | None = None
         usage = UsageCounter()
+        failed_segments: list[dict] = []
 
         with measure_duration() as elapsed:
             if effective_model == "whisper_local":
@@ -276,17 +421,23 @@ class Transcriber:
                     prompt=prompt,
                     transcription_model=effective_model,
                     usage=usage,
+                    failed_segments=failed_segments,
                 )
 
             enhanced_text: str | None = None
+            refused_passes: list[dict] | None = None
             if self.enhanced_transcript_enabled:
                 print("Fixing transcription errors with TranscriptEnhancer...")
-                enhancer = TranscriptEnhancer(api_config=self.api_config)
+                enhancer = TranscriptEnhancer(
+                    api_config=self.api_config,
+                    max_change_ratio=self.enhancement_max_change_ratio,
+                )
                 enhanced_result = enhancer.enhance_text(
                     raw_transcript,
                     additional_instructions=self.enhanced_transcript_instructions,
                 )
                 enhanced_text = enhanced_result.enhanced_text
+                refused_passes = [r.model_dump() for r in enhanced_result.refused_passes]
             else:
                 print("Transcript error fixing disabled; returning raw text only.")
         duration_s = round(elapsed(), 3)
@@ -296,6 +447,7 @@ class Transcriber:
         return TranscriptionResult(
             raw_transcript=raw_transcript,
             enhanced_transcript=enhanced_text,
+            enhancement_refused_passes=refused_passes,
             job_id=job_id,
             segments=segments,
             srt_content=srt_content,
@@ -304,6 +456,7 @@ class Transcriber:
             audio_duration_s=audio_duration_s,
             model_used=effective_model,
             usage=usage.snapshot(),
+            failed_segments=failed_segments,
         )
 
     # ------------------------------------------------------------------
@@ -402,6 +555,7 @@ class Transcriber:
         prompt: str | None,
         transcription_model: str,
         usage: UsageCounter | None = None,
+        failed_segments: list[dict] | None = None,
     ) -> str:
         """
         If input is within configured size and duration limits: single-pass
@@ -409,12 +563,13 @@ class Transcriber:
         supported by the API). Otherwise, chunk with PyDub and transcribe
         sequentially. Chunking is model-independent; every remote transcription
         model goes through the same size/duration guard.
+
+        ``failed_segments``, if given, gets the chunks that failed (with
+        ``allow_partial``) appended, as :func:`split_and_transcribe_with_context`.
         """
         if self._needs_chunking(input_path):
             print("Chunking input for transcription...")
-            audio = AudioSegment.from_file(
-                input_path
-            )  # works for audio, and many video containers via ffmpeg
+            audio = _decode_audio(input_path)  # audio, and many video containers via ffmpeg
             self.limits.check_media_seconds(len(audio) / 1000, input_path.name)
             return split_and_transcribe_with_context(
                 str(input_path),
@@ -426,6 +581,8 @@ class Transcriber:
                 transcription_model=transcription_model,
                 usage=usage,
                 language=self.language,
+                allow_partial=self.allow_partial,
+                failed_segments=failed_segments,
             )
 
         print("Transcribing in a single request (original file)...")
@@ -437,7 +594,7 @@ class Transcriber:
             return True
 
         try:
-            duration_seconds = len(AudioSegment.from_file(file_path)) / 1000
+            duration_seconds = len(_decode_audio(file_path)) / 1000
         except Exception as exc:
             print(f"Could not read audio duration for chunking check: {exc}")
             return False
@@ -521,20 +678,36 @@ def split_and_transcribe_with_context(
     transcription_model: str | None = None,
     usage: UsageCounter | None = None,
     language: str | None = None,
+    allow_partial: bool = False,
+    failed_segments: list[dict] | None = None,
 ):
     """Split audio into chunks and transcribe with rolling context.
 
     ``usage``, if given, gets the usage of every chunk request added to it.
     ``language``, a two-letter ISO-639-1 code, goes with every chunk request;
     ``None`` or ``"auto"`` sends none, so the provider detects the language.
+
+    A chunk that cannot be transcribed raises a :class:`RuntimeError` naming its
+    time range, and the remaining chunks are not sent. With
+    ``allow_partial=True`` the chunk is marked
+    ``[Transcription failed for segment N]`` under its timestamp and the rest
+    are transcribed; ``failed_segments``, if given, gets one dict per failed
+    chunk appended (``segment``, 1-based, ``start_seconds``, ``end_seconds``).
+
+    Raises:
+        RuntimeError: If a chunk cannot be transcribed, or, with
+            ``allow_partial=True``, if no chunk can be.
+        ValueError: If ``audio_path`` is a playlist or file list rather than a
+            recording (:func:`~gaik.software_components.input_limits.check_not_media_list`).
     """
 
     _audio_provider(api_config)
+    check_not_media_list(audio_path)
     if transcription_model is None:
         transcription_model = api_config.get("transcription_model", "whisper")
 
     if audio is None:
-        audio = AudioSegment.from_file(audio_path)
+        audio = _decode_audio(audio_path)
 
     duration_seconds = len(audio) / 1000
     file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
@@ -555,6 +728,8 @@ def split_and_transcribe_with_context(
 
     transcripts = []
     context_text = ""
+    failed: list[dict] = []
+    error_types: list[str] = []
 
     audio_client = None
     try:
@@ -587,7 +762,22 @@ def split_and_transcribe_with_context(
                     time.sleep(1)
             except Exception as exc:
                 print(f"Error transcribing chunk {i + 1}: {type(exc).__name__}")
+                if not allow_partial:
+                    raise RuntimeError(
+                        f"Segment {i + 1} of {num_chunks} ({start_time} - {end_time}) could "
+                        f"not be transcribed ({type(exc).__name__}); pass allow_partial=True "
+                        "to get the transcript with this segment marked as failed."
+                    ) from None
                 transcripts.append(f"{chunk_header}[Transcription failed for segment {i + 1}]")
+                failed.append(
+                    {
+                        "segment": i + 1,
+                        "start_seconds": start_ms / 1000,
+                        "end_seconds": end_ms / 1000,
+                    }
+                )
+                if type(exc).__name__ not in error_types:
+                    error_types.append(type(exc).__name__)
                 time.sleep(5)
             else:
                 # Outside the try: a usage error must raise, not mark a good chunk as failed.
@@ -602,6 +792,17 @@ def split_and_transcribe_with_context(
         _close_owned_audio_client(audio_client, api_config)
         shutil.rmtree(temp_dir, ignore_errors=True)
 
+    if failed and len(failed) == num_chunks:
+        # Markers alone are no transcript: fail as the single-pass path does.
+        raise RuntimeError(
+            f"None of the {num_chunks} segments could be transcribed "
+            f"({', '.join(error_types)}), so there is no transcript."
+        )
+    if failed:
+        numbers = ", ".join(str(segment["segment"]) for segment in failed)
+        print(f"Segments {numbers} of {num_chunks} could not be transcribed; they are marked.")
+    if failed_segments is not None:
+        failed_segments.extend(failed)
     return "\n\n".join(transcripts)
 
 
@@ -611,12 +812,18 @@ def split_and_transcribe(
     max_size_mb=25,
     max_duration_seconds=DEFAULT_MAX_DURATION_SECONDS,
     audio=None,
+    allow_partial: bool = False,
 ):
-    """Backward-compatible wrapper without explicit context parameter."""
+    """Backward-compatible wrapper without explicit context parameter.
+
+    Since gaik 0.12.0 a chunk that fails raises ``RuntimeError``;
+    ``allow_partial=True`` keeps the earlier marked result.
+    """
     return split_and_transcribe_with_context(
         audio_path,
         api_config,
         max_size_mb=max_size_mb,
         max_duration_seconds=max_duration_seconds,
         audio=audio,
+        allow_partial=allow_partial,
     )

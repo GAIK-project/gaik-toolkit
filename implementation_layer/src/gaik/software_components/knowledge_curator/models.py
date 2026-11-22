@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gaik.software_components.source_normalizer.models import NormalizedSources
 
@@ -71,14 +71,46 @@ class FactUnit(BaseModel):
 
 
 class Conflict(BaseModel):
-    """A disagreement between sources on one topic."""
+    """A disagreement between sources on one topic.
+
+    The curator sets ``status`` in code, never from the model's answer: ``resolved`` only
+    when ``source_precedence`` ranks one source class of the conflict's units above every
+    other class among them and that class's unit is not of ``low`` confidence, and then
+    ``preferred_unit_ids`` names the units of that class.
+    A person can resolve a conflict by hand in the saved knowledge file the same way.
+
+    A conflict marked ``resolved`` without ``preferred_unit_ids``, with an id that is not
+    one of its ``unit_ids``, or naming every one of them, is read as ``unresolved``: no
+    side is chosen, so the report gives both. This also covers knowledge files saved
+    before the side was named.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     topic: str
     description: str
+    """What each source says, as the model put it. It does not decide the conflict."""
     status: Literal["resolved", "unresolved"]
     unit_ids: list[str]
+    preferred_unit_ids: list[str] = []
+    """For a resolved conflict, the units whose side the report follows; else empty."""
+    resolved_by: str | None = None
+    """For a resolved conflict, the source class that decided it; else None."""
+
+    @model_validator(mode="after")
+    def _side_named(self) -> Conflict:
+        if self.status == "resolved" and (
+            not self.preferred_unit_ids
+            or any(i not in self.unit_ids for i in self.preferred_unit_ids)
+            or set(self.unit_ids) <= set(self.preferred_unit_ids)
+        ):
+            self.status = "unresolved"
+            self.preferred_unit_ids = []
+            self.resolved_by = None
+        elif self.status == "unresolved":
+            self.preferred_unit_ids = []
+            self.resolved_by = None
+        return self
 
 
 class SectionKnowledge(BaseModel):
@@ -113,7 +145,9 @@ def _quote_in_squashed(quote: str, squashed_text: str) -> bool:
 
 
 class DroppedUnit(BaseModel):
-    """A fact the curator dropped because its quote could not be verified."""
+    """A fact the curator dropped because it failed the quote check: its quote is not in
+    the cited source, the file is not a source, or the summary states a number the quote
+    does not give."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -123,7 +157,11 @@ class DroppedUnit(BaseModel):
     quote: str
     file: str
     """The source file the unit cited."""
-    reason: Literal["quote not found in source", "file is not a source"]
+    reason: Literal[
+        "quote not found in source",
+        "file is not a source",
+        "summary states a number the quote does not",
+    ]
 
 
 class KnowledgeBase(BaseModel):
@@ -177,6 +215,7 @@ class KnowledgeBase(BaseModel):
             raise FileNotFoundError(f"No knowledge files in {directory}")
         return cls(
             sections=[
-                SectionKnowledge.model_validate_json(f.read_text(encoding="utf-8")) for f in files
+                SectionKnowledge.model_validate_json(f.read_text(encoding="utf-8-sig"))
+                for f in files
             ]
         )

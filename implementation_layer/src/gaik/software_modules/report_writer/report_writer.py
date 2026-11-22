@@ -51,7 +51,7 @@ def _sample_text(spec: ReportSpec, workspace: Path) -> str | None:
     """The sample report that ``normalize`` wrote, or None if the spec has none."""
     if spec.sample_report is None:
         return None
-    return (workspace / "sample_report.md").read_text(encoding="utf-8")
+    return (workspace / "sample_report.md").read_text(encoding="utf-8-sig")
 
 
 def _split_sections(answer: str, spec: ReportSpec) -> list[ReportSection]:
@@ -142,6 +142,7 @@ class ReportWriter:
             sources,
             spec.sections,
             instructions=spec.instructions,
+            source_precedence=spec.source_precedence,
             progress_callback=progress_callback,
         )
         _clear(workspace / "knowledge")

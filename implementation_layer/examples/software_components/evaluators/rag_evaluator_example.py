@@ -5,9 +5,10 @@ context recall, each on a 1-5 Likert scale via :class:`LLMJudge`. Aggregates
 to 0-1 RAGMetrics for the dataset.
 
 This script needs a Google Vertex / OpenAI / Anthropic API set up — change
-``LLMJudge(model_provider=...)`` to whatever you have configured. Alternative:
-construct ``RAGEvaluator(judge=panel)`` with an ``LLMJudgePanel`` for
-cross-model averaging.
+``LLMJudge(model_provider=...)`` to whatever you have configured. RAGEvaluator
+takes one ``LLMJudge``; an ``LLMJudgePanel`` raises ``TypeError``, because each
+metric is one text-only call of one judge. To compare judges, run one
+RAGEvaluator per judge.
 """
 
 from __future__ import annotations

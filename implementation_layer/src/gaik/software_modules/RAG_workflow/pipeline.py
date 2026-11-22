@@ -7,14 +7,16 @@ The parser is ``"vision"`` (default: Docling layout plus a vision model for imag
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.input_limits import InputLimits
-from gaik.software_components.RAG.answer_generator import AnswerGenerator
+from gaik.software_components.RAG._chunk_ids import check_document_id
+from gaik.software_components.RAG.answer_generator import AnswerGenerator, Citation
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.retriever import Retriever
 from gaik.software_components.RAG.vector_store import VectorStore
@@ -44,8 +46,18 @@ class IndexResult:
 
 @dataclass
 class RAGWorkflowResult:
+    """The answer and the retrieved chunks.
+
+    With ``citations=True``, ``citations`` lists the retrieved chunks the answer cites
+    and ``dropped_citations`` the ``[name, page X]`` citations it wrote that match
+    none of them (removed from the answer). When the answer streams, both are filled
+    in once it has been read to the end.
+    """
+
     answer: str | Iterable[str]
     documents: list[Document]
+    citations: list[Citation] = field(default_factory=list)
+    dropped_citations: list[str] = field(default_factory=list)
 
 
 class RAGWorkflow:
@@ -170,21 +182,50 @@ class RAGWorkflow:
 
     def index_documents(
         self,
-        file_paths: list[str | Path],
+        file_paths: Iterable[str | Path],
         *,
         filenames: list[str] | None = None,
+        document_ids: list[str | int] | None = None,
     ) -> IndexResult:
         """Parse and index documents into the vector store.
+
+        Each file is one document, with ``document_id`` its entry in
+        ``document_ids`` or else its path with forward slashes
+        (``Path(path).as_posix()``). The path is not resolved: ``data/a.pdf``
+        and its absolute path are two documents, and one relative path indexed
+        from two working directories is one. The display name in
+        ``filenames`` does not identify it, so two files with the same name are
+        two documents. Indexing a document again replaces its chunks: the ones
+        it no longer has are deleted, and unchanged ones are not stored twice.
+        Files saved under a new temporary path each time are new documents;
+        pass ``document_ids`` to replace them.
 
         Args:
             file_paths: Paths to the files to index: PDFs, or with ``parser="text"``
                 also Word (.docx), text and Markdown files.
             filenames: Optional list of original filenames (same order as file_paths).
                        If provided, these names are used instead of extracting from paths.
+            document_ids: Optional stable id for each file (same order as
+                file_paths), such as a database key; indexing the same id again
+                replaces that document's chunks. A string or an int (stored as
+                its string); any other id raises ``ValueError`` before a file
+                is parsed.
         """
+        file_paths = list(file_paths)
+        if document_ids is not None and len(document_ids) != len(file_paths):
+            raise ValueError("document_ids must have one entry for each file path")
+        # Every id is checked before any file is parsed: parsing can cost vision calls.
+        # The path in one spelling, so "docs/a.pdf" and Path("docs/a.pdf") (with
+        # backslashes on Windows) are the same document.
+        ids = [
+            check_document_id(
+                document_ids[i] if document_ids is not None else Path(file_path).as_posix()
+            )
+            for i, file_path in enumerate(file_paths)
+        ]
         all_chunks: list[Document] = []
 
-        for i, file_path in enumerate(file_paths):
+        for i, (file_path, document_id) in enumerate(zip(file_paths, ids)):
             doc_name = filenames[i] if filenames and i < len(filenames) else None
             if self.parser_kind == "text":
                 chunks = self.parser.convert_doc_to_chunks(file_path, document_name=doc_name)
@@ -192,16 +233,58 @@ class RAGWorkflow:
                 chunks = self.parser.convert_doc_to_chunks_with_vision(
                     str(file_path), document_name=doc_name
                 )
+            for chunk in chunks:
+                chunk.metadata = {**(chunk.metadata or {}), "document_id": document_id}
             all_chunks.extend(chunks)
 
         embeddings, documents = self.embedder.embed(all_chunks)
-        self.vector_store.add(documents, embeddings)
+        self._replace_documents(list(dict.fromkeys(ids)), documents, embeddings)
 
         return IndexResult(
             num_documents=len(file_paths),
             num_chunks=len(all_chunks),
             vector_store_path=self.vector_store.persist_path if self.vector_store.persist else None,
         )
+
+    def _replace_documents(
+        self, document_ids: list[str], documents: list[Document], embeddings: list[list[float]]
+    ) -> None:
+        """Store ``documents`` in place of the stored chunks of ``document_ids``.
+
+        Runs after the embedding succeeds, so a failed call leaves the old chunks.
+        A store whose ``add()`` takes ``replace`` deletes the old chunks only once
+        the new ones are stored; otherwise they are deleted first. Both act on
+        the store's owner, when it has one.
+        """
+        store = self.vector_store
+        delete_document = getattr(store, "delete_document", None)
+        with_chunks = {(doc.metadata or {}).get("document_id") for doc in documents}
+        if _takes_replace(store.add):
+            store.add(documents, embeddings, replace=True)
+            # A file that now has no chunks keeps none of its old ones.
+            if delete_document is not None:
+                for document_id in document_ids:
+                    if document_id not in with_chunks:
+                        delete_document(document_id)
+            return
+        # A replacement store without replace: delete first, then add.
+        if delete_document is not None:
+            for document_id in document_ids:
+                delete_document(document_id)
+        store.add(documents, embeddings)
+
+    def delete_document(self, document_id: str | int) -> int:
+        """Delete one document's chunks from the vector store.
+
+        Args:
+            document_id: The id the document was indexed under: its entry in
+                ``document_ids``, or else its path with forward slashes
+                (``Path(path).as_posix()``).
+
+        Returns:
+            The number of chunks deleted.
+        """
+        return self.vector_store.delete_document(document_id)
 
     def ask(
         self,
@@ -221,5 +304,19 @@ class RAGWorkflow:
             filters=filters,
             include_scores=include_scores,
         )
-        answer = self.answer_generator.generate(query, documents, stream=stream)
-        return RAGWorkflowResult(answer=answer, documents=documents)
+        cited = self.answer_generator.generate_with_citations(query, documents, stream=stream)
+        return RAGWorkflowResult(
+            answer=cited.answer,
+            documents=documents,
+            citations=cited.citations,
+            dropped_citations=cited.dropped_citations,
+        )
+
+
+def _takes_replace(add) -> bool:
+    """Whether a store's ``add`` accepts ``replace=``."""
+    try:
+        parameters = inspect.signature(add).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    return any(p.name == "replace" or p.kind is p.VAR_KEYWORD for p in parameters)

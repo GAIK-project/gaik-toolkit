@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from solution_wizard.registry import get_registry
 
-REPO = Path(__file__).resolve().parents[3]
 CARDS = json.loads(
     (Path(__file__).parent.parent / "registries" / "component_reference_cards.json").read_text(
         encoding="utf-8"
@@ -76,11 +75,22 @@ def test_card_imports_resolve(card):
         assert hasattr(loaded, name.strip()), name
 
 
-def test_judge_card_names_the_eu_default_location():
-    source = (
-        REPO / "implementation_layer/src/gaik/software_components/validators/llm_judge/llm_judge.py"
-    ).read_text(encoding="utf-8")
-    assert 'location or "eu"' in source and 'location="global"' in source
+def test_judge_card_names_the_eu_default_location(monkeypatch):
+    # What the judge does: its Vertex AI provider asks the EU, then the global
+    # endpoint, when GOOGLE_VERTEXAI_LOCATION is unset; a set location has no fallback.
+    pytest.importorskip("google.genai")
+    from gaik.software_components.llm import google_provider
+    from gaik.software_components.validators.llm_judge import llm_judge
+
+    monkeypatch.setattr(google_provider.genai, "Client", lambda **kwargs: object())
+    monkeypatch.setenv("GOOGLE_VERTEXAI_PROJECT", "project")
+    monkeypatch.delenv("GOOGLE_VERTEXAI_LOCATION", raising=False)
+    judge = llm_judge.LLMJudge(model_provider="google", model="gemini-test")
+    provider = llm_judge._vertex_provider(judge)
+    assert (provider.location, provider._fallback_location) == ("eu", "global")
+    monkeypatch.setenv("GOOGLE_VERTEXAI_LOCATION", "europe-north1")
+    provider = llm_judge._vertex_provider(judge)
+    assert (provider.location, provider._fallback_location) == ("europe-north1", None)
     effect = _option("LLMJudge", "use_vertexai")["effect"]
     assert "default 'global'" not in effect
     assert "'eu'" in effect and "'global'" in effect

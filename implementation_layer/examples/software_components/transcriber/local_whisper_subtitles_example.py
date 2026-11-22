@@ -27,12 +27,17 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
+from gaik.software_components.env_file import load_env_file  # noqa: E402
 from gaik.software_components.transcriber.srt_utils import (  # noqa: E402
     chunk_segments,
     segments_to_srt,
     segments_to_vtt,
 )
 from gaik.software_components.transcriber.whisper_local import transcribe  # noqa: E402
+
+# Settings kept only in the repository's .env are read below before any gaik config
+# helper runs, so load that file (found from the gaik package) first.
+load_env_file()
 
 # ------------------------------------------------------------------
 # Configure these values before running

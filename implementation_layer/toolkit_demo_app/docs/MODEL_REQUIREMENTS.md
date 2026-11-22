@@ -158,6 +158,46 @@ the 0.9.1 release smoke run on gpt-oss 120B generated the schema in 17 seconds.
 - An own Aitta token in the key dialog runs the same routes as any own key, with
   Whisper on that token; RAG and the Transcriber take a server model only.
 
+## Vision Extractor on three receipts, tested 2026-11-19
+
+Three synthetic receipts: a scanned Finnish restaurant receipt (JPG), a scanned London
+office-store receipt (PDF without a text layer) and a Copenhagen hotel folio (PDF). The
+task asked for the merchant, the payment date as YYYY-MM-DD, the currency, the payment
+method, an expense category, the items with quantity and line price, the total VAT and
+the amount paid. Every model ran through the demo's own route on the deployed API, from
+the Vision Extractor's provider menu and from the model menu (two runs per receipt where
+a model is in both). A run counts as right when every one of those values is as printed
+on the receipt; a tip as an extra item is accepted.
+
+| Model | Right with gaik 0.11.0 | Right with the decimal-comma fix (#278) | Time per receipt |
+| --- | --- | --- | --- |
+| GPT-6 Sol | 6/6 | 3/3 | 4-8 s |
+| GPT-6 Luna | 5/6 | not run | 7-10 s |
+| GPT-6.1 Sol, GPT-6.2 Sol, GPT-6 Astra, GPT-5.6 Terra | 3/3 each | not run | 3-11 s |
+| Claude Haiku 5.5 | 4/6 | 6/6 | 3-6 s |
+| Claude Sonnet 5.5 | 5/6 | 6/6 | 3-8 s |
+| Claude Opus 5.5 | 3/3 | 3/3 | 5-10 s |
+| Gemini 3.8 Flash | 5/6 | 6/6 | 7-150 s |
+| Gemini 4 Argon | 2/6 | 6/6 | 8-113 s |
+| Gemini 4 Carbon | 6/6 | 6/6 | 23-170 s |
+| Gemini 4 Neon | 3/6 | 4/6 | 18-60 s |
+| Gemini 4 Hydrogen | 1/6 | 4/6 | 18-120 s |
+| Gemma 4 31B on CSC Aitta | 0/3 | 2/3 | 5-15 min; HTTP 413 on the scan |
+
+- With gaik 0.11.0 most failures are amounts written with a decimal comma ("33,00",
+  "1.495,00"): the decimal cleaner turned them into empty values. The fix in #278 reads
+  them; the demo has it from gaik 0.11.1.
+- Gemini 4 Neon and Hydrogen still left every line price empty on some receipts with the
+  fix: the model returned no value, also into a plain text field. Hydrogen once returned
+  two items and no header values. Neither is in the model menu; `DEMO_SERVER_MODELS` and
+  `DEMO_GOOGLE_MODELS` can list them.
+- Gemini 4 Carbon read every receipt right but is the slowest; it is a team-only model.
+  All four Gemini 4 models (Argon, Carbon, Hydrogen, Neon) answer on Vertex AI's global
+  endpoint for the demo's project; `-flash`, `helium` and `lithium` names do not exist.
+- CSC Aitta answered the scanned PDF's page image with HTTP 413 and the other receipts in
+  5 to 15 minutes, one past the request timeout. The Vision Extractor therefore refuses
+  an Aitta model with a message; the other demos still take one.
+
 ## Models listed in the UI today
 
 Server models: see the README. Own key, OpenAI/Azure: `gpt-6-sol` (default), `gpt-6-luna`,

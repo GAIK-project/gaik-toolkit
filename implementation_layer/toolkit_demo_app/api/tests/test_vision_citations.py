@@ -23,6 +23,17 @@ EXAMPLES = Path(__file__).parent.parent.parent / "public" / "vision-extractor-ex
         (27578.55, "TOTAL: $27,578.55", "match"),
         (1234.5, "Total: 1.234,50 EUR", "match"),
         (2000, "Quantity: 200 pcs", "mismatch"),
+        # A single separator before other than three digits is a decimal point, never
+        # left out (gaik #82): 12,5 is not 125, and 12,50 is not 1250.
+        (125, "Paino: 12,5 kg", "mismatch"),
+        (1250, "Hinta 12,50 EUR", "mismatch"),
+        (12.5, "Paino: 12,5 kg", "match"),
+        (12.5, "Hinta 12,50 EUR", "match"),
+        (123450, "Total: 1.234,50 EUR", "mismatch"),
+        # Grouped thousands still read as one number.
+        (1234567, "Total: 1,234,567", "match"),
+        (1234567, "Summa 1.234.567 EUR", "match"),
+        (100000, "Amount: 1,00,000", "match"),
         (1234, "Total: 1 234 EUR", "match"),
         (-1014.5, "Discount (5%) - EUR 1,014.50", "match"),
         (-1014.5, "Discount (5%) EUR 1,014.50", "mismatch"),

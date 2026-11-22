@@ -59,12 +59,13 @@ def check_prompt(text: str, material: SourceMaterial) -> str:
 
 
 def retry_prompt(
-    text: str, failed: list[tuple[Edit, str]], attempt: int, material: SourceMaterial
+    text: str, failed: list[tuple[str, Edit, str]], attempt: int, material: SourceMaterial
 ) -> str:
+    """The retry request: each failed edit under its id, then the current text."""
     listed = "\n\n".join(
-        f"  search: {edit.search!r}\n  replace: {edit.replace!r}\n"
+        f"  id: {fid}\n  search: {edit.search!r}\n  replace: {edit.replace!r}\n"
         f"  reason: {edit.reason}\n  error: {error}"
-        for edit, error in failed
+        for fid, edit, error in failed
     )
     return (
         f"You have proposed edits to this text {attempt} time(s), but the edits in the "
@@ -72,8 +73,11 @@ def retry_prompt(
         + material.wrap(listed, label="failed_edits")
         + "\n\nThe edits that did apply are already in the current text below; do not "
         "repeat them. Return NEW edits that make the failed changes, each with a 'search' "
-        "that occurs exactly once in the current text. An empty list leaves the failed "
-        "edits unresolved.\n\n"
+        "that occurs exactly once in the current text. Set 'answers' of each edit to the "
+        'ids of the failed edits it makes, such as ["F1"], or ["F1", "F2"] when one edit '
+        "makes both, or to an empty list for an edit that makes none of them. A failed "
+        "edit that no new edit names stays unresolved, and so does every failed edit if "
+        "you return no edits.\n\n"
         "Current text (in the source_material block labelled text):\n"
         + material.wrap(text, label="text")
     )

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sys
+import types
 from pathlib import Path
 from typing import Literal, Union, get_args, get_origin
 
@@ -18,6 +19,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.extractor import SchemaGenerator, get_openai_config
+from gaik.software_components.extractor.saved_schema import save_model_file
 from gaik.software_components.extractor.schema import (
     DECIMAL_PERSISTED_HELPER_SOURCE,
     decimal_field_repr,
@@ -365,8 +367,14 @@ def _collect_models(model: type[BaseModel]) -> list[type[BaseModel]]:
         seen.add(current)
 
         for field in current.model_fields.values():
-            if get_origin(field.annotation) is list:
-                args = get_args(field.annotation)
+            annotation = field.annotation
+            if get_origin(annotation) in (Union, types.UnionType):
+                # A collection the task lets be null: list[Row] | None.
+                inner = [arg for arg in get_args(annotation) if arg is not type(None)]
+                if len(inner) == 1:
+                    annotation = inner[0]
+            if get_origin(annotation) is list:
+                args = get_args(annotation)
                 if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
                     collect(args[0])
 
@@ -467,7 +475,11 @@ def main() -> None:
     requirements = generator.item_requirements
 
     # Save generated artifacts so another workflow can reuse them later.
+    # schema_model.json is the model as data, which read_model_file and
+    # VisionExtractor(schema_dir=...) rebuild it from; schema.py is for reading.
+    # A model that cannot be saved as data gets a notice instead of a traceback.
     SCHEMA_DIR.mkdir(parents=True, exist_ok=True)
+    save_model_file(schema, SCHEMA_DIR / "schema_model.json")
     save_schema_to_python(schema, SCHEMA_DIR / "schema.py")
     save_requirements(requirements, schema.__name__, SCHEMA_DIR / "requirements.json")
     (SCHEMA_DIR / "schema_info.json").write_text(

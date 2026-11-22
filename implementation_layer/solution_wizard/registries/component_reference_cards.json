@@ -2,11 +2,11 @@
   "Transcriber": {
     "import": "from gaik.software_components.transcriber import Transcriber",
     "construct": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language)",
-    "construct_finnish": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language, enhanced_transcript=True)  # ONLY when language == 'fi' -- see the enhanced_transcript option's infer_from",
-    "construct_whisper_local": "import os  # not imported by the PoC templates -- add it\n    transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), transcription_model=\"whisper_local\", language=language, diarization=True, speaker_count=speaker_count, local_api_base=os.environ[\"LOCAL_TRANSCRIBER_API_BASE\"], local_api_key=os.environ[\"LOCAL_TRANSCRIBER_API_KEY\"])",
+    "construct_finnish": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language, enhanced_transcript=not external_model_forbidden(config))  # ONLY when language == 'fi' -- see the enhanced_transcript option's infer_from; stays off when the blueprint allows no external model API",
+    "construct_whisper_local": "audio_config = get_stage_config(config, 'transcription')  # config.yaml: stages.transcription.transcription_model: whisper_local\n    enhance = False  # Finnish audio: not external_model_forbidden(config), as in construct_finnish\n    transcriber = Transcriber(api_config=audio_config, transcription_model=\"whisper_local\", language=language, diarization=True, speaker_count=speaker_count, enhanced_transcript=enhance, **local_transcriber_options(config, audio_config, enhanced_transcript=enhance))  # endpoint and key from LOCAL_TRANSCRIBER_API_*, host checked against the governance flags",
     "call": "tr = transcriber.transcribe(input_path)\n    text = tr.enhanced_transcript or tr.raw_transcript",
     "call_whisper_local": "tr = transcriber.transcribe(input_path)\n    segments = tr.segments or []  # each: start, end, text (+ speaker when diarization=True)\n    srt = tr.srt_content          # timings only, no speaker labels",
-    "returns": "TranscriptionResult(.raw_transcript, .enhanced_transcript, .job_id, .segments, .srt_content, .vtt_content, .duration_s, .audio_duration_s, .model_used)",
+    "returns": "TranscriptionResult(.raw_transcript, .enhanced_transcript, .job_id, .segments, .srt_content, .vtt_content, .duration_s, .audio_duration_s, .model_used, .failed_segments); .failed_segments (since gaik 0.12.0) lists the chunks that failed under allow_partial=True, empty otherwise",
     "returns_note": "IMPORTANT: .segments / .srt_content / .vtt_content are populated ONLY when transcription_model='whisper_local'. On the hosted models (whisper, whisper-1, gpt-4o-transcribe) all three are None and only .raw_transcript is available. Speaker labels appear on .segments alone -- segments_to_srt/segments_to_vtt read only start/end/text, so .srt_content and .vtt_content never carry them.",
     "install_extra": "transcriber",
     "subsumes": [
@@ -49,7 +49,7 @@
         "default": null,
         "effect": "Base URL of the self-hosted whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it. Since gaik 0.11.0, the constructor accepts only the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for that address), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS or api_config['allowed_endpoint_hosts']; any other address raises EndpointNotAllowedError (a ValueError).",
         "selection_relevant": true,
-        "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code read it from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app), never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
+        "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code pass **local_transcriber_options(config, audio_config, enhanced_transcript=enhance) from provider_config.py, with the enhance value the Transcriber's enhanced_transcript gets (see construct_whisper_local). The helper reads the URL from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app) and checks its host against the blueprint's governance flags; never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
       {
         "name": "local_api_key",
@@ -57,7 +57,7 @@
         "default": null,
         "effect": "Auth key for the whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it.",
         "selection_relevant": true,
-        "infer_from": "transcription_model == whisper_local -> in generated code read it from the env var LOCAL_TRANSCRIBER_API_KEY (the convention used by toolkit_demo_app), never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
+        "infer_from": "transcription_model == whisper_local -> in generated code pass **local_transcriber_options(config, audio_config, enhanced_transcript=enhance) from provider_config.py, with the enhance value the Transcriber's enhanced_transcript gets (see construct_whisper_local). The helper reads the key from the env var LOCAL_TRANSCRIBER_API_KEY (the convention used by toolkit_demo_app); never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
       {
         "name": "diarization",
@@ -140,6 +140,14 @@
         "infer_from": "technical plumbing - leave default unless the API provider has a lower duration limit. Not applicable to whisper_local."
       },
       {
+        "name": "allow_partial",
+        "type": "bool",
+        "default": false,
+        "effect": "Since gaik 0.12.0: when a chunk of a split recording cannot be transcribed, transcribe() raises RuntimeError naming the segment and its time range, and the remaining chunks are not sent. allow_partial=True restores the earlier result: the transcript comes back with a '[Transcription failed for segment N]' line under that chunk's timestamp and the rest transcribed. A recording sent in a single request raises on failure either way. Also since gaik 0.12.0, with allow_partial=True result.failed_segments lists each failed chunk ({'segment', 'start_seconds', 'end_seconds'}; empty when none failed), and a run in which every chunk failed still raises RuntimeError.",
+        "selection_relevant": true,
+        "infer_from": "leave False, so a gap in the recording stops the run. Set True only when the user accepts a transcript with missing stretches; then the PoC must read result.failed_segments (since gaik 0.12.0; for earlier releases look for the '[Transcription failed for segment' line in result.raw_transcript, not the enhanced transcript, which enhancement may rewrite) and tell the user which part is missing, and expect RuntimeError when every chunk failed."
+      },
+      {
         "name": "api_config",
         "type": "dict | None",
         "default": null,
@@ -154,6 +162,14 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when recordings can be longer than 6 hours: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "enhancement_max_change_ratio",
+        "type": "float | None",
+        "default": 0.25,
+        "effect": "With enhanced_transcript=True: passed to TranscriptEnhancer as max_change_ratio. A pass that changes digits or more than this share of the letters is refused and the text before it kept; the refusals are in result.enhancement_refused_passes.",
+        "selection_relevant": false,
+        "infer_from": "leave the default; the PoC should report result.enhancement_refused_passes when it is not empty"
       }
     ]
   },
@@ -161,7 +177,7 @@
     "import": "from gaik.software_components.enhance_transcript import TranscriptEnhancer",
     "construct": "enhancer = TranscriptEnhancer(api_config=get_stage_config(config, 'extraction'))",
     "call": "er = enhancer.enhance_text(transcript_text)\n    text = er.enhanced_text",
-    "returns": "result(.enhanced_text, .summary)",
+    "returns": "TranscriptEnhancerResult(.original_text, .enhanced_text, .correction_summary (always set), .diff_chunks (with diff_chunks=True), .refused_passes [RefusedPass(.pass_name, .reason)])",
     "install_extra": "enhance-transcript",
     "options": [
       {
@@ -184,8 +200,8 @@
         "name": "generate_summary",
         "type": "bool",
         "default": false,
-        "effect": "Appends a CorrectionSummary (total_changes, insertions, deletions, substitutions) to the result for auditing how many tokens were changed.",
-        "selection_relevant": true,
+        "effect": "Kept for compatibility: the correction summary is always computed now (result.correction_summary).",
+        "selection_relevant": false,
         "infer_from": "human_review == yes OR audit trail of corrections is required"
       },
       {
@@ -227,17 +243,25 @@
         "effect": "Explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities. An explicit provider wins over legacy use_azure/model_provider flags.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "max_change_ratio",
+        "type": "float | None",
+        "default": 0.25,
+        "effect": "Constructor argument: largest share of a pass's input letters one pass may change (case, punctuation, compound spacing and a/ä, o/ö accents do not count). A pass over it, or one that changes, adds or removes any digit, is refused: its input is kept and listed in result.refused_passes. Not caught: decimal separators, signs, units, magnitude words, numbers written as words, names. None turns the ratio check off; the digit check always applies.",
+        "selection_relevant": true,
+        "infer_from": "keep the default; raise it only for heavily garbled ASR where large repairs are wanted. Where figures and names matter (medical, legal, inspection), keep the raw transcript as the record and have the PoC report result.refused_passes and diff_chunks"
       }
     ],
-    "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=True) instead, which calls this internally. Use this standalone only to enhance an already-existing transcript (text input)."
+    "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=not external_model_forbidden(config)) instead, which calls this internally (off when the blueprint allows no external model API). Use this standalone only to enhance an already-existing transcript (text input)."
   },
   "SchemaGenerator": {
     "import": "from gaik.software_components.extractor import SchemaGenerator",
     "construct": "schema_gen = SchemaGenerator(config=get_stage_config(config, 'extraction'))",
     "call": "schema, requirements = _load_output_schema(schema_dir)\n    if schema is None:\n        schema = schema_gen.generate_schema(user_requirements=user_requirements)\n        requirements = schema_gen.item_requirements\n        schema_dir.mkdir(parents=True, exist_ok=True)\n        _save_output_schema(schema_gen, schema, requirements, schema_dir)",
-    "returns": "Pydantic model class; .item_requirements = ExtractionRequirements or CompositeExtractionRequirements for parent-with-repeated-record schemas",
+    "returns": "Pydantic model class; .item_requirements = ExtractionRequirements or CompositeExtractionRequirements for parent-with-repeated-record schemas. Since gaik 0.12.0 each ChildRequirements has nullable (default False): a collection the task lets be null is list[Row] | None",
     "install_extra": "extract",
-    "note": "Use _load_output_schema() first -- the wizard pre-generates the schema; only call generate_schema() when _load_output_schema() returns None. Schema files are always named output_schema.* regardless of the class name.",
+    "note": "Use _load_output_schema() first -- the wizard pre-generates the schema; only call generate_schema() when _load_output_schema() returns None. Schema files are always named output_schema.* regardless of the class name. When the user changes the requirements after approving a schema, keep the approved requirements and structure before regenerating (the template's _load_output_schema drops them once the requirements hash changes): read output_schema_requirements.json, call generate_schema_with_usage(user_requirements, approved_requirements=<its requirements dict>, approved_structure=<the approved StructureAnalysis or its model_dump() dict when kept, else 'flat' or 'nested_list'>), and show result.diff (structure, fields added, removed, changed; wording apart; notes) for approval before saving. With 'nested_list' the diff notes that a renamed list container cannot be seen, so result.diff.is_empty stays false. A wrong approved_structure raises ValueError before any model call.",
     "options": [
       {
         "name": "temperature",
@@ -334,14 +358,14 @@
     "import": "from gaik.software_components.vision_extractor import VisionExtractor",
     "construct": "extractor = VisionExtractor(api_config=get_stage_config(config, 'extraction'), include_verification=False)",
     "call": "schema, requirements = _load_output_schema(schema_dir)\n    vr = extractor.extract(file_paths=[input_path], user_requirements=user_requirements, extraction_model=schema, requirements=requirements)\n    extracted_fields = vr.data",
-    "returns": "VisionExtractionResult(.data dict, .model, .documents_processed). With include_verification=True each scalar field in .data (also inside list rows) is {\"value\": ..., \"confidence_score\": float, \"confidence_reason\": str, \"found_in_text\": bool or None, \"page\": int or None}, not the bare value: read field[\"value\"] before comparing or validating it",
+    "returns": "VisionExtractionResult(.data dict, .model, .documents_processed). With include_verification=True each scalar field in .data (also inside list rows) is {\"value\": ..., \"confidence_score\": float, \"confidence_reason\": str, \"found_in_text\": bool or None, \"page\": int or None, \"file\": str or None}, not the bare value: read field[\"value\"] before comparing or validating it",
     "install_extra": "vision-extract",
     "options": [
       {
         "name": "include_verification",
         "type": "bool",
         "default": false,
-        "effect": "Per-field confidence_score + confidence_reason (the model's own rating, not proof) and found_in_text + page (the value checked against the PDF text layer; None without one). Use found_in_text, not the score, to flag values for human review. Changes the shape of .data: each field becomes {value, confidence_score, confidence_reason, found_in_text, page}.",
+        "effect": "Per-field confidence_score + confidence_reason (the model's own rating, not proof) and found_in_text + page (the value checked against the PDF text layer; None without one). Since gaik 0.12.0 each entry also has file (the PDF the value was found in), and page counts within that file instead of across all files. Use found_in_text, not the score, to flag values for human review. Changes the shape of .data: each field becomes {value, confidence_score, confidence_reason, found_in_text, page, file}.",
         "selection_relevant": true,
         "infer_from": "human_review == yes OR target_output_spec.confidence_required"
       },
@@ -433,7 +457,7 @@
     "import": "from gaik.software_components.parsers import MultimodalParser",
     "construct": "parser = MultimodalParser(api_config=get_stage_config(config, 'parser'))",
     "call": "pr = parser.parse(str(input_path))\n    parsed_text = pr.clean_markdown",
-    "returns": "ParseResult(.raw_markdown, .clean_markdown, .html [None unless create_html=True], .usage)",
+    "returns": "ParseResult(.raw_markdown, .clean_markdown, .html [None unless create_html=True], .usage, .truncated [True when the reply stopped at the output-token cap, so the end of the document is missing])",
     "install_extra": "multimodal-parser",
     "options": [
       {
@@ -526,14 +550,15 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can have more than 500 pages: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "VisionParser": {
     "import": "from gaik.software_components.parsers import VisionParser",
     "construct": "parser = VisionParser(openai_config=get_stage_config(config, 'parser'))",
     "call": "pages = parser.convert_pdf(str(input_path), clean_output=True)\n    parsed_text = '\\n\\n'.join(pages)",
     "call_page_citations": "pages = parser.convert_pdf(str(input_path), clean_output=False)\n    # DO NOT join -- each list index is one page, needed for file_name|page_number citations\n    file_name = input_path.name\n    cited_pages = [(file_name, page_num, page_text) for page_num, page_text in enumerate(pages, start=1)]",
-    "returns": "list[str] (markdown pages). With clean_output=True and >1 page, this is a ONE-ELEMENT list containing the merged/cleaned markdown for the whole document -- NOT one element per page. Page-level attribution requires clean_output=False.",
+    "returns": "list[str] (markdown pages). With clean_output=True and >1 page, this is a ONE-ELEMENT list containing the merged/cleaned markdown for the whole document -- NOT one element per page; if the cleanup reply stops at max_tokens, the per-page list is returned instead (a warning is logged), so do not assume one element. Page-level attribution requires clean_output=False.",
     "install_extra": "parser",
     "options": [
       {
@@ -608,7 +633,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can have more than 500 pages: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (convert_pdf: another known type than PDF; convert_image: content that is not a PNG, JPEG, GIF, WebP, TIFF or BMP image; an image under another image extension, or a file without a suffix, is sent with the image type its content has) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "PyMuPDFParser": {
     "import": "from gaik.software_components.parsers import PyMuPDFParser",
@@ -634,7 +660,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF (DOCX, XLSX, an image), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DocxParser": {
     "import": "from gaik.software_components.parsers import DocxParser",
@@ -660,7 +687,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "is_supported_file() returns True for both .docx and legacy binary .doc, but parse_document() calls python-docx's Document(), which cannot open the legacy .doc format at all -- a real .doc file raises PackageNotFoundError at parse time, not at the file-type check. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik."
+    "note": "Reads .docx only: python-docx cannot open the legacy binary .doc (Word 97-2003) format, so a real .doc file is refused with FileTypeMismatchError (a ValueError) whose message says to save it as .docx, and is_supported_file() returns False for .doc; a DOCX saved under the .doc name is still read. Text in content controls and tracked insertions is read; tracked deletions and a control's placeholder text are not. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DoclingParser": {
     "import": "from gaik.software_components.parsers import DoclingParser",
@@ -725,7 +752,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (.pdf, .docx, .pptx, .doc/.ppt, .txt) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DocumentClassifier": {
     "import": "from gaik.software_components.doc_classifier import DocumentClassifier",
@@ -765,6 +793,14 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for each file, through its parsers: size (100 MiB) and image pixels; with parser='vision' only the first page of a PDF is rendered and sent. The error is not wrapped in the classification ValueError. A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "temperature",
+        "type": "float | None",
+        "default": 0.0,
+        "effect": "Since gaik 0.12.0: the sampling temperature of the classification call on the OpenAI and Azure client, 0.0 by default as before. None leaves it out, for a model that refuses an explicit temperature (its 400 would otherwise come back as class 'unknown' with confidence 0.0). Other providers' clients are not sent a temperature.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; pass None only for an OpenAI or Azure model that refuses an explicit temperature, and only with a gaik release that has this option"
       }
     ]
   },
@@ -947,7 +983,8 @@
         "selection_relevant": true,
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
-    ]
+    ],
+    "note": "Since gaik 0.12.0, setup() adds a unique chunk_key column, and add() derives it from the chunk's document (metadata document_id, else source, else document_name; a caller's document_id is kept as given, and the document is also recorded as a string under gaik_document_key) and its text: adding a document again updates its rows instead of inserting copies, add(..., replace=True) also deletes the rows a changed document no longer has (one transaction; two calls replacing the same document wait for each other), and store.delete_document(document_id, owner=None) removes one document. A document_id must be a string or an int and is compared exactly (as its string); a chunk's owner (metadata gaik_owner) is part of its key, and replace and delete_document touch one owner's rows only (without an owner, rows that name none). Rows from an older gaik keep working for search but are never deleted by replace or delete_document (they lack gaik_document_key): re-index into a new table_name. delete(ids) still deletes by row id. close(timeout=None) closes the connection (a later call opens a new one); it waits for a call in another thread to end, and with timeout=<seconds> raises TimeoutError after that long and leaves the connection open."
   },
   "Retriever": {
     "import": "from gaik.software_components.RAG.retriever import Retriever",
@@ -1034,7 +1071,7 @@
         "name": "citations",
         "type": "bool",
         "default": false,
-        "effect": "Include source citations in the answer.",
+        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and each numbered reference becomes [document_name, page X] from that chunk's metadata. The citations list (generate_with_citations() -> CitedAnswer.citations) holds only retrieved chunks; a [name, page X] no chunk has is removed. A number that is not a chunk's reference, code, and sources in other forms are left as written. A string context has no chunks: the model is asked for [document_name, page X] citations and the answer is returned as written, with an empty citations list.",
         "selection_relevant": true,
         "infer_from": "traceability / citation requirement"
       },
@@ -1188,14 +1225,14 @@
     "import": "from gaik.software_components.text_to_speech import TextToSpeech",
     "construct": "tts = TextToSpeech(api_config=get_stage_config(config, 'transcription'), language=language)",
     "call": "sr = tts.synthesize(text)\n    saved_path = sr.save(output_dir)",
-    "returns": "SpeechSynthesisResult(.audio_bytes); .save(dir) -> Path",
+    "returns": "SpeechSynthesisResult(.audio_bytes, .instructions); .save(dir) -> Path. .instructions is what was sent with the request (the language line first), None when the model takes none (the tts-1 family)",
     "install_extra": "text-to-speech",
     "options": [
       {
         "name": "language",
         "type": "enum",
         "default": "fi",
-        "effect": "Spoken language; controls the pronunciation instruction injected into the synthesis request. Supported: 'fi' (Finnish), 'en' (English).",
+        "effect": "Spoken language; controls the pronunciation instruction injected into the synthesis request. Supported: 'fi' (Finnish), 'en' (English). Since gaik 0.12.0 the instructions (this line and default_instructions) go to a model whose name contains 'gpt', never to the tts-1 family (tts, tts-1, tts-hd, tts-1-hd, optionally with a dated suffix), which reads the text as written (result.instructions is None), and to any other name only with TextToSpeech(send_instructions=True) or api_config['tts_instructions']=True (a gpt-4o-mini-tts deployment named otherwise). response_format and speed now reach Azure as well; speed goes to a non-tts-1 model only when it is not 1.0.",
         "selection_relevant": true,
         "infer_from": "technical_spec.language or output language requirement"
       },
@@ -1230,6 +1267,14 @@
         "effect": "Persistent speaking-style or persona instructions prepended to every synthesis call (e.g., 'Speak in a calm, professional tone.').",
         "selection_relevant": true,
         "infer_from": "brand voice, tone, or consistent persona is required across all synthesized audio"
+      },
+      {
+        "name": "send_instructions",
+        "type": "bool",
+        "default": null,
+        "effect": "Since gaik 0.12.0: whether the language line and any instructions are sent with the request. None (the default) decides by the model name: sent to a name that contains 'gpt', never to the tts-1 family. True sends them to any other name (for example a gpt-4o-mini-tts deployment named otherwise), False sends none. api_config['tts_instructions'] is the same switch. With a name that decides nothing, the constructor warns that instructions are not sent.",
+        "selection_relevant": false,
+        "infer_from": "the TTS model or Azure deployment name does not contain 'gpt' but is a gpt-4o-mini-tts deployment -> True; otherwise leave default"
       },
       {
         "name": "use_azure",
@@ -1268,7 +1313,7 @@
         "name": "table_allowlist",
         "type": "list[str]",
         "required": true,
-        "effect": "Required: the tables and views the agent may read, as PostgreSQL stores their names (case-sensitive). Only these reach the LLM's schema, and a query that touches any other table, view or system catalog (information_schema, pg_catalog), also through a CTE, subquery, join or UNION, is refused before it runs. Type casts are checked against the list too: a cast to an oid or reg* type, or to a type that is neither built in nor a listed table, is refused, as are session and server details such as version() and current_user. A listed table's rows include those of its partitions and of tables created with INHERITS from it, so list a parent only if its child tables may be read. Since the release after gaik 0.11.0, constructing the agent without it raises TypeError and an empty list raises ValueError; earlier releases read every table in schema_name.",
+        "effect": "Required: the tables and views the agent may read, as PostgreSQL stores their names (case-sensitive). Only these reach the LLM's schema, and a query that touches any other table, view or system catalog (information_schema, pg_catalog), also through a CTE, subquery, join or UNION, is refused before it runs. Type casts are checked against the list too: a cast to an oid or reg* type, or to a type that is neither built in nor a listed table, is refused, as are session and server details such as version() and current_user. A listed table's rows include those of its partitions and of tables created with INHERITS from it, so list a parent only if its child tables may be read. Since gaik 0.11.1, constructing the agent without it raises TypeError and an empty list raises ValueError; earlier releases read every table in schema_name.",
         "selection_relevant": true,
         "infer_from": "the tables the use case's questions need (data sources / security_constraints); ask the user to name them -- never leave it out or list every table"
       },
@@ -1387,7 +1432,7 @@
     "import": "from gaik.software_components.evaluators import RAGEvaluator",
     "construct": "evaluator = RAGEvaluator(judge=judge)",
     "call": "result = evaluator.evaluate_dataset(items)\n    metrics = result.aggregate",
-    "returns": "RAGEvaluationResult(.aggregate faithfulness/relevance/context, .items)",
+    "returns": "RAGEvaluationResult(.aggregate faithfulness/relevance/context, .per_item); .aggregate.failed counts per metric the items left out because the judge gave no score (the means are over the scored items), and each item has .errors saying why a metric got score 0",
     "install_extra": "evaluators",
     "options": [
       {
@@ -1481,7 +1526,7 @@
         "name": "transcriber_ctor",
         "type": "dict",
         "default": null,
-        "effect": "Constructor kwargs forwarded to the internal Transcriber -- the general form of the enhanced_transcript option above. This is the only way to configure transcription inside the module; read the Transcriber reference card for its option names. Every name must be a Transcriber constructor parameter (an unknown one raises ValueError before the run starts), and api_config is refused here: pass the audio provider config to the module constructor as transcription_config (or the shared api_config). NOTE the module drives the hosted Transcriber path, so whisper_local options (diarization, speaker_count) do not produce speaker labels here -- see the LIMITATION in the note.",
+        "effect": "Constructor kwargs forwarded to the internal Transcriber -- the general form of the enhanced_transcript option above. This is the only way to configure transcription inside the module; read the Transcriber reference card for its option names. Every name must be a Transcriber constructor parameter (an unknown one raises ValueError before the run starts), and api_config is refused here: pass the audio provider config to the module constructor as transcription_config (or the shared api_config). Since gaik 0.12.0 a failed chunk raises RuntimeError by default; {'allow_partial': True} keeps the transcript with the segment marked instead (see the Transcriber card's allow_partial option). NOTE the module drives the hosted Transcriber path, so whisper_local options (diarization, speaker_count) do not produce speaker labels here -- see the LIMITATION in the note.",
         "selection_relevant": true,
         "infer_from": "any Transcriber option that would have been set on a standalone transcription step, e.g. {'enhanced_transcript': True, 'language': 'fi'}"
       },
@@ -1639,7 +1684,7 @@
     "import": "from gaik.software_modules.RAG_workflow import RAGWorkflow",
     "construct": "workflow = RAGWorkflow(parser_config=get_stage_config(config, 'parser'), embedding_config=get_stage_config(config, 'embedding'), answer_config=get_stage_config(config, 'answer'), persist=True, persist_path=str(output_dir / 'chroma_store'), citations=True, stream=False)",
     "call": "workflow.index_documents(document_paths)\n    rr = workflow.ask(user_query)\n    answer = rr.answer",
-    "returns": "RAGWorkflowResult(.answer, .documents)",
+    "returns": "RAGWorkflowResult(.answer, .documents, .citations, .dropped_citations)",
     "install_extra": "rag-workflow",
     "subsumes": [
       "Embedder",
@@ -1651,7 +1696,7 @@
         "name": "citations",
         "type": "bool",
         "default": true,
-        "effect": "Include source citations in the answer. ON by default -- unlike the standalone AnswerGenerator, where citations defaults to false.",
+        "effect": "Include source citations in the answer, numbered references resolved to the retrieved chunks; RAGWorkflowResult.citations holds only retrieved chunks, and a [name, page X] the retrieval did not return is removed. Sources written in other forms are left as written. ON by default -- unlike the standalone AnswerGenerator, where citations defaults to false.",
         "selection_relevant": true,
         "infer_from": "leave true unless the requirements explicitly say citations are undesired in the output"
       },
@@ -1800,7 +1845,7 @@
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ],
-    "note": "End-to-end module: embeds, stores in an internal Chroma VectorStore, retrieves, and answers. Do NOT also add Embedder / Retriever / AnswerGenerator as separate steps. PgVectorStore is a separate PostgreSQL component and is not subsumed by this module."
+    "note": "End-to-end module: embeds, stores in an internal Chroma VectorStore, retrieves, and answers. Do NOT also add Embedder / Retriever / AnswerGenerator as separate steps. PgVectorStore is a separate PostgreSQL component and is not subsumed by this module. Since gaik 0.12.0, index_documents() treats each file as one document identified by its document_ids entry or else its path as given with forward slashes (Path(path).as_posix(), not resolved: 'data/a.pdf' and its absolute path are two documents, and one relative path from two working directories is one; filenames are display names only, so two files with the same name are two documents), and indexing it again replaces its chunks; workflow.delete_document(document_id) removes one. Files saved under a new temporary path each time need document_ids to be replaced. A persisted collection from an older gaik is not replaced this way: use a new collection_name. Since gaik 0.12.0, each file's content is checked against its extension before it is read: an HTML page or image named .pdf raises FileTypeMismatchError (a ValueError), so a PoC that indexes user uploads catches it per file."
   },
   "ParallelTranscriber": {
     "import": "from gaik.software_components.parallel_transcriber import ParallelTranscriber, TranscriptionConfig",
@@ -1833,7 +1878,7 @@
           "TranscriptionModel.WHISPER_LOCAL"
         ],
         "default": "TranscriptionModel.WHISPER",
-        "effect": "Transcription backend. All three yield timestamps. NONE of them yields speaker labels to the caller: GPT4O_DIARIZE requests diarized_json and parses the speaker field, then drops it when building the SRT (_segments_to_srt is called without include_speaker=True), and TranscriptionResult exposes only .content, so there is no way to recover it; WHISPER_LOCAL hardcodes diarization=False in its request payload. WHISPER_LOCAL also needs api_config['api_base'] (required) and api_config['key'] (optional), not the cloud provider config.",
+        "effect": "Transcription backend. All three yield timestamps, except that WHISPER gives per-sentence timestamps only when api_config['transcription_model'] is a Whisper model or deployment (whisper, whisper-1): since gaik 0.12.0 a GPT-4o transcription model there (a name with 'gpt' and not 'whisper', such as gpt-4o-transcribe, the get_openai_config() default; TranscriptionConfig(whisper_request_format='json'/'srt') overrides the name) is asked for json and returns text only, so each chunk is one subtitle over its stretch, and a recording over 23 minutes is split to keep each request under 1400 s (earlier releases asked it for srt, which it refuses). NONE of them yields speaker labels to the caller: GPT4O_DIARIZE requests diarized_json and parses the speaker field, then drops it when building the SRT (_segments_to_srt is called without include_speaker=True), and TranscriptionResult exposes only .content, so there is no way to recover it; WHISPER_LOCAL hardcodes diarization=False in its request payload. WHISPER_LOCAL also needs api_config['api_base'] (required) and api_config['key'] (optional), not the cloud provider config.",
         "selection_relevant": true,
         "infer_from": "leave at WHISPER unless technical_spec.model says otherwise. Do NOT select GPT4O_DIARIZE to satisfy a speaker-attribution requirement -- it does not deliver one; use Transcriber(transcription_model='whisper_local', diarization=True) instead."
       },
@@ -1934,6 +1979,14 @@
         "infer_from": "model == WHISPER_LOCAL AND typical/maximum input audio length -> raise if recordings can exceed 6 hours, together with limits=InputLimits(max_media_seconds=...); otherwise leave default and treat as a validation guard"
       },
       {
+        "name": "whisper_request_format",
+        "type": "enum",
+        "default": null,
+        "effect": "TranscriptionConfig field (env WHISPER_REQUEST_FORMAT). Since gaik 0.12.0: what the WHISPER backend asks api_config['transcription_model'] for: 'srt' (a Whisper model, subtitle timestamps) or 'json' (a GPT-4o transcription model, which takes json or text only; each chunk then becomes one subtitle). None decides by the name: 'json' when it contains 'gpt' and not 'whisper', else 'srt'. Any other value raises ValueError.",
+        "selection_relevant": false,
+        "infer_from": "the transcription deployment name says neither 'gpt' nor 'whisper' -> set it to match the model behind it; otherwise leave default"
+      },
+      {
         "name": "max_429_retries",
         "type": "int",
         "default": 4,
@@ -1958,12 +2011,12 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when recordings can be longer than 6 hours: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option)."
+    "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option). Since gaik 0.12.0, a chunk FFmpeg cannot create, even on its retry, or one that comes out shorter than asked for (by encoded length) with audio after it, stops transcribe() with a RuntimeError naming the missing time ranges, instead of the transcript leaving that stretch out; there is no option to keep a partial transcript."
   },
   "MultiSourceReportGenerator": {
     "import": "from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator, save_report_config, load_report_config",
     "construct": "generator = MultiSourceReportGenerator(api_config=get_stage_config(config, 'answer'))",
-    "call": "result = generator.run(\n    input_paths=input_paths,\n    sections=[\n        {\"id\": \"findings\", \"title\": \"Findings\", \"instructions\": \"Describe key findings from the evidence.\"},\n        {\"id\": \"recommendations\", \"title\": \"Recommendations\", \"instructions\": \"Give recommendations.\", \"depends_on\": [\"findings\"]}\n    ],\n    report_title=report_title,\n    report_description=report_description,\n    report_language=report_language,\n    sample_report_path=sample_report_path,\n    output_dir=output_dir,\n    output_docx=False,\n    agentic=True,\n    curate_evidence=False,\n    polish=False,\n    writer_options={'api_config': get_stage_config(config, 'answer')}\n)\n    report_markdown = result.markdown\n    written_sections = [s.title for s in result.sections]\n    docx_path = result.docx_path",
+    "call": "result = generator.run(\n    input_paths=input_paths,\n    sections=[\n        {\"id\": \"findings\", \"title\": \"Findings\", \"instructions\": \"Describe key findings from the evidence.\"},\n        {\"id\": \"recommendations\", \"title\": \"Recommendations\", \"instructions\": \"Give recommendations.\", \"depends_on\": [\"findings\"]}\n    ],\n    report_title=report_title,\n    report_description=report_description,\n    report_language=report_language,\n    sample_report_path=sample_report_path,\n    output_dir=output_dir,\n    output_docx=False,\n    agentic=True,\n    strict_review=True,\n    curate_evidence=False,\n    polish=False,\n    writer_options={'api_config': get_stage_config(config, 'answer')}\n)\n    report_markdown = result.markdown\n    written_sections = [s.title for s in result.sections]\n    docx_path = result.docx_path",
     "returns": "ReportGenerationResult(.markdown, .markdown_path, .docx_path, .sections, .evidence_items, .title, .usage)",
     "install_extra": "multi-source-report-generator",
     "install_extra_agentic": "multi-source-report-generator-agentic",
@@ -2052,10 +2105,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "Agentic mode only. When true, raises before writing any output if the diff-editor reviewer has unresolved edits after retries. Use when the report must never be persisted with unresolved reviewer corrections.",
+        "default": true,
+        "effect": "Agentic mode only. True (the default from gaik 0.12.0; 0.11.1 and older default to false): raises before writing any output if the diff-editor reviewer has unresolved edits after retries, so a report is never saved as reviewed with a correction left out. False writes the report and returns the unresolved edits as section.revision_warnings.",
         "selection_relevant": true,
-        "infer_from": "agentic == true AND (human_review == yes OR accuracy_critical)"
+        "infer_from": "leave true; pass strict_review=True explicitly while the PoC pins any gaik release before 0.12.0 (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections listed as revision warnings for a person to resolve"
       },
       {
         "name": "review_options",
@@ -2104,7 +2157,7 @@
         "name": "transcriber_options",
         "type": "dict",
         "default": null,
-        "effect": "Audio/video Transcriber options use nested ctor and call dictionaries, not flat model/language keys: {'ctor': {'api_config': audio_cfg, 'transcription_model': ..., 'language': ..., 'enhanced_transcript': ...}, 'call': {'custom_context': ...}}. Audio requires native OpenAI/Azure or an explicitly configured supported local mode.",
+        "effect": "Audio/video Transcriber options use nested ctor and call dictionaries, not flat model/language keys: {'ctor': {'api_config': audio_cfg, 'transcription_model': ..., 'language': ..., 'enhanced_transcript': ...}, 'call': {'custom_context': ...}}. Audio requires native OpenAI/Azure or an explicitly configured supported local mode. Since gaik 0.12.0 a failed chunk of a recording raises RuntimeError by default; ctor {'allow_partial': True} keeps the transcript with the segment marked instead (see the Transcriber card).",
         "selection_relevant": true,
         "infer_from": "Audio/video inputs -> provide the transcription stage config under ctor.api_config; select the actual audio deployment separately from chat."
       },
@@ -2173,12 +2226,12 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when recordings can be longer than 6 hours or files over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Since gaik 0.10.0, load_report_config(path, root=None) requires the stored input paths, sample report and output folder (and every file in an input folder) to stay inside the config file's folder, or inside root when given; otherwise it raises SourcePathError before anything is read or written. save_report_config only warns when it stores an input outside the config's folder (as ../...), so such a config loads back only with root=. Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export. Provider stages: constructor api_config is the writer fallback; run(parser_options={'api_config': parser_cfg}, image_options={'api_config': parser_cfg}, transcriber_options={'ctor': {'api_config': audio_cfg}}, writer_options={'api_config': writer_cfg}, review_options={'api_config': judge_cfg}) selects separate clients. Do not serialize credential-bearing configs with save_report_config; supply them only at runtime. Audio must use native OpenAI/Azure."
+    "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Since gaik 0.10.0, load_report_config(path, root=None) requires the stored input paths, sample report and output folder (and every file in an input folder) to stay inside the config file's folder, or inside root when given; otherwise it raises SourcePathError before anything is read or written. From gaik 0.12.0, save_report_config raises SourcePathError for such a path, so a config it writes loads back as saved; save_report_config(..., root=) writes one that needs the same root (0.11.1 and earlier only warn). Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export. Provider stages: constructor api_config is the writer fallback; run(parser_options={'api_config': parser_cfg}, image_options={'api_config': parser_cfg}, transcriber_options={'ctor': {'api_config': audio_cfg}}, writer_options={'api_config': writer_cfg}, review_options={'api_config': judge_cfg}) selects separate clients. Do not serialize credential-bearing configs with save_report_config; supply them only at runtime. Audio must use native OpenAI/Azure."
   },
   "ReportWriter": {
     "import": "from gaik.software_modules.report_writer import ReportWriter, ReportSpec, SectionSpec, RunSettings, ModelSettings",
     "construct": "writer = ReportWriter(config=get_stage_config(config, 'answer'))",
-    "call": "settings = RunSettings(transcription_language=language, strict_review=False, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = [entry.model_dump(mode='json') for entry in report.review_log]  # Pydantic models: json.dumps takes their model_dump(mode='json'), or use report.save(dir)",
+    "call": "settings = RunSettings(transcription_language=language, strict_review=True, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        source_precedence=source_precedence,  # e.g. ['primary', 'secondary'], or [] for a person to settle conflicts; needs gaik 0.12.0 or later, the release that ships source_precedence; 0.11.1 and earlier refuse the key, so leave this line out there\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = [entry.model_dump(mode='json') for entry in report.review_log]  # Pydantic models: json.dumps takes their model_dump(mode='json'), or use report.save(dir)",
     "call_from_spec_file": "spec = ReportSpec.load(spec_path)  # since gaik 0.10.0 (SourcePathError is exported from report_writer): source paths and the sample report are relative to the spec file's folder and must stay inside it; an absolute path, or one leading out through '..' or a symbolic link, raises SourcePathError before any file is read. ReportSpec.load(spec_path, root=parent_folder) accepts paths inside a wider root (and absolute ones inside it). spec.save(path) writes them back relative",
     "call_resume": "report = writer.synthesize(spec, workspace, progress_callback=print)  # after editing workspace/knowledge/*.json; normalize and curate are not rerun",
     "call_rebuild": "report = writer.rebuild(spec, workspace)  # after editing workspace/report/sections/*.md (keep the '## <title>' first line); no LLM call",
@@ -2202,7 +2255,8 @@
       "sections": "Template in report order: SectionSpec(id, title, instructions, required_items, depends_on). id is letters, digits, '_' or '-'. Maps 1:1 from target_output_spec.fields.",
       "required_items": "Per section: items it must cover; each one no source covers becomes '(missing: <item>)' in the report.",
       "depends_on": "Per section: makes it DERIVED -- no knowledge file, written only from the reviewed texts of these sections (never from the sources). Cycles and unknown ids raise.",
-      "instructions": "Report-wide rules sent to curator, writer and reviewer: source hierarchy (which class outranks which), citation/attribution style, tone, missing-data policy.",
+      "instructions": "Report-wide rules sent to curator, writer and reviewer: how each kind of source is worded, citation/attribution style, tone, missing-data policy. They do not decide conflicts.",
+      "source_precedence": "Optional ['primary', 'secondary'] or ['secondary', 'primary']: which class outranks which; needs gaik 0.12.0 or later, the release that ships source_precedence; 0.11.1 and earlier refuse the key. Conflicts are resolved in code from it, unless the higher-ranked fact is of low confidence; without it every conflict is 'Unresolved:' in the report for a person to settle.",
       "sources": "{'primary': [...], 'secondary': [...]} -- at least one non-empty list; file names must be unique across both. The values are Path objects after ReportSpec(...): json.dumps(spec.sources) raises TypeError (PosixPath is not JSON serializable). Print or save with spec.model_dump(mode='json'), spec.save(path), or [str(p) for p in spec.sources['primary']].",
       "sample_report": "Optional report (any SourceNormalizer type) whose structure, length and tone the new report follows; never its facts. Never sent to the reviewer."
     },
@@ -2240,10 +2294,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "RunSettings field. When true, synthesize fails with RuntimeError when a reviewer edit cannot be applied, instead of logging it in report/review_log.json.",
+        "default": true,
+        "effect": "RunSettings field. True (the default from gaik 0.12.0; 0.11.1 and older default to false): synthesize fails with RuntimeError when a reviewer edit cannot be applied, so a report is never returned as reviewed with a correction left out. False logs the edit in report/review_log.json and returns the report.",
         "selection_relevant": true,
-        "infer_from": "accuracy_critical == yes OR the report must never be saved with unresolved reviewer corrections -> true; otherwise false and surface review_log to the human reviewer"
+        "infer_from": "leave true; set it explicitly while the PoC pins any gaik release before 0.12.0 (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections and a person reads report/review_log.json before the report is used"
       },
       {
         "name": "review_attempts",
@@ -2302,7 +2356,7 @@
         "infer_from": "role separation or independent fact-checking wanted (human_review == yes, accuracy_critical) -> a different model on the same provider as the writer; otherwise None"
       }
     ],
-    "note": "End-to-end CURACT report module (report writer v2): SourceNormalizer -> KnowledgeCurator -> ReportSynthesizer (with DraftReviewer). Do NOT add parsers, Transcriber, VisionParser, SourceNormalizer, KnowledgeCurator, ReportSynthesizer or DraftReviewer as separate steps, and do not add LLMJudge. Behaviour knobs other than mode/config are ReportSpec fields, not constructor or run() kwargs: see spec_fields and spec_settings (same shape as options; RunSettings and ModelSettings fields). Build one ReportSpec from the blueprint: target_output_spec.fields -> sections (SectionSpec keys only: id, title, instructions, required_items, depends_on), report-wide rules -> instructions, input files grouped as primary/secondary -> sources. Each stage writes plain files to the workspace, so a human can edit knowledge/*.json and call writer.synthesize(spec, workspace), or edit report/sections/*.md and call writer.rebuild(spec, workspace). Prefer this over the legacy MultiSourceReportGenerator unless the SKILL.md Phase 5 report-writer rule says otherwise (scanned PDFs, unsupported file types, audio with a non-OpenAI/Azure text provider). Figures: the module reads .xlsx and .csv itself (every sheet as a table with row numbers) and the writer quotes figures from them, so do NOT add a custom calculation step (pandas or other code) before it on your own; put the authoritative sheet, the formulas and the rounding into the section instructions. A separate calculation step needs the user's request plus the formulas and the file layout (sheet names, header row, column names); see the SKILL.md Phase 5 'Figures in a report' rule. When the input includes a file that defines the sections (e.g. report_spec.json with sections of id, title, instructions), load those sections from the file at run time and pass them to SectionSpec unchanged; do not write sections or instructions of your own over the user's."
+    "note": "End-to-end CURACT report module (report writer v2): SourceNormalizer -> KnowledgeCurator -> ReportSynthesizer (with DraftReviewer). Do NOT add parsers, Transcriber, VisionParser, SourceNormalizer, KnowledgeCurator, ReportSynthesizer or DraftReviewer as separate steps, and do not add LLMJudge. Behaviour knobs other than mode/config are ReportSpec fields, not constructor or run() kwargs: see spec_fields and spec_settings (same shape as options; RunSettings and ModelSettings fields). Build one ReportSpec from the blueprint: target_output_spec.fields -> sections (SectionSpec keys only: id, title, instructions, required_items, depends_on), report-wide rules -> instructions, input files grouped as primary/secondary -> sources. Each stage writes plain files to the workspace, so a human can edit knowledge/*.json and call writer.synthesize(spec, workspace), or edit report/sections/*.md and call writer.rebuild(spec, workspace). Prefer this over the legacy MultiSourceReportGenerator unless the SKILL.md Phase 5 report-writer rule says otherwise (scanned PDFs, unsupported file types, audio with a non-OpenAI/Azure text provider). Figures: the module reads .xlsx and .csv itself (every sheet as a table with row numbers) and the writer quotes figures from them, so do NOT add a custom calculation step (pandas or other code) before it on your own; put the authoritative sheet, the formulas and the rounding into the section instructions. A separate calculation step needs the user's request plus the formulas and the file layout (sheet names, header row, column names); see the SKILL.md Phase 5 'Figures in a report' rule. When the input includes a file that defines the sections (e.g. report_spec.json with sections of id, title, instructions), those sections take the place of target_output_spec.fields: load them from the file at run time and build each SectionSpec from the section's own id, title, instructions, required_items and depends_on, unchanged (SectionSpec refuses any other key); do not write sections or instructions of your own over the user's."
   },
   "SourceNormalizer": {
     "import": "from gaik.software_components.source_normalizer import SourceNormalizer, NormalizedSources",
@@ -2364,18 +2418,26 @@
   "KnowledgeCurator": {
     "import": "from gaik.software_components.knowledge_curator import KnowledgeCurator, SectionSpec, KnowledgeBase",
     "construct": "curator = KnowledgeCurator(config=get_stage_config(config, 'extraction'), max_workers=4)",
-    "call": "section_specs = [SectionSpec(**s) for s in sections]\n    knowledge = curator.curate(sources, section_specs, instructions=report_instructions, progress_callback=print)\n    knowledge.save(output_dir / 'knowledge')",
+    "call": "section_specs = [SectionSpec(**s) for s in sections]\n    knowledge = curator.curate(sources, section_specs, instructions=report_instructions, source_precedence=source_precedence, progress_callback=print)  # source_precedence needs gaik 0.12.0 or later, the release that ships it; 0.11.1 and earlier refuse it, so leave it out there\n    knowledge.save(output_dir / 'knowledge')",
     "call_verify": "bad_units = knowledge.verify_quotes(sources)  # after hand-editing knowledge files reloaded with KnowledgeBase.load(dir); [] means every quote is verbatim in its source",
-    "returns": "KnowledgeBase(.sections [SectionKnowledge(.section_id, .units [FactUnit(.id, .topic, .time_qualifier, .summary, .quote, .source(.file, .locator), .source_class, .confidence)], .missing, .conflicts [Conflict(.topic, .description, .status, .unit_ids)])], .usage, .dropped [DroppedUnit(.section_id, .topic, .summary, .quote, .file, .reason)]); .get(section_id), .save(dir) -> <section_id>.json per section, KnowledgeBase.load(dir), .verify_quotes(sources)",
+    "returns": "KnowledgeBase(.sections [SectionKnowledge(.section_id, .units [FactUnit(.id, .topic, .time_qualifier, .summary, .quote, .source(.file, .locator), .source_class, .confidence)], .missing, .conflicts [Conflict(.topic, .description, .status, .unit_ids, .preferred_unit_ids, .resolved_by)])], .usage, .dropped [DroppedUnit(.section_id, .topic, .summary, .quote, .file, .reason)]); .get(section_id), .save(dir) -> <section_id>.json per section, KnowledgeBase.load(dir), .verify_quotes(sources)",
     "install_extra": "knowledge-curator",
     "options": [
       {
         "name": "instructions",
         "type": "str",
         "default": "",
-        "effect": "curate() argument: report-level rules -- source hierarchy, scope and style. The curator uses the hierarchy to mark each conflict resolved or unresolved.",
+        "effect": "curate() argument: report-level rules -- scope, style and how each kind of source is worded. They do not decide conflicts; source_precedence does.",
         "selection_relevant": true,
-        "infer_from": "requirements name a source hierarchy (e.g. site observations outrank older documents) or scope rules -> state them here"
+        "infer_from": "requirements name scope or wording rules -> state them here; put which source class outranks which in source_precedence"
+      },
+      {
+        "name": "source_precedence",
+        "type": "list[str] | None",
+        "default": null,
+        "effect": "curate() argument: source classes, highest first, e.g. ['primary', 'secondary']. A conflict is resolved in code only when exactly one of its units has the highest-ranked class and that unit is not of low confidence (Conflict.preferred_unit_ids, .resolved_by); the writer follows those units. Without it, for units of one class, or when the top unit's source is itself unsure, every conflict is unresolved and the report gives both sides. The model no longer marks a conflict resolved, but the code decides from the sources the model's units cite; have a person check resolved conflicts at the evidence checkpoint.",
+        "selection_relevant": true,
+        "infer_from": "requirements say one kind of source outranks another (e.g. site observations over customer documents) -> list the classes in that order; otherwise leave None so a person settles each conflict"
       },
       {
         "name": "model",
@@ -2422,7 +2484,7 @@
   },
   "ReportSynthesizer": {
     "import": "from gaik.software_components.report_synthesizer import ReportSynthesizer, Report",
-    "construct": "synthesizer = ReportSynthesizer(config=get_stage_config(config, 'answer'), reviewer_model=None, strict_review=False, review_attempts=5)",
+    "construct": "synthesizer = ReportSynthesizer(config=get_stage_config(config, 'answer'), reviewer_model=None, strict_review=True, review_attempts=5)",
     "call": "report = synthesizer.synthesize(knowledge, section_specs, title=report_title, language=report_language, instructions=report_instructions, sample_report=sample_report_markdown, progress_callback=print)\n    report.save(output_dir / 'report', docx=False)\n    report_markdown = report.markdown",
     "call_rebuild": "Report.load(output_dir / 'report').save(output_dir / 'report', docx=False)  # after hand-editing report/sections/*.md; no LLM call",
     "returns": "Report(.title, .sections [ReportSection(.id, .title, .text)], .review_log [ReviewEntry(.section_id, .applied, .unresolved)], .usage, .markdown); .save(dir, docx=True) -> sections/NN_<id>.md, review_log.json, report.md, report.docx; report.model_dump(mode='json') for JSON (json.dumps cannot write the Report, its ReviewEntry or Edit models directly); Report.load(dir)",
@@ -2434,10 +2496,10 @@
       {
         "name": "strict_review",
         "type": "bool",
-        "default": false,
-        "effect": "When true, a section with unresolved reviewer edits raises RuntimeError and stops the run; otherwise the edits are logged in review_log.",
+        "default": true,
+        "effect": "True (the default from gaik 0.12.0; 0.11.1 and older default to false): a section with unresolved reviewer edits raises RuntimeError and stops the run, so a report is never returned as reviewed with a correction left out. False logs the edits in review_log and returns the report.",
         "selection_relevant": true,
-        "infer_from": "accuracy_critical == yes OR the report must never be saved with unresolved reviewer corrections -> true"
+        "infer_from": "leave true; pass it explicitly while the PoC pins any gaik release before 0.12.0 (0.11.1 and older). False only when the user accepts a report with unresolved reviewer corrections and a person reads review_log before the report is used"
       },
       {
         "name": "reviewer_model",
@@ -2507,9 +2569,9 @@
         "name": "instructions",
         "type": "str",
         "default": "",
-        "effect": "synthesize() argument: report-wide rules (source hierarchy, missing data, citation style) sent to every writer and to every review. Pass the same instructions as to KnowledgeCurator.curate().",
+        "effect": "synthesize() argument: report-wide rules (how each kind of source is worded, missing data, citation style) sent to every writer and to every review. Conflicts follow KnowledgeCurator's source_precedence, not these rules. Pass the same instructions as to KnowledgeCurator.curate().",
         "selection_relevant": true,
-        "infer_from": "requirements mention a source hierarchy, citation/attribution style, or a report-wide tone rule"
+        "infer_from": "requirements mention how sources are worded, citation/attribution style, or a report-wide tone rule; a source priority goes to source_precedence"
       },
       {
         "name": "config",
@@ -2541,7 +2603,7 @@
         "name": "max_attempts",
         "type": "int",
         "default": 5,
-        "effect": "Most LLM requests per review, the first one included. Retries re-request only edits whose search text did not match exactly once; edits still failing end up in unresolved.",
+        "effect": "Most LLM requests per review, the first one included. Retries re-request only edits whose search text did not match exactly once; a failed edit that a retry answer leaves out is asked for again; edits still failing or still missing end up in unresolved.",
         "selection_relevant": false,
         "infer_from": "leave at 5; lower it only when reviewer cost dominates"
       },
@@ -2668,7 +2730,8 @@
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when documents can embed more than 500 images: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DoclingApiClientParser": {
     "import": "from gaik.software_components.parsers import DoclingApiClientParser",
@@ -2711,7 +2774,8 @@
         "selection_relevant": false,
         "infer_from": "Leave unset; read api_base from DOCLING_API_BASE."
       }
-    ]
+    ],
+    "note": "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (for the extensions it knows: .pdf, Office, image and text files) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "TabularAgent": {
     "import": "from gaik.software_components.tabular_agent import TabularAgent",
@@ -3068,9 +3132,25 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when sheets can have more than 1,000,000 rows: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "csv_delimiter",
+        "type": "str | None",
+        "default": null,
+        "effect": "The CSV field delimiter, one character. None reads it from the rows: the one of ',', ';', tab and '|' that splits the header and at least 80% of the rows into the same number of fields, else ','. A CSV from Excel in a locale with a decimal comma uses ';'.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; set it only when the user names a delimiter that the rows do not show"
+      },
+      {
+        "name": "csv_encoding",
+        "type": "str | None",
+        "default": null,
+        "effect": "The CSV text encoding, such as utf-8 or cp1252. None reads UTF-8, UTF-16 with a byte order mark, or else Windows-1252 (the ANSI code page of a plain Excel CSV on Western-European Windows); other content raises ValueError.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; set it only when the user names the encoding of files in another code page"
       }
     ],
-    "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser."
+    "note": "Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "VectorStore": {
     "import": "from gaik.software_components.RAG.vector_store import VectorStore",
@@ -3112,7 +3192,7 @@
         "infer_from": "several users or sessions use the same index (a multi-user service, a shared demo) -> pass the signed-in user's or session's id; a single user's own index -> leave None"
       }
     ],
-    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. Since gaik 0.11.0, a persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored."
+    "note": "Similarity search only (no keyword half) and a single process: use PgVectorStore for a shared database index or hybrid search. The embedding dimension is whatever the Embedder produces; no setting is needed. Since gaik 0.11.0, a persisted collection uses Chroma's cosine space, so scores match the in-memory store; a collection made by an older gaik (l2 space) warns and still reports cosine scores. add() sends Chroma at most its maximum batch size per call; if a call fails, the earlier batches stay stored. Since gaik 0.12.0, a chunk's id comes from its document (metadata document_id, else source, else document_name; a caller's document_id is kept as given, and the document is also recorded as a string under gaik_document_key) and its text: adding a document again updates its chunks instead of storing copies, add(..., replace=True) also drops the chunks a changed document no longer has (only after every chunk is stored; a failed add keeps the stored chunks), and store.delete_document(document_id, owner=None) removes one document. A document_id must be a string or an int and is compared exactly (as its string); a chunk's owner (metadata gaik_owner) is part of its id, and replace and delete_document touch one owner's chunks only (without an owner, chunks that name none). A chunk naming no document is added as a new one each time. A persisted collection from an older gaik still searches, but its chunks are never deleted by replace or delete_document (they lack gaik_document_key): re-index into a new collection_name."
   },
   "FieldsToDocx": {
     "import": "from gaik.software_components.fields_to_docx import FieldsToDocx",

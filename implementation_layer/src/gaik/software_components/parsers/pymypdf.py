@@ -10,6 +10,8 @@ import os
 from typing import Any
 
 from .._ligatures import expand_ligatures
+from .._log_names import error_text, file_tag
+from ..file_type import check_file_type
 from ..input_limits import InputLimits
 
 try:
@@ -23,7 +25,6 @@ except ImportError as exc:
         "Install extras with 'pip install gaik[parser]'"
     ) from exc
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -76,6 +77,8 @@ class PyMuPDFParser:
             FileNotFoundError: If file does not exist
             ValueError: If page_markers is used with structured text, or the
                 file's content is not a PDF
+            FileTypeMismatchError: If the content is another known type, or not
+                the type the file's extension says (a ``ValueError``)
             InputLimitError: If the file is over ``max_file_bytes`` or ``max_pages``
             Exception: If PDF parsing fails
         """  # noqa: E501
@@ -84,38 +87,38 @@ class PyMuPDFParser:
         if page_markers and not use_markdown:
             raise ValueError("page_markers needs use_markdown=True")
         self.limits.check_file_size(file_path)
+        check_file_type(file_path, {"pdf"})
 
         try:
             doc = fitz.open(file_path)
-            # PyMuPDF opens other formats too and picks the handler from the
-            # content, so ask it what it opened instead of trusting the name.
-            if not doc.is_pdf:
-                doc.close()
-                raise ValueError(f"The content of '{file_path}' is not a PDF document.")
+            # The document is closed however the read ends: an open file cannot be
+            # deleted on Windows, so a caller's cleanup would fail after an error.
             try:
+                # PyMuPDF opens other formats too and picks the handler from the
+                # content, so ask it what it opened instead of trusting the name.
+                if not doc.is_pdf:
+                    raise ValueError(f"The content of '{file_path}' is not a PDF document.")
                 self.limits.check_pages(doc.page_count, os.path.basename(file_path))
-            except ValueError:
+
+                if use_markdown:
+                    # Simple text extraction
+                    text_content = ""
+                    for page_num in range(doc.page_count):
+                        page = doc[page_num]
+                        if page_markers:
+                            text_content += f"[Page {page_num + 1}]\n"
+                        text_content += expand_ligatures(str(page.get_text()))
+                        text_content += "\n\n"  # Add page separator
+                else:
+                    # Structured extraction preserving layout
+                    text_content = self._extract_structured_pdf(doc)
+            finally:
                 doc.close()
-                raise
 
-            if use_markdown:
-                # Simple text extraction
-                text_content = ""
-                for page_num in range(doc.page_count):
-                    page = doc[page_num]
-                    if page_markers:
-                        text_content += f"[Page {page_num + 1}]\n"
-                    text_content += expand_ligatures(str(page.get_text()))
-                    text_content += "\n\n"  # Add page separator
-            else:
-                # Structured extraction preserving layout
-                text_content = self._extract_structured_pdf(doc)
-
-            doc.close()
             return text_content.strip()
 
         except Exception as e:
-            logger.error(f"Error parsing PDF {file_path}: {e}")
+            logger.error("Error parsing PDF %s: %s", file_tag(file_path), error_text(e, file_path))
             raise
 
     def parse_document(
@@ -157,13 +160,13 @@ class PyMuPDFParser:
             )
 
         format_type = "markdown" if use_markdown else "structured"
-        logger.info(f"Parsing document: {file_name} (format: {format_type})")
+        logger.info("Parsing document: %s (format: %s)", file_tag(file_path), format_type)
 
         # Extract text
         text_content = self.parse_pdf(file_path, use_markdown, page_markers)
 
         if not text_content:
-            logger.warning(f"No text content extracted from {file_name}")
+            logger.warning("No text content extracted from %s", file_tag(file_path))
 
         return {
             "file_path": file_path,
@@ -265,6 +268,6 @@ def parse_pdf(file_path: str, use_markdown: bool = True, output_path: str = None
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result["text_content"])
-        logger.info(f"Parsed content saved to: {output_path}")
+        logger.info("Parsed content saved to %s", file_tag(output_path))
 
     return result

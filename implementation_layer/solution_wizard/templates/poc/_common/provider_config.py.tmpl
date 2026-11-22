@@ -23,7 +23,10 @@ _CREDENTIAL_NAME = re.compile(
 
 
 def _local_host(url: str, governance: dict) -> bool:
-    """Whether the URL names this machine or a host listed in models.local_endpoints."""
+    """Whether the URL names this machine or a host in governance.local_endpoints.
+
+    config.yaml's governance.local_endpoints is the blueprint's models.local_endpoints.
+    """
     declared = governance.get("local_endpoints") or []
     hosts = _LOCAL_HOSTS | {str(h).strip().lower() for h in declared if str(h).strip()}
     try:
@@ -277,13 +280,27 @@ def get_stage_config(config: dict, stage: str) -> dict:
     return result
 
 
-def local_transcriber_options(config: dict, audio_config: dict) -> dict:
+#: The variables gaik reads a transcription stage's chat credentials from.
+_CREDENTIAL_VARIABLES = {
+    "azure": "AZURE_API_KEY and AZURE_ENDPOINT",
+    "openai": "OPENAI_API_KEY",
+}
+
+
+def local_transcriber_options(
+    config: dict, audio_config: dict, *, enhanced_transcript: bool | None = None
+) -> dict:
     """Transcriber arguments for self-hosted Whisper (transcription_model: whisper_local).
 
     gaik reads no environment for these, so they come from LOCAL_TRANSCRIBER_API_BASE
     and LOCAL_TRANSCRIBER_API_KEY. When the blueprint allows no external model API, the
-    endpoint must be on localhost or on a host listed in models.local_endpoints.
-    Returns {} for any other transcription model.
+    endpoint must be on localhost or on a host listed in governance.local_endpoints in
+    config.yaml. Returns {} for any other transcription model.
+
+    ``enhanced_transcript`` is the value the Transcriber gets; by default the PoC's, on
+    unless the blueprint allows no external model API. Enhancement sends the transcript
+    to the stage's OpenAI/Azure chat model, so without its credentials the run stops
+    here, before the audio is uploaded, rather than after the transcription.
     """
     if audio_config.get("transcription_model") != "whisper_local":
         return {}
@@ -299,7 +316,21 @@ def local_transcriber_options(config: dict, audio_config: dict) -> dict:
     ):
         raise ValueError(
             "The blueprint allows no external model API, but LOCAL_TRANSCRIBER_API_BASE "
-            "names a host that is neither localhost nor listed in models.local_endpoints."
+            "names a host that is neither localhost nor listed in governance.local_endpoints "
+            "in config.yaml."
+        )
+    if enhanced_transcript is None:
+        enhanced_transcript = not external_model_forbidden(config)
+    if enhanced_transcript and not audio_config.get("api_key"):
+        # get_stage_config could not read the stage's credentials (see its whisper_local case).
+        provider = audio_config.get("provider") or "openai"
+        variables = _CREDENTIAL_VARIABLES.get(provider, "the provider's API key")
+        raise ValueError(
+            "transcription_model is whisper_local and transcript enhancement is on, which "
+            f"sends the transcript to the transcription stage's {provider} chat model, but "
+            f"its credentials are not set ({variables}). No audio has been sent. Set them "
+            "in .env, or turn enhancement off: enhanced_transcript=False on the Transcriber "
+            "and in local_transcriber_options()."
         )
     return {"local_api_base": api_base, "local_api_key": api_key}
 

@@ -14,7 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from gaik.software_components.knowledge_curator.models import SectionSpec, check_sections
-from gaik.software_components.source_normalizer.paths import path_inside
+from gaik.software_components.source_normalizer.paths import SourcePathError, path_inside
 
 
 class ModelSettings(BaseModel):
@@ -52,9 +52,9 @@ class RunSettings(BaseModel):
     """Sections curated in parallel."""
     review_attempts: int = Field(5, ge=1)
     """Most reviewer requests per section, the first one included."""
-    strict_review: bool = False
-    """Fail the synthesize stage when a reviewer edit cannot be applied, instead of
-    logging it in the review log."""
+    strict_review: bool = True
+    """Fail the synthesize stage when a reviewer edit cannot be applied (the default);
+    ``False`` logs it in the review log instead."""
     docx: bool = True
     """Also write ``report.docx``; needs ``pypandoc`` and the Pandoc binary."""
     citations: bool = True
@@ -74,7 +74,11 @@ class ReportSpec(BaseModel):
     language: str = "English"
     sections: list[SectionSpec]
     instructions: str = ""
-    """Rules for every section, such as the source hierarchy and style."""
+    """Rules for every section, such as how each kind of source is worded, and style."""
+    source_precedence: list[str] = []
+    """Source classes, highest first, e.g. ``["primary", "secondary"]``. A conflict between
+    sources is resolved in code only when exactly one of its units has the top class;
+    without it every conflict stays unresolved and the report gives both sides."""
     sources: dict[Literal["primary", "secondary"], list[Path]]
     sample_report: Path | None = None
     """A report whose structure and style the new report follows."""
@@ -86,6 +90,14 @@ class ReportSpec(BaseModel):
         check_sections(self.sections)
         if not any(self.sources.values()):
             raise ValueError("The spec lists no sources")
+        unknown = [c for c in self.source_precedence if c not in ("primary", "secondary")]
+        if unknown:
+            raise ValueError(
+                f"source_precedence names classes a spec cannot have: {unknown}; "
+                "use 'primary' and 'secondary'"
+            )
+        if len(set(self.source_precedence)) != len(self.source_precedence):
+            raise ValueError("source_precedence names a class more than once")
         return self
 
     @classmethod
@@ -103,7 +115,7 @@ class ReportSpec(BaseModel):
             SourcePathError: A path is absolute or leads out of ``root``.
         """
         path = Path(path)
-        spec = cls.model_validate_json(path.read_text(encoding="utf-8"))
+        spec = cls.model_validate_json(path.read_text(encoding="utf-8-sig"))
         folder = path.resolve().parent
         spec.sources = {
             k: [path_inside(p, folder, root=root, what="source") for p in v]
@@ -120,6 +132,10 @@ class ReportSpec(BaseModel):
 
         A file outside that folder is written with ``..``; :meth:`load` then needs a
         ``root`` that holds it.
+
+        Raises:
+            SourcePathError: A source or the sample report is on another drive than the
+                spec file (Windows), so no relative path leads to it. Nothing is written.
         """
         path = Path(path)
         root = path.resolve().parent
@@ -128,7 +144,13 @@ class ReportSpec(BaseModel):
             # The folder is resolved, not the file: a source that is a link keeps its name
             # and its place, which is what load checks.
             p = Path(p)
-            return Path(os.path.relpath(p.parent.resolve() / p.name, root)).as_posix()
+            try:
+                return Path(os.path.relpath(p.parent.resolve() / p.name, root)).as_posix()
+            except ValueError:
+                raise SourcePathError(
+                    f"{p.name} is on another drive than the spec file {path.name}; a spec "
+                    "stores paths relative to its own folder, so keep the sources on its drive"
+                ) from None
 
         data = self.model_dump(mode="json")
         data["sources"] = {k: [rel(p) for p in v] for k, v in self.sources.items()}

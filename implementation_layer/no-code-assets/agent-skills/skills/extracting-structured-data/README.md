@@ -37,7 +37,7 @@ and add page and quote evidence to each field.
 
 ## Needs
 
-`pip install "gaik[extract]==0.11.1"`, or `gaik[vision-extract]` for PDFs and images, and an LLM
+`pip install "gaik[extract]==0.12.0"`, or `gaik[vision-extract]` for PDFs and images, and an LLM
 provider key.
 
 Install the skill with the [gaik-toolkit plugin](../../README.md#installing).

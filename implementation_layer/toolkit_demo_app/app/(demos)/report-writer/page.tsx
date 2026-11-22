@@ -4,12 +4,10 @@ import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { processSSEStream } from "@/lib/sse";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { HowItWorksCard } from "@/components/demo/how-it-works-card";
-import {
-  EmptyStateCard,
-  ResultCard,
-} from "@/components/demo/result-card";
+import { EmptyStateCard, ResultCard } from "@/components/demo/result-card";
 import { PageTransition } from "@/components/demo/page-transition";
 import { FeedbackButton } from "@/components/feedback";
+import { RunButton } from "@/components/demo/run-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,7 +26,6 @@ import posthog from "posthog-js";
 import {
   Download,
   FileText,
-  Loader2,
   Sparkles,
   Upload,
   X,
@@ -87,7 +84,8 @@ const DEFAULT_SECTIONS: SectionRow[] = [
     key: "s2",
     id: "",
     title: "Recommendations",
-    instructions: "Give practical, evidence-based recommendations for next steps.",
+    instructions:
+      "Give practical, evidence-based recommendations for next steps.",
     depends_on: [],
   },
 ];
@@ -136,7 +134,8 @@ function buildConfig(
 
   const transcriber_options: Record<string, unknown> = {};
   const ctor: Record<string, unknown> = {};
-  if (options.transcriptionModel) ctor.transcription_model = options.transcriptionModel;
+  if (options.transcriptionModel)
+    ctor.transcription_model = options.transcriptionModel;
   if (options.language) ctor.language = options.language;
   if (options.enhancedTranscript) ctor.enhanced_transcript = true;
   if (options.diarization) {
@@ -150,12 +149,17 @@ function buildConfig(
   if (options.imageMode === "structured" && options.imageRequirements)
     image_options.user_requirements = options.imageRequirements;
 
-  const writer_options: Record<string, unknown> = { model: options.writerModel || "gpt-6-luna" };
-  if (options.temperature !== 0) writer_options.temperature = options.temperature;
-  if (options.reasoningEffort) writer_options.reasoning_effort = options.reasoningEffort;
+  const writer_options: Record<string, unknown> = {
+    model: options.writerModel || "gpt-6-luna",
+  };
+  if (options.temperature !== 0)
+    writer_options.temperature = options.temperature;
+  if (options.reasoningEffort)
+    writer_options.reasoning_effort = options.reasoningEffort;
 
-  const review_options =
-    options.reviewModel ? { model: options.reviewModel } : null;
+  const review_options = options.reviewModel
+    ? { model: options.reviewModel }
+    : null;
 
   return {
     version: "1",
@@ -167,7 +171,9 @@ function buildConfig(
     output_dir: null,
     output_docx: options.outputDocx,
     include_source_references: options.includeSourceRefs,
-    max_evidence_chars: options.maxEvidenceChars ? Number(options.maxEvidenceChars) : null,
+    max_evidence_chars: options.maxEvidenceChars
+      ? Number(options.maxEvidenceChars)
+      : null,
     parser_choice: options.parserChoice,
     parser_options: {},
     transcriber_options,
@@ -200,7 +206,9 @@ function applyConfig(
         id: (s.id as string) || "",
         title: (s.title as string) || "",
         instructions: (s.instructions as string) || "",
-        depends_on: Array.isArray(s.depends_on) ? (s.depends_on as string[]) : [],
+        depends_on: Array.isArray(s.depends_on)
+          ? (s.depends_on as string[])
+          : [],
       })),
     );
   }
@@ -234,7 +242,9 @@ function applyConfig(
     includeSourceRefs: config.include_source_references !== false,
     outputDocx: Boolean(config.output_docx),
     maxEvidenceChars:
-      config.max_evidence_chars != null ? String(config.max_evidence_chars) : "",
+      config.max_evidence_chars != null
+        ? String(config.max_evidence_chars)
+        : "",
   });
 }
 
@@ -243,7 +253,7 @@ function applyConfig(
 // ---------------------------------------------------------------------------
 
 const ACCEPTED_EXTS =
-  ".txt,.md,.markdown,.pdf,.docx,.csv,.xlsx,.xls,.mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4,.mov,.mkv,.avi,.webm,.png,.jpg,.jpeg,.webp,.tiff,.tif,.bmp,.gif";
+  ".txt,.md,.markdown,.pdf,.docx,.csv,.xlsx,.mp3,.wav,.m4a,.aac,.flac,.ogg,.mp4,.mov,.mkv,.avi,.webm,.png,.jpg,.jpeg,.webp,.tiff,.tif,.bmp,.gif";
 
 function MultiFileUpload({
   files,
@@ -273,7 +283,7 @@ function MultiFileUpload({
     <div className="space-y-2">
       <div
         className={cn(
-          "rounded-lg border-2 border-dashed p-6 text-center transition-colors cursor-pointer",
+          "cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors",
           dragging
             ? "border-primary bg-primary/5"
             : "border-muted-foreground/25 hover:border-muted-foreground/50",
@@ -291,9 +301,9 @@ function MultiFileUpload({
           addFiles(Array.from(e.dataTransfer.files));
         }}
       >
-        <Upload className="mx-auto h-7 w-7 text-muted-foreground mb-2" />
+        <Upload className="text-muted-foreground mx-auto mb-2 h-7 w-7" />
         <p className="text-sm font-medium">Drop files or click to browse</p>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-xs">
           PDF · DOCX · Audio/Video · XLSX · Images · Text · CSV · up to{" "}
           {REPORT_MAX_INPUT_FILES} files
         </p>
@@ -314,9 +324,9 @@ function MultiFileUpload({
               key={i}
               className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm"
             >
-              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
               <span className="flex-1 truncate">{f.name}</span>
-              <span className="text-xs text-muted-foreground shrink-0">
+              <span className="text-muted-foreground shrink-0 text-xs">
                 {formatFileSize(f.size)}
               </span>
               {!disabled && (
@@ -370,7 +380,9 @@ export default function ReportWriterPage() {
     const errors: string[] = [];
 
     if (config.version !== undefined && config.version !== "1")
-      errors.push(`Unsupported config version "${config.version}" (expected "1").`);
+      errors.push(
+        `Unsupported config version "${config.version}" (expected "1").`,
+      );
 
     if (!Array.isArray(config.sections) || config.sections.length === 0)
       errors.push('Config must include a non-empty "sections" array.');
@@ -382,8 +394,14 @@ export default function ReportWriterPage() {
           const sec = s as Record<string, unknown>;
           if (!sec.title || typeof sec.title !== "string" || !sec.title.trim())
             errors.push(`Section ${i + 1}: missing required "title" string.`);
-          if (!sec.instructions || typeof sec.instructions !== "string" || !sec.instructions.trim())
-            errors.push(`Section ${i + 1}: missing required "instructions" string.`);
+          if (
+            !sec.instructions ||
+            typeof sec.instructions !== "string" ||
+            !sec.instructions.trim()
+          )
+            errors.push(
+              `Section ${i + 1}: missing required "instructions" string.`,
+            );
           if (sec.depends_on !== undefined && !Array.isArray(sec.depends_on))
             errors.push(`Section ${i + 1}: "depends_on" must be an array.`);
         }
@@ -393,9 +411,13 @@ export default function ReportWriterPage() {
     if (errors.length > 0) {
       toast.error(
         <div>
-          <p className="font-medium mb-1">Invalid config file</p>
-          <ul className="list-disc pl-4 space-y-0.5">
-            {errors.map((e, i) => <li key={i} className="text-xs">{e}</li>)}
+          <p className="mb-1 font-medium">Invalid config file</p>
+          <ul className="list-disc space-y-0.5 pl-4">
+            {errors.map((e, i) => (
+              <li key={i} className="text-xs">
+                {e}
+              </li>
+            ))}
           </ul>
         </div>,
         { duration: 8000 },
@@ -411,7 +433,9 @@ export default function ReportWriterPage() {
       setOptions,
     );
     const sectionCount = (config.sections as unknown[]).length;
-    toast.success(`Config loaded — ${sectionCount} section${sectionCount !== 1 ? "s" : ""} applied.`);
+    toast.success(
+      `Config loaded — ${sectionCount} section${sectionCount !== 1 ? "s" : ""} applied.`,
+    );
     return true;
   }
 
@@ -456,13 +480,17 @@ export default function ReportWriterPage() {
       const srRes = await fetch("/api/report-writer/example/sample-report");
       if (srRes.ok) {
         const blob = await srRes.blob();
-        setSampleReport(new File([blob], "sample_report.md", { type: "text/markdown" }));
+        setSampleReport(
+          new File([blob], "sample_report.md", { type: "text/markdown" }),
+        );
       }
 
       setIsExampleLoaded(true);
       toast.success("Example loaded");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load example");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load example",
+      );
     }
   }
 
@@ -478,19 +506,25 @@ export default function ReportWriterPage() {
       toast.error("Add at least one section");
       return;
     }
-    if (files.length + (additionalContext.trim() ? 1 : 0) > REPORT_MAX_INPUT_FILES) {
+    if (
+      files.length + (additionalContext.trim() ? 1 : 0) >
+      REPORT_MAX_INPUT_FILES
+    ) {
       toast.error(
         `At most ${REPORT_MAX_INPUT_FILES} input files per report, the additional context counting as one. Remove a file.`,
       );
       return;
     }
     if (uploadTooLarge) {
-      toast.error(`Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. See the note under Input Files.`);
+      toast.error(
+        `Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. See the note under Input Files.`,
+      );
       return;
     }
 
     abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsLoading(true);
     setProgressMessages([]);
     setResult(null);
@@ -511,7 +545,7 @@ export default function ReportWriterPage() {
       const response = await apiFetch("/api/report-writer/run", {
         method: "POST",
         body: formData,
-        signal: abortRef.current.signal,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -541,21 +575,32 @@ export default function ReportWriterPage() {
         },
         onCustomEvent: (event) => {
           if (event.type === "progress") {
-            setProgressMessages((prev) => [...prev, event.data.message as string]);
+            setProgressMessages((prev) => [
+              ...prev,
+              event.data.message as string,
+            ]);
           }
         },
       });
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (err instanceof Error && err.name === "AbortError")
+      )
+        return;
       if (err instanceof RateLimitError) return;
       toast.error(err instanceof Error ? err.message : "An error occurred");
-      setIsLoading(false);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortRef.current === controller) setIsLoading(false);
     }
   }
 
-  function handleCancel() {
+  // Cancels the request in the browser. The Next.js route may still finish the
+  // run on the server, and it then counts against the user's report quota.
+  function handleStop() {
     abortRef.current?.abort();
     setIsLoading(false);
+    setProgressMessages([]);
   }
 
   // -- Download results --
@@ -573,7 +618,9 @@ export default function ReportWriterPage() {
 
   function downloadDocx() {
     if (!result?.docx_b64) return;
-    const bytes = Uint8Array.from(atob(result.docx_b64), (c) => c.charCodeAt(0));
+    const bytes = Uint8Array.from(atob(result.docx_b64), (c) =>
+      c.charCodeAt(0),
+    );
     const blob = new Blob([bytes], {
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     });
@@ -585,8 +632,12 @@ export default function ReportWriterPage() {
     URL.revokeObjectURL(url);
   }
 
-  const hasInput = (files.length > 0 || additionalContext.trim().length > 0) && sections.some((s) => s.title.trim());
-  const uploadBytes = totalFileBytes(sampleReport ? [...files, sampleReport] : files);
+  const hasInput =
+    (files.length > 0 || additionalContext.trim().length > 0) &&
+    sections.some((s) => s.title.trim());
+  const uploadBytes = totalFileBytes(
+    sampleReport ? [...files, sampleReport] : files,
+  );
   const uploadTooLarge = uploadBytes > REPORT_UPLOAD_MAX_BYTES;
   const mediaFiles = files.filter((f) => isMediaFile(f.name));
 
@@ -667,7 +718,8 @@ export default function ReportWriterPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Input Files</CardTitle>
               <CardDescription>
-                Evidence sources — PDF, DOCX, audio/video, XLSX, images, text, CSV
+                Evidence sources — PDF, DOCX, audio/video, XLSX, images, text,
+                CSV
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -681,14 +733,16 @@ export default function ReportWriterPage() {
               <div className="space-y-1">
                 <Label className="text-sm">
                   Other context / input{" "}
-                  <span className="text-muted-foreground font-normal">(optional — plain text)</span>
+                  <span className="text-muted-foreground font-normal">
+                    (optional — plain text)
+                  </span>
                 </Label>
                 <Textarea
                   placeholder="Paste any additional context, notes, or instructions here…"
                   value={additionalContext}
                   onChange={(e) => setAdditionalContext(e.target.value)}
                   disabled={isLoading}
-                  className="text-sm min-h-[80px] resize-y"
+                  className="min-h-[80px] resize-y text-sm"
                 />
               </div>
 
@@ -696,13 +750,15 @@ export default function ReportWriterPage() {
               <div className="space-y-1">
                 <Label className="text-sm">
                   Sample report{" "}
-                  <span className="text-muted-foreground font-normal">(optional — format reference)</span>
+                  <span className="text-muted-foreground font-normal">
+                    (optional — format reference)
+                  </span>
                 </Label>
                 {sampleReport ? (
                   <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <FileText className="text-muted-foreground h-4 w-4" />
                     <span className="flex-1 truncate">{sampleReport.name}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-muted-foreground text-xs">
                       {formatFileSize(sampleReport.size)}
                     </span>
                     {!isLoading && (
@@ -715,7 +771,7 @@ export default function ReportWriterPage() {
                     )}
                   </div>
                 ) : (
-                  <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:border-muted-foreground/50 transition-colors">
+                  <label className="text-muted-foreground hover:border-muted-foreground/50 flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm transition-colors">
                     <Upload className="h-4 w-4" />
                     Upload .md / .txt / .pdf / .docx
                     <input
@@ -739,17 +795,16 @@ export default function ReportWriterPage() {
                   <AlertDescription className="space-y-2">
                     <p>
                       The upload is {formatFileSize(uploadBytes)}, over the{" "}
-                      {REPORT_UPLOAD_MAX_MB} MB limit for all input files and the
-                      sample report together.
+                      {REPORT_UPLOAD_MAX_MB} MB limit for all input files and
+                      the sample report together.
                     </p>
                     {mediaFiles.length > 0 ? (
                       <>
                         <p>
-                          Compress{" "}
-                          {mediaFiles.map((f) => f.name).join(", ")} to
-                          speech-quality MP3. It stays accurate for transcription
-                          and takes about 14 MB per hour of audio, so roughly 7
-                          hours fit. With{" "}
+                          Compress {mediaFiles.map((f) => f.name).join(", ")} to
+                          speech-quality MP3. It stays accurate for
+                          transcription and takes about 14 MB per hour of audio,
+                          so roughly 7 hours fit. With{" "}
                           <a
                             href="https://ffmpeg.org/download.html"
                             target="_blank"
@@ -758,16 +813,22 @@ export default function ReportWriterPage() {
                           >
                             ffmpeg
                           </a>
-                          , replacing <code>input.mp4</code> with your file (audio or
-                          video):
+                          , replacing <code>input.mp4</code> with your file
+                          (audio or video):
                         </p>
-                        <pre className="rounded bg-muted px-2 py-1.5 text-xs text-foreground whitespace-pre-wrap break-all">
+                        <pre className="bg-muted text-foreground rounded px-2 py-1.5 text-xs break-all whitespace-pre-wrap">
                           {AUDIO_COMPRESS_COMMAND}
                         </pre>
-                        <p>Then remove the original file here and add the compressed one.</p>
+                        <p>
+                          Then remove the original file here and add the
+                          compressed one.
+                        </p>
                       </>
                     ) : (
-                      <p>Remove some files or split large documents, then try again.</p>
+                      <p>
+                        Remove some files or split large documents, then try
+                        again.
+                      </p>
                     )}
                   </AlertDescription>
                 </Alert>
@@ -784,74 +845,68 @@ export default function ReportWriterPage() {
 
           {/* Generate button */}
           <div className="flex gap-2">
-            <Button
+            <RunButton
+              running={isLoading}
+              onRun={handleGenerate}
+              onStop={handleStop}
+              icon={Sparkles}
               size="lg"
               className="flex-1"
-              onClick={handleGenerate}
-              disabled={isLoading || !hasInput || uploadTooLarge}
+              disabled={!hasInput || uploadTooLarge}
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Report
-                </>
-              )}
-            </Button>
-            {isLoading && (
-              <Button variant="outline" size="lg" onClick={handleCancel}>
-                <X className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
-            )}
+              Generate Report
+            </RunButton>
           </div>
 
           <HowItWorksCard description="How to create your report use case">
             <p>
-              <strong>1. Set the report title and description.</strong> The title
-              becomes the H1 heading of your report. The description is optional
-              but recommended — it is passed to the writer, reviewer, and polish
-              pass as shared context, helping the model stay on topic throughout.
-              Example: <em>&quot;A structured summary of the Q2 product planning meeting,
-              documenting decisions, action items, and open questions.&quot;</em>
+              <strong>1. Set the report title and description.</strong> The
+              title becomes the H1 heading of your report. The description is
+              optional but recommended — it is passed to the writer, reviewer,
+              and polish pass as shared context, helping the model stay on topic
+              throughout. Example:{" "}
+              <em>
+                &quot;A structured summary of the Q2 product planning meeting,
+                documenting decisions, action items, and open questions.&quot;
+              </em>
             </p>
             <p>
               <strong>2. Define your sections.</strong> Each section needs a{" "}
-              <strong>title</strong> (the heading that appears in the report) and{" "}
-              <strong>instructions</strong> (what the section should contain). Write
-              instructions as a clear prompt to the writer — the more specific, the
-              better. For example:
+              <strong>title</strong> (the heading that appears in the report)
+              and <strong>instructions</strong> (what the section should
+              contain). Write instructions as a clear prompt to the writer — the
+              more specific, the better. For example:
             </p>
-            <ul className="list-disc pl-5 space-y-1 text-sm">
+            <ul className="list-disc space-y-1 pl-5 text-sm">
               <li>
                 <em>Title:</em> <strong>Action Items</strong> ·{" "}
-                <em>Instructions:</em> &quot;List all action items from the meeting in a
-                table with columns: Action Item, Owner, Due Date, and Priority. Use
-                only items explicitly stated in the evidence.&quot;
+                <em>Instructions:</em> &quot;List all action items from the
+                meeting in a table with columns: Action Item, Owner, Due Date,
+                and Priority. Use only items explicitly stated in the
+                evidence.&quot;
               </li>
               <li>
                 <em>Title:</em> <strong>Executive Summary</strong> ·{" "}
-                <em>Instructions:</em> &quot;Summarize the purpose, key decisions, and
-                outcome of the meeting in two concise paragraphs.&quot;
+                <em>Instructions:</em> &quot;Summarize the purpose, key
+                decisions, and outcome of the meeting in two concise
+                paragraphs.&quot;
               </li>
             </ul>
             <p>
-              <strong>3. Use section dependencies for hierarchical reports.</strong>{" "}
-              Open the <em>Advanced</em> panel on any section to see the dependency
-              chips. Click a chip to mark that section as a dependency — it turns
-              solid to show it is selected. A section with dependencies is written{" "}
-              <em>after</em> its dependencies are finalized and receives their
-              content as additional context. Use this when a section needs to
-              synthesize or summarize earlier sections — for example, an{" "}
-              <em>Executive Summary</em> that should reflect the already-written{" "}
-              <em>Findings</em> and <em>Decisions Made</em>, or a{" "}
-              <em>Recommendations</em> section that builds on a{" "}
-              <em>Risk Assessment</em>. Sections without dependencies all run in
-              parallel, which is faster.
+              <strong>
+                3. Use section dependencies for hierarchical reports.
+              </strong>{" "}
+              Open the <em>Advanced</em> panel on any section to see the
+              dependency chips. Click a chip to mark that section as a
+              dependency — it turns solid to show it is selected. A section with
+              dependencies is written <em>after</em> its dependencies are
+              finalized and receives their content as additional context. Use
+              this when a section needs to synthesize or summarize earlier
+              sections — for example, an <em>Executive Summary</em> that should
+              reflect the already-written <em>Findings</em> and{" "}
+              <em>Decisions Made</em>, or a <em>Recommendations</em> section
+              that builds on a <em>Risk Assessment</em>. Sections without
+              dependencies all run in parallel, which is faster.
             </p>
             <p>
               <strong>4. Upload evidence files.</strong> Any mix of PDF, Word,
@@ -862,18 +917,18 @@ export default function ReportWriterPage() {
             <p>
               <strong>5. Choose the workflow.</strong> Agentic mode drafts each
               section independently and then fact-checks and repairs it with a
-              diff-editor reviewer before assembling the report. It is slower but
-              produces more accurate, grounded output. Single-call writes the
-              entire report in one LLM call — faster and cheaper, but without
-              per-section review.
+              diff-editor reviewer before assembling the report. It is slower
+              but produces more accurate, grounded output. Single-call writes
+              the entire report in one LLM call — faster and cheaper, but
+              without per-section review.
             </p>
             <p>
               <strong>6. Save and reuse your configuration.</strong> Click{" "}
               <em>Download Config</em> to save all your settings — title,
               description, sections, options — as a JSON file. Next time, click{" "}
-              <em>Upload Config</em> to restore everything instantly, or share the
-              file with a colleague so they can run the same report on different
-              evidence.
+              <em>Upload Config</em> to restore everything instantly, or share
+              the file with a colleague so they can run the same report on
+              different evidence.
             </p>
           </HowItWorksCard>
         </div>
@@ -905,7 +960,7 @@ export default function ReportWriterPage() {
               {result.sections.some((s) => s.revision_warnings.length > 0) && (
                 <Alert variant="default" className="mb-3">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-xs space-y-0.5">
+                  <AlertDescription className="space-y-0.5 text-xs">
                     {result.sections
                       .filter((s) => s.revision_warnings.length > 0)
                       .map((s) =>
@@ -925,7 +980,9 @@ export default function ReportWriterPage() {
                   <Badge
                     key={s.title}
                     variant={
-                      s.revision_warnings.length > 0 ? "destructive" : "secondary"
+                      s.revision_warnings.length > 0
+                        ? "destructive"
+                        : "secondary"
                     }
                     className="text-xs"
                   >
@@ -938,9 +995,10 @@ export default function ReportWriterPage() {
               </div>
 
               {/* Markdown preview */}
-              <pre className="max-h-72 overflow-y-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap break-words font-mono leading-relaxed mb-3">
+              <pre className="bg-muted mb-3 max-h-72 overflow-y-auto rounded-md p-3 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
                 {result.markdown.slice(0, 3000)}
-                {result.markdown.length > 3000 && "\n\n[… truncated for preview …]"}
+                {result.markdown.length > 3000 &&
+                  "\n\n[… truncated for preview …]"}
               </pre>
 
               {/* Download buttons */}
@@ -956,7 +1014,12 @@ export default function ReportWriterPage() {
                   </Button>
                 ) : (
                   options.outputDocx && (
-                    <Button size="sm" variant="outline" disabled title="DOCX requires Pandoc">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      title="DOCX requires Pandoc"
+                    >
                       <Download className="mr-2 h-3.5 w-3.5" />
                       .docx (Pandoc not available)
                     </Button>

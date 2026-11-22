@@ -264,21 +264,32 @@ export function useJudgeSubmit<T>() {
   async function run(executor: (signal: AbortSignal) => Promise<T>) {
     if (isLoading) return;
     abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsLoading(true);
     setResult(null);
     try {
-      setResult(await executor(abortRef.current.signal));
+      setResult(await executor(controller.signal));
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return;
       toast.error(e instanceof Error ? e.message : "An error occurred");
     } finally {
-      setIsLoading(false);
+      if (abortRef.current === controller) setIsLoading(false);
     }
   }
 
-  return { isLoading, result, setResult, run };
+  function stop() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsLoading(false);
+  }
+
+  return { isLoading, result, setResult, run, stop };
 }
 
 /** The message of a response that is not ok, with a fallback. */

@@ -85,12 +85,15 @@ import os
 import re
 from collections import OrderedDict
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components._tesseract import (
     installed_tesseract_cli_languages,
     installed_tesserocr_languages,
     with_installed_languages,
 )
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits
+from gaik.software_components.parsers._text import decode_text
 
 # Try to import additional format options
 try:
@@ -179,19 +182,25 @@ class DoclingParser:
         # Detect CUDA availability
         self.device = self._detect_device()
 
-        # Initialize pipeline options with detected device
+        # Initialize pipeline options with detected device. Without table structure
+        # the options keep Docling's default: it refuses table_structure_options=None.
+        table_options = (
+            {
+                "table_structure_options": TableStructureOptions(
+                    kind="docling_tableformer", do_cell_matching=True
+                )
+            }
+            if enable_table_structure
+            else {}
+        )
         self.pipeline_options = PdfPipelineOptions(
             do_ocr=enable_ocr,
             do_table_structure=enable_table_structure,
             generate_picture_images=False,
             generate_page_images=False,
             do_formula_enrichment=enable_formula_enrichment,
-            table_structure_options=TableStructureOptions(
-                kind="docling_tableformer", do_cell_matching=True
-            )
-            if enable_table_structure
-            else None,
             accelerator_options=AcceleratorOptions(num_threads=num_threads, device=self.device),
+            **table_options,
         )
 
         # Set OCR engine options if OCR is enabled
@@ -350,6 +359,8 @@ class DoclingParser:
 
         Raises:
             ValueError: If Docling is not available or file format is not supported
+            FileTypeMismatchError: If the content is not the type the file's
+                extension says (a ``ValueError``)
             InputLimitError: If the file is over ``max_file_bytes``, a PDF over
                 ``max_pages``, or a DOCX/XLSX/PPTX unpacks to over ten times the size limit
         """
@@ -401,7 +412,14 @@ class DoclingParser:
                 pass
 
         # Convert document using docling, within the input limits
+        self.limits.check_file_size(file_path)
+        check_file_type(file_path)
         self.limits.check_document(file_path)
+        if file_extension == ".txt":
+            # Docling has no plain-text input format; the text is its own content.
+            with open(file_path, "rb") as handle:
+                text_content = decode_text(handle.read(), file_path)
+            return self._document_dict(file_path, text_content, use_markdown)
         result = self.converter.convert(file_path, **docling_limits(self.limits))
         doc = result.document
 
@@ -416,11 +434,14 @@ class DoclingParser:
             # Use structured document format - extract text from document structure
             text_content = self._extract_structured_text(doc)
 
-        # Return in the same format as DocumentParser
-        document_dict = {
+        return self._document_dict(file_path, text_content, use_markdown)
+
+    def _document_dict(self, file_path: str, text_content: str, use_markdown: bool) -> dict:
+        """The result in the same format as DocumentParser."""
+        return {
             "file_path": file_path,
-            "file_name": file_name,
-            "file_extension": file_extension,
+            "file_name": os.path.basename(file_path),
+            "file_extension": self.get_file_extension(file_path),
             "text_content": text_content,
             "content_length": len(text_content),
             "word_count": len(text_content.split()) if text_content else 0,
@@ -428,13 +449,45 @@ class DoclingParser:
             "format_used": "markdown" if use_markdown else "structured",
         }
 
-        return document_dict
-
     def _extract_structured_text(self, doc) -> str:
         """
         Extract text content from Docling document structure preserving layout information.
         This method preserves more structural information than markdown export.
+
+        The text items and tables come in reading order, each table as a Markdown
+        table; text that reading order does not reach comes after them.
         """
+        if hasattr(doc, "iterate_items"):
+            from docling_core.types.doc import ContentLayer, TableItem
+
+            # A table's Markdown holds its captions and footnotes; they are not repeated.
+            in_tables = {
+                ref.cref
+                for table in getattr(doc, "tables", [])
+                for ref in (*table.captions, *table.footnotes)
+            }
+            parts, seen = [], set()
+            for item, _level in doc.iterate_items(
+                traverse_pictures=True, included_content_layers=set(ContentLayer)
+            ):
+                seen.add(getattr(item, "self_ref", None))
+                if getattr(item, "self_ref", None) in in_tables:
+                    continue
+                if isinstance(item, TableItem):
+                    text = item.export_to_markdown(doc=doc)
+                else:
+                    text = getattr(item, "text", None)
+                if text:
+                    parts.append(text)
+            parts += [
+                text_obj.text
+                for text_obj in getattr(doc, "texts", [])
+                if getattr(text_obj, "self_ref", None) not in seen and text_obj.text
+            ]
+            if parts:
+                return "\n\n".join(parts)
+            return doc.export_to_markdown(image_mode="embedded")
+
         text_parts = []
 
         # Extract text from document structure
@@ -535,6 +588,6 @@ def parse_document(
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result["text_content"])
-        print(f"Parsed content saved to: {output_path}")
+        print(f"Parsed content saved to: {file_tag(output_path)}")
 
     return result

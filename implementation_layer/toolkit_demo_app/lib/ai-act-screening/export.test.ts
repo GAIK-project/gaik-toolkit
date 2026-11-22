@@ -33,7 +33,7 @@ const screening: Screening = {
   actions: [
     {
       type: "required",
-      action: "Inform applicants | in writing.",
+      action: "Inform applicants | in writing, see C:\\notes\\.",
       route: "organisation",
       applies_from: "2025-02-02",
       citations: [{ ref: "Art. 4" }],
@@ -81,7 +81,7 @@ describe("screeningToMarkdown", () => {
   });
 
   test("keeps table cells on one row", () => {
-    expect(md).toContain("Inform applicants \\| in writing.");
+    expect(md).toContain("Inform applicants \\| in writing, see C:\\\\notes\\\\.");
   });
 
   test("never leaks data codes", () => {

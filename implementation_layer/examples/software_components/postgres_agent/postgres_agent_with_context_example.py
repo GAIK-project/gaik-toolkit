@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.postgres_agent import PostgresAgent
 
 # Example: a tiny e-commerce dataset (customers, orders). The agent already
@@ -53,6 +54,9 @@ SQL: SELECT DISTINCT c.id, c.name
 
 
 def main() -> None:
+    # DATABASE_URL is read here before any gaik config helper runs, so load the
+    # repository's .env (found from the gaik package) first.
+    load_env_file()
     dsn = os.getenv(
         "DATABASE_URL",
         "postgresql://postgres:postgres@localhost:5432/postgres",

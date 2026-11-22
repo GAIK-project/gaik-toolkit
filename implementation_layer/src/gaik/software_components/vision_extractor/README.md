@@ -176,7 +176,7 @@ Constructor options:
 | `use_azure` | `bool` | `True` | For OpenAI, use Azure OpenAI. For Claude, use Anthropic Foundry. |
 | `vertex_ai` | `bool` | `True` | For Google, use Vertex AI instead of direct Gemini API. |
 | `additional_instructions` | `str | None` | `None` | Extra extraction instructions appended to the provider user prompt. |
-| `include_verification` | `bool` | `False` | Wraps fields with `value`, `confidence_score`, `confidence_reason`, `found_in_text` and `page`. |
+| `include_verification` | `bool` | `False` | Wraps fields with `value`, `confidence_score`, `confidence_reason`, `found_in_text`, `file` and `page`. |
 | `limits` | `InputLimits | None` | `None` | Checked before the model call: each file's size (100 MiB), an image's pixels, and the pages of all files together (500, an image counting as one). With a shared `api_config` the pixels of each rendered PDF page are checked too. A file over a limit raises `InputLimitError`. |
 
 ### extract()
@@ -237,6 +237,7 @@ When `include_verification=True`, scalar fields are returned with verification m
         "confidence_score": 0.98,
         "confidence_reason": "Value appears explicitly next to the invoice number label.",
         "found_in_text": True,
+        "file": "invoice.pdf",
         "page": 1
     }
 }
@@ -248,11 +249,12 @@ treat a high score as verified.
 
 `found_in_text` is an independent check: the value is looked up in the PDF's text
 layer, ignoring case, spacing, punctuation, thousands separators, the decimal separator
-and the order of an ISO date. `page` is the 1-based page where it was found.
+and the order of an ISO date. `file` is the name of the PDF it was found in and `page`
+the 1-based page within that file: each file is numbered from its own first page.
 
 | `found_in_text` | Meaning |
 |---|---|
-| `True` | The value is written on `page`. |
+| `True` | The value is written on `page` of `file`. |
 | `False` | A PDF text layer exists and the value is not on any page: a misread, or a value the model inferred or reworded (a category, a summary). Review these. |
 | `None` | Not checked: images or scanned PDFs without a text layer, booleans and empty values. |
 

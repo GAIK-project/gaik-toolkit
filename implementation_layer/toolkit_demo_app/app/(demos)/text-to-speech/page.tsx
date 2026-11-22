@@ -3,6 +3,7 @@
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
+import { RunButton } from "@/components/demo/run-button";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { FeedbackButton } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,6 @@ import {
   Check,
   Download,
   Languages,
-  Loader2,
   RotateCcw,
   Trash2,
   Users,
@@ -118,6 +118,7 @@ export default function TextToSpeechPage() {
   const [playing, setPlaying] = useState<string | null>(null);
   const urls = useRef<Set<string>>(new Set());
   const players = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const parts = splitForSpeech(text);
   const tooLong = text.trim().length > MAX_CHARACTERS;
@@ -126,7 +127,10 @@ export default function TextToSpeechPage() {
 
   useEffect(() => {
     const known = urls.current;
-    return () => known.forEach((url) => URL.revokeObjectURL(url));
+    return () => {
+      abortControllerRef.current?.abort();
+      known.forEach((url) => URL.revokeObjectURL(url));
+    };
   }, []);
 
   function loadExample(example: TtsExample): void {
@@ -157,7 +161,7 @@ export default function TextToSpeechPage() {
   }
 
   /** One voice reads every part of the text; the parts are joined into one file. */
-  async function speak(voice: VoiceId): Promise<Take> {
+  async function speak(voice: VoiceId, signal: AbortSignal): Promise<Take> {
     const clips: Uint8Array[] = [];
     let first: TtsResponse | null = null;
     for (const part of parts) {
@@ -168,6 +172,7 @@ export default function TextToSpeechPage() {
       const response = await apiFetch("/api/text-to-speech", {
         method: "POST",
         body: formData,
+        signal,
       });
       if (!response.ok) {
         const error = await response.json().catch(() => null);
@@ -209,6 +214,9 @@ export default function TextToSpeechPage() {
       toast.error(`Text cannot exceed ${MAX_CHARACTERS} characters`);
       return;
     }
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsLoading(true);
     const chosen = [...voices];
     let done = 0;
@@ -219,7 +227,7 @@ export default function TextToSpeechPage() {
       await Promise.all(
         chosen.map(async (voice) => {
           try {
-            const take = await speak(voice);
+            const take = await speak(voice, controller.signal);
             setTakes((previous) => [take, ...previous]);
             posthog.capture("tts_generated", {
               language: take.language,
@@ -231,6 +239,11 @@ export default function TextToSpeechPage() {
               example: exampleTitle,
             });
           } catch (error) {
+            if (
+              controller.signal.aborted ||
+              (error instanceof Error && error.name === "AbortError")
+            )
+              return;
             if (error instanceof RateLimitError) return;
             failed += 1;
             toast.error(
@@ -238,18 +251,29 @@ export default function TextToSpeechPage() {
             );
           } finally {
             done += 1;
-            setProgress(`${done} of ${chosen.length} voices ready`);
+            if (!controller.signal.aborted)
+              setProgress(`${done} of ${chosen.length} voices ready`);
           }
         }),
       );
-      if (failed < chosen.length)
+      if (failed < chosen.length && !controller.signal.aborted)
         toast.success(
           chosen.length === 1 ? "Audio generated" : "Takes generated",
         );
     } finally {
-      setIsLoading(false);
-      setProgress(null);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false);
+        setProgress(null);
+      }
     }
+  }
+
+  /** Cancels the run in the browser; takes already made stay, the text is kept. */
+  function stopRun(): void {
+    abortControllerRef.current?.abort();
+    setIsLoading(false);
+    setProgress(null);
   }
 
   function removeTake(id: string): void {
@@ -506,21 +530,22 @@ export default function TextToSpeechPage() {
                 </p>
               </div>
 
-              <Button
-                onClick={() => void handleSubmit()}
-                disabled={isLoading || !text.trim() || tooLong}
+              <RunButton
+                running={isLoading}
+                onRun={() => void handleSubmit()}
+                onStop={stopRun}
+                spinner
+                disabled={!text.trim() || tooLong}
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {progress ?? "Generating audio…"}
-                  </>
-                ) : (
-                  submitLabel
-                )}
-              </Button>
+                {submitLabel}
+              </RunButton>
+              {isLoading && progress && (
+                <p className="text-muted-foreground text-center text-xs">
+                  {progress}
+                </p>
+              )}
               {text.trim() && !tooLong && requests > 1 && !isLoading && (
                 <p className="text-muted-foreground text-center text-xs">
                   {requests} requests: {parts.length}{" "}

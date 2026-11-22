@@ -1,6 +1,8 @@
 "use client";
 
+import { RunButton } from "@/components/demo/run-button";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { ModelNameInput } from "@/components/demo/model-name-input";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
@@ -24,6 +26,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -40,6 +43,7 @@ import {
   DEFAULT_OPTIONS,
   EFFORTS,
   knowledgePath,
+  PRIMARY_FIRST,
   parseKnowledge,
   readKnowledge,
   readWorkspaceZip,
@@ -48,6 +52,7 @@ import {
   type DroppedUnit,
   type Effort,
   type SectionKnowledge,
+  type SourceClass,
   type VerifyResult,
 } from "@/lib/knowledge-curator/workspace";
 import { processSSEStream } from "@/lib/sse";
@@ -74,7 +79,6 @@ import {
   Sparkles,
   Upload,
   Wand2,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -115,7 +119,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 const GUIDE_NOTES = [
-  "Every quote must appear word for word in its source. A fact whose quote is not there, even after asking again, is dropped and listed. The instructions decide whether a conflict between sources is resolved: for example, primary sources outrank secondary ones.",
+  "Every quote must appear word for word in its source. A fact whose quote is not there, even after asking again, is dropped and listed. A conflict between sources is resolved only when primary sources outrank secondary ones and exactly one side is primary; otherwise it stays for you to settle.",
   "The result lives in this browser tab. Reloading or closing the tab loses it, so download the .zip first.",
 ];
 
@@ -169,6 +173,7 @@ export default function KnowledgeCuratorPage() {
   const [loadingExample, setLoadingExample] = useState(false);
   const [sections, setSections] = useState<SectionRow[]>([newRow(0)]);
   const [instructions, setInstructions] = useState("");
+  const [precedence, setPrecedence] = useState<SourceClass[]>([]);
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
 
   const [knowledge, setKnowledge] = useState<Record<string, string>>({});
@@ -267,6 +272,7 @@ export default function KnowledgeCuratorPage() {
       setOrigin(example.title);
       setSections(example.sections.map((s, i) => newRow(i, { ...s })));
       setInstructions(example.instructions);
+      setPrecedence(example.source_precedence);
       setExampleId(example.id);
     } catch (e) {
       toast.error(`Loading the example failed: ${message(e)}`);
@@ -282,6 +288,7 @@ export default function KnowledgeCuratorPage() {
     setExampleId(null);
     setSections([newRow(0)]);
     setInstructions("");
+    setPrecedence([]);
     setOptions(DEFAULT_OPTIONS);
     resetResult();
   }
@@ -333,7 +340,7 @@ export default function KnowledgeCuratorPage() {
       const form = new FormData();
       form.append(
         "request",
-        JSON.stringify(buildRequest(inputs, instructions, options)),
+        JSON.stringify(buildRequest(inputs, instructions, options, precedence)),
       );
       form.append(
         "artifacts",
@@ -375,12 +382,23 @@ export default function KnowledgeCuratorPage() {
       if (!result) throw new Error("Curate ended without a result.");
       toast.success("Knowledge curated");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(false);
+      if (abortRef.current === controller) setRunning(false);
     }
+  }
+
+  /** Cancels the run in the browser; the sources and options stay. */
+  function stopRun() {
+    abortRef.current?.abort();
+    setRunning(false);
+    setProgress([]);
   }
 
   async function verifyQuotes() {
@@ -593,12 +611,25 @@ export default function KnowledgeCuratorPage() {
               <CardHeader>
                 <CardTitle>3. Instructions</CardTitle>
                 <CardDescription>
-                  Which sources to trust more, scope and style, and the language
-                  of the summaries. When sources disagree, this decides whether
-                  a conflict is resolved.
+                  Scope and style, and the language of the summaries. Whether a
+                  conflict between sources is resolved is set by the switch
+                  below, not by the text.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-1">
+              <CardContent className="flex flex-1 flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="primary-first"
+                    checked={precedence.length > 0}
+                    onCheckedChange={(on) =>
+                      setPrecedence(on ? PRIMARY_FIRST : [])
+                    }
+                    disabled={busy}
+                  />
+                  <Label htmlFor="primary-first" className="text-sm">
+                    Primary sources outrank secondary ones in a conflict
+                  </Label>
+                </div>
                 <Textarea
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
@@ -657,7 +688,8 @@ export default function KnowledgeCuratorPage() {
                       <Label htmlFor="kc-model" className="text-sm">
                         Model
                       </Label>
-                      <Input
+                      <ModelNameInput
+                        kind="chat"
                         id="kc-model"
                         value={options.model ?? ""}
                         disabled={busy}
@@ -723,29 +755,16 @@ export default function KnowledgeCuratorPage() {
                 </AccordionItem>
               </Accordion>
               <CardContent className="flex gap-2 pt-0">
-                <Button
-                  size="lg"
+                <RunButton
+                  running={running}
+                  onRun={curate}
+                  onStop={stopRun}
+                  icon={Sparkles}
                   className="flex-1"
-                  onClick={curate}
                   disabled={busy || !normalized || problem !== null}
                 >
-                  {running ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  {running ? "Curating…" : "Curate"}
-                </Button>
-                {running && (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => abortRef.current?.abort()}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                )}
+                  Curate
+                </RunButton>
               </CardContent>
             </Card>
           </div>

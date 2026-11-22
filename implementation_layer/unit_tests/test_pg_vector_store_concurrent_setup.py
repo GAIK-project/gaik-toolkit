@@ -31,6 +31,9 @@ class _Recorder:
         self.sql.append(sql)
         return self
 
+    def fetchone(self):
+        return None
+
     def commit(self):
         self.sql.append("COMMIT")
 

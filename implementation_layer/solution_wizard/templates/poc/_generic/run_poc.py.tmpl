@@ -33,11 +33,15 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent))
-from provider_config import external_model_forbidden, get_stage_config  # noqa: E402
+from provider_config import (  # noqa: E402
+    external_model_forbidden,
+    get_stage_config,
+    local_transcriber_options,
+)
 import poc_output  # noqa: E402
 
 # Component imports for this pipeline (uncomment / adjust as you wire each step):
-# ${component_imports_placeholder}
+${component_imports_placeholder}
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +143,7 @@ def _schema_to_py_source(schema_class) -> str:
     DecimalField/OptionalDecimalField representation, which a naive
     source-reflection approach would lose.
     """
+    import types
     from typing import Literal, Union, get_args, get_origin
 
     from gaik.software_components.extractor.schema import (
@@ -189,8 +194,14 @@ def _schema_to_py_source(schema_class) -> str:
                 return
             seen.add(current)
             for field in current.model_fields.values():
-                if get_origin(field.annotation) is list:
-                    args = get_args(field.annotation)
+                annotation = field.annotation
+                if get_origin(annotation) in (Union, types.UnionType):
+                    # A collection the task lets be null: list[Row] | None.
+                    inner = [arg for arg in get_args(annotation) if arg is not type(None)]
+                    if len(inner) == 1:
+                        annotation = inner[0]
+                if get_origin(annotation) is list:
+                    args = get_args(annotation)
                     if args and isinstance(args[0], type) and hasattr(args[0], "model_fields"):
                         collect(args[0])
             ordered.append(current)

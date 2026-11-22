@@ -23,7 +23,7 @@ export default function DiaryPage() {
       <DemoPageHeader
         icon={HardHat}
         iconClassName="h-8 w-8 text-amber-500"
-        title="Construction Diary"
+        title="Construction diary"
         description="Turn typed or dictated construction site diaries into structured daily entries"
       >
         <div className="mt-2 flex justify-end">
@@ -32,19 +32,9 @@ export default function DiaryPage() {
       </DemoPageHeader>
 
       <UseCaseChooser
-        exampleDescription="Nothing to prepare. Pick a ready-made site diary and see what the demo does."
-        examplePoints={[
-          "Typed and dictated diaries in English and Finnish, and a spoken one",
-          "See which details are read from each",
-          "Click a value to see where it comes from in the source",
-        ]}
+        exampleDescription="Try English and Finnish examples, including a diary that covers several days."
         createTitle="Test on your own data or examples"
-        createDescription="Try the extraction on your own diaries, with the fields and language you need."
-        createPoints={[
-          "Type text or add a recording of the diary",
-          "Choose fields, add your own, or write the prompt",
-          "Get one entry for each day, with a PDF you can download",
-        ]}
+        createDescription="Pick the fields and language for your daily entries, then download them as a PDF."
         ExampleSection={ExampleSection}
         CreateSection={CreateSection}
       />

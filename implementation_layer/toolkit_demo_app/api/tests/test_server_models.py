@@ -63,6 +63,10 @@ def test_lists_only_providers_with_credentials_default_first(server_env, monkeyp
     models = {m.id: m for m in settings.server_models()}
     assert models["vertex:gemini-3.8-flash"].label == "Gemini 3.8 Flash"
     assert models["vertex:gemini-4-argon"].staff
+    assert models["vertex:gemini-4-carbon"].staff
+    assert models["vertex:gemini-4-carbon"].label == "Gemini 4 Carbon"
+    # Left line prices empty on the test receipts (docs/MODEL_REQUIREMENTS.md).
+    assert "vertex:gemini-4-neon" not in models and "vertex:gemini-4-hydrogen" not in models
 
 
 def test_env_list_overrides_and_still_needs_credentials(server_env, monkeypatch):

@@ -23,6 +23,8 @@ try:
 except Exception:
     pass
 
+from gaik.software_components._log_names import error_text, file_tag
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
 
 if TYPE_CHECKING:
@@ -120,17 +122,18 @@ class VisionRagParser:
             "generate_picture_images": True,  # Must be True to extract images
             "generate_page_images": False,
             "do_formula_enrichment": enable_formula_enrichment,
-            "table_structure_options": TableStructureOptions(
-                kind="docling_tableformer",
-                do_cell_matching=True,
-            )
-            if enable_table_structure
-            else None,
             "accelerator_options": AcceleratorOptions(
                 num_threads=num_threads,
                 device=device,
             ),
         }
+        # Without table structure the options keep Docling's default: it refuses
+        # table_structure_options=None.
+        if enable_table_structure:
+            pipeline_kwargs["table_structure_options"] = TableStructureOptions(
+                kind="docling_tableformer",
+                do_cell_matching=True,
+            )
 
         if enable_ocr:
             pipeline_kwargs["ocr_options"] = _build_ocr_options(ocr_engine)
@@ -258,14 +261,13 @@ class VisionRagParser:
                 chunk_id += 1
 
                 if self.verbose and chunk_id <= 3:
-                    print(
-                        f"Chunk {chunk_id}: document='{filename}', "
-                        f"page={page_num}, heading='{heading}'"
-                    )
+                    # The file by its tag and no heading: a name or a heading can
+                    # name a person.
+                    print(f"Chunk {chunk_id}: {file_tag(pdf_path)}, page={page_num}")
 
             except Exception as exc:
                 if self.verbose:
-                    print(f"Error processing chunk {chunk_id}: {exc}")
+                    print(f"Error processing chunk {chunk_id}: {error_text(exc, pdf_path)}")
                 fallback_meta = {
                     "source": pdf_path,
                     "document_name": doc_name,
@@ -297,7 +299,8 @@ class VisionRagParser:
 
         if self.verbose:
             print(
-                f"Created {len(langchain_docs)} chunks with vision-enhanced content from {doc_name}"
+                f"Created {len(langchain_docs)} chunks with vision-enhanced content "
+                f"from {file_tag(pdf_path)}"
             )
 
         if return_markdown:
@@ -306,8 +309,13 @@ class VisionRagParser:
 
     def _convert_with_vision(self, pdf_path: str) -> tuple[Any, str, dict[int, list[str]]]:
         if self.verbose:
-            print(f"Processing PDF with vision enhancement: {pdf_path}")
+            print(f"Processing PDF with vision enhancement: {file_tag(pdf_path)}")
 
+        # The size first: the content check reads the start of the file.
+        self.limits.check_file_size(pdf_path)
+        # By the extension: Docling also converts DOCX, PPTX and images, so a
+        # .docx must hold a DOCX and a .pdf a PDF.
+        check_file_type(pdf_path)
         self.limits.check_pdf(pdf_path)
         result = self.converter.convert(pdf_path, **docling_limits(self.limits))
         doc = result.document
@@ -340,7 +348,7 @@ class VisionRagParser:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(markdown_text)
         if self.verbose:
-            print(f"Markdown saved to: {output_path}")
+            print(f"Markdown saved to: {file_tag(output_path)}")
 
     def _collect_images(self, doc) -> list[dict[str, Any]]:
         images_with_positions: list[dict[str, Any]] = []
