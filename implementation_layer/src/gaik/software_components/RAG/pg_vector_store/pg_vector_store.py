@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import re
+import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -158,21 +159,27 @@ class HealthReport:
 
 
 def _rolls_back_on_error(method):
-    """Roll the connection back when *method* raises, then re-raise.
+    """Run *method* as the only user of the store's connection; roll back if it raises.
 
     psycopg opens a transaction on the first statement. After a failed
     statement, every later one fails with "current transaction is aborted"
     until a rollback; after a failure in Python partway through ``add()``, the
     rows already sent stay pending and the next commit would store them.
+
+    Threads that share a store share its connection and so its transaction: one
+    thread's commit would store another's half-done ``add()``, its rollback undo
+    it, and an advisory lock taken by one would not stop the other. So each such
+    method holds the store's lock until its transaction ends.
     """
 
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
-        try:
-            return method(self, *args, **kwargs)
-        except BaseException:
-            self._rollback_quietly()
-            raise
+        with self._lock:
+            try:
+                return method(self, *args, **kwargs)
+            except BaseException:
+                self._rollback_quietly()
+                raise
 
     return wrapper
 
@@ -224,6 +231,10 @@ class PgVectorStore:
             sees only its rows. ``health()`` and ``relemmatize()`` are table-wide
             maintenance and read every owner's rows. Without an owner, ``add()``
             refuses metadata that names one.
+
+    Threads can share a store. They also share its one connection, so their calls
+    take turns, each until its transaction ends; give each worker its own store to
+    run queries in parallel.
 
     Example::
 
@@ -330,6 +341,18 @@ class PgVectorStore:
         self.hnsw_iterative_scan = hnsw_iterative_scan
         self._conn: psycopg.Connection | None = None
         self._has_chunk_key: bool | None = None
+        # Held for each transaction on ``_conn``, which threads sharing the store share.
+        self._lock = threading.RLock()
+
+    def __getstate__(self) -> dict:
+        # A lock cannot be pickled or deep-copied; a store not yet connected could be.
+        state = self.__dict__.copy()
+        state.pop("_lock", None)
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        self.__dict__.update(state)
+        self._lock = threading.RLock()
 
     @property
     def _vec(self) -> str:
@@ -395,10 +418,11 @@ class PgVectorStore:
                 logger.warning("Could not set %s = %s: %s", name, value, exc)
 
     def close(self) -> None:
-        """Close the database connection."""
-        if self._conn is not None and not self._conn.closed:
-            self._conn.close()
-            self._conn = None
+        """Close the database connection (after a call another thread is in ends)."""
+        with self._lock:
+            if self._conn is not None and not self._conn.closed:
+                self._conn.close()
+                self._conn = None
 
     def __enter__(self) -> PgVectorStore:
         return self
@@ -871,7 +895,8 @@ class PgVectorStore:
                 deleted, and only rows this release stored (with
                 ``gaik_document_key``). Two calls replacing the same document
                 of the same owner wait for each other (a transaction-scoped
-                advisory lock). Pass all of a document's chunks in one call. If
+                advisory lock across connections; threads sharing this store
+                take turns). Pass all of a document's chunks in one call. If
                 the add fails, the transaction is rolled back and the old rows
                 stay.
 

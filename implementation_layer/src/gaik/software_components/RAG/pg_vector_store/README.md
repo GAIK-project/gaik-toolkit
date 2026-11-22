@@ -218,6 +218,10 @@ document gets no key and is inserted each time, as before. Two calls that replac
 same document of the same owner take a transaction-scoped advisory lock and run one
 after the other, so the table never holds a mix of both versions.
 
+Threads can share one store, but they share its one connection and its transaction,
+so the store's calls take turns: each runs until its transaction ends. Give each worker
+its own store to run queries in parallel.
+
 A table created by an earlier gaik release gets the column the next time `setup()`
 runs; until then `add()` inserts as before and logs a warning. Its existing rows keep
 working for search but have no `chunk_key` and no `gaik_document_key`, so

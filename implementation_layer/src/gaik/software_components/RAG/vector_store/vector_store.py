@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import math
+import os
+import threading
 import uuid
 import warnings
+from collections.abc import Hashable, Iterable, Iterator
+from contextlib import contextmanager
 
 from gaik.software_components.RAG._chunk_ids import (
     DOCUMENT_KEY,
@@ -60,6 +64,49 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return dot / (norm_a * norm_b)
 
 
+class _KeyedLocks:
+    """One lock per key, for the writers of that key in this process.
+
+    A key's lock exists while a thread holds it or waits for it, so a process that
+    writes many documents keeps no lock per document.
+    """
+
+    def __init__(self) -> None:
+        self._guard = threading.Lock()
+        self._entries: dict[Hashable, list] = {}  # key -> [lock, threads using it]
+
+    @contextmanager
+    def hold(self, keys: Iterable[Hashable]) -> Iterator[None]:
+        # Every caller takes its locks in the same order, so two callers that
+        # share several keys cannot wait for each other.
+        ordered = sorted(set(keys), key=repr)
+        with self._guard:
+            entries = []
+            for key in ordered:
+                entry = self._entries.setdefault(key, [threading.RLock(), 0])
+                entry[1] += 1
+                entries.append((key, entry))
+        acquired = []
+        try:
+            for _, entry in entries:
+                entry[0].acquire()
+                acquired.append(entry[0])
+            yield
+        finally:
+            for lock in reversed(acquired):
+                lock.release()
+            with self._guard:
+                for key, entry in entries:
+                    entry[1] -= 1
+                    if entry[1] == 0:
+                        del self._entries[key]
+
+
+# Shared by every Chroma store in the process, so two stores on one folder and
+# collection (one per request, say) also wait for each other.
+_CHROMA_WRITES = _KeyedLocks()
+
+
 class VectorStore:
     """Store embeddings with metadata and provide similarity search.
 
@@ -70,6 +117,11 @@ class VectorStore:
     older gaik, chromadb itself) still reads and writes every chunk, so it is trusted
     the same. Separate users who must not reach each other's data with separate
     collections or folders.
+
+    Threads can share a store. Writes of one document and owner (``add`` and
+    :meth:`delete_document`) run one at a time: in memory every call does, and in
+    Chroma the calls of every store in the process on the same folder and
+    collection. Other processes writing to the same Chroma folder are not covered.
     """
 
     def __init__(
@@ -88,6 +140,8 @@ class VectorStore:
         self._embeddings: list[list[float]] = []
         self._documents: list[Document] = []
         self._ids: list[str] = []
+        # Guards the three lists above, which every in-memory call reads or rebuilds.
+        self._lock = threading.RLock()
 
         self._collection = None
         self._client = None
@@ -117,6 +171,16 @@ class VectorStore:
                     "to search by cosine.",
                     stacklevel=2,
                 )
+
+    def __getstate__(self) -> dict:
+        # A lock cannot be pickled or deep-copied; an in-memory store could be.
+        state = self.__dict__.copy()
+        state.pop("_lock", None)
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        self.__dict__.update(state)
+        self._lock = threading.RLock()
 
     def add(
         self,
@@ -170,35 +234,59 @@ class VectorStore:
             for doc, key in zip(documents, keys)
         ]
 
-        if not self.persist:
-            position = {chunk_id: index for index, chunk_id in enumerate(self._ids)}
-            for doc, embedding, chunk_id in zip(stored, embeddings, keyed):
-                if chunk_id in position:
-                    self._documents[position[chunk_id]] = doc
-                    self._embeddings[position[chunk_id]] = embedding
-                else:
-                    position[chunk_id] = len(self._ids)
-                    self._ids.append(chunk_id)
-                    self._documents.append(doc)
-                    self._embeddings.append(embedding)
-        else:
-            ids = [f"{self.collection_name}_{chunk_id}" for chunk_id in keyed]
-            texts = [doc.page_content for doc in stored]
-            metadatas = [_chroma_metadata(doc.metadata) for doc in stored]
-            # Chroma rejects a single call above its maximum batch size, so send
-            # slices. If one fails, the slices before it stay stored.
-            batch = _max_batch_size(self._client) or len(ids)
-            for start in range(0, len(ids), batch):
-                end = start + batch
-                self._replace_slice(
-                    ids[start:end], embeddings[start:end], texts[start:end], metadatas[start:end]
-                )
-            keyed = ids
+        # Storing and pruning run under one lock: two overlapping replacements of
+        # one document would otherwise each delete the chunks the other stored.
+        with self._writing(document_scopes(keys)):
+            if not self.persist:
+                position = {chunk_id: index for index, chunk_id in enumerate(self._ids)}
+                for doc, embedding, chunk_id in zip(stored, embeddings, keyed):
+                    if chunk_id in position:
+                        self._documents[position[chunk_id]] = doc
+                        self._embeddings[position[chunk_id]] = embedding
+                    else:
+                        position[chunk_id] = len(self._ids)
+                        self._ids.append(chunk_id)
+                        self._documents.append(doc)
+                        self._embeddings.append(embedding)
+            else:
+                ids = [f"{self.collection_name}_{chunk_id}" for chunk_id in keyed]
+                texts = [doc.page_content for doc in stored]
+                metadatas = [_chroma_metadata(doc.metadata) for doc in stored]
+                # Chroma rejects a single call above its maximum batch size, so send
+                # slices. If one fails, the slices before it stay stored.
+                batch = _max_batch_size(self._client) or len(ids)
+                for start in range(0, len(ids), batch):
+                    end = start + batch
+                    self._replace_slice(
+                        ids[start:end],
+                        embeddings[start:end],
+                        texts[start:end],
+                        metadatas[start:end],
+                    )
+                keyed = ids
 
-        if replace:
-            kept = set(keyed)
-            for doc_id, owner in document_scopes(keys):
-                self._delete_ids([i for i in self._ids_in_scope(doc_id, owner) if i not in kept])
+            if replace:
+                kept = set(keyed)
+                for doc_id, owner in document_scopes(keys):
+                    self._delete_ids(
+                        [i for i in self._ids_in_scope(doc_id, owner) if i not in kept]
+                    )
+
+    @contextmanager
+    def _writing(self, scopes: list[tuple[str, str | None]]) -> Iterator[None]:
+        """Hold the lock that writes of these ``(document_id, owner)`` scopes share.
+
+        In memory that is the store's own lock, which every call takes. In Chroma it
+        is one lock per document and owner of this folder and collection, shared by
+        every store in the process, so writes of other documents run alongside.
+        """
+        if not self.persist:
+            with self._lock:
+                yield
+            return
+        where = (os.path.normcase(os.path.realpath(self.persist_path)), self.collection_name)
+        with _CHROMA_WRITES.hold((*where, doc_id, owner) for doc_id, owner in scopes):
+            yield
 
     def _replace_slice(self, ids, embeddings, texts, metadatas) -> None:
         """Store one slice in Chroma in place of the chunks stored with the same ids.
@@ -251,8 +339,9 @@ class VectorStore:
             The number of chunks deleted.
         """
         doc_id, owner = delete_scope(self, document_id, owner)
-        ids = self._ids_in_scope(doc_id, owner)
-        self._delete_ids(ids)
+        with self._writing([(doc_id, owner)]):
+            ids = self._ids_in_scope(doc_id, owner)
+            self._delete_ids(ids)
         return len(ids)
 
     def _ids_in_scope(self, document_id: str, owner: str | None) -> list[str]:
@@ -302,9 +391,10 @@ class VectorStore:
     def count(self) -> int:
         """Return the number of documents in the vector store (this owner's, with one)."""
         if not self.persist:
-            if self.owner is None:
-                return len(self._documents)
-            return sum(1 for d in self._documents if d.metadata.get(OWNER_KEY) == self.owner)
+            with self._lock:
+                if self.owner is None:
+                    return len(self._documents)
+                return sum(1 for d in self._documents if d.metadata.get(OWNER_KEY) == self.owner)
 
         if self._collection is None:
             return 0
@@ -321,9 +411,11 @@ class VectorStore:
         filters: dict | None = None,
     ) -> list[tuple[Document, float]]:
         if not self.persist:
+            # A copy of the lists as one write left them; a write may rebuild them.
+            with self._lock:
+                snapshot = list(zip(self._documents, self._embeddings))
             scored = []
-            for idx, embedding in enumerate(self._embeddings):
-                doc = self._documents[idx]
+            for doc, embedding in snapshot:
                 if self.owner is not None and doc.metadata.get(OWNER_KEY) != self.owner:
                     continue
                 if filters and not _match_filters(doc.metadata, filters):

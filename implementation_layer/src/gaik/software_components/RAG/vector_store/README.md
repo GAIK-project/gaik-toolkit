@@ -103,6 +103,10 @@ and document ids are compared exactly (an int as its string). The owner is the s
   embedding of another dimension, say) has its earlier versions put back as they were.
   Chroma takes the chunks in slices of at most its maximum batch size; slices stored
   before a failure keep their new version.
+- Threads can share a store. Writes of one document and owner wait for each other,
+  so two overlapping replacements leave one version: in memory every call waits,
+  and in Chroma the writes of every store in the process on the same folder and
+  collection. Other processes writing to the same Chroma folder are not covered.
 - `delete_document(document_id, owner=...)` deletes one document's chunks and returns
   how many.
 - Two owners who index a document under the same id keep separate chunks.
