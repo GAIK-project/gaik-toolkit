@@ -26,6 +26,7 @@ from wizard_api.ownership import USER_HEADER
 from wizard_api.services import (
     agent_service,
     artifact_sync,
+    blueprint_edit_service,
     blueprint_ops,
     blueprint_service,
     session_service,
@@ -175,6 +176,9 @@ def test_a_stored_draft_that_no_longer_validates_answers_409_cannot_undo(
     )
     db_session.commit()
     _rename(client, sid, "Read the invoice")
+    # The edit kept the file's draft in a version of its own: that is the first
+    # step back. The one before it is the stored draft that cannot be restored.
+    assert _undo(client, sid, _active(client, sid)).status_code == 200
     before = _read_bytes(created["output_dir"])
     versions = len(_versions(db_session, sid))
     active = _active(client, sid)
@@ -330,4 +334,96 @@ def test_undo_passes_over_a_version_that_shows_the_same(client, db_session, not_
 
     assert _undo(client, sid, _active(client, sid)).status_code == 200
 
+    assert _on_disk(created["output_dir"]) == original
+
+
+def _agent_changes_a_hidden_field(client, db_session, created: dict) -> dict:
+    """The agent edits what the reduced view does not show: its file differs from
+    the active version's draft, and the sync adds no version for it."""
+    agent_file = _on_disk(created["output_dir"])
+    agent_file["business_spec"]["current_process"] = "by hand, written by the agent"
+    _write_file(created["output_dir"], agent_file)
+    session = _session(db_session, created["id"])
+    assert artifact_sync.sync_blueprint_from_draft(db_session, session) is False
+    return agent_file
+
+
+@requires_postgres
+def test_an_edit_keeps_the_agents_unsaved_work_in_a_version(client, db_session, not_busy) -> None:
+    created = _create(client)
+    sid = created["id"]
+    _rename(client, sid, "First name")
+    agent_file = _agent_changes_a_hidden_field(client, db_session, created)
+    active = _active(client, sid)
+
+    edited = _rename(client, sid, "Second name")
+
+    by_number = {v.version: v for v in _versions(db_session, sid)}
+    kept = by_number[active + 1]
+    assert kept.note == "Agent changes kept"
+    assert kept.draft == agent_file
+    assert by_number[active + 2].note != "Agent changes kept"
+    assert edited["active_version"] == active + 2
+    # The undo of the edit gives the agent's work back, not the version before it.
+    assert _undo(client, sid, edited["active_version"]).status_code == 200
+    assert _on_disk(created["output_dir"]) == agent_file
+
+
+@requires_postgres
+def test_an_edit_adds_no_extra_version_when_the_file_is_the_active_draft(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client)
+    sid = created["id"]
+    _rename(client, sid, "First name")
+    count = len(_versions(db_session, sid))
+
+    _rename(client, sid, "Second name")
+
+    assert len(_versions(db_session, sid)) == count + 1
+    assert all(v.note != "Agent changes kept" for v in _versions(db_session, sid))
+
+
+@requires_postgres
+def test_a_failed_edit_leaves_no_version_for_the_agents_work(
+    client, db_session, not_busy, monkeypatch
+) -> None:
+    created = _create(client)
+    sid = created["id"]
+    _rename(client, sid, "First name")
+    agent_file = _agent_changes_a_hidden_field(client, db_session, created)
+    count = len(_versions(db_session, sid))
+    active = _active(client, sid)
+    before = _read_bytes(created["output_dir"])
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("the write failed")
+
+    monkeypatch.setattr(blueprint_edit_service.draft_store, "write_draft", fail)
+    with pytest.raises(RuntimeError):
+        _rename(client, sid, "Second name")
+
+    assert len(_versions(db_session, sid)) == count
+    assert _session(db_session, sid).active_version == active
+    assert _read_bytes(created["output_dir"]) == before
+    assert _on_disk(created["output_dir"]) == agent_file
+
+
+@requires_postgres
+def test_undo_after_kept_agent_work_still_walks_back_one_step_at_a_time(
+    client, db_session, not_busy
+) -> None:
+    created = _create(client)
+    sid = created["id"]
+    original = _on_disk(created["output_dir"])
+    _rename(client, sid, "First name")
+    after_first = _on_disk(created["output_dir"])
+    agent_file = _agent_changes_a_hidden_field(client, db_session, created)
+    edited = _rename(client, sid, "Second name")
+
+    assert _undo(client, sid, edited["active_version"]).status_code == 200
+    assert _on_disk(created["output_dir"]) == agent_file
+    assert _undo(client, sid, _active(client, sid)).status_code == 200
+    assert _on_disk(created["output_dir"]) == after_first
+    assert _undo(client, sid, _active(client, sid)).status_code == 200
     assert _on_disk(created["output_dir"]) == original

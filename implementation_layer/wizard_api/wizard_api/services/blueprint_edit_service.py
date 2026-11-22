@@ -230,6 +230,37 @@ def apply_edit(
 UNDO_NOTE = "Undo"
 #: The note of the version an undo keeps the agent's unsaved file in.
 BEFORE_UNDO_NOTE = "Before undo"
+#: The note of the version an edit keeps the agent's unsaved file in.
+AGENT_CHANGES_NOTE = "Agent changes kept"
+
+
+def _keep_unsaved_draft(
+    db: Session, session, draft: dict[str, Any], marked: frozenset[str], *, note: str
+) -> bool:
+    """Keep the agent's file as a version of its own when no version holds it; True when added.
+
+    The agent can change its file in a field the reduced view has no place for
+    (``parameters``, ``data_handling``): the chat sync then adds no version, so
+    the active version's draft is an older one. A write that replaces the file
+    would lose that work, and an undo would go back past it. Runs inside the
+    write's transaction, so a write that fails leaves no version behind. A
+    version without a draft (saved before migration 004) is not this case: the
+    backfill gives it the file's draft.
+    """
+    active = blueprint_service.get_active_version(db, session)
+    if active is None or active.draft is None or active.draft == draft:
+        return False
+    mapped = artifact_sync.blueprint_from_draft(draft, marked)
+    blueprint_service.add_version(
+        db,
+        session,
+        note=note,
+        content=mapped.model_dump() if mapped is not None else None,
+        draft=draft,
+    )
+    # So the write's own version is numbered after it.
+    db.flush()
+    return True
 
 
 def nothing_to_undo() -> HTTPException:
@@ -287,22 +318,9 @@ def undo(db: Session, session, *, base_version: int) -> None:
             draft_store.validate_draft(restored)
         except ValidationError as exc:
             raise cannot_undo() from exc
-        if active is not None and active.draft is not None and active.draft != draft:
-            # The agent has changed its file since the active version without
-            # changing what the blueprint shows (a field the reduced view has
-            # no place for), so no version holds that work: keep it in one
-            # before the file is written over. Newer than the version restored,
-            # it is no step the walk goes back to.
-            mapped = artifact_sync.blueprint_from_draft(draft, marked)
-            blueprint_service.add_version(
-                db,
-                session,
-                note=BEFORE_UNDO_NOTE,
-                content=mapped.model_dump() if mapped is not None else None,
-                draft=draft,
-            )
-            # So the undo's own version is numbered after it.
-            db.flush()
+        # Newer than the version restored, the kept version is no step the walk
+        # goes back to.
+        _keep_unsaved_draft(db, session, draft, marked, note=BEFORE_UNDO_NOTE)
         return _Write(
             blueprint=restored,
             summaries=[
@@ -413,6 +431,14 @@ def _apply(db: Session, session, base_version: int | None, change: _Change) -> _
         # A version saved before migration 004 has no copy of the draft: keep
         # the one this write is about to replace, so it can be gone back to.
         blueprint_service.backfill_active_draft(db, session, draft)
+        # The agent's work that no version holds (an undo has kept it already).
+        _keep_unsaved_draft(
+            db,
+            session,
+            draft,
+            artifact_sync.still_without_component(draft, artifact_sync.ai_steps(metadata)),
+            note=AGENT_CHANGES_NOTE,
+        )
         taken = draft_store.snapshot(output_dir)
         try:
             draft_store.write_draft(output_dir, written.blueprint)

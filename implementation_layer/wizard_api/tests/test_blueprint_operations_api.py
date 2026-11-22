@@ -345,8 +345,11 @@ def test_a_session_with_a_stored_draft_is_not_backfilled(client, db_session, not
     assert _post(client, sid, base, RENAME).status_code == 200
 
     by_number = {v.version: v for v in _versions(db_session, sid)}
+    # The stored draft is left as it is. The file differed from it, so the file's
+    # draft is kept in a version of its own before the edit's version.
     assert by_number[base].draft == stored
-    assert by_number[base + 1].draft["workflow"]["steps"][1]["name"] == "Read the invoice"
+    assert by_number[base + 1].note == "Agent changes kept"
+    assert by_number[base + 2].draft["workflow"]["steps"][1]["name"] == "Read the invoice"
 
 
 @requires_postgres
