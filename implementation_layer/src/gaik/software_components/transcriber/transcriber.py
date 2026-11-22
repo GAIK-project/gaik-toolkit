@@ -816,7 +816,7 @@ def split_and_transcribe(
 ):
     """Backward-compatible wrapper without explicit context parameter.
 
-    Since the gaik release after 0.11.0 a chunk that fails raises ``RuntimeError``;
+    Since gaik 0.12.0 a chunk that fails raises ``RuntimeError``;
     ``allow_partial=True`` keeps the earlier marked result.
     """
     return split_and_transcribe_with_context(

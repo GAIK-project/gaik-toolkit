@@ -89,7 +89,7 @@ set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 echo The transcriber gets its own virtual environment:
 echo   %VENV_DIR%
 echo Your own Python installation is not changed.
-echo Installing into it: mcp==1.30.0, gaik[transcriber]==0.11.1, python-dotenv==1.2.4
+echo Installing into it: mcp==1.30.0, gaik[transcriber]==0.12.0, python-dotenv==1.2.4
 echo This may take a few minutes...
 echo.
 
@@ -100,11 +100,11 @@ if not exist "%VENV_PYTHON%" (
     exit /b 1
 )
 
-"%VENV_PYTHON%" -m pip install mcp==1.30.0 "gaik[transcriber]==0.11.1" python-dotenv==1.2.4 --quiet
+"%VENV_PYTHON%" -m pip install mcp==1.30.0 "gaik[transcriber]==0.12.0" python-dotenv==1.2.4 --quiet
 
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
-    echo Please try running: "!VENV_PYTHON!" -m pip install mcp==1.30.0 "gaik[transcriber]==0.11.1" python-dotenv==1.2.4
+    echo Please try running: "!VENV_PYTHON!" -m pip install mcp==1.30.0 "gaik[transcriber]==0.12.0" python-dotenv==1.2.4
     pause
     exit /b 1
 )

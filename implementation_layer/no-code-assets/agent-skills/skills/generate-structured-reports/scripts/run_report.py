@@ -249,7 +249,7 @@ def install_provider_extra(provider: str, module: str, extra: str) -> None:
 def load_env_file() -> None:
     """Load the ``.env`` file the way gaik does, before this script reads the environment.
 
-    A gaik newer than 0.11.0 reads ``.env`` on its first configuration call, not on
+    gaik 0.12.0 and later read ``.env`` on its first configuration call, not on
     import, so ``LLM_PROVIDER`` read here would miss it; an older gaik loaded it on
     import already.
     """
@@ -419,7 +419,7 @@ def section_problems(spec) -> tuple[list[str], list[str]]:
 def _resolved(conflict, section) -> dict:
     """A resolved conflict and what the writer does with it.
 
-    With `source_precedence` (gaik after 0.11.1) the code picks the side from the source each
+    With `source_precedence` (gaik 0.12.0 or later) the code picks the side from the source each
     unit cites and names it in `preferred_unit_ids`: the entry lists the side the report follows
     and the side it drops, and the person checks the quotes of both. An older gaik has no
     `preferred_unit_ids`: its curator model resolved the conflict from the report instructions,
