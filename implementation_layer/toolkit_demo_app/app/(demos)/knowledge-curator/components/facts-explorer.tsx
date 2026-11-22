@@ -481,16 +481,19 @@ export function FactsExplorer({
                           className="bg-muted inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs"
                           title={fact?.quote}
                         >
-                          {followed && (
-                            <>
-                              <Check className="size-3" aria-hidden />
-                              <span className="sr-only">Followed:</span>
-                            </>
-                          )}
+                          {followed && <Check className="size-3" aria-hidden />}
                           <span className="font-mono">{id}</span>
                           {fact && (
                             <span className="text-muted-foreground">
                               · {fact.source.file}
+                            </span>
+                          )}
+                          {followed && (
+                            <span
+                              className="font-medium"
+                              title="The report follows this fact"
+                            >
+                              · followed
                             </span>
                           )}
                         </span>

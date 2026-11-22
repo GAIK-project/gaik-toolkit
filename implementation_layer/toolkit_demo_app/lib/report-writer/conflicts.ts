@@ -52,13 +52,21 @@ export function stillChosen(
 }
 
 /**
- * The facts a resolved conflict follows: its `preferred_unit_ids` that are its own units.
- * Empty for an unresolved conflict, and for a file from a gaik that names no sides.
+ * The facts a resolved conflict follows: its `preferred_unit_ids`. Empty for an
+ * unresolved conflict, for a file from a gaik that names no sides, and where gaik reads
+ * the side as none chosen (`Conflict._side_named`): it names a fact that is not one of
+ * the conflict's, or every one of them. gaik then reads the conflict as unresolved.
  */
 export function followedIds(conflict: KnowledgeConflict): string[] {
   if (conflict.status !== "resolved") return [];
   const ids = conflict.unit_ids ?? [];
-  return (conflict.preferred_unit_ids ?? []).filter((id) => ids.includes(id));
+  const preferred = conflict.preferred_unit_ids ?? [];
+  if (
+    preferred.some((id) => !ids.includes(id)) ||
+    ids.every((id) => preferred.includes(id))
+  )
+    return [];
+  return [...preferred];
 }
 
 /**

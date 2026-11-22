@@ -128,6 +128,20 @@ describe("followedIds and resolvedByText", () => {
       [],
     );
   });
+
+  test("follow nothing where gaik reads no side chosen: a fact outside the conflict, or every fact", () => {
+    // gaik's Conflict._side_named reads both as unresolved.
+    const outside = resolved({ preferred_unit_ids: ["roof-01", "ghost"] });
+    expect(followedIds(outside)).toEqual([]);
+    expect(resolvedByText(outside)).toBeNull();
+    const every = resolved({
+      unit_ids: ["roof-01", "roof-02"],
+      preferred_unit_ids: ["roof-01", "roof-02"],
+    });
+    expect(followedIds(every)).toEqual([]);
+    expect(resolvedByText(every)).toBeNull();
+    expect(followedIds(resolved({ unit_ids: [] }))).toEqual([]);
+  });
 });
 
 describe("an open Settle it card", () => {
