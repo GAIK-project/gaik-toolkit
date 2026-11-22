@@ -99,9 +99,11 @@ def introspect_schema(
     # schema are kept: the agent cannot query another schema, and "customers.id"
     # would read as the table of that name in this one. A key into a partitioned
     # table is stored once against the table and once more against each of its
-    # partitions; only the first names the table a query joins, so a key whose
-    # target is a partition is left out. Keys copied onto the partitions of a
-    # referencing table point at the table itself and stay.
+    # partitions; only the first names the table a query joins, so a key into a
+    # partition is left out when the same columns also reference the table the
+    # partition belongs to. A key declared against one partition stays, and so do
+    # keys copied onto the partitions of a referencing table, which point at the
+    # table itself.
     fk_rows = conn.execute(
         """
         SELECT
@@ -116,7 +118,17 @@ def introspect_schema(
         CROSS JOIN LATERAL unnest(con.conkey, con.confkey) AS k(attnum, fattnum)
         JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
         JOIN pg_catalog.pg_attribute fa ON fa.attrelid = con.confrelid AND fa.attnum = k.fattnum
-        WHERE n.nspname = %s AND con.contype = 'f' AND NOT fc.relispartition
+        WHERE n.nspname = %s AND con.contype = 'f'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_inherits i
+            JOIN pg_catalog.pg_constraint parent
+              ON parent.confrelid = i.inhparent
+             AND parent.conrelid = con.conrelid
+             AND parent.conkey = con.conkey
+             AND parent.contype = 'f'
+            WHERE i.inhrelid = con.confrelid
+          )
         ORDER BY c.relname, con.conname
         """,
         (schema_name,),

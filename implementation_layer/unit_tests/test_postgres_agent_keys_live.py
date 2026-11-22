@@ -92,9 +92,19 @@ def partitioned_url():
             f"CREATE TABLE {schema}.customers_eu PARTITION OF {schema}.customers "
             "FOR VALUES IN ('eu')"
         )
+        # A partition that is partitioned again.
         conn.execute(
             f"CREATE TABLE {schema}.customers_us PARTITION OF {schema}.customers "
-            "FOR VALUES IN ('us')"
+            "FOR VALUES IN ('us') PARTITION BY RANGE (id)"
+        )
+        conn.execute(
+            f"CREATE TABLE {schema}.customers_us_low PARTITION OF {schema}.customers_us "
+            "FOR VALUES FROM (0) TO (1000)"
+        )
+        # A key declared against one partition.
+        conn.execute(
+            f"CREATE TABLE {schema}.eu_notes (customer_id int, region text, "
+            f"FOREIGN KEY (customer_id, region) REFERENCES {schema}.customers_eu (id, region))"
         )
         # A plain table and a partitioned one, both referencing the partitioned table.
         conn.execute(
@@ -130,6 +140,8 @@ def test_a_key_into_a_partitioned_table_names_the_table_not_a_partition(partitio
             "customers",
             "customers_eu",
             "customers_us",
+            "customers_us_low",
+            "eu_notes",
             "invoices",
             "orders",
             "orders_early",
@@ -141,3 +153,6 @@ def test_a_key_into_a_partitioned_table_names_the_table_not_a_partition(partitio
         assert tables[table]["region"].references == "customers.region"
     # The key PostgreSQL copies onto a partition of the referencing table is kept.
     assert tables["orders_early"]["customer_id"].references == "customers.id"
+    # A key declared against one partition names that partition.
+    assert tables["eu_notes"]["customer_id"].references == "customers_eu.id"
+    assert tables["eu_notes"]["region"].references == "customers_eu.region"
