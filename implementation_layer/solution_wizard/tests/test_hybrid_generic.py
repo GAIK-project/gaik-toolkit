@@ -486,3 +486,35 @@ def test_generic_imports_exist_in_gaik():
         except ImportError:
             pytest.skip(f"{module} needs an extra that is not installed")
         assert hasattr(mod, name), line
+
+
+def test_a_class_that_uses_a_class_of_its_module_keeps_its_own_import():
+    """LLMJudgePanel lists LLMJudge, from the same module, and is a class itself."""
+    from solution_wizard.registry import get_registry
+    from solution_wizard.scaffolder import _component_import_lines
+
+    lines = _component_import_lines(get_registry().lookup_by_name("LLMJudgePanel"))
+    assert "from gaik.software_components.validators.llm_judge import LLMJudgePanel" in lines
+
+
+def test_every_registry_entry_imports_only_what_gaik_exports():
+    """A step of any component gets imports that load, not only the hybrid blueprint's."""
+    import importlib
+
+    from solution_wizard.registry import get_registry
+    from solution_wizard.scaffolder import _component_import_lines
+
+    checked = 0
+    for entry in get_registry().all():
+        if not entry.get("import_path"):
+            continue
+        for line in _component_import_lines(entry):
+            module, name = line.removeprefix("from ").split(" import ")
+            try:
+                mod = importlib.import_module(module)
+            except ImportError:
+                continue
+            assert hasattr(mod, name), f"{entry['name']}: {line}"
+            checked += 1
+    if not checked:
+        pytest.skip("no gaik module could be imported")

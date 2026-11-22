@@ -1056,22 +1056,30 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
     )
 
 
-def _component_import_lines(registry, entry: dict) -> list[str]:
-    """The import lines for a registry entry's classes.
+#: A reference card's verified import line: ``from <module> import A, B``.
+_CARD_IMPORT_RE = re.compile(r"from (?P<module>[A-Za-z_][\w.]*) import (?P<names>[\w ,]+)")
 
-    Most entries are named after their class. A family entry such as
-    ``Extractor`` is not a class: its module exports the classes it lists in
-    ``uses_components`` (``SchemaGenerator``, ``DataExtractor``), and importing
-    the family name fails at the run's first line. Those classes are imported
-    instead, the ones the same module exports.
+
+def _component_import_lines(entry: dict) -> list[str]:
+    """The import lines for a registry entry's classes, one name per line.
+
+    They come from the entry's reference card, whose import line the _generic
+    skeleton also shows. Most entries are named after their class, but a family
+    entry such as ``Extractor`` is not one: its card imports ``SchemaGenerator``
+    and ``DataExtractor``, and importing the family name would stop the run at
+    its first line. A class that uses another class of its module, such as
+    ``LLMJudgePanel`` with ``LLMJudge``, keeps its own import. Without a card
+    the entry's own name is imported, as before.
     """
-    import_path = entry["import_path"]
-    members = [
-        name
-        for name in entry.get("uses_components") or []
-        if (registry.lookup_by_name(name) or {}).get("import_path") == import_path
-    ]
-    return [f"from {import_path} import {name}" for name in (members or [entry["name"]])]
+    from .registry import get_reference_cards
+
+    card = get_reference_cards().get(entry["name"]) or {}
+    match = _CARD_IMPORT_RE.fullmatch(str(card.get("import", "")).strip())
+    if match:
+        names = [name.strip() for name in match["names"].split(",") if name.strip()]
+        if names:
+            return [f"from {match['module']} import {name}" for name in names]
+    return [f"from {entry['import_path']} import {entry['name']}"]
 
 
 def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
@@ -1123,7 +1131,7 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         if step.component and step.component not in ("custom", "human_review"):
             entry = registry.lookup_by_name(step.component) or registry.lookup_by_id(step.component)
             if entry and entry.get("import_path"):
-                for line in _component_import_lines(registry, entry):
+                for line in _component_import_lines(entry):
                     if line not in import_lines:
                         import_lines.append(line)
 
