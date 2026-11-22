@@ -1325,15 +1325,22 @@ def _init_scored_df(
         )
         return scored
     prior = resume_from.drop_duplicates(question_col, keep="last").set_index(question_col)
-    kept = [column for column in columns if column in prior.columns]
     for idx, question in df[question_col].items():
         key = next((k for k in (question, _csv_cell(question)) if k in prior.index), None)
         if key is None:
             continue
-        for column in kept:
-            value = prior.at[key, column]
-            if pd.notna(value):
-                scored.at[idx, column] = value
+        for col in candidate_cols:
+            fields = [f"{col}_{field_name}" for field_name in score_fields]
+            if not all(field in prior.columns for field in fields):
+                continue
+            values = [prior.at[key, field] for field in fields]
+            if not all(pd.notna(value) for value in values):
+                continue  # a row with some scores missing is judged again, whole
+            for field, value in zip(fields, values):
+                scored.at[idx, field] = value
+            reason = f"{col}_reason"
+            if reason in prior.columns and pd.notna(prior.at[key, reason]):
+                scored.at[idx, reason] = prior.at[key, reason]
     return scored
 
 

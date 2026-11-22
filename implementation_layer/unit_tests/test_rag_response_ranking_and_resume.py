@@ -77,6 +77,20 @@ def test_resume_matches_rows_by_question_not_position(tmp_path) -> None:
     assert resumed.scored_df["x_response_coverage_score"].astype(int).tolist() == [3, 1, 0]
 
 
+def test_a_saved_row_with_a_score_missing_is_judged_again(tmp_path) -> None:
+    client = _Scores()
+    evaluator = RAGResponseEvaluator(client, max_concurrency=1)
+    evaluator.save(evaluator.evaluate(_questions([1, 2])), tmp_path, write_plots=False)
+    saved = pd.read_csv(tmp_path / "rag_eval_scored.csv")
+    saved.loc[1, "x_response_overall_score"] = None  # a cell lost, say in a spreadsheet
+
+    resumed = evaluator.evaluate(_questions([1, 2]), resume_from=saved)
+
+    assert client.calls == 3  # only the incomplete row again
+    assert resumed.scored_df["x_response_overall_score"].astype(int).tolist() == [1, 2]
+    assert resumed.per_system[0].n == 2
+
+
 def test_concurrent_scoring_runs_inside_a_running_event_loop() -> None:
     client = _Scores()
     evaluator = RAGResponseEvaluator(client, max_concurrency=3)
