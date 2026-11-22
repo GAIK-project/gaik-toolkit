@@ -162,8 +162,9 @@ agree, make it in the normalized text and keep a note of it
 (`references/review-and-resume.md`). What no other source settles stays as transcribed.
 
 **Input limits.** Since gaik 0.11.0 the normalizer refuses a file over its input limits with
-`InputLimitError`: the stage fails (exit 5, `normalize-failed`) and the message names the file
-and the limit. The helper keeps gaik's defaults and cannot raise them: a document, spreadsheet,
+`InputLimitError`. Preflight checks the same limits first, so `normalize` usually stops there
+(exit 2, `preflight`); a limit preflight cannot check fails the stage (exit 5,
+`normalize-failed`). Either message names the file and the limit. The helper keeps gaik's defaults and cannot raise them: a document, spreadsheet,
 text or image file up to 100 MiB (a DOCX or XLSX may unpack to ten times that), an image up to
 89,478,485 pixels, a recording up to 6 hours, and up to 1,000,000 data rows per sheet or CSV
 file. A PDF's page count is not limited. Preflight reports every limit but the rows, at no

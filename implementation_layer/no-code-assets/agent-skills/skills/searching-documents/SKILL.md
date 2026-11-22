@@ -284,8 +284,8 @@ around one.
   index scan returns at most `hnsw.ef_search` rows. At the default a `search_semantic()`
   with `top_k` above 40 returns 40 rows, and a hybrid search with `top_k` above 13 gets
   fewer vector candidates than it asked for, because its vector arm reads `3 * top_k`.
-  Set it to at least the largest number of rows a vector search asks for
-  (`hnsw_ef_search=` or `hnsw_iterative_scan="relaxed_order"`). Raising it to 100 also
+  Set `hnsw_ef_search=` to at least the largest number of rows a vector search asks for,
+  or, on pgvector 0.8+, let the scan go on past it with `hnsw_iterative_scan="relaxed_order"`. Raising it to 100 also
   measured recall@20 against an exact scan at 96.2% → 99.2% for +0.7 ms on one
   1,500-dimension corpus.
 - A filtered vector query returns fewer rows than asked unless iterative scans are on
