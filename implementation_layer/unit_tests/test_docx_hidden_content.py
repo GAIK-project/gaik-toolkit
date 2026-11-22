@@ -19,17 +19,23 @@ from gaik.software_components.parsers.docx_parser import DocxParser  # noqa: E40
 W = nsdecls("w")
 
 
-def _run(text: str) -> str:
-    return f'<w:r><w:t xml:space="preserve">{text}</w:t></w:r>'
+def _run(text: str, style: str | None = None) -> str:
+    properties = f"<w:rPr><w:rStyle w:val='{style}'/></w:rPr>" if style else ""
+    return f'<w:r>{properties}<w:t xml:space="preserve">{text}</w:t></w:r>'
 
 
 def _paragraph(*inner: str) -> str:
     return f"<w:p {W}>{''.join(inner)}</w:p>"
 
 
-def _sdt(content: str, *, placeholder: bool = False, ns: bool = False) -> str:
-    properties = "<w:sdtPr><w:alias w:val='Field'/>"
-    properties += "<w:showingPlcHdr/></w:sdtPr>" if placeholder else "</w:sdtPr>"
+def _sdt(content: str, *, placeholder: str | bool = False, ns: bool = False) -> str:
+    """A content control; ``placeholder`` sets w:showingPlcHdr, a string as its w:val."""
+    flag = ""
+    if placeholder is True:
+        flag = "<w:showingPlcHdr/>"
+    elif placeholder:
+        flag = f"<w:showingPlcHdr w:val='{placeholder}'/>"
+    properties = f"<w:sdtPr><w:alias w:val='Field'/>{flag}</w:sdtPr>"
     return f"<w:sdt {W if ns else ''}>{properties}<w:sdtContent>{content}</w:sdtContent></w:sdt>"
 
 
@@ -60,7 +66,11 @@ def _form(path):
             "<w:fldSimple w:instr=' MERGEFIELD Ref '>" + _run("PO-7") + "</w:fldSimple>",
         ),
         # A content control showing its placeholder is an empty field.
-        _sdt(_paragraph(_run("Click or tap here to enter text.")), placeholder=True, ns=True),
+        _sdt(
+            _paragraph(_run("Click or tap here to enter text.", "PlaceholderText")),
+            placeholder=True,
+            ns=True,
+        ),
         # Content controls nested in one another.
         _sdt(_sdt(_paragraph(_run("Nested value")), ns=True), ns=True),
     ]
@@ -135,3 +145,80 @@ def test_keep_structure_puts_a_content_control_row_in_its_table(tmp_path):
     assert "| Item | Qty |\n| --- | --- |\n| Widget | 12 |" in text
     assert text.startswith("# Order form\n\nIntro\n\nCustomer: Acme Oy")
     assert text.endswith("| Widget | 12 |\n\nOutro")
+
+
+def _parse_body(tmp_path, *elements, keep_structure=True, styles=()):
+    document = Document()
+    for style_id in styles:
+        from docx.enum.style import WD_STYLE_TYPE
+        from docx.oxml.ns import qn
+
+        style = document.styles.add_style("Placeholder Text", WD_STYLE_TYPE.CHARACTER)
+        style.element.set(qn("w:styleId"), style_id)
+    anchor = document.add_paragraph("Intro")._p
+    for xml in elements:
+        element = parse_xml(xml)
+        anchor.addnext(element)
+        anchor = element
+    path = tmp_path / "form.docx"
+    document.save(path)
+    return DocxParser().parse_docx(str(path), keep_structure=keep_structure)
+
+
+@pytest.mark.parametrize("value", ["0", "false", "off", "False"])
+def test_a_placeholder_flag_switched_off_keeps_the_filled_value(tmp_path, value):
+    text = _parse_body(
+        tmp_path,
+        _sdt(_paragraph(_run("Filled value", "PlaceholderText")), placeholder=value, ns=True),
+    )
+
+    assert text == "Intro\n\nFilled value"
+
+
+@pytest.mark.parametrize("value", [True, "1", "true", "on"])
+def test_a_placeholder_flag_drops_only_placeholder_styled_text(tmp_path, value):
+    # A generator can fill a control and leave the flag on: unstyled text is a value.
+    text = _parse_body(
+        tmp_path,
+        _sdt(
+            _paragraph(_run("Click here", "PlaceholderText"), _run("Filled by a tool")),
+            placeholder=value,
+            ns=True,
+        ),
+    )
+
+    assert text == "Intro\n\nFilled by a tool"
+
+
+def test_a_localized_placeholder_style_id_is_found_by_its_name(tmp_path):
+    text = _parse_body(
+        tmp_path,
+        _sdt(_paragraph(_run("Klicken Sie hier", "Platzhaltertext")), placeholder=True, ns=True),
+        styles=["Platzhaltertext"],
+    )
+
+    assert text == "Intro"
+
+
+def test_a_placeholder_cell_keeps_its_column(tmp_path):
+    row = (
+        f"<w:tr {W}>"
+        + _sdt(
+            "<w:tc><w:p>" + _run("Click here", "PlaceholderText") + "</w:p></w:tc>",
+            placeholder=True,
+        )
+        + "<w:tc><w:p>"
+        + _run("Col2Val")
+        + "</w:p></w:tc></w:tr>"
+    )
+    document = Document()
+    table = document.add_table(rows=1, cols=2)
+    table.rows[0].cells[0].text = "Col1"
+    table.rows[0].cells[1].text = "Col2"
+    table._tbl.append(parse_xml(row))
+    path = tmp_path / "table.docx"
+    document.save(path)
+
+    text = DocxParser().parse_docx(str(path), keep_structure=True)
+
+    assert text == "| Col1 | Col2 |\n| --- | --- |\n|  | Col2Val |"

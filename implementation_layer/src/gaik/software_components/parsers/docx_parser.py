@@ -35,21 +35,54 @@ _WRAPPERS = ("w:sdt", "w:ins", "w:moveTo", "w:customXml", "w:smartTag", "w:fldSi
 _WRAPPER_PROPERTIES = ("w:sdtPr", "w:sdtEndPr", "w:customXmlPr", "w:smartTagPr", "w:fldData")
 
 
-def _unwrap_content(body) -> None:
+# Values of an OOXML on/off property that switch it off (CT_OnOff).
+_OFF = frozenset({"0", "false", "off"})
+
+
+def _placeholder_styles(doc) -> set[str]:
+    """The ids of the character style Word puts on placeholder text.
+
+    Its name is "Placeholder Text" in every language; its id can be localized.
+    """
+    ids = {"PlaceholderText"}
+    try:
+        ids |= {
+            style.style_id
+            for style in doc.styles
+            if (style.name or "").lower() == "placeholder text" and style.style_id
+        }
+    except (AttributeError, KeyError, ValueError):
+        pass
+    return ids
+
+
+def _shows_placeholder(sdt) -> bool:
+    flag = sdt.find(f"{qn('w:sdtPr')}/{qn('w:showingPlcHdr')}")
+    return flag is not None and (flag.get(qn("w:val")) or "1").lower() not in _OFF
+
+
+def _unwrap_content(body, placeholder_styles: set[str]) -> None:
     """Put the content of each wrapper element (see ``_WRAPPERS``) in its place.
 
-    A content control showing its placeholder text ("Click here to enter text") is
-    empty, so it is dropped.
+    A content control showing its placeholder ("Click here to enter text") holds no
+    value: its runs in the placeholder text style are dropped, and its paragraphs,
+    rows and cells stay, so the table columns do not shift. Text in another style
+    stays, as a generator can fill a control and leave its placeholder flag on.
     """
     properties = {qn(tag) for tag in _WRAPPER_PROPERTIES}
+    style = f"{qn('w:rPr')}/{qn('w:rStyle')}"
     for element in body.xpath(" | ".join(f".//{tag}" for tag in _WRAPPERS)):
         parent = element.getparent()
         if parent is None:
             continue
         if element.tag == qn("w:sdt"):
             content = element.find(qn("w:sdtContent"))
-            placeholder = element.find(f"{qn('w:sdtPr')}/{qn('w:showingPlcHdr')}")
-            children = [] if content is None or placeholder is not None else list(content)
+            children = [] if content is None else list(content)
+            if content is not None and _shows_placeholder(element):
+                for run in list(content.iter(qn("w:r"))):
+                    run_style = run.find(style)
+                    if run_style is not None and run_style.get(qn("w:val")) in placeholder_styles:
+                        run.getparent().remove(run)
         else:
             children = [child for child in element if child.tag not in properties]
         index = parent.index(element)
@@ -63,7 +96,8 @@ class DocxParser:
     Features:
     - Fast local DOCX parsing without external APIs
     - Extract text from paragraphs and tables, including the text in content
-      controls and tracked insertions (not tracked deletions), in document order
+      controls and tracked insertions (not tracked deletions); ``keep_structure``
+      keeps document order, the other modes give the paragraphs, then the tables
     - Simple text extraction or structured output with formatting info
     - Support for Word 2007+ documents (.docx); a Word 97-2003 ``.doc`` file is
       refused with the fix (save it as .docx)
@@ -143,7 +177,7 @@ class DocxParser:
 
         try:
             doc = Document(file_path)
-            _unwrap_content(doc.element.body)
+            _unwrap_content(doc.element.body, _placeholder_styles(doc))
 
             if keep_structure:
                 text_content = self._extract_markdown_docx(doc)
