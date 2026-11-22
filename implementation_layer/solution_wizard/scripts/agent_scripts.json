@@ -45,7 +45,9 @@
       "poc/output",
       "poc/prompts",
       "poc/sample_input",
-      "poc/schemas"
+      "poc/schemas",
+      "poc/ui",
+      "poc/ui/fonts"
     ],
     "validate_blueprint.py": []
   },
