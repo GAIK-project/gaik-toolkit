@@ -569,7 +569,8 @@ def _replacing(metadata: dict | None, stored: dict | None) -> dict | None:
     return {**removed, **new} or None
 
 
-_removes_none: bool | None = None  # what the probe found, once it found an answer
+_removes_none: bool | None = None  # the probe's answer, once it has one
+_probe_runs_left = 3  # probes that could not run are tried again this many times
 
 
 def _chroma_removes_none_values() -> bool:
@@ -577,15 +578,19 @@ def _chroma_removes_none_values() -> bool:
 
     Chroma 1.x does; 0.5 and 0.6 refuse the value. A client that accepts ``None``
     does not show what the store then does with it, so this is a real upsert into
-    a throwaway in-memory collection. A definite answer is kept for the process; a
-    probe that fails for another reason answers ``False`` (the delete-then-add
-    path) this time and is tried again on the next write.
+    a throwaway in-memory collection. Once it gives an answer, the answer is kept
+    for the process. A probe that could not run (no in-memory client) answers
+    ``False``, the delete-then-add path, and is tried again on a later write; after
+    three such runs ``False`` is kept.
     """
-    global _removes_none
+    global _removes_none, _probe_runs_left
     if _removes_none is None:
         found = _probe_none_removal()
         if found is None:
-            return False
+            _probe_runs_left -= 1
+            if _probe_runs_left > 0:
+                return False
+            found = False
         _removes_none = found
     return _removes_none
 
@@ -602,21 +607,29 @@ def _probe_none_removal() -> bool | None:
         return None
     try:
         collection.add(ids=["probe"], embeddings=[[1.0, 0.0]], metadatas=[{"kept": 1, "gone": 1}])
+    except Exception:  # noqa: BLE001 - the probe could not write at all
+        _drop_quietly(client, name)
+        return None
+    try:
         try:
             collection.upsert(
                 ids=["probe"], embeddings=[[1.0, 0.0]], metadatas=[{"kept": 1, "gone": None}]
             )
-        except ValueError:  # 0.5 and 0.6: "Expected metadata value to be a str, ..."
-            return False
+        except Exception:  # noqa: BLE001 - it took a write but not this one: it refuses
+            return False  # 0.5 and 0.6: "Expected metadata value to be a str, ..."
         [metadata] = collection.get(ids=["probe"], include=["metadatas"])["metadatas"]
         return metadata == {"kept": 1}
-    except Exception:  # noqa: BLE001 - the probe itself failed: ask again later
+    except Exception:  # noqa: BLE001 - the read back failed: ask again later
         return None
     finally:
-        try:
-            client.delete_collection(name)
-        except Exception:  # noqa: BLE001 - an in-memory collection goes with the process
-            pass
+        _drop_quietly(client, name)
+
+
+def _drop_quietly(client, name: str) -> None:
+    try:
+        client.delete_collection(name)
+    except Exception:  # noqa: BLE001 - an in-memory collection goes with the process
+        pass
 
 
 def _folder_key(path: str) -> str:
