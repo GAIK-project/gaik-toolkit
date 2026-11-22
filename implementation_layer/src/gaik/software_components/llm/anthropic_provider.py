@@ -8,12 +8,15 @@ validated back through Pydantic.
 from __future__ import annotations
 
 import base64
+import copy
+import logging
+import math
 import os
 from collections.abc import Iterator
 from typing import Any
 
 import anthropic
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from gaik.software_components.endpoints import ANTHROPIC_URL, foundry_host, host_of, log_endpoint
 from gaik.software_components.env_file import load_env_file
@@ -25,6 +28,8 @@ from gaik.software_components.llm.base import (
     UsageCounter,
 )
 from gaik.software_components.llm.content import image_data
+
+logger = logging.getLogger(__name__)
 
 # The `output_config.effort` levels each model accepts (Foundry deployments use
 # the same ids). A model or level not listed here is not sent the option.
@@ -103,6 +108,25 @@ _STRICT_UNSUPPORTED_KEYWORDS = frozenset(
     | {"minLength", "maxLength"}
 )
 
+# How a dropped bound is stated in the field's description instead.
+_BOUND_NOTES = {
+    "minLength": "At least {} characters.",
+    "maxLength": "At most {} characters.",
+    "minimum": "At least {}.",
+    "exclusiveMinimum": "Greater than {}.",
+    "maximum": "At most {}.",
+    "exclusiveMaximum": "Less than {}.",
+    "multipleOf": "A multiple of {}.",
+}
+
+
+_LITERAL_KEYWORDS = frozenset({"default", "const", "enum", "examples"})
+
+
+def _bound_note(keyword: str, value: int | float) -> str:
+    note = _BOUND_NOTES[keyword].format(value)
+    return note.replace(" 1 characters.", " 1 character.")
+
 
 def _strict_schema(node: Any) -> Any:
     """Copy a JSON schema into the shape strict tool use accepts.
@@ -110,7 +134,8 @@ def _strict_schema(node: Any) -> Any:
     Strict mode needs every object closed (`additionalProperties: false`) with
     all its properties required. Optional fields stay nullable through their
     `anyOf` with null, so Pydantic still validates the answer. Numeric and
-    string bounds are dropped; Pydantic checks them on the answer instead.
+    string bounds are dropped and stated in the field's description instead;
+    :func:`_within_dropped_bounds` fits an answer that still breaks one.
     """
     if isinstance(node, list):
         return [_strict_schema(item) for item in node]
@@ -121,13 +146,88 @@ def _strict_schema(node: Any) -> Any:
         if key in ("properties", "$defs") and isinstance(value, dict):
             # Field and model names, not keywords: keep a field called "maximum".
             copied[key] = {name: _strict_schema(sub) for name, sub in value.items()}
+        elif key in _LITERAL_KEYWORDS:
+            # Values, not schemas: a default such as {"maximum": 5} stays as it is.
+            copied[key] = value
         elif key not in _STRICT_UNSUPPORTED_KEYWORDS:
             copied[key] = _strict_schema(value)
+    notes = [
+        _bound_note(key, node[key])
+        for key in _BOUND_NOTES
+        if isinstance(node.get(key), int | float) and not isinstance(node.get(key), bool)
+    ]
     node = copied
+    if notes:
+        description = node.get("description")
+        node["description"] = " ".join(
+            [description, *notes] if isinstance(description, str) and description else notes
+        )
     if node.get("type") == "object" and "properties" in node:
         node["additionalProperties"] = False
         node["required"] = list(node["properties"])
     return node
+
+
+def _fit(value: Any, kind: str, bound: Any) -> tuple[bool, Any]:
+    """``value`` brought within a bound the strict schema could not carry.
+
+    A string is cut to its maximum length and a number is moved to the nearest
+    allowed value; a minimum length or a multiple cannot be met without
+    inventing data, so those are left to fail.
+    """
+    if kind == "string_too_long" and isinstance(value, str) and isinstance(bound, int):
+        return True, value[:bound]
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return False, value
+    if kind in ("greater_than_equal", "less_than_equal"):
+        return True, bound
+    if kind in ("greater_than", "less_than"):
+        toward = math.inf if kind == "greater_than" else -math.inf
+        if isinstance(value, int) and isinstance(bound, int):
+            return True, bound + (1 if kind == "greater_than" else -1)
+        return True, math.nextafter(float(bound), toward)
+    return False, value
+
+
+_BOUND_ERRORS = {
+    "string_too_long": "max_length",
+    "greater_than_equal": "ge",
+    "less_than_equal": "le",
+    "greater_than": "gt",
+    "less_than": "lt",
+}
+
+
+def _within_dropped_bounds(error: ValidationError, data: Any) -> tuple[Any, list[str]] | None:
+    """``data`` with the values that break a dropped bound fitted to it, or None.
+
+    The strict tool schema could not hold these bounds, so an answer that breaks
+    only them is fitted rather than refused. Returns the fitted copy and the
+    paths changed, or None when the answer has any other error.
+    """
+    errors = error.errors()
+    if not isinstance(data, dict) or not all(e["type"] in _BOUND_ERRORS for e in errors):
+        return None
+    fitted = copy.deepcopy(data)
+    changed = []
+    for e in errors:
+        parent, key = None, None
+        node = fitted
+        for part in e["loc"]:
+            if isinstance(node, dict) and part in node:
+                parent, key, node = node, part, node[part]
+            elif (
+                isinstance(node, list) and isinstance(part, int) and -len(node) <= part < len(node)
+            ):
+                parent, key, node = node, part, node[part]
+            # Anything else names a member of a union, not a place in the data.
+        bound = (e.get("ctx") or {}).get(_BOUND_ERRORS[e["type"]])
+        ok, value = _fit(node, e["type"], bound)
+        if parent is None or not ok:
+            return None
+        parent[key] = value
+        changed.append(".".join(str(part) for part in e["loc"]))
+    return fitted, changed
 
 
 def _is_schema_rejection(error: anthropic.BadRequestError) -> bool:
@@ -329,7 +429,24 @@ class AnthropicProvider:
             )
         for block in response.content:
             if getattr(block, "type", None) == "tool_use" and block.name == tool_name:
-                return response_format.model_validate(block.input)
+                try:
+                    return response_format.model_validate(block.input)
+                except ValidationError as error:
+                    # The model saw the dropped bounds only as words in the
+                    # descriptions, so an answer that breaks only those is fitted.
+                    fitted = (
+                        _within_dropped_bounds(error, block.input) if "strict" in tool else None
+                    )
+                    if fitted is None:
+                        raise
+                    data, changed = fitted
+                    logger.warning(
+                        "Claude's answer for '%s' broke bounds its strict tool schema could "
+                        "not hold; fitted to them: %s",
+                        tool_name,
+                        ", ".join(changed),
+                    )
+                    return response_format.model_validate(data)
         raise ValueError(f"Anthropic response did not return tool_use for '{tool_name}'.")
 
     def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
