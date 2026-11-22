@@ -29,6 +29,7 @@ from __future__ import annotations
 import csv
 import logging
 import re
+import string
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
@@ -721,13 +722,17 @@ def _drop_shape_outliers(rows: list[list[Any]]) -> list[list[Any]]:
     return kept if kept else rows
 
 
+_ASCII_LOWER = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
+
+
 def _name_columns(cells: list[Any]) -> list[str]:
     """Give every column a unique, non-empty name, as DuckDB names a CSV's columns.
 
     The header text is kept, so ``Määrä`` and ``Hinta (€)`` stay as written, as they
     do when the same table arrives as a CSV; line breaks and runs of spaces inside a
-    cell become one space. A blank header cell is named ``column_<n>``, and a repeat,
-    in any letter case (DuckDB's names are case-insensitive), gets a numeric suffix.
+    cell become one space. A blank header cell is named ``column_<n>``, and a repeat
+    gets a numeric suffix. DuckDB compares names ignoring the case of ASCII letters
+    only, so ``Region`` repeats ``region`` but ``Å`` and ``å`` are two names.
     The schema shown to the model quotes a name that needs it.
     """
     names: list[str] = []
@@ -736,9 +741,9 @@ def _name_columns(cells: list[Any]) -> list[str]:
         base = "" if _is_blank(cell) else " ".join(str(cell).split())
         base = base or f"column_{i + 1}"
         name, suffix = base, 2
-        while name.lower() in taken:
+        while name.translate(_ASCII_LOWER) in taken:
             name, suffix = f"{base}_{suffix}", suffix + 1
-        taken.add(name.lower())
+        taken.add(name.translate(_ASCII_LOWER))
         names.append(name)
     return names
 
@@ -760,12 +765,13 @@ def _create_from_rows(con: Any, table_name: str, header: list[str], rows: list[l
                 writer.writerow(header)
                 for row in rows:
                     writer.writerow(["" if _is_blank(c) else c for c in row])
-            # The first line is always the header written above: DuckDB would
-            # otherwise read a header of numbers, such as years, as a data row.
+            # The file is in the writer's own dialect, so only the types are left to
+            # guess: DuckDB would otherwise read a header of numbers, such as years,
+            # as a data row, or split cells at a ";" a header holds.
             con.execute(
                 f'CREATE TABLE "{table_name}" AS SELECT * FROM '
                 f"read_csv('{_escape(csv_path.as_posix())}', auto_detect=true, "
-                "sample_size=-1, header=true)"
+                "sample_size=-1, header=true, delim=',', quote='\"', escape='\"')"
             )
     except Exception as exc:
         raise TableLoadError(f"Could not build table '{table_name}': {exc}") from exc

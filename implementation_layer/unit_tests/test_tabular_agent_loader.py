@@ -357,6 +357,23 @@ def test_excel_header_repeats_line_breaks_and_numbers_get_usable_names(con, tmp_
     assert con.execute("SELECT count(*) FROM report").fetchone()[0] == 2
 
 
+def test_excel_headers_differing_in_a_non_ascii_letter_case_are_two_columns(con, tmp_path):
+    """DuckDB folds the case of ASCII letters only, so Å and å are two names, as in a CSV."""
+    path = tmp_path / "letters.xlsx"
+    _write_clean_xlsx(path, {"Sheet1": [("Å", "å", "Ä", "a", "A"), (1, 2, 3, 4, 5)]})
+    _load(con, path)
+    assert [r[0] for r in con.execute("DESCRIBE letters").fetchall()] == ["Å", "å", "Ä", "a", "A_2"]
+
+
+def test_semicolons_in_excel_headers_and_cells_do_not_split_columns(con, tmp_path):
+    path = tmp_path / "notes.xlsx"
+    rows = [("Notes;A", "Notes;B"), ("x;y", "z;w"), ("a;b", "c;d")]
+    _write_clean_xlsx(path, {"Sheet1": rows})
+    _load(con, path)
+    assert [r[0] for r in con.execute("DESCRIBE notes").fetchall()] == ["Notes;A", "Notes;B"]
+    assert con.execute("SELECT * FROM notes").fetchall() == [("x;y", "z;w"), ("a;b", "c;d")]
+
+
 def test_an_excel_header_of_years_is_not_read_back_as_a_data_row(con, tmp_path):
     path = tmp_path / "years.xlsx"
     _write_clean_xlsx(path, {"Sheet1": [(2024, 2025), (1, 2), (3, 4)]})
