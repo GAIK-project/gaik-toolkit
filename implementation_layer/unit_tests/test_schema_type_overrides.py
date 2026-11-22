@@ -715,6 +715,38 @@ def test_a_rule_that_does_not_keep_the_dates_leaves_them_dates(task):
     assert [field.field_type for field in requirements.fields] == ["date", "date"]
 
 
+@pytest.mark.parametrize(
+    "rule",
+    [
+        # Review of PR #317: everyday instructions that do not keep dates as written.
+        "Leave dates empty if they are missing.",
+        "Leave the date fields null when they are missing.",
+        "Keep all dates in one consistent format.",
+        "Keep dates consistent across records.",
+        "There is no need to keep dates as written - convert them to YYYY-MM-DD.",
+        "You don't have to keep the dates as written; convert them to DD.MM.YYYY.",
+        "Retain dates only if they are explicitly stated.",
+        "Keep track of the due dates; they matter.",
+        # More of the same kinds.
+        "It is not required to keep dates as written.",
+        "You needn't keep the dates unchanged.",
+        "Keep dates as written, but convert them to ISO.",
+        "Maintain dates in chronological order.",
+    ],
+)
+def test_an_instruction_that_does_not_keep_dates_as_written_leaves_them_dates(rule):
+    requirements = _requirements(
+        FieldSpec(field_name="invoice_date", field_type="date", description="Invoice date"),
+        FieldSpec(field_name="due_date", field_type="date", description="Due date"),
+        FieldSpec(field_name="revision_date", field_type="date", description="Revision date"),
+    )
+    task = f"Extract the invoice date, the due date and the revision date.\n{rule}\n"
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    assert [field.field_type for field in requirements.fields] == ["date", "date", "date"]
+
+
 def test_a_rule_naming_some_dates_keeps_only_those():
     requirements = _requirements(
         FieldSpec(field_name="revision_date", field_type="date", description="Revision date"),
@@ -734,12 +766,10 @@ def test_a_rule_naming_some_dates_keeps_only_those():
     }
 
 
-def test_a_rule_in_one_collections_section_does_not_reach_the_parents_dates():
-    # The parent parse reads the whole task, child sections included (PR #204).
+def _revision_parts(rule: str):
     task = (
         "Header: drawing number and drawing date.\n"
-        "For each revision: revision number, revision date and note. "
-        "Keep revision dates as written.\n"
+        f"For each revision: revision number, revision date and note. {rule}\n"
     )
     parent = _requirements(
         FieldSpec(field_name="drawing_number", field_type="str", description="Number"),
@@ -748,12 +778,31 @@ def test_a_rule_in_one_collections_section_does_not_reach_the_parents_dates():
     row = _requirements(
         FieldSpec(field_name="revision_date", field_type="date", description="Revision date")
     )
-
+    # The parent parse reads the whole task, child sections included (PR #204).
     _apply_type_overrides(parent, original_text=task)
     _apply_type_overrides(row, original_text=task)
+    return parent, row
+
+
+def test_a_rule_naming_one_collections_dates_does_not_reach_the_parents_dates():
+    parent, row = _revision_parts("Keep revision dates as written.")
 
     assert parent.fields[1].field_type == "date"
     assert row.fields[0].field_type == "str"
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Known limit: a rule in a child collection's section that does not name its "
+        "dates covers the parent's dates too, since the parent's parse reads the whole task"
+    ),
+)
+def test_a_rule_in_one_collections_section_that_names_no_dates_stays_there():
+    parent, row = _revision_parts("Keep the dates as written.")
+
+    assert row.fields[0].field_type == "str"
+    assert parent.fields[1].field_type == "date"
 
 
 # Issue #97: cases where a field took a format or type the task did not ask for.
