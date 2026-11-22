@@ -1,5 +1,6 @@
 "use client";
 
+import { useRunAccess } from "@/components/run-access";
 import { Input } from "@/components/ui/input";
 import {
   type ReportModelKind,
@@ -19,7 +20,9 @@ export function ModelNameInput({
   ...props
 }: Omit<ComponentProps<typeof Input>, "list"> & { kind: ReportModelKind }) {
   const id = useId();
-  const names = reportModelNames(useServerModels(), kind);
+  // Loaded for a signed-in user, as the model menu loads it: it is the same list.
+  const { loggedIn } = useRunAccess();
+  const names = reportModelNames(useServerModels(loggedIn), kind);
   return (
     <>
       <Input
