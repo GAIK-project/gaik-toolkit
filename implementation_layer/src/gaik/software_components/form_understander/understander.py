@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import time
 import unicodedata
+from collections import Counter
 from typing import Literal
 
 from openai import APIError, APITimeoutError, RateLimitError
@@ -83,6 +84,11 @@ class CleanedLabel(BaseModel):
 
 MAX_LABEL_CHARS = 60
 _SENTENCE_PUNCTUATION = re.compile(r"[:;!?]|\.(?=\s|$)")
+_ZWNJ, _ZWJ = "‌", "‍"
+
+
+def _is_letter(ch: str) -> bool:
+    return unicodedata.category(ch)[0] in ("L", "M")
 
 
 def _visible(text: str) -> str:
@@ -90,8 +96,17 @@ def _visible(text: str) -> str:
 
     They are taken out of every label gaik returns, so the label a person sees is the
     one that was compared: a bidi control could otherwise show words in another order.
+    Two of them change what is shown and stay: a zero-width joiner, which builds an
+    emoji sequence (👩‍🔬) or a letter form in Indic scripts, and a zero-width
+    non-joiner between two letters, which keeps them apart (Persian, Indic scripts).
     """
-    return "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    kept = [ch for ch in text if unicodedata.category(ch) != "Cf" or ch in (_ZWJ, _ZWNJ)]
+    return "".join(
+        ch
+        for i, ch in enumerate(kept)
+        if ch != _ZWNJ
+        or (0 < i < len(kept) - 1 and _is_letter(kept[i - 1]) and _is_letter(kept[i + 1]))
+    )
 
 
 def _words(text: str) -> str:
@@ -172,8 +187,8 @@ class FormUnderstander:
         keeps its page label (``changed`` false).
         """
         safe_fields = [f if isinstance(f, InputField) else InputField(**f) for f in fields]
-        ids = [f.id for f in safe_fields]
-        repeated = sorted({i for i in ids if ids.count(i) > 1})
+        # One pass, not a scan per field: a form can have thousands of fields.
+        repeated = sorted(i for i, n in Counter(f.id for f in safe_fields).items() if n > 1)
         if repeated:
             # The model answers per id, so two fields with one id would get one label.
             raise ValueError(f"field ids must be unique; repeated: {repeated}")
