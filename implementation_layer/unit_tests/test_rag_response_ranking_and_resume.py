@@ -101,3 +101,67 @@ def test_concurrent_scoring_runs_inside_a_running_event_loop() -> None:
     result = asyncio.run(inside_a_loop())
 
     assert result.scored_df["x_response_overall_score"].astype(int).tolist() == [1, 2, 3]
+
+
+def test_a_system_never_compared_ranks_last() -> None:
+    aspects = DEFAULT_PAIRWISE_SPEC.aspect_fields
+    row = {"question": "q", "system_a": "A", "system_b": "B", "winner": "A"}
+    row |= {f"{aspect}_a": 3 for aspect in aspects} | {f"{aspect}_b": 3 for aspect in aspects}
+
+    ranking = _aggregate_pairwise(pd.DataFrame([row]), ["A", "B", "C"], DEFAULT_PAIRWISE_SPEC)
+
+    assert [r.system for r in ranking] == ["A", "B", "C"]
+
+
+def test_resume_matches_questions_that_a_csv_reads_back_as_numbers(tmp_path) -> None:
+    client = _Scores()
+    evaluator = RAGResponseEvaluator(client, max_concurrency=1)
+    frame = _questions([1, 3])
+    # Questions that are only digits come back from read_csv as the numbers 1 and 3.
+    frame["question"] = ["1", "3"]
+    evaluator.save(evaluator.evaluate(frame), tmp_path, write_plots=False)
+    saved = pd.read_csv(tmp_path / "rag_eval_scored.csv")
+
+    evaluator.evaluate(frame, resume_from=saved)
+
+    assert client.calls == 2  # nothing judged again
+
+
+def test_a_frame_whose_index_repeats_a_label_resumes_each_row() -> None:
+    client = _Scores()
+    evaluator = RAGResponseEvaluator(client, max_concurrency=1)
+    first = evaluator.evaluate(_questions([1, 3]))
+    saved = first.scored_df.reset_index(drop=True)
+
+    from gaik.software_components.evaluators.rag_response_evaluator import _init_scored_df
+
+    frame = _questions([1, 3])
+    frame.index = [0, 0]
+    scored = _init_scored_df(frame, ["x_response"], ["coverage_score"], saved)
+
+    assert scored["x_response_coverage_score"].tolist() == [1, 3]
+
+
+def test_pairwise_resume_takes_the_last_saved_row_and_judges_an_incomplete_one() -> None:
+    from gaik.software_components.evaluators.rag_response_evaluator import _init_pairwise_df
+
+    aspects = DEFAULT_PAIRWISE_SPEC.aspect_fields
+    done = {"system_a": "x_response", "system_b": "y_response", "winner": "A"}
+    done |= {f"{aspect}_a": 3 for aspect in aspects} | {f"{aspect}_b": 3 for aspect in aspects}
+    saved = pd.DataFrame(
+        [
+            {"question": "q1", **done, "winner": "B"},
+            {"question": "q1", **done},  # saved twice: the last one counts
+            {"question": "q2", **done, "clarity_a": None},  # an aspect score lost
+        ]
+    )
+    frame = pd.DataFrame(
+        {"question": ["q1", "q2"], "x_response": ["x " * 20] * 2, "y_response": ["y " * 20] * 2}
+    )
+
+    comparisons = _init_pairwise_df(
+        frame, "question", [("x_response", "y_response")], DEFAULT_PAIRWISE_SPEC, saved
+    )
+
+    assert comparisons["winner"].tolist()[0] == "A"
+    assert pd.isna(comparisons["winner"].tolist()[1])  # judged again

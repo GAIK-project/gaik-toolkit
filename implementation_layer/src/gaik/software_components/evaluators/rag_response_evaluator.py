@@ -1309,7 +1309,8 @@ def _init_scored_df(
     A row takes the earlier scores of the row with the same question (questions are
     unique), wherever it is in ``resume_from``: a filtered, reordered or extended frame
     resumes correctly, and a row ``resume_from`` does not have is judged. A table read
-    back from a saved CSV is matched in the form ``_write_csv`` gave it.
+    back from a saved CSV is matched in the form ``_write_csv`` gave it (see
+    :func:`_resume_key`).
     """
     scored = df.copy()
     columns = [f"{col}_{field_name}" for col in candidate_cols for field_name in score_fields]
@@ -1324,24 +1325,39 @@ def _init_scored_df(
             question_col,
         )
         return scored
-    prior = resume_from.drop_duplicates(question_col, keep="last").set_index(question_col)
-    for idx, question in df[question_col].items():
-        key = next((k for k in (question, _csv_cell(question)) if k in prior.index), None)
-        if key is None:
+    prior = resume_from.reset_index(drop=True)
+    places = {_resume_key(question): place for place, question in enumerate(prior[question_col])}
+    for row, question in enumerate(df[question_col]):
+        place = next(
+            (
+                places[key]
+                for key in (_resume_key(question), _resume_key(_csv_cell(question)))
+                if key in places
+            ),
+            None,
+        )
+        if place is None:
             continue
         for col in candidate_cols:
             fields = [f"{col}_{field_name}" for field_name in score_fields]
             if not all(field in prior.columns for field in fields):
                 continue
-            values = [prior.at[key, field] for field in fields]
+            values = [prior.at[place, field] for field in fields]
             if not all(pd.notna(value) for value in values):
                 continue  # a row with some scores missing is judged again, whole
-            for field, value in zip(fields, values):
-                scored.at[idx, field] = value
             reason = f"{col}_reason"
-            if reason in prior.columns and pd.notna(prior.at[key, reason]):
-                scored.at[idx, reason] = prior.at[key, reason]
+            if reason in prior.columns and pd.notna(prior.at[place, reason]):
+                fields, values = [*fields, reason], [*values, prior.at[place, reason]]
+            for field, value in zip(fields, values):
+                # By position: a frame whose index repeats a label still gets each row's own.
+                scored.iloc[row, scored.columns.get_loc(field)] = value
     return scored
+
+
+def _resume_key(value: Any) -> str:
+    """A cell as text that survives a CSV round trip: ``read_csv`` gives back ``101`` as a
+    number and a CR LF line break as LF."""
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
 
 
 def _write_referenced_row(
@@ -1485,7 +1501,10 @@ def _init_pairwise_df(
     if resume_from is not None and {"question", "system_a", "system_b", "winner"} <= set(
         resume_from.columns
     ):
-        prior = resume_from.set_index(["question", "system_a", "system_b"]).copy()
+        keys = ["question", "system_a", "system_b"]
+        prior = resume_from.drop_duplicates(keys, keep="last").copy()
+        prior["question"] = prior["question"].map(_resume_key)
+        prior = prior.set_index(keys)
 
     base_cols = [
         "question",
@@ -1520,14 +1539,20 @@ def _init_pairwise_df(
             key = next(
                 (
                     k
-                    for k in ((q, a, b), (_csv_cell(q), _csv_cell(a), _csv_cell(b)))
+                    for k in (
+                        (_resume_key(q), a, b),
+                        (_resume_key(_csv_cell(q)), _csv_cell(a), _csv_cell(b)),
+                    )
                     if prior is not None and k in prior.index
                 ),
                 None,
             )
             if key is not None:
                 pr = prior.loc[key]
-                if pd.notna(pr.get("winner", pd.NA)):
+                # A comparison with an aspect score missing is judged again, whole.
+                if pd.notna(pr.get("winner", pd.NA)) and all(
+                    ac in pr and pd.notna(pr[ac]) for ac in aspect_cols
+                ):
                     entry.update(
                         {
                             "winner": pr["winner"],
@@ -1614,10 +1639,16 @@ def _aggregate_pairwise(
 
     # A system without a decisive comparison (only ties) neither won nor lost: it sorts
     # as a win rate of one half, among the systems that won as often as they lost, and its
-    # aspect scores place it there. Its reported win_rate stays NaN.
+    # aspect scores place it there. Its reported win_rate stays NaN. A system with no
+    # comparison at all (a partial table) has nothing to rank it by and sorts last.
+    def _sorted_win_rate(r: PairwiseRanking) -> float:
+        if not math.isnan(r.win_rate):
+            return r.win_rate
+        return 0.5 if r.ties else -1.0
+
     rankings.sort(
         key=lambda r: (
-            -(r.win_rate if not math.isnan(r.win_rate) else 0.5),
+            -_sorted_win_rate(r),
             -_aspect_avg(r),
             -(r.avg_score if not math.isnan(r.avg_score) else -1),
         )
