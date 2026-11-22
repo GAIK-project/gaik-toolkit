@@ -467,7 +467,10 @@ The reviewer:
 - checks section instruction coverage
 - checks sample-section format/style when a matching sample section exists
 - proposes targeted search/replace corrections
-- applies corrections locally with exact and fuzzy matching
+- applies corrections locally: where the search occurs as written, else at the one
+  passage it matches once case, quote and dash styles and whitespace are ignored, else
+  at the one passage that differs from it by at most 10% (a typo or a letter left out).
+  A correction that fits no passage, or more than one, is not applied
 - retries failed corrections up to the configured retry limit
 
 With `strict_review=False`, unresolved reviewer edits become `section.revision_warnings` and the report is written.

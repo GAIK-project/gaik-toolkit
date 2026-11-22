@@ -2,20 +2,21 @@
 genericized.
 
 A mandatory fact/format repair pass for one section: the LLM returns a
-structured ``CorrectionList`` of ``{search, replace, reason}`` edits, which are
-applied with exact then fuzzy (>= 0.9) string matching; unapplied edits are
-retried (up to ``MAX_ATTEMPTS``). Whatever cannot be applied is returned as
-human-readable warnings rather than raising. An optional style-only ``polish``
-pass reuses the same editor.
+structured ``CorrectionList`` of ``{search, replace, reason}`` edits. Each is
+applied where its search occurs, or else at the one passage it means once case,
+quotes, dashes and whitespace are ignored, or at the one passage within 10% of it
+(``_span.locate``); an edit that fits no passage, or more than one, is retried (up
+to ``MAX_ATTEMPTS``). Whatever cannot be applied is returned as human-readable
+warnings rather than raising. An optional style-only ``polish`` pass reuses the
+same editor.
 
 Uses GAIK's ``ProviderClient.chat_parsed(messages, response_format=...)`` for
-structured output and the stdlib ``difflib`` for fuzzy matching (no extra deps).
+structured output; the matching needs no extra dependencies.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from difflib import SequenceMatcher
 
 from pydantic import BaseModel, Field
 
@@ -26,6 +27,7 @@ from gaik.software_components.source_material import (
 )
 
 from .._material import Evidence
+from ._span import Span, locate
 from .prompts import build_polish_instruction, build_reviewer_instruction
 
 MAX_ATTEMPTS = 5
@@ -77,34 +79,22 @@ class CorrectionList(BaseModel):
 
 
 def _find_search_string(text: str, search: str, threshold: float = FUZZY_THRESHOLD) -> str | None:
-    """Return the actual substring of ``text`` matching ``search``, or None.
+    """Return the passage of ``text`` that ``search`` means, or None.
 
-    Handles exact, case-insensitive, and (for longer strings) fuzzy matches.
+    Exact first, then ignoring case, quote and dash styles and whitespace runs, then
+    (for 10 characters or more) a close match; a loose match must be the only one.
     """
-    if search in text:
-        return search
+    span = locate(text, search, threshold)
+    return text[span.start : span.end] if isinstance(span, Span) else None
 
-    low = search.lower()
-    text_low = text.lower()
-    if low in text_low:
-        pos = text_low.find(low)
-        return text[pos : pos + len(search)]
 
-    # Too short to fuzzy-match reliably.
-    if len(search) < 10:
-        return None
-
-    n = len(search)
-    best: str | None = None
-    best_ratio = threshold
-    step = max(1, n // 4)
-    for i in range(0, max(1, len(text) - n + 1), step):
-        cand = text[i : i + n]
-        ratio = SequenceMatcher(None, low, cand.lower()).ratio()
-        if ratio >= best_ratio:
-            best_ratio = ratio
-            best = cand
-    return best
+def _replacement(span: Span, replace: str) -> str:
+    """``replace`` without the edge whitespace of the search that the text lacks there."""
+    if span.lead and replace.startswith(span.lead):
+        replace = replace[len(span.lead) :]
+    if span.trail and replace.endswith(span.trail):
+        replace = replace[: len(replace) - len(span.trail)]
+    return replace
 
 
 def _apply_corrections(
@@ -114,17 +104,19 @@ def _apply_corrections(
     successful: list[dict] = []
     failed: list[dict] = []
     for index, c in enumerate(corrections):
-        target = c.search if c.search in current else _find_search_string(current, c.search)
-        if target:
-            current = current.replace(target, c.replace, 1)
-            successful.append({"search": target, "replace": c.replace, "reason": c.reason})
+        span = locate(current, c.search, FUZZY_THRESHOLD)
+        if isinstance(span, Span):
+            target = current[span.start : span.end]
+            replace = _replacement(span, c.replace)
+            current = current[: span.start] + replace + current[span.end :]
+            successful.append({"search": target, "replace": replace, "reason": c.reason})
         else:
             failed.append(
                 {
                     "search": c.search,
                     "replace": c.replace,
                     "reason": c.reason,
-                    "error": "search string not found in text",
+                    "error": span,
                     "index": index,
                 }
             )
