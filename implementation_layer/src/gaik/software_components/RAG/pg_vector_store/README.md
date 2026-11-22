@@ -198,7 +198,7 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 | `search_hybrid_weighted(query_embedding, query_text, *, top_k, semantic_weight, keyword_weight, filters)` | Weighted hybrid search |
 | `health(*, sample_rows=5)` | Check the live table against this store's configuration; returns a `HealthReport` |
 | `relemmatize(*, batch_size=500)` | Recompute the lemma column with the current `text_processor`; returns rows updated |
-| `close(*, timeout=5.0)` | Close database connection (a later call opens a new one). A call another thread is in gets `timeout` seconds to end its transaction; then its statement is cancelled, so it fails and rolls back. A call that still holds on after another `timeout` closes the connection when it ends, with a warning logged; the connection is never closed under it |
+| `close(*, timeout=None)` | Close database connection (a later call opens a new one). Waits for a call another thread is in to end its transaction: as long as it takes, or with `timeout`, raises `TimeoutError` after that many seconds and leaves the connection open. Called inside one of the store's calls on the same thread, it closes the connection when the outermost call ends |
 
 ### Chunk keys and re-indexing
 

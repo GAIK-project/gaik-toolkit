@@ -169,25 +169,35 @@ def _rolls_back_on_error(method):
     Threads that share a store share its connection and so its transaction: one
     thread's commit would store another's half-done ``add()``, its rollback undo
     it, and an advisory lock taken by one would not stop the other. So each such
-    method holds the store's lock until its transaction ends, and closes the
-    connection on its way out when a ``close()`` could not wait for it.
+    method holds the store's lock until its transaction ends. The outermost call
+    then closes the connections a ``close()`` made inside it asked to close.
     """
 
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
         with self._lock:
-            self._calls += 1
+            turns = self._turns
+            turns.calls += 1
             try:
                 return method(self, *args, **kwargs)
             except BaseException:
                 self._rollback_quietly()
                 raise
             finally:
-                self._calls -= 1
-                if self._owed_close and not self._calls:
-                    self._close_owed()
+                turns.calls -= 1
+                if not turns.calls:
+                    while turns.close_requests:
+                        turns.close_requests.pop()._close_locked(quietly=True)
 
     return wrapper
+
+
+class _Turns:
+    """What a store's calls share with its shallow copies besides the lock."""
+
+    def __init__(self) -> None:
+        self.calls = 0  # store calls running under the lock: one thread's, nested
+        self.close_requests: list[Any] = []  # stores close() was called on inside a call
 
 
 class PgVectorStore:
@@ -353,15 +363,13 @@ class PgVectorStore:
     def _init_turns(self) -> None:
         # Held for each transaction on ``_conn``, which threads sharing the store share.
         self._lock = threading.RLock()
-        self._calls = 0  # this store's calls under the lock (one thread, nested)
-        # Connections a close() could not wait for: the call holding them closes them.
-        self._owed_close: list[Any] = []
+        self._turns = _Turns()
 
     def __getstate__(self) -> dict:
         # A lock cannot be pickled or deep-copied; a store not yet connected could be.
         # The copy made from this state has a connection of its own, and its own lock.
         state = self.__dict__.copy()
-        for name in ("_lock", "_calls", "_owed_close"):
+        for name in ("_lock", "_turns"):
             state.pop(name, None)
         return state
 
@@ -371,10 +379,9 @@ class PgVectorStore:
 
     def __copy__(self) -> PgVectorStore:
         # A shallow copy starts on the same connection, so its calls take turns with
-        # the original's: it shares the lock (and the closes owed under it).
+        # the original's: it shares the lock and the count of calls under it.
         clone = type(self).__new__(type(self))
         clone.__dict__.update(self.__dict__)
-        clone._calls = 0
         return clone
 
     @property
@@ -446,54 +453,50 @@ class PgVectorStore:
                 conn.rollback()
                 logger.warning("Could not set %s = %s: %s", name, value, exc)
 
-    def close(self, *, timeout: float = 5.0) -> None:
+    def close(self, *, timeout: float | None = None) -> None:
         """Close the database connection; a later call opens a new one.
 
-        A call another thread is in gets up to ``timeout`` seconds to end its
-        transaction, so a long ``relemmatize()`` does not hold up a shutdown for
-        good. Then the statement it is running is cancelled, which makes that call
-        fail and roll back, and ``close()`` waits up to ``timeout`` again. If the
-        call still has not ended (it is not inside a statement), the connection is
-        left to it: it is closed when the call ends, and a warning is logged. The
-        connection is never closed under a call that is using it.
+        Waits for a call another thread is in to end its transaction: as long as it
+        takes with ``timeout=None``, else up to ``timeout`` seconds, after which
+        ``TimeoutError`` is raised and the connection is left open and untouched.
+        Called from inside one of this store's calls on the same thread (a callback,
+        say), it closes the connection once the outermost call ends.
+
+        Raises:
+            TimeoutError: The other thread's call did not end within ``timeout``.
         """
-        timeout = max(timeout, 0)
-        if not self._lock.acquire(timeout=timeout):
-            # Only a cancel, which psycopg allows from another thread, touches the
-            # connection without the lock.
-            _cancel_quietly(self._conn, timeout)
-            if not self._lock.acquire(timeout=timeout):
-                conn = self._conn
-                if conn is not None:
-                    self._owed_close.append(conn)
-                # The call may have just looked for owed closes and be on its way
-                # out; then it is gone in a moment and the close is done here.
-                if not self._lock.acquire(timeout=min(timeout, 0.1)):
-                    logger.warning(
-                        "close(): a call in another thread is still using the "
-                        "connection after %.1f s; it is closed when that call ends",
-                        2 * timeout,
-                    )
-                    return
+        if timeout is None:
+            acquired = self._lock.acquire()
+        else:
+            acquired = self._lock.acquire(timeout=max(timeout, 0))
+        if not acquired:
+            raise TimeoutError(
+                f"close(): a call in another thread still used the connection after "
+                f"{timeout} s; the connection was left open"
+            )
         try:
-            if self._conn is not None:
-                self._owed_close.append(self._conn)
-            self._close_owed()
+            if self._turns.calls:
+                # This thread is inside a call (only the lock's holder can be), so
+                # the connection is in use: the outermost call closes it.
+                if not any(store is self for store in self._turns.close_requests):
+                    self._turns.close_requests.append(self)
+                return
+            self._close_locked()
         finally:
             self._lock.release()
 
-    def _close_owed(self) -> None:
-        """Close the connections a ``close()`` left to the call holding them (locked)."""
-        # pop() one at a time: a close() in another thread may append meanwhile.
-        while self._owed_close:
-            conn = self._owed_close.pop()
-            if conn is self._conn:
-                self._conn = None
-            try:
-                if not conn.closed:
-                    conn.close()
-            except Exception as exc:  # noqa: BLE001 - it is being dropped anyway
-                logger.warning("Could not close a database connection: %s", exc)
+    def _close_locked(self, *, quietly: bool = False) -> None:
+        """Close and forget the connection; the store's lock is held."""
+        conn, self._conn = self._conn, None
+        if conn is None or conn.closed:
+            return
+        try:
+            conn.close()
+        except Exception as exc:
+            if not quietly:
+                raise
+            # A call's own error, if any, is the one raised.
+            logger.warning("Could not close a database connection: %s", exc)
 
     def __enter__(self) -> PgVectorStore:
         return self
@@ -1849,24 +1852,6 @@ class PgVectorStore:
             score = float(row[score_key])
             results.append((doc, score))
         return results
-
-
-def _cancel_quietly(conn: Any, timeout: float) -> None:
-    """Ask the server to cancel the statement ``conn`` is running in another thread.
-
-    ``cancel_safe()`` (psycopg 3.2+) and ``cancel()`` may be called from another
-    thread; the call running the statement then fails with ``QueryCanceled``.
-    """
-    if conn is None:
-        return
-    try:
-        cancel_safe = getattr(conn, "cancel_safe", None)
-        if cancel_safe is not None:
-            cancel_safe(timeout=max(timeout, 1.0))
-        else:
-            conn.cancel()
-    except Exception as exc:  # noqa: BLE001 - close() goes on waiting either way
-        logger.warning("close(): could not cancel the running statement: %s", exc)
 
 
 def _transaction_status(conn: Any) -> str | None:

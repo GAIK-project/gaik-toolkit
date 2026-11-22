@@ -343,24 +343,23 @@ def test_pg_threads_sharing_a_store_do_not_run_inside_each_others_transaction(
     assert "second" not in names[: conn.log.index(("first", "COMMIT")) + 1], conn.log
 
 
-class _LongStatementPg:
-    """A fake connection whose statement runs until it is cancelled (or let go).
+class _ClosablePg:
+    """A fake connection that records a ``close()`` while a statement runs.
 
-    Like psycopg, ``cancel_safe`` may be called from another thread, and a cancelled
-    statement raises ``QueryCanceled``. Using the connection after ``close()`` raises
-    ``OperationalError``, as psycopg does; ``close()`` while a statement runs is
-    recorded, because psycopg would free the handle under it.
+    psycopg would free the handle under that statement. A statement can run
+    ``during`` (on the calling thread, as a notice handler would) or wait for
+    ``let_go``. Using the connection after ``close()`` raises ``OperationalError``,
+    as psycopg does.
     """
 
-    def __init__(self, *, cancellable: bool = True) -> None:
+    def __init__(self, *, during=None, wait: bool = False) -> None:
         self.closed = False
-        self.cancellable = cancellable
+        self.during = during
+        self.wait = wait
         self.running = threading.Event()
-        self.cancelled = threading.Event()
         self.let_go = threading.Event()
         self.in_statement = False
         self.closed_under_a_statement = False
-        self.closed_by: str | None = None
 
     def execute(self, sql, params=()):
         import psycopg
@@ -370,10 +369,10 @@ class _LongStatementPg:
         self.in_statement = True
         try:
             self.running.set()
-            if self.cancellable:
-                if self.cancelled.wait(10):
-                    raise psycopg.errors.QueryCanceled("canceling statement due to user request")
-            else:
+            if self.during is not None:
+                during, self.during = self.during, None
+                during()
+            if self.wait:
                 self.let_go.wait(10)
         finally:
             self.in_statement = False
@@ -381,9 +380,6 @@ class _LongStatementPg:
 
     def fetchone(self):
         return {"cnt": 3}
-
-    def cancel_safe(self, *, timeout: float = 30.0) -> None:
-        self.cancelled.set()
 
     def commit(self):
         pass
@@ -393,97 +389,57 @@ class _LongStatementPg:
 
     def close(self):
         self.closed_under_a_statement = self.in_statement
-        self.closed_by = threading.current_thread().name
         self.closed = True
 
 
-def test_pg_close_cancels_a_long_call_and_a_later_call_gets_a_psycopg_error(monkeypatch):
-    import time
+@pytest.mark.parametrize("closer", ["store", "shallow copy"])
+def test_pg_close_inside_a_call_on_the_same_thread_waits_for_the_call(closer):
+    import copy
 
+    store, _ = _pg_store()
+    holder: list = []
+    store._conn = conn = _ClosablePg(during=lambda: holder[0].close())
+    # A copy shares the count of calls, so it too sees that the original is in one.
+    holder.append(store if closer == "store" else copy.copy(store))
+
+    assert store.count() == 3, "the call was cut short"
+    assert conn.closed, "the close asked for inside the call was dropped"
+    assert not conn.closed_under_a_statement
+    assert holder[0]._conn is None
+
+
+def test_pg_close_with_a_timeout_raises_and_leaves_the_connection_usable(monkeypatch):
     import psycopg
     from gaik.software_components.RAG.pg_vector_store import pg_vector_store as module
 
     store, _ = _pg_store()
-    store._conn = conn = _LongStatementPg()
-
-    def refused(*args, **kwargs):
-        raise psycopg.OperationalError("connection refused")
-
-    monkeypatch.setattr(module.psycopg, "connect", refused)
-    errors: list[BaseException] = []
-    closed = threading.Event()
-
-    def call():
-        try:
-            store.count()
-        except BaseException as exc:  # noqa: BLE001 - checked below
-            errors.append(exc)
-
-    def worker():  # a relemmatize() of a big table, say, then a call after the close
-        call()
-        if closed.wait(5):
-            call()
-
-    thread = threading.Thread(target=worker, daemon=True)
-    thread.start()
-    assert conn.running.wait(5)
-    started = time.monotonic()
-    store.close(timeout=0.2)
-    elapsed = time.monotonic() - started
-    closed.set()
-    thread.join(5)
-
-    assert conn.cancelled.is_set(), "close() did not cancel the running statement"
-    assert conn.closed and not conn.closed_under_a_statement
-    assert store._conn is None
-    assert elapsed < 3, elapsed
-    # The cancelled call fails, and the next one opens a new connection: both with
-    # a psycopg error, never an AttributeError from a connection set to None.
-    assert [type(exc) for exc in errors] == [
-        psycopg.errors.QueryCanceled,
-        psycopg.OperationalError,
-    ], errors
-
-
-def test_pg_close_cancels_with_cancel_on_psycopg_before_3_2():
-    pytest.importorskip("psycopg")
-    from gaik.software_components.RAG.pg_vector_store import pg_vector_store as module
-
-    class _Psycopg31:  # cancel(), and no cancel_safe()
-        def __init__(self) -> None:
-            self.cancelled = 0
-
-        def cancel(self) -> None:
-            self.cancelled += 1
-
-    conn = _Psycopg31()
-    module._cancel_quietly(conn, 0.1)
-    module._cancel_quietly(None, 0.1)
-    assert conn.cancelled == 1
-
-
-def test_pg_close_leaves_a_call_that_cannot_be_cancelled_to_close_it(caplog):
-    import logging
-
-    store, _ = _pg_store()
-    store._conn = conn = _LongStatementPg(cancellable=False)
+    store._conn = conn = _ClosablePg(wait=True)
     results = []
-    thread = threading.Thread(
-        target=lambda: results.append(store.count()), name="holder", daemon=True
-    )
+    thread = threading.Thread(target=lambda: results.append(store.count()), daemon=True)
     thread.start()
     assert conn.running.wait(5)
 
-    with caplog.at_level(logging.WARNING):
+    with pytest.raises(TimeoutError):
         store.close(timeout=0.1)
-    assert not conn.closed, "close() closed the connection under a running call"
-    assert any("still using the connection" in r.getMessage() for r in caplog.records)
+    assert not conn.closed and store._conn is conn
 
     conn.let_go.set()
     thread.join(5)
     assert results == [3]
-    assert conn.closed and conn.closed_by == "holder" and not conn.closed_under_a_statement
-    assert store._conn is None
+    conn.wait = False
+    assert store.count() == 3 and store._conn is conn, "the connection was not usable"
+
+    store.close()  # no call is running now
+    assert conn.closed and not conn.closed_under_a_statement and store._conn is None
+
+    def refused(*args, **kwargs):
+        raise psycopg.OperationalError("connection refused")
+
+    # A call after the close opens a new connection: a psycopg error here, never an
+    # AttributeError from a connection set to None.
+    monkeypatch.setattr(module.psycopg, "connect", refused)
+    with pytest.raises(psycopg.OperationalError):
+        store.count()
 
 
 def _held_by_caller(lock) -> bool:
@@ -531,11 +487,16 @@ def test_pg_the_text_processor_runs_outside_the_stores_lock():
     assert processor.held == [False] * 4
 
 
-def test_pg_a_shallow_copy_shares_the_connections_lock():
+def test_pg_a_shallow_copy_shares_the_lock_and_the_count_of_calls():
     import copy
+    import pickle
 
     store, _ = _pg_store()
-    assert copy.copy(store)._lock is store._lock
+    clone = copy.copy(store)
+    assert clone._lock is store._lock and clone._turns is store._turns
+    store._conn = None
+    unpickled = pickle.loads(pickle.dumps(store))
+    assert unpickled._lock is not store._lock and unpickled._turns is not store._turns
 
 
 def test_pg_a_store_not_yet_connected_can_still_be_pickled():
