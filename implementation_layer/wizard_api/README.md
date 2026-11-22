@@ -29,6 +29,8 @@ needs a deployment named `claude-sonnet-4-6`, or set `ANTHROPIC_MODEL` to the
 deployment's name. Compose passes these four names, and no other line of the file,
 to `wizard-api`; `docker compose up -d wizard-api` picks up a change.
 `WIZARD_AGENT_CHAT=false` in the same file brings back the UI's mock reply.
+A stack built before the dev-login build arg keeps its old `wizard-ui` image on a
+plain `docker compose up`, with dev login off: rebuild it once with `--build`.
 
 | What you see | `docker compose logs wizard-api` | Cause |
 |---|---|---|

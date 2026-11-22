@@ -25,6 +25,8 @@ UI http://localhost:3000 · API http://localhost:8100
 `claude-sonnet-4-6`, tai aseta `ANTHROPIC_MODEL` deploymentin nimeksi. Compose vie
 `wizard-api`:lle vain nämä neljä muuttujaa; muutoksen jälkeen `docker compose up -d wizard-api`.
 Oireet ja syyt: ks. kohta 8. Portit kuuntelevat vain `127.0.0.1`:ssä.
+Jos olet rakentanut stackin ennen tätä muutosta, rakenna se kerran uudelleen (`docker compose up --build`):
+vanha `wizard-ui`-image on käännetty ilman dev-loginia, eikä pelkkä `docker compose up` rakenna sitä uudelleen.
 
 **Windows:** käytä tätä Docker-polkua. Option B ja C (API suoraan koneella) vaativat
 Linuxin, macOS:n tai WSL:n, koska `wizard_api` käyttää `fcntl`ia ja `os.O_NOFOLLOW`ia.
