@@ -2195,6 +2195,10 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
             # the choices win and the value is one of those texts. A copy: the
             # caller's FieldSpec keeps its own choices.
             if has_default:
+                if isinstance(default, Decimal):
+                    # The value is one of these texts, so a Decimal default is its
+                    # text: a Decimal in the Literal would refuse its own JSON.
+                    default = str(default)
                 values = f.enum if default in f.enum else [*f.enum, default]
                 annotated = Literal[tuple(values)]  # type: ignore[misc,call-arg]
             else:

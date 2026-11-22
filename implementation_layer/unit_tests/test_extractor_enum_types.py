@@ -157,6 +157,27 @@ def test_text_choices_on_a_decimal_field_replace_its_type_as_on_int():
     assert rebuilt.model_json_schema() == model.model_json_schema()
 
 
+def test_a_number_default_on_a_decimal_field_with_labels_is_one_of_its_texts():
+    requirements = _requirements(
+        FieldSpec(
+            field_name="tier",
+            field_type="decimal",
+            description="t",
+            enum=["low", "high"],
+            default="1.5",
+            has_explicit_default=True,
+        )
+    )
+    model = create_extraction_model(requirements)
+
+    assert model.model_validate({"tier": "1.5"}).tier == "1.5"
+    assert model.model_validate({}).tier == "1.5"
+    # The model reads back what it writes.
+    written = model.model_validate({"tier": "low"}).model_dump_json()
+    assert model.model_validate_json(written).tier == "low"
+    assert model.model_validate_json(model.model_validate({}).model_dump_json()).tier == "1.5"
+
+
 def test_building_a_model_leaves_the_field_specs_as_they_were():
     level = FieldSpec(
         field_name="level",
