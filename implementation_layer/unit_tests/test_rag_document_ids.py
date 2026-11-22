@@ -466,6 +466,34 @@ def test_workflow_document_ids_identify_the_files(workflow):
         workflow.index_documents(["/tmp/x1.pdf"], document_ids=[])
 
 
+@pytest.mark.parametrize("bad", [{"$gt": ""}, None, 1.5, ""])
+def test_workflow_checks_every_document_id_before_it_parses_a_file(workflow, bad):
+    parsed = []
+    parse = workflow.parser.convert_doc_to_chunks
+
+    def counting(path, document_name=None):
+        parsed.append(path)
+        return parse(path, document_name=document_name)
+
+    workflow.parser.convert_doc_to_chunks = counting
+    workflow.parser.texts = {"/in/a.pdf": ["one"], "/in/b.pdf": ["two"]}
+
+    with pytest.raises(ValueError):
+        workflow.index_documents(["/in/a.pdf", "/in/b.pdf"], document_ids=["doc-1", bad])
+    # Parsing a file can cost vision calls; none is parsed for a call that fails.
+    assert parsed == []
+    assert workflow.vector_store.count() == 0
+
+
+def test_workflow_takes_file_paths_from_a_generator_and_int_ids(workflow):
+    workflow.parser.texts = {"/in/a.pdf": ["one"], "/in/b.pdf": ["two"]}
+    result = workflow.index_documents((p for p in ["/in/a.pdf", "/in/b.pdf"]), document_ids=[7, 8])
+
+    assert result.num_documents == 2
+    assert workflow.delete_document(7) == 1
+    assert [d.page_content for d in workflow.vector_store._documents] == ["two"]
+
+
 def test_workflow_keeps_the_old_chunks_when_the_store_add_fails(workflow, monkeypatch):
     workflow.parser.texts = {"/in/a.pdf": ["one", "two"]}
     workflow.index_documents(["/in/a.pdf"])
@@ -657,6 +685,30 @@ def test_pg_lock_keys_differ_by_document_owner_and_table():
     keys.add(store._document_lock_key("report", None))
     assert len(keys) == 4
     assert store._document_lock_key("report", None) == store._document_lock_key("report", None)
+
+
+def test_pg_one_table_named_in_two_cases_takes_one_lock():
+    # Postgres folds an unquoted name: Documents and documents are one table.
+    store, _ = _pg()
+    lower = store._document_lock_key("report", None)
+    store.table_name = "Documents"
+    assert store._document_lock_key("report", None) == lower
+
+
+def test_pg_add_checks_the_document_id_before_it_connects(monkeypatch):
+    pytest.importorskip("psycopg")
+    from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+    from gaik.software_components.RAG.pg_vector_store import pg_vector_store as module
+
+    def connect(*args, **kwargs):
+        raise AssertionError("add() connected before it checked the document id")
+
+    monkeypatch.setattr(module.psycopg, "connect", connect)
+    store = PgVectorStore("postgresql://unused", embedding_dim=3)
+    doc = Document(page_content="x", metadata={"document_id": ["report"]})
+    with pytest.raises(ValueError):
+        store.add([doc], [A1], replace=True)
+    assert store._conn is None
 
 
 @pytest.mark.parametrize("bad", [{"$ne": "x"}, ["report"], None, 1.5, True])

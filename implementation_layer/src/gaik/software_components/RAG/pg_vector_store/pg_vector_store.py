@@ -924,12 +924,13 @@ class PgVectorStore:
                 for doc in documents
             ]
 
-        conn = self._get_conn()
-        has_chunk_key = self._chunk_key_column(conn)
+        # The document ids are checked before a connection is opened.
         keyed = chunk_ids(documents)
         metadatas = [
             with_document_id(doc.metadata, key.document_id) for doc, key in zip(documents, keyed)
         ]
+        conn = self._get_conn()
+        has_chunk_key = self._chunk_key_column(conn)
         ids: list[int] = []
 
         with conn.cursor() as cur:
@@ -1047,7 +1048,7 @@ class PgVectorStore:
         return result.rowcount
 
     @_rolls_back_on_error
-    def delete_document(self, document_id: str, *, owner: str | None = None) -> int:
+    def delete_document(self, document_id: str | int, *, owner: str | None = None) -> int:
         """Delete every row of one document and one owner.
 
         ``add()`` records each row's document in its metadata under
@@ -1077,8 +1078,12 @@ class PgVectorStore:
         return result.rowcount
 
     def _document_lock_key(self, document_id: str, owner: str | None) -> int:
-        """The advisory lock key (a signed bigint) for one document of one owner here."""
-        payload = json.dumps([self.table_name, document_id, owner], ensure_ascii=False)
+        """The advisory lock key (a signed bigint) for one document of one owner here.
+
+        The table name is lower-cased, as Postgres folds it: ``Documents`` and
+        ``documents`` are one table and take one lock.
+        """
+        payload = json.dumps([self.table_name.lower(), document_id, owner], ensure_ascii=False)
         digest = hashlib.sha256(payload.encode("utf-8")).digest()
         return int.from_bytes(digest[:8], "big", signed=True)
 

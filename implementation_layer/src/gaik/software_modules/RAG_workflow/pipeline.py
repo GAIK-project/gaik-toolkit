@@ -185,7 +185,7 @@ class RAGWorkflow:
         file_paths: list[str | Path],
         *,
         filenames: list[str] | None = None,
-        document_ids: list[str] | None = None,
+        document_ids: list[str | int] | None = None,
     ) -> IndexResult:
         """Parse and index documents into the vector store.
 
@@ -207,14 +207,25 @@ class RAGWorkflow:
                        If provided, these names are used instead of extracting from paths.
             document_ids: Optional stable id for each file (same order as
                 file_paths), such as a database key; indexing the same id again
-                replaces that document's chunks.
+                replaces that document's chunks. A string or an int (stored as
+                its string); any other id raises ``ValueError`` before a file
+                is parsed.
         """
+        file_paths = list(file_paths)
         if document_ids is not None and len(document_ids) != len(file_paths):
             raise ValueError("document_ids must have one entry for each file path")
+        # Every id is checked before any file is parsed: parsing can cost vision calls.
+        # The path in one spelling, so "docs/a.pdf" and Path("docs/a.pdf") (with
+        # backslashes on Windows) are the same document.
+        ids = [
+            check_document_id(
+                document_ids[i] if document_ids is not None else Path(file_path).as_posix()
+            )
+            for i, file_path in enumerate(file_paths)
+        ]
         all_chunks: list[Document] = []
-        ids: list[str] = []
 
-        for i, file_path in enumerate(file_paths):
+        for i, (file_path, document_id) in enumerate(zip(file_paths, ids)):
             doc_name = filenames[i] if filenames and i < len(filenames) else None
             if self.parser_kind == "text":
                 chunks = self.parser.convert_doc_to_chunks(file_path, document_name=doc_name)
@@ -222,12 +233,6 @@ class RAGWorkflow:
                 chunks = self.parser.convert_doc_to_chunks_with_vision(
                     str(file_path), document_name=doc_name
                 )
-            # The path in one spelling, so "docs/a.pdf" and Path("docs/a.pdf") (with
-            # backslashes on Windows) are the same document.
-            document_id = check_document_id(
-                document_ids[i] if document_ids is not None else Path(file_path).as_posix()
-            )
-            ids.append(document_id)
             for chunk in chunks:
                 chunk.metadata = {**(chunk.metadata or {}), "document_id": document_id}
             all_chunks.extend(chunks)
@@ -268,7 +273,7 @@ class RAGWorkflow:
                 delete_document(document_id)
         store.add(documents, embeddings)
 
-    def delete_document(self, document_id: str) -> int:
+    def delete_document(self, document_id: str | int) -> int:
         """Delete one document's chunks from the vector store.
 
         Args:

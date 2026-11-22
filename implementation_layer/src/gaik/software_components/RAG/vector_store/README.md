@@ -71,7 +71,7 @@ who must not reach each other's data separate collections or folders.
 
 ```python
 store.add(documents: list[Document], embeddings: list[list[float]], *, replace: bool = False) -> None
-store.delete_document(document_id: str, *, owner: str | None = None) -> int  # chunks deleted
+store.delete_document(document_id: str | int, *, owner: str | None = None) -> int  # chunks deleted
 
 results = store.search(
     query_embedding: list[float],

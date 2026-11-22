@@ -362,7 +362,7 @@ class VectorStore:
                 )
             raise
 
-    def delete_document(self, document_id: str, *, owner: str | None = None) -> int:
+    def delete_document(self, document_id: str | int, *, owner: str | None = None) -> int:
         """Delete every chunk of one document and one owner.
 
         ``add()`` records each chunk's document under ``gaik_document_key``
