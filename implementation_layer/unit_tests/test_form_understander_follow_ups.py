@@ -7,10 +7,10 @@ import pytest
 from gaik.software_components.form_understander import FormUnderstander
 from gaik.software_components.form_understander.understander import LabelMapping
 
-SCIENTIST = "\U0001f469‍\U0001f52c"  # woman scientist, one emoji
+SCIENTIST = "\U0001f469\u200d\U0001f52c"  # woman scientist, one emoji
 TWO_EMOJI = "\U0001f469\U0001f52c"  # woman, microscope
-PERSIAN = "می‌خواهم"  # "mi-khaham", ZWNJ inside
-PERSIAN_JOINED = PERSIAN.replace("‌", "")
+PERSIAN = "می\u200cخواهم"  # "mi-khaham", ZWNJ inside
+PERSIAN_JOINED = PERSIAN.replace("\u200c", "")
 
 
 class _Provider:
@@ -46,10 +46,9 @@ def _form(monkeypatch, entries):
     "label",
     [
         SCIENTIST,
-        "\U0001f3f3️‍\U0001f308",  # rainbow flag
-        "\U0001f468\U0001f3fd‍\U0001f4bb",  # man technologist, skin tone
-        "ශ්‍රී",  # Sinhala "shri" with its ZWJ
-        "ന്‍",  # Malayalam chillu written with a ZWJ at the end
+        "\U0001f3f3\ufe0f\u200d\U0001f308",  # rainbow flag
+        "\U0001f468\U0001f3fd\u200d\U0001f4bb",  # man technologist, skin tone
+        "ශ්\u200dරී",  # Sinhala "shri" with its ZWJ
         PERSIAN,
     ],
 )
@@ -77,8 +76,50 @@ def test_a_label_that_lost_or_gained_a_joiner_is_a_change(monkeypatch, page, mod
     assert (described.label, described.original) == (model, page)
 
 
+ZWJ, ZWNJ = "\u200d", "\u200c"
+
+
+@pytest.mark.parametrize(
+    ("page", "shown"),
+    [
+        (f"Name{ZWJ}", "Name"),
+        (f"{ZWJ}Name", "Name"),
+        (f"First{ZWJ} Name", "First Name"),
+        (f"First {ZWNJ}Name", "First Name"),
+        (f"{SCIENTIST}{ZWJ}", SCIENTIST),
+    ],
+)
+def test_a_joiner_at_an_edge_or_beside_a_space_is_taken_out(monkeypatch, page, shown):
+    form, _ = _form(monkeypatch, [])
+
+    (described,) = form.describe_labels([{"id": "a", "raw": page}])
+
+    assert (described.label, described.original) == (shown, shown)
+    assert described.changed is False
+
+
+@pytest.mark.parametrize("answer", [ZWJ, f"{ZWJ} ", f" {ZWNJ}{ZWJ} ", "\u0301"])
+def test_a_label_that_shows_nothing_keeps_the_page_label(monkeypatch, answer):
+    form, _ = _form(monkeypatch, [{"id": "a", "label": answer}])
+
+    (described,) = form.describe_labels([{"id": "a", "raw": "Etunimi"}])
+
+    assert (described.label, described.changed) == ("Etunimi", False)
+    assert form.clean_labels([{"id": "a", "raw": "Etunimi"}]) == {}
+
+
+def test_a_cut_leaves_no_joiner_at_its_end(monkeypatch):
+    page = "x" * 58 + SCIENTIST + " tail"  # the cut falls just after the joiner
+    form, _ = _form(monkeypatch, [{"id": "a", "label": page}])
+
+    (described,) = form.describe_labels([{"id": "a", "raw": page}])
+
+    assert not described.label.endswith(ZWJ)
+    assert described.truncated is True and described.changed is False
+
+
 def test_a_non_joiner_outside_letters_is_still_taken_out(monkeypatch):
-    form, _ = _form(monkeypatch, [{"id": "a", "label": "‌Name‌ 1‌2"}])
+    form, _ = _form(monkeypatch, [{"id": "a", "label": "\u200cName\u200c 1\u200c2"}])
 
     (described,) = form.describe_labels([{"id": "a", "raw": "Name 12"}])
 
@@ -87,7 +128,7 @@ def test_a_non_joiner_outside_letters_is_still_taken_out(monkeypatch):
 
 
 def test_bidi_controls_are_still_taken_out_next_to_a_joiner(monkeypatch):
-    form, _ = _form(monkeypatch, [{"id": "a", "label": f"‮{SCIENTIST}‬"}])
+    form, _ = _form(monkeypatch, [{"id": "a", "label": f"\u202e{SCIENTIST}\u202c"}])
 
     (described,) = form.describe_labels([{"id": "a", "raw": SCIENTIST}])
 

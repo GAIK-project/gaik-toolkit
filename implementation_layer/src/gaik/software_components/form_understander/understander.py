@@ -83,11 +83,12 @@ class CleanedLabel(BaseModel):
 
 MAX_LABEL_CHARS = 60
 _SENTENCE_PUNCTUATION = re.compile(r"[:;!?]|\.(?=\s|$)")
-_ZWNJ, _ZWJ = "‌", "‍"
-
-
-def _is_letter(ch: str) -> bool:
-    return unicodedata.category(ch)[0] in ("L", "M")
+_ZWNJ, _ZWJ = "\u200c", "\u200d"
+# A zero-width joiner shows only between letters, marks, digits or symbols (an
+# emoji is a symbol, its variation selector a mark); a non-joiner only between letters.
+_JOINS = {_ZWJ: ("L", "M", "N", "S"), _ZWNJ: ("L", "M")}
+# What a person can see: letters, digits, symbols and punctuation.
+_SEEN = ("L", "N", "S", "P")
 
 
 def _visible(text: str) -> str:
@@ -95,17 +96,33 @@ def _visible(text: str) -> str:
 
     They are taken out of every label gaik returns, so the label a person sees is the
     one that was compared: a bidi control could otherwise show words in another order.
-    Two of them change what is shown and stay: a zero-width joiner, which builds an
-    emoji sequence (👩‍🔬) or a letter form in Indic scripts, and a zero-width
-    non-joiner between two letters, which keeps them apart (Persian, Indic scripts).
+    Two of them change what is shown where they join two characters, and stay there:
+    a zero-width joiner between letters, marks, digits or symbols, which builds an
+    emoji sequence (a woman scientist) or a letter form in Indic scripts, and a
+    zero-width non-joiner between two letters, which keeps them apart (Persian,
+    Indic scripts). At an edge, beside a space or alone they show nothing and go.
     """
-    kept = [ch for ch in text if unicodedata.category(ch) != "Cf" or ch in (_ZWJ, _ZWNJ)]
+    kept = [ch for ch in text if unicodedata.category(ch) != "Cf" or ch in _JOINS]
     return "".join(
         ch
         for i, ch in enumerate(kept)
-        if ch != _ZWNJ
-        or (0 < i < len(kept) - 1 and _is_letter(kept[i - 1]) and _is_letter(kept[i + 1]))
+        if ch not in _JOINS
+        or (
+            0 < i < len(kept) - 1
+            and unicodedata.category(kept[i - 1])[0] in _JOINS[ch]
+            and unicodedata.category(kept[i + 1])[0] in _JOINS[ch]
+        )
     )
+
+
+def _shows_something(text: str) -> bool:
+    """Whether ``text`` has a character a person can see, not only spacing or marks."""
+    return any(unicodedata.category(ch)[0] in _SEEN for ch in text)
+
+
+def _cut(text: str) -> str:
+    """``text`` cut to ``MAX_LABEL_CHARS``, without a joiner left at the cut."""
+    return _visible(text[:MAX_LABEL_CHARS])
 
 
 def _words(text: str) -> str:
@@ -185,10 +202,8 @@ class FormUnderstander:
         described = []
         for f in safe_fields:
             original = _visible(f.raw).strip()
-            label = cleaned.get(f.id, original[:MAX_LABEL_CHARS])
-            truncated = len(original) > MAX_LABEL_CHARS and _same_words(
-                label, original[:MAX_LABEL_CHARS]
-            )
+            label = cleaned.get(f.id, _cut(original))
+            truncated = len(original) > MAX_LABEL_CHARS and _same_words(label, _cut(original))
             described.append(
                 CleanedLabel(
                     id=f.id,
@@ -266,7 +281,8 @@ class FormUnderstander:
             if entry.id not in known_ids:
                 continue
             label = _visible(entry.label).strip()
-            if not label:
+            # Only spacing or marks would show the person nothing: keep the page label.
+            if not _shows_something(label):
                 continue
-            result[entry.id] = label[:MAX_LABEL_CHARS]
+            result[entry.id] = _cut(label)
         return result
