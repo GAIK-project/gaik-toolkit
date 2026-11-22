@@ -35,7 +35,7 @@ RUN apt-get update \
 # against solution_wizard/gaik_validated_version.txt, and a test keeps this pin
 # equal to it: on 0.8.2 a PoC written to that guidance failed on
 # RunSettings(citations=...), which arrived in 0.8.3.
-ARG GAIK_VERSION=0.11.1
+ARG GAIK_VERSION=0.12.0
 
 # Only the extras the customer's five use cases actually import. `gaik[all-cpu]`
 # was the obvious choice and the wrong one: it pulls classifier/RAG/Finnish-NLP
