@@ -152,6 +152,15 @@ def _transcription_usage(response) -> dict[str, int]:
     raise ValueError(f"Unknown transcription usage type {usage.type!r}")
 
 
+def _azure_resource_endpoint(endpoint: str) -> str:
+    """The resource address of an Azure endpoint, without its ``/openai`` path:
+    ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``."""
+    base = endpoint.rstrip("/")
+    if base.endswith("/openai"):
+        base = base[: -len("/openai")]
+    return base.split("/openai/")[0]
+
+
 def _create_audio_client(api_config: dict):
     """Create an isolated SDK client, preserving the caller's HTTP transport."""
     provider = _audio_provider(api_config)
@@ -159,7 +168,7 @@ def _create_audio_client(api_config: dict):
     if provider == "azure":
         endpoint = api_config.get("azure_audio_endpoint") or api_config.get("azure_endpoint")
         if endpoint:
-            audio_config["azure_endpoint"] = endpoint.split("/openai/")[0]
+            audio_config["azure_endpoint"] = _azure_resource_endpoint(endpoint)
             audio_config.pop("base_url", None)
         audio_config.setdefault("api_version", "2024-12-01-preview")
     return create_openai_client(audio_config)

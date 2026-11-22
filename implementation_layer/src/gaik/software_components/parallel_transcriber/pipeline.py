@@ -14,7 +14,9 @@ and ``audio_pipeline.py``.  Provides a single entry point that handles:
 from __future__ import annotations
 
 import concurrent.futures
+import difflib
 import logging
+import math
 import re
 import shutil
 import subprocess
@@ -56,6 +58,152 @@ _GPT4O_API_DURATION_LIMIT_SECONDS = 1400
 # decoder need not agree to the last fraction of a second.
 _MAX_GPT4O_DURATION_SECONDS = 1380
 
+# Joining the text of two overlapping chunks from a model without timestamps: the
+# longest run of words both give for their shared audio is kept once, when it is at
+# least this many words; each side is searched over this many words per second of
+# shared audio (fast speech is about 3.5).
+_MIN_REPEATED_WORDS = 4
+_MAX_WORDS_PER_SECOND = 4
+
+
+def _azure_resource_endpoint(endpoint: str) -> str:
+    """The resource address of an Azure endpoint, without its ``/openai`` path:
+    ``https://r.openai.azure.com/openai/v1`` gives ``https://r.openai.azure.com``.
+
+    The same cut as the Transcriber's, which this package cannot import (pydub).
+    """
+    base = endpoint.rstrip("/")
+    if base.endswith("/openai"):
+        base = base[: -len("/openai")]
+    return base.split("/openai/")[0]
+
+
+def _returns_text_only(deployment: str) -> bool:
+    """True for a GPT-4o transcription model or deployment (``gpt-4o-transcribe``,
+    ``gpt-4o-mini-transcribe``): it answers in ``json`` or ``text`` only, without the
+    ``srt`` and its timestamps that Whisper gives."""
+    return "gpt" in deployment.lower()
+
+
+def _srt_cue_text(text: str) -> str:
+    # A blank line ends an SRT cue, so a cue's text has none.
+    return re.sub(r"\n\s*\n", "\n", text.strip())
+
+
+def _text_as_srt(text: str, seconds: float) -> str:
+    """One cue from 0 to ``seconds`` holding ``text``; empty for no text."""
+    text = _srt_cue_text(text)
+    if not text:
+        return ""
+    return f"1\n{seconds_to_time(0.0)} --> {seconds_to_time(seconds)}\n{text}\n"
+
+
+def _word_key(word: str) -> str:
+    return re.sub(r"[^\w]", "", word.lower())
+
+
+def _drop_repeated_words(
+    previous: list[str], following: list[str], shared_seconds: float
+) -> tuple[list[str], list[str]]:
+    """Keep the words two overlapping chunks both give for their shared audio once.
+
+    The longest run of the same words in the end of ``previous`` and the start of
+    ``following`` is the shared speech: ``previous`` is cut after it and ``following``
+    goes on after it. Without such a run of ``_MIN_REPEATED_WORDS`` both are kept whole,
+    so a word can repeat but none is lost.
+    """
+    window = max(_MIN_REPEATED_WORDS, math.ceil(shared_seconds * _MAX_WORDS_PER_SECOND))
+    tail = previous[-window:]
+    head = following[:window]
+    # A word that is only punctuation has no key; it never matches.
+    tail_keys = [_word_key(word) or f"\0a{i}" for i, word in enumerate(tail)]
+    head_keys = [_word_key(word) or f"\0b{i}" for i, word in enumerate(head)]
+    match = difflib.SequenceMatcher(None, tail_keys, head_keys, autojunk=False).find_longest_match(
+        0, len(tail_keys), 0, len(head_keys)
+    )
+    if match.size < _MIN_REPEATED_WORDS:
+        return previous, following
+    kept = len(previous) - len(tail) + match.a + match.size
+    return previous[:kept], following[match.b + match.size :]
+
+
+def _text_chunks_as_srt(
+    texts: list[str], chunk_metadata: list[dict] | None, last_chunk_seconds: float
+) -> str:
+    """Join the transcripts of overlapping chunks from a model without timestamps.
+
+    Each chunk becomes one cue over its own stretch of the recording (from its
+    nominal start to the next chunk's), and the words two chunks both give for
+    their overlap are kept once (:func:`_drop_repeated_words`).
+    """
+    if not chunk_metadata or len(chunk_metadata) != len(texts):
+        return _text_as_srt("\n".join(texts), last_chunk_seconds)
+    words = [text.split() for text in texts]
+    for i in range(1, len(words)):
+        shared = chunk_metadata[i - 1].get("overlap_end", 0) + chunk_metadata[i].get(
+            "overlap_start", 0
+        )
+        if shared > 0:
+            words[i - 1], words[i] = _drop_repeated_words(words[i - 1], words[i], shared)
+    cues: list[str] = []
+    for i, chunk_words in enumerate(words):
+        text = _srt_cue_text(" ".join(chunk_words))
+        if not text:
+            continue
+        start = chunk_metadata[i]["nominal_start"]
+        if i + 1 < len(words):
+            end = chunk_metadata[i + 1]["nominal_start"]
+        else:
+            end = max(start, chunk_metadata[i]["actual_start"] + last_chunk_seconds)
+        cues.append(
+            f"{len(cues) + 1}\n{seconds_to_time(start)} --> {seconds_to_time(end)}\n{text}\n"
+        )
+    return "\n".join(cues)
+
+
+class _Skipped:
+    """What a chunk job returns when an earlier one failed and the run is ending."""
+
+
+def _run_chunk_jobs(
+    job: Callable[[tuple[int, str]], tuple[int, str]],
+    chunk_files: list[str],
+    max_workers: int,
+) -> list[str | None]:
+    """Run ``job`` over the indexed chunk files in a thread pool; results by index.
+
+    The first job that raises ends the run: the chunks not yet started are not
+    sent (each would be a paid request whose result is thrown away), the ones
+    already running finish, and the error is raised.
+    """
+    stop = threading.Event()
+
+    def guarded(item: tuple[int, str]):
+        if stop.is_set():
+            return _Skipped
+        try:
+            return job(item)
+        except BaseException:
+            stop.set()
+            raise
+
+    results: list[str | None] = [None] * len(chunk_files)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+    try:
+        futures = [executor.submit(guarded, item) for item in enumerate(chunk_files)]
+        for future in concurrent.futures.as_completed(futures):
+            outcome = future.result()
+            if outcome is _Skipped:
+                continue
+            index, value = outcome
+            results[index] = value
+    except BaseException:
+        stop.set()
+        executor.shutdown(wait=True, cancel_futures=True)
+        raise
+    executor.shutdown(wait=True)
+    return results
+
 
 class ParallelTranscriber:
     """High-level orchestrator for parallel audio/video transcription.
@@ -93,6 +241,7 @@ class ParallelTranscriber:
         limits: InputLimits | None = None,
     ) -> None:
         cfg = config or TranscriptionConfig()
+        provider: str | None = None
         # Whisper Local has its own on-prem auth (api_base + key) — skip the
         # OpenAI/Azure provider check that the cloud-only models require.
         if cfg.model == TranscriptionModel.WHISPER_LOCAL:
@@ -123,6 +272,7 @@ class ParallelTranscriber:
                     what="azure_audio_endpoint",
                 )
         self._api_config = dict(api_config)
+        self._provider = provider
         self._config = cfg
         self._limits = limits or InputLimits()
 
@@ -409,21 +559,65 @@ class ParallelTranscriber:
     # Whisper API
     # ------------------------------------------------------------------
 
+    def _whisper_client_config(self) -> dict:
+        """The client config for the Whisper backend, built as the Transcriber builds it.
+
+        The provider is resolved as in the constructor (``provider: "azure"`` works
+        without the legacy ``use_azure`` flag). On Azure ``azure_audio_endpoint``, cut
+        at its ``/openai`` path, wins over ``base_url`` and ``azure_endpoint``; without
+        it a ``base_url`` is kept (the SDK then ignores ``azure_endpoint``), and a bare
+        ``azure_endpoint`` is cut the same way.
+        """
+        provider = self._provider or resolve_provider(
+            config={"use_azure": False, **self._api_config}
+        )
+        config = {**self._api_config, "provider": provider, "use_azure": provider == "azure"}
+        if provider == "azure":
+            if config.get("azure_audio_endpoint"):
+                config["azure_endpoint"] = _azure_resource_endpoint(config["azure_audio_endpoint"])
+                config.pop("base_url", None)
+            elif config.get("azure_endpoint") and not config.get("base_url"):
+                config["azure_endpoint"] = _azure_resource_endpoint(config["azure_endpoint"])
+            config.setdefault("api_version", "2024-12-01-preview")
+        return config
+
     def _make_whisper_client(self):
         """Create a new OpenAI client for Whisper (thread-safe: one per thread)."""
         from gaik.software_components.config import create_openai_client
 
-        # For audio endpoints, Azure may need a different base URL
-        config = dict(self._api_config)
-        if config.get("use_azure") and config.get("azure_audio_endpoint"):
-            config["azure_endpoint"] = config["azure_audio_endpoint"]
-        return create_openai_client(config)
+        return create_openai_client(self._whisper_client_config())
 
     def _get_whisper_deployment(self) -> str:
         return self._api_config.get("transcription_model", "whisper")
 
+    def _whisper_request(self, deployment: str, file) -> dict:
+        """The keyword arguments of one Whisper-backend transcription request.
+
+        Whisper is asked for SRT, which the merge and every output format are built
+        from. A GPT-4o model takes ``json`` or ``text`` only, so it is asked for
+        ``json`` and its text is made into SRT afterwards.
+        """
+        cfg = self._config
+        kwargs: dict = {
+            "model": deployment,
+            "file": file,
+            "response_format": "json" if _returns_text_only(deployment) else "srt",
+        }
+        if cfg.language and cfg.language != "auto":
+            kwargs["language"] = cfg.language
+        if cfg.prompt:
+            kwargs["prompt"] = cfg.prompt
+        return kwargs
+
+    @staticmethod
+    def _whisper_answer(response, deployment: str) -> str:
+        """SRT for Whisper; the transcript's text for a model asked for ``json``."""
+        if _returns_text_only(deployment):
+            return response.text or ""
+        return str(response)
+
     def _call_whisper_single(self, audio_path: Path) -> str:
-        """Transcribe a single file with Whisper."""
+        """Transcribe a single file with Whisper; returns SRT."""
         from ._retry import with_retry
 
         cfg = self._config
@@ -432,23 +626,27 @@ class ParallelTranscriber:
 
         def _do():
             with open(audio_path, "rb") as f:
-                kwargs: dict = {
-                    "model": deployment,
-                    "file": f,
-                    "response_format": "srt",  # always get SRT, convert later
-                }
-                if cfg.language and cfg.language != "auto":
-                    kwargs["language"] = cfg.language
-                if cfg.prompt:
-                    kwargs["prompt"] = cfg.prompt
-                return str(client.audio.transcriptions.create(**kwargs))
+                response = client.audio.transcriptions.create(
+                    **self._whisper_request(deployment, f)
+                )
+            return self._whisper_answer(response, deployment)
 
-        return with_retry(
+        answer = with_retry(
             _do,
             max_retries=cfg.max_retries,
             base_delay=cfg.retry_base_delay_seconds,
             max_429_retries=cfg.max_429_retries,
         )
+        if _returns_text_only(deployment):
+            return _text_as_srt(answer, self._seconds_or_zero(audio_path))
+        return answer
+
+    @staticmethod
+    def _seconds_or_zero(audio_path: str | Path) -> float:
+        try:
+            return get_audio_duration(str(audio_path))
+        except (OSError, subprocess.SubprocessError, ValueError):
+            return 0.0
 
     def _transcribe_chunks_whisper(
         self,
@@ -479,16 +677,10 @@ class ParallelTranscriber:
 
             def _do():
                 with open(path, "rb") as f:
-                    kwargs: dict = {
-                        "model": deployment,
-                        "file": f,
-                        "response_format": "srt",
-                    }
-                    if cfg.language and cfg.language != "auto":
-                        kwargs["language"] = cfg.language
-                    if cfg.prompt:
-                        kwargs["prompt"] = cfg.prompt
-                    return str(client.audio.transcriptions.create(**kwargs))
+                    response = client.audio.transcriptions.create(
+                        **self._whisper_request(deployment, f)
+                    )
+                return self._whisper_answer(response, deployment)
 
             result = with_retry(
                 _do,
@@ -511,24 +703,22 @@ class ParallelTranscriber:
             logger.info("Chunk %d/%d transcribed", idx + 1, total)
             return idx, result
 
-        indexed = list(enumerate(chunk_files))
-        results: list[str | None] = [None] * total
         max_workers = min(parallelism, total)
 
         logger.info("Transcribing %d chunks (parallel=%d, model=whisper)", total, max_workers)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_map = {executor.submit(_transcribe_one, item): item[0] for item in indexed}
-            for future in concurrent.futures.as_completed(future_map):
-                out_idx, transcription = future.result()
-                results[out_idx] = transcription
-
+        results = _run_chunk_jobs(_transcribe_one, chunk_files, max_workers)
         ordered = [t for t in results if t is not None]
 
         if progress_callback:
             progress_callback("merging", 0, 1, "Merging transcriptions …")
 
-        combined = combine_srt_chunks(ordered, chunk_metadata)
+        if _returns_text_only(deployment):
+            combined = _text_chunks_as_srt(
+                ordered, chunk_metadata, self._seconds_or_zero(chunk_files[-1])
+            )
+        else:
+            combined = combine_srt_chunks(ordered, chunk_metadata)
 
         if progress_callback:
             progress_callback("merging", 1, 1, "Merge complete")
@@ -560,8 +750,10 @@ class ParallelTranscriber:
         if not api_key or not endpoint:
             raise ValueError("Azure credentials not configured for GPT-4o Diarize")
 
+        # The deployment path goes after the resource address, so an endpoint given
+        # with its /openai/v1 path does not get that path twice.
         url = (
-            f"{endpoint.rstrip('/')}/openai/deployments/{deployment}"
+            f"{_azure_resource_endpoint(endpoint)}/openai/deployments/{deployment}"
             f"/audio/transcriptions?api-version={api_version}"
         )
 
@@ -690,18 +882,11 @@ class ParallelTranscriber:
             logger.info("Chunk %d/%d transcribed (GPT-4o)", idx + 1, total)
             return idx, srt
 
-        indexed = list(enumerate(chunk_files))
-        results: list[str | None] = [None] * total
         max_workers = min(parallelism, total)
 
         logger.info("Transcribing %d chunks (parallel=%d, model=gpt-4o)", total, max_workers)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_map = {executor.submit(_transcribe_one, item): item[0] for item in indexed}
-            for future in concurrent.futures.as_completed(future_map):
-                out_idx, srt_content = future.result()
-                results[out_idx] = srt_content
-
+        results = _run_chunk_jobs(_transcribe_one, chunk_files, max_workers)
         ordered = [r for r in results if r is not None]
 
         if progress_callback:
@@ -823,18 +1008,11 @@ class ParallelTranscriber:
             logger.info("Chunk %d/%d transcribed (whisper_local)", idx + 1, total)
             return idx, srt
 
-        indexed = list(enumerate(chunk_files))
-        results: list[str | None] = [None] * total
         max_workers = min(parallelism, total)
 
         logger.info("Transcribing %d chunks (parallel=%d, model=whisper_local)", total, max_workers)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_map = {executor.submit(_transcribe_one, item): item[0] for item in indexed}
-            for future in concurrent.futures.as_completed(future_map):
-                out_idx, srt_content = future.result()
-                results[out_idx] = srt_content
-
+        results = _run_chunk_jobs(_transcribe_one, chunk_files, max_workers)
         ordered = [r for r in results if r is not None]
 
         if progress_callback:

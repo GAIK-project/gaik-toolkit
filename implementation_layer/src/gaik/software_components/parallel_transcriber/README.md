@@ -115,14 +115,33 @@ call has a 60-second timeout, decoding a 10-minute one.
 
 A chunk that FFmpeg cannot create, even on its sequential retry, stops the run with a
 `RuntimeError` that names the missing time ranges, and a chunk whose transcription fails
-after its retries stops the run too. A chunk the provider transcribes as empty text is not
-an error, so a stretch of speech the provider returns nothing for looks like silence;
+after its retries stops the run too: the chunks not yet sent are not sent (each would be a
+paid request), and the error is raised once the running ones finish. A chunk the provider
+transcribes as empty text is not an error, so a stretch of speech the provider returns
+nothing for looks like silence;
 compare the transcript's timestamps with the recording where a gap matters. Each chunk's
 encoded length is read back with ffprobe, so the check holds at every `audio_bitrate`. A
 chunk shorter than asked for is retried like a failed one; if it is still short while audio
 continues past it, it is a missing stretch and stops the run. Chunks past the real end of
 the audio, which a file whose header overstates its length produces, are skipped and
 logged, and a recording in which no chunk holds audio stops the run with a `RuntimeError`.
+
+### Models on the Whisper backend
+
+`TranscriptionModel.WHISPER` sends `api_config["transcription_model"]`. A Whisper model or
+deployment (`whisper`, `whisper-1`) is asked for SRT, which gives subtitle timestamps and
+the overlap merge. A GPT-4o transcription model (any name containing `gpt`, such as
+`gpt-4o-transcribe`, the default of `get_openai_config()`) takes only `json` or `text`, so
+it is asked for `json` and gives text without timestamps: each chunk becomes one subtitle
+over its own stretch of the recording, and the words two chunks both give for their
+overlap are kept once (the longest run of at least 4 matching words; without one, both
+texts are kept whole). Use Whisper or `GPT4O_DIARIZE` where per-sentence timestamps matter.
+
+On Azure the Whisper backend resolves the provider as `Transcriber` does
+(`provider: "azure"` needs no `use_azure` flag), sends to `azure_audio_endpoint` when it is
+set, else to `base_url` or `azure_endpoint`, and cuts an Azure endpoint at its `/openai`
+path, so one given as `https://<resource>.openai.azure.com/openai/v1` works for Whisper and
+GPT-4o Diarize alike.
 
 ### TranscriptionConfig
 
