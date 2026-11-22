@@ -185,6 +185,26 @@ def test_rule_12_suggests_transcript_enhancement_only_when_external_models_are_a
         assert "stays off" in hints[0]
 
 
+@pytest.mark.parametrize("external", [True, False])
+def test_rule_12_suggests_no_enhancement_on_any_parent_when_external_models_are_forbidden(
+    external,
+):
+    """AudioToStructuredData uses TranscriptEnhancer too, and the audio PoC keeps its
+    enhancement off as well when the blueprint allows no external model API."""
+    blueprint = Blueprint.from_file(EXAMPLES / "incident_reporting_blueprint.json")
+    [step] = [s for s in blueprint.workflow.steps if s.component == "Transcriber"]
+    step.component = "AudioToStructuredData"
+    blueprint.governance.data_handling.external_model_api_allowed = external
+    hints = [
+        i.message
+        for i in validate(blueprint).warnings
+        if i.rule == 12 and "'TranscriptEnhancer'" in i.message
+    ]
+    assert len(hints) == 1 and "'AudioToStructuredData'" in hints[0]
+    assert ("enable it via an option" in hints[0]) is external
+    assert ("stays off" in hints[0]) is not external
+
+
 def test_every_function_the_transcriber_cards_call_is_imported_by_the_generic_poc():
     """The cards are what an agent wires into the _generic skeleton; a helper it calls
     and the skeleton does not import stops the PoC at that line."""

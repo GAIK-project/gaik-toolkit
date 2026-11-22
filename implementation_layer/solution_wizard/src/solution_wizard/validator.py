@@ -363,7 +363,8 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     # recommend enabling it via an option on the parent instead. The canonical
     # case: Transcriber(enhanced_transcript=True) on audio input makes a
     # separate TranscriptEnhancer step redundant. A blueprint that allows no
-    # external model API gets no such hint: enhancement sends the transcript to a
+    # external model API gets no hint to enable enhancement on any parent
+    # (Transcriber, AudioToStructuredData): enhancement sends the transcript to a
     # cloud chat model, so the PoC keeps it off there.
     from .scaffolder import external_model_forbidden
 
@@ -384,13 +385,15 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
         for inner in provided:
             other = step_by_component.get(inner)
             if other is not None and other.id != s.id:
-                if s.component == "Transcriber" and inner == "TranscriptEnhancer":
+                if inner == "TranscriptEnhancer" and no_external_model:
+                    # Transcriber, AudioToStructuredData or any other parent: the PoC
+                    # keeps their enhancement off, so there is nothing to enable.
                     hint = (
                         "remove the step: the blueprint allows no external model API, so "
                         "transcript enhancement stays off"
-                        if no_external_model
-                        else "set Transcriber(enhanced_transcript=True) on the audio step instead"
                     )
+                elif s.component == "Transcriber" and inner == "TranscriptEnhancer":
+                    hint = "set Transcriber(enhanced_transcript=True) on the audio step instead"
                 else:
                     hint = f"enable it via an option/parameter on '{s.component}' instead of a separate step"
                 warnings.append(
