@@ -30,6 +30,16 @@ def _check(value, quote: str, text: str | None = None) -> str:
         (-1014.5, "Discount (5%) - EUR 1,014.50", "match"),  # a sign set apart, as before
         (250, "Hyvitys -1 250,00 EUR", "mismatch"),  # one negative number, not -1 and 250
         (-1250, "Hyvitys -1 250,00 EUR", "match"),
+        # A dash elsewhere in the quote says nothing about the number.
+        (-250, "Lasku 2026-0042 Summa 250,00", "mismatch"),
+        (-250, "Tilaus PO-2025-1 Hinta 250,00 EUR", "mismatch"),
+        (-250, "250,00 - 14.3.2026", "mismatch"),
+        (-250, "Sivut 10 - 250", "mismatch"),
+        (-250, "Paino (250 g)", "mismatch"),
+        # A negative written as accounts write it.
+        (-250, "Hyvitys (250,00)", "match"),
+        (-250, "Saldo 250,00-", "match"),
+        (-250, "Saldo 250.00 CR", "match"),
     ],
 )
 def test_the_sign_of_a_number_counts(value, quote, expected) -> None:
@@ -61,6 +71,28 @@ def test_the_sign_of_a_number_counts(value, quote, expected) -> None:
 )
 def test_a_text_value_with_another_number_needs_a_person(value, quote, verdict) -> None:
     assert _check(value, quote) == verdict
+
+
+@pytest.mark.parametrize(
+    ("value", "quote", "expected"),
+    [
+        ("1.2.3", "Asennettu versio v1.2.3", "match"),
+        ("2.10.1", "Versio v2.10.1 (2026)", "match"),
+        ("12-2025-03", "Viite 12-2025-03", "match"),
+        ("1.2.3", "Versio v1.2.3.4", "mismatch"),  # a longer version
+        ("1.2.3", "Versio v11.2.3", "mismatch"),
+    ],
+)
+def test_a_version_no_date_reads_is_compared_as_written(value, quote, expected) -> None:
+    assert value_status(value, quote) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "verdict"),
+    [("2026-03-14T10:00", "reworded"), ("2026-03-14T11:00", "check")],
+)
+def test_a_clock_time_with_a_dot_is_hours_and_minutes(value, verdict) -> None:
+    assert _check(value, "Toimitus 14.3.2026 klo 10.00") == verdict
 
 
 def test_a_quote_of_an_escaped_closing_tag_is_found() -> None:

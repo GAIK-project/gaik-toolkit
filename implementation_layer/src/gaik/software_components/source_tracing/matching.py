@@ -35,8 +35,27 @@ _MONTHS = {
         start=1,
     )
 }
+# Finnish month names by their stem and "kuu", in any case form: maaliskuu, maaliskuuta,
+# marraskuun, kesäkuussa. Read before the English prefixes, which take marraskuu for March.
+_FINNISH_MONTHS = {
+    stem: number
+    for number, stem in enumerate(
+        (
+            "tammi", "helmi", "maalis", "huhti", "touko", "kesä",
+            "heinä", "elo", "syys", "loka", "marras", "joulu",
+        ),
+        start=1,
+    )
+}  # fmt: skip
+_FINNISH_MONTH = re.compile(rf"({'|'.join(_FINNISH_MONTHS)})kuu", re.IGNORECASE)
 _MINUS = "-\u2212\u2013"  # hyphen-minus, minus sign, en dash
 _LIGATURE = re.compile("[\ufb00-\ufb06]")  # the ones _ligatures expands
+# A minus set apart from the number after it, with a currency between them or not.
+_MINUS_APART = re.compile(rf"([{_MINUS}])\s+(?:[A-Za-z]{{3}}\s+|[\u20ac$\u00a3]\s*)?$")
+# A minus right after a number (250,00-), not one that joins it to another (10-20), or CR.
+_TRAILING_MINUS = re.compile(rf"(?:[{_MINUS}](?![\d\w])|\s*CR\b)")
+# A clock time after "klo" or "kello": 10.00, 9:30.
+_CLOCK = re.compile(r"\b(?:klo|kello|kl)\.?\s*(\d{1,2})[.:](\d{2})\b", re.IGNORECASE)
 # The parts of a date in a text: runs of digits, and words, of which month names count.
 _DATE_ITEM = re.compile(r"\d+|[^\W\d_]+")
 _DASHES = "\\-\u2010\u2011\u2012\u2013\u2014"
@@ -49,7 +68,9 @@ _DAY_MONTH_GAP = re.compile(r"[\s./]*")
 _YEAR_GAP = re.compile(rf"[\s.,/'’{_DASHES}]*")
 # What stands between the parts of a date with a month name: 11th of April, April 11, 2025,
 # 11-Apr-2025, the 11th day of April, 11 April (2025).
-_NAMED_GAP = re.compile(rf"(?:st|nd|rd|th)?(?:[\s.,/'’()\[\]{_DASHES}]|of|the|day)*", re.IGNORECASE)
+_NAMED_GAP = re.compile(
+    rf"(?:st|nd|rd|th)?(?:[\s.,/'’()\[\]{_DASHES}]|of|the|day|päivänä)*", re.IGNORECASE
+)
 # What joins the days of a range or a list: 11.–15.4.2025, 9., 11. ja 15.4.2025, 11 to 15
 # April, 11th–15th April, 11/12 April. A day's ordinal suffix may come first.
 _LINK = re.compile(
@@ -135,6 +156,25 @@ def _number_groups(text: str) -> list[list[float]]:
                     readings += _readings_of(piece)
         groups.append(readings)
     return groups
+
+
+def _negatives_in(text: str) -> list[float]:
+    """The readings (without their sign) of the numbers written negative in another way than
+    a minus against the digits: a minus set apart before it, perhaps with a currency
+    (``- EUR 250``, ``– 250``), brackets around it (``(250.00)``), a minus right after it
+    (``250,00-``) or ``CR`` after it."""
+    readings: list[float] = []
+    for match in _NUMBER.finditer(text):
+        before, after = text[: match.start()], text[match.end() :]
+        apart = _MINUS_APART.search(before)
+        if (
+            # Not a dash between two words or numbers (Sivut 10 - 250).
+            (apart and not before[: apart.start(1)].rstrip()[-1:].isalnum())
+            or (before.endswith("(") and after.startswith(")"))
+            or _TRAILING_MINUS.match(after)
+        ):
+            readings += [abs(reading) for reading in _readings_of(match.group())]
+    return readings
 
 
 def _signed(text: str, start: int) -> bool:
@@ -225,8 +265,11 @@ def _date_items(text: str) -> tuple[list[_Item], list[str]]:
     end: int | None = None
     for match in _DATE_ITEM.finditer(_nfc(text)):
         word = match.group()
+        finnish = _FINNISH_MONTH.match(word)
         if word[0].isdigit():
             item: _Item = (word, None)
+        elif finnish:
+            item = (None, _FINNISH_MONTHS[finnish.group(1).lower()])
         elif len(word) >= 3 and word[:3].lower() in _MONTHS:
             item = (None, _MONTHS[word[:3].lower()])
         else:
@@ -510,13 +553,22 @@ def value_status(value: Any, quote: str, policy: TracePolicy = _DEFAULT_POLICY) 
         tolerance = policy.number_tolerance
         readings = _numbers_in(quote)
         found = any(abs(reading - number) < tolerance for reading in readings)
-        # A sign set apart from its number ("Discount - EUR 1,014.50") reads as positive.
-        if not found and number < 0 and re.search(r"[-−–]", quote):
-            found = any(abs(reading + number) < tolerance for reading in readings)
+        if not found and number < 0:
+            # A negative written another way: a sign set apart (Discount - EUR 1,014.50),
+            # brackets (250.00), a sign after it (250,00-) or CR. A dash elsewhere in the
+            # quote (Lasku 2026-0042) says nothing about the number.
+            found = any(abs(reading + number) < tolerance for reading in _negatives_in(quote))
         return "match" if found else "mismatch"
     text = str(value)
     if date_parts(text) is not None:
-        return "match" if _date_in(text, quote) else "mismatch"
+        if _date_in(text, quote):
+            return "match"
+        if _value_dates(text):
+            return "mismatch"
+        # No date reads it (1.2.3, 12-2025-03): a version or an identifier, as written in
+        # the quote (v1.2.3), but not as part of a longer one (1.2.3.4, 11.2.3).
+        if re.search(rf"(?<!\d)(?<!\d[.,]){re.escape(text.strip())}(?![.,]?\d)", _nfc(quote)):
+            return "match"
     wanted = tokens(text)
     if not wanted:
         return "unchecked"
@@ -768,6 +820,8 @@ def _other_numbers(value: str, quote: str, tolerance: float) -> bool:
     if not wanted or len(_DATE_PARTS.findall(quote)) < len(_DATE_PARTS.findall(value)):
         return False
     readings = [reading for group in _number_groups(quote) for reading in group]
+    # A clock time with a dot (klo 10.00) is hours and minutes, not 10.0.
+    readings += [float(part) for clock in _CLOCK.finditer(quote) for part in clock.groups()]
     in_shared_date = _shared_date_parts(value, quote)
     for match, group in zip(wanted, _number_groups(value)):
         if any(abs(mine - theirs) < tolerance for mine in group for theirs in readings):

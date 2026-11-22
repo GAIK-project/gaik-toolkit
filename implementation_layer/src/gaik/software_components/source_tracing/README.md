@@ -271,13 +271,19 @@ No model is involved in the check. For each citation:
 2. **Value in the quote?** Numbers are compared as numbers in both European and American
    formats (`3.000 kg` holds `3000`, `1.234,50` holds `1234.5`), with their sign: a minus
    written against the digits counts (`-250,00` does not hold `250`), a dash between two
-   numbers does not (`10-20`). Dates are compared by their year, month and day, in an order
-   a date is written in and each from its own number: `11.04.2025` holds `2025-04-11` and
-   `11 April 2025`, but not `2025-11-04`, since dates with dots put the day first; a slash or a
+   numbers does not (`10-20`). A negative value also matches a number in brackets
+   (`(250,00)`), with a minus after it (`250,00-`) or `CR`, or with a minus set apart before
+   it (`- EUR 250`); a dash elsewhere in the quote (`Lasku 2026-0042`) does not count.
+   Dates are compared by their year, month and day, in an order
+   a date is written in and each from its own number: `11.04.2025` holds `2025-04-11`,
+   `11 April 2025` and `11. huhtikuuta 2025` (English and Finnish month names), but not
+   `2025-11-04`, since dates with dots put the day first; a slash or a
    dash may put the month first (`04/11/2025` holds both). Only a year written with two digits
    (`'25`, `11.04.05`) stands for a four-digit one. Each end of a range or a list shares the
-   rest of the date (`11.–15.4.2025` holds the 11th and the 15th). Text is compared by its
-   words, or as the same characters with other separators (`7200-4453-21` for `7200445321`).
+   rest of the date (`11.–15.4.2025` holds the 11th and the 15th). A value no date order reads,
+   such as a version `1.2.3`, matches the same characters in the quote (`v1.2.3`). Text is
+   compared by its words, or as the same characters with other separators (`7200-4453-21`
+   for `7200445321`).
    Text is compared in Unicode NFC form, so a decomposed `ä` (as some PDFs store it) is the
    same letter as a composed one.
 3. **Verdict** from the two answers, as in the table above.

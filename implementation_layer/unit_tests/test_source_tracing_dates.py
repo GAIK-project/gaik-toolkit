@@ -9,6 +9,7 @@ number below 100 as a year.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -144,6 +145,14 @@ VERIFIED_ON_MAIN = [
 ]
 
 NOW_VERIFIED = [
+    # Finnish month names, in their case forms.
+    ("2026-03-14", "14. maaliskuuta 2026"),
+    ("2025-11-14", "Toimitus 14. marraskuuta 2025"),
+    ("2025-06-01", "kesäkuun 1. päivänä 2025"),
+    ("2025-06-01", "1. päivänä kesäkuuta 2025"),
+    ("2025-12-24", "Jouluaatto 24. joulukuuta 2025"),
+    ("2025-01-31", "31. tammikuuta 2025"),
+    (DATE, "11.–15. huhtikuuta 2025"),
     (DATE, "11Apr2025"),
     ("1998-12-31", "31.12.98"),
     ("11.4.25", "11.4.2025"),
@@ -173,6 +182,7 @@ WRONG_DATES = [
     ("2025-11-15", "11.–15.–17.4.2025"),  # a range of days is not a day and a month
     ("2025-11-04", "2025年4月11日"),
     ("2025-04-15", "11.4.25–15.5.25"),
+    ("2025-03-14", "14. marraskuuta 2025"),  # marraskuu is November, not March
 ]
 
 
@@ -237,7 +247,10 @@ def test_a_long_run_of_digits_does_not_stop_the_check() -> None:
 def test_a_quote_with_many_numbers_is_checked_quickly() -> None:
     quote = ", ".join(str(n % 28 + 1) for n in range(3000)) + " ja 11.4.2025"
 
+    started = time.perf_counter()
     assert value_status(DATE, quote) == "match"
+    # Linear in the quote: about 0.05 s here. A quadratic reading of the list takes minutes.
+    assert time.perf_counter() - started < 5
 
 
 def test_a_zero_padded_year_is_boxed_in_a_pdf(tmp_path: Path) -> None:
