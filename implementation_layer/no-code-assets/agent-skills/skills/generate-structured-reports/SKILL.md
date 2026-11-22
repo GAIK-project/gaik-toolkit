@@ -167,7 +167,8 @@ and the limit. The helper keeps gaik's defaults and cannot raise them: a documen
 text or image file up to 100 MiB (a DOCX or XLSX may unpack to ten times that), an image up to
 89,478,485 pixels, a recording up to 6 hours, and up to 1,000,000 data rows per sheet or CSV
 file. A PDF's page count is not limited. Preflight reports every limit but the rows, at no
-cost; the normalizer checks the sources before it converts any of them, but counts a sheet's
+cost (a recording's length only when `ffprobe` is installed; without it the normalizer
+checks the length when it decodes the audio); the normalizer checks the sources before it converts any of them, but counts a sheet's
 rows only while reading it, after the files listed before it were converted (recordings and
 images included, which are paid). Tell the user which file is over which limit, and let them
 choose: a smaller file (a document split in parts, part of a sheet exported, a recording
