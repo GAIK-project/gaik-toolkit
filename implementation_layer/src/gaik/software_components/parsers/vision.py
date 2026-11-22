@@ -37,6 +37,8 @@ from gaik.software_components.source_material import (
     source_material_messages,
 )
 
+from ._cut_off import Reply, reply_cut_off
+
 try:
     from openai import AzureOpenAI, OpenAI
 except ImportError as exc:  # pragma: no cover - optional dependency guard
@@ -212,7 +214,8 @@ class VisionParser:
             Rendering resolution for the PDF to image conversion (default ``200``).
         clean_output:
             When ``True`` merge and clean multi-page output via a post-processing
-            LLM call.
+            LLM call. If that reply stops at ``max_tokens``, the per-page Markdown
+            is returned instead, with a warning in the log, so no page is lost.
         first_pages:
             Convert only this many pages from the start, e.g. ``1`` to read the
             first page. The ``max_pages`` limit then applies to these pages, not
@@ -241,7 +244,9 @@ class VisionParser:
             markdown_pages.append(markdown)
 
         if clean_output and len(markdown_pages) > 1:
-            return [self._clean_markdown(markdown_pages)]
+            merged = self._clean_markdown(markdown_pages)
+            if merged is not None:
+                return [merged]
         return markdown_pages
 
     def convert_image(self, image_path: str | Path) -> str:
@@ -494,9 +499,12 @@ class VisionParser:
         content = self._chat_content([{"role": "user", "content": payload}])
         if content is None:
             raise RuntimeError("Vision model returned empty content")
-        return content
+        if getattr(content, "cut_off", False):
+            logger.warning("Page %s: the reply stopped at max_tokens=%s", page, self.max_tokens)
+        return str(content)
 
-    def _clean_markdown(self, markdown_pages: Sequence[str]) -> str:
+    def _clean_markdown(self, markdown_pages: Sequence[str]) -> str | None:
+        """The merged Markdown, or None when the reply stopped at ``max_tokens``."""
         logger.info("Cleaning and merging markdown output")
 
         combined = "\n\n---PAGE_BREAK---\n\n".join(markdown_pages)
@@ -506,6 +514,14 @@ class VisionParser:
                 self._cleanup_prompt(), material.wrap(combined, label="markdown pages")
             )
         )
+        if getattr(content, "cut_off", False):
+            # A cut-off merge would replace every page with a document missing its end.
+            logger.warning(
+                "The cleanup reply stopped at max_tokens=%s; returning the %d pages unmerged",
+                self.max_tokens,
+                len(markdown_pages),
+            )
+            return None
         if not content:
             raise RuntimeError("Cleanup LLM returned empty output")
 
@@ -515,6 +531,10 @@ class VisionParser:
         return trimmed
 
     def _chat_content(self, messages: list[dict]) -> str | None:
+        """The reply's text as a :class:`Reply`, which says whether it was cut off.
+
+        None when the model returned no content and was not cut off.
+        """
         if isinstance(self._client, ProviderClient):
             chat = self._client.chat(
                 messages,
@@ -523,7 +543,7 @@ class VisionParser:
                 **self._sampling_kwargs(),
             )
             self.usage.add(chat.usage)
-            return chat.text
+            return Reply(chat.text or "", reply_cut_off(chat.raw))
         options = normalize_chat_kwargs(
             self.config.model,
             {"max_completion_tokens": self.max_tokens, **self._sampling_kwargs()},
@@ -536,7 +556,9 @@ class VisionParser:
             self.usage.add(
                 {k: v for k, v in response.usage.model_dump().items() if isinstance(v, int)}
             )
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        cut_off = reply_cut_off(response)
+        return None if content is None and not cut_off else Reply(content or "", cut_off)
 
     def _build_prompt(self, previous_context: str | None, material: SourceMaterial) -> str:
         if not (previous_context and self.use_context):
