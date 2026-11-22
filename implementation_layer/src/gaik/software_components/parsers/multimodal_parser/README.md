@@ -86,6 +86,8 @@ result.raw_markdown     # Model output with <div data-bbox/data-label> wrappers
 result.clean_markdown   # Wrappers stripped, inner markdown/HTML preserved
 result.html             # Styled HTML document (document tags only), or None if create_html=False
 result.usage            # UsageRecord with token counts, duration, and USD cost
+result.truncated        # True when the reply stopped at the output-token cap:
+                        # the end of the document is missing (a warning is logged)
 ```
 
 ### UsageRecord

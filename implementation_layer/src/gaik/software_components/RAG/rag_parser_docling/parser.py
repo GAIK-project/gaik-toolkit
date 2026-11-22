@@ -7,7 +7,7 @@ import re
 from collections import OrderedDict
 from typing import TYPE_CHECKING
 
-from gaik.software_components._log_names import file_tag
+from gaik.software_components._log_names import error_text, file_tag
 from gaik.software_components._tesseract import (
     installed_tesseract_cli_languages,
     installed_tesserocr_languages,
@@ -289,13 +289,12 @@ class DoclingRagParser:
                 chunk_id += 1
 
                 if chunk_id <= 3:
-                    print(
-                        f"Chunk {chunk_id}: document='{filename}', "
-                        f"page={page_num}, heading='{heading}'"
-                    )
+                    # The file by its tag and no heading: a name or a heading can
+                    # name a person.
+                    print(f"Chunk {chunk_id}: {file_tag(pdf_path)}, page={page_num}")
 
             except Exception as exc:
-                print(f"Error processing chunk {chunk_id}: {exc}")
+                print(f"Error processing chunk {chunk_id}: {error_text(exc, pdf_path)}")
                 fallback_meta = {
                     "source": pdf_path,
                     "document_name": document_name,

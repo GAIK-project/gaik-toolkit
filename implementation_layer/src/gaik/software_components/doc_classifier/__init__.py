@@ -16,7 +16,7 @@ Configuration:
 Features:
     - Single-label classification (one class per document)
     - Automatic parser selection based on file type
-    - Support for PDFs, Word docs (.docx, .doc), and images (.png, .jpg, .jpeg)
+    - Support for PDFs, Word docs (.docx; a Word 97-2003 .doc is refused), and images (.png, .jpg, .jpeg)
     - Confidence scores and reasoning for each classification
     - Batch processing of directories
     - "unknown" fallback category for uncertain classifications

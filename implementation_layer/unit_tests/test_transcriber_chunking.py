@@ -364,6 +364,76 @@ def test_allow_partial_marks_the_failed_chunk_and_transcribes_the_rest(tmp_path:
     assert "One" in outcome and "Three" in outcome
 
 
+def test_allow_partial_still_raises_when_every_chunk_failed(tmp_path: Path):
+    # A wrong key or a missing deployment fails every chunk: the markers alone are
+    # no transcript, whatever allow_partial says.
+    failed: list[dict] = []
+    requests, outcome = _three_chunks(
+        tmp_path,
+        [PermissionError("bad key k-123")] * 3,
+        allow_partial=True,
+        failed_segments=failed,
+    )
+
+    assert len(requests) == 3
+    assert isinstance(outcome, RuntimeError)
+    assert "None of the 3 segments could be transcribed (PermissionError)" in str(outcome)
+    assert "k-123" not in str(outcome)
+    assert outcome.__cause__ is None
+    assert failed == []  # nothing to report beside the raised error
+
+
+def test_allow_partial_lists_the_failed_segments(tmp_path: Path, capsys):
+    failed: list[dict] = []
+    _, outcome = _three_chunks(
+        tmp_path,
+        ["One", RuntimeError("provider error"), "Three"],
+        allow_partial=True,
+        failed_segments=failed,
+    )
+
+    assert isinstance(outcome, str)
+    assert failed == [{"segment": 2, "start_seconds": 40.0, "end_seconds": 80.0}]
+    assert "Segments 2 of 3 could not be transcribed" in capsys.readouterr().out
+
+
+def test_the_transcription_result_lists_the_failed_segments(tmp_path: Path):
+    audio = tmp_path / "long.mp3"
+    audio.write_bytes(b"tiny")
+    transcriber = Transcriber(
+        {"use_azure": False, "api_key": "test-key"},
+        output_dir=tmp_path / "w",
+        allow_partial=True,
+        transcription_model="gpt-4o-transcribe",
+    )
+    lost = {"segment": 2, "start_seconds": 40.0, "end_seconds": 80.0}
+
+    def split(*_args, failed_segments, **_kwargs):
+        failed_segments.append(lost)
+        return "[Timestamp: 00:40 - 01:20]\n[Transcription failed for segment 2]"
+
+    with (
+        patch.object(transcriber, "_needs_chunking", return_value=True),
+        patch(
+            "gaik.software_components.transcriber.transcriber._decode_audio",
+            return_value=_SliceableFakeAudio(duration_ms=120_000),
+        ),
+        patch(
+            "gaik.software_components.transcriber.transcriber.split_and_transcribe_with_context",
+            side_effect=split,
+        ),
+    ):
+        result = transcriber.transcribe(audio)
+
+    assert result.failed_segments == [lost]
+
+
+def test_a_transcription_result_without_failures_lists_none():
+    from gaik.software_components.transcriber.transcriber import TranscriptionResult
+
+    assert TranscriptionResult("text", None, "job").failed_segments == []
+
+
 @pytest.mark.parametrize("allow_partial", [False, True])
 def test_the_transcriber_passes_allow_partial_to_the_chunked_path(
     tmp_path: Path, allow_partial: bool

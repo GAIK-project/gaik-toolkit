@@ -394,7 +394,7 @@
       "Speaker labels are exposed on .segments only. .srt_content and .vtt_content are built by segments_to_srt/segments_to_vtt, which read start/end/text and drop every other key.",
       "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. Change a limit with limits=InputLimits(...).",
       "Since gaik 0.11.0, local_api_base must be the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS; otherwise the constructor raises EndpointNotAllowedError. Read it from that variable.",
-      "Since the gaik release after 0.11.0, a chunk of a split recording that cannot be transcribed makes transcribe() raise RuntimeError naming the segment and its time range; the remaining chunks are not sent. allow_partial=True returns the transcript with a '[Transcription failed for segment N]' line instead, as earlier releases did."
+      "Since the gaik release after 0.11.0, a chunk of a split recording that cannot be transcribed makes transcribe() raise RuntimeError naming the segment and its time range; the remaining chunks are not sent. allow_partial=True returns the transcript with a '[Transcription failed for segment N]' line instead, as earlier releases did; since the gaik release after 0.11.1 result.failed_segments then lists the failed chunks, and a run in which every chunk failed raises RuntimeError even so."
     ],
     "best_for": [
       "audio_to_transcript",
@@ -2977,7 +2977,7 @@
       ]
     },
     "known_limitations": [
-      "Word documents -- use a PDF parser for PDFs. Declares .doc support (is_supported_file() accepts it), but python-docx's Document() cannot open the legacy binary .doc format -- a real .doc file is refused with FileTypeMismatchError before python-docx opens it. Treat only .docx as actually supported.",
+      "Word documents (.docx) -- use a PDF parser for PDFs. A legacy binary .doc (Word 97-2003) is refused with FileTypeMismatchError whose message says to save it as .docx; a DOCX saved under the .doc name is read. Text in content controls and tracked insertions is read; tracked deletions are not.",
       "DOCX has no fixed page model, so page-level citations are not possible",
       "use_markdown=False emits paragraph-index and style markers rather than clean prose",
       "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB) and unpacked size (10 x that) before it is read. Change a limit with limits=InputLimits(...).",
@@ -3636,7 +3636,9 @@
     "uses_components": [],
     "required_parameters": [],
     "optional_parameters": [
-      "limits"
+      "limits",
+      "csv_delimiter",
+      "csv_encoding"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
