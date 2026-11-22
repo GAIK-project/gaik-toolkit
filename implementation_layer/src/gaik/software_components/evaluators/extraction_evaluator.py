@@ -304,11 +304,18 @@ def _as_decimal(value: Any) -> Decimal | None:
 
 
 def _values_equal(a: Any, b: Any) -> bool:
-    """``a == b``, with numbers compared as numbers when at least one side is a number."""
+    """``a == b``, with numbers compared as numbers when at least one side is a number.
+
+    Whatever ``==`` already called equal stays equal; a list still differs from a tuple.
+    """
     if isinstance(a, dict) and isinstance(b, dict):
         return a.keys() == b.keys() and all(_values_equal(a[key], b[key]) for key in a)
-    if isinstance(a, list | tuple) and isinstance(b, list | tuple):
+    if (isinstance(a, list) and isinstance(b, list)) or (
+        isinstance(a, tuple) and isinstance(b, tuple)
+    ):
         return len(a) == len(b) and all(_values_equal(x, y) for x, y in zip(a, b))
+    if a == b:
+        return True
     is_number = (isinstance(x, int | float | Decimal) and not isinstance(x, bool) for x in (a, b))
     if any(is_number):
         left, right = _as_decimal(a), _as_decimal(b)
