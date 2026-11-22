@@ -72,7 +72,10 @@ An explicit `transcription_model` always wins over the one in `api_config`.
 - When a chunk cannot be transcribed, `transcribe` raises a `RuntimeError` that names the
   chunk's time range, and the remaining chunks are not sent. Pass `allow_partial=True` to
   get the transcript with a `[Transcription failed for segment N]` line under that chunk's
-  timestamp instead.
+  timestamp instead; `result.failed_segments` then lists each failed chunk
+  (`{"segment": 2, "start_seconds": 40.0, "end_seconds": 80.0}`), and is empty when none
+  failed. A run in which every chunk failed (a wrong key, a missing deployment) raises a
+  `RuntimeError` even with `allow_partial=True`: markers alone are no transcript.
 
 ## Input limits
 

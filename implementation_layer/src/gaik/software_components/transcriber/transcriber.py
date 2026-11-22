@@ -197,6 +197,10 @@ class TranscriptionResult:
     # Enhancement passes refused because they changed digits or too much of the text
     # (TranscriptEnhancer.refused_passes, as dicts); the raw transcript was kept for them.
     enhancement_refused_passes: list[dict] | None = None
+    # Segments of a split recording that could not be transcribed (only with
+    # allow_partial=True), one dict each: "segment" (1-based), "start_seconds" and
+    # "end_seconds". Empty when every segment was transcribed.
+    failed_segments: list[dict] = field(default_factory=list)
 
     def save(
         self,
@@ -245,7 +249,8 @@ class Transcriber:
     raises a :class:`RuntimeError` naming its time range, and the remaining
     chunks are not sent. With ``allow_partial=True`` the transcript comes back
     with a ``[Transcription failed for segment N]`` line under that chunk's
-    timestamp instead.
+    timestamp instead, and :attr:`TranscriptionResult.failed_segments` lists the
+    failed chunks; a run in which every chunk failed still raises.
     """
 
     def __init__(
@@ -355,6 +360,7 @@ class Transcriber:
         srt_content: str | None = None
         vtt_content: str | None = None
         usage = UsageCounter()
+        failed_segments: list[dict] = []
 
         with measure_duration() as elapsed:
             if effective_model == "whisper_local":
@@ -372,6 +378,7 @@ class Transcriber:
                     prompt=prompt,
                     transcription_model=effective_model,
                     usage=usage,
+                    failed_segments=failed_segments,
                 )
 
             enhanced_text: str | None = None
@@ -406,6 +413,7 @@ class Transcriber:
             audio_duration_s=audio_duration_s,
             model_used=effective_model,
             usage=usage.snapshot(),
+            failed_segments=failed_segments,
         )
 
     # ------------------------------------------------------------------
@@ -504,6 +512,7 @@ class Transcriber:
         prompt: str | None,
         transcription_model: str,
         usage: UsageCounter | None = None,
+        failed_segments: list[dict] | None = None,
     ) -> str:
         """
         If input is within configured size and duration limits: single-pass
@@ -511,6 +520,9 @@ class Transcriber:
         supported by the API). Otherwise, chunk with PyDub and transcribe
         sequentially. Chunking is model-independent; every remote transcription
         model goes through the same size/duration guard.
+
+        ``failed_segments``, if given, gets the chunks that failed (with
+        ``allow_partial``) appended, as :func:`split_and_transcribe_with_context`.
         """
         if self._needs_chunking(input_path):
             print("Chunking input for transcription...")
@@ -527,6 +539,7 @@ class Transcriber:
                 usage=usage,
                 language=self.language,
                 allow_partial=self.allow_partial,
+                failed_segments=failed_segments,
             )
 
         print("Transcribing in a single request (original file)...")
@@ -623,6 +636,7 @@ def split_and_transcribe_with_context(
     usage: UsageCounter | None = None,
     language: str | None = None,
     allow_partial: bool = False,
+    failed_segments: list[dict] | None = None,
 ):
     """Split audio into chunks and transcribe with rolling context.
 
@@ -634,9 +648,12 @@ def split_and_transcribe_with_context(
     time range, and the remaining chunks are not sent. With
     ``allow_partial=True`` the chunk is marked
     ``[Transcription failed for segment N]`` under its timestamp and the rest
-    are transcribed.
+    are transcribed; ``failed_segments``, if given, gets one dict per failed
+    chunk appended (``segment``, 1-based, ``start_seconds``, ``end_seconds``).
 
     Raises:
+        RuntimeError: If a chunk cannot be transcribed, or, with
+            ``allow_partial=True``, if no chunk can be.
         ValueError: If ``audio_path`` is a playlist or file list rather than a
             recording (:func:`~gaik.software_components.input_limits.check_not_media_list`).
     """
@@ -668,6 +685,8 @@ def split_and_transcribe_with_context(
 
     transcripts = []
     context_text = ""
+    failed: list[dict] = []
+    error_types: list[str] = []
 
     audio_client = None
     try:
@@ -707,6 +726,15 @@ def split_and_transcribe_with_context(
                         "to get the transcript with this segment marked as failed."
                     ) from None
                 transcripts.append(f"{chunk_header}[Transcription failed for segment {i + 1}]")
+                failed.append(
+                    {
+                        "segment": i + 1,
+                        "start_seconds": start_ms / 1000,
+                        "end_seconds": end_ms / 1000,
+                    }
+                )
+                if type(exc).__name__ not in error_types:
+                    error_types.append(type(exc).__name__)
                 time.sleep(5)
             else:
                 # Outside the try: a usage error must raise, not mark a good chunk as failed.
@@ -721,6 +749,17 @@ def split_and_transcribe_with_context(
         _close_owned_audio_client(audio_client, api_config)
         shutil.rmtree(temp_dir, ignore_errors=True)
 
+    if failed and len(failed) == num_chunks:
+        # Markers alone are no transcript: fail as the single-pass path does.
+        raise RuntimeError(
+            f"None of the {num_chunks} segments could be transcribed "
+            f"({', '.join(error_types)}), so there is no transcript."
+        )
+    if failed:
+        numbers = ", ".join(str(segment["segment"]) for segment in failed)
+        print(f"Segments {numbers} of {num_chunks} could not be transcribed; they are marked.")
+    if failed_segments is not None:
+        failed_segments.extend(failed)
     return "\n\n".join(transcripts)
 
 
