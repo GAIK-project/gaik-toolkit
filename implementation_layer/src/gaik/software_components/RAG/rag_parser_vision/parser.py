@@ -23,7 +23,7 @@ try:
 except Exception:
     pass
 
-from gaik.software_components._log_names import file_tag
+from gaik.software_components._log_names import error_text, file_tag
 from gaik.software_components.input_limits import InputLimits, docling_limits, image_size
 
 if TYPE_CHECKING:
@@ -259,14 +259,13 @@ class VisionRagParser:
                 chunk_id += 1
 
                 if self.verbose and chunk_id <= 3:
-                    print(
-                        f"Chunk {chunk_id}: document='{filename}', "
-                        f"page={page_num}, heading='{heading}'"
-                    )
+                    # The file by its tag and no heading: a name or a heading can
+                    # name a person.
+                    print(f"Chunk {chunk_id}: {file_tag(pdf_path)}, page={page_num}")
 
             except Exception as exc:
                 if self.verbose:
-                    print(f"Error processing chunk {chunk_id}: {exc}")
+                    print(f"Error processing chunk {chunk_id}: {error_text(exc, pdf_path)}")
                 fallback_meta = {
                     "source": pdf_path,
                     "document_name": doc_name,
@@ -298,7 +297,8 @@ class VisionRagParser:
 
         if self.verbose:
             print(
-                f"Created {len(langchain_docs)} chunks with vision-enhanced content from {doc_name}"
+                f"Created {len(langchain_docs)} chunks with vision-enhanced content "
+                f"from {file_tag(pdf_path)}"
             )
 
         if return_markdown:

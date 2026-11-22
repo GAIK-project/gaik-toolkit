@@ -2,8 +2,8 @@
   "Transcriber": {
     "import": "from gaik.software_components.transcriber import Transcriber",
     "construct": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language)",
-    "construct_finnish": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language, enhanced_transcript=True)  # ONLY when language == 'fi' -- see the enhanced_transcript option's infer_from",
-    "construct_whisper_local": "import os  # not imported by the PoC templates -- add it\n    transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), transcription_model=\"whisper_local\", language=language, diarization=True, speaker_count=speaker_count, local_api_base=os.environ[\"LOCAL_TRANSCRIBER_API_BASE\"], local_api_key=os.environ[\"LOCAL_TRANSCRIBER_API_KEY\"])",
+    "construct_finnish": "transcriber = Transcriber(api_config=get_stage_config(config, 'transcription'), language=language, enhanced_transcript=not external_model_forbidden(config))  # ONLY when language == 'fi' -- see the enhanced_transcript option's infer_from; stays off when the blueprint allows no external model API",
+    "construct_whisper_local": "audio_config = get_stage_config(config, 'transcription')  # config.yaml: stages.transcription.transcription_model: whisper_local\n    enhance = False  # Finnish audio: not external_model_forbidden(config), as in construct_finnish\n    transcriber = Transcriber(api_config=audio_config, transcription_model=\"whisper_local\", language=language, diarization=True, speaker_count=speaker_count, enhanced_transcript=enhance, **local_transcriber_options(config, audio_config, enhanced_transcript=enhance))  # endpoint and key from LOCAL_TRANSCRIBER_API_*, host checked against the governance flags",
     "call": "tr = transcriber.transcribe(input_path)\n    text = tr.enhanced_transcript or tr.raw_transcript",
     "call_whisper_local": "tr = transcriber.transcribe(input_path)\n    segments = tr.segments or []  # each: start, end, text (+ speaker when diarization=True)\n    srt = tr.srt_content          # timings only, no speaker labels",
     "returns": "TranscriptionResult(.raw_transcript, .enhanced_transcript, .job_id, .segments, .srt_content, .vtt_content, .duration_s, .audio_duration_s, .model_used)",
@@ -49,7 +49,7 @@
         "default": null,
         "effect": "Base URL of the self-hosted whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it. Since gaik 0.11.0, the constructor accepts only the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for that address), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS or api_config['allowed_endpoint_hosts']; any other address raises EndpointNotAllowedError (a ValueError).",
         "selection_relevant": true,
-        "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code read it from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app), never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
+        "infer_from": "transcription_model == whisper_local -> ask the user for the endpoint URL; in generated code pass **local_transcriber_options(config, audio_config, enhanced_transcript=enhance) from provider_config.py, with the enhance value the Transcriber's enhanced_transcript gets (see construct_whisper_local). The helper reads the URL from the env var LOCAL_TRANSCRIBER_API_BASE (the convention used by toolkit_demo_app) and checks its host against the blueprint's governance flags; never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
       {
         "name": "local_api_key",
@@ -57,7 +57,7 @@
         "default": null,
         "effect": "Auth key for the whisper_local server. Required when transcription_model='whisper_local' -- transcribe() raises ValueError without it.",
         "selection_relevant": true,
-        "infer_from": "transcription_model == whisper_local -> in generated code read it from the env var LOCAL_TRANSCRIBER_API_KEY (the convention used by toolkit_demo_app), never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
+        "infer_from": "transcription_model == whisper_local -> in generated code pass **local_transcriber_options(config, audio_config, enhanced_transcript=enhance) from provider_config.py, with the enhance value the Transcriber's enhanced_transcript gets (see construct_whisper_local). The helper reads the key from the env var LOCAL_TRANSCRIBER_API_KEY (the convention used by toolkit_demo_app); never hard-code. gaik itself has no env fallback -- the kwarg must be passed explicitly."
       },
       {
         "name": "diarization",
@@ -143,9 +143,9 @@
         "name": "allow_partial",
         "type": "bool",
         "default": false,
-        "effect": "Since the gaik release after 0.11.0: when a chunk of a split recording cannot be transcribed, transcribe() raises RuntimeError naming the segment and its time range, and the remaining chunks are not sent. allow_partial=True restores the earlier result: the transcript comes back with a '[Transcription failed for segment N]' line under that chunk's timestamp and the rest transcribed. A recording sent in a single request raises on failure either way.",
+        "effect": "Since the gaik release after 0.11.0: when a chunk of a split recording cannot be transcribed, transcribe() raises RuntimeError naming the segment and its time range, and the remaining chunks are not sent. allow_partial=True restores the earlier result: the transcript comes back with a '[Transcription failed for segment N]' line under that chunk's timestamp and the rest transcribed. A recording sent in a single request raises on failure either way. Since the gaik release after 0.11.1, with allow_partial=True result.failed_segments lists each failed chunk ({'segment', 'start_seconds', 'end_seconds'}; empty when none failed), and a run in which every chunk failed still raises RuntimeError.",
         "selection_relevant": true,
-        "infer_from": "leave False, so a gap in the recording stops the run. Set True only when the user accepts a transcript with missing stretches; then the PoC must look for the '[Transcription failed for segment' line in result.raw_transcript (not the enhanced transcript: transcript enhancement may drop or rewrite the line) and tell the user which part is missing."
+        "infer_from": "leave False, so a gap in the recording stops the run. Set True only when the user accepts a transcript with missing stretches; then the PoC must read result.failed_segments (since the gaik release after 0.11.1; for earlier releases look for the '[Transcription failed for segment' line in result.raw_transcript, not the enhanced transcript, which enhancement may rewrite) and tell the user which part is missing, and expect RuntimeError when every chunk failed."
       },
       {
         "name": "api_config",
@@ -253,7 +253,7 @@
         "infer_from": "keep the default; raise it only for heavily garbled ASR where large repairs are wanted. Where figures and names matter (medical, legal, inspection), keep the raw transcript as the record and have the PoC report result.refused_passes and diff_chunks"
       }
     ],
-    "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=True) instead, which calls this internally. Use this standalone only to enhance an already-existing transcript (text input)."
+    "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=not external_model_forbidden(config)) instead, which calls this internally (off when the blueprint allows no external model API). Use this standalone only to enhance an already-existing transcript (text input)."
   },
   "SchemaGenerator": {
     "import": "from gaik.software_components.extractor import SchemaGenerator",
@@ -457,7 +457,7 @@
     "import": "from gaik.software_components.parsers import MultimodalParser",
     "construct": "parser = MultimodalParser(api_config=get_stage_config(config, 'parser'))",
     "call": "pr = parser.parse(str(input_path))\n    parsed_text = pr.clean_markdown",
-    "returns": "ParseResult(.raw_markdown, .clean_markdown, .html [None unless create_html=True], .usage)",
+    "returns": "ParseResult(.raw_markdown, .clean_markdown, .html [None unless create_html=True], .usage, .truncated [True when the reply stopped at the output-token cap, so the end of the document is missing])",
     "install_extra": "multimodal-parser",
     "options": [
       {
@@ -558,7 +558,7 @@
     "construct": "parser = VisionParser(openai_config=get_stage_config(config, 'parser'))",
     "call": "pages = parser.convert_pdf(str(input_path), clean_output=True)\n    parsed_text = '\\n\\n'.join(pages)",
     "call_page_citations": "pages = parser.convert_pdf(str(input_path), clean_output=False)\n    # DO NOT join -- each list index is one page, needed for file_name|page_number citations\n    file_name = input_path.name\n    cited_pages = [(file_name, page_num, page_text) for page_num, page_text in enumerate(pages, start=1)]",
-    "returns": "list[str] (markdown pages). With clean_output=True and >1 page, this is a ONE-ELEMENT list containing the merged/cleaned markdown for the whole document -- NOT one element per page. Page-level attribution requires clean_output=False.",
+    "returns": "list[str] (markdown pages). With clean_output=True and >1 page, this is a ONE-ELEMENT list containing the merged/cleaned markdown for the whole document -- NOT one element per page; if the cleanup reply stops at max_tokens, the per-page list is returned instead (a warning is logged), so do not assume one element. Page-level attribution requires clean_output=False.",
     "install_extra": "parser",
     "options": [
       {
@@ -687,7 +687,7 @@
         "infer_from": "leave unset; the defaults fit ordinary files. Only when files can be over 100 MiB: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
       }
     ],
-    "note": "is_supported_file() returns True for both .docx and legacy binary .doc, but parse_document() calls python-docx's Document(), which cannot open the legacy .doc format at all -- a real .doc file is refused with FileTypeMismatchError (a ValueError) before python-docx opens it. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
+    "note": "Reads .docx only: python-docx cannot open the legacy binary .doc (Word 97-2003) format, so a real .doc file is refused with FileTypeMismatchError (a ValueError) whose message says to save it as .docx, and is_supported_file() returns False for .doc; a DOCX saved under the .doc name is still read. Text in content controls and tracked insertions is read; tracked deletions and a control's placeholder text are not. If the use case may receive .doc (not .docx) files, flag this as an unsupported input rather than assuming this parser handles it; there is no conversion step (e.g. LibreOffice/antiword) in gaik. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "DoclingParser": {
     "import": "from gaik.software_components.parsers import DoclingParser",
@@ -1224,7 +1224,7 @@
         "name": "language",
         "type": "enum",
         "default": "fi",
-        "effect": "Spoken language; controls the pronunciation instruction injected into the synthesis request. Supported: 'fi' (Finnish), 'en' (English).",
+        "effect": "Spoken language; controls the pronunciation instruction injected into the synthesis request. Supported: 'fi' (Finnish), 'en' (English). Since the gaik release after 0.11.1 the instructions (this line and default_instructions) go to a model whose name contains 'gpt', never to the tts-1 family (tts, tts-1, tts-hd, tts-1-hd, optionally with a dated suffix), which reads the text as written (result.instructions is None), and to any other name only with TextToSpeech(send_instructions=True) or api_config['tts_instructions']=True (a gpt-4o-mini-tts deployment named otherwise). response_format and speed now reach Azure as well; speed goes to a non-tts-1 model only when it is not 1.0.",
         "selection_relevant": true,
         "infer_from": "technical_spec.language or output language requirement"
       },
@@ -1862,7 +1862,7 @@
           "TranscriptionModel.WHISPER_LOCAL"
         ],
         "default": "TranscriptionModel.WHISPER",
-        "effect": "Transcription backend. All three yield timestamps. NONE of them yields speaker labels to the caller: GPT4O_DIARIZE requests diarized_json and parses the speaker field, then drops it when building the SRT (_segments_to_srt is called without include_speaker=True), and TranscriptionResult exposes only .content, so there is no way to recover it; WHISPER_LOCAL hardcodes diarization=False in its request payload. WHISPER_LOCAL also needs api_config['api_base'] (required) and api_config['key'] (optional), not the cloud provider config.",
+        "effect": "Transcription backend. All three yield timestamps, except that WHISPER gives per-sentence timestamps only when api_config['transcription_model'] is a Whisper model or deployment (whisper, whisper-1): since the gaik release after 0.11.1 a GPT-4o transcription model there (a name with 'gpt' and not 'whisper', such as gpt-4o-transcribe, the get_openai_config() default; TranscriptionConfig(whisper_request_format='json'/'srt') overrides the name) is asked for json and returns text only, so each chunk is one subtitle over its stretch, and a recording over 23 minutes is split to keep each request under 1400 s (earlier releases asked it for srt, which it refuses). NONE of them yields speaker labels to the caller: GPT4O_DIARIZE requests diarized_json and parses the speaker field, then drops it when building the SRT (_segments_to_srt is called without include_speaker=True), and TranscriptionResult exposes only .content, so there is no way to recover it; WHISPER_LOCAL hardcodes diarization=False in its request payload. WHISPER_LOCAL also needs api_config['api_base'] (required) and api_config['key'] (optional), not the cloud provider config.",
         "selection_relevant": true,
         "infer_from": "leave at WHISPER unless technical_spec.model says otherwise. Do NOT select GPT4O_DIARIZE to satisfy a speaker-attribution requirement -- it does not deliver one; use Transcriber(transcription_model='whisper_local', diarization=True) instead."
       },
@@ -3108,9 +3108,25 @@
         "effect": "Since gaik 0.11.0: an InputLimits (gaik.software_components.input_limits) checked for the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). A file over a limit raises InputLimitError (a ValueError naming the limit), and no model is called for it. A field set to None switches that limit off. Omit limits= to keep the defaults.",
         "selection_relevant": false,
         "infer_from": "leave unset; the defaults fit ordinary files. Only when sheets can have more than 1,000,000 rows: InputLimits(<field>=None) or a larger value, and tell the user which limit was raised"
+      },
+      {
+        "name": "csv_delimiter",
+        "type": "str | None",
+        "default": null,
+        "effect": "The CSV field delimiter, one character. None reads it from the rows: the one of ',', ';', tab and '|' that splits the header and at least 80% of the rows into the same number of fields, else ','. A CSV from Excel in a locale with a decimal comma uses ';'.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; set it only when the user names a delimiter that the rows do not show"
+      },
+      {
+        "name": "csv_encoding",
+        "type": "str | None",
+        "default": null,
+        "effect": "The CSV text encoding, such as utf-8 or cp1252. None reads UTF-8, UTF-16 with a byte order mark, or else Windows-1252 (the ANSI code page of a plain Excel CSV on Western-European Windows); other content raises ValueError.",
+        "selection_relevant": false,
+        "infer_from": "leave unset; set it only when the user names the encoding of files in another code page"
       }
     ],
-    "note": "No constructor options. Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
+    "note": "Only .xlsx and .csv are supported; .xls and other types raise ValueError. A workbook whose formulas have no stored results raises ValueError until it is opened and saved in Excel or LibreOffice. For questions over the data use TabularAgent; mixed source files go through SourceNormalizer, which already calls this parser. The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
   },
   "VectorStore": {
     "import": "from gaik.software_components.RAG.vector_store import VectorStore",

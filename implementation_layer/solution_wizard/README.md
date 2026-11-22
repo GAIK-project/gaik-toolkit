@@ -71,7 +71,14 @@ python run_wizard_interactive.py
 
 # Or give it (outside this repository):
 python run_wizard_interactive.py --output-dir C:/projects/my-use-case
+
+# Stop once the session's estimated model cost reaches $5 (default: no limit):
+python run_wizard_interactive.py --max-budget-usd 5
 ```
+
+`--max-budget-usd` counts the whole session, across your messages: the CLI keeps one running
+total for a streaming session, although the SDK documents the limit per query. The CLI checks
+that total between turns, so a session can end a little over the limit.
 
 The output folder must be a folder of its own: not this repository or a folder holding it,
 not your home folder or a folder above it, not a hidden settings folder in your home folder
@@ -90,8 +97,11 @@ What the agent may do: it runs with `bypassPermissions` and a PreToolUse hook,
 CLI would approve by itself, such as `ls` or reading a file. The agent reads only the output
 folder and the wizard's own files, writes only the output folder, never reads or writes a
 `.env` file, and runs in Bash only the wizard's scripts with the options
-`scripts/agent_scripts.json` lists. Other tools are refused with the reason, and the agent
-carries on. Your own MCP servers and Claude Code settings are not loaded. The agent's
+`scripts/agent_scripts.json` lists (or `--help` alone). A script does not run while a folder
+it writes into (`writes` in the same file) holds a link or junction it would follow; the
+refusal names the link. A virtual environment elsewhere in the output folder does not count.
+Other tools are refused with the reason, and the agent carries on. Your own MCP servers and
+Claude Code settings are not loaded. The agent's
 environment holds the system basics plus the names the `.env` file sets (without one, the
 provider names `templates/poc/_common/env.example.tmpl` lists and every shell name that
 starts with a provider prefix such as `ANTHROPIC_`, `AZURE_` or `OPENAI_`); the

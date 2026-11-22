@@ -91,31 +91,30 @@ class PyMuPDFParser:
 
         try:
             doc = fitz.open(file_path)
-            # PyMuPDF opens other formats too and picks the handler from the
-            # content, so ask it what it opened instead of trusting the name.
-            if not doc.is_pdf:
-                doc.close()
-                raise ValueError(f"The content of '{file_path}' is not a PDF document.")
+            # The document is closed however the read ends: an open file cannot be
+            # deleted on Windows, so a caller's cleanup would fail after an error.
             try:
+                # PyMuPDF opens other formats too and picks the handler from the
+                # content, so ask it what it opened instead of trusting the name.
+                if not doc.is_pdf:
+                    raise ValueError(f"The content of '{file_path}' is not a PDF document.")
                 self.limits.check_pages(doc.page_count, os.path.basename(file_path))
-            except ValueError:
+
+                if use_markdown:
+                    # Simple text extraction
+                    text_content = ""
+                    for page_num in range(doc.page_count):
+                        page = doc[page_num]
+                        if page_markers:
+                            text_content += f"[Page {page_num + 1}]\n"
+                        text_content += expand_ligatures(str(page.get_text()))
+                        text_content += "\n\n"  # Add page separator
+                else:
+                    # Structured extraction preserving layout
+                    text_content = self._extract_structured_pdf(doc)
+            finally:
                 doc.close()
-                raise
 
-            if use_markdown:
-                # Simple text extraction
-                text_content = ""
-                for page_num in range(doc.page_count):
-                    page = doc[page_num]
-                    if page_markers:
-                        text_content += f"[Page {page_num + 1}]\n"
-                    text_content += expand_ligatures(str(page.get_text()))
-                    text_content += "\n\n"  # Add page separator
-            else:
-                # Structured extraction preserving layout
-                text_content = self._extract_structured_pdf(doc)
-
-            doc.close()
             return text_content.strip()
 
         except Exception as e:

@@ -219,14 +219,20 @@ def detect_file_type(path: str | Path) -> str:
 
 
 def _looks_like_utf16(head: bytes) -> bool:
-    """UTF-16 text without a byte order mark: NUL bytes on one parity only.
+    """UTF-16 text without a byte order mark: NUL bytes on one parity only."""
+    return _utf16_codec(head) is not None
+
+
+def _utf16_codec(head: bytes) -> str | None:
+    """``"utf-16-le"`` or ``"utf-16-be"`` for UTF-16 text without a byte order mark.
 
     Text in a Latin script has a NUL high byte in most characters, so at least a
     quarter of the bytes are NUL and every one of them falls on the same parity.
+    None for other content.
     """
     sample = head[: len(head) // 2 * 2]
     if len(sample) < 4:
-        return False
+        return None
     even, odd = sample[0::2], sample[1::2]
     for zeros, other, codec in ((odd, even, "utf-16-le"), (even, odd, "utf-16-be")):
         if b"\x00" in other or zeros.count(0) * 2 < len(zeros):
@@ -236,9 +242,9 @@ def _looks_like_utf16(head: bytes) -> bool:
             # decoder that is not final keeps those bytes pending.
             codecs.getincrementaldecoder(codec)().decode(sample, final=False)
         except UnicodeDecodeError:
-            return False
-        return True
-    return False
+            return None
+        return codec
+    return None
 
 
 def _zip_type(path: Path) -> str:

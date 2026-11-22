@@ -198,7 +198,7 @@ Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 | `search_hybrid_weighted(query_embedding, query_text, *, top_k, semantic_weight, keyword_weight, filters)` | Weighted hybrid search |
 | `health(*, sample_rows=5)` | Check the live table against this store's configuration; returns a `HealthReport` |
 | `relemmatize(*, batch_size=500)` | Recompute the lemma column with the current `text_processor`; returns rows updated |
-| `close()` | Close database connection |
+| `close(*, timeout=None)` | Close database connection (a later call opens a new one). Waits for a call another thread is in to end its transaction: as long as it takes, or with `timeout`, raises `TimeoutError` after that many seconds and leaves the connection open. Called inside one of the store's calls on the same thread, it closes the connection when the outermost call ends |
 
 ### Chunk keys and re-indexing
 
@@ -217,6 +217,15 @@ Adding a document's chunks again updates their rows instead of inserting copies;
 document gets no key and is inserted each time, as before. Two calls that replace the
 same document of the same owner take a transaction-scoped advisory lock and run one
 after the other, so the table never holds a mix of both versions.
+
+Threads can share one store, but they share its one connection and its transaction,
+so the store's calls take turns: each runs until its transaction ends. The
+`text_processor` runs before a call takes its turn, so a slow lemmatizer does not hold
+up the others (`health()` and `relemmatize()` lemmatize rows they read, inside theirs).
+Two threads can therefore run the `text_processor` at once: it must be thread-safe, or
+give each thread its own store and processor. A shallow copy (`copy.copy`) shares the
+lock, so its calls take turns with the original's. Give each worker its own store to
+run queries in parallel.
 
 A table created by an earlier gaik release gets the column the next time `setup()`
 runs; until then `add()` inserts as before and logs a warning. Its existing rows keep
