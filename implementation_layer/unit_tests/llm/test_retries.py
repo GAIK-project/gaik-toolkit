@@ -149,3 +149,45 @@ def test_the_last_transient_failure_is_raised():
 def test_tries_must_be_positive():
     with pytest.raises(ValueError):
         with_retries(lambda: None, tries=0)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        httpx.ConnectTimeout("slow", request=_REQUEST),
+        httpx.PoolTimeout("busy", request=_REQUEST),
+        httpx.ReadError("reset", request=_REQUEST),
+        httpx.WriteError("broken pipe", request=_REQUEST),
+        httpx.RemoteProtocolError("server hung up", request=_REQUEST),
+    ],
+)
+def test_httpx_timeouts_and_network_errors_are_transient(error):
+    assert is_transient_error(error)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        httpx.UnsupportedProtocol("ftp://", request=_REQUEST),
+        httpx.ProxyError("proxy refused", request=_REQUEST),
+        httpx.LocalProtocolError("bad header", request=_REQUEST),
+    ],
+)
+def test_httpx_errors_that_repeat_on_every_try_are_not_transient(error):
+    assert not is_transient_error(error)
+
+
+def _wrapped(cls, cause):
+    try:
+        raise cls(request=_REQUEST) from cause
+    except cls as error:
+        return error
+
+
+def test_an_sdk_connection_error_is_judged_by_the_httpx_error_under_it():
+    unsupported = httpx.UnsupportedProtocol("ftp://", request=_REQUEST)
+    reset = httpx.ReadError("reset", request=_REQUEST)
+    assert not is_transient_error(_wrapped(openai.APIConnectionError, unsupported))
+    assert is_transient_error(_wrapped(openai.APIConnectionError, reset))
+    # Without an httpx cause the SDK's own word stands.
+    assert is_transient_error(_wrapped(openai.APIConnectionError, OSError("down")))

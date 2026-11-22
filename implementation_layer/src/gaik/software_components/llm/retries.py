@@ -38,6 +38,24 @@ def _status(error: BaseException) -> int | None:
     return None
 
 
+def _transport_may_pass(error: BaseException | None) -> bool | None:
+    """For an httpx transport error, whether it may pass; None for anything else.
+
+    A timeout, a network error (connect, read, write, close) or a server that broke
+    the protocol may pass. An unsupported scheme, a proxy refusal or a request the
+    client itself could not form is the same on every try.
+    """
+    try:
+        import httpx
+    except ImportError:  # pragma: no cover - httpx comes with the openai SDK
+        return None
+    if not isinstance(error, httpx.TransportError):
+        return None
+    return isinstance(
+        error, httpx.TimeoutException | httpx.NetworkError | httpx.RemoteProtocolError
+    )
+
+
 def is_transient_error(error: BaseException) -> bool:
     """Whether ``error`` may pass on another try: 429, 5xx, a timeout, a lost connection."""
     status = _status(error)
@@ -45,13 +63,13 @@ def is_transient_error(error: BaseException) -> bool:
         return status in _RETRY_STATUS or 500 <= status <= 599
     if isinstance(error, TimeoutError | ConnectionError):
         return True
-    try:
-        import httpx
-    except ImportError:  # pragma: no cover - httpx comes with the openai SDK
-        httpx = None
-    if httpx is not None and isinstance(error, httpx.TransportError):
-        return True
-    return any(cls.__name__ in _TRANSIENT_NAMES for cls in type(error).__mro__)
+    transport = _transport_may_pass(error)
+    if transport is not None:
+        return transport
+    if any(cls.__name__ in _TRANSIENT_NAMES for cls in type(error).__mro__):
+        # The SDKs raise these from the httpx error underneath; judge by that one.
+        return _transport_may_pass(error.__cause__) is not False
+    return False
 
 
 def with_retries(
