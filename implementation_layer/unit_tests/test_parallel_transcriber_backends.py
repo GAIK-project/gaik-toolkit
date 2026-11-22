@@ -401,6 +401,21 @@ def test_whisper_still_sends_a_long_small_file_in_one_request(tmp_path, monkeypa
     assert _long_whisper_run(tmp_path, monkeypatch, "whisper", 1800.0) is None
 
 
+@pytest.mark.parametrize("model", [None, ""], ids=["none", "empty"])
+def test_a_transcription_model_left_empty_in_the_config_is_whisper(tmp_path, monkeypatch, model):
+    # {"transcription_model": None} is what a config built from an unset variable has.
+    assert _long_whisper_run(tmp_path, monkeypatch, model, 1800.0) is None
+
+    audio = tmp_path / "note.mp3"
+    audio.write_bytes(b"\x00" * 10)
+    srt = "1\n00:00:00,000 --> 00:00:01,000\nHello\n"
+    client = _FakeAudioClient([srt])
+
+    assert _whisper(model, client)._call_whisper_single(audio) == srt
+    assert client.requests[0]["model"] == "whisper"
+    assert client.requests[0]["response_format"] == "srt"
+
+
 def test_a_gpt4o_single_pass_becomes_one_srt_cue(tmp_path, monkeypatch):
     audio = tmp_path / "note.mp3"
     audio.write_bytes(b"\x00" * 10)
