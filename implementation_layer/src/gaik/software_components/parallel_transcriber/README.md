@@ -141,10 +141,12 @@ the overlap merge. A GPT-4o transcription model (`gpt-4o-transcribe`, the defaul
 asked for `json` and gives text without timestamps: each chunk becomes one subtitle over its
 own stretch of the recording, and the words two chunks both give for their overlap are kept
 once: the end of one chunk's text and the start of the next one's are lined up over every
-length up to the overlap's words, and the best match (a difflib ratio of at least 0.75, with
-at least 4 words in common) is taken from the next chunk, so one word heard differently does
-not repeat the overlap, and a phrase said twice away from where the chunks meet never lines
-them up; without such a match both texts are kept whole. Use Whisper or `GPT4O_DIARIZE` where
+length up to the overlap's words, and the best match (a difflib ratio of at least 0.75 with
+at least 4 words in common, or 0.85 with 3) is taken from the next chunk, so one word heard
+differently does not repeat the overlap, and a phrase said twice away from where the chunks
+meet never lines them up. A word of the earlier chunk before the lined-up stretch is kept.
+Without such a match both texts are kept whole, so a very short or mostly silent overlap may
+appear twice in the transcript. Use Whisper or `GPT4O_DIARIZE` where
 per-sentence timestamps matter. Such a model also refuses a request over 1400 s, so a
 recording longer than 23 minutes is split even when it is small, into chunks of at most
 `(1400 - 2 x chunk_overlap_seconds) / 60` minutes.
@@ -161,7 +163,9 @@ or `/openai/deployments/...` is cut from the endpoint, and a bare trailing `/ope
 Azure host (`*.azure.com`, Azure Government `*.azure.us`, Azure China `*.azure.cn`, API
 Management `*.azure-api.net`), so `https://<resource>.openai.azure.com/openai/v1` works for
 Whisper and GPT-4o Diarize alike, while a gateway such as `https://gw.example.com/openai/prod`
-keeps its own path.
+keeps its own path. A `base_url` you set yourself (an APIM or LiteLLM gateway, say) no longer
+wins over an `azure_endpoint`, or the `azure_audio_endpoint` that `get_llm_config()` fills from
+`AZURE_ENDPOINT`: to send the audio through a gateway, set `azure_audio_endpoint` to it.
 
 ### TranscriptionConfig
 

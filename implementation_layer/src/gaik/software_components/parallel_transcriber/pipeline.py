@@ -62,10 +62,15 @@ _MAX_GPT4O_DURATION_SECONDS = 1380
 # Joining the text of two overlapping chunks from a model without timestamps: the end of
 # one chunk's text and the start of the next one's are lined up over k words, for every
 # k up to _MAX_WORDS_PER_SECOND words per second of shared audio (fast speech is about
-# 3.5). They count as the same speech at a difflib ratio of _MIN_OVERLAP_RATIO or more,
-# with at least _MIN_REPEATED_WORDS words in common.
+# 3.5). They count as the same speech at a difflib ratio of _MIN_OVERLAP_RATIO or more
+# with at least _MIN_REPEATED_WORDS words in common, or, for a short overlap, a ratio of
+# _MIN_SHORT_OVERLAP_RATIO with _MIN_SHORT_OVERLAP_WORDS. Of k values whose ratios are
+# within _OVERLAP_RATIO_SLACK of the best, the smallest is taken.
 _MIN_REPEATED_WORDS = 4
 _MIN_OVERLAP_RATIO = 0.75
+_MIN_SHORT_OVERLAP_WORDS = 3
+_MIN_SHORT_OVERLAP_RATIO = 0.85
+_OVERLAP_RATIO_SLACK = 0.05
 _MAX_WORDS_PER_SECOND = 4
 
 # The path the SDK adds itself, at the end of an Azure endpoint's path.
@@ -129,38 +134,53 @@ def _drop_repeated_words(
 ) -> tuple[list[str], list[str]]:
     """Keep the words two overlapping chunks both give for their shared audio once.
 
-    For each k from the overlap's word window down to ``_MIN_REPEATED_WORDS``, the last
-    k words of ``previous`` are compared with the first k of ``following``, case-folded
-    and without punctuation, by difflib's ratio, so a word heard differently in one
-    chunk ("2023" and "2024") does not split the overlap. The k with the best ratio is
-    the overlap when that ratio is at least ``_MIN_OVERLAP_RATIO`` and the two have at
-    least ``_MIN_REPEATED_WORDS`` words in common: ``previous`` loses its last k words
-    and ``following`` is kept whole, so the following chunk's version of the shared
-    speech stands. Otherwise both are kept whole: a phrase said again away from where
-    the chunks meet does not line them up.
+    For each k from the overlap's word window down to ``_MIN_SHORT_OVERLAP_WORDS``, the
+    last k words of ``previous`` are compared with the first k of ``following``,
+    case-folded and without punctuation, by difflib's ratio, so a word heard differently
+    in one chunk ("2023" and "2024") does not split the overlap. A k counts when its
+    ratio is at least ``_MIN_OVERLAP_RATIO`` with ``_MIN_REPEATED_WORDS`` words in common,
+    or ``_MIN_SHORT_OVERLAP_RATIO`` with ``_MIN_SHORT_OVERLAP_WORDS``; of the k values
+    within ``_OVERLAP_RATIO_SLACK`` of the best, the smallest is taken. ``previous`` is
+    cut where its first matching block starts, moved back over words just before it that
+    ``following`` also has just before its block, so a word of ``previous`` that the
+    lined-up stretch does not hold stays; ``following`` is kept whole, so the following
+    chunk's version of the shared speech stands. Without such a k both are kept whole: a
+    phrase said again away from where the chunks meet does not line them up.
     """
     window = min(
         len(previous),
         len(following),
-        max(_MIN_REPEATED_WORDS, math.ceil(shared_seconds * _MAX_WORDS_PER_SECOND)),
+        max(_MIN_SHORT_OVERLAP_WORDS, math.ceil(shared_seconds * _MAX_WORDS_PER_SECOND)),
     )
     # A word that is only punctuation has no key; it never matches.
     tail_keys = [_word_key(word) or f"\0a{i}" for i, word in enumerate(previous[-window:])]
     head_keys = [_word_key(word) or f"\0b{i}" for i, word in enumerate(following[:window])]
-    best_words, best_ratio = 0, 0.0
-    for words in range(window, _MIN_REPEATED_WORDS - 1, -1):
+    candidates: list[tuple[int, float, int, int]] = []  # k, ratio, first block's a and b
+    for words in range(window, _MIN_SHORT_OVERLAP_WORDS - 1, -1):
         matcher = difflib.SequenceMatcher(
             None, tail_keys[len(tail_keys) - words :], head_keys[:words], autojunk=False
         )
-        if matcher.real_quick_ratio() <= best_ratio or matcher.quick_ratio() <= best_ratio:
+        if matcher.real_quick_ratio() < _MIN_OVERLAP_RATIO:
             continue
         ratio = matcher.ratio()
-        in_common = sum(block.size for block in matcher.get_matching_blocks())
-        if ratio > best_ratio and in_common >= _MIN_REPEATED_WORDS:
-            best_words, best_ratio = words, ratio
-    if best_ratio < _MIN_OVERLAP_RATIO:
+        blocks = matcher.get_matching_blocks()
+        in_common = sum(block.size for block in blocks)
+        if (ratio >= _MIN_OVERLAP_RATIO and in_common >= _MIN_REPEATED_WORDS) or (
+            ratio >= _MIN_SHORT_OVERLAP_RATIO and in_common >= _MIN_SHORT_OVERLAP_WORDS
+        ):
+            candidates.append((words, ratio, blocks[0].a, blocks[0].b))
+    if not candidates:
         return previous, following
-    return previous[: len(previous) - best_words], following
+    best_ratio = max(ratio for _, ratio, _, _ in candidates)
+    words, _, first_a, first_b = min(
+        c for c in candidates if c[1] >= best_ratio - _OVERLAP_RATIO_SLACK
+    )
+    cut = len(previous) - words + first_a
+    # Words of following before its first matching block may be in previous just before it.
+    keys = [_word_key(word) for word in following[:first_b]]
+    while cut > 0 and first_b > 0 and _word_key(previous[cut - 1]) == keys[first_b - 1]:
+        cut, first_b = cut - 1, first_b - 1
+    return previous[:cut], following
 
 
 def _text_chunks_as_srt(

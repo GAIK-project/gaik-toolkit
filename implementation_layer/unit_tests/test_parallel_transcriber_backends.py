@@ -548,11 +548,40 @@ def test_a_phrase_repeated_far_from_the_edges_drops_nothing():
     assert pipeline._drop_repeated_words(previous, following, 30.0) == (previous, following)
 
 
-def test_three_shared_words_are_not_enough_to_drop_any():
+def test_a_short_overlap_of_three_words_is_kept_once_when_they_line_up_exactly():
     previous = "a b c one two three".split()
     following = "one two three d e".split()
 
+    assert pipeline._drop_repeated_words(previous, following, 30.0) == ("a b c".split(), following)
+
+
+def test_three_words_in_common_need_a_ratio_of_0_85():
+    # "one two three" are in both, but with "x" and "y" between: a ratio of 0.75.
+    previous = "a b c one two three x".split()
+    following = "one two y three d".split()
+
     assert pipeline._drop_repeated_words(previous, following, 30.0) == (previous, following)
+
+
+def test_a_word_before_the_lined_up_stretch_is_not_dropped():
+    # The best-scoring alignment starts at "kauppa", which the next chunk does not have.
+    previous = "x kauppa oli päivä yksi hän minä tai kaksi minä".split()
+    following = "oli päivä yksi hän minä tai kaksi X minä yksi aika".split()
+
+    kept_previous, kept_following = pipeline._drop_repeated_words(previous, following, 3.0)
+
+    assert (kept_previous, kept_following) == (["x", "kauppa"], following)
+
+
+def test_a_last_word_heard_differently_and_said_again_next_drops_nothing_real():
+    # The previous chunk ends "perjantaina", the next hears "maanantaina" there and then
+    # says "perjantaina": only the shared stretch is taken from the next chunk.
+    previous = "alku ja sitten sovimme että kokous on perjantaina".split()
+    following = "sitten sovimme että kokous on maanantaina perjantaina ja muuta".split()
+
+    kept_previous, kept_following = pipeline._drop_repeated_words(previous, following, 5.0)
+
+    assert (kept_previous, kept_following) == (["alku", "ja"], following)
 
 
 def test_whisper_chunks_still_go_through_the_srt_merge(tmp_path, monkeypatch):
