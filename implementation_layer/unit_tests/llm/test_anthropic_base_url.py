@@ -81,3 +81,31 @@ def test_without_a_base_url_the_default_host_is_used():
     urls = []
     _client(urls).chat([{"role": "user", "content": "Hi"}])
     assert urls == ["https://api.anthropic.com/v1/messages"]
+
+
+def test_anthropic_base_url_in_the_environment_is_used_after_the_check(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://proxy.example.test")
+    urls = []
+    _client(urls).chat([{"role": "user", "content": "Hi"}])
+    assert urls == ["https://proxy.example.test/v1/messages"]
+
+
+def test_plain_http_in_anthropic_base_url_to_a_public_host_is_warned_about(monkeypatch, caplog):
+    import logging
+
+    monkeypatch.setattr(endpoints, "_warned_http", set())
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://public.example.test")
+    with caplog.at_level(logging.WARNING):
+        _client([])
+    assert "without encryption" in caplog.text and "public.example.test" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "url", ["https://user:secret@proxy.example.test", "ftp://proxy.example.test"]
+)
+def test_a_malformed_anthropic_base_url_is_refused_before_a_request(monkeypatch, url):
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", url)
+    urls = []
+    with pytest.raises(EndpointNotAllowedError, match="ANTHROPIC_BASE_URL"):
+        _client(urls)
+    assert urls == []

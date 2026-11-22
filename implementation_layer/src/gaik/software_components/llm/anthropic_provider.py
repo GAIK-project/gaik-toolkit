@@ -24,7 +24,6 @@ from gaik.software_components.endpoints import (
     ANTHROPIC_URL,
     check_endpoint,
     foundry_host,
-    host_of,
     log_endpoint,
 )
 from gaik.software_components.env_file import load_env_file
@@ -319,18 +318,18 @@ class AnthropicProvider:
                 **options,
             )
         base_url = config.get("base_url")
+        # Without a base_url the SDK itself reads ANTHROPIC_BASE_URL. Either address
+        # receives the key, so both are checked: the variable's host is trusted, but
+        # plain http to a public host is logged and a user name or password refused.
+        url = base_url or os.getenv("ANTHROPIC_BASE_URL", "").strip() or ANTHROPIC_URL
+        host = check_endpoint(
+            url,
+            provider="anthropic",
+            allowed_hosts=config.get("allowed_endpoint_hosts"),
+            what="base_url" if base_url else "ANTHROPIC_BASE_URL",
+        )
         if base_url:
-            # A proxy or gateway in the config; the key goes there, so it is checked.
-            host = check_endpoint(
-                base_url,
-                provider="anthropic",
-                allowed_hosts=config.get("allowed_endpoint_hosts"),
-                what="base_url",
-            )
             options["base_url"] = base_url
-        else:
-            # Without a base_url the SDK itself reads ANTHROPIC_BASE_URL.
-            host = host_of(os.getenv("ANTHROPIC_BASE_URL") or ANTHROPIC_URL)
         log_endpoint("anthropic", host)
         return anthropic.Anthropic(api_key=config["api_key"], **options)
 
