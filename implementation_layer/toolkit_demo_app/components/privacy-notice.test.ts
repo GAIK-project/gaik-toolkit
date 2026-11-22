@@ -49,7 +49,7 @@ test("an open fact is shown as a placeholder, never as a value", () => {
 test("the reminder names what not to upload and links to the notice", () => {
   for (const item of [
     "synthetic or anonymised",
-    "special categories of personal data",
+    "sensitive personal data such as health details",
     "personal identity numbers",
     "card or bank account numbers",
     "passwords or keys",
