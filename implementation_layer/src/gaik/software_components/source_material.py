@@ -85,9 +85,26 @@ def clean_label(label: str) -> str:
     return text[:_LABEL_MAX].strip()
 
 
+# The escape :func:`_escape` writes, found again in a model's answer: "&lt;" in front of a
+# closing tag only, so any other "&lt;" in a quote is left as it is.
+_ESCAPED_CLOSING = re.compile(
+    rf"&lt;(?={_GAP}[{_SLASH}]{_GAP}source{_GAP}(?:[-_]{_GAP})?material)", re.IGNORECASE
+)
+
+
 def _escape(text: str) -> str:
     """Escape every closing tag written inside the material (``<`` becomes ``&lt;``)."""
     return _CLOSING_IN_MATERIAL.sub(lambda m: "&lt;" + m.group(1) + m.group(2), text)
+
+
+def _unescape_closing_tags(text: str) -> str:
+    """``text`` with the escape of :func:`_escape` taken off again (``&lt;`` becomes ``<``).
+
+    A model that quotes a closing tag written in the material quotes it as it saw it,
+    escaped. Only an escape in front of such a tag is turned back; ``&lt;`` anywhere else
+    may be the material's own text.
+    """
+    return _ESCAPED_CLOSING.sub("<", text) if "&lt;" in text else text
 
 
 class SourceMaterial:
@@ -124,12 +141,14 @@ class SourceMaterial:
         The material cannot end its block: the closing tag carries this call's
         random id, and any closing tag written inside the material is escaped
         first, so a fake one reaches the model as plain text. Only that tag
-        changes; the rest of the material is sent as it is.
+        changes; the rest of the material is sent as it is. A value that is not
+        a string (``None``, a number) is sent as its ``str()``.
         """
+        text = text if isinstance(text, str) else str(text)
         if self.boundary in text:
             # Only a caller-chosen boundary can collide; refuse rather than guess.
             raise ValueError("source material contains the block id; draw a new one")
-        body = _escape(str(text))
+        body = _escape(text)
         return f"{self.opening_tag(label)}\n{body}\n{self.closing_tag}"
 
     def strip_echo(self, text: str) -> str:

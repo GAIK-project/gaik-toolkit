@@ -21,6 +21,7 @@ material block, so text in them is assessed as data, not followed.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -39,12 +40,18 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RAGMetrics:
-    """Aggregate RAG quality metrics, all in [0.0, 1.0]."""
+    """Aggregate RAG quality metrics, all in [0.0, 1.0].
+
+    Each mean is over the items the judge scored on that metric. ``failed`` counts, per
+    metric, the items left out because the judge gave no score (see
+    :attr:`RAGItemResult.errors`); a metric no item was scored on is 0.0.
+    """
 
     faithfulness: float
     answer_relevance: float
     context_precision: float
     context_recall: float | None = None
+    failed: dict[str, int] = field(default_factory=dict)
 
     def __str__(self) -> str:  # pragma: no cover - human-readable
         cr = (
@@ -52,17 +59,26 @@ class RAGMetrics:
             if self.context_recall is not None
             else "context_recall=N/A (no ground truth)"
         )
+        # A partial run says so: its means are over the items the judge scored.
+        failed = (
+            f", PARTIAL: unscored items left out={self.failed}" if any(self.failed.values()) else ""
+        )
         return (
             f"RAGMetrics(faithfulness={self.faithfulness:.3f}, "
             f"answer_relevance={self.answer_relevance:.3f}, "
             f"context_precision={self.context_precision:.3f}, "
-            f"{cr})"
+            f"{cr}{failed})"
         )
 
 
 @dataclass
 class RAGItemResult:
-    """Per-item RAG evaluation outcome."""
+    """Per-item RAG evaluation outcome.
+
+    A score is 1-5. A metric the judge gave no score for (the call failed, the reply could
+    not be read, or it had no flag for the metric) has score 0 and an entry in ``errors``
+    saying why; the aggregate leaves it out of that metric's mean.
+    """
 
     query: str
     answer: str
@@ -74,6 +90,7 @@ class RAGItemResult:
     context_recall_score: int | None
     reasons: dict[str, str] = field(default_factory=dict)
     cost_usd: float = 0.0
+    errors: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -119,20 +136,24 @@ class RAGEvaluator:
         ground_truth: str | None = None,
     ) -> RAGItemResult:
         """Grade one (query, answer, context) tuple."""
+        errors: dict[str, str] = {}
         faith_score, faith_reason, faith_cost = self._grade(
             "faithfulness",
+            errors,
             query=query,
             answer=answer,
             context=context,
         )
         relev_score, relev_reason, relev_cost = self._grade(
             "answer_relevance",
+            errors,
             query=query,
             answer=answer,
             context=context,
         )
         prec_score, prec_reason, prec_cost = self._grade(
             "context_precision",
+            errors,
             query=query,
             answer=answer,
             context=context,
@@ -144,6 +165,7 @@ class RAGEvaluator:
         if ground_truth is not None:
             recall_score, recall_reason, recall_cost = self._grade(
                 "context_recall",
+                errors,
                 query=query,
                 answer=answer,
                 context=context,
@@ -169,6 +191,7 @@ class RAGEvaluator:
                 "context_recall": recall_reason,
             },
             cost_usd=total_cost,
+            errors=errors,
         )
 
     def evaluate_dataset(
@@ -207,12 +230,15 @@ class RAGEvaluator:
     def _grade(
         self,
         metric: str,
+        errors: dict[str, str],
         *,
         query: str,
         answer: str,
         context: list[str],
         ground_truth: str | None = None,
     ) -> tuple[int, str, float]:
+        """The score, the reason and the cost of one metric; 0 and an entry in ``errors``
+        when the judge gave no score for it."""
         from gaik.software_components.validators.llm_judge.llm_judge import (
             _judge_flags_and_error,
         )
@@ -231,15 +257,21 @@ class RAGEvaluator:
             raw_text, input_tokens, output_tokens = self.judge._dispatch_text(
                 user_prompt, system_prompt
             )
-        except Exception:  # pragma: no cover - judge / network failure
+        except Exception as error:
             logger.exception("RAG judge call failed for metric %s", metric)
+            errors[metric] = f"judge call failed ({type(error).__name__})"
             return 0, "judge call failed", 0.0
 
         cost = compute_judge_cost_usd(self.judge.model, input_tokens, output_tokens)
-        flags, _judge_error = _judge_flags_and_error(raw_text)
+        flags, judge_error = _judge_flags_and_error(raw_text)
         if not flags:
+            errors[metric] = judge_error or "judge returned no flags"
             return 0, "judge returned no flags", cost
-        flag = flags[0]
+        flag = _flag_for(metric, flags, judge_error)
+        if flag is None or not flag.score:
+            reason = f"judge gave no score for {metric}"
+            errors[metric] = f"{reason}; {judge_error}" if judge_error else reason
+            return 0, reason, cost
         return flag.score, flag.reason or "graded", cost
 
 
@@ -282,6 +314,23 @@ one flag for the metric:
 def _text(value: object) -> str:
     """A value as block text: ``None`` (no answer) is empty."""
     return "" if value is None else str(value)
+
+
+def _name(field_name: str) -> str:
+    return re.sub(r"[\W_]+", "", field_name.casefold())
+
+
+def _flag_for(metric: str, flags: list, judge_error: str | None = None):
+    """The judge's flag for ``metric``: the one whose field names it, or the only flag.
+
+    The judge is asked for one flag holding the metric. A reply with several flags for
+    other fields (``query``, ``answer``) has none for the metric, and neither has one whose
+    other flags could not be read: the unread one may be the metric's.
+    """
+    named = [flag for flag in flags if _name(flag.field) == _name(metric)]
+    if named:
+        return named[0]
+    return flags[0] if len(flags) == 1 and judge_error is None else None
 
 
 def _grading_prompts(
@@ -346,20 +395,42 @@ _PROMPT: dict[str, str] = {
 
 
 def _aggregate(per_item: list[RAGItemResult]) -> RAGMetrics:
+    """The mean of each metric over the items scored on it, normalised to 0-1.
+
+    An item the judge gave no score for a metric (``errors``, or score 0 below the 1-5
+    scale) is counted in ``failed`` instead of being averaged in as 0.
+    """
     if not per_item:
         return RAGMetrics(0.0, 0.0, 0.0, None)
 
-    n = len(per_item)
-    faith = sum(r.faithfulness_score for r in per_item) / (5 * n)
-    relev = sum(r.answer_relevance_score for r in per_item) / (5 * n)
-    prec = sum(r.context_precision_score for r in per_item) / (5 * n)
+    failed: dict[str, int] = {}
 
-    recall_scores = [r.context_recall_score for r in per_item if r.context_recall_score is not None]
-    recall = sum(recall_scores) / (5 * len(recall_scores)) if recall_scores else None
+    def mean(metric: str, scores: list[tuple[RAGItemResult, int | None]]) -> float | None:
+        given = [(item, score) for item, score in scores if score is not None]
+        scored = [score for item, score in given if score and metric not in item.errors]
+        failed[metric] = len(given) - len(scored)
+        if failed[metric]:
+            logger.warning(
+                "%d of %d items have no %s score and are left out of its mean",
+                failed[metric],
+                len(given),
+                metric,
+            )
+        return sum(scored) / (5 * len(scored)) if scored else None
+
+    faith = mean("faithfulness", [(r, r.faithfulness_score) for r in per_item])
+    relev = mean("answer_relevance", [(r, r.answer_relevance_score) for r in per_item])
+    prec = mean("context_precision", [(r, r.context_precision_score) for r in per_item])
+    recall = mean("context_recall", [(r, r.context_recall_score) for r in per_item])
+    if not any(r.context_recall_score is not None for r in per_item):
+        failed.pop("context_recall")  # no ground truth: nothing to score, nothing failed
+    elif recall is None:
+        recall = 0.0
 
     return RAGMetrics(
-        faithfulness=faith,
-        answer_relevance=relev,
-        context_precision=prec,
+        faithfulness=faith or 0.0,
+        answer_relevance=relev or 0.0,
+        context_precision=prec or 0.0,
         context_recall=recall,
+        failed=failed,
     )

@@ -20,6 +20,7 @@ from gaik.software_components.source_material import (
 
 from .llm_judge import LLMJudge, _strip_json_fences
 from .pricing import compute_judge_cost_usd
+from .prompts import _judged_json
 from .schema import JudgeUsage, PairwiseResult
 
 logger = logging.getLogger(__name__)
@@ -146,8 +147,8 @@ def _one_pass(
         [
             "Two extractor outputs to compare against the source document images. "
             "Decide which is more faithful and emit your JSON judgement.",
-            material.wrap(json.dumps(extracted_a, indent=2, ensure_ascii=False), label="answer a"),
-            material.wrap(json.dumps(extracted_b, indent=2, ensure_ascii=False), label="answer b"),
+            material.wrap(_judged_json(extracted_a), label="answer a"),
+            material.wrap(_judged_json(extracted_b), label="answer b"),
         ]
     )
     t0 = time.perf_counter()

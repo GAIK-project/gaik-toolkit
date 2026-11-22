@@ -43,7 +43,8 @@ class BatchEvaluationRunner:
             or :class:`gaik.software_modules.RAG_workflow.RAGWorkflow.run`.
         on_error: ``"raise"`` (default) re-raises the first failure;
             ``"skip"`` records it in :class:`RunnerResult.failures` and
-            keeps going.
+            keeps going. A failure is an exception; ``KeyboardInterrupt``
+            and ``SystemExit`` always stop the run.
     """
 
     def __init__(
@@ -67,7 +68,9 @@ class BatchEvaluationRunner:
             t0 = time.perf_counter()
             try:
                 out = self.pipeline(item)
-            except BaseException as exc:
+            except Exception as exc:
+                # Only errors are item failures: Ctrl-C (KeyboardInterrupt) and
+                # SystemExit stop the run, as they would without the runner.
                 if self.on_error == "raise":
                     raise
                 logger.warning("Pipeline failed on item %d: %s", idx, exc, exc_info=True)

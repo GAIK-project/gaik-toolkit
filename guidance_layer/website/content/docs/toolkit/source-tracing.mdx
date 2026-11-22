@@ -151,8 +151,8 @@ A box is `{"x", "y", "w", "h"}` as fractions of the page from 0 to 1, measured f
 | Verdict | Meaning | What a reviewer does |
 |---|---|---|
 | `verified` | the quote is in the source and holds the value | nothing, or a glance |
-| `check` | the quote is not in the source, or holds another number or date than the value | looks at it: the value may be wrong, or a legitimate conversion |
-| `reworded` | the quote is in the source, but a text value is not in it | usually the model's own wording, such as a translation or a summary; reads it |
+| `check` | the quote is not in the source, or holds another number or date than the value (also a text value such as `PO-2025-15903` against `PO-2025-15908`) | looks at it: the value may be wrong, or a legitimate conversion |
+| `reworded` | the quote is in the source, but a text value is not in it; any numbers in the value are in the quote | usually the model's own wording, such as a translation or a summary; reads it |
 | `unchecked` | cannot be compared: a list, a number written in words, a scan | checks by hand |
 
 A verified value matches its quote. That is not proof that the quote is the right place to read it. Examples from a sample purchase order:
@@ -200,7 +200,7 @@ The fractions are relative to the page as PyMuPDF sees it. If you render with an
 ## How the check decides
 
 1. **Quote in the source?** Quote and source are reduced to lowercase words with punctuation and spacing removed, and the quote's words must appear as an unbroken run. The cited page is tried first, then the other pages of the file, then the other files.
-2. **Value in the quote?** Numbers are compared as numbers in both European and American formats (`3.000 kg` holds `3000`, `1.234,50` holds `1234.5`). Dates are compared by year, month and day in any order, including month names. Text is compared by its words, or as the same characters with other separators.
+2. **Value in the quote?** Numbers are compared as numbers in both European and American formats (`3.000 kg` holds `3000`, `1.234,50` holds `1234.5`), with a minus written against the digits as part of the number; a negative value also matches a number in brackets, with a minus or `CR` after it, or with a minus set apart before it. Dates are compared by year, month and day, in an order a date is written in and each from its own number: `11.04.2025` holds `2025-04-11`, `11 April 2025` and `11. huhtikuuta 2025` (English and Finnish month names) but not `2025-11-04`, since dates with dots put the day first, while a slash or a dash may put the month first. Each end of a range or a list shares the rest of the date (`11.–15.4.2025` holds the 11th and the 15th). Text is compared by its words, or as the same characters with other separators, in Unicode NFC form.
 3. **Verdict** from the two answers, as in the table above.
 4. **Position (PDF):** the matched words' boxes from the PDF's text layer, and the box of the value inside the quote when it can be located.
 

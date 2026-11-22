@@ -94,6 +94,18 @@ The four metrics:
 `context_recall` is skipped when `ground_truth` is missing (set
 `skip_context_recall=False` to error instead).
 
+Each metric reads the judge's flag for that metric. A metric the judge gave no
+score for (the call failed, the reply could not be read, or no flag named the
+metric) has score 0 in the item and an entry in `RAGItemResult.errors` saying
+why. The aggregate leaves such items out of that metric's mean and counts them
+in `RAGMetrics.failed`, and `print(result.aggregate)` then marks the run as
+partial. Look at `failed` before trusting a mean: when most judge calls failed,
+the mean is over the few that worked.
+
+The grading prompt changed in gaik 0.10.0 (the judged content goes in source
+material blocks, and the system prompt is shorter), so RAG scores are not
+comparable with runs made with an earlier version.
+
 ## BatchEvaluationRunner
 
 Generic runner that applies a pipeline callable to a dataset and collects
