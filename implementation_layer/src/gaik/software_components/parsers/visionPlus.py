@@ -83,17 +83,18 @@ class VisionPlusParser:
             "generate_picture_images": True,
             "generate_page_images": False,
             "do_formula_enrichment": enable_formula_enrichment,
-            "table_structure_options": TableStructureOptions(
-                kind="docling_tableformer",
-                do_cell_matching=True,
-            )
-            if enable_table_structure
-            else None,
             "accelerator_options": AcceleratorOptions(
                 num_threads=num_threads,
                 device=device,
             ),
         }
+        # Without table structure the options keep Docling's default: it refuses
+        # table_structure_options=None.
+        if enable_table_structure:
+            pipeline_kwargs["table_structure_options"] = TableStructureOptions(
+                kind="docling_tableformer",
+                do_cell_matching=True,
+            )
 
         if enable_ocr:
             pipeline_kwargs["ocr_options"] = _build_ocr_options(ocr_engine)

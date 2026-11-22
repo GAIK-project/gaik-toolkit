@@ -42,7 +42,7 @@ print(f"Reasoning: {result['document.pdf']['reasoning']}")
 
 ## Features
 
-- **Multi-Format Support** - PDFs, Word documents (.docx, .doc), and images (.png, .jpg, .jpeg)
+- **Multi-Format Support** - PDFs, Word documents (.docx; save a Word 97-2003 .doc as .docx first), and images (.png, .jpg, .jpeg)
 - **Smart Extraction** - Extracts first 1000 characters from PDFs/DOCX, analyzes full images
 - **Auto Parser Selection** - PyMuPDF for PDFs, DocxParser for Word, VisionParser for images
 - **Confidence Scoring** - Returns classification confidence (0.0-1.0) and reasoning
@@ -60,7 +60,10 @@ from gaik.software_components.doc_classifier import DocumentClassifier
 
 classifier = DocumentClassifier(
     config: dict,              # get_llm_config() or get_openai_config()
-    model: str | None = None   # Optional model override
+    model: str | None = None,  # Optional model override
+    *,
+    limits: InputLimits | None = None,  # Size and pixel limits for the parsers
+    temperature: float | None = 0.0,    # None leaves it out (OpenAI and Azure client)
 )
 
 # Classify file(s)

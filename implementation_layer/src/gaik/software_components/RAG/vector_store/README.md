@@ -71,7 +71,7 @@ who must not reach each other's data separate collections or folders.
 
 ```python
 store.add(documents: list[Document], embeddings: list[list[float]], *, replace: bool = False) -> None
-store.delete_document(document_id: str, *, owner: str | None = None) -> int  # chunks deleted
+store.delete_document(document_id: str | int, *, owner: str | None = None) -> int  # chunks deleted
 
 results = store.search(
     query_embedding: list[float],
@@ -99,10 +99,16 @@ and document ids are compared exactly (an int as its string). The owner is the s
 - `add(..., replace=True)` stores the chunks, then deletes the other stored chunks of
   each document in the call, so the chunks a changed document no longer has do not
   stay behind. If storing fails, no stored chunk is lost: the stale chunks are deleted
-  only after every chunk is stored, and in Chroma a slice whose add fails (an
+  only after every chunk is stored, and in Chroma a slice whose write fails (an
   embedding of another dimension, say) has its earlier versions put back as they were.
   Chroma takes the chunks in slices of at most its maximum batch size; slices stored
-  before a failure keep their new version.
+  before a failure keep their new version. Chroma 1.x updates a stored chunk in place,
+  so a process that stops partway leaves each chunk old or new; before 1.0 a chunk
+  is deleted and added again, and one can be lost if the process stops in between.
+- Threads can share a store. Writes of one document and owner wait for each other,
+  so two overlapping replacements leave one version: in memory every call waits,
+  and in Chroma the writes of every store in the process on the same folder and
+  collection. Other processes writing to the same Chroma folder are not covered.
 - `delete_document(document_id, owner=...)` deletes one document's chunks and returns
   how many.
 - Two owners who index a document under the same id keep separate chunks.

@@ -98,7 +98,31 @@ ACCOUNTING_EUR = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "�
         (-1234.5, ACCOUNTING_EUR, "-1234.50 €"),
         (0, ACCOUNTING_EUR, "0.00 €"),
         (1234.5, '"$"#,##0.00_);[Red]("$"#,##0.00)', "$1234.50"),
-        (-1234.5, '"$"#,##0.00_);[Red]("$"#,##0.00)', "-$1234.50"),
+        # A negative number takes the format's negative section, as Excel shows it.
+        (-1234.5, '"$"#,##0.00_);[Red]("$"#,##0.00)', "($1234.50)"),
+        (-1200, '#,##0.00" Cr";#,##0.00" Dr"', "1200.00 Dr"),
+        (1200, '#,##0.00" Cr";#,##0.00" Dr"', "1200.00 Cr"),
+        (-0.05, '"Up "0%;"Down "0%', "Down 5%"),
+        (-3, '"Profit "0;"Loss "0', "Loss 3"),
+        (-3, '"Profit "0;"Loss "0;"Even"', "Loss 3"),
+        (-5, "+0;-0", "-5"),
+        (-1234.5, '0.00;[Red]"-"0.00', "-1234.50"),
+        (-7, '0;\\-0;0;"text;"@', "-7"),
+        # A negative section that would hide the sign, or that is not rendered,
+        # leaves the stored value.
+        (-5, "0;0", "-5 (number format: 0;0)"),
+        (-5, "0.00;[Red]0.00", "-5 (number format: 0.00;[Red]0.00)"),
+        (-5, "0;;0", "-5 (number format: 0;;0)"),
+        (-5, '0;"minus"', '-5 (number format: 0;"minus")'),
+        # A negative section that differs only by colour, decimals or a percent sign
+        # shows no sign either.
+        (-5, "0.00;[Red]0.0", "-5 (number format: 0.00;[Red]0.0)"),
+        (-5, "0;[Red]0.00", "-5 (number format: 0;[Red]0.00)"),
+        (-5, "#,##0.00;#,##0", "-5 (number format: #,##0.00;#,##0)"),
+        (-0.05, "0%;0", "-0.05 (number format: 0%;0)"),
+        # Zero takes the first section, not a zero section's dash.
+        (0, '"Profit "0;"Loss "0;"Even"', "Profit 0"),
+        (0, '#,##0;(#,##0);"-"', "0"),
         (1234.5, "[$€-40B] #,##0.00", "€ 1234.50"),
         (1234.5, "#,##0.00 [$kr-41D]", "1234.50 kr"),
         (12, '0.0" kg"', "12.0 kg"),
@@ -121,7 +145,6 @@ ACCOUNTING_EUR = '_-* #,##0.00\\ "€"_-;\\-* #,##0.00\\ "€"_-;_-* "-"??\\ "�
         (0.5, "# ?/?", "0.5 (number format: # ?/?)"),
         (1500000, "#,##0,", "1500000 (number format: #,##0,)"),
         (358401234567, "000-000 0000", "358401234567 (number format: 000-000 0000)"),
-        (-5, "+0;-0", "-5 (number format: +0;-0)"),
         (5, "[>100]0.0;0", "5 (number format: [>100]0.0;0)"),
     ],
 )
@@ -213,3 +236,31 @@ def test_formulas_keep_stored_results_and_number_formats(tmp_path):
     result = SpreadsheetParser().parse_spreadsheet(path)
 
     assert "| 2 | 2.00 |" in result
+
+
+def _with_dimension(source_path, target_path, ref):
+    """Copy a workbook with sheet1's stated size (<dimension ref>) set to ``ref``."""
+    with ZipFile(source_path) as source, ZipFile(target_path, "w", ZIP_DEFLATED) as target:
+        for item in source.infolist():
+            contents = source.read(item.filename)
+            if item.filename == "xl/worksheets/sheet1.xml":
+                text = contents.decode("utf-8")
+                start = text.index('<dimension ref="') + len('<dimension ref="')
+                end = text.index('"', start)
+                contents = (text[:start] + ref + text[end:]).encode("utf-8")
+            target.writestr(item, contents)
+
+
+@pytest.mark.parametrize("ref", ["A1", "A1:C2", "A1:C100000"])
+def test_xlsx_reads_its_rows_when_the_stated_size_is_stale(tmp_path, ref):
+    source = _xlsx(
+        tmp_path / "source.xlsx",
+        {"Log": [["Item", "Cost", "Note"], *[[f"Item {n}", n, "ok"] for n in range(1, 6)]]},
+    )
+    path = tmp_path / "stale.xlsx"
+    _with_dimension(source, path, ref)
+
+    result = SpreadsheetParser().parse_spreadsheet(path)
+
+    assert result.splitlines()[4:] == [f"| {n + 1} | Item {n} | {n} | ok |" for n in range(1, 6)]
+    assert result.splitlines()[0] == "## Sheet: Log"

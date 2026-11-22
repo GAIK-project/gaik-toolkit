@@ -15,7 +15,13 @@ from gaik.software_components.source_material import (
     with_source_material_instruction,
 )
 
-from .._material import Evidence, render_evidence, render_sections, source_list
+from .._material import (
+    SOURCE_HEADER_NOTE,
+    Evidence,
+    render_evidence,
+    render_sections,
+    source_list,
+)
 
 # ---------------------------------------------------------------------------
 # Section writer
@@ -128,8 +134,8 @@ def build_section_user_prompt(
     parts.append(f"Content to cover:\n{instructions}")
     parts.append(
         "Evidence — this is the ONLY source of facts and content for the section (one "
-        "source_material block per source, labelled with its file name; a curated brief "
-        "names the file of each fact):\n" + render_evidence(blocks, evidence)
+        f"source_material block per source, labelled with its file name; {SOURCE_HEADER_NOTE}; "
+        "a curated brief names the file of each fact):\n" + render_evidence(blocks, evidence)
     )
     if additional_instructions:
         parts.append(f"ADDITIONAL INSTRUCTIONS:\n{additional_instructions}")
@@ -237,11 +243,13 @@ def build_reviewer_instruction(
             + render_sections(blocks, dependencies_context)
         )
         parts.append(
-            "Evidence (also a valid source of facts):\n" + render_evidence(blocks, evidence)
+            f"Evidence (also a valid source of facts; {SOURCE_HEADER_NOTE}):\n"
+            + render_evidence(blocks, evidence)
         )
     else:
         parts.append(
-            "Evidence (the only allowed source of facts):\n" + render_evidence(blocks, evidence)
+            f"Evidence (the only allowed source of facts; {SOURCE_HEADER_NOTE}):\n"
+            + render_evidence(blocks, evidence)
         )
     return "\n".join(parts)
 
@@ -294,6 +302,6 @@ def build_curation_prompt(
         "context), and give each fact the file name of its source block, so it can be "
         "cited. Do not write the section itself.\n\n"
         "Source material (one source_material block per source, labelled with its file "
-        f"name):\n{render_evidence(blocks, evidence)}"
+        f"name; {SOURCE_HEADER_NOTE}):\n{render_evidence(blocks, evidence)}"
     )
     return with_source_material_instruction(_CURATION_SYSTEM_PROMPT), user

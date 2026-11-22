@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import re
 from functools import cache, lru_cache
+from typing import Annotated
 
 from pydantic import BaseModel, Field
+
+from gaik.software_components.llm.base import FIT_TO_BOUNDS
 
 # Maximum characters kept per rendered value when describing a column.
 _VALUE_CHARS = 60
@@ -30,7 +33,9 @@ class GeneratedSQL(BaseModel):
         ...,
         description="A single read-only DuckDB SELECT (a leading WITH is allowed).",
     )
-    reasoning: str = Field(
+    # The agent's own explanation: a strict Claude tool cannot carry the length
+    # limit, so a longer answer is cut to it instead of failing the query.
+    reasoning: Annotated[str, FIT_TO_BOUNDS] = Field(
         ...,
         max_length=500,
         description="Brief explanation of how the query answers the question.",

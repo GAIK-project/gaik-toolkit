@@ -72,7 +72,6 @@ _SUPPORTED_EXTS = {
     ".docx",
     ".csv",
     ".xlsx",
-    ".xls",
     ".mp3",
     ".wav",
     ".m4a",
@@ -93,6 +92,9 @@ _SUPPORTED_EXTS = {
     ".bmp",
     ".gif",
 }
+# Refused at upload: openpyxl reads no .xls, so a run would fail on it after the
+# sources before it were parsed and transcribed.
+_REFUSED_EXTS = {".xls": "the old Excel format .xls is not supported; save it as .xlsx"}
 
 
 # ---------------------------------------------------------------------------
@@ -311,6 +313,9 @@ async def generate_report(
         # The route takes many kinds of file and keeps its own type rules, so
         # the shared check skips only the type step (utils/upload_check.py).
         name = _upload_name(upload.filename, used_names)
+        refused = _REFUSED_EXTS.get(Path(name).suffix.lower())
+        if refused is not None:
+            raise HTTPException(415, f"{name}: {refused}")
         data = await upload.read()
         problem = await upload_problem(Path(name).suffix, data, check_type=False)
         if problem is not None:

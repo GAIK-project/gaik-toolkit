@@ -215,6 +215,7 @@ class KnowledgeBase(BaseModel):
             raise FileNotFoundError(f"No knowledge files in {directory}")
         return cls(
             sections=[
-                SectionKnowledge.model_validate_json(f.read_text(encoding="utf-8")) for f in files
+                SectionKnowledge.model_validate_json(f.read_text(encoding="utf-8-sig"))
+                for f in files
             ]
         )
