@@ -88,8 +88,15 @@ def partitioned_url():
             f"CREATE TABLE {schema}.customers (id int, region text, PRIMARY KEY (id, region)) "
             "PARTITION BY LIST (region)"
         )
+        # A partition attached later, whose columns have other numbers than the
+        # table's: PostgreSQL's copy of a key into it has another confkey.
         conn.execute(
-            f"CREATE TABLE {schema}.customers_eu PARTITION OF {schema}.customers "
+            f"CREATE TABLE {schema}.customers_eu (dropped int, region text NOT NULL, "
+            "id int NOT NULL)"
+        )
+        conn.execute(f"ALTER TABLE {schema}.customers_eu DROP COLUMN dropped")
+        conn.execute(
+            f"ALTER TABLE {schema}.customers ATTACH PARTITION {schema}.customers_eu "
             "FOR VALUES IN ('eu')"
         )
         # A partition that is partitioned again.
@@ -131,28 +138,51 @@ def partitioned_url():
         conn.execute(f"DROP ROLE {role}")
 
 
+_PARTITIONED_TABLES = [
+    "customers",
+    "customers_eu",
+    "customers_us",
+    "customers_us_low",
+    "eu_notes",
+    "invoices",
+    "orders",
+    "orders_early",
+]
+
+
+def _references(url, schema, allowlist):
+    with PostgresAgent(url, schema_name=schema, table_allowlist=allowlist) as agent:
+        return {
+            t.name: {c.name: c.references for c in t.columns} for t in agent.get_schema().tables
+        }
+
+
 def test_a_key_into_a_partitioned_table_names_the_table_not_a_partition(partitioned_url):
     url, schema = partitioned_url
-    with PostgresAgent(
-        url,
-        schema_name=schema,
-        table_allowlist=[
-            "customers",
-            "customers_eu",
-            "customers_us",
-            "customers_us_low",
-            "eu_notes",
-            "invoices",
-            "orders",
-            "orders_early",
-        ],
-    ) as agent:
-        tables = {t.name: {c.name: c for c in t.columns} for t in agent.get_schema().tables}
+    tables = _references(url, schema, _PARTITIONED_TABLES)
     for table in ("invoices", "orders"):
-        assert tables[table]["customer_id"].references == "customers.id"
-        assert tables[table]["region"].references == "customers.region"
+        assert tables[table]["customer_id"] == "customers.id"
+        assert tables[table]["region"] == "customers.region"
     # The key PostgreSQL copies onto a partition of the referencing table is kept.
-    assert tables["orders_early"]["customer_id"].references == "customers.id"
+    assert tables["orders_early"]["customer_id"] == "customers.id"
     # A key declared against one partition names that partition.
-    assert tables["eu_notes"]["customer_id"].references == "customers_eu.id"
-    assert tables["eu_notes"]["region"].references == "customers_eu.region"
+    assert tables["eu_notes"]["customer_id"] == "customers_eu.id"
+    assert tables["eu_notes"]["region"] == "customers_eu.region"
+    # PostgreSQL's copies into customers_eu (attached with other column numbers),
+    # customers_us and its own partition customers_us_low name no column.
+    named = {ref.split(".")[0] for columns in tables.values() for ref in columns.values() if ref}
+    assert named == {"customers", "customers_eu"}
+    assert all(
+        ref is None or ref.startswith("customers_eu.") for ref in tables["eu_notes"].values()
+    )
+
+
+def test_a_key_into_a_partitioned_table_the_agent_may_not_read_names_no_partition(
+    partitioned_url,
+):
+    url, schema = partitioned_url
+    # The keys point at customers, which is not listed; one of its partitions holds
+    # only some of the rows a key may name, so it is not given in its place.
+    tables = _references(url, schema, [t for t in _PARTITIONED_TABLES if t != "customers"])
+    assert tables["invoices"] == {"id": None, "customer_id": None, "region": None}
+    assert tables["eu_notes"]["customer_id"] == "customers_eu.id"

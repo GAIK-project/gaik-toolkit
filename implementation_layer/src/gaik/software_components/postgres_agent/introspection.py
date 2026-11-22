@@ -103,7 +103,9 @@ def introspect_schema(
     # partition is left out when the same columns also reference the table the
     # partition belongs to. A key declared against one partition stays, and so do
     # keys copied onto the partitions of a referencing table, which point at the
-    # table itself.
+    # table itself. The referenced columns are not compared: a partition attached
+    # later can number its columns differently. When the table itself may not be
+    # read, no partition is named in its place, as one holds only part of its rows.
     fk_rows = conn.execute(
         """
         SELECT
