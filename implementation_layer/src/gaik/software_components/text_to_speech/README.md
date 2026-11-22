@@ -86,10 +86,16 @@ The Azure request payload matches this shape:
 
 Both branches send the same body, so `response_format` and `speed` reach Azure too and the
 audio comes back in the format `result.response_format` names. The instructions (the
-language line, `default_instructions` and a call's `instructions`) are added only for a model
-that takes them: one whose model or deployment name contains `gpt` (`gpt-4o-mini-tts`).
-`tts-1`, `tts-1-hd` and a deployment such as `tts-hd` take none, so they read the text as
-written; `result.instructions` holds what was sent, or `None`.
+language line, `default_instructions` and a call's `instructions`) go to every model except
+the `tts-1` family, which takes none: `tts-1`, `tts-1-hd` and the deployment names `tts` and
+`tts-hd` (with an optional dated suffix such as `-1106`) read the text as written. So a
+`gpt-4o-mini-tts` deployment gets them whatever its name (`speech-fi`, `voice-prod`);
+`result.instructions` holds what was sent, or `None`. `speed` always goes to the `tts-1`
+family, and to another model only when it is not the default 1.0.
+
+Azure's `tts-1` voices are `alloy`, `echo`, `fable`, `onyx`, `nova` and `shimmer`: the
+default `voice="marin"` is a `gpt-4o-mini-tts` voice, so pass `voice=` with a `tts-hd`
+deployment.
 
 ## OpenAI Configuration
 

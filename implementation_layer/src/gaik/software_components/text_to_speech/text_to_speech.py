@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,14 +33,20 @@ DEFAULT_VOICE = "marin"
 DEFAULT_RESPONSE_FORMAT = "mp3"
 
 
+# tts-1 and tts-1-hd (with a dated suffix such as tts-1-hd-1106) and the usual Azure
+# deployment names for them: tts, tts-hd.
+_TTS_1_FAMILY = re.compile(r"tts(?:-1)?(?:-hd)?(?:-\d+)?", re.IGNORECASE)
+
+
 def _takes_instructions(model: str) -> bool:
     """Whether a speech model or deployment takes ``instructions``.
 
-    ``gpt-4o-mini-tts`` does; ``tts-1`` and ``tts-1-hd`` do not (OpenAI's API
-    reference). On Azure the model is a deployment name, so a deployment counts as a
-    GPT model when its name contains ``gpt``.
+    ``tts-1`` and ``tts-1-hd`` do not (OpenAI's API reference); ``gpt-4o-mini-tts`` does.
+    On Azure the model is a deployment name, so only the ``tts-1`` family's names
+    (``tts``, ``tts-1``, ``tts-hd``, ``tts-1-hd``, with an optional dated suffix) count
+    as taking none; a deployment with any other name, such as ``speech-fi``, gets them.
     """
-    return "gpt" in model.lower()
+    return _TTS_1_FAMILY.fullmatch(model.strip()) is None
 
 
 @dataclass
@@ -73,10 +80,12 @@ class SpeechSynthesisResult:
 class TextToSpeech:
     """Generate speech audio from text using OpenAI or Azure OpenAI.
 
-    Every request carries the voice, ``response_format`` and ``speed``. The
-    instructions (the language line, ``default_instructions`` and a call's
-    ``instructions``) go only to a model that takes them (:func:`_takes_instructions`);
-    ``SpeechSynthesisResult.instructions`` says what was sent.
+    Every request carries the voice and ``response_format``. The instructions (the
+    language line, ``default_instructions`` and a call's ``instructions``) go to every
+    model but the ``tts-1`` family (:func:`_takes_instructions`), and
+    ``SpeechSynthesisResult.instructions`` says what was sent. ``speed`` goes to the
+    ``tts-1`` family always, and to a model that takes instructions only when it is not
+    1.0, the default.
     """
 
     def __init__(
@@ -157,8 +166,11 @@ class TextToSpeech:
             "input": text,
             "voice": resolved_voice,
             "response_format": resolved_format,
-            "speed": resolved_speed,
         }
+        # The tts-1 family takes speed; a GPT speech model gets it only when it was asked
+        # for, since 1.0 is the default anyway.
+        if resolved_instructions is None or resolved_speed != 1.0:
+            request["speed"] = resolved_speed
         if resolved_instructions is not None:
             request["instructions"] = resolved_instructions
 

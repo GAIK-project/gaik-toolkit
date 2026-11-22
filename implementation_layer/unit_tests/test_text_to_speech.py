@@ -95,6 +95,42 @@ def test_a_call_overrides_the_format_and_speed(monkeypatch):
     assert result.content_type == "audio/flac"
 
 
+@pytest.mark.parametrize("deployment", ["speech-fi", "tts-fi", "voice-prod", "gpt-4o-mini-tts"])
+def test_a_custom_named_deployment_gets_the_instructions(monkeypatch, deployment):
+    # On Azure a gpt-4o-mini-tts deployment can have any name; only the tts-1
+    # family's names are known to take no instructions.
+    payloads = _capture_azure_posts(monkeypatch)
+    tts = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model=deployment)
+
+    result = tts.synthesize("Hei")
+
+    assert "in Finnish" in payloads[0]["instructions"]
+    assert result.instructions == payloads[0]["instructions"]
+
+
+@pytest.mark.parametrize("deployment", ["tts", "tts-1", "TTS-HD", "tts-1-hd", "tts-1-hd-1106"])
+def test_the_tts_1_family_gets_no_instructions(monkeypatch, deployment):
+    payloads = _capture_azure_posts(monkeypatch)
+    tts = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model=deployment)
+
+    assert tts.synthesize("Hei").instructions is None
+    assert "instructions" not in payloads[0]
+
+
+def test_speed_goes_to_a_gpt_speech_model_only_when_it_was_asked_for(monkeypatch):
+    payloads = _capture_azure_posts(monkeypatch)
+    gpt = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model="speech-fi")
+    tts_1 = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model="tts-hd")
+
+    gpt.synthesize("Hei")
+    gpt.synthesize("Hei", speed=1.25)
+    tts_1.synthesize("Hei")
+
+    assert "speed" not in payloads[0]
+    assert payloads[1]["speed"] == 1.25
+    assert payloads[2]["speed"] == 1.0
+
+
 def test_the_openai_branch_sends_instructions_only_to_a_model_that_takes_them():
     tts = TextToSpeech(api_config={"use_azure": False, "api_key": "k"}, model="tts-1")
     requests_made: list[dict] = []
