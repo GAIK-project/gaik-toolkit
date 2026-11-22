@@ -2,6 +2,7 @@
 
 import { RunButton } from "@/components/demo/run-button";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { ModelNameInput } from "@/components/demo/model-name-input";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
@@ -687,7 +688,8 @@ export default function KnowledgeCuratorPage() {
                       <Label htmlFor="kc-model" className="text-sm">
                         Model
                       </Label>
-                      <Input
+                      <ModelNameInput
+                        kind="chat"
                         id="kc-model"
                         value={options.model ?? ""}
                         disabled={busy}

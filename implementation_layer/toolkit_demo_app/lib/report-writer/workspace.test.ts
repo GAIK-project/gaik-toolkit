@@ -10,6 +10,7 @@ import {
   parseArtifacts,
   parseSpec,
   precedenceForSpec,
+  precedenceNotice,
   reportOutOfDate,
   settingsForSpec,
   staleAfterEdit,
@@ -122,6 +123,23 @@ describe("source_precedence", () => {
       "secondary",
       "primary",
     ]);
+  });
+
+  test("a run on a gaik without the key leaves it out, and the page says so", () => {
+    const ranked: ("primary" | "secondary")[] = ["primary", "secondary"];
+    expect(precedenceForSpec(ranked, false)).toEqual({});
+    expect(precedenceForSpec(ranked, true)).toEqual({
+      source_precedence: ranked,
+    });
+
+    const notice = precedenceNotice(ranked, false);
+    expect(notice).toContain("primary over secondary");
+    expect(notice).toContain("where the report instructions rank the sources");
+    // Nothing to say while the API has not answered, when it takes the key, or when
+    // the spec ranks nothing.
+    expect(precedenceNotice(ranked, null)).toBeNull();
+    expect(precedenceNotice(ranked, true)).toBeNull();
+    expect(precedenceNotice([], false)).toBeNull();
   });
 });
 

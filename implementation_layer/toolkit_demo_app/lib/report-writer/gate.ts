@@ -163,6 +163,24 @@ export function reportRunHeaders(): Record<string, string> {
 }
 
 /**
+ * What a page shows for a backend refusal: the API's `detail` when it is a sentence,
+ * as FastAPI sends it for a refused model or an invalid request; else the body as it
+ * came. A `detail` that is not a string (a list of validation errors) stays raw.
+ */
+export function refusalMessage(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && "detail" in parsed) {
+      const { detail } = parsed as { detail: unknown };
+      if (typeof detail === "string" && detail.trim()) return detail;
+    }
+  } catch {
+    // Not JSON: show the body as it is.
+  }
+  return body || "Generation failed";
+}
+
+/**
  * POST the form to the backend and stream its SSE back. When the stream ends,
  * onEnd gets the folded result usage; if it throws, the client receives an
  * `error` event with its message instead of a silent miss. `staff` (from
@@ -199,9 +217,10 @@ export async function forwardReportRun(
   }
 
   if (!backendRes.ok || !backendRes.body) {
+    // The pages show `error` as it is (in a toast or the run's error line).
     const text = await backendRes.text().catch(() => "");
     return NextResponse.json(
-      { error: text || "Generation failed" },
+      { error: refusalMessage(text) },
       { status: backendRes.status || 502 },
     );
   }
