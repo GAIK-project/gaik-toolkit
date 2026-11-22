@@ -696,7 +696,18 @@ output_dir/
         curated_sections/       # only agentic=True and curate_evidence=True
             background.md       # filename = section id (auto-derived from title if not set)
             findings.md
+    .gaik_report_files.json # the files this run wrote, with their SHA-256
 ```
+
+**Reusing an `output_dir`.** Each run records the files it wrote in
+`.gaik_report_files.json`. After a later run into the same folder has written all its
+outputs, it removes the files of the run before that it did not write again (the file
+of a section you removed or renamed, a curated brief, `evidence_index.json`,
+`usage.json`, or a `report.docx` from a run with `output_docx=True`), and only those
+whose content is still what that run wrote. It never deletes a file the generator did
+not write: your own files, a file you edited, and files from a run before the record
+existed stay, and a warning counts the section and brief files left that are not part
+of this report. A run that fails removes nothing.
 
 The returned `ReportGenerationResult` contains:
 

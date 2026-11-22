@@ -62,7 +62,10 @@ def create_section_writer_graph(
     curate_evidence: bool,
     polish: bool,
     reporter,
+    written_files: list[Path] | None = None,
 ):
+    """The per-section graph. Each curated brief saved under ``output_dir`` is added
+    to ``written_files``, so the caller knows which files this run wrote."""
     from langgraph.graph import END, StateGraph
 
     def evidence_loader(state: SectionWriterState) -> dict:
@@ -103,7 +106,10 @@ def create_section_writer_graph(
             curated_dir = Path(out_dir) / "evidence" / "curated_sections"
             curated_dir.mkdir(parents=True, exist_ok=True)
             name = _file_stem(state.get("section_id") or "") or _slug(title)
-            (curated_dir / f"{name}.md").write_text(brief, encoding="utf-8")
+            brief_path = curated_dir / f"{name}.md"
+            brief_path.write_text(brief, encoding="utf-8")
+            if written_files is not None:
+                written_files.append(brief_path)
 
         reporter.emit(f"[{title}] curated evidence -> drafting")
         # The brief repeats source text, so it reaches the writer and the reviewer

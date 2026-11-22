@@ -21,6 +21,7 @@ Pipeline:
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import logging
 import os
@@ -601,6 +602,8 @@ class MultiSourceReportGenerator:
             include_source_references = False
 
         source_filenames = [item.metadata.get("filename", "") for item in evidence_items]
+        # Every file this run writes under output_dir, for the record of its outputs.
+        written: list[Path] = []
 
         # 2. Write the report — either the agentic path or the single LLM call.
         if agentic:
@@ -622,6 +625,7 @@ class MultiSourceReportGenerator:
                 curate_evidence=curate_evidence,
                 verbose=verbose,
                 progress_callback=progress_callback,
+                written_files=written,
             )
         else:
             # Write the whole report in a single LLM call (so a sample report's
@@ -667,9 +671,14 @@ class MultiSourceReportGenerator:
                 evidence_pack=evidence_pack,
                 usage=usage_total,
                 include_evidence_index=include_evidence_index,
+                written=written,
             )
             if output_docx and markdown_path is not None:
                 docx_path = self._write_docx(markdown_path)
+                written.append(docx_path)
+            # Only now that this run's outputs are all written: an earlier run's files
+            # that this run did not replace are removed if they are unchanged.
+            _replace_earlier_outputs(Path(output_dir), written)
 
         return ReportGenerationResult(
             title=report_title,
@@ -771,6 +780,7 @@ class MultiSourceReportGenerator:
         curate_evidence: bool,
         verbose: bool,
         progress_callback: Callable[[str], None] | None,
+        written_files: list[Path] | None = None,
     ) -> tuple[str, list[GeneratedSection], dict]:
         from .agentic import run_agentic_report
         from .progress import ProgressReporter
@@ -823,6 +833,7 @@ class MultiSourceReportGenerator:
             polish=polish,
             strict_review=strict_review,
             reporter=reporter,
+            written_files=written_files,
         )
         return _normalize_report_markdown(markdown, report_title), generated, usage_total
 
@@ -872,7 +883,7 @@ class MultiSourceReportGenerator:
         image_options: dict,
     ) -> str:
         if source_type in ("text", "markdown"):
-            return path.read_text(encoding="utf-8", errors="replace")
+            return path.read_text(encoding="utf-8-sig", errors="replace")
         if source_type == "csv":
             return _csv_to_markdown(path)
         if source_type == "xlsx":
@@ -911,7 +922,7 @@ class MultiSourceReportGenerator:
                 "Use one of: .txt, .md, .markdown, .pdf, .docx"
             )
         if source_type in ("text", "markdown"):
-            return path.read_text(encoding="utf-8", errors="replace")
+            return path.read_text(encoding="utf-8-sig", errors="replace")
         if source_type == "pdf":
             return _extract_sample_pdf(path)
         # docx
@@ -1224,7 +1235,10 @@ class MultiSourceReportGenerator:
         evidence_pack: str,
         usage: dict[str, int],
         include_evidence_index: bool,
+        written: list[Path] | None = None,
     ) -> Path:
+        """Write the report, its sections and evidence files; add each to ``written``."""
+        written = written if written is not None else []
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
         (out / "sections").mkdir(exist_ok=True)
@@ -1232,14 +1246,17 @@ class MultiSourceReportGenerator:
 
         report_path = out / "report.md"
         report_path.write_text(markdown, encoding="utf-8")
+        written.append(report_path)
 
         for i, s in enumerate(sections, start=1):
             name = f"{i:02d}_{_slug(s.title)}.md"
             (out / "sections" / name).write_text(
                 f"## {s.title}\n\n{s.content_markdown.strip()}\n", encoding="utf-8"
             )
+            written.append(out / "sections" / name)
 
         (out / "evidence" / "normalized_sources.md").write_text(evidence_pack, encoding="utf-8")
+        written.append(out / "evidence" / "normalized_sources.md")
 
         if include_evidence_index:
             index = [
@@ -1254,11 +1271,13 @@ class MultiSourceReportGenerator:
             (out / "evidence_index.json").write_text(
                 json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8"
             )
+            written.append(out / "evidence_index.json")
 
         if usage:
             (out / "usage.json").write_text(
                 json.dumps(usage, indent=2, ensure_ascii=False), encoding="utf-8"
             )
+            written.append(out / "usage.json")
 
         return report_path
 
@@ -1282,6 +1301,82 @@ class MultiSourceReportGenerator:
         from gaik.software_components._pandoc import markdown_file_to_docx
 
         return markdown_file_to_docx(md_path, md_path.with_suffix(".docx"))
+
+
+# ---------------------------------------------------------------------------
+# The record of a run's outputs
+# ---------------------------------------------------------------------------
+
+OUTPUT_RECORD = ".gaik_report_files.json"
+"""The file in ``output_dir`` that lists the files a run wrote, with their SHA-256."""
+
+
+def _digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _replace_earlier_outputs(out: Path, written: list[Path]) -> None:
+    """Record this run's files in ``out``; remove the earlier run's files it did not write.
+
+    A reused output folder would otherwise keep, next to this report, the file of a
+    section that was removed or renamed, a curated brief, an ``evidence_index.json``,
+    ``usage.json`` or ``report.docx`` that this run did not write. Only a file that the
+    record of the run before lists, and that still has the content written then, is
+    removed: a file you changed, or one the generator did not write (your own, or one
+    from a run before the record existed), stays, and is counted in a warning.
+    """
+    base = out.resolve()
+    now: dict[str, str] = {}
+    for path in written:
+        try:
+            rel = Path(path).resolve().relative_to(base).as_posix()
+        except ValueError:
+            continue
+        now[rel] = _digest(Path(path))
+
+    record = out / OUTPUT_RECORD
+    earlier: dict = {}
+    try:
+        data = json.loads(record.read_text(encoding="utf-8-sig"))
+        if isinstance(data, dict) and isinstance(data.get("files"), dict):
+            earlier = data["files"]
+    except (OSError, ValueError):
+        pass
+
+    removed = changed = 0
+    for rel, digest in earlier.items():
+        if rel in now or not isinstance(rel, str) or not isinstance(digest, str):
+            continue
+        try:
+            path = path_inside(rel, out, what="earlier output")
+        except SourcePathError:
+            continue  # an edited record cannot name a file outside the folder
+        if not path.is_file():
+            continue
+        if _digest(path) == digest:
+            path.unlink()
+            removed += 1
+        else:
+            changed += 1
+    if removed:
+        logger.info("Removed %d file(s) of the previous run that this run did not write", removed)
+
+    stray = [
+        found
+        for folder in (out / "sections", out / "evidence" / "curated_sections")
+        if folder.is_dir()
+        for found in folder.glob("*.md")
+        if found.relative_to(out).as_posix() not in now
+    ]
+    if changed or stray:
+        logger.warning(
+            "The output folder keeps %d section or brief file(s) this run did not write; "
+            "they are not part of this report. Files the generator wrote in an earlier run "
+            "are removed only while unchanged (%d changed since).",
+            len(stray),
+            changed,
+        )
+    record.write_text(json.dumps({"files": now}, indent=2) + "\n", encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -1443,7 +1538,7 @@ def load_report_config(path: str | Path, *, root: str | Path | None = None) -> d
     config_path = Path(path)
     base = config_path.parent
 
-    raw: dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
+    raw: dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8-sig"))
 
     def _to_abs(p: str | None, what: str) -> Path | None:
         if p is None:
