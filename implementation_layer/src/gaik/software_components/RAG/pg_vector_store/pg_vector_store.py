@@ -346,6 +346,7 @@ class PgVectorStore:
 
     def __getstate__(self) -> dict:
         # A lock cannot be pickled or deep-copied; a store not yet connected could be.
+        # The copy made from this state has a connection of its own, and its own lock.
         state = self.__dict__.copy()
         state.pop("_lock", None)
         return state
@@ -353,6 +354,12 @@ class PgVectorStore:
     def __setstate__(self, state: dict) -> None:
         self.__dict__.update(state)
         self._lock = threading.RLock()
+
+    def __copy__(self) -> PgVectorStore:
+        # A shallow copy shares the connection, so it shares the lock that guards it.
+        clone = type(self).__new__(type(self))
+        clone.__dict__.update(self.__dict__)
+        return clone
 
     @property
     def _vec(self) -> str:
@@ -417,12 +424,21 @@ class PgVectorStore:
                 conn.rollback()
                 logger.warning("Could not set %s = %s: %s", name, value, exc)
 
-    def close(self) -> None:
-        """Close the database connection (after a call another thread is in ends)."""
-        with self._lock:
+    def close(self, *, timeout: float = 5.0) -> None:
+        """Close the database connection.
+
+        A call another thread is in gets up to ``timeout`` seconds to end its
+        transaction; then the connection is closed anyway, and that call fails,
+        so a long ``relemmatize()`` does not hold up a shutdown.
+        """
+        locked = self._lock.acquire(timeout=max(timeout, 0))
+        try:
             if self._conn is not None and not self._conn.closed:
                 self._conn.close()
-                self._conn = None
+            self._conn = None
+        finally:
+            if locked:
+                self._lock.release()
 
     def __enter__(self) -> PgVectorStore:
         return self
@@ -859,7 +875,6 @@ class PgVectorStore:
     # CRUD operations
     # ------------------------------------------------------------------
 
-    @_rolls_back_on_error
     def add(
         self,
         documents: list[Document],
@@ -924,11 +939,32 @@ class PgVectorStore:
                 for doc in documents
             ]
 
-        # The document ids are checked before a connection is opened.
+        # The document ids are checked, and the text processor run, before the
+        # store's lock is taken and a connection opened: a slow lemmatizer does not
+        # hold up the other threads' calls.
         keyed = chunk_ids(documents)
         metadatas = [
             with_document_id(doc.metadata, key.document_id) for doc, key in zip(documents, keyed)
         ]
+        lemmas = (
+            None
+            if self.text_processor is None
+            else [self.text_processor.to_tsvector_text(doc.page_content) for doc in documents]
+        )
+        return self._insert(documents, embeddings, metadatas, keyed, lemmas, replace=replace)
+
+    @_rolls_back_on_error
+    def _insert(
+        self,
+        documents: list[Document],
+        embeddings: list[list[float]],
+        metadatas: list[dict[str, Any]],
+        keyed: list[Any],
+        lemmas: list[str] | None,
+        *,
+        replace: bool,
+    ) -> list[int]:
+        """The transaction of :meth:`add`: lock, delete when replacing, upsert."""
         conn = self._get_conn()
         has_chunk_key = self._chunk_key_column(conn)
         ids: list[int] = []
@@ -944,17 +980,19 @@ class PgVectorStore:
                     cur.execute("SELECT pg_advisory_xact_lock(%s)", (lock,))
                 for doc_id, owner in scopes:
                     cur.execute(*self._delete_document_sql(doc_id, owner))
-            for doc, emb, metadata, key in zip(documents, embeddings, metadatas, keyed):
+            for index, (doc, emb, metadata, key) in enumerate(
+                zip(documents, embeddings, metadatas, keyed)
+            ):
                 chunk_key = key.chunk_id
                 title = metadata.get("title", "")
                 vec_str = _format_vector(emb)
                 columns = ["title", "content", "metadata", "embedding"]
                 values = ["%s", "%s", "%s::jsonb", f"%s::{self._vec}"]
                 params: list[Any] = [title, doc.page_content, json.dumps(metadata), vec_str]
-                if self.text_processor is not None:
+                if lemmas is not None:
                     columns.insert(2, "content_lemmatized")
                     values.insert(2, "%s")
-                    params.insert(2, self.text_processor.to_tsvector_text(doc.page_content))
+                    params.insert(2, lemmas[index])
                 upsert = ""
                 if has_chunk_key:
                     columns.append("chunk_key")
@@ -1163,7 +1201,6 @@ class PgVectorStore:
 
         return self._rows_to_results(rows, score_key="similarity")
 
-    @_rolls_back_on_error
     def search_keyword(
         self,
         query_text: str,
@@ -1181,9 +1218,15 @@ class PgVectorStore:
         Returns:
             List of ``(Document, ts_rank_score)`` tuples, highest first.
         """
+        # The text processor runs before the store's lock is taken (see add()).
+        return self._search_keyword(self._lemmatize_query(query_text), top_k=top_k, filters=filters)
+
+    @_rolls_back_on_error
+    def _search_keyword(
+        self, effective_query: str, *, top_k: int, filters: dict | None
+    ) -> list[tuple[Document, float]]:
         conn = self._get_conn()
         filter_clause, filter_params = _build_filter_clause(self._scoped(filters))
-        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""
@@ -1205,7 +1248,6 @@ class PgVectorStore:
 
         return self._rows_to_results(rows, score_key="score")
 
-    @_rolls_back_on_error
     def search_hybrid(
         self,
         query_embedding: list[float],
@@ -1239,11 +1281,33 @@ class PgVectorStore:
             The RRF score is built from rank positions and cannot tell a real
             match from the nearest neighbour of gibberish; the similarity can.
         """
+        # The text processor runs before the store's lock is taken (see add()).
+        return self._search_hybrid(
+            query_embedding,
+            self._lemmatize_query(query_text),
+            top_k=top_k,
+            rrf_k=rrf_k,
+            semantic_weight=semantic_weight,
+            keyword_weight=keyword_weight,
+            filters=filters,
+        )
+
+    @_rolls_back_on_error
+    def _search_hybrid(
+        self,
+        query_embedding: list[float],
+        effective_query: str,
+        *,
+        top_k: int,
+        rrf_k: int,
+        semantic_weight: float,
+        keyword_weight: float,
+        filters: dict | None,
+    ) -> list[tuple[Document, float]]:
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
         filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
-        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""
@@ -1280,7 +1344,6 @@ class PgVectorStore:
             extra_keys=("semantic_rank", "keyword_rank", "semantic_similarity"),
         )
 
-    @_rolls_back_on_error
     def search_hybrid_weighted(
         self,
         query_embedding: list[float],
@@ -1311,11 +1374,31 @@ class PgVectorStore:
         Returns:
             List of ``(Document, combined_score)`` tuples, highest first.
         """
+        # The text processor runs before the store's lock is taken (see add()).
+        return self._search_hybrid_weighted(
+            query_embedding,
+            self._lemmatize_query(query_text),
+            top_k=top_k,
+            semantic_weight=semantic_weight,
+            keyword_weight=keyword_weight,
+            filters=filters,
+        )
+
+    @_rolls_back_on_error
+    def _search_hybrid_weighted(
+        self,
+        query_embedding: list[float],
+        effective_query: str,
+        *,
+        top_k: int,
+        semantic_weight: float,
+        keyword_weight: float,
+        filters: dict | None,
+    ) -> list[tuple[Document, float]]:
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
         filters = self._scoped(filters)
         filter_json = json.dumps(filters) if filters else None
-        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""
