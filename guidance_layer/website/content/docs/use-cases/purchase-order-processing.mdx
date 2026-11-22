@@ -178,7 +178,7 @@ flowchart TD
     end
 
     EXT --> C("✅ Structured Fields\nPO header + line items")
-    EXT --> D("🗂️ Reusable Schema\nschema.py + requirements.json")
+    EXT --> D("🗂️ Reusable Schema\nmodel + requirements as JSON")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -210,7 +210,7 @@ flowchart LR
     end
 
     B --> C("✅ Typed Structured Output\nPO header + aligned line items")
-    B --> D("🗂️ Reusable Schema\nschema.py + requirements.json")
+    B --> D("🗂️ Reusable Schema\nmodel + requirements as JSON")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style R fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -272,7 +272,7 @@ Output rules:
 - Keep wording close to the source document where possible.
 ```
 
-The Schema Generator parses this description into a typed Pydantic model and saves both the model code (`schema.py`) and the parsed requirements (`requirements.json`) into a `schema_dir`. Subsequent runs reuse the cached schema — no re-parsing required.
+The Schema Generator parses this description into a typed Pydantic model. With a `schema_dir`, VisionExtractor saves the model as data (`schema_model.json`) and the parsed requirements (`requirements.json`) there, with a `schema.py` for people to read. Subsequent runs rebuild the model from the JSON files without importing `schema.py` — no re-parsing required.
 
 ---
 

@@ -18,6 +18,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.extractor import SchemaGenerator, get_openai_config
+from gaik.software_components.extractor.saved_schema import write_model_file
 from gaik.software_components.extractor.schema import (
     DECIMAL_PERSISTED_HELPER_SOURCE,
     decimal_field_repr,
@@ -467,7 +468,10 @@ def main() -> None:
     requirements = generator.item_requirements
 
     # Save generated artifacts so another workflow can reuse them later.
+    # schema_model.json is the model as data, which read_model_file and
+    # VisionExtractor(schema_dir=...) rebuild it from; schema.py is for reading.
     SCHEMA_DIR.mkdir(parents=True, exist_ok=True)
+    write_model_file(schema, SCHEMA_DIR / "schema_model.json")
     save_schema_to_python(schema, SCHEMA_DIR / "schema.py")
     save_requirements(requirements, schema.__name__, SCHEMA_DIR / "requirements.json")
     (SCHEMA_DIR / "schema_info.json").write_text(

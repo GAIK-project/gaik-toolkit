@@ -37,7 +37,7 @@ result = extractor.extract(
         and line items (item number, description, quantity, price, material number)
         from the PO, aligning each line with the matching BOM via material number.
     """,
-    schema_dir="schema_po",      # schema.py + requirements.json persisted here
+    schema_dir="schema_po",      # schema_model.json + requirements.json persisted here
 )
 
 print(result.data)

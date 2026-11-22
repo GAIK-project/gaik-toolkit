@@ -207,8 +207,9 @@ if result.schema and result.requirements:
 ```
 
 **Creates files:**
-- `schemas/invoice.py` - Pydantic model source
+- `schemas/invoice_model.json` - the model as data; `load_schema` rebuilds it from this
 - `schemas/invoice_requirements.json` - model name + ExtractionRequirements
+- `schemas/invoice.py` - Pydantic model source, for reading only (never imported)
 
 ### Loading Schema
 
