@@ -268,8 +268,8 @@ result = generator.run(
     parser_choice="auto",  # auto, pymupdf, vision, multimodal, docling
     parser_options={
         "ctor": {
-            # "use_markdown": True,  # PyMuPDFParser: Markdown-formatted output (default True)
-            # "use_ocr": True,       # DoclingParser: enable OCR for scanned pages
+            # "enable_ocr": True,    # DoclingParser: OCR for scanned pages (default True)
+            # pymupdf takes no ctor options here and always writes Markdown.
         },
         # "openai_config": custom_config,  # override API config for VisionParser / MultimodalParser
     },

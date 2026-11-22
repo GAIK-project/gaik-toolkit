@@ -1,6 +1,4 @@
-## Source 1: deployment-freeze-policy.pdf
-Type: pdf
-Path: sample_inputs/deployment-freeze-policy.pdf
+## Source 1: deployment-freeze-policy.pdf (pdf)
 
 Holiday Deployment Freeze Policy
 Engineering Department | Effective: Q4 2024
@@ -61,17 +59,13 @@ Last updated: December 1, 2024 | Version 2.1
 
 ---
 
-## Source 2: meeting_recording.mp3
-Type: audio
-Path: sample_inputs/meeting_recording.mp3
+## Source 2: meeting_recording.mp3 (audio)
 
 Meeting transcript. Q3 Product Roadmap Review. Date: December 15, 2024. Duration: 45 minutes. Attendees: Sarah Chen, Product Manager, Mike Rodriguez, Engineering Lead, Lisa Park, Design Lead, James Wilson, Marketing, David Kim, QA Lead. Sarah Chen: Good morning, everyone. Let's get started with our Q3 Product Roadmap Review. We have three main items to discuss today: the mobile app launch status, the dashboard redesign, and our API modernization project. Mike Rodriguez: Thanks, Sarah. Starting with the mobile app, we've completed 85% of the core features. The authentication module is done, and we're finishing up the offline sync capability. We're on track for the January 15th beta release. Lisa Park: The UI is looking great. We did user testing last week with 12 participants and got really positive feedback. The only concern was the onboarding flow users found it a bit confusing. I recommend we simplify it from five steps to three. Sarah Chen: That's a good point, Lisa. Can we make that change before beta? Mike Rodriguez: Yes, it's a relatively small change. I'll assign two developers to it. We should have it done by end of next week. James Wilson: From marketing's perspective, we need the final app screenshots by December 20th for the press kit. Can design commit to that? Lisa Park: Absolutely. I'll have those ready by the 18th to give you some buffer. Sarah Chen: Perfect. Let's move on to the dashboard redesign. David, any concerns from QA? David Kim: We found 23 bugs during regression testing. 15 are minor UI issues, but 8 are critical, mainly around data visualization accuracy. The pie charts are showing incorrect percentages in some edge cases. Mike Rodriguez: I saw those reports. We've already fixed 5 of the critical bugs. The remaining 3 should be done by Wednesday. Sarah Chen: Good. What about the API modernization? That's been our biggest challenge this quarter. Mike Rodriguez: Honestly, we need to have a difficult converse.
 
 ---
 
-## Source 3: notes.txt
-Type: text
-Path: sample_inputs/notes.txt
+## Source 3: notes.txt (text)
 
 Q3 ROADMAP MEETING - MY NOTES
 Dec 15, 2024
@@ -108,9 +102,7 @@ Next meeting: Jan 3rd
 
 ---
 
-## Source 4: project-budget.xlsx
-Type: xlsx
-Path: sample_inputs/project-budget.xlsx
+## Source 4: project-budget.xlsx (xlsx)
 
 ### Sheet: Q3 Project Budget
 
@@ -125,9 +117,7 @@ Path: sample_inputs/project-budget.xlsx
 
 ---
 
-## Source 5: sketch.png
-Type: image
-Path: sample_inputs/sketch.png
+## Source 5: sketch.png (image)
 
 # Q3/Q4 Project Timeline (Whiteboard Sketch)
 

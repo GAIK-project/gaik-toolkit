@@ -28,6 +28,7 @@ transcriber = Transcriber(
     api_config=config,
     output_dir="transcripts",
     enhanced_transcript=True,
+    allow_partial=False,  # True: a chunk that fails is marked instead (Chunking Behavior)
 )
 
 result = transcriber.transcribe(file_path="meeting.mp3")
@@ -129,7 +130,6 @@ Optional local parameters:
 - `min_speakers=None`
 - `max_speakers=None`
 - `initial_prompt=None`
-- `allow_partial=False` (every remote model: see Chunking Behavior)
 
 If these local-only options are given while the model is not `whisper_local`, they are ignored with a message. `language` is the exception: it works with every model.
 

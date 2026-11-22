@@ -292,7 +292,7 @@ result = extractor.extract(
     user_requirements="Extract purchase order header and line items ...",
     extraction_model=None,            # Optional pre-built Pydantic model
     requirements=None,                # Optional pre-built ExtractionRequirements
-    schema_dir=None,                  # Persist/load schema.py + requirements.json
+    schema_dir=None,                  # Persist/load schema_model.json + requirements.json
 )
 ```
 
@@ -302,7 +302,11 @@ result = extractor.extract(
 **Schema resolution order:**
 
 1. Both `extraction_model` and `requirements` passed → use directly.
-2. `schema_dir` set and `schema.py` + `requirements.json` exist → load from disk.
+2. `schema_dir` set and `requirements.json` + `schema_model.json` exist → the model is
+   rebuilt from `schema_model.json` as data (`saved_schema.read_model_file`); the
+   `schema.py` written beside it is only for reading and is never imported. A folder
+   from an older gaik (`schema.py` + `requirements.json` only) is rebuilt from the
+   requirements where they determine the model, else refused with `SavedSchemaError`.
 3. Otherwise → generate via `SchemaGenerator` (one text LLM call).
 
 ### VisionExtractionResult

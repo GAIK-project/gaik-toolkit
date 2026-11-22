@@ -33,6 +33,7 @@ import os
 import re
 import sys
 import uuid
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path, PurePath
 from typing import Any
@@ -315,6 +316,38 @@ def source_files(spec) -> list[tuple[str, Path]]:
     return [(cls, Path(p)) for cls, paths in spec.sources.items() for p in paths]
 
 
+LIMIT_ADVICE = (
+    "gaik's normalizer refuses it, and the helper cannot raise its limits: ask the user for a "
+    "smaller file (split, compressed or shortened) or whether to leave it out"
+)
+
+
+def limit_problem(path: Path, kind: str) -> str | None:
+    """Why gaik's normalizer would refuse this file over an input limit, or None.
+
+    The helper builds ReportWriter without `limits=`, so from gaik 0.11.0 the normalizer checks
+    every file against `InputLimits.local_parsing()`: file size, unpacked size of a DOCX or
+    XLSX, image pixels and recording length (the page count of a PDF is not limited). A sheet's
+    rows are counted only while it is read, so they are not checked here. A gaik without input
+    limits refuses nothing.
+    """
+    try:
+        from gaik.software_components.input_limits import InputLimits
+    except ImportError:
+        return None
+    limits = InputLimits.local_parsing()
+    try:
+        if kind == "audio":
+            limits.check_media(path)
+        else:
+            limits.check_document(path)
+    except ValueError as exc:  # InputLimitError, or a playlist given as a recording
+        return str(exc)
+    except (OSError, zipfile.BadZipFile):
+        return None  # the normalizer reports a file it cannot read
+    return None
+
+
 def pdf_page_text(path: Path) -> tuple[int, list[int], list[int]]:
     """Return (page count, pages with no text at all, pages with only a little text), 1-based.
 
@@ -384,10 +417,14 @@ def section_problems(spec) -> tuple[list[str], list[str]]:
 
 
 def _resolved(conflict, section) -> dict:
-    """A resolved conflict with the side the report follows and the side it drops.
+    """A resolved conflict and what the writer does with it.
 
-    The code picks the side from the source each unit cites, so the person checks the
-    quotes of both sides at the evidence checkpoint.
+    With `source_precedence` (gaik after 0.11.1) the code picks the side from the source each
+    unit cites and names it in `preferred_unit_ids`: the entry lists the side the report follows
+    and the side it drops, and the person checks the quotes of both. An older gaik has no
+    `preferred_unit_ids`: its curator model resolved the conflict from the report instructions,
+    and the writer follows the side the conflict's `description` gives. No code knows which unit
+    that is, so `follows` and `drops` are None and `units` lists every side with the description.
     """
     units = {u.id: u for u in section.units}
 
@@ -398,10 +435,22 @@ def _resolved(conflict, section) -> dict:
             if i in units
         ]
 
-    kept = set(getattr(conflict, "preferred_unit_ids", []) or [])
+    preferred = getattr(conflict, "preferred_unit_ids", None)
+    if preferred is None:
+        return {
+            "topic": conflict.topic,
+            "resolved_by": None,
+            "decided_by": "description",
+            "description": conflict.description,
+            "follows": None,
+            "drops": None,
+            "units": side(conflict.unit_ids),
+        }
+    kept = set(preferred)
     return {
         "topic": conflict.topic,
         "resolved_by": getattr(conflict, "resolved_by", None),
+        "decided_by": "preferred_unit_ids",
         "follows": side([i for i in conflict.unit_ids if i in kept]),
         "drops": side([i for i in conflict.unit_ids if i not in kept]),
     }
@@ -503,6 +552,10 @@ def preflight_checks(
         seen[path.name] = path
         if kind in has:
             has[kind] = True
+        problem = limit_problem(path, kind)
+        if problem:
+            errors.append(f"{problem} {LIMIT_ADVICE}")
+            continue
         if kind == "pdf":
             pages, empty, sparse = pdf_page_text(path)
             entry["pages"] = pages
@@ -548,6 +601,8 @@ def preflight_checks(
                 f"{sample.name}: a sample report must be DOCX, Markdown, text or a text-based PDF "
                 "so it converts without a model call"
             )
+        elif problem := limit_problem(sample, "sample"):
+            errors.append(f"{problem} {LIMIT_ADVICE}")
         elif sample.suffix.lower() == ".pdf":
             pages, empty, _ = pdf_page_text(sample)
             if pages and len(empty) == pages:

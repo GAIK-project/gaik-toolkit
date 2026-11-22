@@ -1109,7 +1109,8 @@ class PgVectorStore:
         Args:
             query_embedding: Query vector.
             top_k: Maximum number of results.
-            threshold: Minimum cosine similarity (0.0 to 1.0).
+            threshold: Minimum cosine similarity (-1.0 to 1.0); 0.0 still drops rows
+                with negative similarity.
             filters: Optional JSONB metadata filter (e.g. ``{"category": "news"}``).
 
         Returns:
