@@ -27,14 +27,21 @@ def _verifiable(value_type=str) -> type[BaseModel]:
         (0.0, 0.01),
         (-1, 0.01),
         (1.0, 1.0),
-        # Above 1 and at most 100: a percentage (review of #317).
+        # With a percent sign or above 10: a percentage; else moved into the
+        # bounds (reviews of #317).
         (85, 0.85),
         ("85", 0.85),
         (100, 1.0),
-        (1.2, 0.012),
         (150, 1.0),
+        (1.2, 1.0),
+        (4, 1.0),
+        (10, 1.0),
+        (10.5, 0.105),
         ("0.8", 0.8),
+        ("0,9", 0.9),
         ("85%", 0.85),
+        ("85,5 %", 0.855),
+        ("4%", 0.04),
         ("0.5%", 0.01),
         ("high", 0.01),
         (None, 0.01),
