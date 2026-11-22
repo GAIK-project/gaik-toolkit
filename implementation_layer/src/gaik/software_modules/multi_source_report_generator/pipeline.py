@@ -1384,6 +1384,14 @@ def _replace_earlier_outputs(out: Path, written: list[Path]) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _check_input_folder(folder: Path, root: str | Path) -> None:
+    """Raise ``SourcePathError`` for a supported file in ``folder`` that leads out of
+    ``root``, e.g. through a symbolic link: it would become source material."""
+    for found in sorted(folder.rglob("*")):
+        if found.suffix.lower() in SUPPORTED_EXTENSIONS and found.is_file():
+            path_inside(found.relative_to(folder), folder, root=root, what="input file")
+
+
 def save_report_config(
     path: str | Path,
     *,
@@ -1409,13 +1417,19 @@ def save_report_config(
     polish: bool = False,
     strict_review: bool = True,
     curate_evidence: bool = False,
+    root: str | Path | None = None,
 ) -> Path:
     """Persist all ``run()`` parameters to a JSON config file for later reuse.
 
     Paths (``input_paths``, ``output_dir``, ``sample_report_path``) are stored
-    relative to the config file's directory so the config is portable; one outside
-    that directory is stored with ``..``, and ``load_report_config`` then needs a
-    ``root`` that holds it. A path on another drive raises ``SourcePathError``. All keys
+    relative to the config file's directory so the config is portable. Each one, and
+    each supported file in an input folder, must stay inside ``root``, the config's
+    folder by default, as ``load_report_config`` checks: one outside it (through
+    ``..`` or a symbolic link) or on another drive raises ``SourcePathError`` and
+    nothing is written, so a config saved without ``root`` loads without one. A config
+    saved with a wider ``root`` stores ``..`` paths and needs the same ``root`` to
+    load. A path that is a link is stored under its own name, as ``ReportSpec.save``
+    does. All keys
     inside option dicts (``transcriber_options``, ``parser_options``, etc.) are
     stored as-is, except credential-bearing configs are rejected. Keep credentials
     in the environment and persist the provider/model selection instead.
@@ -1453,25 +1467,25 @@ def save_report_config(
     config_path = Path(path)
     base = config_path.parent
 
-    def _to_rel(p: str | Path | None) -> str | None:
+    def _to_rel(p: str | Path | None, what: str) -> str | None:
         if p is None:
             return None
-        # Resolved first: a relative path is relative to the working directory
-        # here, while load_report_config reads it relative to the config file.
-        absolute = Path(p).resolve()
+        # Made absolute first: a relative path is relative to the working directory
+        # here, while load_report_config reads it relative to the config file. Only the
+        # folder is resolved, as in ReportSpec.save: a link keeps its own name.
+        p = Path(p)
+        absolute = p.parent.resolve() / p.name
         try:
             rel = Path(os.path.relpath(absolute, base.resolve())).as_posix()
         except ValueError:
             raise SourcePathError(
-                f"{Path(p).name} is on another drive than the config file; a config stores "
+                f"{p.name} is on another drive than the config file; a config stores "
                 "paths relative to its own folder"
             ) from None
-        if rel == ".." or rel.startswith("../"):
-            logger.warning(
-                "%s is outside the config's folder; load_report_config needs a root that "
-                "holds both to read it back",
-                file_tag(p),
-            )
+        # Refused here, as load_report_config would refuse it, not written for it to.
+        joined = path_inside(rel, base, root=root, what=what)
+        if what == "input path" and joined.is_dir():
+            _check_input_folder(joined, root if root is not None else base)
         return rel
 
     # Normalise sections: dataclasses → plain dicts, preserve all fields.
@@ -1497,9 +1511,9 @@ def save_report_config(
         "additional_instructions": additional_instructions,
         "report_language": report_language,
         "sections": section_dicts,
-        "input_paths": [_to_rel(p) for p in input_paths],
-        "sample_report_path": _to_rel(sample_report_path),
-        "output_dir": _to_rel(output_dir),
+        "input_paths": [_to_rel(p, "input path") for p in input_paths],
+        "sample_report_path": _to_rel(sample_report_path, "sample report"),
+        "output_dir": _to_rel(output_dir, "output folder"),
         "output_docx": output_docx,
         "include_evidence_index": include_evidence_index,
         "include_source_references": include_source_references,
@@ -1548,15 +1562,7 @@ def load_report_config(path: str | Path, *, root: str | Path | None = None) -> d
     def _input(p: str) -> Path:
         joined = path_inside(p, base, root=root, what="input path")
         if joined.is_dir():
-            # A file in the folder may be a link; it must stay inside ``root`` too.
-            for found in sorted(joined.rglob("*")):
-                if found.suffix.lower() in SUPPORTED_EXTENSIONS and found.is_file():
-                    path_inside(
-                        found.relative_to(joined),
-                        joined,
-                        root=root if root is not None else base,
-                        what="input file",
-                    )
+            _check_input_folder(joined, root if root is not None else base)
         return joined.resolve()
 
     return {

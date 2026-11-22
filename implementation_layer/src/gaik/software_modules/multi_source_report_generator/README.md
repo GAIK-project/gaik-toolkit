@@ -748,8 +748,10 @@ from gaik.software_modules.multi_source_report_generator import (
 # Paths (input_paths, output_dir, sample_report_path) are stored relative to
 # the config file so it is portable. All option dicts are stored as-is.
 # load_report_config refuses a path that is absolute or leads out of the config's
-# folder (through ".." or a symbolic link) with SourcePathError; pass
-# root="<a folder that holds both>" for a config that names files beside its folder.
+# folder (through ".." or a symbolic link) with SourcePathError, and so does
+# save_report_config, before it writes anything: a config it saves loads back as
+# saved. A path that is a link is stored under its own name. For a config that names
+# files beside its folder, pass root="<a folder that holds both>" to both calls.
 save_report_config(
     "my_report_config.json",
     input_paths=["materials/"],
@@ -776,7 +778,8 @@ result = gen.run(**config)
 `save_report_config` accepts the same keyword arguments as `run()`, minus
 `verbose`, `progress_callback`, and `section_context_mode` (runtime preferences
 that are not part of the use-case definition). These can still be passed
-directly to `run()`.
+directly to `run()`. It also takes `root`, the folder every stored path must stay
+inside (the config's folder by default), as `load_report_config` does.
 
 ## Example
 
