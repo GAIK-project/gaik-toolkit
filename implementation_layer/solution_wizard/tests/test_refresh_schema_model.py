@@ -122,13 +122,9 @@ def test_a_type_correction_in_the_py_file_is_the_type_load_schema_gives(tmp_path
     assert after.model_fields["title"].annotation is int
 
 
-def test_with_a_gaik_that_reads_the_py_file_the_command_line_writes_nothing_and_passes(
-    tmp_path, monkeypatch, capsys
-):
+def _without_saved_schema(monkeypatch) -> None:
     import builtins
 
-    schemas = _schemas(tmp_path, CORRECTED)
-    before = (schemas / "output_schema_model.json").read_text(encoding="utf-8")
     real_import = builtins.__import__
 
     def without_saved_schema(name, *args, **kwargs):
@@ -137,8 +133,118 @@ def test_with_a_gaik_that_reads_the_py_file_the_command_line_writes_nothing_and_
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", without_saved_schema)
+
+
+def test_with_a_gaik_that_reads_the_py_file_an_older_model_file_is_named_and_kept(
+    tmp_path, monkeypatch, capsys
+):
+    """A later gaik would load the older model file, so the script says so. It keeps the
+    file: without it gaik rebuilds the model from the requirements, which drops an edit
+    made only in output_schema.py, and the PoC no longer writes it again from the .py."""
+    schemas = _schemas(tmp_path, CORRECTED)
+    before = (schemas / "output_schema_model.json").read_text(encoding="utf-8")
+    _without_saved_schema(monkeypatch)
     monkeypatch.setattr("sys.argv", ["refresh_schema_model.py", "--schemas-dir", str(schemas)])
 
     assert _script().main() == 0
-    assert "Model file not needed" in capsys.readouterr().out
+    captured = capsys.readouterr()
+    assert "Model file not needed" not in captured.out
+    assert "WARNING" in captured.err and "output_schema_model.json" in captured.err
+    assert "before this edit" in captured.err
     assert (schemas / "output_schema_model.json").read_text(encoding="utf-8") == before
+
+
+def test_with_a_gaik_that_reads_the_py_file_and_no_model_file_nothing_is_needed(
+    tmp_path, monkeypatch, capsys
+):
+    schemas = _schemas(tmp_path, CORRECTED)
+    (schemas / "output_schema_model.json").unlink()
+    _without_saved_schema(monkeypatch)
+    monkeypatch.setattr("sys.argv", ["refresh_schema_model.py", "--schemas-dir", str(schemas)])
+
+    assert _script().main() == 0
+    captured = capsys.readouterr()
+    assert "Model file not needed" in captured.out and not captured.err
+    assert not (schemas / "output_schema_model.json").exists()
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        'title: str = Field(max_length=5, description="Ticket title")',
+        'title: str = Field(min_length=1, description="Ticket title")',
+        'count: int = Field(le=10, description="Count")',
+    ],
+)
+def test_a_field_constraint_is_refused_as_step_4_5_says(tmp_path, field):
+    schemas = _schemas(
+        tmp_path,
+        f"from pydantic import BaseModel, Field\n\nclass Ticket(BaseModel):\n    {field}\n",
+    )
+    before = (schemas / "output_schema_model.json").read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="constraint"):
+        _script().refresh(schemas)
+
+    assert (schemas / "output_schema_model.json").read_text(encoding="utf-8") == before
+
+
+_PATTERN_IMPORTS = (
+    "from typing import Annotated, Optional\n"
+    "from pydantic import BaseModel, Field, StringConstraints, constr\n\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("annotation", "saved_type"),
+    [
+        ('Annotated[str, constr(pattern=r"^T-")]', {"type": "str", "pattern": "^T-"}),
+        (
+            'Optional[Annotated[str, constr(pattern=r"^T-")]]',
+            {"type": "optional", "inner": {"type": "str", "pattern": "^T-"}},
+        ),
+        (
+            'list[Annotated[str, constr(pattern=r"^T-")]]',
+            {"type": "list", "items": {"type": "str", "pattern": "^T-"}},
+        ),
+    ],
+)
+def test_a_pattern_on_a_text_field_is_kept_in_the_form_step_4_5_names(
+    tmp_path, annotation, saved_type
+):
+    schemas = _schemas(
+        tmp_path,
+        _PATTERN_IMPORTS + "class Ticket(BaseModel):\n"
+        f'    title: {annotation} = Field(description="Ticket title")\n',
+    )
+
+    _script().refresh(schemas)
+
+    saved = json.loads((schemas / "output_schema_model.json").read_text(encoding="utf-8"))
+    [field] = saved["models"][0]["fields"]
+    assert field["type"] == saved_type
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        'title: str = Field(pattern=r"^T-", description="Ticket title")',
+        'title: constr(pattern=r"^T-") = Field(description="Ticket title")',
+        'title: Annotated[str, StringConstraints(pattern=r"^T-")] = Field(description="Title")',
+        'title: Annotated[str, constr(pattern=r"^T-", max_length=9)] = Field(description="T")',
+    ],
+)
+def test_a_pattern_in_any_other_form_is_refused_as_step_4_5_says(tmp_path, field):
+    schemas = _schemas(tmp_path, _PATTERN_IMPORTS + f"class Ticket(BaseModel):\n    {field}\n")
+    before = (schemas / "output_schema_model.json").read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cannot be saved"):
+        _script().refresh(schemas)
+
+    assert (schemas / "output_schema_model.json").read_text(encoding="utf-8") == before
+
+
+def test_step_4_5_names_the_pattern_form_the_refresh_keeps():
+    skill = (Path(__file__).parents[1] / "SKILL.md").read_text(encoding="utf-8")
+    assert '`Annotated[str, constr(pattern=r"...")]`' in skill
+    assert "`Field(pattern=...)`" in skill
