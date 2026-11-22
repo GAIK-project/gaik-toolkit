@@ -347,8 +347,10 @@ echo.
 echo    2. If it is missing or empty, paste the ENTIRE content of:
 echo       %CONFIG_FILE%
 echo.
-echo    3. Otherwise add only the gaik-transcriber entry to its mcpServers section
-echo       and keep everything else. Then SAVE.
+echo    3. Otherwise copy both the gaik-transcriber and the filesystem entries into
+echo       its mcpServers section, replacing any entry with the same name, and keep
+echo       everything else. The new filesystem entry limits Claude's file access to
+echo       the folder you chose. Then SAVE.
 echo.
 echo    TIP: Press Win+R, paste the path above, and press Enter to open it.
 echo.
