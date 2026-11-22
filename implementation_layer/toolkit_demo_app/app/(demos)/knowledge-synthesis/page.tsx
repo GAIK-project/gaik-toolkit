@@ -676,6 +676,7 @@ export default function KnowledgeSynthesisPage() {
                     }}
                   />
                 </label>
+                <UploadReminder />
               </CardContent>
             </Card>
 
