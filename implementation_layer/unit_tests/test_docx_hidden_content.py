@@ -185,6 +185,7 @@ def test_a_placeholder_flag_drops_only_placeholder_styled_text(tmp_path, value):
             placeholder=value,
             ns=True,
         ),
+        styles=["PlaceholderText"],
     )
 
     assert text == "Intro\n\nFilled by a tool"
@@ -222,3 +223,86 @@ def test_a_placeholder_cell_keeps_its_column(tmp_path):
     text = DocxParser().parse_docx(str(path), keep_structure=True)
 
     assert text == "| Col1 | Col2 |\n| --- | --- |\n|  | Col2Val |"
+
+
+def test_without_a_placeholder_style_an_unstyled_placeholder_is_dropped(tmp_path):
+    # A writer other than Word, or a document whose style was removed: the flag decides.
+    text = _parse_body(
+        tmp_path,
+        _sdt(_paragraph(_run("Click here to enter text.")), placeholder=True, ns=True),
+    )
+
+    assert text == "Intro"
+
+
+def test_with_the_style_but_unstyled_runs_the_placeholder_is_dropped(tmp_path):
+    text = _parse_body(
+        tmp_path,
+        _sdt(_paragraph(_run("Click here to enter text.")), placeholder=True, ns=True),
+        styles=["PlaceholderText"],
+    )
+
+    assert text == "Intro"
+
+
+GLOSSARY_TYPE = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument"
+)
+GLOSSARY_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml"
+)
+
+
+def _with_glossary(path, part_name: str, text: str):
+    """Add a glossary part holding one placeholder doc part, as Word saves it."""
+    from zipfile import ZipFile
+
+    glossary = (
+        f"<w:glossaryDocument {W}><w:docParts><w:docPart><w:docPartPr>"
+        f"<w:name w:val='{part_name}'/></w:docPartPr><w:docPartBody>"
+        f"<w:p>{_run(text)}</w:p></w:docPartBody></w:docPart></w:docParts>"
+        "</w:glossaryDocument>"
+    )
+    with ZipFile(path) as source:
+        items = {item.filename: source.read(item) for item in source.infolist()}
+    items["word/glossary/document.xml"] = glossary.encode("utf-8")
+    rels = items["word/_rels/document.xml.rels"].decode("utf-8")
+    items["word/_rels/document.xml.rels"] = rels.replace(
+        "</Relationships>",
+        f'<Relationship Id="rIdGlossary" Type="{GLOSSARY_TYPE}" '
+        'Target="glossary/document.xml"/></Relationships>',
+    ).encode("utf-8")
+    types = items["[Content_Types].xml"].decode("utf-8")
+    items["[Content_Types].xml"] = types.replace(
+        "</Types>",
+        '<Override PartName="/word/glossary/document.xml" '
+        f'ContentType="{GLOSSARY_CONTENT_TYPE}"/></Types>',
+    ).encode("utf-8")
+    with ZipFile(path, "w") as target:
+        for name, data in items.items():
+            target.writestr(name, data)
+
+
+@pytest.mark.parametrize(
+    ("shown", "expected"),
+    [
+        # The control shows its doc part's text: no value.
+        ("Click or tap here to enter text.", "Intro"),
+        # The control holds other text than its doc part: a filled value.
+        ("Acme Oy", "Intro\n\nAcme Oy"),
+    ],
+)
+def test_an_unstyled_placeholder_is_compared_with_its_doc_part(tmp_path, shown, expected):
+    document = Document()
+    anchor = document.add_paragraph("Intro")._p
+    control = parse_xml(
+        f"<w:sdt {W}><w:sdtPr><w:placeholder><w:docPart w:val='DefaultPlaceholder_1'/>"
+        "</w:placeholder><w:showingPlcHdr/></w:sdtPr><w:sdtContent>"
+        f"<w:p>{_run(shown)}</w:p></w:sdtContent></w:sdt>"
+    )
+    anchor.addnext(control)
+    path = tmp_path / "form.docx"
+    document.save(path)
+    _with_glossary(path, "DefaultPlaceholder_1", "Click or tap here to enter text.")
+
+    assert DocxParser().parse_docx(str(path), keep_structure=True) == expected

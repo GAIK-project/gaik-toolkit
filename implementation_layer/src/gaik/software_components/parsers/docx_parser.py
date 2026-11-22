@@ -15,6 +15,7 @@ from ..input_limits import InputLimits
 
 try:
     from docx import Document
+    from docx.oxml import parse_xml
     from docx.oxml.ns import qn
     from docx.table import Table
 
@@ -40,20 +41,40 @@ _OFF = frozenset({"0", "false", "off"})
 
 
 def _placeholder_styles(doc) -> set[str]:
-    """The ids of the character style Word puts on placeholder text.
+    """The ids of the character style Word puts on placeholder text, if it has one.
 
-    Its name is "Placeholder Text" in every language; its id can be localized.
+    Its name is "Placeholder Text" in every language; its id can be localized. Empty
+    when the document defines no such style (a writer other than Word, a style removed).
     """
-    ids = {"PlaceholderText"}
     try:
-        ids |= {
+        return {
             style.style_id
             for style in doc.styles
             if (style.name or "").lower() == "placeholder text" and style.style_id
         }
     except (AttributeError, KeyError, ValueError):
-        pass
-    return ids
+        return set()
+
+
+def _placeholder_texts(doc) -> dict[str, str]:
+    """The text of each placeholder doc part in the document's glossary, by its name."""
+    texts: dict[str, str] = {}
+    try:
+        for part in doc.part.package.iter_parts():
+            if not str(part.partname).endswith("/glossary/document.xml"):
+                continue
+            for doc_part in parse_xml(part.blob).iter(qn("w:docPart")):
+                name = doc_part.find(f"{qn('w:docPartPr')}/{qn('w:name')}")
+                body = doc_part.find(qn("w:docPartBody"))
+                if name is not None and body is not None:
+                    texts[name.get(qn("w:val"))] = _text_of(body)
+    except Exception:  # A glossary that cannot be read leaves the old rule.
+        return {}
+    return texts
+
+
+def _text_of(element) -> str:
+    return "".join(node.text or "" for node in element.iter(qn("w:t"))).strip()
 
 
 def _shows_placeholder(sdt) -> bool:
@@ -61,16 +82,43 @@ def _shows_placeholder(sdt) -> bool:
     return flag is not None and (flag.get(qn("w:val")) or "1").lower() not in _OFF
 
 
-def _unwrap_content(body, placeholder_styles: set[str]) -> None:
+def _drop_placeholder_text(
+    sdt, content, placeholder_styles: set[str], placeholder_texts: dict[str, str]
+) -> None:
+    """Remove the runs of a content control that shows its placeholder.
+
+    With a placeholder text style in the document and styled runs in the control, the
+    runs in that style go and other text stays: a generator can fill a control and
+    leave its flag on. Otherwise the control's text goes, unless the placeholder doc
+    part it names has other text, which means the control was filled.
+    """
+    style = f"{qn('w:rPr')}/{qn('w:rStyle')}"
+    runs = list(content.iter(qn("w:r")))
+    if placeholder_styles and any(run.find(style) is not None for run in runs):
+        doomed = [
+            run
+            for run in runs
+            if run.find(style) is not None
+            and run.find(style).get(qn("w:val")) in placeholder_styles
+        ]
+    else:
+        doc_part = sdt.find(f"{qn('w:sdtPr')}/{qn('w:placeholder')}/{qn('w:docPart')}")
+        expected = None if doc_part is None else placeholder_texts.get(doc_part.get(qn("w:val")))
+        doomed = runs if expected is None or _text_of(content) == expected else []
+    for run in doomed:
+        run.getparent().remove(run)
+
+
+def _unwrap_content(
+    body, placeholder_styles: set[str], placeholder_texts: dict[str, str] | None = None
+) -> None:
     """Put the content of each wrapper element (see ``_WRAPPERS``) in its place.
 
     A content control showing its placeholder ("Click here to enter text") holds no
-    value: its runs in the placeholder text style are dropped, and its paragraphs,
-    rows and cells stay, so the table columns do not shift. Text in another style
-    stays, as a generator can fill a control and leave its placeholder flag on.
+    value: its placeholder text is dropped (see :func:`_drop_placeholder_text`), and
+    its paragraphs, rows and cells stay, so the table columns do not shift.
     """
     properties = {qn(tag) for tag in _WRAPPER_PROPERTIES}
-    style = f"{qn('w:rPr')}/{qn('w:rStyle')}"
     for element in body.xpath(" | ".join(f".//{tag}" for tag in _WRAPPERS)):
         parent = element.getparent()
         if parent is None:
@@ -79,10 +127,9 @@ def _unwrap_content(body, placeholder_styles: set[str]) -> None:
             content = element.find(qn("w:sdtContent"))
             children = [] if content is None else list(content)
             if content is not None and _shows_placeholder(element):
-                for run in list(content.iter(qn("w:r"))):
-                    run_style = run.find(style)
-                    if run_style is not None and run_style.get(qn("w:val")) in placeholder_styles:
-                        run.getparent().remove(run)
+                _drop_placeholder_text(
+                    element, content, placeholder_styles, placeholder_texts or {}
+                )
         else:
             children = [child for child in element if child.tag not in properties]
         index = parent.index(element)
@@ -177,7 +224,7 @@ class DocxParser:
 
         try:
             doc = Document(file_path)
-            _unwrap_content(doc.element.body, _placeholder_styles(doc))
+            _unwrap_content(doc.element.body, _placeholder_styles(doc), _placeholder_texts(doc))
 
             if keep_structure:
                 text_content = self._extract_markdown_docx(doc)
