@@ -12,7 +12,11 @@ The class is the one named "model_name" in output_schema_requirements.json. The
 script imports output_schema.py: the file the wizard wrote and edited in this PoC
 workspace, next to the run_poc.py the wizard runs. Do not point it at a schemas
 folder from elsewhere. It refuses a model the saved format cannot describe, such as
-a field constraint other than a text pattern (exit code 1, nothing written). With a
+a field constraint (exit code 1, nothing written). The one constraint kept is a
+pattern on a text field written as the schema generator writes it,
+Annotated[str, constr(pattern=r"...")], also inside Optional[...] or list[...];
+Field(pattern=...), a bare constr(pattern=...) type and
+Annotated[str, StringConstraints(pattern=...)] are refused. With a
 gaik release that has no saved_schema module, load_schema() reads output_schema.py
 itself, so the edit is in effect with that release: the script writes nothing and
 exits 0, with a warning when an older output_schema_model.json is there, since a

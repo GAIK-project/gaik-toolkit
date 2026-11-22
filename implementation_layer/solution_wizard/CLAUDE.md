@@ -10,8 +10,11 @@ model file again, and stops when it does not import or cannot be saved. With gai
 import it directly with every release. After editing `output_schema.py` (SKILL.md Step 4.5),
 run `python scripts/refresh_schema_model.py --schemas-dir <output_dir>/poc/schemas`: it says
 at once whether the edit can be saved. It refuses field constraints (`ge`, `max_length`
-and the like, except a `pattern` on a text field) as well as validators, methods and other
-options the saved format cannot hold.
+and the like) as well as validators, methods and other options the saved format cannot
+hold. A pattern on a text field is kept only as the schema generator writes it,
+`Annotated[str, constr(pattern=r"...")]` (also inside `Optional[...]` or `list[...]`);
+`Field(pattern=...)`, a bare `constr(pattern=...)` type and `StringConstraints(pattern=...)`
+are refused.
 
 ## Schema generation constraints
 

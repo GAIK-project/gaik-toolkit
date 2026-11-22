@@ -189,16 +189,62 @@ def test_a_field_constraint_is_refused_as_step_4_5_says(tmp_path, field):
     assert (schemas / "output_schema_model.json").read_text(encoding="utf-8") == before
 
 
-def test_a_pattern_on_a_text_field_is_kept(tmp_path):
+_PATTERN_IMPORTS = (
+    "from typing import Annotated, Optional\n"
+    "from pydantic import BaseModel, Field, StringConstraints, constr\n\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("annotation", "saved_type"),
+    [
+        ('Annotated[str, constr(pattern=r"^T-")]', {"type": "str", "pattern": "^T-"}),
+        (
+            'Optional[Annotated[str, constr(pattern=r"^T-")]]',
+            {"type": "optional", "inner": {"type": "str", "pattern": "^T-"}},
+        ),
+        (
+            'list[Annotated[str, constr(pattern=r"^T-")]]',
+            {"type": "list", "items": {"type": "str", "pattern": "^T-"}},
+        ),
+    ],
+)
+def test_a_pattern_on_a_text_field_is_kept_in_the_form_step_4_5_names(
+    tmp_path, annotation, saved_type
+):
     schemas = _schemas(
         tmp_path,
-        "from typing import Annotated\nfrom pydantic import BaseModel, Field, constr\n\n"
-        "class Ticket(BaseModel):\n"
-        '    title: Annotated[str, constr(pattern=r"^T-")] = Field(description="Ticket title")\n',
+        _PATTERN_IMPORTS + "class Ticket(BaseModel):\n"
+        f'    title: {annotation} = Field(description="Ticket title")\n',
     )
 
     _script().refresh(schemas)
 
     saved = json.loads((schemas / "output_schema_model.json").read_text(encoding="utf-8"))
     [field] = saved["models"][0]["fields"]
-    assert field["type"] == {"type": "str", "pattern": "^T-"}
+    assert field["type"] == saved_type
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        'title: str = Field(pattern=r"^T-", description="Ticket title")',
+        'title: constr(pattern=r"^T-") = Field(description="Ticket title")',
+        'title: Annotated[str, StringConstraints(pattern=r"^T-")] = Field(description="Title")',
+        'title: Annotated[str, constr(pattern=r"^T-", max_length=9)] = Field(description="T")',
+    ],
+)
+def test_a_pattern_in_any_other_form_is_refused_as_step_4_5_says(tmp_path, field):
+    schemas = _schemas(tmp_path, _PATTERN_IMPORTS + f"class Ticket(BaseModel):\n    {field}\n")
+    before = (schemas / "output_schema_model.json").read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cannot be saved"):
+        _script().refresh(schemas)
+
+    assert (schemas / "output_schema_model.json").read_text(encoding="utf-8") == before
+
+
+def test_step_4_5_names_the_pattern_form_the_refresh_keeps():
+    skill = (Path(__file__).parents[1] / "SKILL.md").read_text(encoding="utf-8")
+    assert '`Annotated[str, constr(pattern=r"...")]`' in skill
+    assert "`Field(pattern=...)`" in skill

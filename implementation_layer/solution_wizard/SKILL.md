@@ -372,11 +372,15 @@ The script tells you now what the audio and document PoCs would otherwise find a
 run. If it exits with an error, nothing was written: fix `output_schema.py` and run it
 again. It refuses what the saved format cannot hold: a class name other than `model_name`
 in the requirements JSON, a field type the schema generator does not produce, a field
-constraint (`ge`, `le`, `min_length`, `max_length`, `max_digits` and the like; only a
-`pattern` on a text field is kept), a `Field` option other than the description and the
-default, and validators, serializers, methods, private attributes or config options other
-than `extra` on the class. Keep the generated `DecimalField` / `OptionalDecimalField`
-helpers as they are. When the wizard's own gaik has no saved-schema format, the script
+constraint (`ge`, `le`, `min_length`, `max_length`, `max_digits` and the like), a `Field`
+option other than the description and the default, and validators, serializers, methods,
+private attributes or config options other than `extra` on the class. The one constraint
+kept is a pattern on a text field, written as the schema generator writes it:
+`Annotated[str, constr(pattern=r"...")]`, also inside `Optional[...]` or `list[...]`, with
+nothing but the pattern in that `constr(...)`. The other ways Pydantic takes a pattern are
+refused: `Field(pattern=...)`, `constr(pattern=...)` as the whole type, and
+`Annotated[str, StringConstraints(pattern=...)]`. Keep the generated `DecimalField` /
+`OptionalDecimalField` helpers as they are. When the wizard's own gaik has no saved-schema format, the script
 writes nothing and warns if an older `output_schema_model.json` is there: run it again with
 gaik 0.11 or later before an audio or document PoC run.
 
