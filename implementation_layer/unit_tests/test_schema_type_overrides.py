@@ -572,3 +572,100 @@ def test_a_model_typed_date_is_a_date_whatever_its_name():
 
     assert requirements.fields[0].field_type == "date"
     assert requirements.fields[0].format == "%d.%m.%Y"
+
+
+# Guards for #96 and #97, whose changes are not in this release: what main does
+# today with these tasks, and what a later fix there must keep. They come from the
+# reviews of PR #204 and PR #317.
+@pytest.mark.parametrize(
+    "rule",
+    [
+        "- Preserve original wording of the notes.",
+        "Dates may appear in several formats; keep the amounts unchanged.",
+        "Retain the line item descriptions as written.",
+        "Keep the original language for free-text fields.",
+        "Keep the notes as written and convert dates to ISO.",
+        "Do not keep dates as written; use ISO.",
+        "Don't preserve the dates.",
+        "Keep the notes verbatim, dates in ISO.",
+        "Keep the dates in DD.MM.YYYY format.",
+        "Keep dates in ISO format.",
+        "Never return dates as text.",
+        "Leave dates empty if they are missing.",
+        "Leave the date fields null when they are missing.",
+        "Keep all dates in one consistent format.",
+        "Keep dates consistent across records.",
+        "There is no need to keep dates as written - convert them to YYYY-MM-DD.",
+        "You don't have to keep the dates as written; convert them to DD.MM.YYYY.",
+        "Retain dates only if they are explicitly stated.",
+        "Keep track of the due dates; they matter.",
+        "It is not required to keep dates as written.",
+        "You needn't keep the dates unchanged.",
+        "Keep dates as written, but convert them to ISO.",
+        "Maintain dates in chronological order.",
+        "Keep all dates and quote the remarks exactly as written.",
+        "Preserve the chronological order of dates.",
+    ],
+)
+def test_a_sentence_that_is_no_rule_to_keep_dates_as_written_leaves_them_dates(rule):
+    requirements = _requirements(
+        FieldSpec(field_name="invoice_date", field_type="date", description="Invoice date"),
+        FieldSpec(field_name="due_date", field_type="date", description="Due date"),
+        FieldSpec(field_name="revision_date", field_type="date", description="Revision date"),
+    )
+    task = f"Extract the invoice date, the due date and the revision date.\n{rule}\n"
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    assert [field.field_type for field in requirements.fields] == ["date", "date", "date"]
+
+
+@pytest.mark.parametrize(
+    ("task", "fields", "expected"),
+    [
+        # A later sentence on a field's own line stays its own, and a generic
+        # "date" field does not take it from inside that line.
+        (
+            "- Document date: top right corner\n"
+            "- Delivery date: when the goods arrive. Write the date as DD.MM.YYYY.",
+            [("date", "date"), ("delivery_date", "date")],
+            {"date": None, "delivery_date": "%d.%m.%Y"},
+        ),
+        (
+            "- File format: PDF or Word\n"
+            "- Delivery date: when the goods arrive. Use the format DD.MM.YYYY.",
+            [("format", "str"), ("delivery_date", "date")],
+            {"format": None, "delivery_date": "%d.%m.%Y"},
+        ),
+        (
+            "- Due date: payment deadline. Write the due date as DD.MM.YYYY, not like "
+            "the invoice date.\n- Invoice date",
+            [("due_date", "date"), ("invoice_date", "date")],
+            {"due_date": "%d.%m.%Y", "invoice_date": None},
+        ),
+    ],
+)
+def test_a_later_sentence_on_a_fields_own_line_stays_with_that_field(task, fields, expected):
+    requirements = _requirements(
+        *[FieldSpec(field_name=n, field_type=t, description=n) for n, t in fields]
+    )
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    assert {f.field_name: f.format for f in requirements.fields} == expected
+
+
+def test_a_field_on_a_prose_line_does_not_take_its_neighbours_format():
+    requirements = _requirements(
+        FieldSpec(field_name="order_date", field_type="date", description="Order date"),
+        FieldSpec(
+            field_name="delivery_date", field_type="date", description="Delivery date in DD.MM.YYYY"
+        ),
+    )
+    task = "Extract the order date as YYYY-MM-DD and the delivery date as DD.MM.YYYY."
+
+    _apply_type_overrides(requirements, original_text=task)
+
+    by_name = {field.field_name: field for field in requirements.fields}
+    assert by_name["order_date"].format == "%Y-%m-%d"
+    assert by_name["delivery_date"].format == "%d.%m.%Y"
