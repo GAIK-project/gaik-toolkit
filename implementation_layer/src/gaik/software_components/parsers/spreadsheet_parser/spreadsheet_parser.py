@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import csv
+import io
 import math
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import datetime, time
 from decimal import Decimal
@@ -12,6 +14,12 @@ from typing import Any, NamedTuple
 
 from ...file_type import TEXT_TYPES, check_file_type
 from ...input_limits import InputLimits, count_table_rows
+from .._text import decode_text
+
+# CSV delimiters, in the order a tie between them goes (see _csv_delimiter).
+_CSV_DELIMITERS = ("\t", ";", "|", ",")
+# How much of a CSV its delimiter is read from.
+_CSV_SAMPLE_CHARS = 64 * 1024
 
 # Characters a number format shows as they are, without quotes.
 _PLAIN_TEXT = frozenset("  -+()$€£¥")
@@ -247,29 +255,78 @@ def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
     return blocks
 
 
+def _csv_delimiter(text: str) -> str:
+    """The delimiter that splits the CSV's rows into the same number of fields, at least two.
+
+    Rows are compared by how many of them have the most common field count, then by that
+    count. A tie goes to tab, then ``;``, ``|`` and ``,``: a semicolon CSV, which Excel
+    writes in a locale with a decimal comma, often has commas in its cells, while a comma
+    CSV seldom has semicolons. ``,`` when no delimiter gives two fields.
+    """
+    sample = text[:_CSV_SAMPLE_CHARS]
+    best, best_score = ",", None
+    for preference, delimiter in enumerate(_CSV_DELIMITERS):
+        rows = list(csv.reader(io.StringIO(sample, newline=""), delimiter=delimiter))
+        if len(sample) < len(text) and rows:
+            rows.pop()  # The sample may end inside this row.
+        counts = [len(row) for row in rows if any(cell.strip() for cell in row)]
+        if not counts:
+            continue
+        fields = Counter(counts).most_common(1)[0][0]
+        if fields < 2:
+            continue
+        score = (counts.count(fields) / len(counts), fields, -preference)
+        if best_score is None or score > best_score:
+            best, best_score = delimiter, score
+    return best
+
+
 class SpreadsheetParser:
     """Convert an .xlsx workbook or a .csv file to Markdown tables.
 
     The first non-empty row of each sheet is the header. A ``Row`` column holds the
     1-based sheet or CSV row number of each data row, so a citation can name the row.
 
+    A CSV's delimiter (``,``, ``;``, tab or ``|``) is read from its rows, and its text
+    from UTF-8, UTF-16 with a byte order mark or, failing those, Windows-1252, the
+    "ANSI" code page Excel saves a plain CSV in on Western-European Windows.
+
     A file over its input limits (size, unpacked size, rows per sheet) is refused
     with ``InputLimitError``; the size is checked before the file is opened.
     """
 
-    def __init__(self, *, limits: InputLimits | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        limits: InputLimits | None = None,
+        csv_delimiter: str | None = None,
+        csv_encoding: str | None = None,
+    ) -> None:
         """
         Args:
             limits: Size and row limits; defaults to
                 :class:`~gaik.software_components.input_limits.InputLimits`.
+            csv_delimiter: The CSV field delimiter, one character; ``None`` (default)
+                reads it from the file's rows.
+            csv_encoding: The CSV's text encoding, such as ``"utf-8"`` or ``"cp1252"``;
+                ``None`` (default) reads it as the class docstring says.
+
+        Raises:
+            ValueError: If ``csv_delimiter`` is not one character, or is a quote or a
+                line break.
         """
+        if csv_delimiter is not None and (len(csv_delimiter) != 1 or csv_delimiter in '"\r\n'):
+            raise ValueError(f"csv_delimiter must be one character, got {csv_delimiter!r}")
         self.limits = limits or InputLimits()
+        self.csv_delimiter = csv_delimiter
+        self.csv_encoding = csv_encoding
 
     def parse_spreadsheet(self, file_path: str | Path) -> str:
         """Return the spreadsheet as Markdown: one ``## Sheet: <name>`` table per sheet.
 
         Raises:
-            ValueError: For an unsupported type or a spreadsheet without rows.
+            ValueError: For an unsupported type, a spreadsheet without rows, or a
+                CSV whose text cannot be decoded (the message names the fix).
             FileTypeMismatchError: If the content is not the type the file's
                 extension says: an .xlsx that is no XLSX workbook, a .csv that is
                 not text (a ``ValueError``).
@@ -285,9 +342,11 @@ class SpreadsheetParser:
         elif suffix == ".csv":
             self.limits.check_file_size(path)
             check_file_type(path, TEXT_TYPES)
-            with path.open(encoding="utf-8-sig", newline="") as handle:
-                rows = count_table_rows(csv.reader(handle), self.limits, path.name)
-                blocks = [table] if (table := _table(rows)) else []
+            text = decode_text(path.read_bytes(), path, self.csv_encoding)
+            delimiter = self.csv_delimiter or _csv_delimiter(text)
+            reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
+            rows = count_table_rows(reader, self.limits, path.name)
+            blocks = [table] if (table := _table(rows)) else []
         else:
             raise ValueError(f"{path.name}: unsupported spreadsheet type {suffix}")
         if not blocks:

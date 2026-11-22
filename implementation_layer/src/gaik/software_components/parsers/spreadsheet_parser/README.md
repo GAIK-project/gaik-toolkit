@@ -68,6 +68,12 @@ single table with no sheet heading.
 - Formula cells show the result stored in the file. A workbook whose formulas have no
   stored results (one written by a library such as openpyxl and never opened in Excel)
   raises `ValueError`; open and save it in Excel or LibreOffice first.
+- A CSV's delimiter (`,`, `;`, tab or `|`) is read from its rows, so a CSV that Excel saves
+  in a locale with a decimal comma (`Tuote;Määrä;Hinta` / `Maito;2;1,49`) keeps its
+  columns and its decimal commas. Its text is read as UTF-8, as UTF-16 with a byte order
+  mark, or else as Windows-1252 (cp1252), the "ANSI" code page of a plain Excel CSV on
+  Western-European Windows; content that is none of these raises `ValueError`. Set
+  either yourself with `SpreadsheetParser(csv_delimiter=";", csv_encoding="cp1252")`.
 - An empty sheet is omitted. A file with no non-empty rows raises `ValueError`.
 - Only `.xlsx` and `.csv` are supported; other types, including `.xls`, raise
   `ValueError`.

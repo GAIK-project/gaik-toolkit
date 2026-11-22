@@ -3636,7 +3636,9 @@
     "uses_components": [],
     "required_parameters": [],
     "optional_parameters": [
-      "limits"
+      "limits",
+      "csv_delimiter",
+      "csv_encoding"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
