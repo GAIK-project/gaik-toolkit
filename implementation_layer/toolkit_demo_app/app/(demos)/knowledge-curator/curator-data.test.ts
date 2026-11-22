@@ -138,7 +138,9 @@ describe("the examples", () => {
 test("the examples rank primary sources first, as their instructions describe", () => {
   for (const example of EXAMPLES) {
     expect(example.source_precedence).toEqual(["primary", "secondary"]);
-    // The text no longer decides conflicts: the precedence does.
+    // The text no longer decides conflicts: the precedence does. On a gaik without
+    // it the model reads the ranking from the instructions, so the summary names neither.
     expect(example.instructions).not.toContain("prefer the primary");
+    expect(example.summary).not.toContain("instructions say");
   }
 });

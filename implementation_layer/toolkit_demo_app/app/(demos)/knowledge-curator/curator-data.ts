@@ -64,7 +64,7 @@ export const EXAMPLES: CuratorExample[] = [
     id: "sale",
     title: "A pre-sale inspection where sources disagree",
     summary:
-      "An inspector's notes and readings against the seller's disclosure. They disagree about the roof and the bathroom, and the instructions say which to trust.",
+      "An inspector's notes and readings, the primary sources, against the seller's disclosure. They disagree about the roof and the bathroom.",
     tags: ["3 sources", "3 topics", "conflicts"],
     url: "/knowledge-curator-examples/sale-inspection.json",
     sections: [
