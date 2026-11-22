@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import math
 import os
+import sys
 import threading
 import uuid
 import warnings
@@ -76,6 +77,10 @@ class _KeyedLocks:
         self._guard = threading.Lock()
         self._entries: dict[Hashable, list] = {}  # key -> [lock, threads using it]
 
+    @staticmethod
+    def _new_lock():
+        return threading.RLock()
+
     @contextmanager
     def hold(self, keys: Iterable[Hashable]) -> Iterator[None]:
         # Every caller takes its locks in the same order, so two callers that
@@ -84,7 +89,9 @@ class _KeyedLocks:
         with self._guard:
             entries = []
             for key in ordered:
-                entry = self._entries.setdefault(key, [threading.RLock(), 0])
+                entry = self._entries.get(key)
+                if entry is None:
+                    entry = self._entries[key] = [self._new_lock(), 0]
                 entry[1] += 1
                 entries.append((key, entry))
         acquired = []
@@ -156,6 +163,8 @@ class VectorStore:
                     "Install extras with 'pip install gaik[vector-store]'"
                 ) from exc
 
+            # The folder Chroma opens now, so a later chdir does not change the lock.
+            self._chroma_scope = (_folder_key(self.persist_path), self.collection_name)
             self._client = chromadb.PersistentClient(path=self.persist_path)
             # Cosine space, so that ``1 - distance`` is the same cosine similarity
             # the in-memory store returns. Chroma's default space is l2.
@@ -175,6 +184,7 @@ class VectorStore:
 
     def __getstate__(self) -> dict:
         # A lock cannot be pickled or deep-copied; an in-memory store could be.
+        # The copy made from this state has lists of its own, and its own lock.
         state = self.__dict__.copy()
         state.pop("_lock", None)
         return state
@@ -182,6 +192,12 @@ class VectorStore:
     def __setstate__(self, state: dict) -> None:
         self.__dict__.update(state)
         self._lock = threading.RLock()
+
+    def __copy__(self) -> VectorStore:
+        # A shallow copy shares the lists, so it shares the lock that guards them.
+        clone = type(self).__new__(type(self))
+        clone.__dict__.update(self.__dict__)
+        return clone
 
     def add(
         self,
@@ -285,7 +301,7 @@ class VectorStore:
             with self._lock:
                 yield
             return
-        where = (os.path.normcase(os.path.realpath(self.persist_path)), self.collection_name)
+        where = self._chroma_scope
         with _CHROMA_WRITES.hold((*where, doc_id, owner) for doc_id, owner in scopes):
             yield
 
@@ -556,21 +572,42 @@ def _replacing(metadata: dict | None, stored: dict | None) -> dict | None:
 
 @functools.lru_cache(maxsize=1)
 def _chroma_removes_none_values() -> bool:
-    """Whether this chromadb takes a ``None`` metadata value, which removes the key.
+    """Whether this chromadb removes a metadata key that an upsert sends as ``None``.
 
-    Chroma 1.x does; before 1.0 the check below raises ``ValueError``.
+    Chroma 1.x does; 0.5 and 0.6 refuse the value. A client that accepts ``None``
+    does not show what the store then does with it, so this is a real upsert into
+    a throwaway in-memory collection, once per process. Any failure answers
+    ``False``, which keeps the delete-then-add path.
     """
     try:
-        from chromadb.api.types import validate_metadata
-    except ImportError:
         import chromadb
 
-        return int(str(chromadb.__version__).split(".")[0]) >= 1
-    try:
-        validate_metadata({"gaik_probe": None})
-    except ValueError:
+        client = chromadb.EphemeralClient()
+        name = f"gaik-probe-{uuid.uuid4().hex}"
+        collection = client.create_collection(name)
+    except Exception:  # noqa: BLE001 - no in-memory client: the safe path
         return False
-    return True
+    try:
+        collection.add(ids=["probe"], embeddings=[[1.0, 0.0]], metadatas=[{"kept": 1, "gone": 1}])
+        collection.upsert(
+            ids=["probe"], embeddings=[[1.0, 0.0]], metadatas=[{"kept": 1, "gone": None}]
+        )
+        [metadata] = collection.get(ids=["probe"], include=["metadatas"])["metadatas"]
+        return metadata == {"kept": 1}
+    except Exception:  # noqa: BLE001 - 0.5 and 0.6 raise ValueError for the None
+        return False
+    finally:
+        try:
+            client.delete_collection(name)
+        except Exception:  # noqa: BLE001 - an in-memory collection goes with the process
+            pass
+
+
+def _folder_key(path: str) -> str:
+    """One spelling of a folder: absolute, links resolved, and case folded on Windows
+    and macOS, whose file systems ignore case by default."""
+    key = os.path.normcase(os.path.realpath(path))
+    return key.casefold() if sys.platform == "darwin" else key
 
 
 def _chroma_where(filters: dict) -> dict:

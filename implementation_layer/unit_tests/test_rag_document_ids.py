@@ -264,15 +264,18 @@ def test_a_failed_chroma_reindex_keeps_the_stored_chunk(tmp_path):
     assert store.count() == 1
 
 
-def _chroma(tmp_path):
+def _chroma(tmp_path, *, in_place: bool = False):
     pytest.importorskip("chromadb")
     from gaik.software_components.RAG.vector_store import VectorStore
+    from gaik.software_components.RAG.vector_store import vector_store as module
 
+    if in_place and not module._chroma_removes_none_values():
+        pytest.skip("this chromadb cannot remove a metadata key: the store deletes, then adds")
     return VectorStore(persist=True, persist_path=str(tmp_path / "chroma"))
 
 
 def test_an_interrupted_chroma_reindex_keeps_the_stored_chunk(tmp_path, monkeypatch):
-    store = _chroma(tmp_path)
+    store = _chroma(tmp_path, in_place=True)
     store.add(_chunks("report", ["alpha"]), [A1])
 
     # The process stops while the new version is written: Ctrl-C, say. Writing
@@ -290,7 +293,7 @@ def test_an_interrupted_chroma_reindex_keeps_the_stored_chunk(tmp_path, monkeypa
 
 
 def test_a_chroma_write_that_fails_partway_is_undone(tmp_path, monkeypatch):
-    store = _chroma(tmp_path)
+    store = _chroma(tmp_path, in_place=True)
     [old] = _chunks("report", ["alpha"])
     old.metadata["heading"] = "Old heading"
     store.add([old], [A1])
@@ -340,6 +343,56 @@ def test_the_installed_chroma_removes_a_key_sent_as_none():
 
     major = int(chromadb.__version__.split(".")[0])
     assert module._chroma_removes_none_values() is (major >= 1)
+
+
+class _KeepsKeysCollection:
+    """A Chroma collection that accepts a None value but keeps the key."""
+
+    def __init__(self) -> None:
+        self.metadata: dict = {}
+
+    def add(self, ids, embeddings, metadatas):
+        self.metadata = dict(metadatas[0])
+
+    def upsert(self, ids, embeddings, metadatas):
+        self.metadata.update({k: v for k, v in metadatas[0].items() if v is not None})
+
+    def get(self, ids, include):
+        return {"metadatas": [self.metadata]}
+
+
+class _RefusesNoneCollection(_KeepsKeysCollection):
+    """A Chroma collection before 1.0: a None value is refused."""
+
+    def upsert(self, ids, embeddings, metadatas):
+        raise ValueError("Expected metadata value to be a str, int, float or bool, got None")
+
+
+@pytest.mark.parametrize(
+    "collection", [_KeepsKeysCollection, _RefusesNoneCollection], ids=["keeps", "refuses"]
+)
+def test_a_chroma_that_does_not_remove_a_key_gets_delete_then_add(monkeypatch, collection):
+    pytest.importorskip("chromadb")
+    import chromadb
+    from gaik.software_components.RAG.vector_store import vector_store as module
+
+    deleted = []
+
+    class _Client:
+        def create_collection(self, name):
+            return collection()
+
+        def delete_collection(self, name):
+            deleted.append(name)
+
+    monkeypatch.setattr(chromadb, "EphemeralClient", _Client)
+    module._chroma_removes_none_values.cache_clear()
+    try:
+        # A check of the client alone passes "keeps": the probe writes and reads back.
+        assert module._chroma_removes_none_values() is False
+    finally:
+        module._chroma_removes_none_values.cache_clear()
+    assert len(deleted) == 1, "the throwaway collection was left"
 
 
 def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):
