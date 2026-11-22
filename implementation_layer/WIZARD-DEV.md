@@ -20,9 +20,11 @@ docker compose up --build
 UI http://localhost:3000 · API http://localhost:8100
 
 **Chat ja Azure Foundry:** kopioi `wizard_api/.env.example` → `wizard_api/.env` ja täytä
-`CLAUDE_CODE_USE_FOUNDRY=1`, `ANTHROPIC_FOUNDRY_API_KEY` ja `ANTHROPIC_FOUNDRY_RESOURCE`.
-Compose lukee tiedoston `wizard-api`-palvelulle; muutoksen jälkeen `docker compose up -d wizard-api`.
-Ilman niitä jokainen chat-viesti vastaa 500 (`Command failed with exit code 1` lokissa).
+`CLAUDE_CODE_USE_FOUNDRY=1`, `ANTHROPIC_FOUNDRY_API_KEY` ja `ANTHROPIC_FOUNDRY_RESOURCE`
+(resurssin nimi, ei URL). Foundry-resurssilla pitää olla deployment nimeltä
+`claude-sonnet-4-6`, tai aseta `ANTHROPIC_MODEL` deploymentin nimeksi. Compose vie
+`wizard-api`:lle vain nämä neljä muuttujaa; muutoksen jälkeen `docker compose up -d wizard-api`.
+Oireet ja syyt: ks. kohta 8. Portit kuuntelevat vain `127.0.0.1`:ssä.
 
 **Windows:** käytä tätä Docker-polkua. Option B ja C (API suoraan koneella) vaativat
 Linuxin, macOS:n tai WSL:n, koska `wizard_api` käyttää `fcntl`ia ja `os.O_NOFOLLOW`ia.
@@ -113,7 +115,8 @@ UI-only on vanha Sprint 1 -pikatie UI-kokeiluun — ei demoon, ei asiakasreviewi
 | UI ei lataudu | `docker compose logs wizard-ui` |
 | Tyhjä sessiolista API-tilassa | Normaalia ensimmäisellä kerralla — luo uusi sessio |
 | Chat ei vastaa | Varmista että olet kirjautunut; tuotanto-UI Dockerissa (ei `next dev`) |
-| Chat vastaa 500 | `docker compose logs wizard-api`: `Command failed with exit code 1` = Foundry-muuttujat puuttuvat `wizard_api/.env`:stä |
+| "Vastauksen striimaus epäonnistui." | `docker compose logs wizard-api`: `Not logged in · Please run /login` = Foundry-muuttujat puuttuvat `wizard_api/.env`:stä; `There's an issue with the selected model` = resurssilla ei ole sen nimistä deploymentia (`ANTHROPIC_MODEL`) |
+| Chat vastaa mock-viestillä | `WIZARD_AGENT_CHAT` on `false` (Compose) tai puuttuu (`.env.local`, Option B) |
 | BPMN “Failed to load” / 500 UI-onlyssa | Aja `./scripts/setup.sh` (`.venv` + pydantic) **tai** käytä API-tilaa (`WIZARD_API_URL`) — suositus: API |
 | BPMN OK API-tilassa, 500 UI-onlyssa | Odotettua ilman setupia: UI-only spawn `python3` + `solution_wizard`; API generoi BPMN:n itse |
 
@@ -133,7 +136,8 @@ cd implementation_layer/wizard_api
 cd implementation_layer/solution_wizard_v2
 ./scripts/setup.sh          # once (npm + .venv/pydantic for BPMN scripts)
 cp .env.example .env.local
-# Edit .env.local: NEXT_PUBLIC_DEV_AUTH=true and WIZARD_API_URL=http://localhost:8100
+# Edit .env.local: NEXT_PUBLIC_DEV_AUTH=true, WIZARD_API_URL=http://localhost:8100
+# and WIZARD_AGENT_CHAT=true (the chat then goes to the API's agent, not the mock)
 npm run dev                 # http://localhost:3000
 ```
 

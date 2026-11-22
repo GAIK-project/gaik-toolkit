@@ -24,11 +24,22 @@ chat to the API's agent instead of a mock reply.
 
 The chat needs a model. Copy `.env.example` to `.env` and fill in the three Azure
 Foundry variables (`CLAUDE_CODE_USE_FOUNDRY=1`, `ANTHROPIC_FOUNDRY_API_KEY`,
-`ANTHROPIC_FOUNDRY_RESOURCE`); the `wizard-api` service reads that file, and
-`docker compose up -d wizard-api` picks up a change. Without them every chat
-message answers 500, with "Command failed with exit code 1" in
-`docker compose logs wizard-api`. The service also sets `IS_SANDBOX=1`: the image
-runs as root in Compose, and the agent CLI refuses to start as root without it.
+`ANTHROPIC_FOUNDRY_RESOURCE`, the resource's name, not a URL). The Foundry resource
+needs a deployment named `claude-sonnet-4-6`, or set `ANTHROPIC_MODEL` to the
+deployment's name. Compose passes these four names, and no other line of the file,
+to `wizard-api`; `docker compose up -d wizard-api` picks up a change.
+`WIZARD_AGENT_CHAT=false` in the same file brings back the UI's mock reply.
+
+| What you see | `docker compose logs wizard-api` | Cause |
+|---|---|---|
+| "Vastauksen striimaus epäonnistui." under the message (the API answers 200 and ends the stream with an error frame) | `agent chat turn failed [...]: Not logged in · Please run /login` | The Foundry variables are missing |
+| The same | `There's an issue with the selected model (...)` | No deployment of that name on the resource |
+| Every chat message answers 500 | `cannot be used with root/sudo privileges` | `IS_SANDBOX` is not set |
+
+The service sets `IS_SANDBOX=1`: the image runs as root in Compose, and the agent
+CLI refuses to skip its permission prompts as root without it. The ports are bound
+to `127.0.0.1`, since the stack has dev accounts, no service token and the
+developer's own Foundry key.
 
 On Windows run the API in Docker (this section). The local API below needs Linux,
 macOS or WSL: `wizard_api` imports `fcntl` and uses `os.O_NOFOLLOW`, which
