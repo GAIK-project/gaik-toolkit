@@ -70,12 +70,16 @@ def _is_timeout(exc: BaseException) -> bool:
 
 
 def _usage(response) -> dict[str, int]:
-    if not getattr(response, "usage_metadata", None):
+    meta = getattr(response, "usage_metadata", None)
+    if not meta:
         return {}
     return {
         # The SDK declares every count Optional; a missing count is 0 tokens.
-        "prompt_tokens": response.usage_metadata.prompt_token_count or 0,
-        "completion_tokens": response.usage_metadata.candidates_token_count or 0,
+        "prompt_tokens": meta.prompt_token_count or 0,
+        # Thinking tokens are billed as output but counted apart from the answer's
+        # (candidates) tokens; like OpenAI's completion tokens, the count holds both.
+        "completion_tokens": (meta.candidates_token_count or 0)
+        + (getattr(meta, "thoughts_token_count", None) or 0),
     }
 
 
