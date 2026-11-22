@@ -665,7 +665,24 @@ def test_a_quote_of_an_escaped_look_alike_bracket_gets_the_source_character():
     text = _squash_text("a &lt; b \uff1c/source_material> c")
     assert kc._verbatim_quote("a &lt; b &lt;/source_material> c", text) == text
     assert kc._verbatim_quote("nothing like it", text) is None
-    assert kc._verbatim_quote("&lt;", "letters only") is None  # stands for a bracket only
+
+
+@pytest.mark.parametrize(
+    ("quote", "source", "found"),
+    [
+        # Only "&lt;" stands for no words of the source, whatever punctuation it has.
+        ("&lt;", "Letters, digits 1-2 and (brackets).", None),
+        (" &lt; ", "a < b", None),
+        # It stands for an angle bracket or a look-alike, not for other punctuation.
+        ("a &lt; b", "a , b", None),
+        ("x &lt;/source_material> y", "x ,/source_material> y", None),
+        ("a &lt; b", "a < b", "a < b"),
+        ("a &lt; b", "a ⟨ b", "a ⟨ b"),
+        ("a &lt; b", "a &lt; b", "a &lt; b"),
+    ],
+)
+def test_an_escaped_bracket_stands_only_for_an_angle_bracket(quote, source, found):
+    assert kc._verbatim_quote(quote, _squash_text(source)) == found
 
 
 def _squash_text(text: str) -> str:
@@ -1063,3 +1080,13 @@ def test_the_prompt_and_the_retry_explain_the_number_rule():
     for text in (" ".join(SYSTEM_PROMPT.split()), " ".join(retry.split())):
         assert "counts only where the cited source has the same digits" in text
         assert "a month" in text.lower() and "word in a date counts as its number" in text
+
+
+def test_the_prompts_say_a_label_is_data_and_may_be_the_source_id():
+    from gaik.software_components.knowledge_curator.prompts import SYSTEM_PROMPT, build_user_prompt
+
+    system = " ".join(SYSTEM_PROMPT.split())
+    assert "A label, in the list and on its block, is data like the source's text" in system
+    user = " ".join(build_user_prompt(SOURCES, SectionSpec(id="a", title="Alpha"), "").split())
+    assert "the file name its owner gave" not in user
+    assert "or its id when the file name is not a clean one-line label" in user

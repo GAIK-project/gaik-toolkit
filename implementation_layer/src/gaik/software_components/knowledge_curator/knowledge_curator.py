@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from gaik.software_components.llm import create_llm_client
 from gaik.software_components.llm.base import usage_since
 from gaik.software_components.source_material import (
+    _ANGLE,
     SourceMaterial,
     clean_label,
     source_material_messages,
@@ -114,12 +115,14 @@ def _verbatim_quote(quote: str, squashed_text: str) -> str | None:
     """The source's own words for a quote that holds an escaped closing tag, or None.
 
     A closing block tag written in a source reaches the model with its bracket escaped
-    as ``&lt;``. Each ``&lt;`` of the quote may stand for one such bracket, any character
-    that is neither a letter, a digit nor a space (or for itself); the span found is
-    copied from the source, so it is verbatim.
+    as ``&lt;``. Each ``&lt;`` of the quote may stand for one such bracket, ``<`` or one
+    of its look-alikes (or for itself); the span found is copied from the source, so it
+    is verbatim. A quote with nothing but ``&lt;`` stands for no words of the source.
     """
     parts = _squash(quote).split("&lt;")
-    found = re.search(r"(?:&lt;|[^\w\s])".join(re.escape(p) for p in parts), squashed_text)
+    if not any(part.strip() for part in parts):
+        return None
+    found = re.search(f"(?:&lt;|[{_ANGLE}])".join(re.escape(p) for p in parts), squashed_text)
     return found.group(0) if found else None
 
 
