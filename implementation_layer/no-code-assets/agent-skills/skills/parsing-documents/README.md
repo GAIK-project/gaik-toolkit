@@ -35,7 +35,7 @@ came through intact.
 
 ## Needs
 
-`pip install "gaik[parser]==0.11.1"`, or `gaik[multimodal-parser]` for vision parsing. Vision parsers
+`pip install "gaik[parser]==0.12.0"`, or `gaik[multimodal-parser]` for vision parsing. Vision parsers
 also need an LLM provider key.
 
 Install the skill with the [gaik-toolkit plugin](../../README.md#installing).

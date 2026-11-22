@@ -19,7 +19,7 @@ script after the speech round trip, so grep for key words rather than whole sent
 ## Source hierarchy (P4)
 
 `report_writer_example.py` sets `"source_precedence": ["primary", "secondary"]` (the bundled
-`report_spec.json` leaves the key out until a gaik release after 0.11.1 carries it, since the demo
+`report_spec.json` leaves the key out until the gaik release that carries it (0.12.0 or later), since the demo
 app loads the spec with gaik from PyPI): the curator resolves a conflict in
 code when exactly one side cites a recording, unless that recording is itself unsure (a unit of
 `low` confidence). Every other conflict stays `unresolved` for a person to settle in the knowledge

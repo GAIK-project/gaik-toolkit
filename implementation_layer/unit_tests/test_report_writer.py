@@ -658,7 +658,7 @@ def test_the_spec_refuses_a_source_precedence_it_cannot_use(tmp_path, precedence
         ReportSpec.model_validate(data)
 
 
-def test_the_docs_name_a_release_after_0_11_1_for_source_precedence():
+def test_the_docs_name_gaik_0_12_0_for_source_precedence():
     """gaik 0.11.1 is released without source_precedence and refuses it: a text that says
     "newer than 0.11.0" sends an agent on 0.11.1 into a ValidationError or TypeError."""
     root = Path(__file__).resolve().parents[1]
@@ -678,7 +678,7 @@ def test_the_docs_name_a_release_after_0_11_1_for_source_precedence():
     for text in texts:
         assert "source_precedence" in text
         assert "newer than 0.11.0" not in text and "on 0.11.0 leave" not in text
-        assert "a release after 0.11.1" in text
+        assert "gaik 0.12.0 or later" in text and "a release after 0.11.1" not in text
 
 
 def test_run_settings_review_strictly_by_default():
