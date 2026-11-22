@@ -408,6 +408,20 @@ def test_a_chunk_without_a_page_is_cited_as_its_context_header_names_it(monkeypa
     assert result.dropped_citations == []
 
 
+def test_a_chunk_with_an_empty_page_is_cited_without_one(monkeypatch):
+    chunks = [
+        Document(
+            page_content="Refill weekly.", metadata={"document_name": "notes.md", "page_number": ""}
+        )
+    ]
+    generator = _generator(monkeypatch, "Refill weekly [notes.md, page unknown].")
+
+    result = generator.generate_with_citations(QUESTION, chunks)
+
+    assert result.answer == "Refill weekly [notes.md]."
+    assert result.dropped_citations == []
+
+
 def test_page_unknown_does_not_match_a_chunk_that_has_a_page(monkeypatch):
     generator = _generator(monkeypatch, "It runs for 36 hours [depot_manual.pdf, page unknown].")
 

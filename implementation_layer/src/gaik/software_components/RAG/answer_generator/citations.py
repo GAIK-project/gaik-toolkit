@@ -65,7 +65,7 @@ class Citation:
         """The text the answer shows for this citation."""
         if not self.document_name:
             return f"[{self.reference}]"
-        if self.page_number is None:
+        if self.page_number is None or not str(self.page_number).strip():
             return f"[{self.document_name}]"
         return f"[{self.document_name}, page {self.page_number}]"
 
