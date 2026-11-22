@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from difflib import SequenceMatcher
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from gaik.software_components.llm import create_llm_client
 from gaik.software_components.source_material import (
@@ -25,15 +26,31 @@ class EditList(BaseModel):
     edits: list[Edit]
 
 
+_FAILED_ID = re.compile(r"F\d+")
+
+
+def _split_ids(value: str | list[str]) -> list[str]:
+    """The failed-edit ids written in ``value``, such as ``["F1", "F2"]`` for "f1, F2"."""
+    text = value if isinstance(value, str) else " ".join(str(v) for v in value)
+    return list(dict.fromkeys(_FAILED_ID.findall(text.upper())))
+
+
 class RetryEdit(Edit):
-    """An edit in a retry answer, naming the failed edit it makes."""
+    """An edit in a retry answer, naming the failed edits it makes."""
 
     model_config = ConfigDict(extra="forbid")
 
-    answers: str = Field(
-        description="The id of the failed edit that this edit makes, such as F1, copied "
-        "from the failed_edits block; an empty string for an edit that makes none of them."
+    answers: list[str] = Field(
+        description='The ids of the failed edits that this edit makes, such as ["F1"], or '
+        '["F1", "F2"] when one edit makes both, copied from the failed_edits block; an '
+        "empty list for an edit that makes none of them."
     )
+
+    @field_validator("answers", mode="before")
+    @classmethod
+    def _ids(cls, value):
+        # One id written as a string ("F1", or "F1, F2") is taken as before.
+        return _split_ids(value) if isinstance(value, str) else value
 
 
 class RetryEditList(BaseModel):
@@ -86,7 +103,7 @@ def _closeness(a: str, b: str) -> float:
 def _answer_score(edit: Edit, earlier: Edit) -> float | None:
     """How well a retry edit stands for an earlier failed edit, or None when it does not.
 
-    Used only when a retry answer names no failed edit by its id. It does when it gives
+    Used only for a retry answer without the ``answers`` field. It does when it gives
     the same reason, or makes the same correction: a replacement whose text contains the
     earlier replacement or is contained in it, or a deletion of text like the text the
     earlier deletion meant to delete. Closer search texts score higher, so each earlier
@@ -125,20 +142,42 @@ def _match_by_text(previous: dict[str, Edit], edits: list[Edit]) -> dict[int, st
     return owner
 
 
-def _owners(previous: dict[str, Edit], edits: list[Edit]) -> dict[int, str]:
-    """Which earlier failed edit each retry edit makes, as {retry index: failed id}.
+def _named(edit: Edit) -> list[str] | None:
+    """The failed-edit ids a retry edit names, or None when it has no ``answers`` field.
 
-    A retry edit names its failed edit by id. Each id is taken by the first edit that
-    names it; an edit that names no known id is a new edit. Only when the answer names
-    no known id at all (a model that ignores the field) are the edits paired with the
-    failed ones by their text instead.
+    An edit without the field, a plain :class:`Edit` or one whose model left the field
+    out, names nothing either way; an empty list is an explicit "none of them".
     """
-    owner: dict[int, str] = {}
+    if "answers" not in getattr(edit, "model_fields_set", ()):
+        return None
+    return _split_ids(edit.answers)
+
+
+def _owners(previous: dict[str, Edit], edits: list[Edit]) -> dict[int, list[str]]:
+    """Which earlier failed edits each retry edit makes, as {retry index: failed ids}.
+
+    A retry edit names the failed edits it makes by id, one or several. Each id is taken
+    by the first edit that names it; an edit that names no known id is a new edit. Only
+    when no edit of the answer has the ``answers`` field at all (a model that ignores
+    it) are the edits paired with the failed ones by their text instead: an empty
+    ``answers`` says the edit makes none of them, so an unrelated edit with the same
+    generic reason cannot stand for a failed one.
+    """
+    owner: dict[int, list[str]] = {}
+    taken: set[str] = set()
+    explicit = False
     for j, edit in enumerate(edits):
-        fid = getattr(edit, "answers", "").strip().upper()
-        if fid in previous and fid not in owner.values():
-            owner[j] = fid
-    return owner or _match_by_text(previous, edits)
+        named = _named(edit)
+        if named is None:
+            continue
+        explicit = True
+        mine = [fid for fid in named if fid in previous and fid not in taken]
+        if mine:
+            owner[j] = mine
+            taken.update(mine)
+    if explicit:
+        return owner
+    return {j: [fid] for j, fid in _match_by_text(previous, edits).items()}
 
 
 class DraftReviewer:
@@ -222,17 +261,19 @@ class DraftReviewer:
                 break
             previous = {fid: e for fid, (e, _) in failed.items()}
             owner = _owners(previous, edits) if previous else {}
+            claimed = {fid for ids in owner.values() for fid in ids}
             text, done, missed = _apply(text, [_plain(e) for e in edits])
             applied.extend(done)
             # A failed edit that no retry edit makes stays failed under its id, so it is
             # asked for again and ends in ``unresolved`` rather than disappearing. One
-            # whose retry edit fails too is carried once, as that retry edit.
-            failed = {
-                fid: (e, LEFT_OUT) for fid, e in previous.items() if fid not in owner.values()
-            }
+            # whose retry edit fails too is carried once, as that retry edit, under the
+            # first id it names (it stands for the others it names as well).
+            failed = {fid: (e, LEFT_OUT) for fid, e in previous.items() if fid not in claimed}
             for j, edit, error in missed:
-                fid = owner.get(j)
-                if fid is None:
+                ids = owner.get(j)
+                if ids:
+                    fid = ids[0]
+                else:
                     made += 1
                     fid = f"F{made}"
                 failed[fid] = (edit, error)

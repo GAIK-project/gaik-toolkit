@@ -18,9 +18,15 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from gaik.software_components.draft_reviewer.draft_reviewer import _owners
+from gaik.software_components.draft_reviewer.draft_reviewer import (
+    LEFT_OUT,
+    _owners,
+    _split_ids,
+)
+from gaik.software_components.draft_reviewer.models import Edit
+from gaik.software_components.draft_reviewer.prompts import retry_prompt
 from gaik.software_components.source_material import (
     SourceMaterial,
     with_source_material_instruction,
@@ -59,11 +65,18 @@ class Correction(BaseModel):
     search: str = Field(description="Letter-for-letter exact string to find in the text.")
     replace: str = Field(description="Replacement string to apply.")
     reason: str = Field(description="Why this correction is needed (1-2 sentences).")
-    answers: str = Field(
-        default="",
-        description="In a retry: the id of the failed edit this correction makes, such as "
-        "F1, copied from the failed_edits block; empty for a correction that makes none.",
+    answers: list[str] = Field(
+        default_factory=list,
+        description="In a retry: the ids of the failed edits this correction makes, such "
+        'as ["F1"], or ["F1", "F2"] when one correction makes both, copied from the '
+        "failed_edits block; an empty list for a correction that makes none of them.",
     )
+
+    @field_validator("answers", mode="before")
+    @classmethod
+    def _ids(cls, value):
+        # One id written as a string ("F1", or "F1, F2") is taken as before.
+        return _split_ids(value) if isinstance(value, str) else value
 
 
 class CorrectionList(BaseModel):
@@ -150,22 +163,10 @@ def _check_prompt(text: str, blocks: SourceMaterial) -> str:
 
 
 def _retry_prompt(text: str, failed: list[dict], attempt: int, blocks: SourceMaterial) -> str:
-    failed_info = "\n\n".join(
-        f"  id: {f['id']}\n  search: {f['search']!r}\n  replace: {f['replace']!r}\n"
-        f"  error: {f['error']}"
-        for f in failed
-    )
-    return (
-        f"You have attempted to correct this text {attempt} time(s), but the edits in the "
-        "source_material block labelled failed_edits could not be applied because their "
-        "search strings were not found.\n\n"
-        + blocks.wrap(failed_info, label="failed_edits")
-        + "\n\nRe-read the instructions and decide whether these changes are still needed. "
-        "If so, produce NEW corrections whose 'search' strings EXACTLY match the current "
-        "text below, and set 'answers' of each to the id of the failed edit it makes, such "
-        "as F1, or leave it empty for a correction that makes none of them.\n\n"
-        + blocks.wrap(text, label="text")
-    )
+    """The DraftReviewer's retry request: every failed edit must be made again or it
+    stays unresolved (and fails a strict review), so the two reviewers ask alike."""
+    listed = [(f["id"], Edit(**_edit_fields(f)), f["error"]) for f in failed]
+    return retry_prompt(text, listed, attempt, blocks)
 
 
 def _edit_fields(failed: dict) -> dict:
@@ -215,16 +216,17 @@ def diff_editor_run(
     while pending:
         previous = {f["id"]: Correction(**_edit_fields(f)) for f in failed}
         owner = _owners(previous, pending) if previous else {}
+        claimed = {fid for ids in owner.values() for fid in ids}
         current, successful, missed = _apply_corrections(current, pending)
         applied.extend(successful)
-        failed = [
-            {**f, "error": "left out of the last answer, propose it again"}
-            for f in failed
-            if f["id"] not in owner.values()
-        ]
+        failed = [{**f, "error": LEFT_OUT} for f in failed if f["id"] not in claimed]
         for f in missed:
-            fid = owner.get(f.pop("index"))
-            if fid is None:
+            # A retry correction that makes several failed edits and fails too is
+            # carried once, under the first id it names.
+            ids = owner.get(f.pop("index"))
+            if ids:
+                fid = ids[0]
+            else:
                 made += 1
                 fid = f"F{made}"
             failed.append({**f, "id": fid})
@@ -233,7 +235,7 @@ def diff_editor_run(
             break
         if attempt >= MAX_ATTEMPTS:
             break
-        sent = [current] + [f"{f['search']}\n{f['replace']}" for f in failed]
+        sent = [current] + [f"{f['search']}\n{f['replace']}\n{f['reason']}" for f in failed]
         if any(blocks.boundary in piece for piece in sent):
             blocks = SourceMaterial()
         pending = _request_corrections(
@@ -244,8 +246,7 @@ def diff_editor_run(
         ).corrections
 
     warnings = [
-        f"Unresolved reviewer edit (search text not found after {attempt} attempt(s)): "
-        f"{f['search'][:80]!r}"
+        f"Unresolved reviewer edit ({f['error']}; after {attempt} attempt(s)): {f['search'][:80]!r}"
         for f in failed
     ]
     return current, applied, warnings, num_proposed

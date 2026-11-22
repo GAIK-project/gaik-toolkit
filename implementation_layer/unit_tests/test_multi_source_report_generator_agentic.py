@@ -653,3 +653,67 @@ def test_diff_editor_retry_naming_the_id_resolves_it_whatever_its_wording():
     assert text == TEXT.replace("1999", "1998").replace("centre", "center")
     assert warnings == []
     assert len(editor.prompts) == 2
+
+
+def test_diff_editor_an_unrelated_retry_with_the_same_reason_leaves_the_failed_edit():
+    # The retry's correction names no failed edit ('answers' is an explicit empty
+    # list), so its shared generic reason does not let it stand for the failed one.
+    paint = Correction(search=" It was painted red.", replace="", reason="Not in the evidence.")
+    centre = Correction(
+        search=" near the centre", replace="", reason="Not in the evidence.", answers=[]
+    )
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[paint]),
+        CorrectionList(corrections=[centre]),
+        CorrectionList(corrections=[]),
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace(" near the centre", "")
+    assert len(warnings) == 1 and "painted red" in warnings[0]
+
+
+def test_diff_editor_one_correction_can_make_two_failed_edits():
+    both = Correction(
+        search="opened in 1999. It was painted blue",
+        replace="opened in 1998. It was painted grey",
+        reason="The evidence gives 1998 and grey.",
+        answers=["F1", "F2"],
+    )
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR, MISSING_PAINT]),
+        CorrectionList(corrections=[both]),
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace("1999", "1998").replace("painted blue", "painted grey")
+    assert warnings == []
+    assert len(editor.prompts) == 2
+
+
+def test_diff_editor_retry_asks_like_the_draft_reviewer():
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR]), CorrectionList(corrections=[])
+    )
+    _, _, warnings, _ = _run(editor)
+    retry = editor.prompts[1]
+    assert "decide whether these changes are still needed" not in retry
+    assert "search strings were not found" not in retry
+    assert "stays unresolved" in retry
+    assert '["F1", "F2"] when one edit makes both' in retry
+    assert "reason: r" in retry
+    assert warnings == [
+        "Unresolved reviewer edit (not found in the text; after 1 attempt(s)): "
+        "'opened in 1990 exactly'"
+    ]
+
+
+def test_diff_editor_warning_names_a_left_out_edit_as_left_out():
+    year = Correction(search="1999", replace="1998", reason="other words", answers=["F1"])
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR, MISSING_PAINT]),
+        CorrectionList(corrections=[year]),
+        CorrectionList(corrections=[]),
+    )
+    _, _, warnings, _ = _run(editor)
+    assert len(warnings) == 1
+    assert warnings[0].startswith("Unresolved reviewer edit (left out of the last answer")
+    assert "painted red" in warnings[0]

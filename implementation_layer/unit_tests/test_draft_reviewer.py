@@ -167,7 +167,7 @@ def test_one_retried_deletion_answers_only_the_deletion_it_matches(make):
     assert "tol booth" not in third
 
 
-def _retry(edit: Edit, answers: str) -> dr.RetryEdit:
+def _retry(edit: Edit, answers: str | list[str]) -> dr.RetryEdit:
     return dr.RetryEdit(**edit.model_dump(), answers=answers)
 
 
@@ -179,6 +179,7 @@ def test_retry_request_lists_ids_and_asks_for_them(make):
     retry = client.calls[1][2]["content"]
     assert "id: F1" in retry
     assert "'answers'" in retry
+    assert '["F1", "F2"] when one edit makes both' in retry
 
 
 def test_retry_naming_the_failed_edit_resolves_it_whatever_its_wording(make):
@@ -244,6 +245,64 @@ def test_two_retry_edits_naming_one_id_answer_it_once(make):
     result = reviewer.review(DRAFT, reference=REFERENCE)
     assert result.applied == [YEAR, count]
     assert result.unresolved == [paint]
+
+
+def test_an_unrelated_retry_edit_with_the_same_reason_does_not_resolve_a_failed_one(make):
+    # A generic reason is shared by unrelated deletions. The retry answer says, with an
+    # empty 'answers', that its edit makes none of the failed ones: the failed paint
+    # edit must stay unresolved, so a strict review fails rather than passing.
+    draft = DRAFT + " It has a toll booth."
+    paint = Edit(search=" It was painted bleu.", replace="", reason="Not in the reference.")
+    toll = Edit(search=" It has a toll booth.", replace="", reason="Not in the reference.")
+    answer = dr.RetryEditList(edits=[_retry(toll, [])])
+    reviewer, client = make(_edits(paint), answer, _edits())
+    result = reviewer.review(draft, reference=REFERENCE)
+    assert result.applied == [toll]
+    assert result.unresolved == [paint]
+    assert "It was painted blue." in result.text
+
+
+def test_one_retry_edit_can_make_two_failed_edits(make):
+    year = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    traffic = Edit(search="carries 4000 vehicles", replace="carries 45,000", reason="Count.")
+    both = Edit(
+        search="opened in 1999. It carries 40,000",
+        replace="opened in 1998. It carries 45,000",
+        reason="The reference gives 1998 and 45,000.",
+    )
+    reviewer, client = make(
+        _edits(year, traffic), dr.RetryEditList(edits=[_retry(both, ["F1", "F2"])])
+    )
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.text == DRAFT.replace("1999", "1998").replace("40,000", "45,000")
+    assert result.unresolved == []
+    assert len(client.calls) == 2
+
+
+def test_a_retry_edit_naming_two_ids_that_fails_is_carried_once(make):
+    year = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    traffic = Edit(search="carries 4000 vehicles", replace="carries 45,000", reason="Count.")
+    both = Edit(search="opened in 1999! It", replace="opened in 1998. It", reason="Both.")
+    reviewer, client = make(
+        _edits(year, traffic), dr.RetryEditList(edits=[_retry(both, ["F1", "F2"])]), _edits()
+    )
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.unresolved == [both]
+    third = client.calls[2][2]["content"]
+    assert third.count("id: F") == 1 and "id: F1" in third
+
+
+def test_answers_written_as_a_string_still_name_the_failed_edits():
+    assert dr.RetryEdit(search="a", replace="b", reason="r", answers="F1").answers == ["F1"]
+    assert dr.RetryEdit(search="a", replace="b", reason="r", answers="f1, F2").answers == [
+        "F1",
+        "F2",
+    ]
+    assert dr.RetryEdit(search="a", replace="b", reason="r", answers="").answers == []
+    assert (
+        dr.RetryEditList.model_json_schema()["$defs"]["RetryEdit"]["properties"]["answers"]["type"]
+        == "array"
+    )
 
 
 def test_empty_replace_deletes_passage(make):

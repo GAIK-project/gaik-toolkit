@@ -74,8 +74,10 @@ def retry_prompt(
         + "\n\nThe edits that did apply are already in the current text below; do not "
         "repeat them. Return NEW edits that make the failed changes, each with a 'search' "
         "that occurs exactly once in the current text. Set 'answers' of each edit to the "
-        "id of the failed edit it makes, such as F1, or to an empty string for an edit "
-        "that makes none of them. An empty list leaves the failed edits unresolved.\n\n"
+        'ids of the failed edits it makes, such as ["F1"], or ["F1", "F2"] when one edit '
+        "makes both, or to an empty list for an edit that makes none of them. A failed "
+        "edit that no new edit names stays unresolved, and so does every failed edit if "
+        "you return no edits.\n\n"
         "Current text (in the source_material block labelled text):\n"
         + material.wrap(text, label="text")
     )
