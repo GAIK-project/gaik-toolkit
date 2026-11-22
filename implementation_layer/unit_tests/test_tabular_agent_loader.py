@@ -388,13 +388,13 @@ def test_non_ascii_excel_columns_pass_the_validator_and_run(con, tmp_path):
     path = tmp_path / "kirja.xlsx"
     _write_clean_xlsx(path, {"Sheet1": [_HEADER, (3, 2.5, "Nord", 1), (4, 1.5, "Sud", 2)]})
     _load(con, path)
-    for sql in (
-        'SELECT sum(Määrä), sum("Hinta (€)") FROM kirja',
-        'SELECT sum("Määrä"), sum("hinta (€)") FROM kirja WHERE Région <> \'x\'',
-        'SELECT sum(k."5"" pipe") FROM kirja AS k',
+    for sql, expected in (
+        ('SELECT sum(Määrä), sum("Hinta (€)") FROM kirja', (7, 4.0)),
+        ('SELECT sum("Määrä"), sum("hinta (€)") FROM kirja WHERE Région <> \'x\'', (7, 4.0)),
+        ('SELECT sum(k."5"" pipe") FROM kirja AS k', (3,)),
     ):
         checked = validate_read_only(sql, allowed_tables=["kirja"])
-        assert con.execute(checked).fetchone()[0] in (7, 3)
+        assert con.execute(checked).fetchone() == expected
 
 
 def test_the_schema_text_quotes_the_names_sql_cannot_read_bare(con, tmp_path):
@@ -408,6 +408,57 @@ def test_the_schema_text_quotes_the_names_sql_cannot_read_bare(con, tmp_path):
         assert f"\n  {quoted}" in text
     assert '"2024" BIGINT' in text
     assert "\n  unit_price BIGINT" in text
+
+
+# Header words DuckDB reserves, or that the validator's parser reads as syntax.
+_KEYWORD_HEADER = ["select", "From", "order", "limit", "Group", "if", "drop", "where"]
+
+
+def test_the_schema_text_quotes_keywords_and_the_quoted_names_run(con, tmp_path):
+    from gaik.software_components.tabular_agent.profiling import profile_tables
+    from gaik.software_components.tabular_agent.sql_safety import validate_read_only
+
+    path = tmp_path / "order.csv"
+    path.write_text(
+        ",".join(_KEYWORD_HEADER + ["name", "year"]) + "\n" + ",".join(["1"] * 10) + "\n",
+        encoding="utf-8",
+    )
+    tables = _load(con, path)
+    text = profile_tables(con, tables).to_prompt_text()
+    # The table is named after the file, and "order" is a keyword too.
+    assert text.startswith('TABLE "order"  -- from order.csv')
+    for name in _KEYWORD_HEADER:
+        assert f'\n  "{name}" BIGINT' in text
+        # Written the way the schema shows it, the name passes the validator and runs.
+        sql = f'SELECT sum("{name}") FROM "order" WHERE "{name}" > 0 GROUP BY "{name}"'
+        assert con.execute(validate_read_only(sql, allowed_tables=list(tables))).fetchone() == (1,)
+    # Ordinary words that are not reserved stay bare.
+    assert "\n  name BIGINT" in text
+    assert "\n  year BIGINT" in text
+
+
+@pytest.mark.parametrize("name", ["from", "limit", "select", "where", "if", "drop"])
+def test_these_keywords_fail_bare_so_the_quotes_are_needed(con, name):
+    """Guards the test above: each name in it does break a query written bare."""
+    from gaik.software_components.tabular_agent.sql_safety import (
+        UnsafeSQLError,
+        validate_read_only,
+    )
+
+    con.execute(f'CREATE TABLE t ("{name}" INTEGER, other INTEGER)')
+    con.execute("INSERT INTO t VALUES (1, 1)")
+    failures = 0
+    for sql in (
+        f"SELECT {name} FROM t",
+        f"SELECT sum({name}) FROM t WHERE {name} > 0",
+        f"SELECT {name} FROM t GROUP BY {name}, other",
+    ):
+        try:
+            if con.execute(validate_read_only(sql)).fetchall() != [(1,)]:
+                failures += 1
+        except (UnsafeSQLError, duckdb.Error):
+            failures += 1
+    assert failures
 
 
 def test_empty_sheets_are_skipped(con, tmp_path):

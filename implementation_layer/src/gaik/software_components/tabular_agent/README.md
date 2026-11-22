@@ -292,10 +292,11 @@ TABLE sales  -- from sales_clean.csv, 24 row(s)
 
 Listing the values a low-cardinality column actually holds is what stops the
 model from filtering on categories that do not exist, and is the single biggest
-accuracy lever in the component. A column name that is not a plain identifier
-(with a space, a sign, a leading digit or a letter outside ASCII, such as
-`"Hinta (€)"` or `"Määrä"`) is shown in double quotes, so the model writes it as
-one name.
+accuracy lever in the component. A table or column name that is not a plain
+identifier (with a space, a sign, a leading digit or a letter outside ASCII, such
+as `"Hinta (€)"` or `"Määrä"`), or that is an SQL keyword (`"order"`, `"from"`,
+`"limit"`), is shown in double quotes, so the model writes it as one name that
+the query reads as a column.
 
 ## Configuration
 
