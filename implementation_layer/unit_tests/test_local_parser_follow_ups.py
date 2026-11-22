@@ -2,6 +2,8 @@
 
 - PyMuPDFParser closes the PDF when a page raises, so the caller can delete the file
   (on Windows an open file cannot be deleted).
+- DoclingParser and VisionPlusParser accept enable_table_structure=False: Docling refuses
+  table_structure_options=None.
 """
 
 from __future__ import annotations
@@ -61,3 +63,30 @@ def test_pymupdf_closes_the_pdf_over_the_page_limit_and_after_a_read(monkeypatch
     assert "First page" in PyMuPDFParser().parse_pdf(str(path))
 
     assert len(opened) == 2 and all(document.is_closed for document in opened)
+
+
+def _docling_parser(**options):
+    pytest.importorskip("docling")
+    from gaik.software_components.parsers.docling import DoclingParser
+
+    return DoclingParser(enable_ocr=False, enable_formula_enrichment=False, **options)
+
+
+def test_docling_parser_takes_table_structure_off():
+    parser = _docling_parser(enable_table_structure=False)
+
+    assert parser.pipeline_options.do_table_structure is False
+
+
+def test_vision_plus_parser_takes_table_structure_off():
+    pytest.importorskip("docling")
+    from gaik.software_components.parsers.visionPlus import VisionPlusParser
+
+    parser = VisionPlusParser(
+        vision_config={"model": "gpt-test", "use_azure": False, "api_key": "test"},
+        enable_ocr=False,
+        enable_table_structure=False,
+        verbose=False,
+    )
+
+    assert parser.pipeline_options.do_table_structure is False

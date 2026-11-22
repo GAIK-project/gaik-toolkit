@@ -181,19 +181,25 @@ class DoclingParser:
         # Detect CUDA availability
         self.device = self._detect_device()
 
-        # Initialize pipeline options with detected device
+        # Initialize pipeline options with detected device. Without table structure
+        # the options keep Docling's default: it refuses table_structure_options=None.
+        table_options = (
+            {
+                "table_structure_options": TableStructureOptions(
+                    kind="docling_tableformer", do_cell_matching=True
+                )
+            }
+            if enable_table_structure
+            else {}
+        )
         self.pipeline_options = PdfPipelineOptions(
             do_ocr=enable_ocr,
             do_table_structure=enable_table_structure,
             generate_picture_images=False,
             generate_page_images=False,
             do_formula_enrichment=enable_formula_enrichment,
-            table_structure_options=TableStructureOptions(
-                kind="docling_tableformer", do_cell_matching=True
-            )
-            if enable_table_structure
-            else None,
             accelerator_options=AcceleratorOptions(num_threads=num_threads, device=self.device),
+            **table_options,
         )
 
         # Set OCR engine options if OCR is enabled
