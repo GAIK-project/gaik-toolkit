@@ -46,6 +46,7 @@ tts = TextToSpeech(
     response_format="mp3",
     speed=1.0,
     default_instructions=None,
+    send_instructions=None,  # None: by the model name (see Azure Configuration)
 )
 
 result = tts.synthesize(
@@ -78,9 +79,28 @@ The Azure request payload matches this shape:
 {
   "model": "tts-hd",
   "input": "Hello from GAIK.",
-  "voice": "alloy"
+  "voice": "alloy",
+  "response_format": "mp3",
+  "speed": 1.0
 }
 ```
+
+Both branches send the same body, so `response_format` and `speed` reach Azure too and the
+audio comes back in the format `result.response_format` names. The instructions (the
+language line, `default_instructions` and a call's `instructions`) go to a model whose name
+contains `gpt` (`gpt-4o-mini-tts`), and never to the `tts-1` family (`tts-1`, `tts-1-hd` and
+the deployment names `tts` and `tts-hd`, with an optional dated suffix such as `-1106`),
+which reads the text as written. Any other name, which may be a `tts-1` deployment that
+answers 400 to them, gets them only when you opt in: `TextToSpeech(..., send_instructions=True)`
+or `api_config["tts_instructions"] = True`, for a `gpt-4o-mini-tts` deployment named, say,
+`speech-fi`; `send_instructions=False` turns them off for a `gpt` name. A `TextToSpeech` built
+with such a name and no switch logs one warning that the instructions are not sent.
+`result.instructions` holds what was sent, or `None`. `speed` always goes to a model without
+instructions, and to one with them only when it is not the default 1.0.
+
+Azure's `tts-1` voices are `alloy`, `echo`, `fable`, `onyx`, `nova` and `shimmer`: the
+default `voice="marin"` is a `gpt-4o-mini-tts` voice, so pass `voice=` with a `tts-hd`
+deployment.
 
 ## OpenAI Configuration
 
@@ -99,6 +119,7 @@ If you want to override the default OpenAI model name, set:
 - `language`
 - `response_format`
 - `content_type`
+- `instructions` (the instructions sent, or `None` for a model that takes none)
 
 Save the generated audio with:
 
