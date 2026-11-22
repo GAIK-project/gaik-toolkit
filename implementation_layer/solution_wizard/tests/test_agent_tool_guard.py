@@ -681,36 +681,76 @@ def _written_folders(root: Path) -> set[str]:
     }
 
 
-@pytest.mark.parametrize(
-    "example",
-    [
-        "document_extraction_blueprint.json",
-        "incident_reporting_blueprint.json",
-        "rag_workflow_blueprint.json",
-    ],
+_POC_TEMPLATES = WIZARD / "templates" / "poc"
+#: The pattern each example blueprint scaffolds with.
+_EXAMPLE_PATTERNS = {
+    "audio_to_structured": "incident_reporting_blueprint.json",
+    "document_to_structured": "document_extraction_blueprint.json",
+    "rag": "rag_workflow_blueprint.json",
+}
+#: Every PoC pattern the scaffolder can write: one folder per template, _common
+#: holding the files every pattern shares. A promoted template added there is
+#: covered below without a change here.
+_SCAFFOLD_PATTERNS = sorted(
+    p.name for p in _POC_TEMPLATES.iterdir() if (p / "run_poc.py.tmpl").is_file()
 )
-def test_the_scaffolder_and_the_diagram_and_docs_writers_write_only_the_listed_folders(
-    tmp_path, example
-):
+
+
+def _pattern_blueprint(pattern: str, monkeypatch):
+    """A blueprint the scaffolder writes with ``pattern``, asking for a PDF report too
+    (pdf_report.py) so every file the scaffolder can add is written."""
+    from solution_wizard import scaffolder
     from solution_wizard.blueprint import Blueprint
+
+    example = _EXAMPLE_PATTERNS.get(pattern, "incident_reporting_blueprint.json")
+    blueprint = Blueprint.from_file(WIZARD / "examples" / example)
+    if pattern not in _EXAMPLE_PATTERNS:
+        # No single module covers this pipeline: the _generic skeleton, or a
+        # promoted template when one is saved under the pipeline's key.
+        blueprint.components.selected_modules = []
+        blueprint.components.selected_building_blocks = [
+            "Transcriber",
+            "PyMuPDFParser",
+            "DataExtractor",
+            "LLMJudge",
+        ]
+        key = "_generic" if pattern == "_generic" else pattern
+        monkeypatch.setattr(scaffolder, "_derive_pattern_key", lambda _blueprint: key)
+    blueprint.technical_spec["output_types"] = [
+        *blueprint.technical_spec.get("output_types", []),
+        "pdf",
+    ]
+    return blueprint
+
+
+def test_the_coverage_test_below_knows_the_fixed_patterns():
+    assert set(_EXAMPLE_PATTERNS) | {"_generic"} <= set(_SCAFFOLD_PATTERNS)
+    assert len(_SCAFFOLD_PATTERNS) > len(_EXAMPLE_PATTERNS) + 1  # a promoted one too
+
+
+@pytest.mark.parametrize("pattern", _SCAFFOLD_PATTERNS)
+def test_the_scaffolder_and_the_diagram_and_docs_writers_write_only_the_listed_folders(
+    tmp_path, monkeypatch, pattern
+):
     from solution_wizard.bpmn_generator import write_bpmn
     from solution_wizard.docs_generator import generate_docs
     from solution_wizard.scaffolder import scaffold_poc
     from solution_wizard.visualizer import write_mermaid
 
-    blueprint = Blueprint.from_file(WIZARD / "examples" / example)
+    blueprint = _pattern_blueprint(pattern, monkeypatch)
+    out = tmp_path / "scaffold_poc.py"
+    scaffolded = scaffold_poc(blueprint, out, synthetic=True)
+    assert scaffolded["pattern"] == pattern
+    assert (out / "poc" / "pdf_report.py").is_file()
+    assert _written_folders(out) <= set(TABLE["writes"]["scaffold_poc.py"])
     writers = {
-        "scaffold_poc.py": lambda out: scaffold_poc(blueprint, out, synthetic=True),
         "generate_docs.py": lambda out: generate_docs(blueprint, out),
         "generate_mermaid.py": lambda out: write_mermaid(blueprint, out),
         "generate_bpmn.py": lambda out: write_bpmn(blueprint, out),
     }
     for script, write in writers.items():
         out = tmp_path / script
-        try:
-            write(out)
-        except ValueError as exc:  # an example the scaffolder refuses as it stands
-            pytest.skip(f"{example}: {exc}")
+        write(out)
         assert _written_folders(out) <= set(TABLE["writes"][script]), script
 
 
