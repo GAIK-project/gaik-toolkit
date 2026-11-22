@@ -20,7 +20,8 @@ export function ModelNameInput({
   ...props
 }: Omit<ComponentProps<typeof Input>, "list"> & { kind: ReportModelKind }) {
   const id = useId();
-  // Loaded for a signed-in user, as the model menu loads it: it is the same list.
+  // Loaded and read for a signed-in user only, as the model menu does: it is the same
+  // list, and one loaded before a sign-out may hold the team's names.
   const { loggedIn } = useRunAccess();
   const names = reportModelNames(useServerModels(loggedIn), kind);
   return (

@@ -127,13 +127,24 @@ export function useReasoningEffort(): ReasoningEffort | null {
 // empty list would then hide the model menu until a reload, so a failed load
 // is tried again a few times.
 let catalogRetries = 0;
+/** Counts the lists forgotten, so that a request sent before is not taken. */
+let catalogGeneration = 0;
 
-function loadCatalog() {
-  if (catalogRequest || typeof window === "undefined") return;
-  if (catalog && (catalog.models.length > 0 || catalogRetries === 0)) return;
-  catalogRequest = fetch("/api/model-settings/server")
+/**
+ * Load the server's list for this user, once; a failed load is tried again. Resolves
+ * when the request ends (at once when there is nothing to load).
+ */
+export function loadServerModels(): Promise<void> {
+  if (catalogRequest) return catalogRequest;
+  if (typeof window === "undefined") return Promise.resolve();
+  if (catalog && (catalog.models.length > 0 || catalogRetries === 0))
+    return Promise.resolve();
+  const generation = catalogGeneration;
+  const current = () => generation === catalogGeneration;
+  const request = fetch("/api/model-settings/server")
     .then((response) => (response.ok ? response.json() : null))
     .then((data: ServerModels | null) => {
+      if (!current()) return;
       if (data && Array.isArray(data.models)) {
         catalog = data;
         catalogRetries = 0;
@@ -142,14 +153,39 @@ function loadCatalog() {
       throw new Error("no model list");
     })
     .catch(() => {
+      if (!current()) return;
       catalog = { default: null, models: [] };
       catalogRetries = catalogRetries === 0 ? 3 : catalogRetries - 1;
-      if (catalogRetries > 0) window.setTimeout(loadCatalog, 8000);
+      if (catalogRetries > 0)
+        window.setTimeout(() => {
+          if (current()) void loadServerModels();
+        }, 8000);
     })
     .finally(() => {
+      if (!current()) return;
       catalogRequest = null;
       emit();
     });
+  catalogRequest = request;
+  return request;
+}
+
+/**
+ * Forget the loaded list, as on sign-out: it holds this user's names, team-only ones
+ * for the team. The next user's list is loaded afresh, and a request still running is
+ * not taken.
+ */
+export function forgetServerModels(): void {
+  catalogGeneration += 1;
+  catalog = null;
+  catalogRequest = null;
+  catalogRetries = 0;
+  emit();
+}
+
+/** The loaded list, or null while it loads; null as well when `enabled` is false. */
+export function getServerModels(enabled = true): ServerModels | null {
+  return enabled ? catalog : null;
 }
 
 /** The names a report demo's model field of this kind accepts; empty until known. */
@@ -163,14 +199,17 @@ export function reportModelNames(
     : [];
 }
 
-/** The server's models, or null while they load. Empty when it offers none. */
+/**
+ * The server's models, or null while they load. Empty when it offers none. Null when
+ * not `enabled` (signed out): a list loaded before sign-out is not read.
+ */
 export function useServerModels(enabled = true): ServerModels | null {
   useEffect(() => {
-    if (enabled) loadCatalog();
+    if (enabled) void loadServerModels();
   }, [enabled]);
   return useSyncExternalStore(
     subscribe,
-    () => catalog,
+    () => getServerModels(enabled),
     () => null,
   );
 }
