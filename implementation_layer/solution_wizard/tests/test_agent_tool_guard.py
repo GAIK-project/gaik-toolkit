@@ -633,16 +633,43 @@ def test_without_output_dir_the_scaffolders_folder_is_the_blueprints_package_out
     assert reason and link.as_posix() in reason
 
 
-def test_the_writes_table_names_only_listed_scripts_and_every_one_that_writes():
-    assert set(TABLE["writes"]) <= set(TABLE["scripts"])
+def test_the_writes_table_names_every_listed_script_and_the_folders_of_each_that_writes():
+    assert set(TABLE["writes"]) == set(TABLE["scripts"])
     for script, options in TABLE["scripts"].items():
         if "--output-dir" in options:
             assert TABLE["writes"].get(script), f"{script} writes, but no folders are listed"
     for folders in TABLE["writes"].values():
+        if not folders:
+            continue  # a script that writes nothing
         assert "." in folders
         for folder in folders:
             parent = folder.rsplit("/", 1)[0] if "/" in folder else "."
             assert parent in folders, f"{folder} is listed without {parent}"
+
+
+@pytest.mark.parametrize(
+    "writes", [None, ["."], {"scaffold_poc.py": "."}, {"scaffold_poc.py": [1]}]
+)
+def test_a_table_without_a_writes_list_for_each_script_is_refused(tmp_path, writes):
+    """Read as "writes nothing", a missing table would let every script run unchecked."""
+    table = {key: value for key, value in TABLE.items() if key != "writes"}
+    if writes is not None:
+        table["writes"] = writes
+    path = tmp_path / "agent_scripts.json"
+    path.write_text(json.dumps(table), encoding="utf-8")
+    with pytest.raises(ValueError, match="writes"):
+        agent_tool_guard.load_writes(path)
+
+
+@pytest.mark.parametrize("script", ["validate_blueprint.py", "scaffold_poc.py"])
+def test_a_listed_script_without_a_writes_entry_is_not_run(guard, script):
+    bp = _blueprint(guard.session / "use_case.blueprint.json")
+    command = f"python scripts/{script} --blueprint {bp.as_posix()}"
+    assert guard.check("Bash", {"command": command}) is None
+    del guard.writes[script]
+    reason = guard.check("Bash", {"command": command})
+    assert reason and script in reason and "writes" in reason
+    assert guard.check("Bash", {"command": f"python scripts/{script} --help"}) is None
 
 
 def _written_folders(root: Path) -> set[str]:

@@ -13,7 +13,8 @@ also sees the calls the CLI would approve by itself (``ls``, reading a file):
 * Bash runs only the wizard's scripts, one plain command at a time, with the
   options ``scripts/agent_scripts.json`` lists (or ``--help`` alone): no shell
   operators, redirection or variables, so nothing else can be chained on; a
-  script does not run while a folder it writes into holds a link it would follow;
+  script does not run while a folder it writes into holds a link it would follow,
+  nor when the table does not say which folders it writes into;
 * every other tool (web fetch and search, subagents, notebooks, MCP tools) is
   refused.
 
@@ -92,8 +93,23 @@ def load_left_out(table: Path = SCRIPTS_TABLE) -> dict[str, str]:
 
 
 def load_writes(table: Path = SCRIPTS_TABLE) -> dict[str, list[str]]:
-    """The folders each script writes into, relative to the folder it writes in."""
-    return json.loads(table.read_text(encoding="utf-8")).get("writes", {})
+    """The folders each script writes into, relative to the folder it writes in.
+
+    A table without ``writes`` is refused rather than read as "writes nothing",
+    which would let every script run without the link check; a script the table
+    lists without an entry there is not run (see ``ToolGuard._check_bash``).
+    """
+    data = json.loads(table.read_text(encoding="utf-8"))
+    writes = data.get("writes")
+    if not isinstance(writes, dict):
+        raise ValueError(
+            f"{table.name} has no 'writes' table: list the folders each script writes "
+            "into ([] for one that writes nothing)"
+        )
+    for script, folders in writes.items():
+        if not isinstance(folders, list) or not all(isinstance(f, str) for f in folders):
+            raise ValueError(f"{table.name}: 'writes' for {script} must be a list of folders")
+    return writes
 
 
 def endpoint_ok(value: str) -> bool:
@@ -451,6 +467,13 @@ class ToolGuard:
                     f"{option} must be a provider's own https endpoint; leave it out to use "
                     "the endpoint configured in the environment. " + allowed
                 )
+        if name not in self.writes:
+            # Without an entry the guard cannot tell where the script writes, so it
+            # cannot check those folders for links: not run rather than unchecked.
+            return (
+                f"{name} has no entry under 'writes' in scripts/agent_scripts.json, so the "
+                "wizard cannot check the folders it writes into; it is not run."
+            )
         link = find_link(self._written_folders(name, given))
         if link is not None:
             return (
@@ -466,7 +489,7 @@ class ToolGuard:
         agent_scripts.json): under its --output-dir, or without one where it
         writes instead, the --blueprint's folder or, for the scaffolder, the
         blueprint's package.output_dir."""
-        subfolders = self.writes.get(script) or []
+        subfolders = self.writes[script]
         if "--output-dir" in given:
             base = _real(given["--output-dir"], self.cwd)
         elif "--blueprint" in given:
