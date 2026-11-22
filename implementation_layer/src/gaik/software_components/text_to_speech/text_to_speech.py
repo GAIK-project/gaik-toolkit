@@ -38,15 +38,21 @@ DEFAULT_RESPONSE_FORMAT = "mp3"
 _TTS_1_FAMILY = re.compile(r"tts(?:-1)?(?:-hd)?(?:-\d+)?", re.IGNORECASE)
 
 
-def _takes_instructions(model: str) -> bool:
-    """Whether a speech model or deployment takes ``instructions``.
+def _takes_instructions(model: str, chosen: bool | None = None) -> bool:
+    """Whether to send ``instructions`` to a speech model or deployment.
 
-    ``tts-1`` and ``tts-1-hd`` do not (OpenAI's API reference); ``gpt-4o-mini-tts`` does.
-    On Azure the model is a deployment name, so only the ``tts-1`` family's names
-    (``tts``, ``tts-1``, ``tts-hd``, ``tts-1-hd``, with an optional dated suffix) count
-    as taking none; a deployment with any other name, such as ``speech-fi``, gets them.
+    ``tts-1`` and ``tts-1-hd`` take none (OpenAI's API reference; Azure answers 400), and
+    their names (``tts``, ``tts-1``, ``tts-hd``, ``tts-1-hd``, with an optional dated
+    suffix) never get them. Otherwise ``chosen`` decides when the caller set it
+    (``TextToSpeech(send_instructions=...)`` or ``api_config["tts_instructions"]``), and
+    the name when not: a name with ``gpt`` (``gpt-4o-mini-tts``) gets them. An Azure
+    ``gpt-4o-mini-tts`` deployment named otherwise needs ``send_instructions=True``.
     """
-    return _TTS_1_FAMILY.fullmatch(model.strip()) is None
+    if _TTS_1_FAMILY.fullmatch(model.strip()):
+        return False
+    if chosen is not None:
+        return bool(chosen)
+    return "gpt" in model.lower()
 
 
 @dataclass
@@ -81,11 +87,13 @@ class TextToSpeech:
     """Generate speech audio from text using OpenAI or Azure OpenAI.
 
     Every request carries the voice and ``response_format``. The instructions (the
-    language line, ``default_instructions`` and a call's ``instructions``) go to every
-    model but the ``tts-1`` family (:func:`_takes_instructions`), and
-    ``SpeechSynthesisResult.instructions`` says what was sent. ``speed`` goes to the
-    ``tts-1`` family always, and to a model that takes instructions only when it is not
-    1.0, the default.
+    language line, ``default_instructions`` and a call's ``instructions``) go to a model
+    whose name contains ``gpt``, never to the ``tts-1`` family, and to any other name
+    only with ``send_instructions=True`` (or ``api_config["tts_instructions"]``), for
+    an Azure ``gpt-4o-mini-tts`` deployment named otherwise (:func:`_takes_instructions`).
+    ``SpeechSynthesisResult.instructions`` says what was sent. ``speed`` goes to a model
+    without instructions always, and to one with them only when it is not 1.0, the
+    default.
     """
 
     def __init__(
@@ -101,8 +109,15 @@ class TextToSpeech:
         ] = DEFAULT_RESPONSE_FORMAT,
         speed: float = 1.0,
         default_instructions: str | None = None,
+        send_instructions: bool | None = None,
     ) -> None:
         self.api_config = api_config or get_openai_config(use_azure=use_azure)
+        # None decides by the model name; api_config["tts_instructions"] is the same switch.
+        self.send_instructions = (
+            send_instructions
+            if send_instructions is not None
+            else self.api_config.get("tts_instructions")
+        )
         # Resolve like create_openai_client: a bare legacy config (neither
         # ``provider`` nor ``use_azure``) means standard OpenAI, whatever LLM_PROVIDER says.
         provider = resolve_provider(config={"use_azure": False, **self.api_config})
@@ -158,7 +173,7 @@ class TextToSpeech:
 
         resolved_instructions = (
             self._build_instructions(language=resolved_language, instructions=instructions)
-            if _takes_instructions(self.model)
+            if _takes_instructions(self.model, self.send_instructions)
             else None
         )
         request: dict = {

@@ -1224,7 +1224,7 @@
         "name": "language",
         "type": "enum",
         "default": "fi",
-        "effect": "Spoken language; controls the pronunciation instruction injected into the synthesis request. Supported: 'fi' (Finnish), 'en' (English). Since the gaik release after 0.11.1 the instructions (this line and default_instructions) go to every model except the tts-1 family (tts, tts-1, tts-hd, tts-1-hd, optionally with a dated suffix), which takes none and reads the text as written (result.instructions is None); a gpt-4o-mini-tts deployment gets them whatever its name. response_format and speed now reach Azure as well; speed goes to a non-tts-1 model only when it is not 1.0.",
+        "effect": "Spoken language; controls the pronunciation instruction injected into the synthesis request. Supported: 'fi' (Finnish), 'en' (English). Since the gaik release after 0.11.1 the instructions (this line and default_instructions) go to a model whose name contains 'gpt', never to the tts-1 family (tts, tts-1, tts-hd, tts-1-hd, optionally with a dated suffix), which reads the text as written (result.instructions is None), and to any other name only with TextToSpeech(send_instructions=True) or api_config['tts_instructions']=True (a gpt-4o-mini-tts deployment named otherwise). response_format and speed now reach Azure as well; speed goes to a non-tts-1 model only when it is not 1.0.",
         "selection_relevant": true,
         "infer_from": "technical_spec.language or output language requirement"
       },

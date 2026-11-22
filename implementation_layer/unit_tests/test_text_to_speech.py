@@ -95,10 +95,8 @@ def test_a_call_overrides_the_format_and_speed(monkeypatch):
     assert result.content_type == "audio/flac"
 
 
-@pytest.mark.parametrize("deployment", ["speech-fi", "tts-fi", "voice-prod", "gpt-4o-mini-tts"])
-def test_a_custom_named_deployment_gets_the_instructions(monkeypatch, deployment):
-    # On Azure a gpt-4o-mini-tts deployment can have any name; only the tts-1
-    # family's names are known to take no instructions.
+@pytest.mark.parametrize("deployment", ["gpt-4o-mini-tts", "my-gpt-speech"])
+def test_a_gpt_named_model_gets_the_instructions(monkeypatch, deployment):
     payloads = _capture_azure_posts(monkeypatch)
     tts = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model=deployment)
 
@@ -108,10 +106,41 @@ def test_a_custom_named_deployment_gets_the_instructions(monkeypatch, deployment
     assert result.instructions == payloads[0]["instructions"]
 
 
-@pytest.mark.parametrize("deployment", ["tts", "tts-1", "TTS-HD", "tts-1-hd", "tts-1-hd-1106"])
-def test_the_tts_1_family_gets_no_instructions(monkeypatch, deployment):
+@pytest.mark.parametrize("deployment", ["tts-fi", "tts-prod", "my-tts", "speech-fi"])
+def test_another_name_gets_instructions_only_when_the_caller_opts_in(monkeypatch, deployment):
+    # It may be a tts-1 deployment under another name, which answers 400 to them.
     payloads = _capture_azure_posts(monkeypatch)
-    tts = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model=deployment)
+    config = {"use_azure": True, "api_key": "k"}
+
+    by_name = TextToSpeech(api_config=config, model=deployment).synthesize("Hei")
+    switched = TextToSpeech(api_config=config, model=deployment, send_instructions=True)
+    in_config = TextToSpeech(api_config={**config, "tts_instructions": True}, model=deployment)
+    switched.synthesize("Hei")
+    in_config.synthesize("Hei")
+
+    assert by_name.instructions is None and "instructions" not in payloads[0]
+    assert "in Finnish" in payloads[1]["instructions"]
+    assert "in Finnish" in payloads[2]["instructions"]
+
+
+@pytest.mark.parametrize("deployment", ["tts", "tts-1", "TTS-HD", "tts-1-hd", "tts-1-hd-1106"])
+def test_the_tts_1_family_gets_no_instructions_even_when_asked(monkeypatch, deployment):
+    payloads = _capture_azure_posts(monkeypatch)
+    tts = TextToSpeech(
+        api_config={"use_azure": True, "api_key": "k"}, model=deployment, send_instructions=True
+    )
+
+    assert tts.synthesize("Hei").instructions is None
+    assert "instructions" not in payloads[0]
+
+
+def test_a_gpt_model_can_be_told_to_take_no_instructions(monkeypatch):
+    payloads = _capture_azure_posts(monkeypatch)
+    tts = TextToSpeech(
+        api_config={"use_azure": True, "api_key": "k"},
+        model="gpt-4o-mini-tts",
+        send_instructions=False,
+    )
 
     assert tts.synthesize("Hei").instructions is None
     assert "instructions" not in payloads[0]
@@ -119,7 +148,7 @@ def test_the_tts_1_family_gets_no_instructions(monkeypatch, deployment):
 
 def test_speed_goes_to_a_gpt_speech_model_only_when_it_was_asked_for(monkeypatch):
     payloads = _capture_azure_posts(monkeypatch)
-    gpt = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model="speech-fi")
+    gpt = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model="gpt-4o-mini-tts")
     tts_1 = TextToSpeech(api_config={"use_azure": True, "api_key": "k"}, model="tts-hd")
 
     gpt.synthesize("Hei")
