@@ -153,10 +153,10 @@ For embeddings, also set `embedding_model` or `EMBEDDING_MODEL` to a model serve
 
 ### Allowed endpoints
 
-Since gaik 0.11.0, a client that sends a key, token or password checks its address when it is built, before any request, so the key cannot be sent to a host the deployment did not choose. This covers the OpenAI, Azure, Aitta and compatible clients, LiteLLM's `base_url`, Vertex's `generate_content_url`, the Docling client, local Whisper, Azure speech and the Jev classifier. The address is accepted when it is:
+Since gaik 0.11.0, a client that sends a key, token or password checks its address when it is built, before any request, so the key cannot be sent to a host the deployment did not choose. This covers the OpenAI, Azure, Aitta and compatible clients, Anthropic's and LiteLLM's `base_url`, Vertex's `generate_content_url`, the Docling client, local Whisper, Azure speech and the Jev classifier. The address is accepted when it is:
 
 - https on the provider's own host, for example `api.openai.com`, `*.openai.azure.com`, `*.cognitiveservices.azure.com`, `aitta-api.csc.fi` or the Vertex AI hosts;
-- the address set in that provider's environment variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `LITELLM_BASE_URL`, `GOOGLE_GENERATE_CONTENT_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`, ...). An `http://` address set there is used as set, with a warning once per host outside a private network;
+- the address set in that provider's environment variable (`OPENAI_BASE_URL`, `AZURE_ENDPOINT`, `AITTA_BASE_URL`, `ANTHROPIC_BASE_URL`, `LITELLM_BASE_URL`, `GOOGLE_GENERATE_CONTENT_URL`, `DOCLING_API_BASE`, `LOCAL_TRANSCRIBER_API_BASE`, `GAIK_DECIDE_URL`, ...). An `http://` address set there is used as set, with a warning once per host outside a private network;
 - on a host listed in `GAIK_ALLOWED_ENDPOINT_HOSTS` (comma-separated), or in the `allowed_endpoint_hosts` setting the application passes in code. An entry is a host (`llm.example.org`), a suffix pattern (`*.example.org`), or `http://` with the host to allow plain http (`http://docling.internal`);
 - on this machine (`localhost`, `127.0.0.1`), over http too, for compatible model servers, LiteLLM, Docling and local Whisper.
 

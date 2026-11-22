@@ -18,7 +18,13 @@ from typing import Any
 import anthropic
 from pydantic import BaseModel, ValidationError
 
-from gaik.software_components.endpoints import ANTHROPIC_URL, foundry_host, host_of, log_endpoint
+from gaik.software_components.endpoints import (
+    ANTHROPIC_URL,
+    check_endpoint,
+    foundry_host,
+    host_of,
+    log_endpoint,
+)
 from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm.base import (
     DEFAULT_MAX_RETRIES,
@@ -270,8 +276,20 @@ class AnthropicProvider:
                 api_key=config["api_key"],
                 **options,
             )
-        # Without a base_url the SDK itself reads ANTHROPIC_BASE_URL.
-        log_endpoint("anthropic", host_of(os.getenv("ANTHROPIC_BASE_URL") or ANTHROPIC_URL))
+        base_url = config.get("base_url")
+        if base_url:
+            # A proxy or gateway in the config; the key goes there, so it is checked.
+            host = check_endpoint(
+                base_url,
+                provider="anthropic",
+                allowed_hosts=config.get("allowed_endpoint_hosts"),
+                what="base_url",
+            )
+            options["base_url"] = base_url
+        else:
+            # Without a base_url the SDK itself reads ANTHROPIC_BASE_URL.
+            host = host_of(os.getenv("ANTHROPIC_BASE_URL") or ANTHROPIC_URL)
+        log_endpoint("anthropic", host)
         return anthropic.Anthropic(api_key=config["api_key"], **options)
 
     @staticmethod

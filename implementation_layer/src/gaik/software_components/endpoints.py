@@ -82,6 +82,7 @@ PROVIDER_ENDPOINT_ENVS: dict[str, tuple[str, ...]] = {
     "openai_compatible": ("OPENAI_BASE_URL",),
     "azure": ("AZURE_ENDPOINT", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_BASE", "TTS_ENDPOINT"),
     "aitta": ("AITTA_BASE_URL",),
+    "anthropic": ("ANTHROPIC_BASE_URL",),
     "vertex": ("GOOGLE_GENERATE_CONTENT_URL",),
     "litellm": ("LITELLM_BASE_URL",),
     "jev": ("GAIK_DECIDE_URL", "TYPESAFE_BASE_URL"),
