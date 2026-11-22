@@ -90,9 +90,10 @@ class PyMuPDFParser:
         check_file_type(file_path, {"pdf"})
 
         try:
+            doc = fitz.open(file_path)
             # The document is closed however the read ends: an open file cannot be
             # deleted on Windows, so a caller's cleanup would fail after an error.
-            with fitz.open(file_path) as doc:
+            try:
                 # PyMuPDF opens other formats too and picks the handler from the
                 # content, so ask it what it opened instead of trusting the name.
                 if not doc.is_pdf:
@@ -111,6 +112,8 @@ class PyMuPDFParser:
                 else:
                     # Structured extraction preserving layout
                     text_content = self._extract_structured_pdf(doc)
+            finally:
+                doc.close()
 
             return text_content.strip()
 
