@@ -111,8 +111,83 @@ def test_the_session_loads_no_user_settings_and_no_mcp_servers(output) -> None:
 
     assert options.setting_sources == []
     assert options.mcp_servers in ({}, None)
-    assert "strict-mcp-config" in options.extra_args
+    assert options.strict_mcp_config is True
+    assert "strict-mcp-config" not in options.extra_args  # the documented field instead
     assert set(options.tools) == set(runner.TOOLS)
+    assert options.max_budget_usd is None  # no limit unless --max-budget-usd is given
+
+
+def _cli_command(options: ClaudeAgentOptions, monkeypatch) -> list[str]:
+    """The command line the SDK starts the CLI with, captured without starting it."""
+    seen: list[str] = []
+
+    async def open_process(command, *_args, **_kwargs):
+        seen.extend(command)
+        raise _CLIStartError
+
+    monkeypatch.setattr(anyio, "open_process", open_process)
+
+    async def go() -> None:
+        try:
+            await ClaudeSDKClient(options=options).connect()
+        except Exception:  # noqa: BLE001 - the SDK wraps the stop above in its own error
+            pass
+
+    asyncio.run(go())
+    assert seen, "the SDK did not reach the point where it starts the CLI"
+    return seen
+
+
+def test_the_cli_is_started_with_strict_mcp_config_and_the_budget(output, tmp_path, monkeypatch):
+    cli = tmp_path / "claude"
+    cli.write_text("")
+    env = {"PATH": os.environ.get("PATH", "")}
+    options = runner.build_session_options(output, env, "m", cli_path=str(cli))
+    command = _cli_command(options, monkeypatch)
+    assert command.count("--strict-mcp-config") == 1
+    assert "--max-budget-usd" not in command
+
+    options = runner.build_session_options(output, env, "m", max_budget_usd=2.5, cli_path=str(cli))
+    command = _cli_command(options, monkeypatch)
+    assert command[command.index("--max-budget-usd") + 1] == "2.5"
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "five"])
+def test_the_budget_must_be_a_positive_amount(monkeypatch, value) -> None:
+    monkeypatch.setattr(sys, "argv", ["run_wizard_interactive.py", "--max-budget-usd", value])
+    with pytest.raises(SystemExit):
+        runner.parse_args()
+
+
+def test_the_budget_option_reaches_the_session(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["run_wizard_interactive.py", "--max-budget-usd", "2.5"])
+    assert runner.parse_args().max_budget_usd == 2.5
+    monkeypatch.setattr(sys, "argv", ["run_wizard_interactive.py"])
+    assert runner.parse_args().max_budget_usd is None
+
+
+def test_output_to_a_file_or_a_pipe_takes_any_character(tmp_path, monkeypatch, shell_env):
+    """On Windows a redirected stream is cp1252, which has no ≥ or →: the runner's own
+    error message (Copy .env.example → .env) stopped it with a UnicodeEncodeError."""
+    import io
+
+    out, err = io.BytesIO(), io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(out, encoding="cp1252"))
+    monkeypatch.setattr(sys, "stderr", io.TextIOWrapper(err, encoding="cp1252"))
+    for name in _FOUNDRY_NAMES:
+        os.environ.pop(name, None)
+    missing = tmp_path / "no.env"
+    monkeypatch.setattr(sys, "argv", ["run_wizard_interactive.py", "--env-file", str(missing)])
+
+    with pytest.raises(SystemExit) as stopped:
+        runner.main()
+
+    assert stopped.value.code == 1
+    sys.stderr.flush()
+    assert "Copy .env.example → .env" in err.getvalue().decode("utf-8")
+    print("≥ 0.5")
+    sys.stdout.flush()
+    assert out.getvalue().decode("utf-8").strip() == "≥ 0.5"
 
 
 # --- the guard through the SDK's own control protocol ------------------------
@@ -395,7 +470,12 @@ def test_the_cli_gets_only_the_env_files_names_and_the_system_basics(
     assert seen["DOCLING_API_BASE"] == "https://x"
     assert seen["ANTHROPIC_FOUNDRY_API_KEY"] == "k"
     assert "MY_SHELL_VAR" not in seen
-    added = set(seen) - set(os.environ)
+    # Compared with what the runner may hand on, not with os.environ, which main
+    # has already narrowed to the same names.
+    may_pass = runner.SYSTEM_ENV_VARS | set(runner.AGENT_ENV_DEFAULTS)
+    may_pass |= {"CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_API_KEY"}
+    may_pass |= {"ANTHROPIC_FOUNDRY_RESOURCE", "DOCLING_API_BASE"}  # the .env file's names
+    added = {name for name in seen if name.upper() not in {n.upper() for n in may_pass}}
     assert all(name == "PWD" or name.startswith("CLAUDE") for name in added), added
 
 

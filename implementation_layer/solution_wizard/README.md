@@ -71,7 +71,13 @@ python run_wizard_interactive.py
 
 # Or give it (outside this repository):
 python run_wizard_interactive.py --output-dir C:/projects/my-use-case
+
+# Stop once the session's estimated model cost reaches $5 (default: no limit):
+python run_wizard_interactive.py --max-budget-usd 5
 ```
+
+`--max-budget-usd` counts the whole session, across your messages: the CLI keeps one running
+total for a streaming session, although the SDK documents the limit per query.
 
 The output folder must be a folder of its own: not this repository or a folder holding it,
 not your home folder or a folder above it, not a hidden settings folder in your home folder
