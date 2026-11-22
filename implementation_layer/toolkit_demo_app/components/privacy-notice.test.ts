@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PrivacyContent } from "./privacy-content";
@@ -72,7 +72,8 @@ function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return sources(path);
-    return path.endsWith(".tsx") ? [path] : [];
+    // Forward slashes on every system, so the keys above match on Windows too.
+    return path.endsWith(".tsx") ? [path.split(sep).join("/")] : [];
   });
 }
 
