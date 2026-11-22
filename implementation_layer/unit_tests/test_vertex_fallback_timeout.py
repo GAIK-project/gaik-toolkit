@@ -48,7 +48,7 @@ def clients(monkeypatch):
         return SimpleNamespace(models=Models(kwargs["location"]))
 
     monkeypatch.setattr(google_provider.genai, "Client", client)
-    monkeypatch.setattr(google_provider, "_NOT_SERVED", set())
+    monkeypatch.setattr(google_provider, "_NOT_SERVED", {})
     monkeypatch.setattr(google_provider, "_UNAVAILABLE_UNTIL", {})
     for name in ("GOOGLE_CLOUD_LOCATION", "GOOGLE_SERVICE_ACCOUNT_JSON"):
         monkeypatch.delenv(name, raising=False)

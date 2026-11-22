@@ -1010,7 +1010,9 @@ class VisionExtractor:
             # model; don't fabricate usage counts when the adapter doesn't expose them.
             return result.model_dump(), None
         finally:
-            close = getattr(client.raw, "close", None)
+            # A provider's own close() closes every client it built: Vertex AI has two
+            # after a fallback, and ``raw`` is only the last one used.
+            close = getattr(client, "close", None) or getattr(client.raw, "close", None)
             # Injected transports belong to the caller and may serve later stages.
             if self.config.get("http_client") is None and callable(close):
                 close()
