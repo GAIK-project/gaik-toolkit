@@ -3,6 +3,7 @@
 import { MessageResponse } from "@/components/ai-elements/message";
 import { RunButton } from "@/components/demo/run-button";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { ModelNameInput } from "@/components/demo/model-name-input";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
@@ -773,7 +774,8 @@ export default function SourceNormalizerPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="sn-transcription">Transcription model</Label>
-                <Input
+                <ModelNameInput
+                  kind="transcription"
                   id="sn-transcription"
                   value={options.transcription_model ?? ""}
                   disabled={busy || (rows.length > 0 && !recordings)}
@@ -794,7 +796,8 @@ export default function SourceNormalizerPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="sn-vision">Image model</Label>
-                <Input
+                <ModelNameInput
+                  kind="chat"
                   id="sn-vision"
                   value={options.vision_model ?? ""}
                   disabled={busy || (rows.length > 0 && !images)}

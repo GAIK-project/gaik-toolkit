@@ -143,3 +143,23 @@ async def test_a_report_run_refuses_a_writer_model_the_demo_does_not_offer(serve
     detail = response.json()["detail"]
     assert "writer model" in detail and "gpt-6-luna" in detail
     assert "gpt-6-astra" not in detail  # team-only names are listed for the team only
+
+
+@pytest.mark.asyncio
+async def test_the_model_list_names_what_the_report_fields_accept(server_env, monkeypatch):
+    """The report demos' model fields offer the names their routes check, so a name
+    picked there is never refused as unknown; team-only names only for the team."""
+    from api.routers import model_settings
+
+    monkeypatch.setenv("DEMO_EXTRA_CHAT_MODELS", "extra-deployment")
+    app = _app((model_settings, "/model-settings"))
+    everyone = (await _send(app, "GET", "/model-settings/server")).json()["report_models"]
+    team = (await _send(app, "GET", "/model-settings/server", staff=True)).json()["report_models"]
+
+    assert team == {"chat": allow.chat_models(), "transcription": allow.transcription_models()}
+    assert everyone["chat"][0] == "gpt-6-luna" and "extra-deployment" in everyone["chat"]
+    assert "gpt-6-astra" in team["chat"] and "gpt-6-astra" not in everyone["chat"]
+    assert set(everyone["chat"]) == set(team["chat"]) - allow.team_only_models()
+    assert "gpt-4o-transcribe" in everyone["transcription"]
+    for name in everyone["chat"]:
+        allow.check_model(name, allow.chat_models())  # accepted outside the team too

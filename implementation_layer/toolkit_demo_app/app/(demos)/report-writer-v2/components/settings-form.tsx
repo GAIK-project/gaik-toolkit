@@ -6,6 +6,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { ModelNameInput } from "@/components/demo/model-name-input";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -44,7 +45,8 @@ export function SettingsForm({
 
   const model = (key: ModelKey, label = "Model") => (
     <Row label={label}>
-      <Input
+      <ModelNameInput
+        kind={key === "transcription" ? "transcription" : "chat"}
         placeholder="server default"
         value={models[key] ?? ""}
         onChange={(e) =>
