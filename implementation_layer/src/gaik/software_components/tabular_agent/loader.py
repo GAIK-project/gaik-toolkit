@@ -231,17 +231,18 @@ def _load_flat_file(
 
 # A number with a decimal comma: "1234,56", or with its thousands grouped by dots
 # ("1.234.567,89") or by spaces ("1 234,56"; also the no-break and the narrow
-# no-break space that spreadsheets and locale formatting write). Anchored, so free
-# text containing a comma never matches.
+# no-break space that spreadsheets and locale formatting write), with an optional
+# sign. Anchored, so free text containing a comma never matches, and a value with
+# a unit ("12,5 %", "1 234,56 €") stays text rather than losing its unit.
 _GROUP_SPACES = r" \x{00A0}\x{202F}"
 _DECIMAL_COMMA = (
-    r"^-?[0-9]+,[0-9]+$"
-    r"|^-?[0-9]{1,3}(\.[0-9]{3})+,[0-9]+$"
-    rf"|^-?[0-9]{{1,3}}([{_GROUP_SPACES}][0-9]{{3}})+,[0-9]+$"
+    r"^[-+]?[0-9]+,[0-9]+$"
+    r"|^[-+]?[0-9]{1,3}(\.[0-9]{3})+,[0-9]+$"
+    rf"|^[-+]?[0-9]{{1,3}}([{_GROUP_SPACES}][0-9]{{3}})+,[0-9]+$"
 )
 # A decimal-comma value that reads just as well as a whole number with a thousands
 # comma: "1,200" or "12,000". "3,5", "0,250" and "1234,567" cannot be thousands.
-_THOUSANDS_COMMA = r"^-?[1-9][0-9]{0,2},[0-9]{3}$"
+_THOUSANDS_COMMA = r"^[-+]?[1-9][0-9]{0,2},[0-9]{3}$"
 
 
 def repair_european_decimals(con: Any, table_name: str) -> list[str]:

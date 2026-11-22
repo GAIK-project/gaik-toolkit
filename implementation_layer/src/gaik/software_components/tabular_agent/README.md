@@ -87,7 +87,9 @@ converted to a real number, so `SUM()` behaves. The conversion only fires when
 commas is left alone, and when at least one value cannot be a thousands
 separator (`3,5`, `0,250`, `1 234,56`): a column holding only values like
 `1,200` and `12,000` may be US thousands grouping, so it stays text rather than
-becoming 1.2 and 12.0.
+becoming 1.2 and 12.0. That holds for a column of three-decimal values such as
+`1,500` and `2,250` too. A sign (`+1,5`) is fine; a value with a unit
+(`12,5 %`, `1 234,56 €`) stays text, so the unit is not dropped from it.
 
 ## Messy spreadsheets
 

@@ -154,12 +154,16 @@ def test_space_grouped_comma_decimals_are_converted(con, tmp_path, space):
         (["1,200", "1234,567"], [1.2, 1234.567]),
         (["1,200", "1 234,5"], [1.2, 1234.5]),
         ([" 12,5 ", "3,25"], [12.5, 3.25]),
+        (["+1,5", "-0,25", "+1 234,5"], [1.5, -0.25, 1234.5]),
         # Every value could be thousands grouping, or one can only be: text.
         (["1,200", "-3,450"], None),
         (["1,200", "1,234,567"], None),
         (["1,200", "1,200.50"], None),
         # Not every value is a number: text.
         (["1,5", "n/a"], None),
+        # A unit stays with the value rather than being dropped from it.
+        (["12,5 %", "3,25 %"], None),
+        (["1 234,56 €", "987,50 €"], None),
     ],
 )
 def test_a_column_is_read_as_comma_decimals_only_when_it_cannot_be_thousands(
