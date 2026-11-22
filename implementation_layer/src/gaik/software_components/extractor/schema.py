@@ -1531,11 +1531,46 @@ def _requests_text_representation(text: str) -> bool:
 # language, so they count there. A description is prose, where they count only as
 # its first word ("Data di consegna", "Dato for levering").
 _AMBIGUOUS_DATE_KEYWORDS = frozenset({"data", "dato", "jour"})
+# "data" is also an English word in field names ("raw_data", "master_data"); an
+# Italian, Portuguese or Polish date name starts with it ("data_di_consegna",
+# "data_urodzenia"), so in a name it counts only as the first word as well. A
+# known limit: a str field whose name starts with the English word ("data_source")
+# is still read as a date.
+_LEADING_ONLY_IN_NAME = frozenset({"data"})
 # Keywords that form compounds in their language ("Lieferdatum",
 # "toimituspäivämäärä", "teslimtarihi", "fechaentrega"), so they may be part of a
 # longer word.
 _COMPOUND_DATE_KEYWORDS = frozenset(
     {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih", "fecha"}
+)
+# Turkish "tarih" is also "history": "tarihsel" (historical), "tarihçe" (a
+# history) and "tarihçi" (historian) are not dates.
+_NOT_A_DATE_STEMS = ("tarihsel", "tarihç", "tarihc")
+# A date word in the description alone does not make a field a date when the
+# field's name says it holds another kind of value: "invoice_number" described as
+# "Number printed next to the invoice date" is a number. A date word in the name
+# itself still counts ("date_code").
+_OTHER_VALUE_NAME_WORDS = frozenset(
+    {
+        "amount",
+        "code",
+        "count",
+        "id",
+        "name",
+        "nimi",
+        "no",
+        "nr",
+        "nro",
+        "num",
+        "number",
+        "nummer",
+        "numero",
+        "price",
+        "ref",
+        "reference",
+        "total",
+        "tunnus",
+    }
 )
 # In a field name a word may also end in a keyword or start with "date":
 # "birthdate", "leveringsdato", and "duedate" and "dateofbirth", which is what
@@ -1581,11 +1616,19 @@ def _has_date_keyword(text: str, *, in_name: bool) -> bool:
         ):
             return True
         for keyword in DATE_KEYWORDS:
-            if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name and position:
+            if (
+                keyword in _AMBIGUOUS_DATE_KEYWORDS
+                and position
+                and (not in_name or keyword in _LEADING_ONLY_IN_NAME)
+            ):
                 continue
             if word == keyword:
                 return True
-            if keyword in _COMPOUND_DATE_KEYWORDS and keyword in word:
+            if (
+                keyword in _COMPOUND_DATE_KEYWORDS
+                and keyword in word
+                and not any(stem in word for stem in _NOT_A_DATE_STEMS)
+            ):
                 return True
     return False
 
@@ -1595,9 +1638,19 @@ def _is_date_field(name: str, description: str) -> bool:
 
     A keyword counts only as a whole word, so ``candidate_name``, ``update_notes``
     and ``metadata`` are not dates. This is the fallback for a field the model
-    did not type as a date; :func:`_apply_type_overrides` checks the type first.
+    typed as text; :func:`_apply_type_overrides` checks the type first.
+
+    A date word in the description alone does not count when the name names
+    another kind of value (``invoice_number`` described as "Number printed next
+    to the invoice date"). Known limit: a name without such a word whose
+    description only mentions a date ("Status, set on the approval date") is
+    still read as a date.
     """
-    return _has_date_keyword(name, in_name=True) or _has_date_keyword(description, in_name=False)
+    if _has_date_keyword(name, in_name=True):
+        return True
+    if not _has_date_keyword(description, in_name=False):
+        return False
+    return not set(_LETTER_WORD_RE.findall(name.lower())) & _OTHER_VALUE_NAME_WORDS
 
 
 def _apply_type_overrides(requirements: ExtractionRequirements, original_text: str = "") -> None:
@@ -1620,10 +1673,24 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
         if not _EXPLICIT_PATTERN_RE.search(field_context):
             field.pattern = None
 
+        is_integer_count = (
+            field.field_name == "quantity"
+            or field.field_name.endswith("_quantity")
+            or field.field_name == "count"
+            or field.field_name.endswith("_count")
+        )
+
         # The model's own type comes first: it read the task, and a date field need
         # not have a date word in its name ("deadline", "valid_until"). The keyword
-        # check catches a date the model typed as text.
-        if field.field_type == "date" or _is_date_field(field.field_name, field.description):
+        # check catches a date the model typed as text, and only that: a number,
+        # flag or list the model typed ("data_quality", "date_count",
+        # "date_entries") keeps its type (#106), and a count typed as text gets
+        # the count repair below.
+        if field.field_type == "date" or (
+            field.field_type == "str"
+            and not is_integer_count
+            and _is_date_field(field.field_name, field.description)
+        ):
             if _requests_text_representation(field_context):
                 field.field_type = "str"
                 field.format = None
@@ -1645,12 +1712,6 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
 
         # Match the documented type rule for plain quantities/counts, while
         # preserving an explicit request for text or a unit-bearing string.
-        is_integer_count = (
-            field.field_name == "quantity"
-            or field.field_name.endswith("_quantity")
-            or field.field_name == "count"
-            or field.field_name.endswith("_count")
-        )
         if (
             is_integer_count
             and field.field_type == "str"

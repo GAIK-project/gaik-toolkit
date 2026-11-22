@@ -495,3 +495,80 @@ def test_ambiguous_keyword_that_opens_a_description_makes_a_field_a_date(name, d
     _apply_type_overrides(requirements, original_text="")
 
     assert requirements.fields[0].field_type == "date"
+
+
+# Issue #106: the date keyword fallback replaced types the model got right.
+@pytest.mark.parametrize(
+    ("name", "parsed_type", "description"),
+    [
+        ("data_quality", "float", "Score from 0 to 1"),
+        ("raw_data", "str", "The raw values"),
+        ("date_count", "int", "Number of dates"),
+        ("date_entries", "list[dict]", "Rows"),
+        ("history", "str", "Tarihsel bilgi"),
+        ("invoice_number", "str", "Number printed next to the invoice date"),
+        # More of the same kinds.
+        ("delivery_dates", "list[str]", "Every delivery date"),
+        ("is_dated", "bool", "Whether the letter carries a date"),
+        ("master_data", "str", "Customer master data"),
+        ("tarihce", "str", "Tarihçe"),
+        ("order_id", "str", "Id written beside the order date"),
+        ("contract_reference", "str", "Reference shown with the signing date"),
+    ],
+)
+def test_the_keyword_fallback_keeps_a_type_the_model_got_right(name, parsed_type, description):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type=parsed_type, description=description)
+    )
+
+    _apply_type_overrides(requirements, original_text=f"- {name.replace('_', ' ')}")
+
+    field = requirements.fields[0]
+    assert field.field_type == parsed_type
+    assert field.format is None
+
+
+@pytest.mark.parametrize(
+    ("name", "description"),
+    [
+        ("data_di_consegna", "Consegna"),
+        ("teslim_tarihi", "Teslim"),
+        ("issued", "Date of issue"),
+        ("data", "When it was recorded"),
+        ("dogum", "Doğum tarihi"),
+        ("tarih", "Belge"),
+        # A date word in the name counts whatever else the name holds.
+        ("date_code", "Code printed on the label"),
+    ],
+)
+def test_the_keyword_fallback_still_finds_these_dates(name, description):
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="str", description=description)
+    )
+
+    _apply_type_overrides(requirements, original_text="")
+
+    assert requirements.fields[0].field_type == "date"
+
+
+@pytest.mark.parametrize("name", ["date_count", "delivery_date_count", "data_quantity"])
+def test_a_count_named_after_dates_typed_as_text_gets_the_count_repair(name):
+    # Before, the date keyword won and the integer repair for _count names was skipped.
+    requirements = _requirements(
+        FieldSpec(field_name=name, field_type="str", description="How many dates")
+    )
+
+    _apply_type_overrides(requirements, original_text=f"- {name.replace('_', ' ')}")
+
+    assert requirements.fields[0].field_type == "int"
+
+
+def test_a_model_typed_date_is_a_date_whatever_its_name():
+    requirements = _requirements(
+        FieldSpec(field_name="invoice_number", field_type="date", description="Issue date")
+    )
+
+    _apply_type_overrides(requirements, original_text="- Invoice number (DD.MM.YYYY)")
+
+    assert requirements.fields[0].field_type == "date"
+    assert requirements.fields[0].format == "%d.%m.%Y"
