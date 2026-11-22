@@ -319,6 +319,74 @@ def test_unnamed_columns_get_generated_names(con, tmp_path):
     assert columns[1].startswith("column_")
 
 
+_HEADER = ["Määrä", "Hinta (€)", "Région", '5" pipe']
+
+
+def test_excel_headers_are_named_as_the_same_csv_header_is(con, tmp_path):
+    """Non-ASCII letters, signs and case survive the Excel path, as they do for a CSV."""
+    xlsx, csv_path = tmp_path / "kirja.xlsx", tmp_path / "kirja_csv.csv"
+    _write_clean_xlsx(xlsx, {"Sheet1": [_HEADER, (3, 2.5, "Nord", 1), (4, 1.5, "Sud", 2)]})
+    csv_path.write_text(
+        ",".join('"' + h.replace('"', '""') + '"' for h in _HEADER) + "\n3,2.5,Nord,1\n",
+        encoding="utf-8",
+    )
+    _load(con, xlsx)
+    _load(con, csv_path)
+
+    def names(table):
+        return [r[0] for r in con.execute(f'DESCRIBE "{table}"').fetchall()]
+
+    assert names("kirja") == _HEADER
+    assert names("kirja") == names("kirja_csv")
+
+
+def test_excel_header_repeats_line_breaks_and_numbers_get_usable_names(con, tmp_path):
+    path = tmp_path / "report.xlsx"
+    rows = [("Region", "region", "Sales\nEUR", 2024, None), ("North", "N", 10, 11, 12)]
+    _write_clean_xlsx(path, {"Sheet1": rows + [("South", "S", 20, 21, 22)]})
+    _load(con, path)
+    columns = [r[0] for r in con.execute("DESCRIBE report").fetchall()]
+    # DuckDB's names are case-insensitive, so the repeat needs a suffix.
+    assert columns == ["Region", "region_2", "Sales EUR", "2024", "column_5"]
+    assert con.execute("SELECT count(*) FROM report").fetchone()[0] == 2
+
+
+def test_an_excel_header_of_years_is_not_read_back_as_a_data_row(con, tmp_path):
+    path = tmp_path / "years.xlsx"
+    _write_clean_xlsx(path, {"Sheet1": [(2024, 2025), (1, 2), (3, 4)]})
+    _load(con, path)
+    assert [r[0] for r in con.execute("DESCRIBE years").fetchall()] == ["2024", "2025"]
+    assert con.execute('SELECT sum("2025") FROM years').fetchone()[0] == 6
+
+
+def test_non_ascii_excel_columns_pass_the_validator_and_run(con, tmp_path):
+    from gaik.software_components.tabular_agent.sql_safety import validate_read_only
+
+    path = tmp_path / "kirja.xlsx"
+    _write_clean_xlsx(path, {"Sheet1": [_HEADER, (3, 2.5, "Nord", 1), (4, 1.5, "Sud", 2)]})
+    _load(con, path)
+    for sql in (
+        'SELECT sum(Määrä), sum("Hinta (€)") FROM kirja',
+        'SELECT sum("Määrä"), sum("hinta (€)") FROM kirja WHERE Région <> \'x\'',
+        'SELECT sum(k."5"" pipe") FROM kirja AS k',
+    ):
+        checked = validate_read_only(sql, allowed_tables=["kirja"])
+        assert con.execute(checked).fetchone()[0] in (7, 3)
+
+
+def test_the_schema_text_quotes_the_names_sql_cannot_read_bare(con, tmp_path):
+    from gaik.software_components.tabular_agent.profiling import profile_tables
+
+    path = tmp_path / "kirja.xlsx"
+    rows = [_HEADER + ["unit_price", "2024"], (3, 2.5, "Nord", 1, 9, 1), (4, 1.5, "Sud", 2, 8, 2)]
+    _write_clean_xlsx(path, {"Sheet1": rows})
+    text = profile_tables(con, _load(con, path)).to_prompt_text()
+    for quoted in ('"Määrä" BIGINT', '"Hinta (€)" DOUBLE', '"Région" VARCHAR', '"5"" pipe"'):
+        assert f"\n  {quoted}" in text
+    assert '"2024" BIGINT' in text
+    assert "\n  unit_price BIGINT" in text
+
+
 def test_empty_sheets_are_skipped(con, tmp_path):
     path = tmp_path / "mixed.xlsx"
     _write_clean_xlsx(path, {"Empty": [], "Real": [("a",), (1,)]})

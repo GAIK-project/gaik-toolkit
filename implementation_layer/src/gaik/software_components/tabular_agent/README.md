@@ -97,7 +97,9 @@ tiers handle that, and the expensive one only runs when it is needed:
 
 1. **Deterministic clean-up** (always, no LLM call). Blank edges are trimmed,
    the header row is found by looking for the first mostly-populated,
-   mostly-textual row, and columns are named. On sheets that look messy,
+   mostly-textual row, and columns are named after the header text as a CSV's
+   are (`Määrä` stays `Määrä`; a blank header becomes `column_<n>`, a repeat
+   gets a suffix). On sheets that look messy,
    interleaved subtotal and section rows are then removed *structurally* -- a
    subtotal blanks the descriptive columns but keeps the numbers, which is
    recognisable without matching words like "total" or "yhteensä", so it works

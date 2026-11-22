@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import re
+
 from pydantic import BaseModel, Field
 
 # Maximum characters kept per rendered value when describing a column.
 _VALUE_CHARS = 60
+
+# A name SQL reads without quotes. Any other name a header row can give (with a
+# space, a sign, a leading digit or a letter outside ASCII) is shown quoted, so the
+# model writes it as one name.
+_PLAIN_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 class GeneratedSQL(BaseModel):
@@ -105,10 +112,17 @@ class TabularSchema(BaseModel):
             lines = [f"TABLE {table.name}  -- from {table.source}, {table.row_count} row(s)"]
             lines.append("(")
             for col in table.columns:
-                lines.append(f"  {col.name} {col.data_type}{_describe_column(col)}")
+                lines.append(f"  {_sql_name(col.name)} {col.data_type}{_describe_column(col)}")
             lines.append(")")
             blocks.append("\n".join(lines))
         return "\n\n".join(blocks)
+
+
+def _sql_name(name: str) -> str:
+    """``name`` as a query writes it: quoted, with ``"`` doubled, unless plain."""
+    if _PLAIN_NAME.fullmatch(name):
+        return name
+    return '"' + name.replace('"', '""') + '"'
 
 
 def _describe_column(col: ColumnProfile) -> str:
