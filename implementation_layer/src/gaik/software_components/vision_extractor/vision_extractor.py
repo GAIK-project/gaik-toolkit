@@ -923,11 +923,13 @@ class VisionExtractor:
 
         if isinstance(requirements, CompositeExtractionRequirements):
             coerce_fields(result_dict, requirements.parent_requirements)
-            child_rows = result_dict.get(requirements.child_container_name)
-            if isinstance(child_rows, list):
-                for row in child_rows:
-                    if isinstance(row, dict):
-                        coerce_fields(row, requirements.child_requirements)
+            # Every child collection, each with its own fields.
+            for child in requirements.children:
+                child_rows = result_dict.get(child.container_name)
+                if isinstance(child_rows, list):
+                    for row in child_rows:
+                        if isinstance(row, dict):
+                            coerce_fields(row, child.requirements)
             return result_dict
 
         coerce_fields(result_dict, requirements)

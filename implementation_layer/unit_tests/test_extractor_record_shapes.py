@@ -120,3 +120,65 @@ def test_empty_and_scalar_lists_of_a_flat_record_are_its_own_fields(invoice):
     # A container the record does not name is recognised whether or not it has items.
     assert _holds_items("records", [], invoice)
     assert _holds_items("records", [{"invoice_number": "1"}], invoice)
+
+
+def _pdf(path, text: str):
+    fitz = pytest.importorskip("fitz")
+    document = fitz.open()
+    document.new_page().insert_text((72, 72), text, fontsize=11)
+    document.save(path)
+    document.close()
+    return path
+
+
+def _wrapped(value) -> dict:
+    return {"value": value, "confidence_score": 0.9, "confidence_reason": "Stated."}
+
+
+def test_vision_repairs_blank_numbers_in_every_child_collection(tmp_path, monkeypatch):
+    from gaik.software_components.extractor import (
+        ChildRequirements,
+        CompositeExtractionRequirements,
+    )
+    from gaik.software_components.extractor.schema import _create_parent_with_nested_list_model
+
+    children = [
+        ChildRequirements(
+            container_name="line_items",
+            container_description="Lines",
+            requirements=_requirements(
+                FieldSpec(field_name="qty", field_type="int", description="Quantity")
+            ),
+        ),
+        ChildRequirements(
+            container_name="payments",
+            container_description="Payment terms",
+            requirements=_requirements(
+                FieldSpec(field_name="days", field_type="int", description="Days")
+            ),
+        ),
+    ]
+    parent = _requirements(
+        FieldSpec(field_name="order_number", field_type="str", description="Order number")
+    )
+    requirements = CompositeExtractionRequirements(parent_requirements=parent, children=children)
+    model = _create_parent_with_nested_list_model(parent_requirements=parent, children=children)
+    canned = {
+        "order_number": _wrapped("PO-1"),
+        "line_items": [{"qty": _wrapped("")}],
+        "payments": [{"days": _wrapped("")}],
+    }
+    extractor = VisionExtractor(
+        api_config={"api_key": "unused", "model": "test-model"}, include_verification=True
+    )
+    monkeypatch.setattr(extractor, "_extract", lambda *args, **kwargs: (canned, None))
+
+    result = extractor.extract(
+        file_paths=[_pdf(tmp_path / "po.pdf", "Order PO-1")],
+        user_requirements="order",
+        extraction_model=model,
+        requirements=requirements,
+    )
+
+    assert result.data["line_items"][0]["qty"]["value"] is None
+    assert result.data["payments"][0]["days"]["value"] is None
