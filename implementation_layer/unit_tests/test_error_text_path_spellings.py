@@ -38,6 +38,10 @@ def _assert_tagged(text: str, path) -> None:
         ("/home/Matti Virtanen//report.pdf", "/home/Matti Virtanen/report.pdf"),
         # A relative Windows path, printed normalized.
         (".\\Matti Virtanen\\report.pdf", "Matti Virtanen\\report.pdf"),
+        # A ".." segment collapsed (os.path.normpath), with either separator.
+        ("sub/../Matti Virtanen/report.pdf", "Matti Virtanen/report.pdf"),
+        ("sub/../Matti Virtanen/report.pdf", "Matti Virtanen\\report.pdf"),
+        ("sub\\..\\Matti Virtanen\\report.pdf", "Matti Virtanen/report.pdf"),
     ],
 )
 def test_a_normalized_spelling_of_the_path_is_tagged(given, printed):
@@ -73,22 +77,64 @@ def test_the_absolute_and_resolved_forms_of_a_relative_path_are_tagged(tmp_path,
         _assert_tagged(error_text(FileNotFoundError(f"no file {printed}"), given), given)
 
 
-def test_a_pure_path_object_is_tagged_in_each_spelling():
-    given = PurePosixPath("/srv/Matti Virtanen/report.pdf")
+@pytest.mark.parametrize(
+    "given",
+    [
+        PureWindowsPath("C:/srv/Matti Virtanen/report.pdf"),
+        PurePosixPath("/srv/Matti Virtanen/report.pdf"),
+    ],
+)
+def test_a_pure_path_object_is_tagged_in_each_spelling(given):
+    # For a Windows path, str() and as_posix() are two spellings.
+    windows = PureWindowsPath(given)
+    message = f"{windows} and {windows.as_posix()} and {given.name}"
 
-    text = error_text(ValueError(f"{given} and {given.as_posix()} and {given.name}"), given)
+    text = error_text(ValueError(message), given)
 
     assert text.count(file_tag(given)) == 3
     _assert_tagged(text, given)
 
 
-def test_the_name_and_stem_are_still_tagged_and_a_tag_is_not_rewritten():
+def test_the_stem_is_tagged_where_it_reads_as_a_file_name_and_a_tag_is_not_rewritten():
     # The stem "file" is also the first word of every tag.
     given = "C:/data/Matti Virtanen/file.pdf"
 
-    text = error_text(ValueError("bad file.pdf, see file"), given)
+    text = error_text(ValueError("bad file.pdf, see 'file', file_chunk_001.wav"), given)
 
-    assert text == f"ValueError: bad {file_tag(given)}, see {file_tag(given)}"
+    tag = file_tag(given)
+    assert text == f"ValueError: bad {tag}, see '{tag}', {tag}_chunk_001.wav"
+
+
+@pytest.mark.parametrize(
+    ("given", "message"),
+    [
+        # A stem that is also a word in the message, or part of the type name.
+        ("/x/Value.txt", "bad value"),
+        ("/x/file.csv", "The file is empty"),
+        ("/x/data.csv", "no data in the data table"),
+        ("/x/report.pdf", "report not ready; reporting later"),
+        ("/x/README", "README is a word here"),
+    ],
+)
+def test_a_stem_as_an_ordinary_word_and_the_type_name_are_left_alone(given, message):
+    assert error_text(ValueError(message), given) == f"ValueError: {message}"
+
+
+def test_a_name_named_like_the_error_type_leaves_the_type_name():
+    given = "/x/ValueError.txt"
+
+    text = error_text(ValueError("cannot read ValueError.txt"), given)
+
+    assert text == f"ValueError: cannot read {file_tag(given)}"
+
+
+def test_a_file_named_after_the_stem_is_tagged():
+    # A chunk or temporary file named after the input keeps the person's name.
+    given = "/data/Matti_Virtanen_report.wav"
+
+    text = error_text(RuntimeError("ffmpeg: /tmp/Matti_Virtanen_report_chunk_003.wav"), given)
+
+    _assert_tagged(text, given)
 
 
 def test_other_text_is_left_as_it_is():

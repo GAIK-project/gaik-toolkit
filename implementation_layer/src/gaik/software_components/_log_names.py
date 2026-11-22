@@ -13,7 +13,9 @@ Exceptions raised to the caller keep the path: the caller passed it in and needs
 from __future__ import annotations
 
 import hashlib
+import ntpath
 import os
+import posixpath
 import re
 import secrets
 from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
@@ -57,32 +59,54 @@ def _absolute(whole: str) -> set[str]:
     return forms
 
 
-def _spellings(whole: str) -> set[str]:
-    """Each way a message can spell the path: as given, normalized (``str(PurePath())``,
-    ``as_posix()``) by Windows and by POSIX rules, made absolute or resolved, each with
-    the doubled backslashes of an OSError's repr; and the file's name and stem."""
-    paths = {whole} | _absolute(whole)
+def _spellings(whole: str) -> tuple[set[str], set[str]]:
+    """The ways a message can spell the path, and the file's stems.
+
+    The spellings: the path as given, with ``..`` and ``.`` collapsed, made absolute or
+    resolved, each normalized (``str(PurePath())``, ``as_posix()``) by Windows and by
+    POSIX rules and with the doubled backslashes of an OSError's repr; and the file's
+    name when it has an extension. They are replaced wherever they appear. A stem
+    (``report``) is also an ordinary word, so it is replaced only where it reads as a
+    file name (see :func:`_stem_pattern`).
+    """
+    paths = {whole, ntpath.normpath(whole), posixpath.normpath(whole)} | _absolute(whole)
     forms = set()
     for path in paths:
         for pure in (PureWindowsPath(path), PurePosixPath(path)):
             forms |= {path, str(pure), pure.as_posix()}
     forms |= {form.replace("\\", "\\\\") for form in forms}
+    stems = set()
     for pure in (PureWindowsPath(whole), PurePosixPath(whole)):
-        forms |= {pure.name, pure.stem}
-    return {form for form in forms if len(form) >= 3}
+        if pure.suffix:
+            forms.add(pure.name)
+        stems.add(pure.stem)
+    return {form for form in forms if len(form) >= 3}, {stem for stem in stems if len(stem) >= 3}
+
+
+def _stem_pattern(stem: str) -> str:
+    """The stem as a whole word next to a path separator or a quote before it, or an
+    extension, a quote, a path separator, ``_`` or ``-`` after it (a file named after
+    it, such as ``report_chunk_001.wav``)."""
+    word = re.escape(stem)
+    return (
+        rf"(?<=[/\\'\"`]){word}(?![^\W_])"
+        rf"|(?<![^\W_]){word}(?=\.[^\W\d_]|['\"`/\\_-])"
+    )
 
 
 def error_text(exc: BaseException, *paths: str | PurePath | None, limit: int = 300) -> str:
-    """``"ValueError: cannot open file 3f9a1c2b.pdf"``: the error with each path, however
-    it is spelled (see :func:`_spellings`), and its file name and stem replaced by its tag,
-    so a log line keeps the cause."""
-    text = f"{type(exc).__name__}: {exc}"
+    """``"ValueError: cannot open file 3f9a1c2b.pdf"``: the error's message with each
+    path, however it is spelled, and its file name and stem replaced by its tag (see
+    :func:`_spellings`), so a log line keeps the cause. The error's type name is kept."""
+    message = str(exc)
     for path in paths:
         if not path:
             continue
-        forms = sorted(_spellings(str(path)), key=len, reverse=True)
-        if forms:
-            # One pass, longest spelling first, so a tag is never rewritten.
-            pattern = re.compile("|".join(re.escape(form) for form in forms))
-            text = pattern.sub(file_tag(path), text)
+        forms, stems = _spellings(str(path))
+        # One pass, longest spelling first, so a tag is never rewritten.
+        alternatives = [re.escape(form) for form in sorted(forms, key=len, reverse=True)]
+        alternatives += [_stem_pattern(stem) for stem in sorted(stems, key=len, reverse=True)]
+        if alternatives:
+            message = re.sub("|".join(alternatives), file_tag(path), message)
+    text = f"{type(exc).__name__}: {message}"
     return text if len(text) <= limit else text[: limit - 1] + "…"
