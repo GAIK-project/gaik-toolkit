@@ -1526,224 +1526,6 @@ def _requests_text_representation(text: str) -> bool:
     return bool(_TEXT_REPRESENTATION_RE.search(text))
 
 
-# A task-level rule to keep dates as written (#96). Clauses end at a sentence end,
-# a semicolon, a colon, a line break or a dash between spaces, so "Do not guess:
-# keep dates as written" and "Dates may vary; keep the amounts unchanged" are two
-# clauses each.
-_RULE_CLAUSE_SPLIT_RE = re.compile(r"[.!?](?=\s|$)|[;:\n]|\s[-–—]\s")
-_RULE_SENTENCE_SPLIT_RE = re.compile(r"[.!?](?=\s|$)|\n")
-_KEEP_VERB_RE = re.compile(r"\b(?:preserve|keep|retain|leave|maintain)\b")
-# A negation right before the verb: "do not keep", "never keep", "there is no
-# need to keep", "you don't have to keep", "it is not required to keep".
-_NEGATED_BEFORE_RE = re.compile(
-    r"(?:\b(?:not|never|don't|dont|no)(?:\s+\w+)?"
-    r"|\bno\s+need\s+to"
-    r"|\b(?:do\s+not|don't|dont|does\s+not|doesn't)\s+(?:have|need)\s+to"
-    r"|\bnot\s+(?:required|necessary|needed)\s+to"
-    r"|\bneedn't|\bneed\s+not)\s*$"
-)
-# What makes keep, leave, retain or maintain a rule to keep dates as written: a
-# phrase saying so ("Keep dates as written", "Leave the dates unchanged", "the
-# original format of all dates"). Without one they are everyday instructions
-# ("Leave dates empty if missing", "Keep all dates in one consistent format",
-# "Keep track of the due dates"). "Preserve" needs none.
-_AS_WRITTEN_RE = re.compile(
-    r"\bas\s+(?:written|is|printed|shown|text|strings?|they\s+appear|it\s+appears)\b"
-    r"|\b(?:unchanged|verbatim|untouched)\b"
-    r"|\boriginal\s+(?:format|form|wording|notation|spelling)s?\b"
-)
-_BARE_KEEP_VERBS = frozenset({"preserve"})
-# A sentence that asks to convert dates to a format ("... - convert them to
-# YYYY-MM-DD", "...; use ISO") is not a rule to keep them, whatever else it says.
-_CONVERSION_VERB_RE = re.compile(
-    r"\b(?:convert|normali[sz]e|reformat|format|standardi[sz]e|change|rewrite|write|"
-    r"use|output|return|turn)\b"
-)
-_DATES_WORD_RE = re.compile(
-    r"\bdates\b|\bdate\s+(?:fields|values)\b|\b(?:all|every|each|any)\s+dates?(?:\s+fields?)?\b"
-)
-# "Return dates as written", "Extract date fields as text": plural, so a field's
-# own "Order date as written" is not read as a rule for every date.
-_DATES_AS_WRITTEN_RE = re.compile(
-    r"(?:\bdates|\bdate\s+(?:fields|values))\s+(?:exactly\s+)?as\s+"
-    r"(?:written|text|strings?|printed|shown|they\s+appear)\b"
-)
-# A clause that names an output format is a format rule ("Keep the dates in
-# DD.MM.YYYY", "Keep dates in ISO format"), not a rule to keep them as written.
-_ISO_WORD_RE = re.compile(r"\biso\b")
-# Words that end the keep phrase before the dates are reached: the dates are then
-# the object of another instruction ("Keep the notes as written and convert dates").
-_KEEP_PHRASE_END_RE = re.compile(
-    r"\b(?:convert|normali[sz]e|reformat|standardi[sz]e|change|rewrite|write|use|"
-    r"output|return|extract)\b"
-    # "format" the verb; "the format of all dates" is what is kept.
-    r"|\bformat\b(?!\s+of\b)"
-    r"|\bas\s+(?:written|is|shown|printed|they\s+appear|it\s+appears)\b"
-    r"|\b(?:exactly|unchanged|verbatim)\b"
-)
-# "Do not reformat dates", "Never convert the dates".
-_NO_DATE_CONVERSION_RE = re.compile(
-    r"\b(?:do\s+not|don't|never|no\s+need\s+to)\s+(?:reformat|convert|normali[sz]e|"
-    r"change|standardi[sz]e|alter|modify|rewrite)\s+(?:the\s+|any\s+|all\s+)?dates\b"
-)
-# Words before "dates" that do not narrow which dates are meant: determiners,
-# the prepositions that end such a narrowing ("the format of all dates"), and the
-# instruction's own verb ("Return dates as written").
-_GENERIC_DATE_WORDS = frozenset(
-    {
-        "capture",
-        "copy",
-        "enter",
-        "extract",
-        "give",
-        "list",
-        "output",
-        "provide",
-        "record",
-        "report",
-        "return",
-        "show",
-        "write",
-        "all",
-        "any",
-        "at",
-        "for",
-        "from",
-        "in",
-        "of",
-        "on",
-        "to",
-        "with",
-        "document",
-        "documents",
-        "each",
-        "every",
-        "given",
-        "original",
-        "other",
-        "printed",
-        "source",
-        "such",
-        "the",
-        "their",
-        "these",
-        "those",
-        "written",
-    }
-)
-_MAX_KEEP_PHRASE_WORDS = 10
-
-
-@dataclass(frozen=True)
-class _KeepDatesRule:
-    """Which date fields a task-level "keep dates as written" rule covers."""
-
-    every_date: bool
-    qualifiers: frozenset[str]
-
-    def covers(self, field_name: str) -> bool:
-        return self.every_date or bool(set(field_name.split("_")) & self.qualifiers)
-
-
-def _keep_dates_rule(text: str) -> _KeepDatesRule | None:
-    """The task-level rule to keep dates as written, if the task has one.
-
-    It is a clause whose keep verb, not negated, has "dates" in the phrase it
-    governs: "Preserve original wording, dimensions, dates, and labels",
-    "Preserve dates exactly if the required format cannot be inferred"; with
-    keep, leave, retain or maintain also a phrase saying "as written" ("Keep all
-    dates as they appear", "Leave the dates unchanged"); plural dates asked for as
-    written ("Return dates as written", "Extract date fields as text"); or a
-    negated conversion: "Do not reformat dates". Not one: a negated keep ("There
-    is no need to keep dates as written", "You don't have to keep the dates as
-    written"); an everyday keep or leave ("Leave dates empty if they are
-    missing", "Keep all dates in one consistent format", "Keep track of the due
-    dates"); a clause that mentions dates while it keeps something else ("Extract
-    the invoice and due dates, and retain the descriptions as written"); and a
-    sentence that asks to convert dates to a format ("... - convert them to
-    YYYY-MM-DD", "Keep the dates in DD.MM.YYYY", "in ISO format"). Words right
-    before "dates" narrow it to the date fields whose name holds one of them:
-    "Keep revision dates as written" covers ``revision_date`` only.
-
-    Known limits: the rule is read from words, so a singular "date" ("Keep the
-    date as written") is not one; "Preserve" with dates and no "as written"
-    counts ("Preserve the due dates for later" keeps ``due_date`` as text); and a
-    rule written inside one child collection's section without naming it covers
-    the parent's dates as well, since the parent's parse reads the whole task.
-    """
-    every_date = False
-    qualifiers: set[str] = set()
-
-    def add(words: list[str]) -> None:
-        nonlocal every_date
-        named = _date_qualifiers(words)
-        if named:
-            qualifiers.update(named)
-        else:
-            every_date = True
-
-    clauses = [
-        clause
-        for sentence in _RULE_SENTENCE_SPLIT_RE.split(text.lower())
-        if not (
-            _CONVERSION_VERB_RE.search(sentence)
-            and (_detect_date_format(sentence) or _ISO_WORD_RE.search(sentence))
-        )
-        for clause in _RULE_CLAUSE_SPLIT_RE.split(sentence)
-    ]
-    for clause in clauses:
-        if _detect_date_format(clause) or _ISO_WORD_RE.search(clause):
-            continue
-        if _NO_DATE_CONVERSION_RE.search(clause):
-            every_date = True
-            continue
-        for verb in _KEEP_VERB_RE.finditer(clause):
-            if _NEGATED_BEFORE_RE.search(clause[: verb.start()]):
-                continue
-            dates = _DATES_WORD_RE.search(clause, verb.end())
-            if not dates:
-                continue
-            phrase = clause[verb.end() : dates.start()]
-            words = phrase.split()
-            if len(words) > _MAX_KEEP_PHRASE_WORDS or _KEEP_PHRASE_END_RE.search(phrase):
-                continue
-            if verb.group() not in _BARE_KEEP_VERBS and not (
-                _AS_WRITTEN_RE.search(clause, dates.end()) or _AS_WRITTEN_RE.search(phrase)
-            ):
-                continue
-            add(words)
-        for dates in _DATES_AS_WRITTEN_RE.finditer(clause):
-            before = clause[: dates.start()]
-            if _NEGATED_BEFORE_RE.search(before) or _NEGATED_BEFORE_RE.search(
-                " ".join(before.split()[:-1])
-            ):
-                continue
-            add(before.split()[-_MAX_KEEP_PHRASE_WORDS:])
-    if not every_date and not qualifiers:
-        return None
-    return _KeepDatesRule(every_date=every_date, qualifiers=frozenset(qualifiers))
-
-
-def _date_qualifiers(words: list[str]) -> set[str]:
-    """The words right before "dates" that say which dates ("invoice and due").
-
-    Empty when the dates are one item of a list ("wording, dimensions, dates") or
-    the words before them are generic ("the original dates").
-    """
-    qualifiers: set[str] = set()
-    for word in reversed(words):
-        if word.endswith(","):
-            break
-        if word in {"and", "or"}:
-            if not qualifiers:
-                break
-            continue
-        if word in _GENERIC_DATE_WORDS or not word.isalpha():
-            break
-        qualifiers.add(word)
-    return qualifiers
-
-
 # Keywords that are ordinary words in another language ("data" in English, "dato"
 # in Spanish, "jour" in "ordre du jour"). A field name is written in the task's
 # language, so they count there. A description is prose, where they count only as
@@ -1879,7 +1661,6 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
     Supports multiple languages for date detection.
     """
     global_date_format = _detect_global_date_format(original_text)
-    keep_dates_rule = _keep_dates_rule(original_text)
 
     for field in requirements.fields:
         field_context = _field_specific_context(field, original_text)
@@ -1915,23 +1696,16 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
                 field.format = None
                 continue
 
+            field.field_type = "date"
             # The field's own clause in the task text comes first, then a
             # format the task states for all dates. The parsed description is
             # the last fallback: the parser is told to keep a field's own
             # format there, but what it writes must not override the task.
-            date_format = (
+            field.format = (
                 _detect_date_format(field_context)
                 or global_date_format
                 or _detect_date_format(field.description)
             )
-            if date_format is None and keep_dates_rule and keep_dates_rule.covers(field.field_name):
-                # A task-level rule keeps dates as written, and nothing gives
-                # this field a format of its own (#96).
-                field.field_type = "str"
-                field.format = None
-                continue
-            field.field_type = "date"
-            field.format = date_format
             continue
 
         field.format = None
