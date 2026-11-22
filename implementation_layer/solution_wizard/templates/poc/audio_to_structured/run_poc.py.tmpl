@@ -335,16 +335,17 @@ ${source_tracing_section}${llm_judge_section}
         raw = getattr(result.transcription, "raw_transcript", None)
         enhanced = getattr(result.transcription, "enhanced_transcript", None)
         transcript_text = enhanced or raw or ""
+        changed = bool(raw and enhanced and raw.strip() != enhanced.strip())
         if transcript_text:
             transcript_path.write_text(transcript_text, encoding="utf-8")
-            label = "Enhanced transcript" if enhanced else "Transcript"
+            label = "Enhanced transcript" if changed else "Transcript"
             print(f"{label} saved to: {transcript_path}")
         # The raw transcript stays beside the enhanced one when the enhancement
         # changed more than whitespace, so a changed date or name can be traced to
         # the transcription or to the enhancement. A raw file from an earlier run
         # of the same input goes, so it never stands beside a later transcript.
         raw_path = output_dir / f"{input_file.stem}_transcript_raw.txt"
-        if raw and enhanced and raw.strip() != enhanced.strip():
+        if changed:
             raw_path.write_text(raw, encoding="utf-8")
             print(f"Raw transcript saved to: {raw_path}")
         else:
