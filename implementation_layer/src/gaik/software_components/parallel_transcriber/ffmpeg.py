@@ -14,6 +14,7 @@ import concurrent.futures
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -54,25 +55,38 @@ def _paths_tagged(exc: BaseException, *paths: str | PurePath | None, limit: int 
     Like :func:`~gaik.software_components._log_names.error_text`, but the spellings of
     all the paths are replaced together, longest first: path by path, one path's name
     tagged inside another's spelling first would leave that other's folders in the text.
+    A file's name and stem are replaced only as a whole word (a recording named
+    ``audio.mp3`` leaves "audio stream" alone): the stem only before an extension, a
+    quote or a path separator.
     """
     text = f"{type(exc).__name__}: {exc}"
-    tags: dict[str, str] = {}
+    # spelling -> (tag, how it must stand in the text)
+    tags: dict[str, tuple[str, str]] = {}
     for path in paths:
         if not path:
             continue
         whole = str(path)
         pure = PurePath(whole)
         tag = file_tag(whole)
-        for form in (whole, whole.replace("\\", "\\\\"), pure.name, pure.stem):
-            tags.setdefault(form, tag)
+        for form in (whole, whole.replace("\\", "\\\\")):
+            # A path given as a bare file name is matched as a name, as a whole word.
+            tags.setdefault(form, (tag, "path" if re.search(r"[\\/]", form) else "name"))
+        tags.setdefault(pure.name, (tag, "name"))
+        tags.setdefault(pure.stem, (tag, "stem"))
         folder = str(pure.parent)
         if folder not in (".", "", pure.anchor):
             folder_tag = "folder " + file_tag(folder).split(" ", 1)[1]
             for form in (folder, folder.replace("\\", "\\\\")):
-                tags.setdefault(form, folder_tag)
+                tags.setdefault(form, (folder_tag, "path"))
     for form in sorted(tags, key=len, reverse=True):
-        if len(form) >= 3:
-            text = text.replace(form, tags[form])
+        if len(form) < 3:
+            continue
+        tag, kind = tags[form]
+        if kind == "path":
+            text = text.replace(form, tag)
+            continue
+        after = r"(?![\w-])" if kind == "name" else r"(?=\.\w|['\"\\/])"
+        text = re.sub(rf"(?<![\w.-]){re.escape(form)}{after}", lambda _m, t=tag: t, text)
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 

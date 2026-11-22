@@ -577,3 +577,24 @@ def test_a_relative_input_and_a_private_chunk_folder_stay_out_of_the_log(
     for message in messages:
         for private in (str(tmp_path), str(home), "Matti", "Virtanen", "interview"):
             assert private not in message, message
+
+
+def test_a_file_named_like_a_word_leaves_that_word_in_the_log(tmp_path: Path):
+    # A recording named audio.mp3: the path is tagged, the word "audio" in the error is not.
+    from gaik.software_components.parallel_transcriber.ffmpeg import _paths_tagged
+
+    recording = tmp_path / "Matti Virtanen" / "audio.mp3"
+    chunk = tmp_path / "chunks" / "audio_chunk_01.mp3"
+    error = OSError(2, "could not decode the audio stream of audio", str(recording))
+
+    text = _paths_tagged(error, "audio.mp3", recording, chunk)
+
+    assert "could not decode the audio stream of audio" in text
+    assert "Matti" not in text and str(tmp_path) not in text
+    # The names and stems themselves are still tagged where they stand as names.
+    for message in (f"cannot write {chunk.name}", f"'{chunk.stem}'", "'audio' or audio.mp3"):
+        tagged = _paths_tagged(OSError(message), "audio.mp3", recording, chunk)
+        assert "audio_chunk" not in tagged and "'audio'" not in tagged, tagged
+        assert "audio.mp3" not in tagged, tagged
+    # Only a whole word: another file whose name ends in the same letters stays.
+    assert "myaudio.mp3" in _paths_tagged(OSError("see myaudio.mp3"), "audio.mp3")
