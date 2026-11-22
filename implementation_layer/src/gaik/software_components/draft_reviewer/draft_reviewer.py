@@ -27,6 +27,7 @@ class EditList(BaseModel):
 
 
 _FAILED_ID = re.compile(r"F\d+")
+_DIGIT_RUNS = re.compile(r"\d+")
 
 
 def _split_ids(value: str | list[str]) -> list[str]:
@@ -107,18 +108,23 @@ _DELETION_CLOSENESS = 0.8
 def _answer_score(edit: Edit, earlier: Edit) -> float | None:
     """How well a retry edit stands for an earlier failed edit, or None when it does not.
 
-    Used only for a retry answer in which no edit names a failed edit by its id. It does
-    when it makes the same correction: a replacement whose text contains the earlier
-    replacement or is contained in it, or, for a deletion, a deletion of nearly the same
-    text (search texts at least 80% alike). A shared reason alone is not enough, since a
-    generic one ("Not in the reference.") fits unrelated deletions; it only ranks a pair
-    higher. Closer search texts score higher, so each earlier edit is paired with the
-    retry edit nearest to it.
+    Used only for a retry edit without the ``answers`` field. It does when it makes the
+    same correction: a replacement whose text contains the earlier replacement or is
+    contained in it, or, for a deletion, a deletion of nearly the same text (search texts
+    at least 80% alike, with the same numbers: deleting " Built in 2021." does not stand
+    for deleting " Built in 2020."). A shared reason alone is not enough, since a generic
+    one ("Not in the reference.") fits unrelated deletions; it only ranks a pair higher.
+    Closer search texts score higher, so each earlier edit is paired with the retry edit
+    nearest to it.
     """
     closeness = _closeness(edit.search, earlier.search)
     old, new = earlier.replace.strip(), edit.replace.strip()
     if not old:
-        matched = not new and closeness >= _DELETION_CLOSENESS
+        matched = (
+            not new
+            and closeness >= _DELETION_CLOSENESS
+            and _DIGIT_RUNS.findall(edit.search) == _DIGIT_RUNS.findall(earlier.search)
+        )
     else:
         matched = bool(new) and (old in new or new in old)
     if not matched:
@@ -149,26 +155,38 @@ def _match_by_text(previous: dict[str, Edit], edits: list[Edit]) -> dict[int, st
     return owner
 
 
+def _carries_answers(edit: Edit) -> bool:
+    """Whether a retry edit says which failed edits it makes: its ``answers`` field is
+    set, also to an empty list. A plain :class:`Edit`, or one whose model left the field
+    out, does not."""
+    return "answers" in getattr(edit, "model_fields_set", ())
+
+
 def _owners(previous: dict[str, Edit], edits: list[Edit]) -> dict[int, list[str]]:
     """Which earlier failed edits each retry edit makes, as {retry index: failed ids}.
 
-    A retry edit names the failed edits it makes by id, one or several, in ``answers``.
-    Each id is taken by the first edit that names it. When some edit of the answer names
-    a known id, an edit that names none is a new edit. When no edit names a known id (a
-    model that leaves ``answers`` empty or out, or writes ids that do not exist), the
-    edits are paired with the failed ones by their text instead (:func:`_answer_score`).
+    A retry edit that carries ``answers`` makes exactly the failed edits it names there,
+    one or several; each id is taken by the first edit that names it, and an empty list
+    or an unknown id makes none of them, whatever its text. Only a retry edit without the
+    field (a model or client that leaves it out) is paired with a remaining failed edit
+    by its text (:func:`_answer_score`).
     """
     owner: dict[int, list[str]] = {}
     taken: set[str] = set()
+    unnamed: list[int] = []
     for j, edit in enumerate(edits):
-        named = _split_ids(getattr(edit, "answers", None) or [])
-        mine = [fid for fid in named if fid in previous and fid not in taken]
+        if not _carries_answers(edit):
+            unnamed.append(j)
+            continue
+        mine = [fid for fid in _split_ids(edit.answers) if fid in previous and fid not in taken]
         if mine:
             owner[j] = mine
             taken.update(mine)
-    if owner:
-        return owner
-    return {j: [fid] for j, fid in _match_by_text(previous, edits).items()}
+    if unnamed:
+        rest = {fid: e for fid, e in previous.items() if fid not in taken}
+        by_text = _match_by_text(rest, [edits[j] for j in unnamed])
+        owner.update({unnamed[k]: [fid] for k, fid in by_text.items()})
+    return owner
 
 
 class DraftReviewer:

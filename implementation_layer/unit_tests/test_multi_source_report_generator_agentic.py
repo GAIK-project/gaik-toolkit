@@ -768,8 +768,8 @@ def test_strip_title_heading_takes_only_the_section_title():
     assert _strip_title_heading("", "Key Findings") == ""
 
 
-def test_diff_editor_a_correct_retry_with_empty_answers_resolves_the_failed_edit():
-    fixed = Correction(search="opened in 1999", replace="opened in 1998", reason="r", answers=[])
+def test_diff_editor_a_retry_without_answers_is_matched_by_its_text():
+    fixed = Correction(search="opened in 1999", replace="opened in 1998", reason="r")
     editor = _ScriptedEditor(
         CorrectionList(corrections=[MISSING_YEAR]), CorrectionList(corrections=[fixed])
     )
@@ -777,3 +777,36 @@ def test_diff_editor_a_correct_retry_with_empty_answers_resolves_the_failed_edit
     assert text == TEXT.replace("1999", "1998")
     assert warnings == []
     assert len(editor.prompts) == 2
+
+
+def test_diff_editor_a_retry_with_empty_answers_makes_no_failed_edit():
+    fixed = Correction(search="opened in 1999", replace="opened in 1998", reason="r", answers=[])
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR]),
+        CorrectionList(corrections=[fixed]),
+        CorrectionList(corrections=[]),
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace("1999", "1998")
+    assert len(warnings) == 1 and "opened in 1990" in warnings[0]
+
+
+def test_a_correction_revalidated_from_another_model_keeps_answers_unset():
+    from gaik.software_modules.multi_source_report_generator.agentic import reviewer
+    from pydantic import BaseModel
+
+    class Item(BaseModel):
+        search: str
+        replace: str
+        reason: str
+        answers: list[str] = []
+
+    class Other(BaseModel):
+        corrections: list[Item]
+
+    class Client:
+        def chat_parsed(self, messages, response_format, **kwargs):
+            return Other(corrections=[Item(search="a", replace="b", reason="r")])
+
+    [correction] = reviewer._request_corrections(Client(), "Check.", "text", {}).corrections
+    assert "answers" not in correction.model_fields_set

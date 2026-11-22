@@ -150,7 +150,8 @@ def _request_corrections(
         return result
     # Defensive: some clients may hand back a dict / other BaseModel.
     if isinstance(result, BaseModel):
-        return CorrectionList.model_validate(result.model_dump())
+        # Unset fields stay unset: a correction without "answers" is paired by its text.
+        return CorrectionList.model_validate(result.model_dump(exclude_unset=True))
     return CorrectionList.model_validate(result)
 
 

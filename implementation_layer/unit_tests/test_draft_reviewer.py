@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from gaik.software_components.draft_reviewer import DraftReviewer, Edit, ReviewResult
 from gaik.software_components.draft_reviewer import draft_reviewer as dr
@@ -348,14 +350,47 @@ def test_client_exception_propagates(make):
 
 
 @pytest.mark.parametrize("answers", [[], "", ["F7"]], ids=["empty-list", "empty", "unknown-id"])
-def test_a_correct_retry_that_names_no_known_id_is_matched_by_its_text(make, answers):
-    # A model may return [] for the field under structured output: the corrected edit
-    # still stands for the failed one, so no extra call is made and nothing is left.
+def test_a_retry_edit_that_carries_answers_makes_only_the_ids_it_names(make, answers):
+    # An explicit 'answers' says which failed edits the edit makes; an empty list or an
+    # unknown id makes none of them, so the failed edit stays unresolved.
     typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
     fixed = Edit(search="opened in 1999", replace="opened in 1998", reason="Wrong year.")
-    reviewer, client = make(_edits(typo), dr.RetryEditList(edits=[_retry(fixed, answers)]))
+    reviewer, client = make(
+        _edits(typo), dr.RetryEditList(edits=[_retry(fixed, answers)]), _edits()
+    )
     result = reviewer.review(DRAFT, reference=REFERENCE)
     assert result.text == DRAFT.replace("1999", "1998")
+    assert result.unresolved == [typo]
+    assert len(client.calls) == 3
+
+
+def test_a_retry_edit_without_the_field_is_matched_by_its_text(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    fixed = Edit(search="opened in 1999", replace="opened in 1998", reason="Wrong year.")
+    reviewer, client = make(_edits(typo), _edits(fixed))
+    result = reviewer.review(DRAFT, reference=REFERENCE)
+    assert result.unresolved == []
+    assert len(client.calls) == 2
+
+
+def test_a_retried_deletion_with_another_number_does_not_stand_for_the_failed_one(make):
+    draft = DRAFT + " Built in 2021."
+    failed = Edit(search=" Built in 2020.", replace="", reason="Not in the reference.")
+    other = Edit(search=" Built in 2021.", replace="", reason="Not in the reference.")
+    reviewer, _ = make(_edits(failed), _edits(other), _edits())
+    result = reviewer.review(draft, reference=REFERENCE)
+    assert result.applied == [other]
+    assert result.unresolved == [failed]
+
+
+def test_a_named_and_an_unnamed_retry_edit_are_each_matched_their_way(make):
+    typo = Edit(search="opened in 1990", replace="opened in 1998", reason="Wrong year.")
+    count = Edit(search="carries 4000 vehicles", replace="carries 45,000", reason="Count.")
+    by_id = _retry(YEAR, ["F1"])
+    by_text = Edit(search="carries 40,000", replace="carries 45,000", reason="Count.")
+    answer = SimpleNamespace(edits=[by_id, by_text])  # a client that mixes both kinds
+    reviewer, client = make(_edits(typo, count), answer)
+    result = reviewer.review(DRAFT, reference=REFERENCE)
     assert result.unresolved == []
     assert len(client.calls) == 2
 

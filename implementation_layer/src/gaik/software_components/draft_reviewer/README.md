@@ -59,11 +59,12 @@ removed; style and order are left alone.
   reason differently. A failed edit that no retry edit names is asked for again in the
   next request under the same id, and is returned in `unresolved` if it is still missing
   when the review ends; one whose retry edit fails too is carried once, as that retry
-  edit. Only when no edit of a retry answer names a known id (`answers` empty, left out
-  or naming ids that do not exist) is each retry edit paired with at most one failed edit
+  edit. A retry edit that carries `answers` makes exactly the ids it names: an empty list,
+  or an id that does not exist, makes none of them. Only a retry edit without the field
+  (a model or client that leaves it out) is paired with at most one remaining failed edit
   by its text: the same correction (one replacement containing the other) or, for a
-  deletion, a deletion of nearly the same text. A shared reason alone, such as "Not in
-  the reference.", never pairs two edits.
+  deletion, a deletion of nearly the same text with the same numbers. A shared reason
+  alone, such as "Not in the reference.", never pairs two edits.
 - This repeats until nothing fails or `max_attempts` requests (the first one included)
   have been made. Edits that still fail are returned in `unresolved`, not raised: the
   caller decides whether they are fatal.
