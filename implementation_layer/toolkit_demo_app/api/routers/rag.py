@@ -207,10 +207,14 @@ def _filter_sources_by_citations(
 ) -> list[dict[str, Any]]:
     """The sources whose document and page the answer text names.
 
-    Only for a gaik without ``AnswerGenerator.generate_with_citations`` (0.11.0, which
-    the API image installs); with it, ``_cited_sources`` reads the built citations.
+    A citation is ``[name, page N]``, or the whole label gaik gives a retrieved chunk,
+    ``[name, page N, chunk Y]``. Only for a gaik without
+    ``AnswerGenerator.generate_with_citations`` (0.11.1, which the API image installs);
+    with it, ``_cited_sources`` reads the built citations.
     """
-    citations = re.findall(r"\[([^\]]+?),\s*page\s+(\d+)\]", answer, flags=re.IGNORECASE)
+    citations = re.findall(
+        r"\[([^\]]+?),\s*page\s+(\d+)(?:,\s*chunk\s+[^\],]+)?\]", answer, flags=re.IGNORECASE
+    )
     if not citations:
         return sources
 

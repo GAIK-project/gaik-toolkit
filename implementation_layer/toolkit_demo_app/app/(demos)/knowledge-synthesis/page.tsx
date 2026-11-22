@@ -3,6 +3,7 @@
 import { MessageResponse } from "@/components/ai-elements/message";
 import { RunButton } from "@/components/demo/run-button";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { ModelNameInput } from "@/components/demo/model-name-input";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
@@ -844,7 +845,8 @@ export default function KnowledgeSynthesisPage() {
                           {step}
                         </p>
                         <Row label="Model">
-                          <Input
+                          <ModelNameInput
+                            kind="chat"
                             placeholder="The server's model"
                             value={options[`${step}_model`] ?? ""}
                             disabled={busy}
