@@ -19,6 +19,14 @@ docker compose up --build
 
 UI http://localhost:3000 · API http://localhost:8100
 
+**Chat ja Azure Foundry:** kopioi `wizard_api/.env.example` → `wizard_api/.env` ja täytä
+`CLAUDE_CODE_USE_FOUNDRY=1`, `ANTHROPIC_FOUNDRY_API_KEY` ja `ANTHROPIC_FOUNDRY_RESOURCE`.
+Compose lukee tiedoston `wizard-api`-palvelulle; muutoksen jälkeen `docker compose up -d wizard-api`.
+Ilman niitä jokainen chat-viesti vastaa 500 (`Command failed with exit code 1` lokissa).
+
+**Windows:** käytä tätä Docker-polkua. Option B ja C (API suoraan koneella) vaativat
+Linuxin, macOS:n tai WSL:n, koska `wizard_api` käyttää `fcntl`ia ja `os.O_NOFOLLOW`ia.
+
 **Pysäytys:** `docker compose down` (data säilyy volumeissa)  
 **Logit:** `docker compose logs -f wizard-ui` / `wizard-api`
 
@@ -53,7 +61,7 @@ Docker-stackissa `NEXT_PUBLIC_DEV_AUTH=true` — ei Supabasea.
 1. Etusivulla: kirjoita session nimi → **Aloita uusi**
 2. Avautuu wizard-näkymä (chat + työtila + vaiheet)
 3. Klikkaa **Seuraava vaihe →** pari kertaa
-4. Kirjoita chat-viesti → **Lähetä** — pitäisi näkyä mock-vastaus (SSE)
+4. Kirjoita chat-viesti → **Lähetä** — wizardin agentti vastaa Azure Foundryn kautta (SSE); ensimmäinen vastaus käynnistää agentin, noin puoli minuuttia
 
 ### 4. Jatka myöhemmin (persistenssi)
 
@@ -105,12 +113,15 @@ UI-only on vanha Sprint 1 -pikatie UI-kokeiluun — ei demoon, ei asiakasreviewi
 | UI ei lataudu | `docker compose logs wizard-ui` |
 | Tyhjä sessiolista API-tilassa | Normaalia ensimmäisellä kerralla — luo uusi sessio |
 | Chat ei vastaa | Varmista että olet kirjautunut; tuotanto-UI Dockerissa (ei `next dev`) |
+| Chat vastaa 500 | `docker compose logs wizard-api`: `Command failed with exit code 1` = Foundry-muuttujat puuttuvat `wizard_api/.env`:stä |
 | BPMN “Failed to load” / 500 UI-onlyssa | Aja `./scripts/setup.sh` (`.venv` + pydantic) **tai** käytä API-tilaa (`WIZARD_API_URL`) — suositus: API |
 | BPMN OK API-tilassa, 500 UI-onlyssa | Odotettua ilman setupia: UI-only spawn `python3` + `solution_wizard`; API generoi BPMN:n itse |
 
 ---
 
 ### Option B — Local dev (API + UI separately)
+
+Ei Windowsilla natiivisti: käytä Windowsilla Option A:ta.
 
 ```bash
 # 1. Backend

@@ -18,7 +18,21 @@ docker compose up --build
 | API | http://localhost:8100/health |
 | Postgres | localhost:5432 (`wizard` / `wizard`) |
 
-Set `NEXT_PUBLIC_DEV_AUTH=true` in the UI container for dev login (`dev@gaik.local`).
+The UI image is built with `NEXT_PUBLIC_DEV_AUTH=true` (a build arg: the value is read
+at build time) for dev login (`dev@gaik.local`), and `WIZARD_AGENT_CHAT=true` sends its
+chat to the API's agent instead of a mock reply.
+
+The chat needs a model. Copy `.env.example` to `.env` and fill in the three Azure
+Foundry variables (`CLAUDE_CODE_USE_FOUNDRY=1`, `ANTHROPIC_FOUNDRY_API_KEY`,
+`ANTHROPIC_FOUNDRY_RESOURCE`); the `wizard-api` service reads that file, and
+`docker compose up -d wizard-api` picks up a change. Without them every chat
+message answers 500, with "Command failed with exit code 1" in
+`docker compose logs wizard-api`. The service also sets `IS_SANDBOX=1`: the image
+runs as root in Compose, and the agent CLI refuses to start as root without it.
+
+On Windows run the API in Docker (this section). The local API below needs Linux,
+macOS or WSL: `wizard_api` imports `fcntl` and uses `os.O_NOFOLLOW`, which
+Windows Python lacks.
 
 ## Local API only (without Docker UI)
 

@@ -22,9 +22,20 @@ services:
       target: production
     ports:
       - "8100:8100"
+    # The wizard agent's model settings (Azure Foundry: CLAUDE_CODE_USE_FOUNDRY,
+    # ANTHROPIC_FOUNDRY_API_KEY, ANTHROPIC_FOUNDRY_RESOURCE) come from
+    # wizard_api/.env, which git ignores. Without them the chat has no model.
+    # The values under `environment` below win over the file.
+    env_file:
+      - path: .env
+        required: false
     environment:
       WIZARD_DATABASE_URL: postgresql+psycopg://wizard:wizard@postgres:5432/wizard
       WIZARD_SESSION_OUTPUT_ROOT: /data/sessions
+      # The image runs as root here (Rahti runs it under a non-root uid), and the
+      # agent CLI refuses to skip its permission prompts as root ("cannot be used
+      # with root/sudo privileges") unless it is told it runs in a sandbox.
+      IS_SANDBOX: "1"
     volumes:
       - wizard_session_output:/data/sessions
     depends_on:
@@ -35,10 +46,17 @@ services:
     build:
       context: ../solution_wizard_v2
       dockerfile: Dockerfile
+      # Read at build time (NEXT_PUBLIC_*); the Dockerfile defaults it to false,
+      # and the runtime value under `environment` alone left the dev login off.
+      args:
+        NEXT_PUBLIC_DEV_AUTH: "true"
     ports:
       - "3000:3000"
     environment:
       WIZARD_API_URL: http://wizard-api:8100
+      # The chat goes to wizard-api's agent (which needs the model settings in
+      # wizard_api/.env), as on Rahti; without it the UI answers with a mock reply.
+      WIZARD_AGENT_CHAT: "true"
       NEXT_PUBLIC_DEV_AUTH: "true"
       # Local-only accounts; a deployed instance sets its own from a secret.
       WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"
