@@ -395,13 +395,13 @@ the credential-bearing stage configs when running the report.
 |---|---|---|
 | Text | `.txt` | Read directly |
 | Markdown | `.md`, `.markdown` | Read directly |
-| CSV | `.csv` | Converted to Markdown table with Python stdlib `csv` |
-| Excel | `.xlsx`, `.xls` | Converted to Markdown table with `openpyxl` |
+| CSV | `.csv` | Converted to Markdown table with Python stdlib `csv`; a `\|` in a cell is escaped and a line break becomes a space, as `SpreadsheetParser` writes them |
+| Excel | `.xlsx` | Converted to Markdown table with `openpyxl`, cells as for CSV. An old `.xls` is refused before any source is read, also inside a folder; save it as `.xlsx` |
 | PDF | `.pdf` | Parsed by `parser_choice` |
-| Word | `.docx` | Parsed by `DocxParser` |
+| Word | `.docx` | Parsed by `DocxParser` with `keep_structure=True`: document order, headings and every table cell |
 | Audio | `.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.ogg` | Transcribed by `Transcriber` |
 | Video | `.mp4`, `.mov`, `.mkv`, `.avi`, `.webm` | Transcribed by `Transcriber` |
-| Images | `.png`, `.jpg`, `.jpeg`, `.webp`, `.tiff`, `.tif`, `.bmp`, `.gif` | Parsed by `VisionParser` or extracted by `VisionExtractor` |
+| Images | `.png`, `.jpg`, `.jpeg`, `.webp`, `.tiff`, `.tif`, `.bmp`, `.gif` | Parsed by `VisionParser` or extracted by `VisionExtractor`. TIFF and BMP are converted to PNG first (one image per page of a multi-page TIFF), since the providers take PNG, JPEG, GIF and WebP only |
 
 ## Agentic Mode Details
 

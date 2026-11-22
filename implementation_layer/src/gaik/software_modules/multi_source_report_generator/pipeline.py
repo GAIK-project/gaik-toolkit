@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -72,10 +73,14 @@ _MARKDOWN_EXT = {".md", ".markdown"}
 _PDF_EXT = {".pdf"}
 _DOCX_EXT = {".docx"}
 _CSV_EXT = {".csv"}
-_XLSX_EXT = {".xlsx", ".xls"}
+_XLSX_EXT = {".xlsx"}
 _AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 _VIDEO_EXT = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 _IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".tiff", ".tif", ".bmp", ".gif"}
+# Sent to a model as PNG: the providers take PNG, JPEG, GIF and WebP only.
+_CONVERTED_IMAGE_EXT = {".tiff", ".tif", ".bmp"}
+# Refused before any source is read: openpyxl reads only .xlsx.
+_REFUSED_EXT = {".xls": "the old Excel format .xls is not supported; save it as .xlsx"}
 
 _EXT_TO_TYPE: dict[str, str] = {
     **{e: "text" for e in _TEXT_EXT},
@@ -207,10 +212,15 @@ def _normalize_sections(
 
 
 def _collect_input_files(input_paths: list[str | Path]) -> list[Path]:
-    """Expand files/folders into a flat list of supported source files."""
+    """Expand files/folders into a flat list of supported source files.
+
+    A file of a refused type (``.xls``), named or inside a folder, raises
+    ``ValueError`` here, before any source is parsed or transcribed.
+    """
     if not input_paths:
         raise ValueError("`input_paths` must contain at least one file or folder.")
     collected: list[Path] = []
+    refused: list[Path] = []
     seen: set[Path] = set()
     for raw in input_paths:
         p = Path(raw)
@@ -220,6 +230,9 @@ def _collect_input_files(input_paths: list[str | Path]) -> list[Path]:
         for c in candidates:
             if not c.is_file():
                 continue
+            if c.suffix.lower() in _REFUSED_EXT:
+                refused.append(c)
+                continue
             if c.suffix.lower() not in SUPPORTED_EXTENSIONS:
                 continue
             rp = c.resolve()
@@ -227,6 +240,10 @@ def _collect_input_files(input_paths: list[str | Path]) -> list[Path]:
                 continue
             seen.add(rp)
             collected.append(c)
+    if refused:
+        names = ", ".join(c.name for c in refused[:5]) + (" ..." if len(refused) > 5 else "")
+        reasons = sorted({_REFUSED_EXT[c.suffix.lower()] for c in refused})
+        raise ValueError(f"{names}: {'; '.join(reasons)}. No source was read.")
     return collected
 
 
@@ -238,9 +255,16 @@ def _csv_to_markdown(path: Path) -> str:
     return _rows_to_markdown_table(rows)
 
 
+def _table_cell(value: Any) -> str:
+    """One cell's text for a Markdown table: lines joined by a space and ``|`` escaped,
+    as SpreadsheetParser writes them, so a value stays in its column and its row."""
+    text = "" if value is None else str(value)
+    return " ".join(text.splitlines()).replace("|", "\\|")
+
+
 def _rows_to_markdown_table(rows: list[list[Any]]) -> str:
     width = max(len(r) for r in rows)
-    norm = [[str(c) if c is not None else "" for c in r] + [""] * (width - len(r)) for r in rows]
+    norm = [[_table_cell(c) for c in r] + [""] * (width - len(r)) for r in rows]
     header, *body = norm
     lines = [
         "| " + " | ".join(header) + " |",
@@ -271,6 +295,39 @@ def _xlsx_to_markdown(path: Path) -> str:
         blocks.append(f"### Sheet: {ws.title}\n\n{_rows_to_markdown_table(rows)}")
     wb.close()
     return "\n\n".join(blocks) if blocks else "_(no tabular data found)_"
+
+
+def _as_png_pages(path: Path, folder: Path, limits: InputLimits) -> list[Path]:
+    """A TIFF or BMP image as one PNG file per page in ``folder``.
+
+    The model providers take PNG, JPEG, GIF and WebP only. The image is checked against
+    ``limits`` (size, pixels, and pages for a multi-page TIFF) before it is decoded.
+    """
+    from gaik.software_components.file_type import check_file_type
+
+    try:
+        from PIL import Image, ImageSequence
+    except ImportError as exc:  # pragma: no cover - Pillow comes with the parser extra
+        raise ImportError(
+            "Reading a TIFF or BMP image needs Pillow. Install it with:\n"
+            '    pip install "gaik[multi-source-report-generator]"'
+        ) from exc
+
+    limits.check_image_file(path)
+    check_file_type(path, {"tiff", "bmp"})
+    pages: list[Path] = []
+    with Image.open(path) as image:
+        frames = getattr(image, "n_frames", 1)
+        if limits.max_pages is not None and frames > 1:
+            limits.check_pages(frames, path.name)
+        for number, frame in enumerate(ImageSequence.Iterator(image), start=1):
+            limits.check_image_pixels(frame.width, frame.height, path.name)
+            if frame.mode not in {"1", "L", "LA", "P", "RGB", "RGBA"}:
+                frame = frame.convert("RGB")
+            page = folder / f"page_{number:04d}.png"
+            frame.save(page, format="PNG")
+            pages.append(page)
+    return pages
 
 
 def _normalize_report_markdown(text: str | None, report_title: str) -> str:
@@ -891,6 +948,9 @@ class MultiSourceReportGenerator:
 
             ctor = self._limited(parser_options.get("ctor", {}))
             result = DoclingParser(**ctor).parse_document(str(path))
+            # parse_document returns a dict with the Markdown under "text_content".
+            if isinstance(result, dict) and isinstance(result.get("text_content"), str):
+                return result["text_content"]
             return _coerce_markdown(result)
         raise ValueError(
             f"Unknown parser_choice '{parser_choice}'. "
@@ -900,7 +960,12 @@ class MultiSourceReportGenerator:
     def _parse_docx(self, path: Path) -> str:
         from gaik.software_components.parsers import DocxParser
 
-        return DocxParser(limits=self.limits).parse_docx(str(path), use_markdown=True)
+        # Document order, headings and every table cell (an empty one too), as
+        # SourceNormalizer reads a DOCX; the simple mode drops headings and empty
+        # cells and puts every table after the paragraphs.
+        return DocxParser(limits=self.limits).parse_docx(
+            str(path), use_markdown=True, keep_structure=True
+        )
 
     def _transcribe(self, path: Path, *, transcriber_options: dict) -> str:
         from gaik.software_components.transcriber import Transcriber
@@ -930,6 +995,15 @@ class MultiSourceReportGenerator:
         return ctor
 
     def _parse_image(self, path: Path, *, image_options: dict) -> str:
+        if path.suffix.lower() in _CONVERTED_IMAGE_EXT:
+            # TIFF and BMP go to the model as PNG, one per page of a multi-page TIFF.
+            limits = self._limited(image_options.get("ctor", {})).get("limits")
+            with tempfile.TemporaryDirectory(prefix="gaik-image-") as folder:
+                pages = _as_png_pages(path, Path(folder), limits or InputLimits())
+                return self._parse_image_files(pages, image_options=image_options)
+        return self._parse_image_files([path], image_options=image_options)
+
+    def _parse_image_files(self, paths: list[Path], *, image_options: dict) -> str:
         mode = image_options.get("mode", "parse")  # "parse" | "structured"
         if mode == "structured":
             from gaik.software_components.vision_extractor import VisionExtractor
@@ -939,7 +1013,9 @@ class MultiSourceReportGenerator:
                 "user_requirements",
                 "Extract all visible text, tables, figures, and structured content from the image.",
             )
-            result = extractor.extract(file_paths=[str(path)], user_requirements=user_requirements)
+            result = extractor.extract(
+                file_paths=[str(p) for p in paths], user_requirements=user_requirements
+            )
             return _dict_to_markdown(result.data)
 
         # default: general parsing to markdown via VisionParser.convert_image()
@@ -949,7 +1025,12 @@ class MultiSourceReportGenerator:
             image_options.get("api_config") or image_options.get("openai_config") or self.api_config
         )
         ctor = self._limited(image_options.get("ctor", {}))
-        return VisionParser(cfg, **ctor).convert_image(str(path))
+        parser = VisionParser(cfg, **ctor)
+        if len(paths) == 1:
+            return parser.convert_image(str(paths[0]))
+        return "\n\n".join(
+            f"[Page {n}]\n\n{parser.convert_image(str(p))}" for n, p in enumerate(paths, start=1)
+        )
 
     def _evidence_sources(
         self, evidence_items: list[EvidenceItem], *, max_evidence_chars: int | None
@@ -1421,7 +1502,7 @@ def _coerce_markdown(result: Any) -> str:
         if isinstance(val, str) and val:
             return val
     if isinstance(result, dict):
-        for key in ("clean_markdown", "parsed_markdown", "markdown", "text"):
+        for key in ("clean_markdown", "parsed_markdown", "markdown", "text", "text_content"):
             if isinstance(result.get(key), str):
                 return result[key]
     if isinstance(result, str):
