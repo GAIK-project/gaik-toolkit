@@ -10,7 +10,7 @@ request would wait; in a process of its own only that process does:
   than the API. On other systems nothing caps its memory: the check's budgets
   bound most of its work but not every step, so a hard file can take much
   memory there until the process is stopped. A limit the process could not set
-  is logged as a warning.
+  is logged as a warning, once while the API runs.
 - It runs ``pdf_content.py`` as a script on the standard library alone, with
   none of the API's environment variables.
 - Each process checks one file. ``SPARE_PROCESSES`` wait ready, so a check
@@ -48,6 +48,9 @@ _KEPT_ENV = ("SYSTEMROOT", "LD_LIBRARY_PATH")
 logger = logging.getLogger(__name__)
 _spares: list[subprocess.Popen[bytes]] = []
 _spares_lock = threading.Lock()
+#: The limits a check's process said it could not set, each logged once.
+_limits_logged: set[str] = set()
+_limits_logged_lock = threading.Lock()
 
 
 def _command() -> list[str]:
@@ -93,12 +96,20 @@ def _process() -> subprocess.Popen[bytes]:
 
 
 def _log_limit_notices(err: bytes) -> list[str]:
-    """The process's stderr as lines, after logging each limit it could not set
-    (``pdf_content.LIMIT_NOTICE``): it then ran without that limit."""
+    """The process's stderr as lines, after logging a limit it could not set
+    (``pdf_content.LIMIT_NOTICE``): it then ran without that limit. Each limit is
+    logged once in the API's lifetime, as every check's process meets the same
+    system (macOS refuses the memory cap to each of them)."""
     lines = err.decode("utf-8", "replace").strip().splitlines()
     for line in lines:
-        if line.startswith(pdf_content.LIMIT_NOTICE):
-            logger.warning("%s", line[:200])
+        if not line.startswith(pdf_content.LIMIT_NOTICE):
+            continue
+        limit = line.split(" (", 1)[0]  # "PDF check process: no memory cap"
+        with _limits_logged_lock:
+            if limit in _limits_logged:
+                continue
+            _limits_logged.add(limit)
+        logger.warning("%s", line[:200])
     return lines
 
 
