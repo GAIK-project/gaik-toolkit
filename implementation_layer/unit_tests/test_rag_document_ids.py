@@ -264,6 +264,84 @@ def test_a_failed_chroma_reindex_keeps_the_stored_chunk(tmp_path):
     assert store.count() == 1
 
 
+def _chroma(tmp_path):
+    pytest.importorskip("chromadb")
+    from gaik.software_components.RAG.vector_store import VectorStore
+
+    return VectorStore(persist=True, persist_path=str(tmp_path / "chroma"))
+
+
+def test_an_interrupted_chroma_reindex_keeps_the_stored_chunk(tmp_path, monkeypatch):
+    store = _chroma(tmp_path)
+    store.add(_chunks("report", ["alpha"]), [A1])
+
+    # The process stops while the new version is written: Ctrl-C, say. Writing
+    # the chunk in place leaves it old or new; deleting it first lost it.
+    def interrupted(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(store._collection, "add", interrupted)
+    monkeypatch.setattr(store._collection, "upsert", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        store.add(_chunks("report", ["alpha"]), [B1], replace=True)
+    monkeypatch.undo()
+
+    assert _texts(store, "report") == ["alpha"]
+
+
+def test_a_chroma_write_that_fails_partway_is_undone(tmp_path, monkeypatch):
+    store = _chroma(tmp_path)
+    [old] = _chunks("report", ["alpha"])
+    old.metadata["heading"] = "Old heading"
+    store.add([old], [A1])
+    upsert = store._collection.upsert
+    calls = []
+
+    def fails_after_writing(*args, **kwargs):
+        calls.append(kwargs["ids"])
+        upsert(*args, **kwargs)
+        if len(calls) == 1:
+            raise RuntimeError("disk full")
+
+    monkeypatch.setattr(store._collection, "upsert", fails_after_writing)
+    new = _chunks("report", ["alpha", "beta"])
+    new[0].metadata["section"] = "New section"
+    with pytest.raises(RuntimeError):
+        store.add(new, [B1, C1], replace=True)
+    monkeypatch.undo()
+
+    assert len(calls) == 2, "the failed write was not undone"
+    [(doc, score)] = store.search(A1, top_k=5)
+    assert doc.page_content == "alpha" and score == pytest.approx(1.0)
+    assert doc.metadata["heading"] == "Old heading"
+    assert "section" not in doc.metadata
+    assert store.count() == 1
+
+
+def test_an_older_chroma_without_key_removal_still_drops_a_key(tmp_path, monkeypatch):
+    from gaik.software_components.RAG.vector_store import vector_store as module
+
+    store = _chroma(tmp_path)
+    monkeypatch.setattr(module, "_chroma_removes_none_values", lambda: False)
+    [chunk] = _chunks("report", ["alpha"])
+    chunk.metadata["heading"] = "Old heading"
+    store.add([chunk], [A1])
+    store.add(_chunks("report", ["alpha"]), [A1], replace=True)
+
+    [(doc, _)] = store.search(A1, top_k=5)
+    assert "heading" not in doc.metadata
+    assert store.count() == 1
+
+
+def test_the_installed_chroma_removes_a_key_sent_as_none():
+    pytest.importorskip("chromadb")
+    import chromadb
+    from gaik.software_components.RAG.vector_store import vector_store as module
+
+    major = int(chromadb.__version__.split(".")[0])
+    assert module._chroma_removes_none_values() is (major >= 1)
+
+
 def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):
     store.add(_chunks("report", ["alpha", "beta"]), [A1, B1])
 
@@ -272,6 +350,7 @@ def test_replace_keeps_the_old_chunks_when_storing_fails(store, monkeypatch):
 
     if store.persist:
         monkeypatch.setattr(store._collection, "add", fail)
+        monkeypatch.setattr(store._collection, "upsert", fail)
     else:
         monkeypatch.setattr(store, "_ids", _FailingList(store._ids))
     with pytest.raises(RuntimeError):

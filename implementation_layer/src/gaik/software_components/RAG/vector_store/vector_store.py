@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import math
 import os
 import threading
@@ -291,16 +292,59 @@ class VectorStore:
     def _replace_slice(self, ids, embeddings, texts, metadatas) -> None:
         """Store one slice in Chroma in place of the chunks stored with the same ids.
 
-        An upsert would merge the new metadata into the stored one, and a key the
-        new chunk lacks (a heading it no longer has) would stay. So the stored
-        chunks with these ids are read, deleted and the slice added anew; if the
-        add fails (an embedding of another dimension, say), the chunks read are
-        added back as they were and the error is raised.
+        The slice is upserted, so each chunk is replaced where it is: a call that
+        is interrupted leaves a chunk old or new, never gone. An upsert merges the
+        new metadata into the stored one, so a key the stored chunk has and the
+        new one lacks (a heading it no longer has) is sent as ``None``, which
+        Chroma 1.x removes. If the upsert fails, the chunks read are put back as
+        they were and the error is raised.
+
+        Chroma before 1.0 refuses a ``None`` value. There the stored chunks are
+        deleted and the slice added anew, which loses a chunk if the process stops
+        between the two calls.
         """
         collection = self._collection
         old = collection.get(  # type: ignore[union-attr]
             ids=ids, include=["embeddings", "documents", "metadatas"]
         )
+        old_ids = list(old.get("ids") or [])
+        if not _chroma_removes_none_values():
+            self._delete_then_add(old, ids, embeddings, texts, metadatas)
+            return
+        # Chroma returns the stored chunks in its own order, not the order asked for.
+        old_metadata = dict(zip(old_ids, old.get("metadatas") or [None] * len(old_ids)))
+        new_metadata = dict(zip(ids, metadatas))
+        try:
+            collection.upsert(  # type: ignore[union-attr]
+                ids=ids,
+                embeddings=embeddings,
+                documents=texts,
+                metadatas=[
+                    _replacing(metadata, old_metadata.get(chunk_id))
+                    for chunk_id, metadata in zip(ids, metadatas)
+                ],
+            )
+        except Exception:
+            # Chroma checks a call before it writes, so this seldom has anything
+            # to undo; a write that failed partway is undone here.
+            new_ids = [chunk_id for chunk_id in ids if chunk_id not in old_metadata]
+            if new_ids:
+                collection.delete(ids=new_ids)  # type: ignore[union-attr]
+            if old_ids:
+                collection.upsert(  # type: ignore[union-attr]
+                    ids=old_ids,
+                    embeddings=old["embeddings"],
+                    documents=old["documents"],
+                    metadatas=[
+                        _replacing(old_metadata[chunk_id], new_metadata.get(chunk_id))
+                        for chunk_id in old_ids
+                    ],
+                )
+            raise
+
+    def _delete_then_add(self, old, ids, embeddings, texts, metadatas) -> None:
+        """:meth:`_replace_slice` for a Chroma that cannot remove a metadata key."""
+        collection = self._collection
         old_ids = list(old.get("ids") or [])
         if old_ids:
             collection.delete(ids=old_ids)  # type: ignore[union-attr]
@@ -497,6 +541,36 @@ def _chroma_metadata(metadata: dict | None) -> dict | None:
     """
     kept = {key: value for key, value in (metadata or {}).items() if value is not None}
     return kept or None
+
+
+def _replacing(metadata: dict | None, stored: dict | None) -> dict | None:
+    """``metadata`` for an upsert over a chunk stored with ``stored``.
+
+    An upsert keeps a stored key the new metadata lacks, so each such key is sent
+    as ``None``, which Chroma 1.x removes.
+    """
+    new = metadata or {}
+    removed = {key: None for key in (stored or {}) if key not in new}
+    return {**removed, **new} or None
+
+
+@functools.lru_cache(maxsize=1)
+def _chroma_removes_none_values() -> bool:
+    """Whether this chromadb takes a ``None`` metadata value, which removes the key.
+
+    Chroma 1.x does; before 1.0 the check below raises ``ValueError``.
+    """
+    try:
+        from chromadb.api.types import validate_metadata
+    except ImportError:
+        import chromadb
+
+        return int(str(chromadb.__version__).split(".")[0]) >= 1
+    try:
+        validate_metadata({"gaik_probe": None})
+    except ValueError:
+        return False
+    return True
 
 
 def _chroma_where(filters: dict) -> dict:
