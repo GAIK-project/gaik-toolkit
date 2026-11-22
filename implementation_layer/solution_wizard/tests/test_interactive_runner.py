@@ -173,7 +173,9 @@ def test_the_budget_option_reaches_the_cli_through_main(
     env_file.write_text(
         "CLAUDE_CODE_USE_FOUNDRY=1\nANTHROPIC_FOUNDRY_API_KEY=k\nANTHROPIC_FOUNDRY_RESOURCE=r\n"
     )
-    for name in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"):
+    # The .env file is the only source: load_dotenv keeps a variable already set, and
+    # CI sets the Foundry ones to "" where it has no secret for them.
+    for name in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", *_FOUNDRY_NAMES):
         os.environ.pop(name, None)
     cli = tmp_path / "claude"
     cli.write_text("")
