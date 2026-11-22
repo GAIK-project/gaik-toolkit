@@ -8,13 +8,13 @@ of documents and categorizing them using LLM-based classification.
 import logging
 from dataclasses import replace
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 from gaik.software_components._log_names import error_text, file_tag
 from gaik.software_components.input_limits import InputLimitError, InputLimits
-from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.base import FIT_TO_BOUNDS, ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.source_material import (
@@ -55,7 +55,9 @@ def _create_classification_model(classes: list[str]):
         confidence: float = Field(
             ..., ge=0.0, le=1.0, description="Confidence score between 0 and 1"
         )
-        reasoning: str = Field(
+        # The classifier's own explanation: a strict Claude tool cannot carry the
+        # length limit, so a longer answer is cut to it instead of failing.
+        reasoning: Annotated[str, FIT_TO_BOUNDS] = Field(
             ..., max_length=200, description="Brief explanation for the classification"
         )
 

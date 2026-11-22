@@ -1,12 +1,15 @@
 """Bounds a strict Claude tool cannot hold are stated in the schema, and an answer
-that breaks only them is fitted rather than refused (#146 item 8)."""
+that breaks only them is fitted rather than refused, on fields marked FIT_TO_BOUNDS
+only: a caller's field is never changed (#146 item 8)."""
 
 import json
 import logging
 import math
+from typing import Annotated
 
 import httpx
 import pytest
+from gaik.software_components.llm.base import FIT_TO_BOUNDS
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import create_llm_client
 from pydantic import BaseModel, Field, ValidationError
@@ -50,17 +53,19 @@ def _ask(model, response_format, data, bodies=None):
 
 
 class Note(BaseModel):
-    text: str = Field(max_length=5)
+    text: Annotated[str, FIT_TO_BOUNDS] = Field(max_length=5)
 
 
 class Bounded(BaseModel):
-    reasoning: str = Field(max_length=10, description="Why.")
-    confidence: float = Field(ge=0, le=1)
-    count: int = Field(gt=0)
-    share: float = Field(gt=0, lt=1)
-    comment: str | None = Field(None, max_length=3)
+    """Every bounded field opts in to fitting."""
+
+    reasoning: Annotated[str, FIT_TO_BOUNDS] = Field(max_length=10, description="Why.")
+    confidence: Annotated[float, FIT_TO_BOUNDS] = Field(ge=0, le=1)
+    count: Annotated[int, FIT_TO_BOUNDS] = Field(gt=0)
+    share: Annotated[float, FIT_TO_BOUNDS] = Field(gt=0, lt=1)
+    comment: Annotated[str | None, FIT_TO_BOUNDS] = Field(None, max_length=3)
     tags: list[str] = Field(default_factory=list)
-    notes: list[Note] = Field(default_factory=list)
+    note: Note | None = None
 
 
 GOOD = {"reasoning": "short", "confidence": 0.5, "count": 2, "share": 0.5}
@@ -74,7 +79,6 @@ def test_an_answer_that_breaks_only_dropped_bounds_is_fitted(caplog):
         "share": 1.0,
         "comment": "abcdef",
         "tags": ["a"],
-        "notes": [{"text": "ok"}, {"text": "too long"}],
     }
     with caplog.at_level(logging.WARNING):
         result = _ask(STRICT, Bounded, answer)
@@ -83,9 +87,8 @@ def test_an_answer_that_breaks_only_dropped_bounds_is_fitted(caplog):
     assert result.count == 1
     assert result.share == math.nextafter(1.0, 0) and result.share < 1
     assert result.comment == "abc"
-    assert [note.text for note in result.notes] == ["ok", "too l"]
     # The log names the fields, never their values.
-    assert "reasoning" in caplog.text and "notes.1.text" in caplog.text
+    assert "reasoning" in caplog.text and "comment" in caplog.text
     assert "xxxxxxxxxx" not in caplog.text
 
 
@@ -93,6 +96,72 @@ def test_a_value_below_a_minimum_is_raised_to_it():
     result = _ask(STRICT, Bounded, {**GOOD, "confidence": -0.2, "share": 0.0})
     assert result.confidence == 0
     assert result.share > 0
+
+
+@pytest.mark.parametrize(("answer", "fitted"), [(0.0, 1), (-3.0, 1)])
+def test_an_int_field_answered_with_a_whole_float_gets_an_int(answer, fitted):
+    """A JSON 0.0 for an int field with gt=0 becomes 1, not the smallest float."""
+    result = _ask(STRICT, Bounded, {**GOOD, "count": answer})
+    assert result.count == fitted and isinstance(result.count, int)
+
+
+class Below(BaseModel):
+    count: Annotated[int, FIT_TO_BOUNDS] = Field(lt=10)
+
+
+def test_an_int_field_above_an_exclusive_maximum_gets_the_int_below():
+    assert _ask(STRICT, Below, {"count": 10.0}).count == 9
+
+
+def test_a_field_in_a_nested_model_that_opts_in_is_fitted():
+    result = _ask(STRICT, Bounded, {**GOOD, "note": {"text": "too long"}})
+    assert result.note.text == "too l"
+
+
+class Invoice(BaseModel):
+    """A caller's extraction schema: no field opts in."""
+
+    invoice_number: str = Field(max_length=20)
+    amount: float = Field(ge=0)
+    reasoning: Annotated[str, FIT_TO_BOUNDS] = Field("", max_length=10)
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        {"invoice_number": "INV-" + "9" * 21, "amount": 10.0},
+        {"invoice_number": "INV-1", "amount": -50.0},
+        # One field that opts in does not open the others.
+        {"invoice_number": "INV-" + "9" * 21, "amount": 10.0, "reasoning": "x" * 30},
+    ],
+)
+def test_a_callers_field_is_never_changed(caplog, answer):
+    with caplog.at_level(logging.WARNING), pytest.raises(ValidationError):
+        _ask(STRICT, Invoice, answer)
+    assert "fitted" not in caplog.text
+
+
+def test_a_callers_field_still_gets_its_bounds_in_words():
+    bodies = []
+    _ask(STRICT, Invoice, {"invoice_number": "INV-1", "amount": 1.0}, bodies)
+    properties = bodies[0]["tools"][0]["input_schema"]["properties"]
+    assert properties["invoice_number"]["description"] == "At most 20 characters."
+    assert properties["amount"]["description"] == "At least 0."
+
+
+def test_a_field_in_a_list_is_not_fitted_even_when_it_opts_in():
+    class Notes(BaseModel):
+        notes: list[Note]
+
+    with pytest.raises(ValidationError):
+        _ask(STRICT, Notes, {"notes": [{"text": "too long"}]})
+
+
+def test_the_marker_stays_out_of_the_schema():
+    bodies = []
+    _ask(STRICT, Bounded, GOOD, bodies)
+    assert "FIT_TO_BOUNDS" not in json.dumps(bodies[0]["tools"][0])
+    assert "FitToBounds" not in json.dumps(Bounded.model_json_schema())
 
 
 def test_the_strict_schema_states_the_bounds_it_drops():
@@ -167,11 +236,11 @@ def test_generated_sql_with_long_reasoning_keeps_its_sql():
 def test_the_document_classifier_keeps_its_class(tmp_path):
     from gaik.software_components.doc_classifier.classifier import DocumentClassifier
 
-    answer = {"document_class": "invoice", "confidence": 1.2, "reasoning": "y" * 300}
+    answer = {"document_class": "invoice", "confidence": 0.9, "reasoning": "y" * 300}
     classifier = DocumentClassifier(
         config=_config(STRICT, "ClassificationResult", answer, []), model=STRICT
     )
     result = classifier._classify_with_llm("Invoice 12", ["invoice", "receipt", "unknown"])
     assert result["class"] == "invoice"
-    assert result["confidence"] == 1.0
+    assert result["confidence"] == 0.9
     assert len(result["reasoning"]) == 200

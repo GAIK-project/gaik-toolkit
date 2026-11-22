@@ -12,6 +12,8 @@ import copy
 import logging
 import math
 import os
+import types
+import typing
 from collections.abc import Iterator
 from typing import Any
 
@@ -31,6 +33,7 @@ from gaik.software_components.llm.base import (
     DEFAULT_TIMEOUT_SECONDS,
     ChatMessage,
     ChatResponse,
+    FitToBounds,
     UsageCounter,
 )
 from gaik.software_components.llm.content import image_data
@@ -141,7 +144,8 @@ def _strict_schema(node: Any) -> Any:
     all its properties required. Optional fields stay nullable through their
     `anyOf` with null, so Pydantic still validates the answer. Numeric and
     string bounds are dropped and stated in the field's description instead;
-    :func:`_within_dropped_bounds` fits an answer that still breaks one.
+    :func:`_within_dropped_bounds` fits an answer that still breaks one on a
+    field marked :data:`FIT_TO_BOUNDS`, and any other field raises as before.
     """
     if isinstance(node, list):
         return [_strict_schema(item) for item in node]
@@ -178,19 +182,22 @@ def _fit(value: Any, kind: str, bound: Any) -> tuple[bool, Any]:
     """``value`` brought within a bound the strict schema could not carry.
 
     A string is cut to its maximum length and a number is moved to the nearest
-    allowed value; a minimum length or a multiple cannot be met without
+    allowed value: the next integer for an integer bound (an ``int`` field), the
+    next float otherwise. A minimum length or a multiple cannot be met without
     inventing data, so those are left to fail.
     """
     if kind == "string_too_long" and isinstance(value, str) and isinstance(bound, int):
         return True, value[:bound]
-    if not isinstance(value, int | float) or isinstance(value, bool):
+    if not isinstance(value, int | float) or isinstance(value, bool) or isinstance(bound, bool):
         return False, value
     if kind in ("greater_than_equal", "less_than_equal"):
         return True, bound
     if kind in ("greater_than", "less_than"):
-        toward = math.inf if kind == "greater_than" else -math.inf
-        if isinstance(value, int) and isinstance(bound, int):
+        # Pydantic reports a float field's bound as a float, so an int bound
+        # belongs to an int field, also when the answer was 0.0.
+        if isinstance(bound, int):
             return True, bound + (1 if kind == "greater_than" else -1)
+        toward = math.inf if kind == "greater_than" else -math.inf
         return True, math.nextafter(float(bound), toward)
     return False, value
 
@@ -204,34 +211,69 @@ _BOUND_ERRORS = {
 }
 
 
-def _within_dropped_bounds(error: ValidationError, data: Any) -> tuple[Any, list[str]] | None:
+def _without_none(annotation: Any) -> Any:
+    """``X`` for ``X | None`` (or ``Optional[X]``); anything else as it is."""
+    if typing.get_origin(annotation) in (typing.Union, types.UnionType):
+        members = [arg for arg in typing.get_args(annotation) if arg is not type(None)]
+        if len(members) == 1:
+            return members[0]
+    return annotation
+
+
+def _fits_to_bounds(model: type[BaseModel], loc: tuple) -> bool:
+    """Whether ``loc`` names a field marked :data:`FIT_TO_BOUNDS`.
+
+    The field is one of the model's own or of a model held directly (or as
+    ``Model | None``) in one of its fields; a place in a list, a dict or another
+    union is never fitted.
+    """
+    current: Any = model
+    field = None
+    for part in loc:
+        current = _without_none(current)
+        if not (
+            isinstance(part, str) and isinstance(current, type) and issubclass(current, BaseModel)
+        ):
+            return False
+        field = next(
+            (info for name, info in current.model_fields.items() if part in (name, info.alias)),
+            None,
+        )
+        if field is None:
+            return False
+        current = field.annotation
+    return field is not None and any(isinstance(item, FitToBounds) for item in field.metadata)
+
+
+def _within_dropped_bounds(
+    response_format: type[BaseModel], error: ValidationError, data: Any
+) -> tuple[Any, list[str]] | None:
     """``data`` with the values that break a dropped bound fitted to it, or None.
 
-    The strict tool schema could not hold these bounds, so an answer that breaks
-    only them is fitted rather than refused. Returns the fitted copy and the
-    paths changed, or None when the answer has any other error.
+    The strict tool schema could not hold these bounds. Only a field marked
+    :data:`FIT_TO_BOUNDS` (gaik's own explanation fields) is fitted: a caller's
+    field, such as an invoice number or an amount, is never changed. Returns the
+    fitted copy and the paths changed, or None when any error is another kind
+    or on a field that is not marked.
     """
     errors = error.errors()
-    if not isinstance(data, dict) or not all(e["type"] in _BOUND_ERRORS for e in errors):
+    if not isinstance(data, dict) or not all(
+        e["type"] in _BOUND_ERRORS and _fits_to_bounds(response_format, e["loc"]) for e in errors
+    ):
         return None
     fitted = copy.deepcopy(data)
     changed = []
     for e in errors:
-        parent, key = None, None
-        node = fitted
+        parent, node = None, fitted
         for part in e["loc"]:
-            if isinstance(node, dict) and part in node:
-                parent, key, node = node, part, node[part]
-            elif (
-                isinstance(node, list) and isinstance(part, int) and -len(node) <= part < len(node)
-            ):
-                parent, key, node = node, part, node[part]
-            # Anything else names a member of a union, not a place in the data.
+            if not isinstance(node, dict) or part not in node:
+                return None
+            parent, node = node, node[part]
         bound = (e.get("ctx") or {}).get(_BOUND_ERRORS[e["type"]])
         ok, value = _fit(node, e["type"], bound)
         if parent is None or not ok:
             return None
-        parent[key] = value
+        parent[e["loc"][-1]] = value
         changed.append(".".join(str(part) for part in e["loc"]))
     return fitted, changed
 
@@ -453,18 +495,21 @@ class AnthropicProvider:
                     # The model saw the dropped bounds only as words in the
                     # descriptions, so an answer that breaks only those is fitted.
                     fitted = (
-                        _within_dropped_bounds(error, block.input) if "strict" in tool else None
+                        _within_dropped_bounds(response_format, error, block.input)
+                        if "strict" in tool
+                        else None
                     )
                     if fitted is None:
                         raise
                     data, changed = fitted
+                    result = response_format.model_validate(data)
                     logger.warning(
                         "Claude's answer for '%s' broke bounds its strict tool schema could "
                         "not hold; fitted to them: %s",
                         tool_name,
                         ", ".join(changed),
                     )
-                    return response_format.model_validate(data)
+                    return result
         raise ValueError(f"Anthropic response did not return tool_use for '{tool_name}'.")
 
     def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
