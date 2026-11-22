@@ -140,9 +140,11 @@ the overlap merge. A GPT-4o transcription model (`gpt-4o-transcribe`, the defaul
 `get_openai_config()`, or `gpt-4o-mini-transcribe`) takes only `json` or `text`, so it is
 asked for `json` and gives text without timestamps: each chunk becomes one subtitle over its
 own stretch of the recording, and the words two chunks both give for their overlap are kept
-once. Only a run of at least 4 matching words that reaches the end of one chunk's text and
-the start of the next one's counts, so a phrase said twice elsewhere is never taken for the
-overlap; without such a run both texts are kept whole. Use Whisper or `GPT4O_DIARIZE` where
+once: the end of one chunk's text and the start of the next one's are lined up over every
+length up to the overlap's words, and the best match (a difflib ratio of at least 0.75, with
+at least 4 words in common) is taken from the next chunk, so one word heard differently does
+not repeat the overlap, and a phrase said twice away from where the chunks meet never lines
+them up; without such a match both texts are kept whole. Use Whisper or `GPT4O_DIARIZE` where
 per-sentence timestamps matter. Such a model also refuses a request over 1400 s, so a
 recording longer than 23 minutes is split even when it is small, into chunks of at most
 `(1400 - 2 x chunk_overlap_seconds) / 60` minutes.

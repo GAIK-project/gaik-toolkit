@@ -424,11 +424,14 @@ def test_gpt4o_chunks_are_joined_without_their_shared_words(tmp_path, monkeypatc
     monkeypatch.setattr(pipeline, "get_audio_duration", lambda _p: 31.0)
     client = _FakeAudioClient(
         {
+            # The shared speech ends chunk 1 with a word cut in half ("s").
             "rec_chunk_01.mp3": SimpleNamespace(
-                text="Alku on tässä. Potilas tuli vastaanotolle ja hammas 36 oiretti, ja s"
+                text="Alku on tässä. Potilas tuli vastaanotolle aamulla ja kertoi, että "
+                "hammas 36 oireili kylmälle ja kuumalle, joten se tutkittiin ja s"
             ),
             "rec_chunk_02.mp3": SimpleNamespace(
-                text="tuli vastaanotolle ja hammas 36 oireili, joten se paikattiin."
+                text="tuli vastaanotolle aamulla ja kertoi, että hammas 36 oireili "
+                "kylmälle ja kuumalle, joten se tutkittiin ja paikattiin."
             ),
         }
     )
@@ -443,7 +446,8 @@ def test_gpt4o_chunks_are_joined_without_their_shared_words(tmp_path, monkeypatc
     ]
     text = " ".join(c["text"] for c in cues)
     assert text == (
-        "Alku on tässä. Potilas tuli vastaanotolle ja hammas 36 oireili, joten se paikattiin."
+        "Alku on tässä. Potilas tuli vastaanotolle aamulla ja kertoi, että hammas 36 "
+        "oireili kylmälle ja kuumalle, joten se tutkittiin ja paikattiin."
     )
     assert {r["response_format"] for r in client.requests} == {"json"}
 
@@ -468,13 +472,28 @@ def test_gpt4o_chunks_without_shared_words_are_both_kept_whole(tmp_path, monkeyp
     ]
 
 
-def test_shared_words_are_kept_once_and_nothing_else_is_dropped():
+def test_the_following_chunks_version_of_the_overlap_is_kept():
+    # x and y are the words cut in half where the chunks end and start.
     previous = "a b c one two three four five x".split()
     following = "y one two three four five six seven".split()
 
     kept_previous, kept_following = pipeline._drop_repeated_words(previous, following, 30.0)
 
-    assert kept_previous + kept_following == "a b c one two three four five six seven".split()
+    assert (kept_previous, kept_following) == ("a b c".split(), following)
+
+
+def test_one_word_heard_differently_in_the_overlap_does_not_repeat_it():
+    # 10 s shared; the two chunks heard the year differently.
+    previous = (
+        "alpha we agreed that the report would be in 2023 and then we moved on to the budget"
+    ).split()
+    following = (
+        "we agreed that the report would be in 2024 and then we moved on to the budget next item"
+    ).split()
+
+    kept_previous, kept_following = pipeline._drop_repeated_words(previous, following, 10.0)
+
+    assert (kept_previous, kept_following) == (["alpha"], following)
 
 
 def test_a_phrase_said_again_elsewhere_is_not_taken_for_the_overlap():

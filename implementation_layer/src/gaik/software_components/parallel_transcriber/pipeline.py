@@ -14,6 +14,7 @@ and ``audio_pipeline.py``.  Provides a single entry point that handles:
 from __future__ import annotations
 
 import concurrent.futures
+import difflib
 import logging
 import math
 import re
@@ -58,13 +59,13 @@ _GPT4O_API_DURATION_LIMIT_SECONDS = 1400
 # decoder need not agree to the last fraction of a second.
 _MAX_GPT4O_DURATION_SECONDS = 1380
 
-# Joining the text of two overlapping chunks from a model without timestamps: a run of
-# at least _MIN_REPEATED_WORDS words both give is kept once, but only a run that reaches
-# the end of the previous chunk's text and the start of the next one's, give or take
-# _EDGE_WORDS words (a word cut in half where a chunk ends). Each side is searched over
-# _MAX_WORDS_PER_SECOND words per second of shared audio (fast speech is about 3.5).
+# Joining the text of two overlapping chunks from a model without timestamps: the end of
+# one chunk's text and the start of the next one's are lined up over k words, for every
+# k up to _MAX_WORDS_PER_SECOND words per second of shared audio (fast speech is about
+# 3.5). They count as the same speech at a difflib ratio of _MIN_OVERLAP_RATIO or more,
+# with at least _MIN_REPEATED_WORDS words in common.
 _MIN_REPEATED_WORDS = 4
-_EDGE_WORDS = 3
+_MIN_OVERLAP_RATIO = 0.75
 _MAX_WORDS_PER_SECOND = 4
 
 # The path the SDK adds itself, at the end of an Azure endpoint's path.
@@ -123,33 +124,38 @@ def _drop_repeated_words(
 ) -> tuple[list[str], list[str]]:
     """Keep the words two overlapping chunks both give for their shared audio once.
 
-    The shared speech is the longest run of the same words that ends within
-    ``_EDGE_WORDS`` of the end of ``previous`` and starts within ``_EDGE_WORDS`` of the
-    start of ``following``: ``previous`` is cut after it and ``following`` goes on
-    after it, so what is dropped from either side is the other's copy of the shared
-    audio. A phrase said again elsewhere, or a run that does not reach both edges, is
-    not taken: then both are kept whole, so a word can repeat but none is lost.
+    For each k from the overlap's word window down to ``_MIN_REPEATED_WORDS``, the last
+    k words of ``previous`` are compared with the first k of ``following``, case-folded
+    and without punctuation, by difflib's ratio, so a word heard differently in one
+    chunk ("2023" and "2024") does not split the overlap. The k with the best ratio is
+    the overlap when that ratio is at least ``_MIN_OVERLAP_RATIO`` and the two have at
+    least ``_MIN_REPEATED_WORDS`` words in common: ``previous`` loses its last k words
+    and ``following`` is kept whole, so the following chunk's version of the shared
+    speech stands. Otherwise both are kept whole: a phrase said again away from where
+    the chunks meet does not line them up.
     """
-    window = max(_MIN_REPEATED_WORDS, math.ceil(shared_seconds * _MAX_WORDS_PER_SECOND))
-    tail = previous[-window:]
-    head = following[:window]
+    window = min(
+        len(previous),
+        len(following),
+        max(_MIN_REPEATED_WORDS, math.ceil(shared_seconds * _MAX_WORDS_PER_SECOND)),
+    )
     # A word that is only punctuation has no key; it never matches.
-    tail_keys = [_word_key(word) or f"\0a{i}" for i, word in enumerate(tail)]
-    head_keys = [_word_key(word) or f"\0b{i}" for i, word in enumerate(head)]
-    best_size, best_tail_end, best_head_end = 0, 0, 0
-    # runs[j + 1]: length of the run of equal words ending at tail[i] and head[j].
-    runs = [0] * (len(head_keys) + 1)
-    for i, key in enumerate(tail_keys):
-        runs = [0] + [runs[j] + 1 if key == other else 0 for j, other in enumerate(head_keys)]
-        if i < len(tail_keys) - 1 - _EDGE_WORDS:
-            continue  # a run ending here does not reach the end of the previous chunk
-        for j, size in enumerate(runs[1:]):
-            if size > best_size and j - size + 1 <= _EDGE_WORDS:
-                best_size, best_tail_end, best_head_end = size, i, j
-    if best_size < _MIN_REPEATED_WORDS:
+    tail_keys = [_word_key(word) or f"\0a{i}" for i, word in enumerate(previous[-window:])]
+    head_keys = [_word_key(word) or f"\0b{i}" for i, word in enumerate(following[:window])]
+    best_words, best_ratio = 0, 0.0
+    for words in range(window, _MIN_REPEATED_WORDS - 1, -1):
+        matcher = difflib.SequenceMatcher(
+            None, tail_keys[len(tail_keys) - words :], head_keys[:words], autojunk=False
+        )
+        if matcher.real_quick_ratio() <= best_ratio or matcher.quick_ratio() <= best_ratio:
+            continue
+        ratio = matcher.ratio()
+        in_common = sum(block.size for block in matcher.get_matching_blocks())
+        if ratio > best_ratio and in_common >= _MIN_REPEATED_WORDS:
+            best_words, best_ratio = words, ratio
+    if best_ratio < _MIN_OVERLAP_RATIO:
         return previous, following
-    kept = len(previous) - len(tail) + best_tail_end + 1
-    return previous[:kept], following[best_head_end + 1 :]
+    return previous[: len(previous) - best_words], following
 
 
 def _text_chunks_as_srt(
