@@ -103,6 +103,93 @@ def test_free_text_with_commas_is_not_converted_to_numbers(con, tmp_path):
     assert types["comment"].startswith("VARCHAR")
 
 
+def _column(con, table, column):
+    """``(type, values in row order)`` of one column."""
+    types = {r[0]: r[1] for r in con.execute(f'DESCRIBE "{table}"').fetchall()}
+    values = [r[0] for r in con.execute(f'SELECT "{column}" FROM "{table}" ORDER BY id').fetchall()]
+    return types[column], values
+
+
+def test_us_thousands_commas_are_not_read_as_decimals(con, tmp_path):
+    """1,200 is as likely to be twelve hundred as one point two: the column stays text."""
+    path = tmp_path / "orders.csv"
+    path.write_text('id,amount\n1,"1,200"\n2,"3,450"\n3,"12,000"\n', encoding="utf-8")
+    _load(con, path)
+    data_type, values = _column(con, "orders", "amount")
+    assert data_type == "VARCHAR"
+    assert values == ["1,200", "3,450", "12,000"]
+
+
+@pytest.mark.parametrize(
+    "space",
+    [" ", " ", " "],
+    ids=["space", "no-break space", "narrow no-break space"],
+)
+def test_space_grouped_comma_decimals_are_converted(con, tmp_path, space):
+    path = tmp_path / "myynti.csv"
+    rows = ["1 234,56", "987,5", "12 345 678,90", "-1 000,25"]
+    path.write_text(
+        "id;summa\n" + "".join(f"{i};{v.replace(' ', space)}\n" for i, v in enumerate(rows)),
+        encoding="utf-8",
+    )
+    _load(con, path)
+    data_type, values = _column(con, "myynti", "summa")
+    assert data_type == "DOUBLE"
+    assert values == pytest.approx([1234.56, 987.5, 12345678.9, -1000.25])
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # One value that cannot be thousands grouping decides the whole column.
+        (["1,200", "3,5"], [1.2, 3.5]),
+        (["1,200", "1.234,56"], [1.2, 1234.56]),
+        (["1,200", "0,250"], [1.2, 0.25]),
+        (["1,200", "1234,567"], [1.2, 1234.567]),
+        (["1,200", "1 234,5"], [1.2, 1234.5]),
+        ([" 12,5 ", "3,25"], [12.5, 3.25]),
+        # Every value could be thousands grouping, or one can only be: text.
+        (["1,200", "-3,450"], None),
+        (["1,200", "1,234,567"], None),
+        (["1,200", "1,200.50"], None),
+        # Not every value is a number: text.
+        (["1,5", "n/a"], None),
+    ],
+)
+def test_a_column_is_read_as_comma_decimals_only_when_it_cannot_be_thousands(
+    con, tmp_path, raw, expected
+):
+    path = tmp_path / "mixed.csv"
+    path.write_text(
+        "id;value\n" + "".join(f'{i};"{v}"\n' for i, v in enumerate(raw)), encoding="utf-8"
+    )
+    _load(con, path)
+    data_type, values = _column(con, "mixed", "value")
+    if expected is None:
+        assert data_type == "VARCHAR"
+        assert values == raw
+    else:
+        assert data_type == "DOUBLE"
+        assert values == pytest.approx(expected)
+
+
+def test_excel_text_cells_get_the_same_number_handling(con, tmp_path):
+    path = tmp_path / "book.xlsx"
+    _write_clean_xlsx(
+        path,
+        {
+            "Sheet1": [
+                ("id", "summa", "us_amount"),
+                (1, "1 234,56", "1,200"),
+                (2, "987,5", "12,000"),
+            ]
+        },
+    )
+    _load(con, path)
+    assert _column(con, "book", "summa") == ("DOUBLE", pytest.approx([1234.56, 987.5]))
+    assert _column(con, "book", "us_amount") == ("VARCHAR", ["1,200", "12,000"])
+
+
 def test_a_column_name_with_a_double_quote_is_loaded_and_profiled(con, tmp_path):
     from gaik.software_components.tabular_agent.profiling import profile_tables
 

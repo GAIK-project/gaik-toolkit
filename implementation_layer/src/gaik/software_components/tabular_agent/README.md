@@ -80,10 +80,14 @@ the sheet, so cross-sheet joins work out of the box.
 | Parquet | `.parquet` | Types come from the file |
 | JSON | `.json`, `.ndjson` | Records auto-detected |
 
-**Nordic number formats work.** A column of `1 234,56` values is detected and
+**Nordic number formats work.** A column of `1 234,56` values (thousands
+grouped by a space, a no-break space or a dot, or not grouped) is detected and
 converted to a real number, so `SUM()` behaves. The conversion only fires when
 *every* value in the column is a comma-decimal number, so free text containing
-commas is left alone.
+commas is left alone, and when at least one value cannot be a thousands
+separator (`3,5`, `0,250`, `1 234,56`): a column holding only values like
+`1,200` and `12,000` may be US thousands grouping, so it stays text rather than
+becoming 1.2 and 12.0.
 
 ## Messy spreadsheets
 

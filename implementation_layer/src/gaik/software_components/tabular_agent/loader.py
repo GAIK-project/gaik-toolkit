@@ -228,9 +228,19 @@ def _load_flat_file(
         repair_european_decimals(con, table_name)
 
 
-# "1234,56" or "1.234.567,89" -- a decimal comma, optionally with dot as the
-# thousands separator. Anchored, so free text containing a comma never matches.
-_EURO_DECIMAL = r"^-?[0-9]{1,3}(\.[0-9]{3})*,[0-9]+$|^-?[0-9]+,[0-9]+$"
+# A number with a decimal comma: "1234,56", or with its thousands grouped by dots
+# ("1.234.567,89") or by spaces ("1 234,56"; also the no-break and the narrow
+# no-break space that spreadsheets and locale formatting write). Anchored, so free
+# text containing a comma never matches.
+_GROUP_SPACES = r" \x{00A0}\x{202F}"
+_DECIMAL_COMMA = (
+    r"^-?[0-9]+,[0-9]+$"
+    r"|^-?[0-9]{1,3}(\.[0-9]{3})+,[0-9]+$"
+    rf"|^-?[0-9]{{1,3}}([{_GROUP_SPACES}][0-9]{{3}})+,[0-9]+$"
+)
+# A decimal-comma value that reads just as well as a whole number with a thousands
+# comma: "1,200" or "12,000". "3,5", "0,250" and "1234,567" cannot be thousands.
+_THOUSANDS_COMMA = r"^-?[1-9][0-9]{0,2},[0-9]{3}$"
 
 
 def repair_european_decimals(con: Any, table_name: str) -> list[str]:
@@ -239,7 +249,10 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
     DuckDB's type inference reads ``1234,56`` as text, so a Finnish or Swedish
     export silently loses every numeric column and no amount of prompting makes
     ``SUM()`` work on it. A column is converted only when *every* non-null value
-    is a comma-decimal number, which leaves genuine free text untouched.
+    is a comma-decimal number, which leaves genuine free text untouched, and at
+    least one of them cannot be a thousands separator: a column of ``1,200``,
+    ``3,450`` and ``12,000`` is as likely to be 1200, 3450 and 12000, so it is
+    left as text rather than read as 1.2, 3.45 and 12.0.
 
     Returns:
         The names of the columns that were converted.
@@ -250,33 +263,45 @@ def repair_european_decimals(con: Any, table_name: str) -> list[str]:
         return []
 
     converted: list[str] = []
+    ambiguous: list[str] = []
     for row in described:
         column, data_type = row[0], str(row[1]).upper()
         if not data_type.startswith("VARCHAR"):
             continue
         quoted = quote_identifier(column)
+        value = f"trim({quoted})"
         try:
-            total, matching = con.execute(
+            total, decimal, thousands = con.execute(
                 f"SELECT count({quoted}), "
-                f"count(*) FILTER (WHERE regexp_matches({quoted}, ?)) "
+                f"count(*) FILTER (WHERE regexp_matches({value}, ?)), "
+                f"count(*) FILTER (WHERE regexp_matches({value}, ?)) "
                 f'FROM "{table_name}"',
-                [_EURO_DECIMAL],
+                [_DECIMAL_COMMA, _THOUSANDS_COMMA],
             ).fetchone()
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug("Decimal probe failed for column %s: %s", column, type(exc).__name__)
             continue
-        if not total or matching != total:
+        if not total or decimal != total:
+            continue
+        if thousands == total:
+            ambiguous.append(column)
             continue
         try:
+            # Every value matched, so a dot or a space in it groups thousands.
             con.execute(
-                f'ALTER TABLE "{table_name}" ALTER {quoted} TYPE DOUBLE '
-                f"USING CAST(replace(replace({quoted}, '.', ''), ',', '.') AS DOUBLE)"
+                f'ALTER TABLE "{table_name}" ALTER {quoted} TYPE DOUBLE USING CAST(replace('
+                f"regexp_replace({value}, '[.{_GROUP_SPACES}]', '', 'g'), ',', '.') AS DOUBLE)"
             )
             converted.append(column)
         except Exception as exc:
             logger.debug("Could not retype column %s as DOUBLE: %s", column, type(exc).__name__)
     if converted:
         logger.info("Converted comma-decimal column(s): %s", ", ".join(converted))
+    if ambiguous:
+        logger.info(
+            "Left column(s) as text, as their commas may separate thousands: %s",
+            ", ".join(ambiguous),
+        )
     return converted
 
 
