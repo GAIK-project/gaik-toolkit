@@ -49,6 +49,8 @@ def _form(monkeypatch, entries):
         "\U0001f3f3\ufe0f\u200d\U0001f308",  # rainbow flag
         "\U0001f468\U0001f3fd\u200d\U0001f4bb",  # man technologist, skin tone
         "ශ්\u200dරී",  # Sinhala "shri" with its ZWJ
+        "\u0d28\u0d4d\u200d",  # Malayalam chillu: ZWJ after a virama
+        "\u0d05\u0d35\u0d28\u0d4d\u200d \u0d35\u0d28\u0d4d\u0d28\u0d41",  # its ZWJ before a space
         PERSIAN,
     ],
 )

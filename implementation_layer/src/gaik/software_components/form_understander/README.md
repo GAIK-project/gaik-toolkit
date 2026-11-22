@@ -43,7 +43,8 @@ for field in understander.describe_labels(fields, language_hint="fi"):
   `label` and `original`, so what is compared is what is shown. A zero-width joiner
   between two letters, marks, digits or symbols (it builds an emoji sequence or a letter
   form) and a zero-width non-joiner between two letters stay, so a label that gained or
-  lost one is `changed`; at an edge or beside a space they go. A model label that shows
+  lost one is `changed`; at an edge or beside a space they go, except a joiner right after
+  a virama, which writes a Malayalam chillu. A model label that shows
   nothing, only spacing, joiners or marks, is dropped and the page label kept. Escape
   the labels for the place you show them (HTML, a terminal) as with any page text.
 

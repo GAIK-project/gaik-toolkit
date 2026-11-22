@@ -89,6 +89,8 @@ _ZWNJ, _ZWJ = "\u200c", "\u200d"
 _JOINS = {_ZWJ: ("L", "M", "N", "S"), _ZWNJ: ("L", "M")}
 # What a person can see: letters, digits, symbols and punctuation.
 _SEEN = ("L", "N", "S", "P")
+# The canonical combining class of a virama (Indic scripts' vowel killer).
+_VIRAMA = 9
 
 
 def _visible(text: str) -> str:
@@ -100,13 +102,16 @@ def _visible(text: str) -> str:
     a zero-width joiner between letters, marks, digits or symbols, which builds an
     emoji sequence (a woman scientist) or a letter form in Indic scripts, and a
     zero-width non-joiner between two letters, which keeps them apart (Persian,
-    Indic scripts). At an edge, beside a space or alone they show nothing and go.
+    Indic scripts). A zero-width joiner right after a virama also stays, at the end
+    of a word too: it writes a Malayalam chillu, which shows a visible virama
+    without it. Elsewhere at an edge, beside a space or alone they show nothing and go.
     """
     kept = [ch for ch in text if unicodedata.category(ch) != "Cf" or ch in _JOINS]
     return "".join(
         ch
         for i, ch in enumerate(kept)
         if ch not in _JOINS
+        or (ch == _ZWJ and i > 0 and unicodedata.combining(kept[i - 1]) == _VIRAMA)
         or (
             0 < i < len(kept) - 1
             and unicodedata.category(kept[i - 1])[0] in _JOINS[ch]
