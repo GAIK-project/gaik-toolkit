@@ -36,7 +36,8 @@ from .usage import UsageRecord, build_usage_record
 logger = logging.getLogger(__name__)
 
 FENCED_BLOCK_RE = re.compile(r"^```[a-zA-Z0-9_-]*\s*\n(?P<body>.*?)(?:\n```\s*)?$", re.DOTALL)
-DIV_BLOCK_RE = re.compile(r"<div\b[^>]*>\s*(.*?)\s*</div>", re.DOTALL)
+# An opening or closing div tag: the layout wrappers the prompts ask for.
+DIV_TAG_RE = re.compile(r"<div\b[^>]*>|</div\s*>", re.IGNORECASE)
 MARKDOWN_RENDERER = MarkdownIt("commonmark", {"html": True}).enable("table")
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -606,13 +607,14 @@ def _unwrap_fenced_output(text: str) -> str:
 
 
 def _clean_markdown(text: str) -> str:
-    """Strip outer layout div wrappers while keeping inner markdown and HTML."""
+    """Strip the layout div wrappers while keeping all markdown and other HTML.
+
+    Every div tag is a block boundary: the text between two tags is one block, so a
+    div nested in another and text outside any div are kept, in their order.
+    """
     unwrapped = _unwrap_fenced_output(text)
-    blocks = DIV_BLOCK_RE.findall(unwrapped)
-    if not blocks:
-        return unwrapped.strip() + "\n"
-    cleaned = [b.strip() for b in blocks if b.strip()]
-    return "\n\n".join(cleaned).strip() + "\n"
+    blocks = (block.strip() for block in DIV_TAG_RE.split(unwrapped))
+    return "\n\n".join(block for block in blocks if block) + "\n"
 
 
 def _markdown_to_html(markdown_text: str, title: str = "Parsed Document") -> str:

@@ -3,8 +3,8 @@
 VisionParser merges the pages of a PDF with one cleanup call (clean_output=True, the
 default). When that reply stopped at max_tokens, it replaced the complete per-page
 Markdown and the later pages were lost without an error. MultimodalParser had no check
-of a stop reason either. Also here: the cleanup's code-fence
-language tag.
+of a stop reason either. Also here: the cleanup's code-fence language tag, and the
+multimodal cleaner that dropped nested and out-of-div text.
 """
 
 from __future__ import annotations
@@ -239,3 +239,31 @@ def test_multimodal_gemini_rest_reply_cut_off_is_read(monkeypatch, tmp_path):
 
     assert text == "# Title\n"
     assert text.cut_off is True
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # Flat layout wrappers, as before.
+        (
+            '<div data-label="Title"># Report</div>\n<div data-label="Text">Body text</div>',
+            "# Report\n\nBody text\n",
+        ),
+        # A div nested in another keeps both its text and the text after it.
+        (
+            '<div data-label="Table"><div data-label="Caption">Table 1</div>'
+            "<table><tr><td>1</td></tr></table></div>",
+            "Table 1\n\n<table><tr><td>1</td></tr></table>\n",
+        ),
+        # Text outside every div is kept, in its place.
+        (
+            'Intro line\n<div data-label="Text">Inside</div>\nClosing line',
+            "Intro line\n\nInside\n\nClosing line\n",
+        ),
+        # No divs at all.
+        ("# Plain\n\nText", "# Plain\n\nText\n"),
+        ("", "\n"),
+    ],
+)
+def test_multimodal_cleaner_keeps_nested_and_out_of_div_content(raw, expected):
+    assert multimodal._clean_markdown(raw) == expected
