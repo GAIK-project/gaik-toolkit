@@ -213,7 +213,8 @@ def test_a_rerun_removes_only_its_own_unchanged_files_of_the_run_before(tmp_path
     assert not (out / "evidence_index.json").exists()
     assert (out / "report.md").exists() and (out / "usage.json").exists()
     assert "Removed 2 file(s)" in caplog.text
-    assert "keeps 2 section or brief file(s)" in caplog.text and "1 changed" in caplog.text
+    assert "keeps 2 section or brief file(s)" in caplog.text
+    assert "Kept 1 file(s) of the previous run that were changed" in caplog.text
     # Log lines name no file.
     assert "windows" not in caplog.text.lower() and "notes_to_self" not in caplog.text
     record = json.loads((out / msrg.OUTPUT_RECORD).read_text(encoding="utf-8"))
@@ -293,3 +294,152 @@ def test_a_progress_callback_still_gets_the_file_name(tmp_path, client):
         progress_callback=messages.append,
     )
     assert "Normalizing [1/1]: site_notes.txt (text)" in messages
+
+
+# -- the record cannot remove a file this run wrote, or anything outside the folder ------
+
+
+def _link_dir(link: Path, target: Path) -> None:
+    """A link to a folder: a symbolic link, or a junction where Windows refuses one."""
+    import os
+    import sys
+
+    try:
+        os.symlink(target, link, target_is_directory=True)
+    except OSError:
+        if sys.platform != "win32":
+            raise
+        import _winapi
+
+        _winapi.CreateJunction(str(target), str(link))
+
+
+def _files(out: Path) -> dict[str, bytes]:
+    return {
+        p.relative_to(out).as_posix(): p.read_bytes()
+        for p in out.rglob("*")
+        if p.is_file() and p.name != msrg.OUTPUT_RECORD
+    }
+
+
+def test_another_spelling_in_the_record_never_removes_a_file_this_run_wrote(tmp_path, client):
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    _run(tmp_path, ["Roof"])
+    before = _files(out)
+    digests = {rel: msrg._digest(out / rel) for rel in before}
+    aliases = {}
+    for rel, digest in digests.items():
+        for alias in (f"./{rel}", rel.upper(), rel.replace("/", "\\"), f"sections/../{rel}"):
+            aliases[alias] = digest
+    aliases["report.md\x00.txt"] = digests["report.md"]
+    aliases[msrg.OUTPUT_RECORD] = "0" * 64
+    (out / msrg.OUTPUT_RECORD).write_text(json.dumps({"files": aliases}), encoding="utf-8")
+
+    result = _run(tmp_path, ["Roof"])
+
+    assert _files(out) == before
+    assert result.markdown_path.exists()
+    assert (out / msrg.OUTPUT_RECORD).exists()
+
+
+def test_the_record_removes_only_names_the_generator_writes(tmp_path, client):
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    _run(tmp_path, ["Roof"])
+    (out / "my_summary.txt").write_text("Mine.", encoding="utf-8")
+    (out / "evidence" / "extra.md").write_text("Mine.", encoding="utf-8")
+    record = json.loads((out / msrg.OUTPUT_RECORD).read_text(encoding="utf-8"))
+    record["files"]["my_summary.txt"] = msrg._digest(out / "my_summary.txt")
+    record["files"]["evidence/extra.md"] = msrg._digest(out / "evidence" / "extra.md")
+    (out / msrg.OUTPUT_RECORD).write_text(json.dumps(record), encoding="utf-8")
+
+    _run(tmp_path, ["Roof"])
+
+    assert (out / "my_summary.txt").exists() and (out / "evidence" / "extra.md").exists()
+
+
+def test_the_record_cannot_remove_a_file_through_a_folder_linked_out(tmp_path, client):
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    _run(tmp_path, ["Roof"])
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "keep.md").write_text("Precious.", encoding="utf-8")
+    _link_dir(out / "evidence" / "curated_sections", elsewhere)
+    record = json.loads((out / msrg.OUTPUT_RECORD).read_text(encoding="utf-8"))
+    record["files"]["evidence/curated_sections/keep.md"] = msrg._digest(elsewhere / "keep.md")
+    (out / msrg.OUTPUT_RECORD).write_text(json.dumps(record), encoding="utf-8")
+
+    _run(tmp_path, ["Roof"])
+
+    assert (elsewhere / "keep.md").read_text(encoding="utf-8") == "Precious."
+
+
+def test_a_record_that_is_a_link_is_neither_read_nor_written(tmp_path, client, symlink):
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    _run(tmp_path, ["Roof", "Walls"])
+    outside = tmp_path / "outside.json"
+    outside.write_text((out / msrg.OUTPUT_RECORD).read_text(encoding="utf-8"), encoding="utf-8")
+    (out / msrg.OUTPUT_RECORD).unlink()
+    symlink(out / msrg.OUTPUT_RECORD, outside)
+    kept = outside.read_text(encoding="utf-8")
+
+    _run(tmp_path, ["Roof"])
+
+    assert outside.read_text(encoding="utf-8") == kept
+    assert (out / "sections" / "02_walls.md").exists()
+
+
+def test_a_section_folder_in_another_case_gives_no_false_warning(tmp_path, client, caplog):
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    (out / "Sections").mkdir(parents=True)
+    with caplog.at_level(logging.INFO, logger=msrg.__name__):
+        _run(tmp_path, ["Roof"])
+        _run(tmp_path, ["Roof"])
+    assert "keeps" not in caplog.text and "Kept" not in caplog.text
+
+
+def test_only_a_changed_file_is_reported_as_changed(tmp_path, client, caplog):
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    _run(tmp_path, ["Roof"])
+    (out / "evidence_index.json").write_text("[]", encoding="utf-8")
+    with caplog.at_level(logging.INFO, logger=msrg.__name__):
+        _run(tmp_path, ["Roof"], include_evidence_index=False)
+    assert (out / "evidence_index.json").read_text(encoding="utf-8") == "[]"
+    assert "Kept 1 file(s) of the previous run that were changed" in caplog.text
+    assert "keeps 0" not in caplog.text and "section or brief" not in caplog.text
+
+
+def test_a_second_different_report_replaces_the_first_ones_generated_files(tmp_path, client):
+    # One output folder holds one report, the one written last: a different report
+    # written into it removes the first one's unchanged section files.
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    _run(tmp_path, ["Roof", "Walls"])
+    (out / "sections" / "02_walls.md").write_text("## Walls\n\nMy edit.\n", encoding="utf-8")
+    _run(tmp_path, ["Budget"])
+    assert sorted(p.name for p in (out / "sections").iterdir()) == ["01_budget.md", "02_walls.md"]
+    assert "## Budget" in (out / "report.md").read_text(encoding="utf-8")
+
+
+def test_a_failed_agentic_rerun_keeps_the_earlier_report_and_removes_nothing(tmp_path, client):
+    pytest.importorskip("langgraph")
+    (tmp_path / "notes.txt").write_text("The roof is old.", encoding="utf-8")
+    out = tmp_path / "out"
+    _run(tmp_path, ["Roof", "Walls"], agentic=True, curate_evidence=True)
+    report = (out / "report.md").read_bytes()
+    names = sorted(_files(out))
+
+    def failing_parsed(messages, response_format, **kwargs):
+        raise RuntimeError("reviewer unavailable")
+
+    client.chat_parsed = failing_parsed  # the curator writes its briefs, then review fails
+    with pytest.raises(RuntimeError):
+        _run(tmp_path, ["Roof"], agentic=True, curate_evidence=True)
+
+    assert sorted(_files(out)) == names
+    assert (out / "report.md").read_bytes() == report

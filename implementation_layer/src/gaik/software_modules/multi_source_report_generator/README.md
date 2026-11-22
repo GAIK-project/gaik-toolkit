@@ -701,15 +701,21 @@ output_dir/
     .gaik_report_files.json # the files this run wrote, with their SHA-256
 ```
 
-**Reusing an `output_dir`.** Each run records the files it wrote in
-`.gaik_report_files.json`. After a later run into the same folder has written all its
-outputs, it removes the files of the run before that it did not write again (the file
-of a section you removed or renamed, a curated brief, `evidence_index.json`,
-`usage.json`, or a `report.docx` from a run with `output_docx=True`), and only those
-whose content is still what that run wrote. It never deletes a file the generator did
-not write: your own files, a file you edited, and files from a run before the record
-existed stay, and a warning counts the section and brief files left that are not part
-of this report. A run that fails removes nothing.
+**Reusing an `output_dir`.** One output folder holds one report: the one written last.
+Each run records the files it wrote in `.gaik_report_files.json`. After a later run into
+the same folder has written all its outputs, it removes the files of the run before
+that it did not write again (the file of a section you removed or renamed, a curated
+brief, `evidence_index.json`, `usage.json`, or a `report.docx` from a run with
+`output_docx=True`). A second, different report written into the folder therefore
+replaces the first one's generated files; to keep both, give each report its own
+folder. A file is removed only if the record lists it, it is one of the names the
+generator writes (`report.md`, `report.docx`, `usage.json`, `evidence_index.json`,
+`evidence/normalized_sources.md`, `sections/*.md`, `evidence/curated_sections/*.md`),
+its content is still what that run wrote, it is not a link, it resolves inside the
+folder, and it is not a file this run wrote. Your own files, a file you edited, and
+files from a run before the record existed stay, and a warning counts them. A run that
+fails removes nothing; with `curate_evidence=True` its curated briefs may already have
+replaced the earlier ones, as intermediate files.
 
 The returned `ReportGenerationResult` contains:
 

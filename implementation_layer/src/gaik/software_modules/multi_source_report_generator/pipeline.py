@@ -30,7 +30,7 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from gaik.software_components._log_names import file_tag
@@ -1320,72 +1320,136 @@ OUTPUT_RECORD = ".gaik_report_files.json"
 """The file in ``output_dir`` that lists the files a run wrote, with their SHA-256."""
 
 
+_GENERATED_FILES = frozenset(
+    {
+        "report.md",
+        "report.docx",
+        "usage.json",
+        "evidence_index.json",
+        "evidence/normalized_sources.md",
+    }
+)
+_GENERATED_FOLDERS = ("sections", "evidence/curated_sections")  # their *.md files
+
+
 def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _same_file_key(path: Path) -> str | None:
+    """``path`` resolved, in the platform's case, for comparing files; None if it cannot be."""
+    try:
+        return os.path.normcase(str(path.resolve()))
+    except (OSError, ValueError, RuntimeError):
+        return None
+
+
+def _generated_name(rel: str) -> PurePosixPath | None:
+    """``rel`` as a path the generator writes (``report.md``, ``sections/<x>.md``, ...),
+    or None for any other name, an absolute path, ``..``, a backslash or a NUL."""
+    if not isinstance(rel, str) or "\\" in rel or "\x00" in rel:
+        return None
+    pure = PurePosixPath(rel)
+    if pure.is_absolute() or ".." in pure.parts or not pure.parts:
+        return None
+    text = pure.as_posix()
+    if text in _GENERATED_FILES:
+        return pure
+    if pure.suffix == ".md" and pure.parent.as_posix() in _GENERATED_FOLDERS:
+        return pure
+    return None
 
 
 def _replace_earlier_outputs(out: Path, written: list[Path]) -> None:
     """Record this run's files in ``out``; remove the earlier run's files it did not write.
 
-    A reused output folder would otherwise keep, next to this report, the file of a
-    section that was removed or renamed, a curated brief, an ``evidence_index.json``,
-    ``usage.json`` or ``report.docx`` that this run did not write. Only a file that the
-    record of the run before lists, and that still has the content written then, is
-    removed: a file you changed, or one the generator did not write (your own, or one
-    from a run before the record existed), stays, and is counted in a warning.
+    One output folder holds one report, the one written last. A reused folder would
+    otherwise keep, next to this report, the file of a section that was removed or
+    renamed, a curated brief, an ``evidence_index.json``, ``usage.json`` or
+    ``report.docx`` that this run did not write. The same holds for a second, different
+    report written into the folder: it replaces the first one's generated files. A file
+    is removed only when all of this holds: the record of the run before lists it, it
+    is one of the names the generator writes, it still has the content written then, it
+    is not a link, it resolves inside the folder, and it is not a file this run wrote
+    (compared by resolved path, so another spelling of a name cannot point at one).
+    Everything else stays: your own files, files you changed, and files from a run
+    before the record existed; a warning counts them. A record that cannot be read, or
+    is a link, removes nothing.
     """
     base = out.resolve()
+    written_keys = {key for p in written if (key := _same_file_key(Path(p))) is not None}
     now: dict[str, str] = {}
     for path in written:
         try:
             rel = Path(path).resolve().relative_to(base).as_posix()
-        except ValueError:
-            continue
-        now[rel] = _digest(Path(path))
+            now[rel] = _digest(Path(path))
+        except (OSError, ValueError):
+            continue  # a written file that is not inside the folder is not recorded
 
     record = out / OUTPUT_RECORD
     earlier: dict = {}
-    try:
-        data = json.loads(record.read_text(encoding="utf-8-sig"))
-        if isinstance(data, dict) and isinstance(data.get("files"), dict):
-            earlier = data["files"]
-    except (OSError, ValueError):
-        pass
+    if record.is_symlink():
+        logger.warning(
+            "The output record %s is a link; it is neither read nor written", OUTPUT_RECORD
+        )
+    else:
+        try:
+            data = json.loads(record.read_text(encoding="utf-8-sig"))
+            if isinstance(data, dict) and isinstance(data.get("files"), dict):
+                earlier = data["files"]
+        except (OSError, ValueError):
+            pass
 
     removed = changed = 0
     for rel, digest in earlier.items():
-        if rel in now or not isinstance(rel, str) or not isinstance(digest, str):
+        pure = _generated_name(rel)
+        if pure is None or not isinstance(digest, str):
             continue
+        path = out.joinpath(*pure.parts)
+        key = _same_file_key(path)
+        if key is None or key in written_keys:
+            continue  # never a file this run wrote, whatever the record says
         try:
-            path = path_inside(rel, out, what="earlier output")
-        except SourcePathError:
-            continue  # an edited record cannot name a file outside the folder
-        if not path.is_file():
-            continue
-        if _digest(path) == digest:
+            if path.is_symlink() or not path.is_file():
+                continue
+            if not path.resolve().is_relative_to(base):
+                continue  # through a linked folder out of the output folder
+            if _digest(path) != digest:
+                changed += 1
+                continue
             path.unlink()
             removed += 1
-        else:
-            changed += 1
+        except (OSError, ValueError):
+            continue
     if removed:
         logger.info("Removed %d file(s) of the previous run that this run did not write", removed)
-
-    stray = [
-        found
-        for folder in (out / "sections", out / "evidence" / "curated_sections")
-        if folder.is_dir()
-        for found in folder.glob("*.md")
-        if found.relative_to(out).as_posix() not in now
-    ]
-    if changed or stray:
+    if changed:
         logger.warning(
-            "The output folder keeps %d section or brief file(s) this run did not write; "
-            "they are not part of this report. Files the generator wrote in an earlier run "
-            "are removed only while unchanged (%d changed since).",
-            len(stray),
+            "Kept %d file(s) of the previous run that were changed after it wrote them; "
+            "they are not part of this report",
             changed,
         )
-    record.write_text(json.dumps({"files": now}, indent=2) + "\n", encoding="utf-8")
+
+    stray = 0
+    for folder in _GENERATED_FOLDERS:
+        found_folder = out / folder
+        if not found_folder.is_dir():
+            continue
+        for found in found_folder.glob("*.md"):
+            if _same_file_key(found) not in written_keys:
+                stray += 1
+    if stray:
+        logger.warning(
+            "The output folder keeps %d section or brief file(s) this run did not write; "
+            "they are not part of this report",
+            stray,
+        )
+
+    if not record.is_symlink():
+        try:
+            record.write_text(json.dumps({"files": now}, indent=2) + "\n", encoding="utf-8")
+        except OSError:
+            logger.warning("Could not write the output record %s", OUTPUT_RECORD)
 
 
 # ---------------------------------------------------------------------------
