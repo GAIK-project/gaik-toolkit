@@ -187,3 +187,35 @@ def test_the_fuzzy_match_takes_bounded_time():
     assert isinstance(found, _span.Span)
     assert (found.start, found.end) == (start, start + 1000)
     assert elapsed < 2.0
+
+
+@pytest.mark.parametrize(
+    ("text", "search", "passage"),
+    [
+        # A thousands separator is not another number.
+        (
+            "Intro. The repair cost 1 200 euros and was done in May. End.",
+            "The repair cost 1200 euros and was done in May.",
+            "The repair cost 1 200 euros and was done in May.",
+        ),
+        (
+            "Intro. The repair cost 1200 euros and was done in May. End.",
+            "The repair cost 1,200 euros and was done in May.",
+            "The repair cost 1200 euros and was done in May.",
+        ),
+        # A list item's number after a line break, dropped by the search.
+        (
+            "1. Eka kohta.\n2. Toinen kohta on tässä, ja se jatkuu pitkään.",
+            "Eka kohta.\nToinen kohta on tässä, ja se jatkuu pitkään.",
+            "Eka kohta.\n2. Toinen kohta on tässä, ja se jatkuu pitkään.",
+        ),
+    ],
+)
+def test_grouped_digits_and_an_inner_list_number_are_the_same_numbers(text, search, passage):
+    assert _find_search_string(text, search) == passage
+
+
+def test_a_list_number_the_search_adds_at_its_start_is_still_refused():
+    # Ignoring it would let the edit take the previous sentence's ". " as its edge.
+    text = "Eka kohta.\nToinen kohta on tässä, ja se jatkuu pitkään."
+    assert _find_search_string(text, "2. Toinen kohta on tässä, ja se jatkuu pitkään.") is None

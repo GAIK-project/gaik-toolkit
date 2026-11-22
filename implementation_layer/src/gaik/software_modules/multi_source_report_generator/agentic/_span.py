@@ -57,6 +57,17 @@ AMBIGUOUS = "fits more than one passage; copy it exactly, with enough words to b
 NUMBER_DIFFERS = "not found in the text: the closest passage has other numbers; copy it exactly"
 
 _DIGITS = re.compile(r"\d+")
+# A list item's number after a line break ("\n2. Toinen"), which a search may drop.
+# One at the very start stays: a search that adds "2. " the text lacks must not take the
+# previous sentence's ". " as its edge.
+_INNER_LIST_MARKER = re.compile(r"(?<=\n)[ \t]*\d+[.)](?=\s)")
+# A thousands separator: "1 200", "1,200" and "1.200" are the number 1200.
+_THOUSANDS_SEPARATOR = re.compile(r"(?<=\d)[   ,.](?=\d{3}(?!\d))")
+
+
+def _numbers_of(text: str) -> list[str]:
+    """The numbers of ``text`` in order, grouped digits joined, list markers inside left out."""
+    return _DIGITS.findall(_THOUSANDS_SEPARATOR.sub("", _INNER_LIST_MARKER.sub("", text)))
 
 
 @dataclass(frozen=True)
@@ -327,10 +338,10 @@ def locate(text: str, search: str, threshold: float = 0.9) -> Span | str:
         span = _fuzzy(folded_core, folded_text, threshold)
         # A close match may differ in a letter, never in a number: "2021" for a
         # passage that says "2020" is a different fact, not a typo.
-        if not isinstance(span, str) and _DIGITS.findall(
-            folded_text[span[0] : span[1]]
-        ) != _DIGITS.findall(folded_core):
-            return NUMBER_DIFFERS
+        if not isinstance(span, str):
+            passage = text[where[span[0]] : where[span[1] - 1] + 1]
+            if _numbers_of(passage) != _numbers_of(core):
+                return NUMBER_DIFFERS
     if isinstance(span, str):
         return span
     start, end = where[span[0]], where[span[1] - 1] + 1
