@@ -2546,7 +2546,12 @@ def _resolve_fallback(field: FieldSpec):
 _LIST_FIELD_TYPES = ("list[str]", "list[dict]")
 
 
-def _holds_items(key: str, value: object, requirements: ExtractionRequirements) -> bool:
+def _holds_items(
+    key: str,
+    value: object,
+    requirements: ExtractionRequirements,
+    record: dict | None = None,
+) -> bool:
     """True when ``value`` is a nested-list schema's item list under ``key``.
 
     The items are dicts. ``key`` decides first: a key that is one of the record's
@@ -2556,7 +2561,9 @@ def _holds_items(key: str, value: object, requirements: ExtractionRequirements) 
     container's name (``event`` holding rows that each have an ``event``), since a
     scalar field cannot hold a list. A list with no items is recognised by its key
     alone; reading the first item alone took an empty collection for a flat
-    record.
+    record. Under a scalar field's name, though, an empty list is that field's
+    value when ``record``, the answer the key is in, holds any of the other
+    fields: a flat record whose ``status`` came back as ``[]`` keeps its policies.
     """
     if not isinstance(value, list):
         return False
@@ -2567,6 +2574,9 @@ def _holds_items(key: str, value: object, requirements: ExtractionRequirements) 
         return spec.field_type == "list[str]" and bool(value) and isinstance(value[0], dict)
     if value:
         return isinstance(value[0], dict)
+    if spec is not None and record is not None:
+        # A nested-list answer is the container alone; a flat one has its fields.
+        return not any(f.field_name in record for f in requirements.fields if f.field_name != key)
     return True
 
 

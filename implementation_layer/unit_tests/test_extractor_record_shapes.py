@@ -122,6 +122,37 @@ def test_empty_and_scalar_lists_of_a_flat_record_are_its_own_fields(invoice):
     assert _holds_items("records", [{"invoice_number": "1"}], invoice)
 
 
+@pytest.fixture
+def ticket() -> ExtractionRequirements:
+    return _requirements(
+        FieldSpec(field_name="status", field_type="str", description="S", enum=["open", "closed"]),
+        FieldSpec(field_name="amount", field_type="float", description="Amount"),
+        FieldSpec(field_name="owner", field_type="str", description="Owner"),
+    )
+
+
+def test_an_empty_list_on_a_scalar_field_of_a_flat_record_is_that_fields_value(ticket, event_rows):
+    answer = {"status": [], "amount": ""}
+
+    assert not _holds_items("status", [], ticket, answer)
+    # The record is just the container: a container named like a row field, empty.
+    assert _holds_items("event", [], event_rows, {"event": []})
+
+
+@pytest.mark.parametrize("extractor", ["vision", "data"])
+def test_an_empty_list_on_a_scalar_field_keeps_the_record_policies(ticket, extractor):
+    answer = {"status": [], "amount": ""}
+
+    if extractor == "vision":
+        result = VisionExtractor._post_process(None, dict(answer), ticket)
+    else:
+        result = _extract_one(answer, ticket)
+
+    # The record's policies ran: the choice falls back, the blank number is None and
+    # the missing required field is filled in.
+    assert result == {"status": "", "amount": None, "owner": ""}
+
+
 def _pdf(path, text: str):
     fitz = pytest.importorskip("fitz")
     document = fitz.open()
