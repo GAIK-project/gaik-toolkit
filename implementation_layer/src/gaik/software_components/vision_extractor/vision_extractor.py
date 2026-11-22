@@ -931,8 +931,9 @@ class VisionExtractor:
             return result_dict
 
         coerce_fields(result_dict, requirements)
-        for value in result_dict.values():
-            if isinstance(value, list):
+        for key, value in result_dict.items():
+            # The rows of a flat record's own list[dict] field are not its records.
+            if _holds_items(key, value, requirements):
                 for row in value:
                     if isinstance(row, dict):
                         coerce_fields(row, requirements)
@@ -1256,7 +1257,7 @@ class VisionExtractor:
             result_dict = apply_field_policies(result_dict, requirements)
 
         for key, value in list(result_dict.items()):
-            if isinstance(value, list) and value and isinstance(value[0], dict):
+            if _holds_items(key, value, requirements):
                 result_dict[key] = [normalize_extracted_data(item, requirements) for item in value]
         result_dict = normalize_extracted_data(result_dict, requirements)
         return result_dict

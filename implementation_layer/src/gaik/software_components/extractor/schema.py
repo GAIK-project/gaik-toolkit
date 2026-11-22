@@ -2239,18 +2239,31 @@ def _resolve_fallback(field: FieldSpec):
     return None
 
 
+_LIST_FIELD_TYPES = ("list[str]", "list[dict]")
+
+
 def _holds_items(key: str, value: object, requirements: ExtractionRequirements) -> bool:
     """True when ``value`` is a nested-list schema's item list under ``key``.
 
-    The items are dicts. A list with no items is recognised by its key, which is
-    the container's name and not one of the item fields; reading the first item
-    alone took an empty collection for a flat record.
+    The items are dicts. ``key`` decides first: a key that is one of the record's
+    own list fields holds that field's value, so a flat record's ``line_items``
+    (``list[dict]``) is not read as the record's items (issue #141). A list of
+    dicts under any other key is the container, even when an item field has the
+    container's name (``event`` holding rows that each have an ``event``), since a
+    scalar field cannot hold a list. A list with no items is recognised by its key
+    alone; reading the first item alone took an empty collection for a flat
+    record.
     """
     if not isinstance(value, list):
         return False
+    spec = next((f for f in requirements.fields if f.field_name == key), None)
+    if spec is not None and spec.field_type in _LIST_FIELD_TYPES:
+        # The record's own list field, unless its values cannot be that field's:
+        # rows of dicts under a list[str] field name are the container's items.
+        return spec.field_type == "list[str]" and bool(value) and isinstance(value[0], dict)
     if value:
         return isinstance(value[0], dict)
-    return key not in {field.field_name for field in requirements.fields}
+    return True
 
 
 def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> dict:
