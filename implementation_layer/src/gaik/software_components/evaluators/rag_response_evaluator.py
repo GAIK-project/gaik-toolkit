@@ -19,11 +19,12 @@ source material block, so text in them is assessed as data, not followed.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import math
 import random
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -823,7 +824,7 @@ class RAGResponseEvaluator:
             candidate_cols,
             list(spec.score_fields),
             resume_from,
-            text_cols=[question_col, reference_col, *candidate_cols],
+            question_col=question_col,
         )
 
         sentinel_field = next(iter(spec.score_fields))
@@ -853,7 +854,7 @@ class RAGResponseEvaluator:
                 _write_referenced_row(scored_df, idx, col, verdict, spec)
                 _emit(on_progress, "referenced", i + 1, total, t0, col=col, row=idx)
         else:
-            asyncio.run(
+            _run_to_end(
                 self._evaluate_referenced_async(
                     df,
                     scored_df,
@@ -967,7 +968,7 @@ class RAGResponseEvaluator:
                     _write_pairwise_row(comp_df, idx, outcome, spec)
                     _emit(on_progress, "pairwise", i + 1, total, t0, row=idx)
             else:
-                asyncio.run(
+                _run_to_end(
                     self._evaluate_pairwise_async(
                         comp_df,
                         pending,
@@ -1111,6 +1112,22 @@ class RAGResponseEvaluator:
 # ============================================================================
 # INTERNAL HELPERS
 # ============================================================================
+
+
+def _run_to_end(coroutine: Any) -> None:
+    """Run ``coroutine`` to its end from synchronous code.
+
+    ``asyncio.run`` cannot start inside a running event loop (a Jupyter notebook, an
+    async web handler), so there the coroutine runs on a loop of its own in a worker
+    thread, and this call waits for it; ``on_progress`` is then called from that thread.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(coroutine)
+        return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        pool.submit(asyncio.run, coroutine).result()
 
 
 @dataclass
@@ -1285,24 +1302,38 @@ def _init_scored_df(
     candidate_cols: list[str],
     score_fields: list[str],
     resume_from: pd.DataFrame | None,
-    text_cols: Sequence[str] = (),
+    question_col: str = "question",
 ) -> pd.DataFrame:
-    if resume_from is not None and len(resume_from) == len(df):
-        scored = resume_from.copy()
-        # A table read back from a saved CSV carries _write_csv's leading
-        # apostrophe on text that starts like a formula; the input text is df's.
-        for column in text_cols:
-            if column in scored.columns:
-                scored[column] = df[column].to_numpy()
-    else:
-        scored = df.copy()
-    for col in candidate_cols:
-        for field_name in score_fields:
-            colname = f"{col}_{field_name}"
-            if colname not in scored.columns:
-                scored[colname] = pd.NA
-        if f"{col}_reason" not in scored.columns:
-            scored[f"{col}_reason"] = pd.NA
+    """``df`` with a score and a reason column per candidate, filled from ``resume_from``.
+
+    A row takes the earlier scores of the row with the same question (questions are
+    unique), wherever it is in ``resume_from``: a filtered, reordered or extended frame
+    resumes correctly, and a row ``resume_from`` does not have is judged. A table read
+    back from a saved CSV is matched in the form ``_write_csv`` gave it.
+    """
+    scored = df.copy()
+    columns = [f"{col}_{field_name}" for col in candidate_cols for field_name in score_fields]
+    columns += [f"{col}_reason" for col in candidate_cols]
+    for column in columns:
+        scored[column] = pd.NA
+    if resume_from is None:
+        return scored
+    if question_col not in resume_from.columns:
+        logger.warning(
+            "resume_from has no '%s' column to match rows by; every row is judged again",
+            question_col,
+        )
+        return scored
+    prior = resume_from.drop_duplicates(question_col, keep="last").set_index(question_col)
+    kept = [column for column in columns if column in prior.columns]
+    for idx, question in df[question_col].items():
+        key = next((k for k in (question, _csv_cell(question)) if k in prior.index), None)
+        if key is None:
+            continue
+        for column in kept:
+            value = prior.at[key, column]
+            if pd.notna(value):
+                scored.at[idx, column] = value
     return scored
 
 
@@ -1574,9 +1605,12 @@ def _aggregate_pairwise(
         vals = [v for v in r.aspect_means.values() if not math.isnan(v)]
         return sum(vals) / len(vals) if vals else 0.0
 
+    # A system without a decisive comparison (only ties) neither won nor lost: it sorts
+    # as a win rate of one half, among the systems that won as often as they lost, and its
+    # aspect scores place it there. Its reported win_rate stays NaN.
     rankings.sort(
         key=lambda r: (
-            -(r.win_rate if not math.isnan(r.win_rate) else -1),
+            -(r.win_rate if not math.isnan(r.win_rate) else 0.5),
             -_aspect_avg(r),
             -(r.avg_score if not math.isnan(r.avg_score) else -1),
         )
