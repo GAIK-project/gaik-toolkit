@@ -1432,7 +1432,7 @@
     "import": "from gaik.software_components.evaluators import RAGEvaluator",
     "construct": "evaluator = RAGEvaluator(judge=judge)",
     "call": "result = evaluator.evaluate_dataset(items)\n    metrics = result.aggregate",
-    "returns": "RAGEvaluationResult(.aggregate faithfulness/relevance/context, .items); .aggregate.failed counts per metric the items left out because the judge gave no score (the means are over the scored items), and each item has .errors saying why a metric got score 0",
+    "returns": "RAGEvaluationResult(.aggregate faithfulness/relevance/context, .per_item); .aggregate.failed counts per metric the items left out because the judge gave no score (the means are over the scored items), and each item has .errors saying why a metric got score 0",
     "install_extra": "evaluators",
     "options": [
       {
