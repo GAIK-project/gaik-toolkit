@@ -287,3 +287,52 @@ def test_threads_sharing_a_judge_build_one_provider(world, monkeypatch):
         thread.join()
     assert len(built) == 1
     assert len({id(provider) for provider in providers}) == 1
+
+
+# ── The records stay small, and clients are built once ──────────────
+
+
+@pytest.mark.parametrize(
+    ("failure", "record", "lifetime"),
+    [
+        (_error(404), "_NOT_SERVED", "NOT_SERVED_RETRY_SECONDS"),
+        (_error(503), "_UNAVAILABLE_UNTIL", "LOCATION_RETRY_SECONDS"),
+    ],
+)
+def test_an_expired_entry_is_dropped_when_read(world, failure, record, lifetime):
+    world["failures"][("eu", "gemini-a")] = failure
+    _provider().chat(USER)
+    assert ("project", "eu", "gemini-a") in getattr(google_provider, record)
+
+    del world["failures"][("eu", "gemini-a")]
+    world["clock"][0] += getattr(google_provider, lifetime) + 1
+    _provider().chat(USER)
+    assert getattr(google_provider, record) == {}
+
+
+def test_threads_sharing_a_provider_build_each_client_once(world, monkeypatch):
+    import threading
+    import time as real_time
+
+    world["failures"][("eu", "gemini-a")] = _error(404)
+    provider = _provider()
+    assert [c.kwargs["location"] for c in world["clients"]] == ["eu"]
+    client_class = google_provider.genai.Client
+
+    def slow_client(**kwargs):
+        real_time.sleep(0.05)  # widen the window two unguarded threads would share
+        return client_class(**kwargs)
+
+    monkeypatch.setattr(google_provider.genai, "Client", slow_client)
+    start = threading.Barrier(8)
+
+    def ask():
+        start.wait()
+        provider.chat(USER)
+
+    threads = [threading.Thread(target=ask) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert [c.kwargs["location"] for c in world["clients"]] == ["eu", "global"]
