@@ -447,3 +447,6 @@ def test_the_release_gate_leaves_out_only_an_existing_v2_image_pin_check():
     assert f"def {name}(" in (ROOT / path).read_text(encoding="utf-8")
     workflow = (ROOT / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
     assert f"--deselect {gate.V2_IMAGE_PIN_TEST}" in workflow
+    assert workflow.count("--deselect") == 1
+    script = (ROOT / "scripts" / "release_check.py").read_text(encoding="utf-8")
+    assert script.count('"--deselect"') == 1
