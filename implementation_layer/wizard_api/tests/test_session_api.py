@@ -215,6 +215,8 @@ def test_a_chat_turn_resumes_the_remembered_cli_session_and_tells_about_a_restar
     assert json.loads(frames[0]) == {"delta": agent_service.RESTART_NOTICE["fi"]}  # first
     detail = client.get(f"/sessions/{sid}").json()
     assert detail["metadata"]["agent_sdk_session_id"] == SDK_NEW
+    # The replaced conversation stays listed, so removing the session finds it.
+    assert detail["metadata"]["agent_sdk_session_ids"] == sorted({SDK_OLD, SDK_NEW})
     assert detail["metadata"]["messages"][-1]["content"].startswith("⟳ Wizard käynnistettiin")
 
 

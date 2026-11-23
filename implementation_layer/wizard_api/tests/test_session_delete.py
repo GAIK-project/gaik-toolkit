@@ -18,6 +18,8 @@ BOB = {USER_HEADER: "bob@example.com"}
 STORED = "11111111-1111-4111-8111-111111111111"
 EARLIER = "22222222-2222-4222-8222-222222222222"
 OTHER = "33333333-3333-4333-8333-333333333333"
+MENTIONS = "44444444-4444-4444-8444-444444444444"
+CLAIMED = "55555555-5555-4555-8555-555555555555"
 
 
 @pytest.fixture
@@ -64,8 +66,15 @@ def test_everything_of_the_session_goes(client, db_session, root) -> None:
     (Path(session["output_dir"]) / "poc" / "input" / "a.txt").write_text("x")
     _set_metadata(db_session, sid, agent_sdk_session_id=STORED)
     gone = _conversation(root, STORED, "latest")
-    gone += _conversation(root, EARLIER, f"cwd /data/sessions/alice/{sid}")
+    # A conversation it replaced names its folder, as the agent's first message does.
+    gone += _conversation(root, EARLIER, f"cwd {session['output_dir']}")
     kept = _conversation(root, OTHER, "another session")
+    # Another session's conversation where this session's id was pasted (review of #324).
+    kept += _conversation(root, MENTIONS, f"the user pasted session {sid} here")
+    # One that names the folder too, but that another session stored as its own.
+    other = _create(client)
+    _set_metadata(db_session, other["id"], agent_sdk_session_id=CLAIMED)
+    kept += _conversation(root, CLAIMED, f"cwd {session['output_dir']}")
 
     assert client.delete(f"/sessions/{sid}", headers=ALICE).status_code == 204
 
@@ -183,6 +192,46 @@ def test_the_sessions_folder_is_accepted(root) -> None:
     sid = uuid.uuid4()
     session = SimpleNamespace(id=sid, output_dir=f"{root}/alice/{sid}")
     assert session_removal.session_folder(session) == (root / "alice" / str(sid)).resolve()
+
+
+def _session(output_dir: Path, **metadata) -> SimpleNamespace:
+    return SimpleNamespace(id=uuid.uuid4(), output_dir=str(output_dir), session_metadata=metadata)
+
+
+def test_the_conversations_the_session_listed_are_its_own(root) -> None:
+    session = _session(
+        root / "alice" / "s", agent_sdk_session_id=STORED, agent_sdk_session_ids=[EARLIER, STORED]
+    )
+    _conversation(root, STORED, "latest")
+    _conversation(root, EARLIER, "nothing that names the session")
+    _conversation(root, OTHER, "another session")
+    found = session_removal.conversation_ids(root / ".claude-agent", session)
+    assert found == {STORED, EARLIER}
+
+
+def test_a_transcript_that_only_mentions_the_session_id_is_not_its_own(root) -> None:
+    session = _session(root / "alice" / "s", agent_sdk_session_id=STORED)
+    _conversation(root, MENTIONS, f"see session {session.id}")
+    found = session_removal.conversation_ids(root / ".claude-agent", session)
+    # Its stored id is its own; the transcript that only names the id is not.
+    assert found == {STORED}
+
+
+def test_a_conversation_another_session_stored_is_never_this_ones(root) -> None:
+    session = _session(root / "alice" / "s", agent_sdk_session_id=STORED)
+    _conversation(root, CLAIMED, f"cwd {session.output_dir}")
+    _conversation(root, EARLIER, f"cwd {session.output_dir}")
+    found = session_removal.conversation_ids(
+        root / ".claude-agent", session, frozenset({CLAIMED, STORED})
+    )
+    # Its own stored id is left out too when another session also claims it.
+    assert found == {EARLIER}
+
+
+def test_stored_ids_of_another_shape_are_not_conversations() -> None:
+    metadata = {"agent_sdk_session_id": "../x", "agent_sdk_session_ids": [STORED, 7, "../y"]}
+    assert session_removal.stored_conversation_ids(metadata) == {STORED}
+    assert session_removal.stored_conversation_ids({"agent_sdk_session_ids": "x"}) == set()
 
 
 def test_a_stored_id_of_another_shape_reaches_no_path(root) -> None:

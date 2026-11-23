@@ -1711,11 +1711,21 @@ async def chat(
         if sdk_id and sdk_id != metadata.get("agent_sdk_session_id"):
             # Remembered so the next process can resume this CLI session. A
             # server write: update_session, not the PATCH route that refuses it.
+            # Every id the session had is kept too: removing the session removes
+            # exactly its own conversations (session_removal).
+            from wizard_api.services import session_removal
+
+            known = session_removal.stored_conversation_ids(metadata) | {sdk_id}
             await asyncio.to_thread(
                 session_service.update_session,
                 turn_db,
                 turn_session,
-                SessionUpdate(metadata={"agent_sdk_session_id": sdk_id}),
+                SessionUpdate(
+                    metadata={
+                        "agent_sdk_session_id": sdk_id,
+                        session_removal.CONVERSATIONS_KEY: sorted(known),
+                    }
+                ),
             )
         assistant_text = "".join(parts).strip()
         # Before the exchange is stored: a change that reopened a gate is said
