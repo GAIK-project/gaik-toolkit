@@ -2,6 +2,7 @@
 
 import os
 import sys
+from pathlib import Path
 
 import pytest
 from gaik.software_components.env_file import load_env_file
@@ -29,12 +30,15 @@ POSIX_SHELL_TESTS = frozenset(
 )
 
 
+_HERE = Path(__file__).resolve().parent
+
+
 def pytest_collection_modifyitems(config, items):
     if sys.platform != "win32":
         return
     skip = pytest.mark.skip(reason="runs Solution Wizard v2's deploy scripts with a POSIX bash")
     for item in items:
-        if item.path.name in POSIX_SHELL_TESTS:
+        if item.path.parent == _HERE and item.path.name in POSIX_SHELL_TESTS:
             item.add_marker(skip)
 
 
