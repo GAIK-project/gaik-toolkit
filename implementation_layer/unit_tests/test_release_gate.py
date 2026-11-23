@@ -438,3 +438,12 @@ def test_raw_client_budget_preserves_raw_component_branch_and_sampling_kwargs():
     assert calls == [{"model": "gpt-6-luna", "temperature": 0, "max_completion_tokens": 256}]
     with pytest.raises(RuntimeError, match="budget"):
         wrapped.chat.completions.create(model="gpt-6-luna")
+
+
+def test_the_release_gate_leaves_out_only_an_existing_v2_image_pin_check():
+    """pytest ignores a --deselect that names nothing, so a renamed test would come
+    back into the gate unnoticed; test.yml must leave out the same one."""
+    path, name = gate.V2_IMAGE_PIN_TEST.split("::")
+    assert f"def {name}(" in (ROOT / path).read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
+    assert f"--deselect {gate.V2_IMAGE_PIN_TEST}" in workflow

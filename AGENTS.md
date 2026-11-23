@@ -226,4 +226,7 @@ expected.
   publish like the certification does. Run it, or `gh workflow run live-smoke.yml`, before
   tagging so that the tag does not find a failure first.
 - Once a release is on PyPI, offer to take it into the Solution Wizard v2 fork with the
-  `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`.
+  `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`. v2's
+  images here pin the older gaik until that sync comes back with the next delivery; the
+  release gate leaves their pin check to `solution-wizard-v2.yml`, which stays red on a
+  wizard change until then.

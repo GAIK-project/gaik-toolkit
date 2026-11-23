@@ -61,6 +61,13 @@ TRANSCRIPTION_ENV_FALLBACKS = {
 # The library is currently well below this. A larger artifact needs a deliberate
 # packaging review before PyPI; accidentally bundling the monorepo must fail.
 MAX_DISTRIBUTION_BYTES = 10 * 1024 * 1024
+# Solution Wizard v2's images install gaik from PyPI and move to a release only after it
+# is there, so before a release the validated version is always ahead of them. Their pin
+# check runs in solution-wizard-v2.yml; the gaik release gate leaves it out (test.yml too).
+V2_IMAGE_PIN_TEST = (
+    "implementation_layer/unit_tests/test_deploy_instances.py"
+    "::test_the_images_pin_the_gaik_version_the_guidance_is_validated_for"
+)
 
 
 def select_targets(providers: str, environ: dict, required: list[str] = ()) -> list[dict]:
@@ -295,7 +302,16 @@ def run_gate(args) -> dict:
         uv_python = ["uv", "run", "--no-sync", "python"]
         if not stage(
             "offline-tests",
-            [*uv_python, "-m", "pytest", "-m", "not llm", "--strict-markers"],
+            [
+                *uv_python,
+                "-m",
+                "pytest",
+                "-m",
+                "not llm",
+                "--strict-markers",
+                "--deselect",
+                V2_IMAGE_PIN_TEST,
+            ],
             env=test_env,
         ):
             return report
