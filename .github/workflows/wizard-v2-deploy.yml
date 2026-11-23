@@ -60,14 +60,14 @@ jobs:
           SHA: ${{ github.sha }}
           REPO: ${{ github.repository }}
         run: |
-          runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100"             --jq '[.check_runs[] | select(.name == "wizard-api" or .name == "solution-wizard" or .name == "solution-wizard-v2" or .name == "deploy-manifests")]')
+          runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100"             --jq '[.check_runs[] | select(.name == "wizard-api" or .name == "solution-wizard" or .name == "solution-wizard-v2" or .name == "deploy-manifests" or .name == "security")]')
           # Distinct job names, not check runs: a rerun adds a second run with
           # the same name, which must not stand in for a job that never ran.
           count=$(jq '[.[].name] | unique | length' <<<"$runs")
           echo "Solution Wizard V2 jobs with a check run on $SHA: $count"
           jq -r '.[] | "  \(.name): \(.status) / \(.conclusion // "-")"' <<<"$runs"
-          if [ "$count" -lt 4 ]; then
-            echo "::error::CI has not run (all four jobs) for $SHA. Push the branch, let solution-wizard-v2.yml finish, then deploy."
+          if [ "$count" -lt 5 ]; then
+            echo "::error::CI has not run (all five jobs) for $SHA. Push the branch, let solution-wizard-v2.yml finish, then deploy."
             exit 1
           fi
           # Take the latest run per job name; an earlier failure that was rerun does not count.
@@ -88,8 +88,9 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       NEXT_PUBLIC_DEV_AUTH: "false"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
           # deploy.sh wants the whole history: `git describe --tags` names the
           # build, and require_pushed_commit asks `git branch -r --contains`
           # whether the commit exists anywhere but here. A shallow, tagless
@@ -112,14 +113,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
+      # Secrets and inputs reach the shell as environment variables, never
+      # pasted into the script text.
       - name: Log in to Rahti
+        env:
+          RAHTI_SERVER: ${{ secrets.RAHTI_SERVER }}
+          RAHTI_TOKEN: ${{ secrets.RAHTI_TOKEN }}
         run: |
-          oc login --server="${{ secrets.RAHTI_SERVER }}" --token="${{ secrets.RAHTI_TOKEN }}"
+          oc login --server="$RAHTI_SERVER" --token="$RAHTI_TOKEN"
           oc project "$PROJECT"
 
       - name: Deploy
         working-directory: implementation_layer/deploy/openshift
+        env:
+          TARGET: ${{ github.event.inputs.target || 'all' }}
         run: |
           chmod +x deploy.sh
           echo "Deploying instance '${INSTANCE:-<staging>}' to project $PROJECT"
-          ./deploy.sh "${{ github.event.inputs.target || 'all' }}"
+          ./deploy.sh "$TARGET"

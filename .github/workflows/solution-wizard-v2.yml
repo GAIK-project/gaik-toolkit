@@ -56,8 +56,10 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
       - name: Install wizard_api
@@ -79,7 +81,7 @@ jobs:
         run: python .github/scripts/junit_summary.py "wizard_api unit tests" "$RUNNER_TEMP/junit/wizard-api.xml"
       - name: Keep the test report (wizard-api)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: junit-wizard-api
           path: ${{ runner.temp }}/junit
@@ -89,8 +91,10 @@ jobs:
   solution-wizard:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
       - name: Install solution_wizard
@@ -143,7 +147,7 @@ jobs:
         run: python .github/scripts/junit_summary.py "solution_wizard unit tests" "$RUNNER_TEMP/junit/solution-wizard.xml"
       - name: Keep the test report (solution-wizard)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: junit-solution-wizard
           path: ${{ runner.temp }}/junit
@@ -154,16 +158,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: wizard-api
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: implementation_layer/solution_wizard_v2/package-lock.json
+          # No dependency cache: this workflow's results gate a deploy, and a
+          # cache is shared with other runs of the repository.
+          package-manager-cache: false
       - name: Install UI deps
         working-directory: implementation_layer/solution_wizard_v2
         run: npm ci
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
       - name: Python deps for BPMN scripts
@@ -183,7 +190,7 @@ jobs:
         run: python .github/scripts/junit_summary.py "Web app unit tests (vitest)" "$RUNNER_TEMP/junit/web-app.xml"
       - name: Keep the test report (web-app)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: junit-web-app
           path: ${{ runner.temp }}/junit
@@ -225,7 +232,7 @@ jobs:
         run: python .github/scripts/junit_summary.py "Browser tests (Playwright)" "$RUNNER_TEMP/e2e/junit.xml"
       - name: Keep the browser test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: junit-e2e
           path: ${{ runner.temp }}/e2e/junit.xml
@@ -233,7 +240,7 @@ jobs:
           if-no-files-found: ignore
       - name: Keep the browser test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report
           path: ${{ runner.temp }}/e2e/html
@@ -249,8 +256,10 @@ jobs:
   deploy-manifests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
       - name: Install test dependencies
@@ -269,7 +278,7 @@ jobs:
         run: python .github/scripts/junit_summary.py "Deploy manifest tests" "$RUNNER_TEMP/junit/deploy-manifests.xml"
       - name: Keep the test report (deploy-manifests)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: junit-deploy-manifests
           path: ${{ runner.temp }}/junit
@@ -293,13 +302,18 @@ jobs:
       GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
       REPORTS: ${{ github.workspace }}/security-reports
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
+          # No dependency cache: this workflow's results gate a deploy, and a
+          # cache is shared with other runs of the repository.
+          package-manager-cache: false
       - name: Install audit tools
         run: |
           pip install "uv==0.13.4" "pip-audit==2.10.1"
@@ -389,7 +403,7 @@ jobs:
           --report "trivy:poc-runner Dockerfile=$REPORTS/trivy-config-deploy-poc-runner.json"
       - name: Keep the raw reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: security-reports
           path: security-reports/
@@ -421,7 +435,9 @@ jobs:
       TRIVY_VERSION: "0.76.1"
       TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Install Trivy
         run: |
           tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
@@ -440,7 +456,7 @@ jobs:
           trivy image --quiet --exit-code 0 --scanners vuln --timeout 20m
           --format json --output "$RUNNER_TEMP/trivy-image.json"
           "security-scan/${{ matrix.image }}:ci"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
       - name: Apply policy
@@ -465,16 +481,21 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
           fetch-depth: 0
+      # The checkout keeps no token; the tag is made through the API with the
+      # job's own token, passed in the environment.
       - name: Tag this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           TAG="dev-$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)"
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists, skipping"
           else
-            git tag "$TAG"
-            git push origin "$TAG"
+            gh api "repos/$REPO/git/refs" -f "ref=refs/tags/$TAG" -f "sha=$(git rev-parse HEAD)" >/dev/null
             echo "Tagged $TAG"
           fi
