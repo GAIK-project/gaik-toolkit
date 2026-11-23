@@ -2391,6 +2391,11 @@ def _record_successful_run(session_id: uuid.UUID, run_id: str) -> None:
         session = session_service.get_session(db, session_id)
         if session is None:
             return
+        # The checks below and the write at the end are one transaction on the
+        # locked row: read without the lock, a gate reopened between the two
+        # left the run voided and recorded as successful (review of
+        # GAIK-project/gaik-toolkit#324). reopen_gate locks the row the same way.
+        session_service.lock_fresh(db, session)
         # A gate reopened while the run was going takes the run's place as the
         # session's latest (reopen_gate): the run tested the solution as it was
         # before the change, so it proves nothing about the one being approved.

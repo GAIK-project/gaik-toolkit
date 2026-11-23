@@ -651,6 +651,39 @@ def test_a_run_from_before_the_reopening_is_not_the_proof_of_the_session(
 
 
 @requires_postgres
+def test_a_reopening_that_lands_while_the_run_is_recorded_still_voids_it(
+    client, db_session, monkeypatch
+) -> None:
+    """The gate is reopened between the run's checks and its write (review of
+    GAIK-project/gaik-toolkit#324): the run must not end up voided and successful."""
+    created = _session_past_gate_2(client, db_session, "race")
+    sid = created["id"]
+    session = session_service.get_session(db_session, uuid.UUID(sid))
+    session_service.update_session(
+        db_session, session, SessionUpdate(metadata={"latest_run": "run-old"})
+    )
+    lock_fresh = session_service.lock_fresh
+    reopened = []
+
+    def reopen_first(db, row):
+        # The first lock the run asks for: a reopening commits just before it.
+        # Marked before the request, whose own lock comes through here too.
+        if not reopened:
+            reopened.append("reopening")
+            reopened.append(client.post(f"/sessions/{sid}/gates/2/reopen").status_code)
+        return lock_fresh(db, row)
+
+    monkeypatch.setattr(session_service, "lock_fresh", reopen_first)
+    sessions_router._record_successful_run(uuid.UUID(sid), "run-old")
+    db_session.expire_all()
+
+    assert reopened == ["reopening", 200]
+    after = client.get(f"/sessions/{sid}").json()["metadata"]
+    assert "run-old" in after["voided_runs"]
+    assert after["last_successful_run"] is None
+
+
+@requires_postgres
 def test_reopening_never_leaves_the_session_past_a_gate_that_is_not_approved(
     client, db_session
 ) -> None:
