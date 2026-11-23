@@ -224,14 +224,51 @@ def _open_case_dirs(output_dir: str) -> list[Path]:
     return open_dirs
 
 
+def _sample_input_sizes(output_dir: str) -> dict[str, int]:
+    """The PoC's test inputs (``poc/sample_input/``) by name, with their sizes."""
+    poc = os.path.join(output_dir, "poc")
+    return {str(e["name"]): int(e["bytes"]) for e in poc_service.list_sample_inputs(poc)}
+
+
 def _session_input_bytes(output_dir: str) -> int:
-    return sum(
+    """What the session's input adds up to: its open cases' and the PoC's test inputs."""
+    cases = sum(
         p.stat().st_size
         for case in _open_case_dirs(output_dir)
         if (case / INPUTS_DIR).is_dir()
         for p in (case / INPUTS_DIR).iterdir()
         if p.is_file()
     )
+    return cases + sum(_sample_input_sizes(output_dir).values())
+
+
+def save_sample_input(output_dir: str, poc_dir: str, filename: str, data: bytes) -> str:
+    """Store one of the PoC's test inputs, within the limits a case's input has.
+
+    An upload is at most ``poc_service.MAX_INPUT_BYTES``; without these limits
+    many of them filled the api's volume, which every session shares (review of
+    GAIK-project/gaik-toolkit#324). The test data holds as many files and bytes as
+    one case and counts toward the session's input with its cases. A file of the
+    same name replaces the earlier one, so only the difference counts.
+    """
+    name = poc_service.safe_input_name(filename)
+    with _session_locked(output_dir):
+        held = _sample_input_sizes(output_dir)
+        replaced = held.get(name, 0)
+        if name not in held and len(held) >= MAX_INPUTS_PER_CASE:
+            raise poc_service.InputRejectedError(
+                f"the test data already has {MAX_INPUTS_PER_CASE} files; remove one first"
+            )
+        if sum(held.values()) - replaced + len(data) > MAX_CASE_INPUT_BYTES:
+            raise poc_service.InputTooLargeError(
+                f"the test data would exceed {MAX_CASE_INPUT_BYTES // (1024 * 1024)} MB in all"
+            )
+        session_limit = max_session_input_bytes()
+        if _session_input_bytes(output_dir) - replaced + len(data) > session_limit:
+            raise poc_service.InputTooLargeError(
+                f"the session's input would exceed {session_limit // (1024 * 1024)} MB in all"
+            )
+        return poc_service.save_sample_input(poc_dir, filename, data)
 
 
 def _event(case: dict[str, Any], role: str, action: str, detail: str = "") -> None:
@@ -480,7 +517,7 @@ def save_input(
         session_limit = max_session_input_bytes()
         if _session_input_bytes(output_dir) + len(data) > session_limit:
             raise poc_service.InputTooLargeError(
-                f"the session's case input would exceed {session_limit // (1024 * 1024)} MB in all"
+                f"the session's input would exceed {session_limit // (1024 * 1024)} MB in all"
             )
         name = _save_into(inputs_dir(output_dir, case_id), filename, data)
         if task:
